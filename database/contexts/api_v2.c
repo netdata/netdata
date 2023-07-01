@@ -905,6 +905,8 @@ void buffer_json_query_timings(BUFFER *wb, const char *key, struct query_timings
     buffer_json_object_close(wb);
 }
 
+void build_info_to_json_object(BUFFER *b);
+
 void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time_t now_s, bool info) {
     if(!now_s)
         now_s = now_realtime_sec();
@@ -918,8 +920,11 @@ void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time
     buffer_json_member_add_uint64(wb, "ai", 0);
 
     if(info) {
-        buffer_json_member_add_object(wb, "netdata");
+        buffer_json_member_add_object(wb, "application");
         buffer_json_member_add_string(wb, "version", string2str(localhost->program_version));
+        buffer_json_member_add_object(wb, "build_info");
+        build_info_to_json_object(wb);
+        buffer_json_object_close(wb); // build_info
         buffer_json_object_close(wb); // netdata
 
         buffer_json_member_add_object(wb, "cloud");

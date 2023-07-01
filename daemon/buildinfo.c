@@ -14,6 +14,7 @@ typedef enum __attribute__((packed)) {
     BIB_DB_DBENGINE,
     BIB_HTTPD_STATIC,
     BIB_HTTPD_H2O,
+    BIB_WEBRTC,
     BIB_NATIVE_HTTPS,
     BIB_ACLK,
     BIB_CLOUD,
@@ -45,7 +46,16 @@ typedef enum __attribute__((packed)) {
     BIB_EXPORT_AWS_KINESIS,
     BIB_EXPORT_GCP_PUBSUB,
     BIB_EXPORT_MONGOC,
+    BIB_EXPORT_PROMETHEUS_EXPORTER,
     BIB_EXPORT_PROMETHEUS_REMOTE_WRITE,
+    BIB_EXPORT_GRAPHITE,
+    BIB_EXPORT_GRAPHITE_HTTP,
+    BIB_EXPORT_JSON,
+    BIB_EXPORT_JSON_HTTP,
+    BIB_EXPORT_OPENTSDB,
+    BIB_EXPORT_OPENTSDB_HTTP,
+    BIB_EXPORT_ALLMETRICS,
+    BIB_EXPORT_SHELL,
 } BUILD_INFO_BIT;
 
 static BITMAP256 BUILD_INFO = { 0 }; // the bitmap we store our build information
@@ -53,6 +63,8 @@ static BITMAP256 BUILD_INFO = { 0 }; // the bitmap we store our build informatio
 typedef enum __attribute__((packed)) {
     BIC_TERMINATOR = 0,
     BIC_FEATURE,
+    BIC_DATABASE,
+    BIC_CONNECTIVITY,
     BIC_LIBS,
     BIC_PLUGINS,
     BIC_EXPORTERS,
@@ -69,18 +81,50 @@ static struct {
 } BUILD_INFO_NAMES[] = {
         {
                 .bit = BIB_DB_DBENGINE,
-                .category = BIC_FEATURE,
+                .category = BIC_DATABASE,
                 .analytics = "dbengine",
                 .print = "dbengine",
                 .print_json = "dbengine",
                 .value = NULL,
         },
         {
-                .bit = BIB_NATIVE_HTTPS,
-                .category = BIC_FEATURE,
-                .analytics = "Native HTTPS",
-                .print = "Native HTTPS",
-                .print_json = "native-https",
+                .bit = BIB_DB_ALLOC,
+                .category = BIC_DATABASE,
+                .analytics = NULL,
+                .print = "alloc",
+                .print_json = "alloc",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_DB_RAM,
+                .category = BIC_DATABASE,
+                .analytics = NULL,
+                .print = "ram",
+                .print_json = "ram",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_DB_MAP,
+                .category = BIC_DATABASE,
+                .analytics = NULL,
+                .print = "map",
+                .print_json = "map",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_DB_SAVE,
+                .category = BIC_DATABASE,
+                .analytics = NULL,
+                .print = "save",
+                .print_json = "save",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_DB_NONE,
+                .category = BIC_DATABASE,
+                .analytics = NULL,
+                .print = "none",
+                .print_json = "none",
                 .value = NULL,
         },
         {
@@ -101,15 +145,47 @@ static struct {
         },
         {
                 .bit = BIB_ACLK,
-                .category = BIC_FEATURE,
+                .category = BIC_CONNECTIVITY,
                 .analytics = NULL,
-                .print = "ACLK",
+                .print = "ACLK (Agent-Cloud Link: MQTT over WebSockets over TLS)",
                 .print_json = "aclk",
                 .value = NULL,
         },
         {
+                .bit = BIB_HTTPD_STATIC,
+                .category = BIC_CONNECTIVITY,
+                .analytics = NULL,
+                .print = "static (Netdata's internal web server)",
+                .print_json = "static",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_HTTPD_H2O,
+                .category = BIC_CONNECTIVITY,
+                .analytics = NULL,
+                .print = "h2o (web server)",
+                .print_json = "h2o",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_WEBRTC,
+                .category = BIC_CONNECTIVITY,
+                .analytics = NULL,
+                .print = "WebRTC (experimental)",
+                .print_json = "webrtc",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_NATIVE_HTTPS,
+                .category = BIC_CONNECTIVITY,
+                .analytics = "Native HTTPS",
+                .print = "Native HTTPS (TLS Support)",
+                .print_json = "native-https",
+                .value = NULL,
+        },
+        {
                 .bit = BIB_TLS_HOST_VERIFY,
-                .category = BIC_FEATURE,
+                .category = BIC_CONNECTIVITY,
                 .analytics = "TLS Host Verification",
                 .print = "TLS Host Verification",
                 .print_json = "tls-host-verify",
@@ -127,16 +203,8 @@ static struct {
                 .bit = BIB_LZ4,
                 .category = BIC_FEATURE,
                 .analytics = "Stream Compression",
-                .print = "Stream Compression",
+                .print = "Stream Compression (LZ4)",
                 .print_json = "stream-compression",
-                .value = NULL,
-        },
-        {
-                .bit = BIB_HTTPD_H2O,
-                .category = BIC_FEATURE,
-                .analytics = NULL,
-                .print = "HTTPD (h2o)",
-                .print_json = "httpd-h2o",
                 .value = NULL,
         },
         {
@@ -154,14 +222,6 @@ static struct {
                 .print = "protobuf-source",
                 .print_json = "protobuf-source",
                 .value = "none",
-        },
-        {
-                .bit = BIB_JEMALLOC,
-                .category = BIC_LIBS,
-                .analytics = "jemalloc",
-                .print = "jemalloc",
-                .print_json = "jemalloc",
-                .value = NULL,
         },
         {
                 .bit = BIB_JSONC,
@@ -196,10 +256,18 @@ static struct {
                 .value = NULL,
         },
         {
+                .bit = BIB_JEMALLOC,
+                .category = BIC_LIBS,
+                .analytics = "jemalloc",
+                .print = "jemalloc",
+                .print_json = "jemalloc",
+                .value = NULL,
+        },
+        {
                 .bit = BIB_TCMALLOC,
                 .category = BIC_LIBS,
                 .analytics = "tcalloc",
-                .print = "tcalloc",
+                .print = "TCMalloc",
                 .print_json = "tcmalloc",
                 .value = NULL,
         },
@@ -215,7 +283,7 @@ static struct {
                 .bit = BIB_PLUGIN_APPS,
                 .category = BIC_PLUGINS,
                 .analytics = "apps",
-                .print = "apps",
+                .print = "apps (monitor processes)",
                 .print_json = "apps",
                 .value = NULL,
         },
@@ -223,7 +291,7 @@ static struct {
                 .bit = BIB_PLUGIN_DEBUGFS,
                 .category = BIC_PLUGINS,
                 .analytics = "debugfs",
-                .print = "debugfs",
+                .print = "debugfs (kernel debugging metrics)",
                 .print_json = "debugfs",
                 .value = NULL,
         },
@@ -231,7 +299,7 @@ static struct {
                 .bit = BIB_SETNS,
                 .category = BIC_PLUGINS,
                 .analytics = "cgroup Network Tracking",
-                .print = "cgroup Network Tracking",
+                .print = "CGROUP Network with setns()",
                 .print_json = "cgroup-net",
                 .value = NULL,
         },
@@ -239,7 +307,7 @@ static struct {
                 .bit = BIB_PLUGIN_CUPS,
                 .category = BIC_PLUGINS,
                 .analytics = "CUPS",
-                .print = "CUPS",
+                .print = "CUPS (monitor printers and print jobs)",
                 .print_json = "cups",
                 .value = NULL,
         },
@@ -247,7 +315,7 @@ static struct {
                 .bit = BIB_PLUGIN_EBPF,
                 .category = BIC_PLUGINS,
                 .analytics = "EBPF",
-                .print = "EBPF",
+                .print = "eBPF (monitor system calls)",
                 .print_json = "ebpf",
                 .value = NULL,
         },
@@ -255,15 +323,15 @@ static struct {
                 .bit = BIB_PLUGIN_FREEIPMI,
                 .category = BIC_PLUGINS,
                 .analytics = "IPMI",
-                .print = "IPMI",
-                .print_json = "ipmi",
+                .print = "FreeIPMI (monitor server H/W)",
+                .print_json = "freeipmi",
                 .value = NULL,
         },
         {
                 .bit = BIB_PLUGIN_NFACCT,
                 .category = BIC_PLUGINS,
                 .analytics = "NFACCT",
-                .print = "NFACCT",
+                .print = "NFACCT (gather netfilter accounting)",
                 .print_json = "nfacct",
                 .value = NULL,
         },
@@ -271,7 +339,7 @@ static struct {
                 .bit = BIB_PLUGIN_PERF,
                 .category = BIC_PLUGINS,
                 .analytics = "perf",
-                .print = "perf",
+                .print = "Perf (collect kernel performance events)",
                 .print_json = "perf",
                 .value = NULL,
         },
@@ -279,7 +347,7 @@ static struct {
                 .bit = BIB_PLUGIN_SLABINFO,
                 .category = BIC_PLUGINS,
                 .analytics = "slabinfo",
-                .print = "slabinfo",
+                .print = "slabinfo (monitor kernel object caching)",
                 .print_json = "slabinfo",
                 .value = NULL,
         },
@@ -287,7 +355,6 @@ static struct {
                 .bit = BIB_PLUGIN_XEN,
                 .category = BIC_PLUGINS,
                 .analytics = "Xen",
-
                 .print = "Xen",
                 .print_json = "xen",
                 .value = NULL,
@@ -298,6 +365,94 @@ static struct {
                 .analytics = "Xen VBD Error Tracking",
                 .print = "Xen VBD Error Tracking",
                 .print_json = "xen-vbd-error",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_EXPORT_MONGOC,
+                .category = BIC_EXPORTERS,
+                .analytics = "MongoDB",
+                .print = "MongoDB",
+                .print_json = "mongodb",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_EXPORT_GRAPHITE,
+                .category = BIC_EXPORTERS,
+                .analytics = NULL,
+                .print = "Graphite",
+                .print_json = "graphite",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_EXPORT_GRAPHITE_HTTP,
+                .category = BIC_EXPORTERS,
+                .analytics = NULL,
+                .print = "Graphite HTTP / HTTPS",
+                .print_json = "graphite:http",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_EXPORT_JSON,
+                .category = BIC_EXPORTERS,
+                .analytics = NULL,
+                .print = "JSON",
+                .print_json = "json",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_EXPORT_JSON_HTTP,
+                .category = BIC_EXPORTERS,
+                .analytics = NULL,
+                .print = "JSON HTTP / HTTPS",
+                .print_json = "json:http",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_EXPORT_OPENTSDB,
+                .category = BIC_EXPORTERS,
+                .analytics = NULL,
+                .print = "OpenTSDB",
+                .print_json = "opentsdb",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_EXPORT_OPENTSDB_HTTP,
+                .category = BIC_EXPORTERS,
+                .analytics = NULL,
+                .print = "OpenTSDB HTTP / HTTPS",
+                .print_json = "opentsdb:http",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_EXPORT_ALLMETRICS,
+                .category = BIC_EXPORTERS,
+                .analytics = NULL,
+                .print = "All Metrics API",
+                .print_json = "allmetrics",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_EXPORT_SHELL,
+                .category = BIC_EXPORTERS,
+                .analytics = NULL,
+                .print = "Shell (use metrics in shell scripts)",
+                .print_json = "shell",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_EXPORT_PROMETHEUS_EXPORTER,
+                .category = BIC_EXPORTERS,
+                .analytics = NULL,
+                .print = "Prometheus (OpenMetrics) Exporter",
+                .print_json = "openmetrics",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_EXPORT_PROMETHEUS_REMOTE_WRITE,
+                .category = BIC_EXPORTERS,
+                .analytics = "Prometheus Remote Write",
+                .print = "Prometheus Remote Write",
+                .print_json = "prom-remote-write",
                 .value = NULL,
         },
         {
@@ -317,26 +472,10 @@ static struct {
                 .value = NULL,
         },
         {
-                .bit = BIB_EXPORT_MONGOC,
-                .category = BIC_EXPORTERS,
-                .analytics = "MongoDB",
-                .print = "MongoDB",
-                .print_json = "mongodb",
-                .value = NULL,
-        },
-        {
-                .bit = BIB_EXPORT_PROMETHEUS_REMOTE_WRITE,
-                .category = BIC_EXPORTERS,
-                .analytics = "Prometheus Remote Write",
-                .print = "Prometheus Remote Write",
-                .print_json = "prom-remote-write",
-                .value = NULL,
-        },
-        {
                 .bit = BIB_TRACE_ALLOCATIONS,
                 .category = BIC_DEBUG_DEVEL,
                 .analytics = "DebugTraceAlloc",
-                .print = "Trace Allocations",
+                .print = "Trace All Netdata Allocations (with charts)",
                 .print_json = "trace-allocations",
                 .value = NULL,
         },
@@ -360,6 +499,7 @@ static void build_info_set_value(BUILD_INFO_BIT bit, const char *value) {
 }
 
 __attribute__((constructor)) void initialize_build_info(void) {
+    bitmap256_set_bit(&BUILD_INFO, BIB_ZLIB, true);
     bitmap256_set_bit(&BUILD_INFO, BIB_HTTPD_STATIC, true);
     bitmap256_set_bit(&BUILD_INFO, BIB_DB_ALLOC, true);
     bitmap256_set_bit(&BUILD_INFO, BIB_DB_MAP, true);
@@ -367,8 +507,21 @@ __attribute__((constructor)) void initialize_build_info(void) {
     bitmap256_set_bit(&BUILD_INFO, BIB_DB_SAVE, true);
     bitmap256_set_bit(&BUILD_INFO, BIB_DB_RAM, true);
 
+    bitmap256_set_bit(&BUILD_INFO, BIB_EXPORT_PROMETHEUS_EXPORTER, true);
+    bitmap256_set_bit(&BUILD_INFO, BIB_EXPORT_GRAPHITE, true);
+    bitmap256_set_bit(&BUILD_INFO, BIB_EXPORT_GRAPHITE_HTTP, true);
+    bitmap256_set_bit(&BUILD_INFO, BIB_EXPORT_JSON, true);
+    bitmap256_set_bit(&BUILD_INFO, BIB_EXPORT_JSON_HTTP, true);
+    bitmap256_set_bit(&BUILD_INFO, BIB_EXPORT_OPENTSDB, true);
+    bitmap256_set_bit(&BUILD_INFO, BIB_EXPORT_OPENTSDB_HTTP, true);
+    bitmap256_set_bit(&BUILD_INFO, BIB_EXPORT_ALLMETRICS, true);
+    bitmap256_set_bit(&BUILD_INFO, BIB_EXPORT_SHELL, true);
+
 #ifdef ENABLE_DBENGINE
     bitmap256_set_bit(&BUILD_INFO, BIB_DB_DBENGINE, true);
+#endif
+#ifdef HAVE_LIBDATACHANNEL
+    bitmap256_set_bit(&BUILD_INFO, BIB_WEBRTC, true);
 #endif
 #ifdef ENABLE_HTTPD
     bitmap256_set_bit(&BUILD_INFO, BIB_HTTPD_H2O, true);
@@ -514,6 +667,118 @@ void get_install_type(char **install_type, char **prebuilt_arch, char **prebuilt
     freez(install_type_filename);
 }
 
+static void print_build_info_category_to_json(BUFFER *b, BUILD_INFO_CATEGORY category, const char *key) {
+    buffer_json_member_add_object(b, key);
+    for(size_t i = 0; BUILD_INFO_NAMES[i].category != BIC_TERMINATOR ;i++) {
+        if(BUILD_INFO_NAMES[i].category == category && BUILD_INFO_NAMES[i].print_json) {
+            if(BUILD_INFO_NAMES[i].value)
+                buffer_json_member_add_string(b, BUILD_INFO_NAMES[i].print_json, BUILD_INFO_NAMES[i].value);
+            else
+                buffer_json_member_add_boolean(b, BUILD_INFO_NAMES[i].print_json,bitmap256_get_bit(&BUILD_INFO, BUILD_INFO_NAMES[i].bit));
+        }
+    }
+    buffer_json_object_close(b); // key
+}
+
+static void print_build_info_category_to_console(BUILD_INFO_CATEGORY category, const char *title) {
+    printf("%s:\n", title);
+    for(size_t i = 0; BUILD_INFO_NAMES[i].category != BIC_TERMINATOR ;i++) {
+        if(BUILD_INFO_NAMES[i].category == category && BUILD_INFO_NAMES[i].print) {
+            const char *v, *k = BUILD_INFO_NAMES[i].print;
+            if(BUILD_INFO_NAMES[i].value)
+                v = BUILD_INFO_NAMES[i].value;
+            else
+                v = bitmap256_get_bit(&BUILD_INFO, BUILD_INFO_NAMES[i].bit) ? "YES" : "NO";
+
+
+            int padding_length = 60 - strlen(k) - 1;
+            if (padding_length < 0) padding_length = 0;
+
+            char padding[padding_length + 1];
+            memset(padding, '_', padding_length);
+            padding[padding_length] = '\0';
+
+            printf("    %s %s : %s\n", k, padding, v);
+        }
+    }
+}
+
+static struct {
+    SPINLOCK spinlock;
+    bool populated;
+    char *install_type;
+    char *prebuilt_arch;
+    char *prebuilt_distro;
+} BUILD_PACKAGING_INFO = { 0 };
+
+static void populate_packaging_info() {
+    if(!BUILD_PACKAGING_INFO.populated) {
+        spinlock_lock(&BUILD_PACKAGING_INFO.spinlock);
+        if(!BUILD_PACKAGING_INFO.populated) {
+            BUILD_PACKAGING_INFO.populated = true;
+
+            get_install_type(&BUILD_PACKAGING_INFO.install_type, &BUILD_PACKAGING_INFO.prebuilt_arch, &BUILD_PACKAGING_INFO.prebuilt_distro);
+
+            if(!BUILD_PACKAGING_INFO.install_type)
+                BUILD_PACKAGING_INFO.install_type = "unknown";
+
+            if(!BUILD_PACKAGING_INFO.prebuilt_arch)
+                BUILD_PACKAGING_INFO.prebuilt_arch = "unknown";
+
+            if(!BUILD_PACKAGING_INFO.prebuilt_distro)
+                BUILD_PACKAGING_INFO.prebuilt_distro = "unknown";
+        }
+        spinlock_unlock(&BUILD_PACKAGING_INFO.spinlock);
+    }
+}
+
+void print_build_info(void) {
+    populate_packaging_info();
+    printf("Configure options: %s\n", CONFIGURE_COMMAND);
+    printf("Install type: %s\n", BUILD_PACKAGING_INFO.install_type);
+    printf("    Binary architecture: %s\n", BUILD_PACKAGING_INFO.prebuilt_arch);
+    printf("    Packaging distro: %s\n", BUILD_PACKAGING_INFO.prebuilt_distro);
+
+    print_build_info_category_to_console(BIC_FEATURE, "Features");
+    print_build_info_category_to_console(BIC_DATABASE, "Database Engines");
+    print_build_info_category_to_console(BIC_CONNECTIVITY, "Connectivity Capabilities");
+    print_build_info_category_to_console(BIC_LIBS, "Libraries");
+    print_build_info_category_to_console(BIC_PLUGINS, "Plugins");
+    print_build_info_category_to_console(BIC_EXPORTERS, "Exporters");
+    print_build_info_category_to_console(BIC_DEBUG_DEVEL, "Debug/Developer Features");
+};
+
+void build_info_to_json_object(BUFFER *b) {
+    buffer_json_member_add_object(b, "packaging");
+    {
+        populate_packaging_info();
+        buffer_json_member_add_string(b, "configure_options", CONFIGURE_COMMAND);
+        buffer_json_member_add_string(b, "install_type", BUILD_PACKAGING_INFO.install_type);
+        buffer_json_member_add_string(b, "binary_architecture", BUILD_PACKAGING_INFO.prebuilt_arch);
+        buffer_json_member_add_string(b, "packaging_distro", BUILD_PACKAGING_INFO.prebuilt_distro);
+    }
+    buffer_json_object_close(b);
+
+    print_build_info_category_to_json(b, BIC_FEATURE, "features");
+    print_build_info_category_to_json(b, BIC_DATABASE, "databases");
+    print_build_info_category_to_json(b, BIC_CONNECTIVITY, "connectivity");
+    print_build_info_category_to_json(b, BIC_LIBS, "libs");
+    print_build_info_category_to_json(b, BIC_PLUGINS, "plugins");
+    print_build_info_category_to_json(b, BIC_EXPORTERS, "exporters");
+    print_build_info_category_to_json(b, BIC_DEBUG_DEVEL, "debug-n-devel");
+}
+
+void print_build_info_json(void) {
+    BUFFER *b = buffer_create(0, NULL);
+    buffer_json_initialize(b, "\"", "\"", 0, true, false);
+
+    build_info_to_json_object(b);
+
+    buffer_json_finalize(b);
+    printf("%s\n", buffer_tostring(b));
+    buffer_free(b);
+};
+
 void analytics_build_info(BUFFER *b) {
     size_t added = 0;
     for(size_t i = 0; BUILD_INFO_NAMES[i].category != BIC_TERMINATOR ;i++) {
@@ -528,76 +793,3 @@ void analytics_build_info(BUFFER *b) {
     }
 }
 
-static void print_build_info_category_to_json(BUFFER *b, BUILD_INFO_CATEGORY category, const char *key) {
-    buffer_json_member_add_object(b, key);
-    for(size_t i = 0; BUILD_INFO_NAMES[i].category != BIC_TERMINATOR ;i++) {
-        if(BUILD_INFO_NAMES[i].category == category && BUILD_INFO_NAMES[i].print_json) {
-            if(BUILD_INFO_NAMES[i].value)
-                buffer_json_member_add_string(b, BUILD_INFO_NAMES[i].print_json, BUILD_INFO_NAMES[i].value);
-            else
-                buffer_json_member_add_boolean(b, BUILD_INFO_NAMES[i].print_json,bitmap256_get_bit(&BUILD_INFO, BUILD_INFO_NAMES[i].bit));
-        }
-    }
-    buffer_json_object_close(b); // key
-}
-
-void print_build_info_json(void) {
-    BUFFER *b = buffer_create(0, NULL);
-    buffer_json_initialize(b, "\"", "\"", 0, true, false);
-
-    print_build_info_category_to_json(b, BIC_FEATURE, "features");
-    print_build_info_category_to_json(b, BIC_LIBS, "libs");
-    print_build_info_category_to_json(b, BIC_PLUGINS, "plugins");
-    print_build_info_category_to_json(b, BIC_EXPORTERS, "exporters");
-    print_build_info_category_to_json(b, BIC_DEBUG_DEVEL, "debug-n-devel");
-
-    buffer_json_finalize(b);
-    printf("%s\n", buffer_tostring(b));
-    buffer_free(b);
-};
-
-
-static void print_build_info_category_to_console(BUILD_INFO_CATEGORY category, const char *title) {
-    printf("%s:\n", title);
-    for(size_t i = 0; BUILD_INFO_NAMES[i].category != BIC_TERMINATOR ;i++) {
-        if(BUILD_INFO_NAMES[i].category == category && BUILD_INFO_NAMES[i].print) {
-            const char *v, *k = BUILD_INFO_NAMES[i].print;
-            if(BUILD_INFO_NAMES[i].value)
-                v = BUILD_INFO_NAMES[i].value;
-            else
-                v = bitmap256_get_bit(&BUILD_INFO, BUILD_INFO_NAMES[i].bit) ? "YES" : "NO";
-
-            printf("    %s:%-*s%s\n", k, 30 - (int)strlen(k) - 1, "", v);
-        }
-    }
-}
-
-void print_build_info(void) {
-    char *install_type = NULL;
-    char *prebuilt_arch = NULL;
-    char *prebuilt_distro = NULL;
-    get_install_type(&install_type, &prebuilt_arch, &prebuilt_distro);
-
-    printf("Configure options: %s\n", CONFIGURE_COMMAND);
-
-    if (!install_type)
-        printf("Install type: unknown\n");
-    else
-        printf("Install type: %s\n", install_type);
-
-    if (prebuilt_arch)
-        printf("    Binary architecture: %s\n", prebuilt_arch);
-
-    if (prebuilt_distro)
-        printf("    Packaging distro: %s\n", prebuilt_distro);
-
-    freez(install_type);
-    freez(prebuilt_arch);
-    freez(prebuilt_distro);
-
-    print_build_info_category_to_console(BIC_FEATURE, "Features");
-    print_build_info_category_to_console(BIC_LIBS, "Libraries");
-    print_build_info_category_to_console(BIC_PLUGINS, "Plugins");
-    print_build_info_category_to_console(BIC_EXPORTERS, "Exporters");
-    print_build_info_category_to_console(BIC_DEBUG_DEVEL, "Debug/Developer Features");
-};
