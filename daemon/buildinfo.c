@@ -5,209 +5,476 @@
 #include "common.h"
 #include "buildinfo.h"
 
-// Optional features
+typedef enum __attribute__((packed)) {
+    BIB_DB_RAM = 0,
+    BIB_DB_SAVE,
+    BIB_DB_MAP,
+    BIB_DB_ALLOC,
+    BIB_DB_NONE,
+    BIB_DB_DBENGINE,
+    BIB_HTTPD_STATIC,
+    BIB_HTTPD_H2O,
+    BIB_NATIVE_HTTPS,
+    BIB_ACLK,
+    BIB_CLOUD,
+    BIB_CLOUD_DISABLED,
+    BIB_LZ4,
+    BIB_ZLIB,
+    BIB_PROTOBUF,
+    BIB_PROTOBUF_SOURCE,
+    BIB_JEMALLOC,
+    BIB_TCMALLOC,
+    BIB_JSONC,
+    BIB_LIBCAP,
+    BIB_LIBCRYPTO,
+    BIB_LIBM,
+    BIB_SETNS,
+    BIB_TRACE_ALLOCATIONS,
+    BIB_TLS_HOST_VERIFY,
+    BIB_ML,
+    BIB_PLUGIN_APPS,
+    BIB_PLUGIN_DEBUGFS,
+    BIB_PLUGIN_CUPS,
+    BIB_PLUGIN_EBPF,
+    BIB_PLUGIN_FREEIPMI,
+    BIB_PLUGIN_NFACCT,
+    BIB_PLUGIN_PERF,
+    BIB_PLUGIN_SLABINFO,
+    BIB_PLUGIN_XEN,
+    BIB_PLUGIN_XEN_VBD_ERROR,
+    BIB_EXPORT_AWS_KINESIS,
+    BIB_EXPORT_GCP_PUBSUB,
+    BIB_EXPORT_MONGOC,
+    BIB_EXPORT_PROMETHEUS_REMOTE_WRITE,
+} BUILD_INFO_BIT;
 
-#ifdef ENABLE_ACLK
-#define FEAT_CLOUD 1
-#define FEAT_CLOUD_MSG ""
-#else
-#ifdef DISABLE_CLOUD
-#define FEAT_CLOUD 0
-#define FEAT_CLOUD_MSG "(by user request)"
-#else
-#define FEAT_CLOUD 0
-#define FEAT_CLOUD_MSG ""
-#endif
-#endif
+static BITMAP256 BUILD_INFO = { 0 }; // the bitmap we store our build information
 
-#ifdef ENABLE_HTTPD
-#define FEAT_HTTPD 1
-#else
-#define FEAT_HTTPD 0
-#endif
+typedef enum __attribute__((packed)) {
+    BIC_TERMINATOR = 0,
+    BIC_FEATURE,
+    BIC_LIBS,
+    BIC_PLUGINS,
+    BIC_EXPORTERS,
+    BIC_DEBUG_DEVEL
+} BUILD_INFO_CATEGORY;
+
+static struct {
+    BUILD_INFO_BIT bit;
+    BUILD_INFO_CATEGORY category;
+    const char *analytics;
+    const char *print;
+    const char *print_json;
+    const char *value;
+} BUILD_INFO_NAMES[] = {
+        {
+                .bit = BIB_DB_DBENGINE,
+                .category = BIC_FEATURE,
+                .analytics = "dbengine",
+                .print = "dbengine",
+                .print_json = "dbengine",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_NATIVE_HTTPS,
+                .category = BIC_FEATURE,
+                .analytics = "Native HTTPS",
+                .print = "Native HTTPS",
+                .print_json = "native-https",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_CLOUD,
+                .category = BIC_FEATURE,
+                .analytics = "Netdata Cloud",
+                .print = "Netdata Cloud",
+                .print_json = "cloud",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_CLOUD_DISABLED,
+                .category = BIC_FEATURE,
+                .analytics = NULL,
+                .print = NULL,
+                .print_json = "cloud-disabled",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_ACLK,
+                .category = BIC_FEATURE,
+                .analytics = NULL,
+                .print = "ACLK",
+                .print_json = "aclk",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_TLS_HOST_VERIFY,
+                .category = BIC_FEATURE,
+                .analytics = "TLS Host Verification",
+                .print = "TLS Host Verification",
+                .print_json = "tls-host-verify",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_ML,
+                .category = BIC_FEATURE,
+                .analytics = "Machine Learning",
+                .print = "Machine Learning",
+                .print_json = "machine-learning",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_LZ4,
+                .category = BIC_FEATURE,
+                .analytics = "Stream Compression",
+                .print = "Stream Compression",
+                .print_json = "stream-compression",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_HTTPD_H2O,
+                .category = BIC_FEATURE,
+                .analytics = NULL,
+                .print = "HTTPD (h2o)",
+                .print_json = "httpd-h2o",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_PROTOBUF,
+                .category = BIC_LIBS,
+                .analytics = "protobuf",
+                .print = "protobuf",
+                .print_json = "protobuf",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_PROTOBUF_SOURCE,
+                .category = BIC_LIBS,
+                .analytics = NULL,
+                .print = "protobuf-source",
+                .print_json = "protobuf-source",
+                .value = "none",
+        },
+        {
+                .bit = BIB_JEMALLOC,
+                .category = BIC_LIBS,
+                .analytics = "jemalloc",
+                .print = "jemalloc",
+                .print_json = "jemalloc",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_JSONC,
+                .category = BIC_LIBS,
+                .analytics = "JSON-C",
+                .print = "JSON-C",
+                .print_json = "jsonc",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_LIBCAP,
+                .category = BIC_LIBS,
+                .analytics = "libcap",
+                .print = "libcap",
+                .print_json = "libcap",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_LIBCRYPTO,
+                .category = BIC_LIBS,
+                .analytics = "libcrypto",
+                .print = "libcrypto",
+                .print_json = "libcrypto",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_LIBM,
+                .category = BIC_LIBS,
+                .analytics = "libm",
+                .print = "libm",
+                .print_json = "libm",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_TCMALLOC,
+                .category = BIC_LIBS,
+                .analytics = "tcalloc",
+                .print = "tcalloc",
+                .print_json = "tcmalloc",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_ZLIB,
+                .category = BIC_LIBS,
+                .analytics = "zlib",
+                .print = "zlib",
+                .print_json = "zlib",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_PLUGIN_APPS,
+                .category = BIC_PLUGINS,
+                .analytics = "apps",
+                .print = "apps",
+                .print_json = "apps",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_PLUGIN_DEBUGFS,
+                .category = BIC_PLUGINS,
+                .analytics = "debugfs",
+                .print = "debugfs",
+                .print_json = "debugfs",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_SETNS,
+                .category = BIC_PLUGINS,
+                .analytics = "cgroup Network Tracking",
+                .print = "cgroup Network Tracking",
+                .print_json = "cgroup-net",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_PLUGIN_CUPS,
+                .category = BIC_PLUGINS,
+                .analytics = "CUPS",
+                .print = "CUPS",
+                .print_json = "cups",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_PLUGIN_EBPF,
+                .category = BIC_PLUGINS,
+                .analytics = "EBPF",
+                .print = "EBPF",
+                .print_json = "ebpf",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_PLUGIN_FREEIPMI,
+                .category = BIC_PLUGINS,
+                .analytics = "IPMI",
+                .print = "IPMI",
+                .print_json = "ipmi",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_PLUGIN_NFACCT,
+                .category = BIC_PLUGINS,
+                .analytics = "NFACCT",
+                .print = "NFACCT",
+                .print_json = "nfacct",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_PLUGIN_PERF,
+                .category = BIC_PLUGINS,
+                .analytics = "perf",
+                .print = "perf",
+                .print_json = "perf",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_PLUGIN_SLABINFO,
+                .category = BIC_PLUGINS,
+                .analytics = "slabinfo",
+                .print = "slabinfo",
+                .print_json = "slabinfo",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_PLUGIN_XEN,
+                .category = BIC_PLUGINS,
+                .analytics = "Xen",
+
+                .print = "Xen",
+                .print_json = "xen",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_PLUGIN_XEN_VBD_ERROR,
+                .category = BIC_PLUGINS,
+                .analytics = "Xen VBD Error Tracking",
+                .print = "Xen VBD Error Tracking",
+                .print_json = "xen-vbd-error",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_EXPORT_AWS_KINESIS,
+                .category = BIC_EXPORTERS,
+                .analytics = "AWS Kinesis",
+                .print = "AWS Kinesis",
+                .print_json = "kinesis",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_EXPORT_GCP_PUBSUB,
+                .category = BIC_EXPORTERS,
+                .analytics = "GCP PubSub",
+                .print = "GCP PubSub",
+                .print_json = "pubsub",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_EXPORT_MONGOC,
+                .category = BIC_EXPORTERS,
+                .analytics = "MongoDB",
+                .print = "MongoDB",
+                .print_json = "mongodb",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_EXPORT_PROMETHEUS_REMOTE_WRITE,
+                .category = BIC_EXPORTERS,
+                .analytics = "Prometheus Remote Write",
+                .print = "Prometheus Remote Write",
+                .print_json = "prom-remote-write",
+                .value = NULL,
+        },
+        {
+                .bit = BIB_TRACE_ALLOCATIONS,
+                .category = BIC_DEBUG_DEVEL,
+                .analytics = "DebugTraceAlloc",
+                .print = "Trace Allocations",
+                .print_json = "trace-allocations",
+                .value = NULL,
+        },
+        {
+                .bit = 0,
+                .category = BIC_TERMINATOR,
+                .analytics = NULL,
+                .print = NULL,
+                .print_json = NULL,
+                .value = NULL,
+        },
+};
+
+static void build_info_set_value(BUILD_INFO_BIT bit, const char *value) {
+    for(size_t i = 0; BUILD_INFO_NAMES[i].category != BIC_TERMINATOR ; i++) {
+        if(BUILD_INFO_NAMES[i].bit == bit) {
+            BUILD_INFO_NAMES[i].value = value;
+            break;
+        }
+    }
+}
+
+__attribute__((constructor)) void initialize_build_info(void) {
+    bitmap256_set_bit(&BUILD_INFO, BIB_HTTPD_STATIC, true);
+    bitmap256_set_bit(&BUILD_INFO, BIB_DB_ALLOC, true);
+    bitmap256_set_bit(&BUILD_INFO, BIB_DB_MAP, true);
+    bitmap256_set_bit(&BUILD_INFO, BIB_DB_NONE, true);
+    bitmap256_set_bit(&BUILD_INFO, BIB_DB_SAVE, true);
+    bitmap256_set_bit(&BUILD_INFO, BIB_DB_RAM, true);
 
 #ifdef ENABLE_DBENGINE
-#define FEAT_DBENGINE 1
+    bitmap256_set_bit(&BUILD_INFO, BIB_DB_DBENGINE, true);
+#endif
+#ifdef ENABLE_HTTPD
+    bitmap256_set_bit(&BUILD_INFO, BIB_HTTPD_H2O, true);
+#endif
+#ifdef ENABLE_HTTPS
+    bitmap256_set_bit(&BUILD_INFO, BIB_NATIVE_HTTPS, true);
+#endif
+
+#ifdef ENABLE_ACLK
+    bitmap256_set_bit(&BUILD_INFO, BIB_CLOUD, true);
+    bitmap256_set_bit(&BUILD_INFO, BIB_ACLK, true);
 #else
-#define FEAT_DBENGINE 0
+    bitmap256_set_bit(&BUILD_INFO, BIB_CLOUD_DISABLED, true);
+#ifdef DISABLE_CLOUD
+    build_info_set_value(BIB_CLOUD_DISABLED, "disabled by user");
+#else
+    build_info_set_value(BIB_CLOUD_DISABLED, "not available");
+#endif
 #endif
 
 #if defined(HAVE_X509_VERIFY_PARAM_set1_host) && HAVE_X509_VERIFY_PARAM_set1_host == 1
-#define FEAT_TLS_HOST_VERIFY 1
-#else
-#define FEAT_TLS_HOST_VERIFY 0
+    bitmap256_set_bit(&BUILD_INFO, BIB_TLS_HOST_VERIFY, true);
 #endif
-
-#ifdef ENABLE_HTTPS
-#define FEAT_NATIVE_HTTPS 1
-#else
-#define FEAT_NATIVE_HTTPS 0
-#endif
-
 #ifdef ENABLE_ML
-#define FEAT_ML 1
-#else
-#define FEAT_ML 0
+    bitmap256_set_bit(&BUILD_INFO, BIB_ML, true);
 #endif
-
-#ifdef  ENABLE_COMPRESSION
-#define  FEAT_STREAM_COMPRESSION 1
-#else
-#define  FEAT_STREAM_COMPRESSION 0
-#endif  //ENABLE_COMPRESSION
-
-
-// Optional libraries
+#ifdef ENABLE_COMPRESSION
+    bitmap256_set_bit(&BUILD_INFO, BIB_LZ4, true);
+#endif
 
 #ifdef HAVE_PROTOBUF
-#define FEAT_PROTOBUF 1
+    bitmap256_set_bit(&BUILD_INFO, BIB_PROTOBUF, true);
 #ifdef BUNDLED_PROTOBUF
-#define FEAT_PROTOBUF_BUNDLED " (bundled)"
+    build_info_set_value(BIB_PROTOBUF_SOURCE, "bundled");
 #else
-#define FEAT_PROTOBUF_BUNDLED " (system)"
+    build_info_set_value(BIB_PROTOBUF_SOURCE, "system");
 #endif
-#else
-#define FEAT_PROTOBUF 0
-#define FEAT_PROTOBUF_BUNDLED ""
-#endif
-
-#ifdef ENABLE_JSONC
-#define FEAT_JSONC 1
-#else
-#define FEAT_JSONC 0
 #endif
 
 #ifdef ENABLE_JEMALLOC
-#define FEAT_JEMALLOC 1
-#else
-#define FEAT_JEMALLOC 0
+    bitmap256_set_bit(&BUILD_INFO, BIB_JEMALLOC, true);
 #endif
-
-#ifdef ENABLE_TCMALLOC
-#define FEAT_TCMALLOC 1
-#else
-#define FEAT_TCMALLOC 0
+#ifdef ENABLE_JSONC
+    bitmap256_set_bit(&BUILD_INFO, BIB_JSONC, true);
 #endif
-
 #ifdef HAVE_CAPABILITY
-#define FEAT_LIBCAP 1
-#else
-#define FEAT_LIBCAP 0
+    bitmap256_set_bit(&BUILD_INFO, BIB_LIBCAP, true);
 #endif
-
-#ifdef STORAGE_WITH_MATH
-#define FEAT_LIBM 1
-#else
-#define FEAT_LIBM 0
-#endif
-
 #ifdef HAVE_CRYPTO
-#define FEAT_CRYPTO 1
-#else
-#define FEAT_CRYPTO 0
+    bitmap256_set_bit(&BUILD_INFO, BIB_LIBCRYPTO, true);
 #endif
-
-// Optional plugins
-
+#ifdef STORAGE_WITH_MATH
+    bitmap256_set_bit(&BUILD_INFO, BIB_LIBM, true);
+#endif
+#ifdef ENABLE_TCMALLOC
+    bitmap256_set_bit(&BUILD_INFO, BIB_TCMALLOC, true);
+#endif
 #ifdef ENABLE_APPS_PLUGIN
-#define FEAT_APPS_PLUGIN 1
-#else
-#define FEAT_APPS_PLUGIN 0
+    bitmap256_set_bit(&BUILD_INFO, BIB_PLUGIN_APPS, true);
 #endif
-
 #ifdef ENABLE_DEBUGFS_PLUGIN
-#define FEAT_DEBUGFS_PLUGIN 1
-#else
-#define FEAT_DEBUGFS_PLUGIN 0
+    bitmap256_set_bit(&BUILD_INFO, BIB_PLUGIN_DEBUGFS, true);
 #endif
-
-#ifdef HAVE_FREEIPMI
-#define FEAT_IPMI 1
-#else
-#define FEAT_IPMI 0
-#endif
-
-#ifdef HAVE_CUPS
-#define FEAT_CUPS 1
-#else
-#define FEAT_CUPS 0
-#endif
-
-#ifdef HAVE_NFACCT
-#define FEAT_NFACCT 1
-#else
-#define FEAT_NFACCT 0
-#endif
-
-#ifdef HAVE_LIBXENSTAT
-#define FEAT_XEN 1
-#else
-#define FEAT_XEN 0
-#endif
-
-#ifdef HAVE_XENSTAT_VBD_ERROR
-#define FEAT_XEN_VBD_ERROR 1
-#else
-#define FEAT_XEN_VBD_ERROR 0
-#endif
-
-#ifdef HAVE_LIBBPF
-#define FEAT_EBPF 1
-#else
-#define FEAT_EBPF 0
-#endif
-
 #ifdef HAVE_SETNS
-#define FEAT_CGROUP_NET 1
-#else
-#define FEAT_CGROUP_NET 0
+    bitmap256_set_bit(&BUILD_INFO, BIB_SETNS, true);
 #endif
-
+#ifdef HAVE_CUPS
+    bitmap256_set_bit(&BUILD_INFO, BIB_PLUGIN_CUPS, true);
+#endif
+#ifdef HAVE_LIBBPF
+    bitmap256_set_bit(&BUILD_INFO, BIB_PLUGIN_EBPF, true);
+#endif
+#ifdef HAVE_FREEIPMI
+    bitmap256_set_bit(&BUILD_INFO, BIB_PLUGIN_FREEIPMI, true);
+#endif
+#ifdef HAVE_NFACCT
+    bitmap256_set_bit(&BUILD_INFO, BIB_PLUGIN_NFACCT, true);
+#endif
 #ifdef ENABLE_PERF_PLUGIN
-#define FEAT_PERF 1
-#else
-#define FEAT_PERF 0
+    bitmap256_set_bit(&BUILD_INFO, BIB_PLUGIN_PERF, true);
 #endif
-
 #ifdef ENABLE_SLABINFO
-#define FEAT_SLABINFO 1
-#else
-#define FEAT_SLABINFO 0
+    bitmap256_set_bit(&BUILD_INFO, BIB_PLUGIN_SLABINFO, true);
 #endif
-
-// Optional Exporters
-
+#ifdef HAVE_LIBXENSTAT
+    bitmap256_set_bit(&BUILD_INFO, BIB_PLUGIN_XEN, true);
+#endif
+#ifdef HAVE_XENSTAT_VBD_ERROR
+    bitmap256_set_bit(&BUILD_INFO, BIB_PLUGIN_XEN_VBD_ERROR, true);
+#endif
 #ifdef HAVE_KINESIS
-#define FEAT_KINESIS 1
-#else
-#define FEAT_KINESIS 0
+    bitmap256_set_bit(&BUILD_INFO, BIB_EXPORT_AWS_KINESIS, true);
 #endif
-
 #ifdef ENABLE_EXPORTING_PUBSUB
-#define FEAT_PUBSUB 1
-#else
-#define FEAT_PUBSUB 0
+    bitmap256_set_bit(&BUILD_INFO, BIB_EXPORT_GCP_PUBSUB, true);
 #endif
-
 #ifdef HAVE_MONGOC
-#define FEAT_MONGO 1
-#else
-#define FEAT_MONGO 0
+    bitmap256_set_bit(&BUILD_INFO, BIB_EXPORT_MONGOC, true);
 #endif
-
 #ifdef ENABLE_PROMETHEUS_REMOTE_WRITE
-#define FEAT_REMOTE_WRITE 1
-#else
-#define FEAT_REMOTE_WRITE 0
+    bitmap256_set_bit(&BUILD_INFO, BIB_EXPORT_PROMETHEUS_REMOTE_WRITE, true);
 #endif
-
-#define FEAT_YES_NO(x) ((x) ? "YES" : "NO")
-
 #ifdef NETDATA_TRACE_ALLOCATIONS
-#define FEAT_TRACE_ALLOC 1
-#else
-#define FEAT_TRACE_ALLOC 0
+    bitmap256_set_bit(&BUILD_INFO, BIB_TRACE_ALLOCATIONS, true);
 #endif
+}
 
 char *get_value_from_key(char *buffer, char *key) {
     char *s = NULL, *t = NULL;
@@ -247,6 +514,64 @@ void get_install_type(char **install_type, char **prebuilt_arch, char **prebuilt
     freez(install_type_filename);
 }
 
+void analytics_build_info(BUFFER *b) {
+    size_t added = 0;
+    for(size_t i = 0; BUILD_INFO_NAMES[i].category != BIC_TERMINATOR ;i++) {
+        if(BUILD_INFO_NAMES[i].analytics && bitmap256_get_bit(&BUILD_INFO, BUILD_INFO_NAMES[i].bit)) {
+
+            if(added)
+                buffer_strcat(b, "|");
+
+            buffer_strcat (b, BUILD_INFO_NAMES[i].analytics);
+            added++;
+        }
+    }
+}
+
+static void print_build_info_category_to_json(BUFFER *b, BUILD_INFO_CATEGORY category, const char *key) {
+    buffer_json_member_add_object(b, key);
+    for(size_t i = 0; BUILD_INFO_NAMES[i].category != BIC_TERMINATOR ;i++) {
+        if(BUILD_INFO_NAMES[i].category == category && BUILD_INFO_NAMES[i].print_json) {
+            if(BUILD_INFO_NAMES[i].value)
+                buffer_json_member_add_string(b, BUILD_INFO_NAMES[i].print_json, BUILD_INFO_NAMES[i].value);
+            else
+                buffer_json_member_add_boolean(b, BUILD_INFO_NAMES[i].print_json,bitmap256_get_bit(&BUILD_INFO, BUILD_INFO_NAMES[i].bit));
+        }
+    }
+    buffer_json_object_close(b); // key
+}
+
+void print_build_info_json(void) {
+    BUFFER *b = buffer_create(0, NULL);
+    buffer_json_initialize(b, "\"", "\"", 0, true, false);
+
+    print_build_info_category_to_json(b, BIC_FEATURE, "features");
+    print_build_info_category_to_json(b, BIC_LIBS, "libs");
+    print_build_info_category_to_json(b, BIC_PLUGINS, "plugins");
+    print_build_info_category_to_json(b, BIC_EXPORTERS, "exporters");
+    print_build_info_category_to_json(b, BIC_DEBUG_DEVEL, "debug-n-devel");
+
+    buffer_json_finalize(b);
+    printf("%s\n", buffer_tostring(b));
+    buffer_free(b);
+};
+
+
+static void print_build_info_category_to_console(BUILD_INFO_CATEGORY category, const char *title) {
+    printf("%s:\n", title);
+    for(size_t i = 0; BUILD_INFO_NAMES[i].category != BIC_TERMINATOR ;i++) {
+        if(BUILD_INFO_NAMES[i].category == category && BUILD_INFO_NAMES[i].print) {
+            const char *v, *k = BUILD_INFO_NAMES[i].print;
+            if(BUILD_INFO_NAMES[i].value)
+                v = BUILD_INFO_NAMES[i].value;
+            else
+                v = bitmap256_get_bit(&BUILD_INFO, BUILD_INFO_NAMES[i].bit) ? "YES" : "NO";
+
+            printf("    %s:%-*s%s\n", k, 30 - (int)strlen(k) - 1, "", v);
+        }
+    }
+}
+
 void print_build_info(void) {
     char *install_type = NULL;
     char *prebuilt_arch = NULL;
@@ -255,227 +580,24 @@ void print_build_info(void) {
 
     printf("Configure options: %s\n", CONFIGURE_COMMAND);
 
-    if (install_type == NULL) {
+    if (!install_type)
         printf("Install type: unknown\n");
-    } else {
+    else
         printf("Install type: %s\n", install_type);
-    }
 
-    if (prebuilt_arch != NULL) {
+    if (prebuilt_arch)
         printf("    Binary architecture: %s\n", prebuilt_arch);
-    }
 
-    if (prebuilt_distro != NULL) {
+    if (prebuilt_distro)
         printf("    Packaging distro: %s\n", prebuilt_distro);
-    }
 
     freez(install_type);
     freez(prebuilt_arch);
     freez(prebuilt_distro);
 
-    printf("Features:\n");
-    printf("    dbengine:                   %s\n", FEAT_YES_NO(FEAT_DBENGINE));
-    printf("    Native HTTPS:               %s\n", FEAT_YES_NO(FEAT_NATIVE_HTTPS));
-    printf("    Netdata Cloud:              %s %s\n", FEAT_YES_NO(FEAT_CLOUD), FEAT_CLOUD_MSG);
-    printf("    ACLK:                       %s\n", FEAT_YES_NO(FEAT_CLOUD));
-    printf("    TLS Host Verification:      %s\n", FEAT_YES_NO(FEAT_TLS_HOST_VERIFY));
-    printf("    Machine Learning:           %s\n", FEAT_YES_NO(FEAT_ML));
-    printf("    Stream Compression:         %s\n", FEAT_YES_NO(FEAT_STREAM_COMPRESSION));
-    printf("    HTTPD (h2o):                %s\n", FEAT_YES_NO(FEAT_HTTPD));
-
-    printf("Libraries:\n");
-    printf("    protobuf:                %s%s\n", FEAT_YES_NO(FEAT_PROTOBUF), FEAT_PROTOBUF_BUNDLED);
-    printf("    jemalloc:                %s\n", FEAT_YES_NO(FEAT_JEMALLOC));
-    printf("    JSON-C:                  %s\n", FEAT_YES_NO(FEAT_JSONC));
-    printf("    libcap:                  %s\n", FEAT_YES_NO(FEAT_LIBCAP));
-    printf("    libcrypto:               %s\n", FEAT_YES_NO(FEAT_CRYPTO));
-    printf("    libm:                    %s\n", FEAT_YES_NO(FEAT_LIBM));
-    printf("    tcalloc:                 %s\n", FEAT_YES_NO(FEAT_TCMALLOC));
-    printf("    zlib:                    %s\n", FEAT_YES_NO(1));
-
-    printf("Plugins:\n");
-    printf("    apps:                    %s\n", FEAT_YES_NO(FEAT_APPS_PLUGIN));
-    printf("    cgroup Network Tracking: %s\n", FEAT_YES_NO(FEAT_CGROUP_NET));
-    printf("    CUPS:                    %s\n", FEAT_YES_NO(FEAT_CUPS));
-    printf("    debugfs:                 %s\n", FEAT_YES_NO(FEAT_DEBUGFS_PLUGIN));
-    printf("    EBPF:                    %s\n", FEAT_YES_NO(FEAT_EBPF));
-    printf("    IPMI:                    %s\n", FEAT_YES_NO(FEAT_IPMI));
-    printf("    NFACCT:                  %s\n", FEAT_YES_NO(FEAT_NFACCT));
-    printf("    perf:                    %s\n", FEAT_YES_NO(FEAT_PERF));
-    printf("    slabinfo:                %s\n", FEAT_YES_NO(FEAT_SLABINFO));
-    printf("    Xen:                     %s\n", FEAT_YES_NO(FEAT_XEN));
-    printf("    Xen VBD Error Tracking:  %s\n", FEAT_YES_NO(FEAT_XEN_VBD_ERROR));
-
-    printf("Exporters:\n");
-    printf("    AWS Kinesis:             %s\n", FEAT_YES_NO(FEAT_KINESIS));
-    printf("    GCP PubSub:              %s\n", FEAT_YES_NO(FEAT_PUBSUB));
-    printf("    MongoDB:                 %s\n", FEAT_YES_NO(FEAT_MONGO));
-    printf("    Prometheus Remote Write: %s\n", FEAT_YES_NO(FEAT_REMOTE_WRITE));
-
-    printf("Debug/Developer Features:\n");
-    printf("    Trace Allocations:       %s\n", FEAT_YES_NO(FEAT_TRACE_ALLOC));
+    print_build_info_category_to_console(BIC_FEATURE, "Features");
+    print_build_info_category_to_console(BIC_LIBS, "Libraries");
+    print_build_info_category_to_console(BIC_PLUGINS, "Plugins");
+    print_build_info_category_to_console(BIC_EXPORTERS, "Exporters");
+    print_build_info_category_to_console(BIC_DEBUG_DEVEL, "Debug/Developer Features");
 };
-
-#define FEAT_JSON_BOOL(x) ((x) ? "true" : "false")
-// This intentionally does not use JSON-C so it works even if JSON-C is not present
-// This is used for anonymous statistics reporting, so it intentionally
-// does not include the configure options, which would be very easy to use
-// for tracking custom builds (and complicate outputting valid JSON).
-void print_build_info_json(void) {
-    printf("{\n");
-    printf("  \"features\": {\n");
-    printf("    \"dbengine\": %s,\n",         FEAT_JSON_BOOL(FEAT_DBENGINE));
-    printf("    \"native-https\": %s,\n",     FEAT_JSON_BOOL(FEAT_NATIVE_HTTPS));
-    printf("    \"cloud\": %s,\n",            FEAT_JSON_BOOL(FEAT_CLOUD));
-#ifdef DISABLE_CLOUD
-    printf("    \"cloud-disabled\": true,\n");
-#else
-    printf("    \"cloud-disabled\": false,\n");
-#endif
-    printf("    \"aclk\": %s,\n", FEAT_JSON_BOOL(FEAT_CLOUD));
-
-    printf("    \"tls-host-verify\": %s,\n",   FEAT_JSON_BOOL(FEAT_TLS_HOST_VERIFY));
-    printf("    \"machine-learning\": %s\n",   FEAT_JSON_BOOL(FEAT_ML));
-    printf("    \"stream-compression\": %s\n", FEAT_JSON_BOOL(FEAT_STREAM_COMPRESSION));
-    printf("    \"httpd-h2o\": %s\n",          FEAT_JSON_BOOL(FEAT_HTTPD));
-    printf("  },\n");
-
-    printf("  \"libs\": {\n");
-    printf("    \"protobuf\": %s,\n",         FEAT_JSON_BOOL(FEAT_PROTOBUF));
-    printf("    \"protobuf-source\": \"%s\",\n", FEAT_PROTOBUF_BUNDLED);
-    printf("    \"jemalloc\": %s,\n",         FEAT_JSON_BOOL(FEAT_JEMALLOC));
-    printf("    \"jsonc\": %s,\n",            FEAT_JSON_BOOL(FEAT_JSONC));
-    printf("    \"libcap\": %s,\n",           FEAT_JSON_BOOL(FEAT_LIBCAP));
-    printf("    \"libcrypto\": %s,\n",        FEAT_JSON_BOOL(FEAT_CRYPTO));
-    printf("    \"libm\": %s,\n",             FEAT_JSON_BOOL(FEAT_LIBM));
-    printf("    \"tcmalloc\": %s,\n",         FEAT_JSON_BOOL(FEAT_TCMALLOC));
-    printf("    \"zlib\": %s\n",              FEAT_JSON_BOOL(1));
-    printf("  },\n");
-
-    printf("  \"plugins\": {\n");
-    printf("    \"apps\": %s,\n",             FEAT_JSON_BOOL(FEAT_APPS_PLUGIN));
-    printf("    \"cgroup-net\": %s,\n",       FEAT_JSON_BOOL(FEAT_CGROUP_NET));
-    printf("    \"cups\": %s,\n",             FEAT_JSON_BOOL(FEAT_CUPS));
-    printf("    \"debugfs\": %s,\n",          FEAT_JSON_BOOL(FEAT_DEBUGFS_PLUGIN));
-    printf("    \"ebpf\": %s,\n",             FEAT_JSON_BOOL(FEAT_EBPF));
-    printf("    \"ipmi\": %s,\n",             FEAT_JSON_BOOL(FEAT_IPMI));
-    printf("    \"nfacct\": %s,\n",           FEAT_JSON_BOOL(FEAT_NFACCT));
-    printf("    \"perf\": %s,\n",             FEAT_JSON_BOOL(FEAT_PERF));
-    printf("    \"slabinfo\": %s,\n",         FEAT_JSON_BOOL(FEAT_SLABINFO));
-    printf("    \"xen\": %s,\n",              FEAT_JSON_BOOL(FEAT_XEN));
-    printf("    \"xen-vbd-error\": %s\n",     FEAT_JSON_BOOL(FEAT_XEN_VBD_ERROR));
-    printf("  },\n");
-
-    printf("  \"exporters\": {\n");
-    printf("    \"kinesis\": %s,\n",          FEAT_JSON_BOOL(FEAT_KINESIS));
-    printf("    \"pubsub\": %s,\n",           FEAT_JSON_BOOL(FEAT_PUBSUB));
-    printf("    \"mongodb\": %s,\n",          FEAT_JSON_BOOL(FEAT_MONGO));
-    printf("    \"prom-remote-write\": %s\n", FEAT_JSON_BOOL(FEAT_REMOTE_WRITE));
-    printf("  }\n");
-    printf("  \"debug-n-devel\": {\n");
-    printf("    \"trace-allocations\": %s\n  }\n",FEAT_JSON_BOOL(FEAT_TRACE_ALLOC));
-    printf("}\n");
-};
-
-#define add_to_bi(buffer, str)       \
-    { if(first) {                    \
-        buffer_strcat (b, str);      \
-        first = 0;                   \
-    } else                           \
-        buffer_strcat (b, "|" str); }
-
-void analytics_build_info(BUFFER *b) {
-    int first = 1;
-#ifdef ENABLE_DBENGINE
-    add_to_bi(b, "dbengine");
-#endif
-#ifdef ENABLE_HTTPS
-    add_to_bi(b, "Native HTTPS");
-#endif
-#ifdef ENABLE_ACLK
-    add_to_bi(b, "Netdata Cloud");
-#endif
-#if (FEAT_TLS_HOST_VERIFY!=0)
-    add_to_bi(b, "TLS Host Verification");
-#endif
-#ifdef ENABLE_ML
-    add_to_bi(b, "Machine Learning");
-#endif
-#ifdef ENABLE_COMPRESSION
-    add_to_bi(b, "Stream Compression");
-#endif
-
-#ifdef HAVE_PROTOBUF
-    add_to_bi(b, "protobuf");
-#endif
-#ifdef ENABLE_JEMALLOC
-    add_to_bi(b, "jemalloc");
-#endif
-#ifdef ENABLE_JSONC
-    add_to_bi(b, "JSON-C");
-#endif
-#ifdef HAVE_CAPABILITY
-    add_to_bi(b, "libcap");
-#endif
-#ifdef HAVE_CRYPTO
-    add_to_bi(b, "libcrypto");
-#endif
-#ifdef STORAGE_WITH_MATH
-    add_to_bi(b, "libm");
-#endif
-
-#ifdef ENABLE_TCMALLOC
-    add_to_bi(b, "tcalloc");
-#endif
-    add_to_bi(b, "zlib");
-
-#ifdef ENABLE_APPS_PLUGIN
-    add_to_bi(b, "apps");
-#endif
-#ifdef ENABLE_DEBUGFS_PLUGIN
-    add_to_bi(b, "debugfs");
-#endif
-#ifdef HAVE_SETNS
-    add_to_bi(b, "cgroup Network Tracking");
-#endif
-#ifdef HAVE_CUPS
-    add_to_bi(b, "CUPS");
-#endif
-#ifdef HAVE_LIBBPF
-    add_to_bi(b, "EBPF");
-#endif
-#ifdef HAVE_FREEIPMI
-    add_to_bi(b, "IPMI");
-#endif
-#ifdef HAVE_NFACCT
-    add_to_bi(b, "NFACCT");
-#endif
-#ifdef ENABLE_PERF_PLUGIN
-    add_to_bi(b, "perf");
-#endif
-#ifdef ENABLE_SLABINFO
-    add_to_bi(b, "slabinfo");
-#endif
-#ifdef HAVE_LIBXENSTAT
-    add_to_bi(b, "Xen");
-#endif
-#ifdef HAVE_XENSTAT_VBD_ERROR
-    add_to_bi(b, "Xen VBD Error Tracking");
-#endif
-
-#ifdef HAVE_KINESIS
-    add_to_bi(b, "AWS Kinesis");
-#endif
-#ifdef ENABLE_EXPORTING_PUBSUB
-    add_to_bi(b, "GCP PubSub");
-#endif
-#ifdef HAVE_MONGOC
-    add_to_bi(b, "MongoDB");
-#endif
-#ifdef ENABLE_PROMETHEUS_REMOTE_WRITE
-    add_to_bi(b, "Prometheus Remote Write");
-#endif
-#ifdef NETDATA_TRACE_ALLOCATIONS
-    add_to_bi(b, "DebugTraceAlloc");
-#endif
-}
