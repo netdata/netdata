@@ -758,10 +758,10 @@ __attribute__((constructor)) void initialize_build_info(void) {
     bitmap256_set_bit(&BUILD_INFO, BIB_LIB_LIBM, true);
 #endif
 #ifdef ENABLE_JEMALLOC
-    bitmap256_set_bit(&BUILD_INFO, BIB_JEMALLOC, true);
+    bitmap256_set_bit(&BUILD_INFO, BIB_LIB_JEMALLOC, true);
 #endif
 #ifdef ENABLE_TCMALLOC
-    bitmap256_set_bit(&BUILD_INFO, BIB_TCMALLOC, true);
+    bitmap256_set_bit(&BUILD_INFO, BIB_LIB_TCMALLOC, true);
 #endif
 
 #ifdef ENABLE_APPS_PLUGIN
