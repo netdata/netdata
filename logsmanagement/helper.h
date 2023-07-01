@@ -13,8 +13,6 @@
 #define LOGS_MANAG_STR_HELPER(x) #x
 #define LOGS_MANAG_STR(x) LOGS_MANAG_STR_HELPER(x)
 
-#define MAX_LOGS_MANAG_LOG_MSG_LEN 256
-
 #ifndef m_assert
 #if defined(LOGS_MANAGEMENT_STRESS_TEST) 
 #define m_assert(expr, msg) assert(((void)(msg), (expr)))
