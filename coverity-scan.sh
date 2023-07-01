@@ -173,7 +173,7 @@ installit() {
 OTHER_OPTIONS="--disable-lto"
 OTHER_OPTIONS+=" --with-zlib"
 OTHER_OPTIONS+=" --with-math"
-OTHER_OPTIONS+=" --enable-https"
+OTHER_OPTIONS+=" --enable-openssl"
 OTHER_OPTIONS+=" --enable-jsonc"
 OTHER_OPTIONS+=" --enable-plugin-nfacct"
 OTHER_OPTIONS+=" --enable-plugin-freeipmi"
