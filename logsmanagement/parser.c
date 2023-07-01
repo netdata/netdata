@@ -1574,7 +1574,7 @@ int parse_web_log_buf( char *text, size_t text_size,
  * @details It tries to automatically detect the configuration to be used for
  * a web log parser, by parsing a single web log line record and trying to pick 
  * a matching configuration (from a static list of predefined ones.)
- * @param[in] line Web log line to use in guessing the configuration.
+ * @param[in] line Null-terminated web log line to use in guessing the configuration.
  * @param[in] delimiter Delimiter used to break down \p line in separate fields.
  * @returns Pointer to the web log parser configuration if automatic detection
  * was sucessful, otherwise NULL.

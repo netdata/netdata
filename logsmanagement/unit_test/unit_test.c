@@ -129,7 +129,7 @@ const char * const parse_configs_to_test[] = {
 
     /* [2] Apache csvCombined 2 - extra white space */
     "::1 - - [01/Sep/2022:19:04:42 +0100] \"GET   /   HTTP/1.1\" 200 3477 \"-\" \"Mozilla/5.0 (Windows NT 10.0; \
-Win64; x64; rv:103.0)    Gecko/20100101 Firefox/103.0\"   ",
+Win64; x64; rv:103.0)    Gecko/20100101 Firefox/103.0\"",
 
     /* [3] Apache csvCombined 3 - with new line */
     "209.202.252.202 - rosenbaum7551 [20/Jun/2023:14:42:27 +0000] \"PUT /harness/networks/initiatives/engineer HTTP/2.0\"\
@@ -141,8 +141,8 @@ Win64; x64; rv:103.0)    Gecko/20100101 Firefox/103.0\"   ",
 /5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.53 Safari/537.36\
  Edg/103.0.1264.37\"",
 
-    /* [5] Apache csvCommon 1 - no double quotes at REQ field */                                                                                        
-    "127.0.0.1 - - [30/Jun/2022:16:43:51 +0300] GET / HTTP/1.0 200 11228",
+    /* [5] Apache csvCommon 1 */                                                                                        
+    "127.0.0.1 - - [30/Jun/2022:16:43:51 +0300] \"GET / HTTP/1.0\" 200 11228",
 
     /* [6] Apache csvCommon 2 - with carriage return */                                                                                        
     "180.89.137.89 - barrows1527 [05/Jun/2023:17:46:08 +0000]\
@@ -190,8 +190,13 @@ static int test_auto_detect_web_log_parser_config() {
     }
 
     for(int i = 0; i < (int) (sizeof(parse_configs_to_test) / sizeof(parse_configs_to_test[0])); i++){
+        size_t line_sz = strlen(parse_configs_to_test[i]) + 1;
         char *line = strdupz(parse_configs_to_test[i]);
-        line[strlen(line) - 1] = 0;
+        if(line[line_sz - 2] != '\n' && line[line_sz - 2] != '\r'){
+            line = reallocz(line, ++line_sz); // +1 to add '\n' char
+            line[line_sz - 1] = '\0';
+            line[line_sz - 2] = '\n';
+        }
         Web_log_parser_config_t *wblp_conf = auto_detect_web_log_parser_config(line, parse_config_delim);
         if(!wblp_conf){
             fprintf(stderr, "- Error (NULL wblp_conf) for:\n%s", line);
