@@ -1242,19 +1242,17 @@ static inline void coverity_remove_taint(char *s)
     (void)s;
 }
 
-int get_system_info(struct rrdhost_system_info *system_info) {
+int get_system_info(struct rrdhost_system_info *system_info, bool log) {
     char *script;
     script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("system-info.sh") + 2));
     sprintf(script, "%s/%s", netdata_configured_primary_plugins_dir, "system-info.sh");
     if (unlikely(access(script, R_OK) != 0)) {
-        netdata_log_info("System info script %s not found.",script);
+        error("System info script %s not found.",script);
         freez(script);
         return 1;
     }
 
     pid_t command_pid;
-
-    netdata_log_info("Executing %s", script);
 
     FILE *fp_child_input;
     FILE *fp_child_output = netdata_popen(script, &command_pid, &fp_child_input);
@@ -1275,10 +1273,12 @@ int get_system_info(struct rrdhost_system_info *system_info) {
                 coverity_remove_taint(value);
 
                 if(unlikely(rrdhost_set_system_info_variable(system_info, line, value))) {
-                    netdata_log_info("Unexpected environment variable %s=%s", line, value);
+                    error("Unexpected environment variable %s=%s", line, value);
                 }
                 else {
-                    netdata_log_info("%s=%s", line, value);
+                    if(log)
+                        netdata_log_info("%s=%s", line, value);
+
                     setenv(line, value, 1);
                 }
             }
@@ -1785,7 +1785,6 @@ int main(int argc, char **argv) {
                             claiming_pending_arguments = optarg + strlen(claim_string);
                         }
                         else if(strcmp(optarg, "buildinfo") == 0) {
-                            printf("Version: %s %s\n", program_name, program_version);
                             print_build_info();
                             return 0;
                         }
@@ -2049,7 +2048,7 @@ int main(int argc, char **argv) {
     netdata_anonymous_statistics_enabled=-1;
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
-    get_system_info(system_info);
+    get_system_info(system_info, true);
     (void) registry_get_this_machine_guid();
     system_info->hops = 0;
     get_install_type(&system_info->install_type, &system_info->prebuilt_arch, &system_info->prebuilt_dist);
