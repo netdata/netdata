@@ -73,6 +73,7 @@ typedef enum __attribute__((packed)) {
     BIB_EXPORT_ALLMETRICS,
     BIB_EXPORT_SHELL,
     BIB_DEVEL_TRACE_ALLOCATIONS,
+    BIB_DEVELOPER_MODE,
 } BUILD_INFO_BIT;
 
 static BITMAP256 BUILD_INFO = BITMAP256_INITIALIZER; // the bitmap we store our build information
@@ -633,6 +634,14 @@ static struct {
                 .value = NULL,
         },
         {
+                .bit = BIB_DEVELOPER_MODE,
+                .category = BIC_DEBUG_DEVEL,
+                .analytics = NULL,
+                .print = "Developer Mode (more runtime checks, slower)",
+                .print_json = "dev-mode",
+                .value = NULL,
+        },
+        {
                 .bit = 0,
                 .category = BIC_TERMINATOR,
                 .analytics = NULL,
@@ -829,6 +838,10 @@ __attribute__((constructor)) void initialize_build_info(void) {
 
 #ifdef NETDATA_TRACE_ALLOCATIONS
     bitmap256_set_bit(&BUILD_INFO, BIB_DEVEL_TRACE_ALLOCATIONS, true);
+#endif
+
+#if defined(NETDATA_DEV_MODE) || defined(NETDATA_INTERNAL_CHECKS)
+    bitmap256_set_bit(&BUILD_INFO, BIB_DEVELOPER_MODE, true);
 #endif
 }
 
