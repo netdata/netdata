@@ -3395,6 +3395,7 @@ static void ebpf_parse_args(int argc, char **argv)
                 exit_code = 0;
 unittest:
                 exit(exit_code);
+            }
             case EBPF_OPTION_SEVERITY_LEVEL: {
                 netdata_log_level_t slevel =  log_severity_string_to_severity_level(optarg);
                 log_collector_severity_level(slevel);
