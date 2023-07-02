@@ -1715,8 +1715,9 @@ static int bitmapX_test(BITMAPX *ptr, char *expected, const char *msg) {
         }
     }
 
-    fprintf(stderr,"%s(): %s, found %d errors\n",
-            __FUNCTION__, msg, errors);
+    if(errors)
+        fprintf(stderr,"%s(): %s, found %d errors\n",
+                __FUNCTION__, msg, errors);
 
     return errors;
 }

@@ -630,17 +630,14 @@ static inline BITMAPX *bitmapX_create(uint32_t bits) {
     return bmp;
 }
 
-static inline bool bitmapX_get_bit(register BITMAPX *ptr, register uint32_t idx) {
-    return (ptr->data[idx >> 5] & (1U << (idx & 31)));
-}
-
-static inline void bitmapX_set_bit(register BITMAPX *ptr, register uint32_t idx, register bool value) {
-    register uint64_t mask = 1U << (idx & 31);
-    if (value)
-        ptr->data[idx >> 5] |= mask;
-    else
-        ptr->data[idx >> 5] &= ~mask;
-}
+#define bitmapX_get_bit(ptr, idx) ((ptr)->data[(idx) >> 5] & (1U << ((idx) & 31)))
+#define bitmapX_set_bit(ptr, idx, value) do {           \
+    register uint32_t _bitmask = 1U << ((idx) & 31);  \
+    if (value)                                          \
+        (ptr)->data[(idx) >> 5] |= _bitmask;            \
+    else                                                \
+        (ptr)->data[(idx) >> 5] &= ~_bitmask;           \
+} while(0)
 
 #else // 64bit version of bitmaps
 
@@ -665,17 +662,14 @@ static inline BITMAPX *bitmapX_create(uint32_t bits) {
     return bmp;
 }
 
-static inline bool bitmapX_get_bit(register BITMAPX *ptr, register uint32_t idx) {
-    return (ptr->data[idx >> 6] & (1ULL << (idx & 63)));
-}
-
-static inline void bitmapX_set_bit(register BITMAPX *ptr, register uint32_t idx, register bool value) {
-    register uint64_t mask = 1ULL << (idx & 63);
-    if (value)
-        ptr->data[idx >> 6] |= mask;
-    else
-        ptr->data[idx >> 6] &= ~mask;
-}
+#define bitmapX_get_bit(ptr, idx) ((ptr)->data[(idx) >> 6] & (1ULL << ((idx) & 63)))
+#define bitmapX_set_bit(ptr, idx, value) do {           \
+    register uint64_t _bitmask = 1ULL << ((idx) & 63);  \
+    if (value)                                          \
+        (ptr)->data[(idx) >> 6] |= _bitmask;            \
+    else                                                \
+        (ptr)->data[(idx) >> 6] &= ~_bitmask;           \
+} while(0)
 
 #endif // 64bit version of bitmaps
 
