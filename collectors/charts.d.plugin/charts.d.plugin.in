@@ -24,6 +24,7 @@ MODULE_NAME="main"
 # create temp dir
 
 debug=0
+security_level=0
 TMP_DIR=
 chartsd_cleanup() {
 	trap '' EXIT QUIT HUP INT TERM
@@ -60,7 +61,7 @@ warning() {
 }
 
 error() {
-	log ERROR "${@}"
+	[ $security_level -ge 1 ] && log ERROR "${@}"
 }
 
 info() {
@@ -165,6 +166,7 @@ enable_all_charts="yes"
 # -----------------------------------------------------------------------------
 # parse parameters
 
+security_level_set=0
 check=0
 chart_only=
 while [ ! -z "$1" ]; do
@@ -176,6 +178,23 @@ while [ ! -z "$1" ]; do
 
 	if [ "$1" = "debug" -o "$1" = "all" ]; then
 		debug=1
+		shift
+		continue
+	fi
+
+	if [ "$1" = "severity-level" ] || [ $security_level_set -eq 1 ] ; then
+	  if [ $security_level_set -eq 0 ]; then
+	    security_level_set=1
+	  else
+	    security_level_set=0
+	    if [ "$1" != "info" -a "$1" != "error" ]; then
+	      error "Wrong security_level given, plugin will work with default info."
+	    else
+	      if [ "$1" = "error" ]; then
+	        security_level=1
+	      fi
+	    fi
+	  fi
 		shift
 		continue
 	fi
