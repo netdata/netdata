@@ -103,14 +103,14 @@ static inline int aclk_v2_payload_get_query(const char *payload, char **query_ur
     // TODO better check of URL
     if(strncmp(payload, ACLK_CLOUD_REQ_V2_PREFIX, strlen(ACLK_CLOUD_REQ_V2_PREFIX))) {
         errno = 0;
-        error("Only accepting requests that start with \"%s\" from CLOUD.", ACLK_CLOUD_REQ_V2_PREFIX);
+        netdata_log_error("Only accepting requests that start with \"%s\" from CLOUD.", ACLK_CLOUD_REQ_V2_PREFIX);
         return 1;
     }
     start = payload + 4;
 
     if(!(end = strstr(payload, " HTTP/1.1\x0D\x0A"))) {
         errno = 0;
-        error("Doesn't look like HTTP GET request.");
+        netdata_log_error("Doesn't look like HTTP GET request.");
         return 1;
     }
 
@@ -126,7 +126,7 @@ static int aclk_handle_cloud_http_request_v2(struct aclk_request *cloud_to_agent
 
     errno = 0;
     if (cloud_to_agent->version < ACLK_V_COMPRESSION) {
-        error(
+        netdata_log_error(
             "This handler cannot reply to request with version older than %d, received %d.",
             ACLK_V_COMPRESSION,
             cloud_to_agent->version);
@@ -136,22 +136,22 @@ static int aclk_handle_cloud_http_request_v2(struct aclk_request *cloud_to_agent
     query = aclk_query_new(HTTP_API_V2);
 
     if (unlikely(aclk_extract_v2_data(raw_payload, &query->data.http_api_v2.payload))) {
-        error("Error extracting payload expected after the JSON dictionary.");
+        netdata_log_error("Error extracting payload expected after the JSON dictionary.");
         goto error;
     }
 
     if (unlikely(aclk_v2_payload_get_query(query->data.http_api_v2.payload, &query->dedup_id))) {
-        error("Could not extract payload from query");
+        netdata_log_error("Could not extract payload from query");
         goto error;
     }
 
     if (unlikely(!cloud_to_agent->callback_topic)) {
-        error("Missing callback_topic");
+        netdata_log_error("Missing callback_topic");
         goto error;
     }
 
     if (unlikely(!cloud_to_agent->msg_id)) {
-        error("Missing msg_id");
+        netdata_log_error("Missing msg_id");
         goto error;
     }
 
@@ -254,13 +254,13 @@ int create_node_instance_result(const char *msg, size_t msg_len)
 
     uuid_t host_id, node_id;
     if (uuid_parse(res.machine_guid, host_id)) {
-        error("Error parsing machine_guid provided by CreateNodeInstanceResult");
+        netdata_log_error("Error parsing machine_guid provided by CreateNodeInstanceResult");
         freez(res.machine_guid);
         freez(res.node_id);
         return 1;
     }
     if (uuid_parse(res.node_id, node_id)) {
-        error("Error parsing node_id provided by CreateNodeInstanceResult");
+        netdata_log_error("Error parsing node_id provided by CreateNodeInstanceResult");
         freez(res.machine_guid);
         freez(res.node_id);
         return 1;
@@ -341,7 +341,7 @@ int start_alarm_streaming(const char *msg, size_t msg_len)
 {
     struct start_alarm_streaming res = parse_start_alarm_streaming(msg, msg_len);
     if (!res.node_id) {
-        error("Error parsing StartAlarmStreaming");
+        netdata_log_error("Error parsing StartAlarmStreaming");
         return 1;
     }
     aclk_start_alert_streaming(res.node_id, res.resets);
@@ -353,7 +353,7 @@ int send_alarm_checkpoint(const char *msg, size_t msg_len)
 {
     struct send_alarm_checkpoint sac = parse_send_alarm_checkpoint(msg, msg_len);
     if (!sac.node_id || !sac.claim_id) {
-        error("Error parsing SendAlarmCheckpoint");
+        netdata_log_error("Error parsing SendAlarmCheckpoint");
         freez(sac.node_id);
         freez(sac.claim_id);
         return 1;
@@ -368,7 +368,7 @@ int send_alarm_configuration(const char *msg, size_t msg_len)
 {
     char *config_hash = parse_send_alarm_configuration(msg, msg_len);
     if (!config_hash || !*config_hash) {
-        error("Error parsing SendAlarmConfiguration");
+        netdata_log_error("Error parsing SendAlarmConfiguration");
         freez(config_hash);
         return 1;
     }
@@ -381,7 +381,7 @@ int send_alarm_snapshot(const char *msg, size_t msg_len)
 {
     struct send_alarm_snapshot *sas = parse_send_alarm_snapshot(msg, msg_len);
     if (!sas->node_id || !sas->claim_id || !sas->snapshot_uuid) {
-        error("Error parsing SendAlarmSnapshot");
+        netdata_log_error("Error parsing SendAlarmSnapshot");
         destroy_send_alarm_snapshot(sas);
         return 1;
     }
@@ -396,7 +396,7 @@ int handle_disconnect_req(const char *msg, size_t msg_len)
     if (!cmd)
         return 1;
     if (cmd->permaban) {
-        error("Cloud Banned This Agent!");
+        netdata_log_error("Cloud Banned This Agent!");
         aclk_disable_runtime = 1;
     }
     netdata_log_info("Cloud requested disconnect (EC=%u, \"%s\")", (unsigned int)cmd->error_code, cmd->error_description);
@@ -531,7 +531,7 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
     new_cloud_rx_msg_t *msg_descriptor = find_rx_handler_by_hash(simple_hash(message_type));
     debug(D_ACLK, "Got message named '%s' from cloud", message_type);
     if (unlikely(!msg_descriptor)) {
-        error("Do not know how to handle message of type '%s'. Ignoring", message_type);
+        netdata_log_error("Do not know how to handle message of type '%s'. Ignoring", message_type);
         if (aclk_stats_enabled) {
             ACLK_STATS_LOCK;
             aclk_metrics_per_sample.cloud_req_err++;
@@ -557,7 +557,7 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
         ACLK_STATS_UNLOCK;
     }
     if (msg_descriptor->fnc(msg, msg_len)) {
-        error("Error processing message of type '%s'", message_type);
+        netdata_log_error("Error processing message of type '%s'", message_type);
         if (aclk_stats_enabled) {
             ACLK_STATS_LOCK;
             aclk_metrics_per_sample.cloud_req_err++;

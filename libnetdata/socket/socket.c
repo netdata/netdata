@@ -124,7 +124,7 @@ int sock_setnonblock(int fd) {
 
     int ret = fcntl(fd, F_SETFL, flags);
     if(ret < 0)
-        error("Failed to set O_NONBLOCK on socket %d", fd);
+        netdata_log_error("Failed to set O_NONBLOCK on socket %d", fd);
 
     return ret;
 }
@@ -137,7 +137,7 @@ int sock_delnonblock(int fd) {
 
     int ret = fcntl(fd, F_SETFL, flags);
     if(ret < 0)
-        error("Failed to remove O_NONBLOCK on socket %d", fd);
+        netdata_log_error("Failed to remove O_NONBLOCK on socket %d", fd);
 
     return ret;
 }
@@ -146,7 +146,7 @@ int sock_setreuse(int fd, int reuse) {
     int ret = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
 
     if(ret == -1)
-        error("Failed to set SO_REUSEADDR on socket %d", fd);
+        netdata_log_error("Failed to set SO_REUSEADDR on socket %d", fd);
 
     return ret;
 }
@@ -157,7 +157,7 @@ int sock_setreuse_port(int fd, int reuse) {
 #ifdef SO_REUSEPORT
     ret = setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse));
     if(ret == -1 && errno != ENOPROTOOPT)
-        error("failed to set SO_REUSEPORT on socket %d", fd);
+        netdata_log_error("failed to set SO_REUSEPORT on socket %d", fd);
 #else
     ret = -1;
 #endif
@@ -171,7 +171,7 @@ int sock_enlarge_in(int fd) {
     ret = setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &bs, sizeof(bs));
 
     if(ret == -1)
-        error("Failed to set SO_RCVBUF on socket %d", fd);
+        netdata_log_error("Failed to set SO_RCVBUF on socket %d", fd);
 
     return ret;
 }
@@ -181,7 +181,7 @@ int sock_enlarge_out(int fd) {
     ret = setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &bs, sizeof(bs));
 
     if(ret == -1)
-        error("Failed to set SO_SNDBUF on socket %d", fd);
+        netdata_log_error("Failed to set SO_SNDBUF on socket %d", fd);
 
     return ret;
 }
@@ -220,7 +220,7 @@ int create_listen_socket_unix(const char *path, int listen_backlog) {
 
     sock = socket(AF_UNIX, SOCK_STREAM, 0);
     if(sock < 0) {
-        error("LISTENER: UNIX socket() on path '%s' failed.", path);
+        netdata_log_error("LISTENER: UNIX socket() on path '%s' failed.", path);
         return -1;
     }
 
@@ -234,22 +234,22 @@ int create_listen_socket_unix(const char *path, int listen_backlog) {
 
     errno = 0;
     if (unlink(path) == -1 && errno != ENOENT)
-        error("LISTENER: failed to remove existing (probably obsolete or left-over) file on UNIX socket path '%s'.", path);
+        netdata_log_error("LISTENER: failed to remove existing (probably obsolete or left-over) file on UNIX socket path '%s'.", path);
 
     if(bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0) {
         close(sock);
-        error("LISTENER: UNIX bind() on path '%s' failed.", path);
+        netdata_log_error("LISTENER: UNIX bind() on path '%s' failed.", path);
         return -1;
     }
 
     // we have to chmod this to 0777 so that the client will be able
     // to read from and write to this socket.
     if(chmod(path, 0777) == -1)
-        error("LISTENER: failed to chmod() socket file '%s'.", path);
+        netdata_log_error("LISTENER: failed to chmod() socket file '%s'.", path);
 
     if(listen(sock, listen_backlog) < 0) {
         close(sock);
-        error("LISTENER: UNIX listen() on path '%s' failed.", path);
+        netdata_log_error("LISTENER: UNIX listen() on path '%s' failed.", path);
         return -1;
     }
 
@@ -264,7 +264,7 @@ int create_listen_socket4(int socktype, const char *ip, uint16_t port, int liste
 
     sock = socket(AF_INET, socktype, 0);
     if(sock < 0) {
-        error("LISTENER: IPv4 socket() on ip '%s' port %d, socktype %d failed.", ip, port, socktype);
+        netdata_log_error("LISTENER: IPv4 socket() on ip '%s' port %d, socktype %d failed.", ip, port, socktype);
         return -1;
     }
 
@@ -280,20 +280,20 @@ int create_listen_socket4(int socktype, const char *ip, uint16_t port, int liste
 
     int ret = inet_pton(AF_INET, ip, (void *)&name.sin_addr.s_addr);
     if(ret != 1) {
-        error("LISTENER: Failed to convert IP '%s' to a valid IPv4 address.", ip);
+        netdata_log_error("LISTENER: Failed to convert IP '%s' to a valid IPv4 address.", ip);
         close(sock);
         return -1;
     }
 
     if(bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0) {
         close(sock);
-        error("LISTENER: IPv4 bind() on ip '%s' port %d, socktype %d failed.", ip, port, socktype);
+        netdata_log_error("LISTENER: IPv4 bind() on ip '%s' port %d, socktype %d failed.", ip, port, socktype);
         return -1;
     }
 
     if(socktype == SOCK_STREAM && listen(sock, listen_backlog) < 0) {
         close(sock);
-        error("LISTENER: IPv4 listen() on ip '%s' port %d, socktype %d failed.", ip, port, socktype);
+        netdata_log_error("LISTENER: IPv4 listen() on ip '%s' port %d, socktype %d failed.", ip, port, socktype);
         return -1;
     }
 
@@ -309,7 +309,7 @@ int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip, int p
 
     sock = socket(AF_INET6, socktype, 0);
     if (sock < 0) {
-        error("LISTENER: IPv6 socket() on ip '%s' port %d, socktype %d, failed.", ip, port, socktype);
+        netdata_log_error("LISTENER: IPv6 socket() on ip '%s' port %d, socktype %d, failed.", ip, port, socktype);
         return -1;
     }
 
@@ -320,7 +320,7 @@ int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip, int p
 
     /* IPv6 only */
     if(setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (void*)&ipv6only, sizeof(ipv6only)) != 0)
-        error("LISTENER: Cannot set IPV6_V6ONLY on ip '%s' port %d, socktype %d.", ip, port, socktype);
+        netdata_log_error("LISTENER: Cannot set IPV6_V6ONLY on ip '%s' port %d, socktype %d.", ip, port, socktype);
 
     struct sockaddr_in6 name;
     memset(&name, 0, sizeof(struct sockaddr_in6));
@@ -330,7 +330,7 @@ int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip, int p
 
     int ret = inet_pton(AF_INET6, ip, (void *)&name.sin6_addr.s6_addr);
     if(ret != 1) {
-        error("LISTENER: Failed to convert IP '%s' to a valid IPv6 address.", ip);
+        netdata_log_error("LISTENER: Failed to convert IP '%s' to a valid IPv6 address.", ip);
         close(sock);
         return -1;
     }
@@ -339,13 +339,13 @@ int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip, int p
 
     if (bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0) {
         close(sock);
-        error("LISTENER: IPv6 bind() on ip '%s' port %d, socktype %d failed.", ip, port, socktype);
+        netdata_log_error("LISTENER: IPv6 bind() on ip '%s' port %d, socktype %d failed.", ip, port, socktype);
         return -1;
     }
 
     if (socktype == SOCK_STREAM && listen(sock, listen_backlog) < 0) {
         close(sock);
-        error("LISTENER: IPv6 listen() on ip '%s' port %d, socktype %d failed.", ip, port, socktype);
+        netdata_log_error("LISTENER: IPv6 listen() on ip '%s' port %d, socktype %d failed.", ip, port, socktype);
         return -1;
     }
 
@@ -355,7 +355,7 @@ int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip, int p
 
 static inline int listen_sockets_add(LISTEN_SOCKETS *sockets, int fd, int family, int socktype, const char *protocol, const char *ip, uint16_t port, int acl_flags) {
     if(sockets->opened >= MAX_LISTEN_FDS) {
-        error("LISTENER: Too many listening sockets. Failed to add listening %s socket at ip '%s' port %d, protocol %s, socktype %d", protocol, ip, port, protocol, socktype);
+        netdata_log_error("LISTENER: Too many listening sockets. Failed to add listening %s socket at ip '%s' port %d, protocol %s, socktype %d", protocol, ip, port, protocol, socktype);
         close(fd);
         return -1;
     }
@@ -485,7 +485,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
         protocol_str = "unix";
         int fd = create_listen_socket_unix(path, listen_backlog);
         if (fd == -1) {
-            error("LISTENER: Cannot create unix socket '%s'", path);
+            netdata_log_error("LISTENER: Cannot create unix socket '%s'", path);
             sockets->failed++;
         } else {
             acl_flags = WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING | WEB_CLIENT_ACL_SSL_DEFAULT;
@@ -551,7 +551,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
     if(*interface) {
         scope_id = if_nametoindex(interface);
         if(!scope_id)
-            error("LISTENER: Cannot find a network interface named '%s'. Continuing with limiting the network interface", interface);
+            netdata_log_error("LISTENER: Cannot find a network interface named '%s'. Continuing with limiting the network interface", interface);
     }
 
     if(!*ip || *ip == '*' || !strcmp(ip, "any") || !strcmp(ip, "all"))
@@ -571,7 +571,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
 
     int r = getaddrinfo(ip, port, &hints, &result);
     if (r != 0) {
-        error("LISTENER: getaddrinfo('%s', '%s'): %s\n", ip, port, gai_strerror(r));
+        netdata_log_error("LISTENER: getaddrinfo('%s', '%s'): %s\n", ip, port, gai_strerror(r));
         return -1;
     }
 
@@ -608,7 +608,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
         }
 
         if (fd == -1) {
-            error("LISTENER: Cannot bind to ip '%s', port %d", rip, rport);
+            netdata_log_error("LISTENER: Cannot bind to ip '%s', port %d", rip, rport);
             sockets->failed++;
         }
         else {
@@ -630,7 +630,7 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
     long long int old_port = sockets->default_port;
     long long int new_port = appconfig_get_number(sockets->config, sockets->config_section, "default port", sockets->default_port);
     if(new_port < 1 || new_port > 65535) {
-        error("LISTENER: Invalid listen port %lld given. Defaulting to %lld.", new_port, old_port);
+        netdata_log_error("LISTENER: Invalid listen port %lld given. Defaulting to %lld.", new_port, old_port);
         sockets->default_port = (uint16_t) appconfig_set_number(sockets->config, sockets->config_section, "default port", old_port);
     }
     else sockets->default_port = (uint16_t)new_port;
@@ -677,13 +677,13 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
 static inline int connect_to_unix(const char *path, struct timeval *timeout) {
     int fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if(fd == -1) {
-        error("Failed to create UNIX socket() for '%s'", path);
+        netdata_log_error("Failed to create UNIX socket() for '%s'", path);
         return -1;
     }
 
     if(timeout) {
         if(setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *) timeout, sizeof(struct timeval)) < 0)
-            error("Failed to set timeout on UNIX socket '%s'", path);
+            netdata_log_error("Failed to set timeout on UNIX socket '%s'", path);
     }
 
     struct sockaddr_un addr;
@@ -692,7 +692,7 @@ static inline int connect_to_unix(const char *path, struct timeval *timeout) {
     strncpy(addr.sun_path, path, sizeof(addr.sun_path)-1);
 
     if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
-        error("Cannot connect to UNIX socket on path '%s'.", path);
+        netdata_log_error("Cannot connect to UNIX socket on path '%s'.", path);
         close(fd);
         return -1;
     }
@@ -723,7 +723,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
 
     int ai_err = getaddrinfo(host, service, &hints, &ai_head);
     if (ai_err != 0) {
-        error("Cannot resolve host '%s', port '%s': %s", host, service, gai_strerror(ai_err));
+        netdata_log_error("Cannot resolve host '%s', port '%s': %s", host, service, gai_strerror(ai_err));
         return -1;
     }
 
@@ -804,7 +804,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
         if(fd != -1) {
             if(timeout) {
                 if(setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *) timeout, sizeof(struct timeval)) < 0)
-                    error("Failed to set timeout on the socket to ip '%s' port '%s'", hostBfr, servBfr);
+                    netdata_log_error("Failed to set timeout on the socket to ip '%s' port '%s'", hostBfr, servBfr);
             }
 
             errno = 0;
@@ -828,26 +828,26 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
                         }
                         else {
                             // This means that the socket is in error. We will close it and set fd to -1
-                            error("Failed to connect to '%s', port '%s'.", hostBfr, servBfr);
+                            netdata_log_error("Failed to connect to '%s', port '%s'.", hostBfr, servBfr);
                             close(fd);
                             fd = -1;
                         }
                     }
                     else if (ret == 0) {
                         // poll() timed out, the connection is not established within the specified timeout.
-                        error("Timed out while connecting to '%s', port '%s'.", hostBfr, servBfr);
+                        netdata_log_error("Timed out while connecting to '%s', port '%s'.", hostBfr, servBfr);
                         close(fd);
                         fd = -1;
                     }
                     else {
                         // poll() returned an error.
-                        error("Failed to connect to '%s', port '%s'. poll() returned %d", hostBfr, servBfr, ret);
+                        netdata_log_error("Failed to connect to '%s', port '%s'. poll() returned %d", hostBfr, servBfr, ret);
                         close(fd);
                         fd = -1;
                     }
                 }
                 else {
-                    error("Failed to connect to '%s', port '%s'", hostBfr, servBfr);
+                    netdata_log_error("Failed to connect to '%s', port '%s'", hostBfr, servBfr);
                     close(fd);
                     fd = -1;
                 }
@@ -933,14 +933,14 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
     debug(D_CONNECT_TO, "Attempting connection to host = '%s', service = '%s', interface = '%s', protocol = %d (tcp = %d, udp = %d)", host, service, interface, protocol, IPPROTO_TCP, IPPROTO_UDP);
 
     if(!*host) {
-        error("Definition '%s' does not specify a host.", definition);
+        netdata_log_error("Definition '%s' does not specify a host.", definition);
         return -1;
     }
 
     if(*interface) {
         scope_id = if_nametoindex(interface);
         if(!scope_id)
-            error("Cannot find a network interface named '%s'. Continuing with limiting the network interface", interface);
+            netdata_log_error("Cannot find a network interface named '%s'. Continuing with limiting the network interface", interface);
     }
 
     if(!*service)
@@ -1125,7 +1125,7 @@ ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
             return netdata_ssl_write(ssl, buf, len);
         }
         else {
-            error("cannot write to SSL connection - connection is not ready.");
+            netdata_log_error("cannot write to SSL connection - connection is not ready.");
             return -1;
         }
     }
@@ -1204,7 +1204,7 @@ int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsi
         if (err != 0 ||
             (err = getnameinfo((struct sockaddr *)&sadr, addrlen, client_host, (socklen_t)hostsize,
                               NULL, 0, NI_NAMEREQD)) != 0) {
-            error("Incoming %s on '%s' does not match a numeric pattern, and host could not be resolved (err=%s)",
+            netdata_log_error("Incoming %s on '%s' does not match a numeric pattern, and host could not be resolved (err=%s)",
                   patname, client_ip, gai_strerror(err));
             if (hostsize >= 8)
                 strcpy(client_host,"UNKNOWN");
@@ -1212,7 +1212,7 @@ int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsi
         }
         struct addrinfo *addr_infos = NULL;
         if (getaddrinfo(client_host, NULL, NULL, &addr_infos) !=0 ) {
-            error("LISTENER: cannot validate hostname '%s' from '%s' by resolving it",
+            netdata_log_error("LISTENER: cannot validate hostname '%s' from '%s' by resolving it",
                   client_host, client_ip);
             if (hostsize >= 8)
                 strcpy(client_host,"UNKNOWN");
@@ -1240,7 +1240,7 @@ int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsi
             scan = scan->ai_next;
         }
         if (!validated) {
-            error("LISTENER: Cannot validate '%s' as ip of '%s', not listed in DNS", client_ip, client_host);
+            netdata_log_error("LISTENER: Cannot validate '%s' as ip of '%s', not listed in DNS", client_ip, client_host);
             if (hostsize >= 8)
                 strcpy(client_host,"UNKNOWN");
         }
@@ -1266,7 +1266,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
     if (likely(nfd >= 0)) {
         if (getnameinfo((struct sockaddr *)&sadr, addrlen, client_ip, (socklen_t)ipsize,
                         client_port, (socklen_t)portsize, NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
-            error("LISTENER: cannot getnameinfo() on received client connection.");
+            netdata_log_error("LISTENER: cannot getnameinfo() on received client connection.");
             strncpyz(client_ip, "UNKNOWN", ipsize);
             strncpyz(client_port, "UNKNOWN", portsize);
         }
@@ -1308,7 +1308,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
         }
         if (!connection_allowed(nfd, client_ip, client_host, hostsize, access_list, "connection", allow_dns)) {
             errno = 0;
-            error("Permission denied for client '%s', port '%s'", client_ip, client_port);
+            netdata_log_error("Permission denied for client '%s', port '%s'", client_ip, client_port);
             close(nfd);
             nfd = -1;
             errno = EPERM;
@@ -1316,7 +1316,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
     }
 #ifdef HAVE_ACCEPT4
     else if (errno == ENOSYS)
-        error("netdata has been compiled with the assumption that the system has the accept4() call, but it is not here. Recompile netdata like this: ./configure --disable-accept4 ...");
+        netdata_log_error("netdata has been compiled with the assumption that the system has the accept4() call, but it is not here. Recompile netdata like this: ./configure --disable-accept4 ...");
 #endif
 
     return nfd;
@@ -1457,7 +1457,7 @@ inline void poll_close_fd(POLLINFO *pi) {
 
         if(likely(!(pi->flags & POLLINFO_FLAG_DONT_CLOSE))) {
             if(close(pf->fd) == -1)
-                error("Failed to close() poll_events() socket %d", pf->fd);
+                netdata_log_error("Failed to close() poll_events() socket %d", pf->fd);
         }
     }
 
@@ -1507,14 +1507,14 @@ void *poll_default_add_callback(POLLINFO *pi, short int *events, void *data) {
     (void)events;
     (void)data;
 
-    // error("POLLFD: internal error: poll_default_add_callback() called");
+    // netdata_log_error("POLLFD: internal error: poll_default_add_callback() called");
 
     return NULL;
 }
 
 void poll_default_del_callback(POLLINFO *pi) {
     if(pi->data)
-        error("POLLFD: internal error: del_callback_default() called with data pointer - possible memory leak");
+        netdata_log_error("POLLFD: internal error: del_callback_default() called with data pointer - possible memory leak");
 }
 
 int poll_default_rcv_callback(POLLINFO *pi, short int *events) {
@@ -1528,7 +1528,7 @@ int poll_default_rcv_callback(POLLINFO *pi, short int *events) {
         if (rc < 0) {
             // read failed
             if (errno != EWOULDBLOCK && errno != EAGAIN) {
-                error("POLLFD: poll_default_rcv_callback(): recv() failed with %zd.", rc);
+                netdata_log_error("POLLFD: poll_default_rcv_callback(): recv() failed with %zd.", rc);
                 return -1;
             }
         } else if (rc) {
@@ -1565,7 +1565,7 @@ static void poll_events_cleanup(void *data) {
 }
 
 static int poll_process_error(POLLINFO *pi, struct pollfd *pf, short int revents) {
-    error("POLLFD: LISTENER: received %s %s %s on socket at slot %zu (fd %d) client '%s' port '%s' expecting %s %s %s, having %s %s %s"
+    netdata_log_error("POLLFD: LISTENER: received %s %s %s on socket at slot %zu (fd %d) client '%s' port '%s' expecting %s %s %s, having %s %s %s"
           , revents & POLLERR  ? "POLLERR" : ""
           , revents & POLLHUP  ? "POLLHUP" : ""
           , revents & POLLNVAL ? "POLLNVAL" : ""
@@ -1673,7 +1673,7 @@ static int poll_process_new_tcp_connection(POLLJOB *p, POLLINFO *pi, struct poll
                       p->used, p->limit);
         }
         else if(unlikely(errno != EWOULDBLOCK && errno != EAGAIN))
-            error("POLLFD: LISTENER: accept() failed.");
+            netdata_log_error("POLLFD: LISTENER: accept() failed.");
 
     }
     else {
@@ -1720,7 +1720,7 @@ void poll_events(LISTEN_SOCKETS *sockets
         , size_t max_tcp_sockets
 ) {
     if(!sockets || !sockets->opened) {
-        error("POLLFD: internal error: no listening sockets are opened");
+        netdata_log_error("POLLFD: internal error: no listening sockets are opened");
         return;
     }
 
@@ -1827,7 +1827,7 @@ void poll_events(LISTEN_SOCKETS *sockets
         time_t now = now_boottime_sec();
 
         if(unlikely(retval == -1)) {
-            error("POLLFD: LISTENER: poll() failed while waiting on %zu sockets.", p.max + 1);
+            netdata_log_error("POLLFD: LISTENER: poll() failed while waiting on %zu sockets.", p.max + 1);
             break;
         }
         else if(unlikely(!retval)) {
@@ -1885,7 +1885,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                             conns[conns_max++] = i;
                         }
                         else
-                            error("POLLFD: LISTENER: server slot %zu (fd %d) connection from %s port %s using unhandled socket type %d."
+                            netdata_log_error("POLLFD: LISTENER: server slot %zu (fd %d) connection from %s port %s using unhandled socket type %d."
                                  , i
                                  , pi->fd
                                  , pi->client_ip ? pi->client_ip : "<undefined-ip>"
@@ -1894,7 +1894,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                             );
                     }
                     else
-                        error("POLLFD: LISTENER: client slot %zu (fd %d) data from %s port %s using flags %08X is neither client nor server."
+                        netdata_log_error("POLLFD: LISTENER: client slot %zu (fd %d) data from %s port %s using flags %08X is neither client nor server."
                               , i
                               , pi->fd
                               , pi->client_ip ? pi->client_ip : "<undefined-ip>"
@@ -1903,7 +1903,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                         );
                 }
                 else
-                    error("POLLFD: LISTENER: socket slot %zu (fd %d) client %s port %s unhandled event id %d."
+                    netdata_log_error("POLLFD: LISTENER: socket slot %zu (fd %d) client %s port %s unhandled event id %d."
                       , i
                       , pi->fd
                       , pi->client_ip ? pi->client_ip : "<undefined-ip>"

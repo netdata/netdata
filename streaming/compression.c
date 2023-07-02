@@ -52,7 +52,7 @@ size_t rrdpush_compress(struct compressor_state *state, const char *data, size_t
         return 0;
 
     if(unlikely(size > COMPRESSION_MAX_MSG_SIZE)) {
-        error("RRDPUSH COMPRESS: Compression Failed - Message size %lu above compression buffer limit: %d",
+        netdata_log_error("RRDPUSH COMPRESS: Compression Failed - Message size %lu above compression buffer limit: %d",
               (long unsigned int)size, COMPRESSION_MAX_MSG_SIZE);
         return 0;
     }
@@ -83,7 +83,7 @@ size_t rrdpush_compress(struct compressor_state *state, const char *data, size_t
         1);
 
     if (compressed_data_size < 0) {
-        error("Data compression error: %ld", compressed_data_size);
+        netdata_log_error("Data compression error: %ld", compressed_data_size);
         return 0;
     }
 
@@ -125,7 +125,7 @@ size_t rrdpush_decompress(struct decompressor_state *state, const char *compress
             );
 
     if (unlikely(decompressed_size < 0)) {
-        error("RRDPUSH DECOMPRESS: decompressor returned negative decompressed bytes: %ld", decompressed_size);
+        netdata_log_error("RRDPUSH DECOMPRESS: decompressor returned negative decompressed bytes: %ld", decompressed_size);
         return 0;
     }
 

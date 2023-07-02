@@ -50,7 +50,7 @@ REGISTRY_URL *registry_url_get(const char *url, size_t urllen) {
         debug(D_REGISTRY, "Registry: registry_url_get('%s'): indexing it", url);
         n = registry_url_index_add(u);
         if(n != u) {
-            error("INTERNAL ERROR: registry_url_get(): url '%s' already exists in the registry as '%s'", u->url, n->url);
+            netdata_log_error("INTERNAL ERROR: registry_url_get(): url '%s' already exists in the registry as '%s'", u->url, n->url);
             freez(u);
             u = n;
         }
@@ -72,11 +72,11 @@ void registry_url_unlink(REGISTRY_URL *u) {
         debug(D_REGISTRY, "Registry: registry_url_unlink('%s'): No more links for this URL", u->url);
         REGISTRY_URL *n = registry_url_index_del(u);
         if(!n) {
-            error("INTERNAL ERROR: registry_url_unlink('%s'): cannot find url in index", u->url);
+            netdata_log_error("INTERNAL ERROR: registry_url_unlink('%s'): cannot find url in index", u->url);
         }
         else {
             if(n != u) {
-                error("INTERNAL ERROR: registry_url_unlink('%s'): deleted different url '%s'", u->url, n->url);
+                netdata_log_error("INTERNAL ERROR: registry_url_unlink('%s'): deleted different url '%s'", u->url, n->url);
             }
 
             registry.urls_memory -= sizeof(REGISTRY_URL) + n->len; // no need for +1, 1 is already in REGISTRY_URL

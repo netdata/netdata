@@ -350,7 +350,8 @@ void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc) {
 
     // delete it from SQL
     if(ctx_delete_context(&rc->rrdhost->host_uuid, &rc->hub) != 0)
-        error("RRDCONTEXT: failed to delete context '%s' version %"PRIu64" from SQL.", rc->hub.id, rc->hub.version);
+        netdata_log_error("RRDCONTEXT: failed to delete context '%s' version %"PRIu64" from SQL.",
+                          rc->hub.id, rc->hub.version);
 }
 
 static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jobs) {
@@ -374,11 +375,11 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jo
                                         if(rrdmetric_should_be_deleted(rm)) {
                                             if(worker_jobs) worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
                                             if(!dictionary_del(ri->rrdmetrics, string2str(rm->id)))
-                                                error("RRDCONTEXT: metric '%s' of instance '%s' of context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
-                                                      string2str(rm->id),
-                                                      string2str(ri->id),
-                                                      string2str(rc->id),
-                                                      rrdhost_hostname(host));
+                                                netdata_log_error("RRDCONTEXT: metric '%s' of instance '%s' of context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
+                                                                  string2str(rm->id),
+                                                                  string2str(ri->id),
+                                                                  string2str(rc->id),
+                                                                  rrdhost_hostname(host));
                                             else
                                                 internal_error(
                                                         true,
@@ -394,10 +395,10 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jo
                             if(rrdinstance_should_be_deleted(ri)) {
                                 if(worker_jobs) worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
                                 if(!dictionary_del(rc->rrdinstances, string2str(ri->id)))
-                                    error("RRDCONTEXT: instance '%s' of context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
-                                          string2str(ri->id),
-                                          string2str(rc->id),
-                                          rrdhost_hostname(host));
+                                    netdata_log_error("RRDCONTEXT: instance '%s' of context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
+                                                      string2str(ri->id),
+                                                      string2str(rc->id),
+                                                      rrdhost_hostname(host));
                                 else
                                     internal_error(
                                             true,
@@ -415,7 +416,7 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jo
                     rrdcontext_delete_from_sql_unsafe(rc);
 
                     if(!dictionary_del(host->rrdctx.contexts, string2str(rc->id)))
-                        error("RRDCONTEXT: context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
+                        netdata_log_error("RRDCONTEXT: context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
                               string2str(rc->id),
                               rrdhost_hostname(host));
                     else
@@ -844,7 +845,7 @@ void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe_unused
         rrdcontext_delete_from_sql_unsafe(rc);
 
     else if (ctx_store_context(&rc->rrdhost->host_uuid, &rc->hub) != 0)
-        error("RRDCONTEXT: failed to save context '%s' version %"PRIu64" to SQL.", rc->hub.id, rc->hub.version);
+        netdata_log_error("RRDCONTEXT: failed to save context '%s' version %"PRIu64" to SQL.", rc->hub.id, rc->hub.version);
 }
 
 static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending __maybe_unused) {
@@ -1021,8 +1022,8 @@ static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now
 
                         // delete it from the master dictionary
                         if(!dictionary_del(host->rrdctx.contexts, string2str(rc->id)))
-                            error("RRDCONTEXT: '%s' of host '%s' failed to be deleted from rrdcontext dictionary.",
-                                  string2str(id), rrdhost_hostname(host));
+                            netdata_log_error("RRDCONTEXT: '%s' of host '%s' failed to be deleted from rrdcontext dictionary.",
+                                              string2str(id), rrdhost_hostname(host));
 
                         string_freez(id);
                     }

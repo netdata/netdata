@@ -22,7 +22,7 @@ static ssize_t send_to_plugin(const char *txt, void *data) {
             bytes = netdata_ssl_write(ssl, (void *) txt, strlen(txt));
 
         else
-            error("PLUGINSD: cannot send command (SSL)");
+            netdata_log_error("PLUGINSD: cannot send command (SSL)");
 
         spinlock_unlock(&parser->writer.spinlock);
         return bytes;
@@ -33,7 +33,7 @@ static ssize_t send_to_plugin(const char *txt, void *data) {
 
         bytes = fprintf(parser->fp_output, "%s", txt);
         if(bytes <= 0) {
-            error("PLUGINSD: cannot send command (FILE)");
+            netdata_log_error("PLUGINSD: cannot send command (FILE)");
             bytes = -2;
         }
         else
@@ -51,7 +51,7 @@ static ssize_t send_to_plugin(const char *txt, void *data) {
         do {
             sent = write(parser->fd, &txt[bytes], total - bytes);
             if(sent <= 0) {
-                error("PLUGINSD: cannot send command (fd)");
+                netdata_log_error("PLUGINSD: cannot send command (fd)");
                 spinlock_unlock(&parser->writer.spinlock);
                 return -3;
             }
@@ -64,7 +64,7 @@ static ssize_t send_to_plugin(const char *txt, void *data) {
     }
 
     spinlock_unlock(&parser->writer.spinlock);
-    error("PLUGINSD: cannot send command (no output socket/pipe/file given to plugins.d parser)");
+    netdata_log_error("PLUGINSD: cannot send command (no output socket/pipe/file given to plugins.d parser)");
     return -4;
 }
 
@@ -72,7 +72,7 @@ static inline RRDHOST *pluginsd_require_host_from_parent(PARSER *parser, const c
     RRDHOST *host = parser->user.host;
 
     if(unlikely(!host))
-        error("PLUGINSD: command %s requires a host, but is not set.", cmd);
+        netdata_log_error("PLUGINSD: command %s requires a host, but is not set.", cmd);
 
     return host;
 }
@@ -81,7 +81,7 @@ static inline RRDSET *pluginsd_require_chart_from_parent(PARSER *parser, const c
     RRDSET *st = parser->user.st;
 
     if(unlikely(!st))
-        error("PLUGINSD: command %s requires a chart defined via command %s, but is not set.", cmd, parent_cmd);
+        netdata_log_error("PLUGINSD: command %s requires a chart defined via command %s, but is not set.", cmd, parent_cmd);
 
     return st;
 }
@@ -124,8 +124,10 @@ void pluginsd_rrdset_cleanup(RRDSET *st) {
 static inline void pluginsd_unlock_previous_chart(PARSER *parser, const char *keyword, bool stale) {
     if(unlikely(pluginsd_unlock_rrdset_data_collection(parser))) {
         if(stale)
-            error("PLUGINSD: 'host:%s/chart:%s/' stale data collection lock found during %s; it has been unlocked",
-              rrdhost_hostname(parser->user.st->rrdhost), rrdset_id(parser->user.st), keyword);
+            netdata_log_error("PLUGINSD: 'host:%s/chart:%s/' stale data collection lock found during %s; it has been unlocked",
+                              rrdhost_hostname(parser->user.st->rrdhost),
+                              rrdset_id(parser->user.st),
+                              keyword);
     }
 
     if(unlikely(parser->user.v2.ml_locked)) {
@@ -133,8 +135,10 @@ static inline void pluginsd_unlock_previous_chart(PARSER *parser, const char *ke
         parser->user.v2.ml_locked = false;
 
         if(stale)
-            error("PLUGINSD: 'host:%s/chart:%s/' stale ML lock found during %s, it has been unlocked",
-              rrdhost_hostname(parser->user.st->rrdhost), rrdset_id(parser->user.st), keyword);
+            netdata_log_error("PLUGINSD: 'host:%s/chart:%s/' stale ML lock found during %s, it has been unlocked",
+                              rrdhost_hostname(parser->user.st->rrdhost),
+                              rrdset_id(parser->user.st),
+                              keyword);
     }
 }
 
@@ -159,8 +163,8 @@ static inline void pluginsd_set_chart_from_parent(PARSER *parser, RRDSET *st, co
 
 static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, const char *dimension, const char *cmd) {
     if (unlikely(!dimension || !*dimension)) {
-        error("PLUGINSD: 'host:%s/chart:%s' got a %s, without a dimension.",
-              rrdhost_hostname(host), rrdset_id(st), cmd);
+        netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a %s, without a dimension.",
+                          rrdhost_hostname(host), rrdset_id(st), cmd);
         return NULL;
     }
 
@@ -181,8 +185,8 @@ static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, cons
 
     rda = rrddim_find_and_acquire(st, dimension);
     if (unlikely(!rda)) {
-        error("PLUGINSD: 'host:%s/chart:%s/dim:%s' got a %s but dimension does not exist.",
-              rrdhost_hostname(host), rrdset_id(st), dimension, cmd);
+        netdata_log_error("PLUGINSD: 'host:%s/chart:%s/dim:%s' got a %s but dimension does not exist.",
+                          rrdhost_hostname(host), rrdset_id(st), dimension, cmd);
 
         return NULL;
     }
@@ -195,15 +199,15 @@ static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, cons
 
 static inline RRDSET *pluginsd_find_chart(RRDHOST *host, const char *chart, const char *cmd) {
     if (unlikely(!chart || !*chart)) {
-        error("PLUGINSD: 'host:%s' got a %s without a chart id.",
-              rrdhost_hostname(host), cmd);
+        netdata_log_error("PLUGINSD: 'host:%s' got a %s without a chart id.",
+                          rrdhost_hostname(host), cmd);
         return NULL;
     }
 
     RRDSET *st = rrdset_find(host, chart);
     if (unlikely(!st))
-        error("PLUGINSD: 'host:%s/chart:%s' got a %s but chart does not exist.",
-              rrdhost_hostname(host), chart, cmd);
+        netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a %s but chart does not exist.",
+                          rrdhost_hostname(host), chart, cmd);
 
     return st;
 }
@@ -717,7 +721,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     pf->sent_ut = now_realtime_usec();
 
     if(ret < 0) {
-        error("FUNCTION: failed to send function to plugin, error %d", ret);
+        netdata_log_error("FUNCTION: failed to send function to plugin, error %d", ret);
         rrd_call_function_error(pf->destination_wb, "Failed to communicate with collector", HTTP_RESP_BACKEND_FETCH_FAILED);
     }
     else {
@@ -731,7 +735,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
 static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused, void *new_func, void *parser_ptr __maybe_unused) {
     struct inflight_function *pf = new_func;
 
-    error("PLUGINSD_PARSER: duplicate UUID on pending function '%s' detected. Ignoring the second one.", string2str(pf->function));
+    netdata_log_error("PLUGINSD_PARSER: duplicate UUID on pending function '%s' detected. Ignoring the second one.", string2str(pf->function));
     pf->code = rrd_call_function_error(pf->destination_wb, "This request is already in progress", HTTP_RESP_BAD_REQUEST);
     pf->callback(pf->destination_wb, pf->code, pf->callback_data);
     string_freez(pf->function);
@@ -841,14 +845,14 @@ static inline PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER
     if(!st) global = true;
 
     if (unlikely(!timeout_s || !name || !help || (!global && !st))) {
-        error("PLUGINSD: 'host:%s/chart:%s' got a FUNCTION, without providing the required data (global = '%s', name = '%s', timeout = '%s', help = '%s'). Ignoring it.",
-              rrdhost_hostname(host),
-              st?rrdset_id(st):"(unset)",
-              global?"yes":"no",
-              name?name:"(unset)",
-              timeout_s?timeout_s:"(unset)",
-              help?help:"(unset)"
-              );
+        netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a FUNCTION, without providing the required data (global = '%s', name = '%s', timeout = '%s', help = '%s'). Ignoring it.",
+                          rrdhost_hostname(host),
+                          st?rrdset_id(st):"(unset)",
+                          global?"yes":"no",
+                          name?name:"(unset)",
+                          timeout_s?timeout_s:"(unset)",
+                          help?help:"(unset)"
+                          );
         return PARSER_RC_ERROR;
     }
 
@@ -878,7 +882,7 @@ static inline PARSER_RC pluginsd_function_result_begin(char **words, size_t num_
     char *expires = get_word(words, num_words, 4);
 
     if (unlikely(!key || !*key || !status || !*status || !format || !*format || !expires || !*expires)) {
-        error("got a " PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " without providing the required data (key = '%s', status = '%s', format = '%s', expires = '%s')."
+        netdata_log_error("got a " PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " without providing the required data (key = '%s', status = '%s', format = '%s', expires = '%s')."
               , key ? key : "(unset)"
               , status ? status : "(unset)"
               , format ? format : "(unset)"
@@ -898,7 +902,7 @@ static inline PARSER_RC pluginsd_function_result_begin(char **words, size_t num_
         pf = (struct inflight_function *)dictionary_get(parser->inflight.functions, key);
 
     if(!pf) {
-        error("got a " PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " for transaction '%s', but the transaction is not found.", key?key:"(unset)");
+        netdata_log_error("got a " PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " for transaction '%s', but the transaction is not found.", key?key:"(unset)");
     }
     else {
         if(format && *format)
@@ -955,11 +959,11 @@ static inline PARSER_RC pluginsd_variable(char **words, size_t num_words, PARSER
         value = NULL;
 
     if (unlikely(!value)) {
-        error("PLUGINSD: 'host:%s/chart:%s' cannot set %s VARIABLE '%s' to an empty value",
-              rrdhost_hostname(host),
-              st ? rrdset_id(st):"UNSET",
-              (global) ? "HOST" : "CHART",
-              name);
+        netdata_log_error("PLUGINSD: 'host:%s/chart:%s' cannot set %s VARIABLE '%s' to an empty value",
+                          rrdhost_hostname(host),
+                          st ? rrdset_id(st):"UNSET",
+                          (global) ? "HOST" : "CHART",
+                          name);
         return PARSER_RC_OK;
     }
 
@@ -970,18 +974,18 @@ static inline PARSER_RC pluginsd_variable(char **words, size_t num_words, PARSER
     v = (NETDATA_DOUBLE) str2ndd_encoded(value, &endptr);
     if (unlikely(endptr && *endptr)) {
         if (endptr == value)
-            error("PLUGINSD: 'host:%s/chart:%s' the value '%s' of VARIABLE '%s' cannot be parsed as a number",
-                  rrdhost_hostname(host),
-                  st ? rrdset_id(st):"UNSET",
-                  value,
-                  name);
+            netdata_log_error("PLUGINSD: 'host:%s/chart:%s' the value '%s' of VARIABLE '%s' cannot be parsed as a number",
+                              rrdhost_hostname(host),
+                              st ? rrdset_id(st):"UNSET",
+                              value,
+                              name);
         else
-            error("PLUGINSD: 'host:%s/chart:%s' the value '%s' of VARIABLE '%s' has leftovers: '%s'",
-                  rrdhost_hostname(host),
-                  st ? rrdset_id(st):"UNSET",
-                  value,
-                  name,
-                  endptr);
+            netdata_log_error("PLUGINSD: 'host:%s/chart:%s' the value '%s' of VARIABLE '%s' has leftovers: '%s'",
+                              rrdhost_hostname(host),
+                              st ? rrdset_id(st):"UNSET",
+                              value,
+                              name,
+                              endptr);
     }
 
     if (global) {
@@ -991,9 +995,9 @@ static inline PARSER_RC pluginsd_variable(char **words, size_t num_words, PARSER
             rrdvar_custom_host_variable_release(host, rva);
         }
         else
-            error("PLUGINSD: 'host:%s' cannot find/create HOST VARIABLE '%s'",
-                  rrdhost_hostname(host),
-                  name);
+            netdata_log_error("PLUGINSD: 'host:%s' cannot find/create HOST VARIABLE '%s'",
+                              rrdhost_hostname(host),
+                              name);
     } else {
         const RRDSETVAR_ACQUIRED *rsa = rrdsetvar_custom_chart_variable_add_and_acquire(st, name);
         if (rsa) {
@@ -1001,8 +1005,8 @@ static inline PARSER_RC pluginsd_variable(char **words, size_t num_words, PARSER
             rrdsetvar_custom_chart_variable_release(st, rsa);
         }
         else
-            error("PLUGINSD: 'host:%s/chart:%s' cannot find/create CHART VARIABLE '%s'",
-                  rrdhost_hostname(host), rrdset_id(st), name);
+            netdata_log_error("PLUGINSD: 'host:%s/chart:%s' cannot find/create CHART VARIABLE '%s'",
+                              rrdhost_hostname(host), rrdset_id(st), name);
     }
 
     return PARSER_RC_OK;
@@ -1093,7 +1097,7 @@ static inline PARSER_RC pluginsd_clabel(char **words, size_t num_words, PARSER *
     const char *label_source = get_word(words, num_words, 3);
 
     if (!name || !value || !*label_source) {
-        error("Ignoring malformed or empty CHART LABEL command.");
+        netdata_log_error("Ignoring malformed or empty CHART LABEL command.");
         return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
     }
 
@@ -1118,7 +1122,7 @@ static inline PARSER_RC pluginsd_clabel_commit(char **words __maybe_unused, size
     debug(D_PLUGINSD, "requested to commit chart labels");
 
     if(!parser->user.chart_rrdlabels_linked_temporarily) {
-        error("PLUGINSD: 'host:%s' got CLABEL_COMMIT, without a CHART or BEGIN. Ignoring it.", rrdhost_hostname(host));
+        netdata_log_error("PLUGINSD: 'host:%s' got CLABEL_COMMIT, without a CHART or BEGIN. Ignoring it.", rrdhost_hostname(host));
         return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
     }
 
@@ -1209,11 +1213,12 @@ static inline PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PA
             return PARSER_RC_OK;
         }
 
-        error("PLUGINSD REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN
-              " from %ld to %ld, but timestamps are invalid "
-              "(now is %ld [%s], tolerance %ld). Ignoring " PLUGINSD_KEYWORD_REPLAY_SET,
-              rrdhost_hostname(st->rrdhost), rrdset_id(st), start_time, end_time,
-              wall_clock_time, wall_clock_comes_from_child ? "child wall clock" : "parent wall clock", tolerance);
+        netdata_log_error("PLUGINSD REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN
+                          " from %ld to %ld, but timestamps are invalid "
+                          "(now is %ld [%s], tolerance %ld). Ignoring " PLUGINSD_KEYWORD_REPLAY_SET,
+                          rrdhost_hostname(st->rrdhost), rrdset_id(st), start_time, end_time,
+                          wall_clock_time, wall_clock_comes_from_child ? "child wall clock" : "parent wall clock",
+                          tolerance);
     }
 
     // the child sends an RBEGIN without any parameters initially
@@ -1279,7 +1284,7 @@ static inline PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARS
     if(!rd) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
     if (unlikely(!parser->user.replay.start_time || !parser->user.replay.end_time)) {
-        error("PLUGINSD: 'host:%s/chart:%s/dim:%s' got a %s with invalid timestamps %ld to %ld from a %s. Disabling it.",
+        netdata_log_error("PLUGINSD: 'host:%s/chart:%s/dim:%s' got a %s with invalid timestamps %ld to %ld from a %s. Disabling it.",
               rrdhost_hostname(host),
               rrdset_id(st),
               dimension,
@@ -1391,7 +1396,7 @@ static inline PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, si
 
 static inline PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARSER *parser) {
     if (num_words < 7) { // accepts 7, but the 7th is optional
-        error("REPLAY: malformed " PLUGINSD_KEYWORD_REPLAY_END " command");
+        netdata_log_error("REPLAY: malformed " PLUGINSD_KEYWORD_REPLAY_END " command");
         return PARSER_RC_ERROR;
     }
 
@@ -1808,7 +1813,7 @@ static inline PARSER_RC streaming_claimed_id(char **words, size_t num_words, PAR
     const char *claim_id_str = get_word(words, num_words, 2);
 
     if (!host_uuid_str || !claim_id_str) {
-        error("Command CLAIMED_ID came malformed, uuid = '%s', claim_id = '%s'",
+        netdata_log_error("Command CLAIMED_ID came malformed, uuid = '%s', claim_id = '%s'",
               host_uuid_str ? host_uuid_str : "[unset]",
               claim_id_str ? claim_id_str : "[unset]");
         return PARSER_RC_ERROR;
@@ -1820,16 +1825,16 @@ static inline PARSER_RC streaming_claimed_id(char **words, size_t num_words, PAR
     // We don't need the parsed UUID
     // just do it to check the format
     if(uuid_parse(host_uuid_str, uuid)) {
-        error("1st parameter (host GUID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", host_uuid_str);
+        netdata_log_error("1st parameter (host GUID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", host_uuid_str);
         return PARSER_RC_ERROR;
     }
     if(uuid_parse(claim_id_str, uuid) && strcmp(claim_id_str, "NULL") != 0) {
-        error("2nd parameter (Claim ID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", claim_id_str);
+        netdata_log_error("2nd parameter (Claim ID) to CLAIMED_ID command is not valid GUID. Received: \"%s\".", claim_id_str);
         return PARSER_RC_ERROR;
     }
 
     if(strcmp(host_uuid_str, host->machine_guid) != 0) {
-        error("Claim ID is for host \"%s\" but it came over connection for \"%s\"", host_uuid_str, host->machine_guid);
+        netdata_log_error("Claim ID is for host \"%s\" but it came over connection for \"%s\"", host_uuid_str, host->machine_guid);
         return PARSER_RC_OK; //the message is OK problem must be somewhere else
     }
 
@@ -1882,27 +1887,27 @@ static inline bool buffered_reader_read_timeout(struct buffered_reader *reader, 
             return buffered_reader_read(reader, fd);
 
         else if(fds[0].revents & POLLERR) {
-            error("PARSER: read failed: POLLERR.");
+            netdata_log_error("PARSER: read failed: POLLERR.");
             return false;
         }
         else if(fds[0].revents & POLLHUP) {
-            error("PARSER: read failed: POLLHUP.");
+            netdata_log_error("PARSER: read failed: POLLHUP.");
             return false;
         }
         else if(fds[0].revents & POLLNVAL) {
-            error("PARSER: read failed: POLLNVAL.");
+            netdata_log_error("PARSER: read failed: POLLNVAL.");
             return false;
         }
 
-        error("PARSER: poll() returned positive number, but POLLIN|POLLERR|POLLHUP|POLLNVAL are not set.");
+        netdata_log_error("PARSER: poll() returned positive number, but POLLIN|POLLERR|POLLHUP|POLLNVAL are not set.");
         return false;
     }
     else if (ret == 0) {
-        error("PARSER: timeout while waiting for data.");
+        netdata_log_error("PARSER: timeout while waiting for data.");
         return false;
     }
 
-    error("PARSER: poll() failed with code %d.", ret);
+    netdata_log_error("PARSER: poll() failed with code %d.", ret);
     return false;
 }
 
@@ -1927,13 +1932,13 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     }
 
     if (unlikely(fileno(fp_plugin_input) == -1)) {
-        error("input file descriptor given is not a valid stream");
+        netdata_log_error("input file descriptor given is not a valid stream");
         cd->serial_failures++;
         return 0;
     }
 
     if (unlikely(fileno(fp_plugin_output) == -1)) {
-        error("output file descriptor given is not a valid stream");
+        netdata_log_error("output file descriptor given is not a valid stream");
         cd->serial_failures++;
         return 0;
     }

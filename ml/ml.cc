@@ -1390,7 +1390,7 @@ void ml_host_get_models(RRDHOST *rh, BUFFER *wb)
     UNUSED(wb);
 
     // TODO: To be implemented
-    error("Fetching KMeans models is not supported yet");
+    netdata_log_error("Fetching KMeans models is not supported yet");
 }
 
 void ml_chart_new(RRDSET *rs)
@@ -1519,11 +1519,11 @@ static void ml_flush_pending_models(ml_training_thread_t *training_thread) {
 
     // try to rollback transaction if we got any failures
     if (rc) {
-        error("Trying to rollback ML transaction because it failed with rc=%d, op_no=%d", rc, op_no);
+        netdata_log_error("Trying to rollback ML transaction because it failed with rc=%d, op_no=%d", rc, op_no);
         op_no++;
         rc = db_execute(db, "ROLLBACK;");
         if (rc)
-            error("ML transaction rollback failed with rc=%d", rc);
+            netdata_log_error("ML transaction rollback failed with rc=%d", rc);
     }
 
     training_thread->pending_model_info.clear();

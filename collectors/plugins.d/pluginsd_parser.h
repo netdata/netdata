@@ -209,8 +209,8 @@ static inline int parser_action(PARSER *parser, char *input) {
             buffer_fast_strcat(wb, "\"", 1);
         }
 
-        error("PLUGINSD: parser_action('%s') failed on line %zu: { %s } (quotes added to show parsing)",
-              command, parser->line, buffer_tostring(wb));
+        netdata_log_error("PLUGINSD: parser_action('%s') failed on line %zu: { %s } (quotes added to show parsing)",
+                          command, parser->line, buffer_tostring(wb));
 
         buffer_free(wb);
     }

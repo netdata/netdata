@@ -104,7 +104,7 @@ void parse_command_line(int argc, char **argv) {
     if (freq >= netdata_update_every) {
         netdata_update_every = freq;
     } else if (freq) {
-        error("update frequency %d seconds is too small for CUPS. Using %d.", freq, netdata_update_every);
+        netdata_log_error("update frequency %d seconds is too small for CUPS. Using %d.", freq, netdata_update_every);
     }
 }
 
@@ -275,7 +275,7 @@ int main(int argc, char **argv) {
             httpClose(http);
             http = httpConnect2(cupsServer(), ippPort(), NULL, AF_UNSPEC, cupsEncryption(), 0, netdata_update_every * 1000, NULL);
             if(http == NULL) {
-                error("cups daemon is not running. Exiting!");
+                netdata_log_error("cups daemon is not running. Exiting!");
                 exit(1);
             }
         }
@@ -321,7 +321,7 @@ int main(int argc, char **argv) {
                         fprintf(stderr, "printer state is missing for destination %s", curr_dest->name);
                     break;
                 default:
-                    error("Unknown printer state (%d) found.", printer_state);
+                    netdata_log_error("Unknown printer state (%d) found.", printer_state);
                     break;
             }
 
@@ -364,7 +364,7 @@ int main(int argc, char **argv) {
                     global_job_metrics.size_processing += curr_job->size;
                     break;
                 default:
-                    error("Unsupported job state (%u) found.", curr_job->state);
+                    netdata_log_error("Unsupported job state (%u) found.", curr_job->state);
                     break;
             }
         }

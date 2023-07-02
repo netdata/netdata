@@ -289,20 +289,20 @@ static void health_silencers_init(void) {
                     json_parse(str, NULL, health_silencers_json_read_callback);
                     netdata_log_info("Parsed health silencers file %s", silencers_filename);
                 } else {
-                    error("Cannot read the data from health silencers file %s", silencers_filename);
+                    netdata_log_error("Cannot read the data from health silencers file %s", silencers_filename);
                 }
                 freez(str);
             }
         } else {
-            error(
-                "Health silencers file %s has the size %" PRId64 " that is out of range[ 1 , %d ]. Aborting read.",
-                silencers_filename,
-                (int64_t)length,
-                HEALTH_SILENCERS_MAX_FILE_LEN);
+            netdata_log_error("Health silencers file %s has the size %" PRId64 " that is out of range[ 1 , %d ]. Aborting read.",
+                              silencers_filename,
+                              (int64_t)length,
+                              HEALTH_SILENCERS_MAX_FILE_LEN);
         }
         fclose(fd);
     } else {
-        netdata_log_info("Cannot open the file %s, so Netdata will work with the default health configuration.",silencers_filename);
+        netdata_log_info("Cannot open the file %s, so Netdata will work with the default health configuration.",
+                         silencers_filename);
     }
 }
 
@@ -589,7 +589,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
         enqueue_alarm_notify_in_progress(ae);
         health_alarm_log_save(host, ae);
     } else {
-        error("Failed to format command arguments");
+        netdata_log_error("Failed to format command arguments");
     }
 
     buffer_free(wb);
@@ -803,7 +803,10 @@ static void initialize_health(RRDHOST *host)
 
     long n = config_get_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", host->health_log.max);
     if(n < 10) {
-        error("Host '%s': health configuration has invalid max log entries %ld. Using default %u", rrdhost_hostname(host), n, host->health_log.max);
+        netdata_log_error("Host '%s': health configuration has invalid max log entries %ld. Using default %u",
+                          rrdhost_hostname(host),
+                          n,
+                          host->health_log.max);
         config_set_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", (long)host->health_log.max);
     }
     else

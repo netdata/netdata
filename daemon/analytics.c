@@ -1035,11 +1035,11 @@ void send_statistics(const char *action, const char *action_result, const char *
         char *s = fgets(buffer, 4, fp_child_output);
         int exit_code = netdata_pclose(fp_child_input, fp_child_output, command_pid);
         if (exit_code)
-            error("Execution of anonymous statistics script returned %d.", exit_code);
+            netdata_log_error("Execution of anonymous statistics script returned %d.", exit_code);
         if (s && strncmp(buffer, "200", 3))
-            error("Execution of anonymous statistics script returned http code %s.", buffer);
+            netdata_log_error("Execution of anonymous statistics script returned http code %s.", buffer);
     } else {
-        error("Failed to run anonymous statistics script %s.", as_script);
+        netdata_log_error("Failed to run anonymous statistics script %s.", as_script);
     }
     freez(command_to_run);
 }

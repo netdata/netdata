@@ -178,7 +178,7 @@ static struct domain_metrics *domain_metrics_free(struct domain_metrics *d) {
     }
 
     if(unlikely(!cur)) {
-        error("XENSTAT: failed to free domain metrics.");
+        netdata_log_error("XENSTAT: failed to free domain metrics.");
         return NULL;
     }
 
@@ -242,7 +242,7 @@ static int vcpu_metrics_collect(struct domain_metrics *d, xenstat_domain *domain
         vcpu = xenstat_domain_vcpu(domain, i);
 
         if(unlikely(!vcpu)) {
-            error("XENSTAT: cannot get VCPU statistics.");
+            netdata_log_error("XENSTAT: cannot get VCPU statistics.");
             return 1;
         }
 
@@ -288,7 +288,7 @@ static int vbd_metrics_collect(struct domain_metrics *d, xenstat_domain *domain)
         vbd = xenstat_domain_vbd(domain, i);
 
         if(unlikely(!vbd)) {
-            error("XENSTAT: cannot get VBD statistics.");
+            netdata_log_error("XENSTAT: cannot get VBD statistics.");
             return 1;
         }
 
@@ -336,7 +336,7 @@ static int network_metrics_collect(struct domain_metrics *d, xenstat_domain *dom
         network = xenstat_domain_network(domain, i);
 
         if(unlikely(!network)) {
-            error("XENSTAT: cannot get network statistics.");
+            netdata_log_error("XENSTAT: cannot get network statistics.");
             return 1;
         }
 
@@ -368,7 +368,7 @@ static int xenstat_collect(xenstat_handle *xhandle, libxl_ctx *ctx, libxl_dominf
 
     xenstat_node *node = xenstat_get_node(xhandle, XENSTAT_ALL);
     if (unlikely(!node)) {
-        error("XENSTAT: failed to retrieve statistics from libxenstat.");
+        netdata_log_error("XENSTAT: failed to retrieve statistics from libxenstat.");
         return 1;
     }
 
@@ -388,7 +388,7 @@ static int xenstat_collect(xenstat_handle *xhandle, libxl_ctx *ctx, libxl_dominf
         // get domain UUID
         unsigned int id = xenstat_domain_id(domain);
         if(unlikely(libxl_domain_info(ctx, info, id))) {
-            error("XENSTAT: cannot get domain info.");
+            netdata_log_error("XENSTAT: cannot get domain info.");
         }
         else {
             snprintfz(uuid, LIBXL_UUID_FMTLEN, LIBXL_UUID_FMT "\n", LIBXL_UUID_BYTES(info->uuid));
@@ -989,7 +989,7 @@ int main(int argc, char **argv) {
             exit(1);
         }
 
-        error("xenstat.plugin: ignoring parameter '%s'", argv[i]);
+        netdata_log_error("xenstat.plugin: ignoring parameter '%s'", argv[i]);
     }
 
     errno = 0;
@@ -997,7 +997,7 @@ int main(int argc, char **argv) {
     if(freq >= netdata_update_every)
         netdata_update_every = freq;
     else if(freq)
-        error("update frequency %d seconds is too small for XENSTAT. Using %d.", freq, netdata_update_every);
+        netdata_log_error("update frequency %d seconds is too small for XENSTAT. Using %d.", freq, netdata_update_every);
 
     // ------------------------------------------------------------------------
     // initialize xen API handles
@@ -1008,13 +1008,13 @@ int main(int argc, char **argv) {
     if(unlikely(debug)) fprintf(stderr, "xenstat.plugin: calling xenstat_init()\n");
     xhandle = xenstat_init();
     if (xhandle == NULL) {
-        error("XENSTAT: failed to initialize xenstat library.");
+        netdata_log_error("XENSTAT: failed to initialize xenstat library.");
         return 1;
     }
 
     if(unlikely(debug)) fprintf(stderr, "xenstat.plugin: calling libxl_ctx_alloc()\n");
     if (libxl_ctx_alloc(&ctx, LIBXL_VERSION, 0, NULL)) {
-        error("XENSTAT: failed to initialize xl context.");
+        netdata_log_error("XENSTAT: failed to initialize xl context.");
         xenstat_uninit(xhandle);
         return 1;
     }

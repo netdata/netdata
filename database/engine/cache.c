@@ -1847,7 +1847,7 @@ void pgc_destroy(PGC *cache) {
     free_all_unreferenced_clean_pages(cache);
 
     if(PGC_REFERENCED_PAGES(cache))
-        error("DBENGINE CACHE: there are %zu referenced cache pages - leaving the cache allocated", PGC_REFERENCED_PAGES(cache));
+        netdata_log_error("DBENGINE CACHE: there are %zu referenced cache pages - leaving the cache allocated", PGC_REFERENCED_PAGES(cache));
     else {
         pointer_destroy_index(cache);
 

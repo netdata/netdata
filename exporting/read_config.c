@@ -176,7 +176,7 @@ inline EXPORTING_OPTIONS exporting_parse_data_source(const char *data_source, EX
         exporting_options |= EXPORTING_SOURCE_DATA_SUM;
         exporting_options &= ~(EXPORTING_OPTIONS_SOURCE_BITS ^ EXPORTING_SOURCE_DATA_SUM);
     } else {
-        error("EXPORTING: invalid data data_source method '%s'.", data_source);
+        netdata_log_error("EXPORTING: invalid data data_source method '%s'.", data_source);
     }
 
     return exporting_options;
@@ -316,34 +316,34 @@ struct engine *read_exporting_config()
         netdata_log_info("Instance %s on %s", tmp_ci_list->local_ci.instance_name, tmp_ci_list->local_ci.connector_name);
 
         if (tmp_ci_list->exporting_type == EXPORTING_CONNECTOR_TYPE_UNKNOWN) {
-            error("Unknown exporting connector type");
+            netdata_log_error("Unknown exporting connector type");
             goto next_connector_instance;
         }
 
 #ifndef ENABLE_PROMETHEUS_REMOTE_WRITE
         if (tmp_ci_list->exporting_type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE) {
-            error("Prometheus Remote Write support isn't compiled");
+            netdata_log_error("Prometheus Remote Write support isn't compiled");
             goto next_connector_instance;
         }
 #endif
 
 #ifndef HAVE_KINESIS
         if (tmp_ci_list->exporting_type == EXPORTING_CONNECTOR_TYPE_KINESIS) {
-            error("AWS Kinesis support isn't compiled");
+            netdata_log_error("AWS Kinesis support isn't compiled");
             goto next_connector_instance;
         }
 #endif
 
 #ifndef ENABLE_EXPORTING_PUBSUB
         if (tmp_ci_list->exporting_type == EXPORTING_CONNECTOR_TYPE_PUBSUB) {
-            error("Google Cloud Pub/Sub support isn't compiled");
+            netdata_log_error("Google Cloud Pub/Sub support isn't compiled");
             goto next_connector_instance;
         }
 #endif
 
 #ifndef HAVE_MONGOC
         if (tmp_ci_list->exporting_type == EXPORTING_CONNECTOR_TYPE_MONGODB) {
-            error("MongoDB support isn't compiled");
+            netdata_log_error("MongoDB support isn't compiled");
             goto next_connector_instance;
         }
 #endif

@@ -106,7 +106,7 @@ static void on_pipe_read(uv_stream_t* pipe, ssize_t nread, const uv_buf_t* buf)
     } else if (UV_EOF == nread) {
         netdata_log_info("EOF found in spawn pipe.");
     } else if (nread < 0) {
-        error("%s: %s", __func__, uv_strerror(nread));
+        netdata_log_error("%s: %s", __func__, uv_strerror(nread));
     }
 
     if (nread < 0) { /* stop stream due to EOF or error */
@@ -176,7 +176,7 @@ void spawn_client(void *arg)
     loop = mallocz(sizeof(uv_loop_t));
     ret = uv_loop_init(loop);
     if (ret) {
-        error("uv_loop_init(): %s", uv_strerror(ret));
+        netdata_log_error("uv_loop_init(): %s", uv_strerror(ret));
         spawn_thread_error = ret;
         goto error_after_loop_init;
     }
@@ -185,14 +185,14 @@ void spawn_client(void *arg)
     spawn_async.data = NULL;
     ret = uv_async_init(loop, &spawn_async, async_cb);
     if (ret) {
-        error("uv_async_init(): %s", uv_strerror(ret));
+        netdata_log_error("uv_async_init(): %s", uv_strerror(ret));
         spawn_thread_error = ret;
         goto error_after_async_init;
     }
 
     ret = uv_pipe_init(loop, &spawn_channel, 1);
     if (ret) {
-        error("uv_pipe_init(): %s", uv_strerror(ret));
+        netdata_log_error("uv_pipe_init(): %s", uv_strerror(ret));
         spawn_thread_error = ret;
         goto error_after_pipe_init;
     }
@@ -200,7 +200,7 @@ void spawn_client(void *arg)
 
     ret = create_spawn_server(loop, &spawn_channel, &process);
     if (ret) {
-        error("Failed to fork spawn server process.");
+        netdata_log_error("Failed to fork spawn server process.");
         spawn_thread_error = ret;
         goto error_after_spawn_server;
     }

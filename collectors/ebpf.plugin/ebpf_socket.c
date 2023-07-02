@@ -1927,7 +1927,7 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
         netdata_socket_plot_t *check ;
         check = (netdata_socket_plot_t *) avl_insert_lock(&out->tree, (avl_t *)w);
         if (check != w)
-            error("Internal error, cannot insert the AVL tree.");
+            netdata_log_error("Internal error, cannot insert the AVL tree.");
 
 #ifdef NETDATA_INTERNAL_CHECKS
         char iptext[INET6_ADDRSTRLEN];
@@ -3165,7 +3165,7 @@ static inline in_addr_t ipv4_network(in_addr_t addr, int prefix)
 static inline int ip2nl(uint8_t *dst, char *ip, int domain, char *source)
 {
     if (inet_pton(domain, ip, dst) <= 0) {
-        error("The address specified (%s) is invalid ", source);
+        netdata_log_error("The address specified (%s) is invalid ", source);
         return -1;
     }
 
@@ -3639,7 +3639,7 @@ static void read_max_dimension(struct config *cfg)
                                         EBPF_MAXIMUM_DIMENSIONS,
                                         NETDATA_NV_CAP_VALUE);
     if (maxdim < 0) {
-        error("'maximum dimensions = %d' must be a positive number, Netdata will change for default value %ld.",
+        netdata_log_error("'maximum dimensions = %d' must be a positive number, Netdata will change for default value %ld.",
               maxdim, NETDATA_NV_CAP_VALUE);
         maxdim = NETDATA_NV_CAP_VALUE;
     }
@@ -3827,7 +3827,7 @@ static void link_dimension_name(char *port, uint32_t hash, char *value)
 {
     int test = str2i(port);
     if (test < NETDATA_MINIMUM_PORT_VALUE || test > NETDATA_MAXIMUM_PORT_VALUE){
-        error("The dimension given (%s = %s) has an invalid value and it will be ignored.", port, value);
+        netdata_log_error("The dimension given (%s = %s) has an invalid value and it will be ignored.", port, value);
         return;
     }
 
@@ -3950,7 +3950,7 @@ static int ebpf_socket_load_bpf(ebpf_module_t *em)
 #endif
 
     if (ret) {
-        error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
+        netdata_log_error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
     }
 
     return ret;
@@ -3975,7 +3975,7 @@ void *ebpf_socket_thread(void *ptr)
     parse_table_size_options(&socket_config);
 
     if (pthread_mutex_init(&nv_mutex, NULL)) {
-        error("Cannot initialize local mutex");
+        netdata_log_error("Cannot initialize local mutex");
         goto endsocket;
     }
 

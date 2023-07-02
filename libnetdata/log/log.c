@@ -530,7 +530,7 @@ static FILE *open_log_file(int fd, FILE *fp, const char *filename, int *enabled_
     else {
         f = open(filename, O_WRONLY | O_APPEND | O_CREAT, 0664);
         if(f == -1) {
-            error("Cannot open file '%s'. Leaving %d to its default.", filename, fd);
+            netdata_log_error("Cannot open file '%s'. Leaving %d to its default.", filename, fd);
             if(fd_ptr) *fd_ptr = fd;
             return fp;
         }
@@ -550,7 +550,7 @@ static FILE *open_log_file(int fd, FILE *fp, const char *filename, int *enabled_
         // it automatically closes
         int t = dup2(f, fd);
         if (t == -1) {
-            error("Cannot dup2() new fd %d to old fd %d for '%s'", f, fd, filename);
+            netdata_log_error("Cannot dup2() new fd %d to old fd %d for '%s'", f, fd, filename);
             close(f);
             if(fd_ptr) *fd_ptr = fd;
             return fp;
@@ -563,10 +563,10 @@ static FILE *open_log_file(int fd, FILE *fp, const char *filename, int *enabled_
     if(!fp) {
         fp = fdopen(fd, "a");
         if (!fp)
-            error("Cannot fdopen() fd %d ('%s')", fd, filename);
+            netdata_log_error("Cannot fdopen() fd %d ('%s')", fd, filename);
         else {
             if (setvbuf(fp, NULL, _IOLBF, 0) != 0)
-                error("Cannot set line buffering on fd %d ('%s')", fd, filename);
+                netdata_log_error("Cannot set line buffering on fd %d ('%s')", fd, filename);
         }
     }
 

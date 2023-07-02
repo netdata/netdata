@@ -118,7 +118,7 @@ void worker_register_job_custom_metric(size_t job_id, const char *name, const ch
     if(unlikely(!worker)) return;
 
     if(unlikely(job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES)) {
-        error("WORKER_UTILIZATION: job_id %zu is too big. Max is %zu", job_id, (size_t)(WORKER_UTILIZATION_MAX_JOB_TYPES - 1));
+        netdata_log_error("WORKER_UTILIZATION: job_id %zu is too big. Max is %zu", job_id, (size_t)(WORKER_UTILIZATION_MAX_JOB_TYPES - 1));
         return;
     }
 
@@ -127,7 +127,7 @@ void worker_register_job_custom_metric(size_t job_id, const char *name, const ch
 
     if(worker->per_job_type[job_id].name) {
         if(strcmp(string2str(worker->per_job_type[job_id].name), name) != 0 || worker->per_job_type[job_id].type != type || strcmp(string2str(worker->per_job_type[job_id].units), units) != 0)
-            error("WORKER_UTILIZATION: duplicate job registration: worker '%s' job id %zu is '%s', ignoring the later '%s'", worker->workname, job_id, string2str(worker->per_job_type[job_id].name), name);
+            netdata_log_error("WORKER_UTILIZATION: duplicate job registration: worker '%s' job id %zu is '%s', ignoring the later '%s'", worker->workname, job_id, string2str(worker->per_job_type[job_id].name), name);
         return;
     }
 

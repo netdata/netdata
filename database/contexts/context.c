@@ -33,7 +33,7 @@ static void rrdcontext_insert_callback(const DICTIONARY_ITEM *item __maybe_unuse
         // we are loading data from the SQL database
 
         if(rc->version)
-            error("RRDCONTEXT: context '%s' is already initialized with version %"PRIu64", but it is loaded again from SQL with version %"PRIu64"", string2str(rc->id), rc->version, rc->hub.version);
+            netdata_log_error("RRDCONTEXT: context '%s' is already initialized with version %"PRIu64", but it is loaded again from SQL with version %"PRIu64"", string2str(rc->id), rc->version, rc->hub.version);
 
         // IMPORTANT
         // replace all string pointers in rc->hub with our own versions

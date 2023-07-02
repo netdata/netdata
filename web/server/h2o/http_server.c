@@ -78,11 +78,11 @@ static int ssl_init()
 
     /* load certificate and private key */
     if (SSL_CTX_use_PrivateKey_file(accept_ctx.ssl_ctx, key_fn, SSL_FILETYPE_PEM) != 1) {
-        error("Could not load server key from \"%s\"", key_fn);
+        netdata_log_error("Could not load server key from \"%s\"", key_fn);
         return -1;
     }
     if (SSL_CTX_use_certificate_file(accept_ctx.ssl_ctx, cert_fn, SSL_FILETYPE_PEM) != 1) {
-        error("Could not load certificate from \"%s\"", cert_fn);
+        netdata_log_error("Could not load certificate from \"%s\"", cert_fn);
         return -1;
     }
 
@@ -318,14 +318,14 @@ void *h2o_main(void *ptr) {
     accept_ctx.hosts = config.hosts;
 
     if (create_listener(bind_addr, bind_port) != 0) {
-        error("failed to create listener %s:%d", bind_addr, bind_port);
+        netdata_log_error("failed to create listener %s:%d", bind_addr, bind_port);
         return NULL;
     }
 
     while (service_running(SERVICE_HTTPD)) {
         int rc = h2o_evloop_run(ctx.loop, POLL_INTERVAL);
         if (rc < 0 && errno != EINTR) {
-            error("h2o_evloop_run returned (%d) with errno other than EINTR. Aborting", rc);
+            netdata_log_error("h2o_evloop_run returned (%d) with errno other than EINTR. Aborting", rc);
             break;
         }
     } 

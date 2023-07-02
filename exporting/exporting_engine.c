@@ -183,7 +183,7 @@ void *exporting_main(void *ptr)
     }
 
     if (init_connectors(engine) != 0) {
-        error("EXPORTING: cannot initialize exporting connectors");
+        netdata_log_error("EXPORTING: cannot initialize exporting connectors");
         send_statistics("EXPORTING_START", "FAIL", "-");
         goto cleanup;
     }

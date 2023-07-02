@@ -799,7 +799,7 @@ static bool send_replay_chart_cmd(struct replication_request_details *r, const c
 
     ssize_t ret = r->caller.callback(buffer, r->caller.data);
     if (ret < 0) {
-        error("REPLAY ERROR: 'host:%s/chart:%s' failed to send replication request to child (error %zd)",
+        netdata_log_error("REPLAY ERROR: 'host:%s/chart:%s' failed to send replication request to child (error %zd)",
               rrdhost_hostname(r->host), rrdset_id(r->st), ret);
         return false;
     }
@@ -1860,7 +1860,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
 
     int threads = config_get_number(CONFIG_SECTION_DB, "replication threads", 1);
     if(threads < 1 || threads > MAX_REPLICATION_THREADS) {
-        error("replication threads given %d is invalid, resetting to 1", threads);
+        netdata_log_error("replication threads given %d is invalid, resetting to 1", threads);
         threads = 1;
     }
 

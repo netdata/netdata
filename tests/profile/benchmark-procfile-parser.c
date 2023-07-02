@@ -207,7 +207,7 @@ procfile *procfile_readall1(procfile *ff) {
         debug(D_PROCFILE, "Reading file '%s', from position %zd with length %zd", procfile_filename(ff), s, (ssize_t)(ff->size - s));
         r = read(ff->fd, &ff->data[s], ff->size - s);
         if(unlikely(r == -1)) {
-            if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) error(PF_PREFIX ": Cannot read from file '%s' on fd %d", procfile_filename(ff), ff->fd);
+            if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) netdata_log_error(PF_PREFIX ": Cannot read from file '%s' on fd %d", procfile_filename(ff), ff->fd);
             procfile_close(ff);
             return NULL;
         }
@@ -217,7 +217,7 @@ procfile *procfile_readall1(procfile *ff) {
 
     // debug(D_PROCFILE, "Rewinding file '%s'", ff->filename);
     if(unlikely(lseek(ff->fd, 0, SEEK_SET) == -1)) {
-        if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
+        if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) netdata_log_error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
         procfile_close(ff);
         return NULL;
     }

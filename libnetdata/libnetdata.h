@@ -601,7 +601,7 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 #define UNUSED_FUNCTION(x) UNUSED_##x
 #endif
 
-#define error_report(x, args...) do { errno = 0; error(x, ##args); } while(0)
+#define error_report(x, args...) do { errno = 0; netdata_log_error(x, ##args); } while(0)
 
 // Taken from linux kernel
 #define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))

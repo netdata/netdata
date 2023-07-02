@@ -83,7 +83,7 @@ void ml_config_load(ml_config_t *cfg) {
      */
 
     if (min_train_samples >= max_train_samples) {
-        error("invalid min/max train samples found (%u >= %u)", min_train_samples, max_train_samples);
+        netdata_log_error("invalid min/max train samples found (%u >= %u)", min_train_samples, max_train_samples);
 
         min_train_samples = 1 * 3600;
         max_train_samples = 6 * 3600;

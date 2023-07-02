@@ -842,10 +842,10 @@ void rrdset_delete_files(RRDSET *st) {
         if(cache_filename) {
             netdata_log_info("Deleting chart header file '%s'.", cache_filename);
             if (unlikely(unlink(cache_filename) == -1))
-                error("Cannot delete chart header file '%s'", cache_filename);
+                netdata_log_error("Cannot delete chart header file '%s'", cache_filename);
         }
         else
-            error("Cannot find the cache filename of chart '%s'", rrdset_id(st));
+            netdata_log_error("Cannot find the cache filename of chart '%s'", rrdset_id(st));
     }
 
     rrddim_foreach_read(rd, st) {
@@ -854,7 +854,7 @@ void rrdset_delete_files(RRDSET *st) {
 
         netdata_log_info("Deleting dimension file '%s'.", cache_filename);
         if(unlikely(unlink(cache_filename) == -1))
-            error("Cannot delete dimension file '%s'", cache_filename);
+            netdata_log_error("Cannot delete dimension file '%s'", cache_filename);
     }
     rrddim_foreach_done(rd);
 
@@ -873,7 +873,7 @@ void rrdset_delete_obsolete_dimensions(RRDSET *st) {
             if(!cache_filename) continue;
             netdata_log_info("Deleting dimension file '%s'.", cache_filename);
             if(unlikely(unlink(cache_filename) == -1))
-                error("Cannot delete dimension file '%s'", cache_filename);
+                netdata_log_error("Cannot delete dimension file '%s'", cache_filename);
         }
     }
     rrddim_foreach_done(rd);
@@ -1538,7 +1538,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
     }
 
     if (unlikely(rrdset_flags & RRDSET_FLAG_OBSOLETE)) {
-        error("Chart '%s' has the OBSOLETE flag set, but it is collected.", rrdset_id(st));
+        netdata_log_error("Chart '%s' has the OBSOLETE flag set, but it is collected.", rrdset_id(st));
         rrdset_isnot_obsolete(st);
     }
 
@@ -1685,7 +1685,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
             collected_total += rd->collector.collected_value;
 
             if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))) {
-                error("Dimension %s in chart '%s' has the OBSOLETE flag set, but it is collected.", rrddim_name(rd), rrdset_id(st));
+                netdata_log_error("Dimension %s in chart '%s' has the OBSOLETE flag set, but it is collected.", rrddim_name(rd), rrdset_id(st));
                 rrddim_isnot_obsolete(st, rd);
             }
         }
@@ -2166,15 +2166,15 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
         memset(st_on_file, 0, size);
     }
     else if(strncmp(st_on_file->id, rrdset_id(st), RRD_ID_LENGTH_MAX_V019) != 0) {
-        error("File '%s' contents are not for chart '%s'. Clearing it.", fullfilename, rrdset_id(st));
+        netdata_log_error("File '%s' contents are not for chart '%s'. Clearing it.", fullfilename, rrdset_id(st));
         memset(st_on_file, 0, size);
     }
     else if(st_on_file->memsize != size || st_on_file->entries != st->db.entries) {
-        error("File '%s' does not have the desired size. Clearing it.", fullfilename);
+        netdata_log_error("File '%s' does not have the desired size. Clearing it.", fullfilename);
         memset(st_on_file, 0, size);
     }
     else if(st_on_file->update_every != st->update_every) {
-        error("File '%s' does not have the desired granularity. Clearing it.", fullfilename);
+        netdata_log_error("File '%s' does not have the desired granularity. Clearing it.", fullfilename);
         memset(st_on_file, 0, size);
     }
     else if((now_s - st_on_file->last_updated.tv_sec) > (long)st->update_every * (long)st->db.entries) {
@@ -2182,7 +2182,7 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
         memset(st_on_file, 0, size);
     }
     else if(st_on_file->last_updated.tv_sec > now_s + st->update_every) {
-        error("File '%s' refers to the future by %zd secs. Resetting it to now.", fullfilename, (ssize_t)(st_on_file->last_updated.tv_sec - now_s));
+        netdata_log_error("File '%s' refers to the future by %zd secs. Resetting it to now.", fullfilename, (ssize_t)(st_on_file->last_updated.tv_sec - now_s));
         st_on_file->last_updated.tv_sec = now_s;
     }
 

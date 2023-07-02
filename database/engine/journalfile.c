@@ -12,7 +12,7 @@ static void after_extent_write_journalfile_v1_io(uv_fs_t* req)
     debug(D_RRDENGINE, "%s: Journal block was written to disk.", __func__);
     if (req->result < 0) {
         ctx_io_error(ctx);
-        error("DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)req->result));
+        netdata_log_error("DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)req->result));
     } else {
         debug(D_RRDENGINE, "%s: Journal block was written to disk.", __func__);
     }
@@ -271,7 +271,7 @@ static bool journalfile_v2_mounted_data_unmount(struct rrdengine_journalfile *jo
             if (munmap(journalfile->mmap.data, journalfile->mmap.size)) {
                 char path[RRDENG_PATH_MAX];
                 journalfile_v2_generate_path(journalfile->datafile, path, sizeof(path));
-                error("DBENGINE: failed to unmap index file '%s'", path);
+                netdata_log_error("DBENGINE: failed to unmap index file '%s'", path);
                 internal_fatal(true, "DBENGINE: failed to unmap file '%s'", path);
                 ctx_fs_error(journalfile->datafile->ctx);
             }
@@ -483,7 +483,7 @@ static int close_uv_file(struct rrdengine_datafile *datafile, uv_file file)
     ret = uv_fs_close(NULL, &req, file, NULL);
     if (ret < 0) {
         journalfile_v1_generate_path(datafile, path, sizeof(path));
-        error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
+        netdata_log_error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
         ctx_fs_error(datafile->ctx);
     }
     uv_fs_req_cleanup(&req);
@@ -512,7 +512,7 @@ int journalfile_unlink(struct rrdengine_journalfile *journalfile)
 
     ret = uv_fs_unlink(NULL, &req, path, NULL);
     if (ret < 0) {
-        error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
+        netdata_log_error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
         ctx_fs_error(ctx);
     }
     uv_fs_req_cleanup(&req);
@@ -536,7 +536,7 @@ int journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct
     if (journalfile->file) {
     ret = uv_fs_ftruncate(NULL, &req, journalfile->file, 0, NULL);
     if (ret < 0) {
-        error("DBENGINE: uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
+        netdata_log_error("DBENGINE: uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
         ctx_fs_error(ctx);
     }
     uv_fs_req_cleanup(&req);
@@ -546,14 +546,14 @@ int journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct
     // This is the new journal v2 index file
     ret = uv_fs_unlink(NULL, &req, path_v2, NULL);
     if (ret < 0) {
-        error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
+        netdata_log_error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
         ctx_fs_error(ctx);
     }
     uv_fs_req_cleanup(&req);
 
     ret = uv_fs_unlink(NULL, &req, path, NULL);
     if (ret < 0) {
-        error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
+        netdata_log_error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
         ctx_fs_error(ctx);
     }
     uv_fs_req_cleanup(&req);
@@ -598,7 +598,7 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
     ret = uv_fs_write(NULL, &req, file, &iov, 1, 0, NULL);
     if (ret < 0) {
         fatal_assert(req.result < 0);
-        error("DBENGINE: uv_fs_write: %s", uv_strerror(ret));
+        netdata_log_error("DBENGINE: uv_fs_write: %s", uv_strerror(ret));
         ctx_io_error(ctx);
     }
     uv_fs_req_cleanup(&req);
@@ -630,7 +630,7 @@ static int journalfile_check_superblock(uv_file file)
 
     ret = uv_fs_read(NULL, &req, file, &iov, 1, 0, NULL);
     if (ret < 0) {
-        error("DBENGINE: uv_fs_read: %s", uv_strerror(ret));
+        netdata_log_error("DBENGINE: uv_fs_read: %s", uv_strerror(ret));
         uv_fs_req_cleanup(&req);
         goto error;
     }
@@ -639,7 +639,7 @@ static int journalfile_check_superblock(uv_file file)
 
     if (strncmp(superblock->magic_number, RRDENG_JF_MAGIC, RRDENG_MAGIC_SZ) ||
         strncmp(superblock->version, RRDENG_JF_VER, RRDENG_VER_SZ)) {
-        error("DBENGINE: File has invalid superblock.");
+        netdata_log_error("DBENGINE: File has invalid superblock.");
         ret = UV_EINVAL;
     } else {
         ret = 0;
@@ -660,7 +660,7 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
     descr_size = sizeof(*jf_metric_data->descr) * count;
     payload_length = sizeof(*jf_metric_data) + descr_size;
     if (payload_length > max_size) {
-        error("DBENGINE: corrupted transaction payload.");
+        netdata_log_error("DBENGINE: corrupted transaction payload.");
         return;
     }
 
@@ -671,7 +671,7 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
 
         if (page_type > PAGE_TYPE_MAX) {
             if (!bitmap256_get_bit(&page_error_map, page_type)) {
-                error("DBENGINE: unknown page type %d encountered.", page_type);
+                netdata_log_error("DBENGINE: unknown page type %d encountered.", page_type);
                 bitmap256_set_bit(&page_error_map, page_type, 1);
             }
             continue;
@@ -744,14 +744,14 @@ static unsigned journalfile_replay_transaction(struct rrdengine_instance *ctx, s
         return 0;
     }
     if (sizeof(*jf_header) > max_size) {
-        error("DBENGINE: corrupted transaction record, skipping.");
+        netdata_log_error("DBENGINE: corrupted transaction record, skipping.");
         return 0;
     }
     *id = jf_header->id;
     payload_length = jf_header->payload_length;
     size_bytes = sizeof(*jf_header) + payload_length + sizeof(*jf_trailer);
     if (size_bytes > max_size) {
-        error("DBENGINE: corrupted transaction record, skipping.");
+        netdata_log_error("DBENGINE: corrupted transaction record, skipping.");
         return 0;
     }
     jf_trailer = buf + sizeof(*jf_header) + payload_length;
@@ -760,7 +760,7 @@ static unsigned journalfile_replay_transaction(struct rrdengine_instance *ctx, s
     ret = crc32cmp(jf_trailer->checksum, crc);
     debug(D_RRDENGINE, "Transaction %"PRIu64" was read from disk. CRC32 check: %s", *id, ret ? "FAILED" : "SUCCEEDED");
     if (unlikely(ret)) {
-        error("DBENGINE: transaction %"PRIu64" was read from disk. CRC32 check: FAILED", *id);
+        netdata_log_error("DBENGINE: transaction %"PRIu64" was read from disk. CRC32 check: FAILED", *id);
         return size_bytes;
     }
     switch (jf_header->type) {
@@ -769,7 +769,7 @@ static unsigned journalfile_replay_transaction(struct rrdengine_instance *ctx, s
             journalfile_restore_extent_metadata(ctx, journalfile, buf + sizeof(*jf_header), payload_length);
         break;
     default:
-        error("DBENGINE: unknown transaction type, skipping record.");
+        netdata_log_error("DBENGINE: unknown transaction type, skipping record.");
         break;
     }
 
@@ -807,7 +807,7 @@ static uint64_t journalfile_iterate_transactions(struct rrdengine_instance *ctx,
         iov = uv_buf_init(buf, size_bytes);
         ret = uv_fs_read(NULL, &req, file, &iov, 1, pos, NULL);
         if (ret < 0) {
-            error("DBENGINE: uv_fs_read: pos=%" PRIu64 ", %s", pos, uv_strerror(ret));
+            netdata_log_error("DBENGINE: uv_fs_read: pos=%" PRIu64 ", %s", pos, uv_strerror(ret));
             uv_fs_req_cleanup(&req);
             goto skip_file;
         }
@@ -846,7 +846,7 @@ static int journalfile_check_v2_extent_list (void *data_start, size_t file_size)
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, (uint8_t *) data_start + j2_header->extent_offset, j2_header->extent_count * sizeof(struct journal_extent_list));
     if (unlikely(crc32cmp(journal_v2_trailer->checksum, crc))) {
-        error("DBENGINE: extent list CRC32 check: FAILED");
+        netdata_log_error("DBENGINE: extent list CRC32 check: FAILED");
         return 1;
     }
 
@@ -866,7 +866,7 @@ static int journalfile_check_v2_metric_list(void *data_start, size_t file_size)
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, (uint8_t *) data_start + j2_header->metric_offset, j2_header->metric_count * sizeof(struct journal_metric_list));
     if (unlikely(crc32cmp(journal_v2_trailer->checksum, crc))) {
-        error("DBENGINE: metric list CRC32 check: FAILED");
+        netdata_log_error("DBENGINE: metric list CRC32 check: FAILED");
         return 1;
     }
     return 0;
@@ -910,7 +910,7 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
 
     rc = crc32cmp(journal_v2_trailer->checksum, crc);
     if (unlikely(rc)) {
-        error("DBENGINE: file CRC32 check: FAILED");
+        netdata_log_error("DBENGINE: file CRC32 check: FAILED");
         return 1;
     }
 
@@ -1047,13 +1047,13 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
         if (errno == ENOENT)
             return 1;
         ctx_fs_error(ctx);
-        error("DBENGINE: failed to open '%s'", path_v2);
+        netdata_log_error("DBENGINE: failed to open '%s'", path_v2);
         return 1;
     }
 
     ret = fstat(fd, &statbuf);
     if (ret) {
-        error("DBENGINE: failed to get file information for '%s'", path_v2);
+        netdata_log_error("DBENGINE: failed to get file information for '%s'", path_v2);
         close(fd);
         return 1;
     }
@@ -1085,7 +1085,7 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
             error_report("File %s is invalid and it will be rebuilt", path_v2);
 
         if (unlikely(munmap(data_start, journal_v2_file_size)))
-            error("DBENGINE: failed to unmap '%s'", path_v2);
+            netdata_log_error("DBENGINE: failed to unmap '%s'", path_v2);
 
         close(fd);
         return rc;
@@ -1096,7 +1096,7 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
 
     if (unlikely(!entries)) {
         if (unlikely(munmap(data_start, journal_v2_file_size)))
-            error("DBENGINE: failed to unmap '%s'", path_v2);
+            netdata_log_error("DBENGINE: failed to unmap '%s'", path_v2);
 
         close(fd);
         return 1;
@@ -1479,7 +1479,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     if (ret < 0) {
         ctx_current_disk_space_increase(ctx, total_file_size);
         ctx_fs_error(ctx);
-        error("DBENGINE: failed to resize file '%s'", path);
+        netdata_log_error("DBENGINE: failed to resize file '%s'", path);
     }
     else
         ctx_current_disk_space_increase(ctx, resize_file_to);
@@ -1560,7 +1560,7 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
 cleanup:
     ret = uv_fs_close(NULL, &req, file, NULL);
     if (ret < 0) {
-        error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
+        netdata_log_error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
         ctx_fs_error(ctx);
     }
     uv_fs_req_cleanup(&req);

@@ -219,7 +219,7 @@ int create_spawn_server(uv_loop_t *loop, uv_pipe_t *spawn_channel, uv_process_t 
 
     ret = uv_spawn(loop, process, &options); /* execute the netdata binary again as the netdata user */
     if (0 != ret) {
-        error("uv_spawn (process: \"%s\") (user: %s) failed (%s).", exepath, user, uv_strerror(ret));
+        netdata_log_error("uv_spawn (process: \"%s\") (user: %s) failed (%s).", exepath, user, uv_strerror(ret));
         fatal("Cannot start netdata without the spawn server.");
     }
 
@@ -242,7 +242,7 @@ void spawn_init(void)
     completion_init(&completion);
     error = uv_thread_create(&thread, spawn_client, &completion);
     if (error) {
-        error("uv_thread_create(): %s", uv_strerror(error));
+        netdata_log_error("uv_thread_create(): %s", uv_strerror(error));
         goto after_error;
     }
     /* wait for spawn client thread to initialize */
@@ -253,7 +253,7 @@ void spawn_init(void)
     if (spawn_thread_error) {
         error = uv_thread_join(&thread);
         if (error) {
-            error("uv_thread_create(): %s", uv_strerror(error));
+            netdata_log_error("uv_thread_create(): %s", uv_strerror(error));
         }
         goto after_error;
     }
@@ -285,5 +285,5 @@ void spawn_init(void)
     return;
 
     after_error:
-    error("Failed to initialize spawn service. The alarms notifications will not be spawned.");
+        netdata_log_error("Failed to initialize spawn service. The alarms notifications will not be spawned.");
 }

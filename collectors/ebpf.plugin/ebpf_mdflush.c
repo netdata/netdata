@@ -241,7 +241,7 @@ static void mdflush_read_count_map(int maps_per_core)
         if (v_is_new) {
             avl_t *check = avl_insert_lock(&mdflush_pub, (avl_t *)v);
             if (check != (avl_t *)v) {
-                error("Internal error, cannot insert the AVL tree.");
+                netdata_log_error("Internal error, cannot insert the AVL tree.");
             }
         }
     }
@@ -384,7 +384,7 @@ void *ebpf_mdflush_thread(void *ptr)
 
     char *md_flush_request = ebpf_find_symbol("md_flush_request");
     if (!md_flush_request) {
-        error("Cannot monitor MD devices, because md is not loaded.");
+        netdata_log_error("Cannot monitor MD devices, because md is not loaded.");
         goto endmdflush;
     }
 

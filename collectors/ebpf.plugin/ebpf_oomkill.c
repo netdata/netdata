@@ -259,7 +259,7 @@ static uint32_t oomkill_read_data(int32_t *keys)
         if (unlikely(test < 0)) {
             // since there's only 1 thread doing these deletions, it should be
             // impossible to get this condition.
-            error("key unexpectedly not available for deletion.");
+            netdata_log_error("key unexpectedly not available for deletion.");
         }
     }
 

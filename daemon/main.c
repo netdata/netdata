@@ -479,7 +479,7 @@ void netdata_cleanup_and_exit(int ret) {
         delta_shutdown_time("remove pid file");
 
         if(unlink(pidfile) != 0)
-            error("EXIT: cannot unlink pidfile '%s'.", pidfile);
+            netdata_log_error("EXIT: cannot unlink pidfile '%s'.", pidfile);
     }
 
 #ifdef ENABLE_HTTPS
@@ -518,7 +518,7 @@ int make_dns_decision(const char *section_name, const char *config_name, const c
     if(!strcmp("no",value))
         return 0;
     if(strcmp("heuristic",value))
-        error("Invalid configuration option '%s' for '%s'/'%s'. Valid options are 'yes', 'no' and 'heuristic'. Proceeding with 'heuristic'",
+        netdata_log_error("Invalid configuration option '%s' for '%s'/'%s'. Valid options are 'yes', 'no' and 'heuristic'. Proceeding with 'heuristic'",
               value, section_name, config_name);
 
     return simple_pattern_is_potential_name(p);
@@ -592,17 +592,17 @@ void web_server_config_options(void)
     else if(!strcmp(s, "fixed"))
         web_gzip_strategy = Z_FIXED;
     else {
-        error("Invalid compression strategy '%s'. Valid strategies are 'default', 'filtered', 'huffman only', 'rle' and 'fixed'. Proceeding with 'default'.", s);
+        netdata_log_error("Invalid compression strategy '%s'. Valid strategies are 'default', 'filtered', 'huffman only', 'rle' and 'fixed'. Proceeding with 'default'.", s);
         web_gzip_strategy = Z_DEFAULT_STRATEGY;
     }
 
     web_gzip_level = (int)config_get_number(CONFIG_SECTION_WEB, "gzip compression level", 3);
     if(web_gzip_level < 1) {
-        error("Invalid compression level %d. Valid levels are 1 (fastest) to 9 (best ratio). Proceeding with level 1 (fastest compression).", web_gzip_level);
+        netdata_log_error("Invalid compression level %d. Valid levels are 1 (fastest) to 9 (best ratio). Proceeding with level 1 (fastest compression).", web_gzip_level);
         web_gzip_level = 1;
     }
     else if(web_gzip_level > 9) {
-        error("Invalid compression level %d. Valid levels are 1 (fastest) to 9 (best ratio). Proceeding with level 9 (best compression).", web_gzip_level);
+        netdata_log_error("Invalid compression level %d. Valid levels are 1 (fastest) to 9 (best ratio). Proceeding with level 9 (best compression).", web_gzip_level);
         web_gzip_level = 9;
     }
 }
@@ -622,11 +622,11 @@ int killpid(pid_t pid) {
                 return ret;
 
             case EPERM:
-                error("Cannot kill pid %d, but I do not have enough permissions.", pid);
+                netdata_log_error("Cannot kill pid %d, but I do not have enough permissions.", pid);
                 break;
 
             default:
-                error("Cannot kill pid %d, but I received an error.", pid);
+                netdata_log_error("Cannot kill pid %d, but I received an error.", pid);
                 break;
         }
     }
@@ -637,7 +637,7 @@ int killpid(pid_t pid) {
 static void set_nofile_limit(struct rlimit *rl) {
     // get the num files allowed
     if(getrlimit(RLIMIT_NOFILE, rl) != 0) {
-        error("getrlimit(RLIMIT_NOFILE) failed");
+        netdata_log_error("getrlimit(RLIMIT_NOFILE) failed");
         return;
     }
 
@@ -647,17 +647,17 @@ static void set_nofile_limit(struct rlimit *rl) {
     // make the soft/hard limits equal
     rl->rlim_cur = rl->rlim_max;
     if (setrlimit(RLIMIT_NOFILE, rl) != 0) {
-        error("setrlimit(RLIMIT_NOFILE, { %zu, %zu }) failed", (size_t)rl->rlim_cur, (size_t)rl->rlim_max);
+        netdata_log_error("setrlimit(RLIMIT_NOFILE, { %zu, %zu }) failed", (size_t)rl->rlim_cur, (size_t)rl->rlim_max);
     }
 
     // sanity check to make sure we have enough file descriptors available to open
     if (getrlimit(RLIMIT_NOFILE, rl) != 0) {
-        error("getrlimit(RLIMIT_NOFILE) failed");
+        netdata_log_error("getrlimit(RLIMIT_NOFILE) failed");
         return;
     }
 
     if (rl->rlim_cur < 1024)
-        error("Number of open file descriptors allowed for this process is too low (RLIMIT_NOFILE=%zu)", (size_t)rl->rlim_cur);
+        netdata_log_error("Number of open file descriptors allowed for this process is too low (RLIMIT_NOFILE=%zu)", (size_t)rl->rlim_cur);
 }
 
 void cancel_main_threads() {
@@ -694,7 +694,7 @@ void cancel_main_threads() {
     if(found) {
         for (i = 0; static_threads[i].name != NULL ; i++) {
             if (static_threads[i].enabled != NETDATA_MAIN_THREAD_EXITED)
-                error("Main thread %s takes too long to exit. Giving up...", static_threads[i].name);
+                netdata_log_error("Main thread %s takes too long to exit. Giving up...", static_threads[i].name);
         }
     }
     else
@@ -1056,7 +1056,7 @@ static void get_netdata_configured_variables() {
 
     char buf[HOSTNAME_MAX + 1];
     if(gethostname(buf, HOSTNAME_MAX) == -1){
-        error("Cannot get machine hostname.");
+        netdata_log_error("Cannot get machine hostname.");
     }
 
     netdata_configured_hostname = config_get(CONFIG_SECTION_GLOBAL, "hostname", buf);
@@ -1067,7 +1067,7 @@ static void get_netdata_configured_variables() {
 
     default_rrd_update_every = (int) config_get_number(CONFIG_SECTION_DB, "update every", UPDATE_EVERY);
     if(default_rrd_update_every < 1 || default_rrd_update_every > 600) {
-        error("Invalid data collection frequency (update every) %d given. Defaulting to %d.", default_rrd_update_every, UPDATE_EVERY);
+        netdata_log_error("Invalid data collection frequency (update every) %d given. Defaulting to %d.", default_rrd_update_every, UPDATE_EVERY);
         default_rrd_update_every = UPDATE_EVERY;
         config_set_number(CONFIG_SECTION_DB, "update every", default_rrd_update_every);
     }
@@ -1079,7 +1079,7 @@ static void get_netdata_configured_variables() {
         const char *mode = config_get(CONFIG_SECTION_DB, "mode", rrd_memory_mode_name(default_rrd_memory_mode));
         default_rrd_memory_mode = rrd_memory_mode_id(mode);
         if(strcmp(mode, rrd_memory_mode_name(default_rrd_memory_mode)) != 0) {
-            error("Invalid memory mode '%s' given. Using '%s'", mode, rrd_memory_mode_name(default_rrd_memory_mode));
+            netdata_log_error("Invalid memory mode '%s' given. Using '%s'", mode, rrd_memory_mode_name(default_rrd_memory_mode));
             config_set(CONFIG_SECTION_DB, "mode", rrd_memory_mode_name(default_rrd_memory_mode));
         }
     }
@@ -1130,7 +1130,7 @@ static void get_netdata_configured_variables() {
         default_rrdeng_extent_cache_mb = 0;
 
     if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
-        error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
+        netdata_log_error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
         default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
         config_set_number(CONFIG_SECTION_DB, "dbengine page cache size MB", default_rrdeng_page_cache_mb);
     }
@@ -1140,14 +1140,14 @@ static void get_netdata_configured_variables() {
 
     default_rrdeng_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
     if(default_rrdeng_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
-        error("Invalid dbengine disk space %d given. Defaulting to %d.", default_rrdeng_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
+        netdata_log_error("Invalid dbengine disk space %d given. Defaulting to %d.", default_rrdeng_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
         default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
         config_set_number(CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
     }
 
     default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", compute_multidb_diskspace());
     if(default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
-        error("Invalid multidb disk space %d given. Defaulting to %d.", default_multidb_disk_quota_mb, default_rrdeng_disk_quota_mb);
+        netdata_log_error("Invalid multidb disk space %d given. Defaulting to %d.", default_multidb_disk_quota_mb, default_rrdeng_disk_quota_mb);
         default_multidb_disk_quota_mb = default_rrdeng_disk_quota_mb;
         config_set_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", default_multidb_disk_quota_mb);
     }
@@ -1229,7 +1229,7 @@ static bool load_netdata_conf(char *filename, char overwrite_used, char **user) 
     if(filename && *filename) {
         ret = config_load(filename, overwrite_used, NULL);
         if(!ret)
-            error("CONFIG: cannot load config file '%s'.", filename);
+            netdata_log_error("CONFIG: cannot load config file '%s'.", filename);
     }
     else {
         filename = strdupz_path_subpath(netdata_configured_user_config_dir, "netdata.conf");
@@ -1263,7 +1263,7 @@ int get_system_info(struct rrdhost_system_info *system_info, bool log) {
     script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("system-info.sh") + 2));
     sprintf(script, "%s/%s", netdata_configured_primary_plugins_dir, "system-info.sh");
     if (unlikely(access(script, R_OK) != 0)) {
-        error("System info script %s not found.",script);
+        netdata_log_error("System info script %s not found.",script);
         freez(script);
         return 1;
     }
@@ -1289,7 +1289,7 @@ int get_system_info(struct rrdhost_system_info *system_info, bool log) {
                 coverity_remove_taint(value);
 
                 if(unlikely(rrdhost_set_system_info_variable(system_info, line, value))) {
-                    error("Unexpected environment variable %s=%s", line, value);
+                    netdata_log_error("Unexpected environment variable %s=%s", line, value);
                 }
                 else {
                     if(log)
@@ -1341,7 +1341,7 @@ int main(int argc, char **argv) {
     usec_t started_ut = now_monotonic_usec();
     usec_t last_ut = started_ut;
     const char *prev_msg = NULL;
-    // Initialize stderror avoiding coredump when netdata_log_info() or error() is called
+    // Initialize stderror avoiding coredump when netdata_log_info() or netdata_log_error() is called
     stderror = stderr;
 
     int i;
@@ -1386,7 +1386,7 @@ int main(int argc, char **argv) {
             switch(opt) {
                 case 'c':
                     if(!load_netdata_conf(optarg, 1, &user)) {
-                        error("Cannot load configuration file %s.", optarg);
+                        netdata_log_error("Cannot load configuration file %s.", optarg);
                         return 1;
                     }
                     else {
@@ -1881,7 +1881,7 @@ int main(int argc, char **argv) {
         if(debug_flags != 0) {
             struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
             if(setrlimit(RLIMIT_CORE, &rl) != 0)
-                error("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
+                netdata_log_error("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
 
 #ifdef HAVE_SYS_PRCTL_H
             prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
@@ -1985,7 +1985,7 @@ int main(int argc, char **argv) {
     if(debug_flags != 0) {
         struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
         if(setrlimit(RLIMIT_CORE, &rl) != 0)
-            error("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
+            netdata_log_error("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
 #ifdef HAVE_SYS_PRCTL_H
         prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
 #endif
@@ -2131,14 +2131,14 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // Report ACLK build failure
 #ifndef ENABLE_ACLK
-    error("This agent doesn't have ACLK.");
+    netdata_log_error("This agent doesn't have ACLK.");
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/.aclk_report_sent", netdata_configured_varlib_dir);
     if (netdata_anonymous_statistics_enabled > 0 && access(filename, F_OK)) { // -1 -> not initialized
         send_statistics("ACLK_DISABLED", "-", "-");
         int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 444);
         if (fd == -1)
-            error("Cannot create file '%s'. Please fix this.", filename);
+            netdata_log_error("Cannot create file '%s'. Please fix this.", filename);
         else
             close(fd);
     }

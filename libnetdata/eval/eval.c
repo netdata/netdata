@@ -1129,14 +1129,14 @@ EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, in
 
     if(!op) {
         unsigned long pos = s - string + 1;
-        error("failed to parse expression '%s': %s at character %lu (i.e.: '%s').", string, expression_strerror(err), pos, s);
+        netdata_log_error("failed to parse expression '%s': %s at character %lu (i.e.: '%s').", string, expression_strerror(err), pos, s);
         return NULL;
     }
 
     BUFFER *out = buffer_create(1024, NULL);
     print_parsed_as_node(out, op, &err);
     if(err != EVAL_ERROR_OK) {
-        error("failed to re-generate expression '%s' with reason: %s", string, expression_strerror(err));
+        netdata_log_error("failed to re-generate expression '%s' with reason: %s", string, expression_strerror(err));
         eval_node_free(op);
         buffer_free(out);
         return NULL;

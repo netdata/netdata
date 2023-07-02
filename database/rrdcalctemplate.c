@@ -223,17 +223,17 @@ static size_t rrdcalctemplate_key(char *dst, size_t dst_len, const char *name, c
 
 void rrdcalctemplate_add_from_config(RRDHOST *host, RRDCALCTEMPLATE *rt) {
     if(unlikely(!rt->context)) {
-        error("Health configuration for template '%s' does not have a context", rrdcalctemplate_name(rt));
+        netdata_log_error("Health configuration for template '%s' does not have a context", rrdcalctemplate_name(rt));
         return;
     }
 
     if(unlikely(!rt->update_every)) {
-        error("Health configuration for template '%s' has no frequency (parameter 'every'). Ignoring it.", rrdcalctemplate_name(rt));
+        netdata_log_error("Health configuration for template '%s' has no frequency (parameter 'every'). Ignoring it.", rrdcalctemplate_name(rt));
         return;
     }
 
     if(unlikely(!RRDCALCTEMPLATE_HAS_DB_LOOKUP(rt) && !rt->calculation && !rt->warning && !rt->critical)) {
-        error("Health configuration for template '%s' is useless (no calculation, no warning and no critical evaluation)", rrdcalctemplate_name(rt));
+        netdata_log_error("Health configuration for template '%s' is useless (no calculation, no warning and no critical evaluation)", rrdcalctemplate_name(rt));
         return;
     }
 

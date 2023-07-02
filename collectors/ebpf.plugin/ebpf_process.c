@@ -683,17 +683,17 @@ static void ebpf_process_disable_tracepoints()
     char *default_message = { "Cannot disable the tracepoint" };
     if (!was_sched_process_exit_enabled) {
         if (ebpf_disable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_exit))
-            error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_exit);
+            netdata_log_error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_exit);
     }
 
     if (!was_sched_process_exec_enabled) {
         if (ebpf_disable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_exec))
-            error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_exec);
+            netdata_log_error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_exec);
     }
 
     if (!was_sched_process_fork_enabled) {
         if (ebpf_disable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_fork))
-            error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_fork);
+            netdata_log_error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_fork);
     }
 }
 

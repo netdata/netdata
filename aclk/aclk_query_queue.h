@@ -79,7 +79,7 @@ void aclk_queue_unlock(void);
     if (likely(query->data.bin_payload.payload)) {                                                                     \
         aclk_queue_query(query);                                                                                       \
     } else {                                                                                                           \
-        error("Failed to generate payload (%s)", __FUNCTION__);                                                        \
+        netdata_log_error("Failed to generate payload (%s)", __FUNCTION__);                                            \
         aclk_query_free(query);                                                                                        \
     }
 

@@ -257,7 +257,7 @@ static void sql_delete_aclk_table_list(char *host_guid)
 
     rc = db_execute(db_meta, buffer_tostring(sql));
     if (unlikely(rc))
-        error("Failed to drop unused ACLK tables");
+        netdata_log_error("Failed to drop unused ACLK tables");
 
 fail:
     buffer_free(sql);

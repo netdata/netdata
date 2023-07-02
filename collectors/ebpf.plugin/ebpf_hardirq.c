@@ -406,7 +406,7 @@ static int hardirq_read_latency_map(int mapfd)
 
             avl_t *check = avl_insert_lock(&hardirq_pub, (avl_t *)v);
             if (check != (avl_t *)v) {
-                error("Internal error, cannot insert the AVL tree.");
+                netdata_log_error("Internal error, cannot insert the AVL tree.");
             }
         }
 

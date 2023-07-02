@@ -32,7 +32,7 @@ int init_pubsub_instance(struct instance *instance)
 
     instance->buffer = (void *)buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
     if (!instance->buffer) {
-        error("EXPORTING: cannot create buffer for Pub/Sub exporting connector instance %s", instance->config.name);
+        netdata_log_error("EXPORTING: cannot create buffer for Pub/Sub exporting connector instance %s", instance->config.name);
         return 1;
     }
     uv_mutex_init(&instance->mutex);
@@ -48,7 +48,7 @@ int init_pubsub_instance(struct instance *instance)
             (void *)connector_specific_data, error_message, instance->config.destination,
             connector_specific_config->credentials_file, connector_specific_config->project_id,
             connector_specific_config->topic_id)) {
-        error(
+        netdata_log_error(
             "EXPORTING: Cannot initialize a Pub/Sub publisher for instance %s: %s",
             instance->config.name, error_message);
         return 1;
@@ -132,7 +132,7 @@ void pubsub_connector_worker(void *instance_p)
         stats->buffered_bytes = buffer_len;
 
         if (pubsub_add_message(instance->connector_specific_data, (char *)buffer_tostring(buffer))) {
-            error("EXPORTING: Instance %s: Cannot add data to a message", instance->config.name);
+            netdata_log_error("EXPORTING: Instance %s: Cannot add data to a message", instance->config.name);
 
             stats->data_lost_events++;
             stats->lost_metrics += stats->buffered_metrics;
@@ -146,7 +146,7 @@ void pubsub_connector_worker(void *instance_p)
             connector_specific_config->project_id, connector_specific_config->topic_id, buffer_len);
 
         if (pubsub_publish((void *)connector_specific_data, error_message, stats->buffered_metrics, buffer_len)) {
-            error("EXPORTING: Instance: %s: Cannot publish a message: %s", instance->config.name, error_message);
+            netdata_log_error("EXPORTING: Instance: %s: Cannot publish a message: %s", instance->config.name, error_message);
 
             stats->transmission_failures++;
             stats->data_lost_events++;
@@ -164,8 +164,8 @@ void pubsub_connector_worker(void *instance_p)
         if (unlikely(pubsub_get_result(
                 connector_specific_data, error_message, &sent_metrics, &sent_bytes, &lost_metrics, &lost_bytes))) {
             // oops! we couldn't send (all or some of the) data
-            error("EXPORTING: %s", error_message);
-            error(
+            netdata_log_error("EXPORTING: %s", error_message);
+            netdata_log_error(
                 "EXPORTING: failed to write data to service '%s'. Willing to write %zu bytes, wrote %zu bytes.",
                 instance->config.destination, lost_bytes, sent_bytes);
 
