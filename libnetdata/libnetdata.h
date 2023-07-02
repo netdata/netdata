@@ -609,17 +609,17 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 #ifdef ENV32BIT
 
 typedef struct bitmapX {
-    const uint32_t bits;
+    uint32_t bits;
     uint32_t data[];
 } BITMAPX;
 
 typedef struct bitmap256 {
-    const uint32_t bits;
+    uint32_t bits;
     uint32_t data[256 / 32];
 } BITMAP256;
 
 typedef struct bitmap1024 {
-    const uint32_t bits;
+    uint32_t bits;
     uint32_t data[1024 / 32];
 } BITMAP1024;
 
@@ -645,24 +645,23 @@ static inline void bitmapX_set_bit(register BITMAPX *ptr, register uint32_t idx,
 #else // 64bit version of bitmaps
 
 typedef struct bitmapX {
-    const uint32_t bits;
+    uint32_t bits;
     uint64_t data[];
 } BITMAPX;
 
 typedef struct bitmap256 {
-    const uint32_t bits;
+    uint32_t bits;
     uint64_t data[256 / 64];
 } BITMAP256;
 
 typedef struct bitmap1024 {
-    const uint32_t bits;
+    uint32_t bits;
     uint64_t data[1024 / 64];
 } BITMAP1024;
 
 static inline BITMAPX *bitmapX_create(uint32_t bits) {
     BITMAPX *bmp = (BITMAPX *)callocz(1, sizeof(BITMAPX) + sizeof(uint64_t) * ((bits + 63) / 64));
-    uint32_t *p = (uint32_t *)&bmp->bits;
-    *p = bits;
+    bmp->bits = bits;
     return bmp;
 }
 
@@ -681,8 +680,8 @@ static inline void bitmapX_set_bit(register BITMAPX *ptr, register uint32_t idx,
 #endif // 64bit version of bitmaps
 
 #define BITMAPX_INITIALIZER(wanted_bits) { .bits = (wanted_bits), .data = {0} }
-#define BITMAP256_INITIALIZER BITMAPX_INITIALIZER(256)
-#define BITMAP1024_INITIALIZER BITMAPX_INITIALIZER(1024)
+#define BITMAP256_INITIALIZER (BITMAP256)BITMAPX_INITIALIZER(256)
+#define BITMAP1024_INITIALIZER (BITMAP1024)BITMAPX_INITIALIZER(1024)
 #define bitmap256_get_bit(ptr, idx) bitmapX_get_bit((BITMAPX *)ptr, idx)
 #define bitmap256_set_bit(ptr, idx, value) bitmapX_set_bit((BITMAPX *)ptr, idx, value)
 #define bitmap1024_get_bit(ptr, idx) bitmapX_get_bit((BITMAPX *)ptr, idx)

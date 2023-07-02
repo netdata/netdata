@@ -1473,7 +1473,7 @@ int main(int argc, char **argv) {
                                 return 1;
                             if (buffer_unittest())
                                 return 1;
-                            if (unit_test_bitmap256())
+                            if (unit_test_bitmaps())
                                 return 1;
                             // No call to load the config file on this code-path
                             post_conf_load(&user);
