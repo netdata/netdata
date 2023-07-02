@@ -1704,7 +1704,7 @@ error:
 int unit_test_bitmap256(void) {
     fprintf(stderr, "%s() running...\n", __FUNCTION__ );
 
-    BITMAP256 test_bitmap = {0};
+    BITMAP256 test_bitmap = BITMAP256_INITIALIZER;
 
     bitmap256_set_bit(&test_bitmap, 0, 1);
     bitmap256_set_bit(&test_bitmap, 64, 1);
@@ -1727,30 +1727,30 @@ int unit_test_bitmap256(void) {
     } while (j < 256);
 
     if (test_bitmap.data[0] == 0xffffffffffffffff)
-        fprintf(stderr, "%s() INDEX 0 is fully set OK\n", __FUNCTION__);
+        fprintf(stderr, "%s() PASS 1, INDEX 0 is fully set OK\n", __FUNCTION__);
     else {
-        fprintf(stderr, "%s() INDEX 0 is %"PRIu64" expected 0xffffffffffffffff\n", __FUNCTION__, test_bitmap.data[0]);
+        fprintf(stderr, "%s() PASS 1, INDEX 0 is 0x%"PRIx64" expected 0xffffffffffffffff\n", __FUNCTION__, test_bitmap.data[0]);
         return 1;
     }
 
     if (test_bitmap.data[1] == 0xffffffffffffffff)
-        fprintf(stderr, "%s() INDEX 1 is fully set OK\n", __FUNCTION__);
+        fprintf(stderr, "%s() PASS 1, INDEX 1 is fully set OK\n", __FUNCTION__);
     else {
-        fprintf(stderr, "%s() INDEX 1 is %"PRIu64" expected 0xffffffffffffffff\n", __FUNCTION__, test_bitmap.data[0]);
+        fprintf(stderr, "%s() PASS 1, INDEX 1 is 0x%"PRIx64" expected 0xffffffffffffffff\n", __FUNCTION__, test_bitmap.data[1]);
         return 1;
     }
 
     if (test_bitmap.data[2] == 0xffffffffffffffff)
-        fprintf(stderr, "%s() INDEX 2 is fully set OK\n", __FUNCTION__);
+        fprintf(stderr, "%s() PASS 1, INDEX 2 is fully set OK\n", __FUNCTION__);
     else {
-        fprintf(stderr, "%s() INDEX 2 is %"PRIu64" expected 0xffffffffffffffff\n", __FUNCTION__, test_bitmap.data[0]);
+        fprintf(stderr, "%s() PASS 1, INDEX 2 is 0x%"PRIx64" expected 0xffffffffffffffff\n", __FUNCTION__, test_bitmap.data[2]);
         return 1;
     }
 
     if (test_bitmap.data[3] == 0xffffffffffffffff)
-        fprintf(stderr, "%s() INDEX 3 is fully set OK\n", __FUNCTION__);
+        fprintf(stderr, "%s() PASS 1, INDEX 3 is fully set OK\n", __FUNCTION__);
     else {
-        fprintf(stderr, "%s() INDEX 3 is %"PRIu64" expected 0xffffffffffffffff\n", __FUNCTION__, test_bitmap.data[0]);
+        fprintf(stderr, "%s() PASS 1, INDEX 3 is 0x%"PRIx64" expected 0xffffffffffffffff\n", __FUNCTION__, test_bitmap.data[3]);
         return 1;
     }
 
@@ -1762,29 +1762,29 @@ int unit_test_bitmap256(void) {
     } while (j < 256);
 
     if (test_bitmap.data[0] == 0)
-        fprintf(stderr, "%s() INDEX 0 is reset OK\n", __FUNCTION__);
+        fprintf(stderr, "%s() PASS 2, INDEX 0 is reset OK\n", __FUNCTION__);
     else {
-        fprintf(stderr, "%s() INDEX 0 is not reset FAILED\n", __FUNCTION__);
+        fprintf(stderr, "%s() PASS 2, INDEX 0 is not reset FAILED\n", __FUNCTION__);
         return 1;
     }
     if (test_bitmap.data[1] == 0)
-        fprintf(stderr, "%s() INDEX 1 is reset OK\n", __FUNCTION__);
+        fprintf(stderr, "%s() PASS 2, INDEX 1 is reset OK\n", __FUNCTION__);
     else {
-        fprintf(stderr, "%s() INDEX 1 is not reset FAILED\n", __FUNCTION__);
+        fprintf(stderr, "%s() PASS 2, INDEX 1 is not reset FAILED\n", __FUNCTION__);
         return 1;
     }
 
     if (test_bitmap.data[2] == 0)
-        fprintf(stderr, "%s() INDEX 2 is reset OK\n", __FUNCTION__);
+        fprintf(stderr, "%s() PASS 2, INDEX 2 is reset OK\n", __FUNCTION__);
     else {
-        fprintf(stderr, "%s() INDEX 2 is not reset FAILED\n", __FUNCTION__);
+        fprintf(stderr, "%s() PASS 2, INDEX 2 is not reset FAILED\n", __FUNCTION__);
         return 1;
     }
 
     if (test_bitmap.data[3] == 0)
-        fprintf(stderr, "%s() INDEX 3 is reset OK\n", __FUNCTION__);
+        fprintf(stderr, "%s() PASS 2, INDEX 3 is reset OK\n", __FUNCTION__);
     else {
-        fprintf(stderr, "%s() INDEX 3 is not reset FAILED\n", __FUNCTION__);
+        fprintf(stderr, "%s() PASS 2, INDEX 3 is not reset FAILED\n", __FUNCTION__);
         return 1;
     }
 
@@ -1797,30 +1797,30 @@ int unit_test_bitmap256(void) {
     } while (j < 256);
 
     if (test_bitmap.data[0] == 0x1111111111111111)
-        fprintf(stderr, "%s() INDEX 0 is 0x1111111111111111 set OK\n", __FUNCTION__);
+        fprintf(stderr, "%s() PASS 3, INDEX 0 is 0x1111111111111111 set OK\n", __FUNCTION__);
     else {
-        fprintf(stderr, "%s() INDEX 0 is %"PRIu64" expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[0]);
+        fprintf(stderr, "%s() PASS 3, INDEX 0 is 0x%"PRIx64" expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[0]);
         return 1;
     }
 
     if (test_bitmap.data[1] == 0x1111111111111111)
-        fprintf(stderr, "%s() INDEX 1 is 0x1111111111111111 set OK\n", __FUNCTION__);
+        fprintf(stderr, "%s() PASS 3, INDEX 1 is 0x1111111111111111 set OK\n", __FUNCTION__);
     else {
-        fprintf(stderr, "%s() INDEX 1 is %"PRIu64" expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[1]);
+        fprintf(stderr, "%s() PASS 3, INDEX 1 is 0x%"PRIx64" expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[1]);
         return 1;
     }
 
     if (test_bitmap.data[2] == 0x1111111111111111)
-        fprintf(stderr, "%s() INDEX 2 is 0x1111111111111111 set OK\n", __FUNCTION__);
+        fprintf(stderr, "%s() PASS 3, INDEX 2 is 0x1111111111111111 set OK\n", __FUNCTION__);
     else {
-        fprintf(stderr, "%s() INDEX 2 is %"PRIu64" expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[2]);
+        fprintf(stderr, "%s() PASS 3, INDEX 2 is 0x%"PRIx64" expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[2]);
         return 1;
     }
 
     if (test_bitmap.data[3] == 0x1111111111111111)
-        fprintf(stderr, "%s() INDEX 3 is 0x1111111111111111 set OK\n", __FUNCTION__);
+        fprintf(stderr, "%s() PASS 3, INDEX 3 is 0x1111111111111111 set OK\n", __FUNCTION__);
     else {
-        fprintf(stderr, "%s() INDEX 3 is %"PRIu64" expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[3]);
+        fprintf(stderr, "%s() PASS 3, INDEX 3 is 0x%"PRIx64" expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[3]);
         return 1;
     }
 

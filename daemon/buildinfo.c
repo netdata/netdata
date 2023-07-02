@@ -75,7 +75,7 @@ typedef enum __attribute__((packed)) {
     BIB_DEVEL_TRACE_ALLOCATIONS,
 } BUILD_INFO_BIT;
 
-static BITMAP256 BUILD_INFO = { 0 }; // the bitmap we store our build information
+static BITMAP256 BUILD_INFO = BITMAP256_INITIALIZER; // the bitmap we store our build information
 
 typedef enum __attribute__((packed)) {
     BIC_TERMINATOR = 0,

@@ -613,21 +613,15 @@ typedef struct bitmapX {
     uint32_t data[];
 } BITMAPX;
 
-#define BITMAP_INITIALIZER(wanted_bits) { .bits = (wanted_bits), .data = {0} }
-
 typedef struct bitmap256 {
     const uint32_t bits;
     uint32_t data[256 / 32];
 } BITMAP256;
 
-#define BITMAP256_INITIALIZER BITMAPX_INITIALIZER(256)
-
 typedef struct bitmap1024 {
     const uint32_t bits;
     uint32_t data[1024 / 32];
 } BITMAP1024;
-
-#define BITMAP1024_INITIALIZER BITMAPX_INITIALIZER(1024)
 
 static inline BITMAPX *bitmapX_create(uint32_t bits) {
     BITMAPX *bmp = (BITMAPX *)callocz(1, sizeof(BITMAPX) + sizeof(uint32_t) * ((bits + 31) / 32));
@@ -636,20 +630,17 @@ static inline BITMAPX *bitmapX_create(uint32_t bits) {
     return bmp;
 }
 
-#define bitmapX_get_bit(ptr, idx) (((ptr)->data[(idx) >> 5] & (1U << ((idx) & 31))) != 0)
-#define bitmapX_set_bit(ptr, idx, value) do {       \
-    register uint32_t _mask = 1U << ((idx) & 31);   \
-    if (value)                                      \
-        (ptr)->data[(idx) >> 5] |= _mask;           \
-    else                                            \
-        (ptr)->data[(idx) >> 5] &= ~_mask;          \
-} while(0)
+static inline bool bitmapX_get_bit(register BITMAPX *ptr, register uint32_t idx) {
+    return (ptr->data[idx >> 5] & (1U << (idx & 31)));
+}
 
-#define bitmap256_get_bit(ptr, idx) bitmapX_get_bit(ptr, idx)
-#define bitmap256_set_bit(ptr, idx, value) bitmapX_set_bit(ptr, idx, value)
-
-#define bitmap1024_get_bit(ptr, idx) bitmapX_get_bit(ptr, idx)
-#define bitmap1024_set_bit(ptr, idx, value) bitmapX_set_bit(ptr, idx, value)
+static inline void bitmapX_set_bit(register BITMAPX *ptr, register uint32_t idx, register bool value) {
+    register uint64_t mask = 1U << (idx & 31);
+    if (value)
+        ptr->data[idx >> 5] |= mask;
+    else
+        ptr->data[idx >> 5] &= ~mask;
+}
 
 #else // 64bit version of bitmaps
 
@@ -658,21 +649,15 @@ typedef struct bitmapX {
     uint64_t data[];
 } BITMAPX;
 
-#define BITMAP_INITIALIZER(wanted_bits) { .bits = (wanted_bits), .data = {0} }
-
 typedef struct bitmap256 {
     const uint32_t bits;
     uint64_t data[256 / 64];
 } BITMAP256;
 
-#define BITMAP256_INITIALIZER BITMAPX_INITIALIZER(256)
-
 typedef struct bitmap1024 {
     const uint32_t bits;
     uint64_t data[1024 / 64];
 } BITMAP1024;
-
-#define BITMAP1024_INITIALIZER BITMAPX_INITIALIZER(1024)
 
 static inline BITMAPX *bitmapX_create(uint32_t bits) {
     BITMAPX *bmp = (BITMAPX *)callocz(1, sizeof(BITMAPX) + sizeof(uint64_t) * ((bits + 63) / 64));
@@ -681,22 +666,28 @@ static inline BITMAPX *bitmapX_create(uint32_t bits) {
     return bmp;
 }
 
-#define bitmapX_get_bit(ptr, idx) (((ptr)->data[(idx) >> 6] & (1ULL << ((idx) & 63))) != 0)
-#define bitmapX_set_bit(ptr, idx, value) do {       \
-    register uint64_t _mask = 1ULL << ((idx) & 63); \
-    if (value)                                      \
-        (ptr)->data[(idx) >> 6] |= _mask;           \
-    else                                            \
-        (ptr)->data[(idx) >> 6] &= ~_mask;          \
-} while(0)
+static inline bool bitmapX_get_bit(register BITMAPX *ptr, register uint32_t idx) {
+    return (ptr->data[idx >> 6] & (1ULL << (idx & 63)));
+}
 
-#define bitmap256_get_bit(ptr, idx) bitmapX_get_bit(ptr, idx)
-#define bitmap256_set_bit(ptr, idx, value) bitmapX_set_bit(ptr, idx, value)
-
-#define bitmap1024_get_bit(ptr, idx) bitmapX_get_bit(ptr, idx)
-#define bitmap1024_set_bit(ptr, idx, value) bitmapX_set_bit(ptr, idx, value)
+static inline void bitmapX_set_bit(register BITMAPX *ptr, register uint32_t idx, register bool value) {
+    register uint64_t mask = 1ULL << (idx & 63);
+    if (value)
+        ptr->data[idx >> 6] |= mask;
+    else
+        ptr->data[idx >> 6] &= ~mask;
+}
 
 #endif // 64bit version of bitmaps
+
+#define BITMAPX_INITIALIZER(wanted_bits) { .bits = (wanted_bits), .data = {0} }
+#define BITMAP256_INITIALIZER BITMAPX_INITIALIZER(256)
+#define BITMAP1024_INITIALIZER BITMAPX_INITIALIZER(1024)
+#define bitmap256_get_bit(ptr, idx) bitmapX_get_bit((BITMAPX *)ptr, idx)
+#define bitmap256_set_bit(ptr, idx, value) bitmapX_set_bit((BITMAPX *)ptr, idx, value)
+#define bitmap1024_get_bit(ptr, idx) bitmapX_get_bit((BITMAPX *)ptr, idx)
+#define bitmap1024_set_bit(ptr, idx, value) bitmapX_set_bit((BITMAPX *)ptr, idx, value)
+
 
 #define COMPRESSION_MAX_MSG_SIZE 0x4000
 #define PLUGINSD_LINE_MAX (COMPRESSION_MAX_MSG_SIZE - 1024)
