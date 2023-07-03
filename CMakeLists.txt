@@ -555,6 +555,10 @@ set(TIMEX_PLUGIN_FILES
         collectors/timex.plugin/plugin_timex.c
         )
 
+set(PROFILE_PLUGIN_FILES
+        collectors/profile.plugin/plugin_profile.cc
+        )
+
 set(FREEIPMI_PLUGIN_FILES
         collectors/freeipmi.plugin/freeipmi_plugin.c
         )
@@ -1278,6 +1282,7 @@ ENDIF()
 
 list(APPEND NETDATA_FILES ${ACLK_ALWAYS_BUILD})
 list(APPEND NETDATA_FILES ${TIMEX_PLUGIN_FILES})
+list(APPEND NETDATA_FILES ${PROFILE_PLUGIN_FILES})
 
 # -----------------------------------------------------------------------------
 # netdata

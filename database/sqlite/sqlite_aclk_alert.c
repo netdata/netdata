@@ -519,7 +519,7 @@ void aclk_send_alarm_configuration(char *config_hash)
 #define SQL_SELECT_ALERT_CONFIG "SELECT alarm, template, on_key, class, type, component, os, hosts, plugin," \
     "module, charts, families, lookup, every, units, green, red, calc, warn, crit, to_key, exec, delay, repeat, info," \
     "options, host_labels, p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after," \
-    "p_db_lookup_before, p_update_every FROM alert_hash WHERE hash_id = @hash_id;"
+    "p_db_lookup_before, p_update_every, chart_labels FROM alert_hash WHERE hash_id = @hash_id;"
 int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash __maybe_unused)
 {
     int rc = 0;
@@ -619,6 +619,8 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
         }
 
         alarm_config.p_update_every = sqlite3_column_int(res, 32);
+
+        alarm_config.chart_labels = sqlite3_column_bytes(res, 33) > 0 ? strdupz((char *)sqlite3_column_text(res, 33)) : NULL;
 
         p_alarm_config.cfg_hash = strdupz((char *) config_hash);
         p_alarm_config.cfg = alarm_config;

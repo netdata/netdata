@@ -6,15 +6,20 @@
 
 **Merged pull requests:**
 
+- Optimizations part 3 [\#15293](https://github.com/netdata/netdata/pull/15293) ([ktsaou](https://github.com/ktsaou))
+- docs: update stream.conf "health enabled by default" description [\#15291](https://github.com/netdata/netdata/pull/15291) ([ilyam8](https://github.com/ilyam8))
+- merged spaces, war rooms and invite your team to one place [\#15289](https://github.com/netdata/netdata/pull/15289) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - use stat\(\) instead of lstat\(\) [\#15287](https://github.com/netdata/netdata/pull/15287) ([ktsaou](https://github.com/ktsaou))
 - Only try to enable \_FORTIFY\_SOURCE if the user has not disabled optimizations [\#15284](https://github.com/netdata/netdata/pull/15284) ([Ferroin](https://github.com/Ferroin))
 - Fixed mistype for 'send automatic labels' Prometheus option [\#15282](https://github.com/netdata/netdata/pull/15282) ([k0ste](https://github.com/k0ste))
 - Optimizations part 2 [\#15280](https://github.com/netdata/netdata/pull/15280) ([ktsaou](https://github.com/ktsaou))
 - Revert "Optimizations Part 2" [\#15279](https://github.com/netdata/netdata/pull/15279) ([ktsaou](https://github.com/ktsaou))
 - exporting: change priority to synchronous when calculating value [\#15276](https://github.com/netdata/netdata/pull/15276) ([ilyam8](https://github.com/ilyam8))
+- expose CmdLine in apps function [\#15275](https://github.com/netdata/netdata/pull/15275) ([ilyam8](https://github.com/ilyam8))
 - Misc alert fixes [\#15274](https://github.com/netdata/netdata/pull/15274) ([MrZammler](https://github.com/MrZammler))
 - Small readme improvements [\#15270](https://github.com/netdata/netdata/pull/15270) ([andrewm4894](https://github.com/andrewm4894))
 - Optimizations Part 2 [\#15267](https://github.com/netdata/netdata/pull/15267) ([ktsaou](https://github.com/ktsaou))
+- Replace `info` macro with a less generic name [\#15266](https://github.com/netdata/netdata/pull/15266) ([carlocab](https://github.com/carlocab))
 - fix tc.plugin charts labels [\#15262](https://github.com/netdata/netdata/pull/15262) ([ilyam8](https://github.com/ilyam8))
 - Update libbpf version [\#15258](https://github.com/netdata/netdata/pull/15258) ([thiagoftsm](https://github.com/thiagoftsm))
 - rewrite /api/v2/alerts [\#15257](https://github.com/netdata/netdata/pull/15257) ([ktsaou](https://github.com/ktsaou))
@@ -398,11 +403,6 @@
 - Fix broken link [\#14630](https://github.com/netdata/netdata/pull/14630) ([cakrit](https://github.com/cakrit))
 - Fix intermittent permissions issues in some Docker builds. [\#14629](https://github.com/netdata/netdata/pull/14629) ([Ferroin](https://github.com/Ferroin))
 - Update REFERENCE.md [\#14627](https://github.com/netdata/netdata/pull/14627) ([cakrit](https://github.com/cakrit))
-- Make the title metadata H1 in all markdown files [\#14625](https://github.com/netdata/netdata/pull/14625) ([Ancairon](https://github.com/Ancairon))
-- eBPF new charts \(user ring\) [\#14623](https://github.com/netdata/netdata/pull/14623) ([thiagoftsm](https://github.com/thiagoftsm))
-- rename glossary [\#14622](https://github.com/netdata/netdata/pull/14622) ([cakrit](https://github.com/cakrit))
-- Reorg learn 0227 [\#14621](https://github.com/netdata/netdata/pull/14621) ([cakrit](https://github.com/cakrit))
-- Assorted improvements to OpenRC support. [\#14620](https://github.com/netdata/netdata/pull/14620) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 

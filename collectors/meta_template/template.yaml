@@ -1,0 +1,92 @@
+plugin_name: ""
+module_name: ""
+monitored_instance:
+  name: ""
+  link: ""
+alternative_monitored_instances:
+  - name: ""
+    link: ""
+overview:
+  data_collection:
+    metrics_description: ""
+    method_description: ""
+  supported_platforms:
+    include: []
+    exclude: []
+  multi-instance: true
+  additional_permissions:
+    description: ""
+  default_behavior:
+    auto_detection:
+      description: ""
+    limits:
+      description: ""
+    performance_impact:
+      description: ""
+setup:
+  prerequisites:
+    list:
+      - title: ""
+        description: ""
+  configuration:
+    file:
+      description: ""
+    options:
+      description: ""
+      folding:
+        title: ""
+        enabled: true
+      list:
+        - name: ""
+          default_value: ""
+          description: ""
+          required: false
+    examples:
+      list:
+        - name: ""
+          folding: 
+            enabled: true
+            title: ""
+          description: ""
+          config: ""
+troubleshooting:
+  problems:
+    list:
+      - name: ""
+        description: ""
+related_resources:
+  integrations:
+    list:
+      - plugin_name: ""
+        module_name: ""
+info_provided_to_referring_integrations:
+  description: ""
+alerts:
+  - info: ""
+    link: ""
+    metric: ""
+    name: ""
+    os: ""
+metrics:
+  folding:
+    enabled: false
+    title: ""
+  description: ""
+  availability:
+    - ""
+  scopes:
+    - name: ""
+      description: ""
+      labels:
+        - name: ""
+          description: ""
+      metrics:
+        - name: ""
+          availability:
+            - ""
+          description: ""
+          unit: ""
+          chart_type: ""
+          dimensions:
+            - name: ""
+

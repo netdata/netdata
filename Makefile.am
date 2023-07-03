@@ -406,6 +406,10 @@ PROC_PLUGIN_FILES = \
     collectors/proc.plugin/sys_class_infiniband.c \
     $(NULL)
 
+PROFILE_PLUGIN_FILES = \
+    collectors/profile.plugin/plugin_profile.cc \
+    $(NULL)
+
 TC_PLUGIN_FILES = \
     collectors/tc.plugin/plugin_tc.c \
     $(NULL)
@@ -1076,6 +1080,7 @@ NETDATA_FILES = \
     $(ACLK_FILES) \
     $(SPAWN_PLUGIN_FILES) \
     $(TIMEX_PLUGIN_FILES) \
+    $(PROFILE_PLUGIN_FILES) \
     $(NULL)
 
 if FREEBSD
