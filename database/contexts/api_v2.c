@@ -967,14 +967,23 @@ void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time
 
             buffer_json_add_array_item_object(wb);
             buffer_json_member_add_uint64(wb, "tier", tier);
-            buffer_json_member_add_uint64(wb, "disk_used", used);
-            buffer_json_member_add_uint64(wb, "disk_max", max);
-            buffer_json_member_add_double(wb, "disk_percent", percent);
-            buffer_json_member_add_time_t(wb, "from", first_time_s);
-            buffer_json_member_add_time_t(wb, "to", now_s);
-            buffer_json_member_add_time_t(wb, "retention", now_s - first_time_s);
-            buffer_json_member_add_time_t(wb, "expected_retention", (time_t)((NETDATA_DOUBLE)(now_s - first_time_s) * 100.0 / percent));
-            buffer_json_member_add_uint64(wb, "currently_collected_metrics", currently_collected_metrics);
+
+            if(used || max) {
+                buffer_json_member_add_uint64(wb, "disk_used", used);
+                buffer_json_member_add_uint64(wb, "disk_max", max);
+                buffer_json_member_add_double(wb, "disk_percent", percent);
+            }
+
+            if(first_time_s) {
+                buffer_json_member_add_time_t(wb, "from", first_time_s);
+                buffer_json_member_add_time_t(wb, "to", now_s);
+                buffer_json_member_add_time_t(wb, "retention", now_s - first_time_s);
+                buffer_json_member_add_time_t(wb, "expected_retention",
+                                              (time_t) ((NETDATA_DOUBLE) (now_s - first_time_s) * 100.0 / percent));
+            }
+
+            if(currently_collected_metrics)
+                buffer_json_member_add_uint64(wb, "currently_collected_metrics", currently_collected_metrics);
 
             buffer_json_object_close(wb);
         }
