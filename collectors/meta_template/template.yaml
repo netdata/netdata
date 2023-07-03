@@ -61,7 +61,12 @@ related_resources:
         module_name: ""
 info_provided_to_referring_integrations:
   description: ""
-alerts: []
+alerts:
+  - info: ""
+    link: ""
+    metric: ""
+    name: ""
+    os: ""
 metrics:
   folding:
     enabled: false
@@ -69,4 +74,19 @@ metrics:
   description: ""
   availability:
     - ""
-  scopes: []
+  scopes:
+    - name: ""
+      description: ""
+      labels:
+        - name: ""
+          description: ""
+      metrics:
+        - name: ""
+          availability:
+            - ""
+          description: ""
+          unit: ""
+          chart_type: ""
+          dimensions:
+            - name: ""
+

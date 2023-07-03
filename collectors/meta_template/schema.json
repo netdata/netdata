@@ -5,7 +5,7 @@
   "properties": {
     "plugin_name": {
       "type": "string",
-      "description": "Plugin name (e.g. apps.plugin, proc.plugin, go.d.plugin). It must match the name of the binary in the plugins.d directory."
+      "description": "Plugin name (e.g. apps.plugin, proc.plugin, go.d.plugin). It must match the name of the executable file in the plugins.d directory."
     },
     "module_name": {
       "type": "string",
