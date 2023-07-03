@@ -2049,7 +2049,7 @@ void sql_alert_transitions(DICTIONARY *alert_instances, time_t after, time_t bef
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(command), -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement sql_health_alarm_log2json_v3");
+        error_report("Failed to prepare statement sql_alert_transitions");
         goto fail_only_drop;
     }
 
