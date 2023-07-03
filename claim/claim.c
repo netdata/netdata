@@ -181,7 +181,7 @@ void load_claiming_state(void)
     freez(claimed_id);
 
     netdata_log_info("File '%s' was found. Setting state to AGENT_CLAIMED.", filename);
-    netdata_cloud_enabled = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1);
+    netdata_cloud_enabled = appconfig_get_boolean_ondemand(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", netdata_cloud_enabled);
 #endif
 }
 

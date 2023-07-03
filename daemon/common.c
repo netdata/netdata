@@ -20,9 +20,9 @@ int32_t netdata_configured_utc_offset        = 0;
 bool netdata_ready = false;
 
 #if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
-bool netdata_cloud_enabled = false;
+int netdata_cloud_enabled = CONFIG_BOOLEAN_NO;
 #else
-bool netdata_cloud_enabled = true;
+int netdata_cloud_enabled = CONFIG_BOOLEAN_AUTO;
 #endif
 
 long get_netdata_cpus(void) {
@@ -70,6 +70,9 @@ const char *cloud_status_to_string(CLOUD_STATUS status) {
         case CLOUD_STATUS_UNAVAILABLE:
             return "unavailable";
 
+        case CLOUD_STATUS_AVAILABLE:
+            return "available";
+
         case CLOUD_STATUS_DISABLED:
             return "disabled";
 
@@ -92,8 +95,15 @@ CLOUD_STATUS cloud_status(void) {
     if(aclk_connected)
         return CLOUD_STATUS_ONLINE;
 
-    if(netdata_cloud_enabled)
+    char *agent_id = get_agent_claimid();
+    bool claimed = agent_id != NULL;
+    freez(agent_id);
+
+    if(netdata_cloud_enabled == CONFIG_BOOLEAN_YES && claimed)
         return CLOUD_STATUS_OFFLINE;
+
+    if(netdata_cloud_enabled == CONFIG_BOOLEAN_AUTO)
+        return CLOUD_STATUS_AVAILABLE;
 
     return CLOUD_STATUS_DISABLED;
 #else

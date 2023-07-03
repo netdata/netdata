@@ -1235,12 +1235,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     host_functions2json(host, wb);
     host_collectors(host, wb);
 
-#ifdef DISABLE_CLOUD
-    buffer_json_member_add_boolean(wb, "cloud-enabled", false);
-#else
-    buffer_json_member_add_boolean(wb, "cloud-enabled",
-                   appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", true));
-#endif
+    buffer_json_member_add_boolean(wb, "cloud-enabled", netdata_cloud_enabled);
 
 #ifdef ENABLE_ACLK
     buffer_json_member_add_boolean(wb, "cloud-available", true);

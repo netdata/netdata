@@ -10,6 +10,7 @@ typedef enum __attribute__((packed)) {
     BIB_PACKAGING_INSTALL_TYPE,
     BIB_PACKAGING_ARCHITECTURE,
     BIB_PACKAGING_DISTRO,
+    BIB_PACKAGING_CONFIGURE_OPTIONS,
     BIB_OS_KERNEL_NAME,
     BIB_OS_KERNEL_VERSION,
     BIB_OS_NAME,
@@ -27,7 +28,7 @@ typedef enum __attribute__((packed)) {
     BIB_HW_VIRTUALIZATION_DETECTION,
     BIB_CONTAINER_NAME,
     BIB_CONTAINER_DETECTION,
-    BIB_KUBERNETES,
+    BIB_CONTAINER_ORCHESTRATOR,
     BIB_CONTAINER_OS_NAME,
     BIB_CONTAINER_OS_ID,
     BIB_CONTAINER_OS_ID_LIKE,
@@ -169,6 +170,15 @@ static struct {
                 .analytics = NULL,
                 .print = "Package Distro",
                 .json = "distro",
+                .value = "unknown",
+        },
+        {
+                .bit = BIB_PACKAGING_CONFIGURE_OPTIONS,
+                .category = BIC_PACKAGING,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Configure Options",
+                .json = "configure",
                 .value = "unknown",
         },
         {
@@ -325,12 +335,12 @@ static struct {
                 .value = "unknown",
         },
         {
-                .bit = BIB_KUBERNETES,
+                .bit = BIB_CONTAINER_ORCHESTRATOR,
                 .category = BIC_CONTAINER,
                 .type = BIT_STRING,
                 .analytics = NULL,
-                .print = "Kubernetes",
-                .json = "kubernetes",
+                .print = "Container Orchestrator",
+                .json = "orchestrator",
                 .value = "unknown",
         },
         {
@@ -1026,6 +1036,7 @@ static void build_info_set_value_strdupz(BUILD_INFO_BIT bit, const char *value) 
 
 __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_value(BIB_PACKAGING_NETDATA_VERSION, program_version);
+    build_info_set_value(BIB_PACKAGING_CONFIGURE_OPTIONS, CONFIGURE_COMMAND);
 
 #ifdef COMPILED_FOR_LINUX
     bitmap256_set_bit(&BUILD_INFO, BIB_FEATURE_BUILT_FOR, true);
@@ -1258,7 +1269,12 @@ static void populate_system_info(void) {
     build_info_set_value_strdupz(BIB_HW_VIRTUALIZATION_DETECTION, system_info->virt_detection);
     build_info_set_value_strdupz(BIB_CONTAINER_NAME, system_info->container);
     build_info_set_value_strdupz(BIB_CONTAINER_DETECTION, system_info->container_detection);
-    build_info_set_value_strdupz(BIB_KUBERNETES, system_info->is_k8s_node);
+
+    if(system_info->is_k8s_node && !strcmp(system_info->is_k8s_node, "true"))
+        build_info_set_value_strdupz(BIB_CONTAINER_ORCHESTRATOR, "kubernetes");
+    else
+        build_info_set_value_strdupz(BIB_CONTAINER_ORCHESTRATOR, "none");
+
     build_info_set_value_strdupz(BIB_CONTAINER_OS_NAME, system_info->container_os_name);
     build_info_set_value_strdupz(BIB_CONTAINER_OS_ID, system_info->container_os_id);
     build_info_set_value_strdupz(BIB_CONTAINER_OS_ID_LIKE, system_info->container_os_id_like);

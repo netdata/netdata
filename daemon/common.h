@@ -111,7 +111,7 @@ extern int netdata_zero_metrics_enabled;
 extern int netdata_anonymous_statistics_enabled;
 
 extern bool netdata_ready;
-extern bool netdata_cloud_enabled;
+extern int netdata_cloud_enabled;
 
 extern time_t netdata_start_time;
 
@@ -119,6 +119,7 @@ long get_netdata_cpus(void);
 
 typedef enum __attribute__((packed)) {
     CLOUD_STATUS_UNAVAILABLE = 0,
+    CLOUD_STATUS_AVAILABLE,
     CLOUD_STATUS_DISABLED,
     CLOUD_STATUS_BANNED,
     CLOUD_STATUS_OFFLINE,
