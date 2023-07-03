@@ -218,15 +218,16 @@ static inline char *read_last_line(const char *filename, int max_line_width){
 
     for(int i = bytes_read - 2; i >= 0; i--){
         char ch = buff[i];
-        if (ch == '\n' || ch == '\r'){
+        if (ch == '\n'){
             found_ln = 1;
             line_pos = i;
             break;
         }
     }
+    
     if(found_ln){
         char *line = callocz(1, (size_t) (bytes_read - line_pos - 1) * sizeof(char));
-        memcpy(line, &buff[line_pos + 1], (size_t) (bytes_read - line_pos - 2));
+        memcpy(line, &buff[line_pos + 1], (size_t) (bytes_read - line_pos - 1));
         freez(buff);
         uv_fs_close(NULL, &req, file_handle, NULL);
         return line;
