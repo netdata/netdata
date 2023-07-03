@@ -294,7 +294,7 @@ static int do_migration_v8_v9(sqlite3 *database, const char *name)
 static int do_migration_v9_v10(sqlite3 *database, const char *name)
 {
     UNUSED(name);
-    info("Running \"%s\" database migration", name);
+    netdata_log_info("Running \"%s\" database migration", name);
 
     if (table_exists_in_database("alert_hash") && !column_exists_in_table("alert_hash", "chart_labels"))
         return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v9_v10[0]);
