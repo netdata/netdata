@@ -4,18 +4,14 @@ netdata_ebpf_test_functions() {
     curl -k -o /tmp/ebpf_netdata_test_functions.txt "${1}"
     TEST=$?
     if [ $TEST -ne 0 ]; then
-        if [ -f /tmp/ebpf_netdata_test_functions.txt ]; then
-            rm /tmp/ebpf_netdata_test_functions.txt
-        fi
-        echo "Cannot request run a for ${1}."
+        echo "Cannot request run a for ${1}. See '/tmp/ebpf_netdata_test_functions.txt' for more details."
         exit 1
     fi
 
     grep "${2}" /tmp/ebpf_netdata_test_functions.txt >/dev/null
     TEST=$?
     if [ $TEST -ne 0 ]; then
-        rm /tmp/ebpf_netdata_test_functions.txt
-        echo "Cannot find ${2} in the output."
+        echo "Cannot find ${2} in the output. See '/tmp/ebpf_netdata_test_functions.txt' for more details.."
         exit 1
     fi
 
@@ -39,7 +35,7 @@ netdata_ebpf_test_functions "${MURL}/api/v1/function?function=ebpf_thread%20help
 netdata_ebpf_test_functions "${MURL}/api/v1/function?function=ebpf_thread" "columns"
 
 #Test thread requests . The mdflush is not enabled, because it is not present in all distributions by default.
-for THREAD in "cachestat" "dcstat" "disk" "fd" "filesystem" "hardirq" "mount" "oomkill" "process" "shm" "socket" "softirq" "sync" "swap" "vfs" ;
+for THREAD in "cachestat" "dc" "disk" "fd" "filesystem" "hardirq" "mount" "oomkill" "process" "shm" "socket" "softirq" "sync" "swap" "vfs" ;
 do
     echo "TESTING ${THREAD}"
     netdata_ebpf_test_functions "${MURL}/api/v1/function?function=ebpf_thread%20enable:${THREAD}:${INTERVAL}%20thread:${THREAD}"
