@@ -37,7 +37,7 @@
 
 #define SELECT_DIMENSION_LIST "SELECT dim_id, rowid FROM dimension WHERE rowid > @row_id"
 
-#define SQL_STORE_HOST_INFO_VALUES "INSERT OR REPLACE INTO host_info (host_id, system_key, system_value, date_created) VALUES " \
+#define SQL_STORE_HOST_SYSTEM_INFO_VALUES "INSERT OR REPLACE INTO host_info (host_id, system_key, system_value, date_created) VALUES " \
     "(@uuid, @name, @value, unixepoch())"
 
 #define MIGRATE_LOCALHOST_TO_NEW_MACHINE_GUID                                                                          \
@@ -391,7 +391,7 @@ static int add_host_sysinfo_key_value(const char *name, const char *value, uuid_
     }
 
     if (unlikely((!res))) {
-        rc = prepare_statement(db_meta, SQL_STORE_HOST_INFO_VALUES, &res);
+        rc = prepare_statement(db_meta, SQL_STORE_HOST_SYSTEM_INFO_VALUES, &res);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to store host info values, rc = %d", rc);
             return 0;
