@@ -3,7 +3,7 @@
 #include "sqlite_functions.h"
 #include "sqlite_db_migration.h"
 
-#define DB_METADATA_VERSION 9
+#define DB_METADATA_VERSION 10
 
 const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS host(host_id BLOB PRIMARY KEY, hostname TEXT NOT NULL, "
@@ -32,7 +32,7 @@ const char *database_config[] = {
     "every text, units text, calc text, families text, plugin text, module text, charts text, green text, "
     "red text, warn text, crit text, exec text, to_key text, info text, delay text, options text, "
     "repeat text, host_labels text, p_db_lookup_dimensions text, p_db_lookup_method text, p_db_lookup_options int, "
-    "p_db_lookup_after int, p_db_lookup_before int, p_update_every int, source text);",
+    "p_db_lookup_after int, p_db_lookup_before int, p_update_every int, source text, chart_labels text);",
 
     "CREATE INDEX IF NOT EXISTS alert_hash_index ON alert_hash (hash_id);",
 
