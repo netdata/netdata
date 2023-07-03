@@ -14,7 +14,7 @@ overview:
     include: []
     exclude: []
   multi-instance: true
-  permissions:
+  additional_permissions:
     description: ""
   default_behavior:
     auto_detection:
@@ -44,10 +44,11 @@ setup:
     examples:
       list:
         - name: ""
-          folding: true
+          folding: 
+            enabled: true
+            title: ""
           description: ""
-          configuration_data:
-            jobs: []
+          config: ""
 troubleshooting:
   problems:
     list:
@@ -55,13 +56,17 @@ troubleshooting:
         description: ""
 related_resources:
   integrations:
-    list: []
+    list:
+      - plugin_name: ""
+        module_name: ""
 info_provided_to_referring_integrations:
   description: ""
 alerts: []
 metrics:
-  description: ""
   folding:
-    title: ""
     enabled: false
+    title: ""
+  description: ""
+  availability:
+    - ""
   scopes: []

@@ -310,7 +310,7 @@
           },
           "link": {
             "type": "string",
-            "description": "TODO"
+            "description": "Link to github .conf file that this alert originates from"
           },
           "metric": {
             "type": "string",
