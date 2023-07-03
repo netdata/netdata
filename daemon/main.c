@@ -35,6 +35,7 @@ typedef struct service_thread {
     SERVICE_THREAD_TYPE type;
     SERVICE_TYPE services;
     char name[NETDATA_THREAD_NAME_MAX + 1];
+    bool stop_immediately;
     bool cancelled;
 
     union {
@@ -48,11 +49,9 @@ typedef struct service_thread {
 } SERVICE_THREAD;
 
 struct service_globals {
-    SERVICE_TYPE running;
     SPINLOCK lock;
     Pvoid_t pid_judy;
 } service_globals = {
-        .running = ~0,
         .pid_judy = NULL,
 };
 
@@ -110,20 +109,12 @@ bool service_running(SERVICE_TYPE service) {
     if(unlikely(!sth))
         sth = service_register(SERVICE_THREAD_TYPE_NETDATA, NULL, NULL, NULL, false);
 
-    if(unlikely(netdata_exit))
-        __atomic_store_n(&service_globals.running, 0, __ATOMIC_RELAXED);
-
-    if(unlikely(service == 0))
-        service = sth->services;
-
     sth->services |= service;
 
-    return ((__atomic_load_n(&service_globals.running, __ATOMIC_RELAXED) & service) == service);
+    return !(sth->stop_immediately || netdata_exit);
 }
 
 void service_signal_exit(SERVICE_TYPE service) {
-    __atomic_and_fetch(&service_globals.running, ~(service), __ATOMIC_RELAXED);
-
     spinlock_lock(&service_globals.lock);
 
     Pvoid_t *PValue;
@@ -132,11 +123,14 @@ void service_signal_exit(SERVICE_TYPE service) {
     while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
         SERVICE_THREAD *sth = *PValue;
 
-        if((sth->services & service) && sth->request_quit_callback) {
-            spinlock_unlock(&service_globals.lock);
-            sth->request_quit_callback(sth->data);
-            spinlock_lock(&service_globals.lock);
-            continue;
+        if((sth->services & service)) {
+            sth->stop_immediately = true;
+
+            if(sth->request_quit_callback) {
+                spinlock_unlock(&service_globals.lock);
+                sth->request_quit_callback(sth->data);
+                spinlock_lock(&service_globals.lock);
+            }
         }
     }
 
@@ -271,7 +265,7 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
 
                 buffer_flush(service_list);
                 service_to_buffer(service_list, running_services);
-                info("SERVICE CONTROL: waiting for the following %zu services [ %s] to exit: %s",
+                netdata_log_info("SERVICE CONTROL: waiting for the following %zu services [ %s] to exit: %s",
                      running, buffer_tostring(service_list),
                      running <= 10 ? buffer_tostring(thread_list) : "");
             }
@@ -286,7 +280,7 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
     if(running) {
         buffer_flush(service_list);
         service_to_buffer(service_list, running_services);
-        info("SERVICE CONTROL: "
+        netdata_log_info("SERVICE CONTROL: "
              "the following %zu service(s) [ %s] take too long to exit: %s; "
              "giving up on them...",
              running, buffer_tostring(service_list),
@@ -303,9 +297,9 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
     {                                                   \
         usec_t now_ut = now_monotonic_usec();           \
         if(prev_msg)                                    \
-            info("NETDATA SHUTDOWN: in %7llu ms, %s%s - next: %s", (now_ut - last_ut) / USEC_PER_MS, (timeout)?"(TIMEOUT) ":"", prev_msg, msg); \
+            netdata_log_info("NETDATA SHUTDOWN: in %7llu ms, %s%s - next: %s", (now_ut - last_ut) / USEC_PER_MS, (timeout)?"(TIMEOUT) ":"", prev_msg, msg); \
         else                                            \
-            info("NETDATA SHUTDOWN: next: %s", msg);    \
+            netdata_log_info("NETDATA SHUTDOWN: next: %s", msg);    \
         last_ut = now_ut;                               \
         prev_msg = msg;                                 \
         timeout = false;                                \
@@ -320,7 +314,7 @@ void netdata_cleanup_and_exit(int ret) {
     bool timeout = false;
 
     error_log_limit_unlimited();
-    info("NETDATA SHUTDOWN: initializing shutdown with code %d...", ret);
+    netdata_log_info("NETDATA SHUTDOWN: initializing shutdown with code %d...", ret);
 
     send_statistics("EXIT", ret?"ERROR":"OK","-");
 
@@ -358,8 +352,7 @@ void netdata_cleanup_and_exit(int ret) {
     delta_shutdown_time("stop replication, exporters, health and web servers threads");
 
     timeout = !service_wait_exit(
-            SERVICE_REPLICATION
-            | SERVICE_EXPORTERS
+            SERVICE_EXPORTERS
             | SERVICE_HEALTH
             | SERVICE_WEB_SERVER
             | SERVICE_HTTPD
@@ -370,6 +363,12 @@ void netdata_cleanup_and_exit(int ret) {
     timeout = !service_wait_exit(
             SERVICE_COLLECTORS
             | SERVICE_STREAMING
+            , 3 * USEC_PER_SEC);
+
+    delta_shutdown_time("stop replication threads");
+
+    timeout = !service_wait_exit(
+            SERVICE_REPLICATION // replication has to be stopped after STREAMING, because it cleans up ARAL
             , 3 * USEC_PER_SEC);
 
     delta_shutdown_time("disable ML detection and training threads");
@@ -495,7 +494,7 @@ void netdata_cleanup_and_exit(int ret) {
     delta_shutdown_time("exit");
 
     usec_t ended_ut = now_monotonic_usec();
-    info("NETDATA SHUTDOWN: completed in %llu ms - netdata is now exiting - bye bye...", (ended_ut - started_ut) / USEC_PER_MS);
+    netdata_log_info("NETDATA SHUTDOWN: completed in %llu ms - netdata is now exiting - bye bye...", (ended_ut - started_ut) / USEC_PER_MS);
     exit(ret);
 }
 
@@ -642,7 +641,7 @@ static void set_nofile_limit(struct rlimit *rl) {
         return;
     }
 
-    info("resources control: allowed file descriptors: soft = %zu, max = %zu",
+    netdata_log_info("resources control: allowed file descriptors: soft = %zu, max = %zu",
          (size_t) rl->rlim_cur, (size_t) rl->rlim_max);
 
     // make the soft/hard limits equal
@@ -669,10 +668,10 @@ void cancel_main_threads() {
     for (i = 0; static_threads[i].name != NULL ; i++) {
         if (static_threads[i].enabled == NETDATA_MAIN_THREAD_RUNNING) {
             if (static_threads[i].thread) {
-                info("EXIT: Stopping main thread: %s", static_threads[i].name);
+                netdata_log_info("EXIT: Stopping main thread: %s", static_threads[i].name);
                 netdata_thread_cancel(*static_threads[i].thread);
             } else {
-                info("EXIT: No thread running (marking as EXITED): %s", static_threads[i].name);
+                netdata_log_info("EXIT: No thread running (marking as EXITED): %s", static_threads[i].name);
                 static_threads[i].enabled = NETDATA_MAIN_THREAD_EXITED;
             }
             found++;
@@ -683,7 +682,7 @@ void cancel_main_threads() {
 
     while(found && max > 0) {
         max -= step;
-        info("Waiting %d threads to finish...", found);
+        netdata_log_info("Waiting %d threads to finish...", found);
         sleep_usec(step);
         found = 0;
         for (i = 0; static_threads[i].name != NULL ; i++) {
@@ -699,7 +698,7 @@ void cancel_main_threads() {
         }
     }
     else
-        info("All threads finished.");
+        netdata_log_info("All threads finished.");
 
     for (i = 0; static_threads[i].name != NULL ; i++)
         freez(static_threads[i].thread);
@@ -1186,7 +1185,7 @@ static void get_netdata_configured_variables() {
     // https://github.com/netdata/netdata/pull/11222#issuecomment-868367920 for more information.
     if (rrdset_free_obsolete_time_s < 10) {
         rrdset_free_obsolete_time_s = 10;
-        info("The \"cleanup obsolete charts after seconds\" option was set to 10 seconds.");
+        netdata_log_info("The \"cleanup obsolete charts after seconds\" option was set to 10 seconds.");
         config_set_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time_s);
     }
 
@@ -1222,13 +1221,13 @@ int load_netdata_conf(char *filename, char overwrite_used) {
 
         ret = config_load(filename, overwrite_used, NULL);
         if(!ret) {
-            info("CONFIG: cannot load user config '%s'. Will try the stock version.", filename);
+            netdata_log_info("CONFIG: cannot load user config '%s'. Will try the stock version.", filename);
             freez(filename);
 
             filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "netdata.conf");
             ret = config_load(filename, overwrite_used, NULL);
             if(!ret)
-                info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
+                netdata_log_info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
         }
 
         freez(filename);
@@ -1248,14 +1247,14 @@ int get_system_info(struct rrdhost_system_info *system_info) {
     script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("system-info.sh") + 2));
     sprintf(script, "%s/%s", netdata_configured_primary_plugins_dir, "system-info.sh");
     if (unlikely(access(script, R_OK) != 0)) {
-        info("System info script %s not found.",script);
+        netdata_log_info("System info script %s not found.",script);
         freez(script);
         return 1;
     }
 
     pid_t command_pid;
 
-    info("Executing %s", script);
+    netdata_log_info("Executing %s", script);
 
     FILE *fp_child_input;
     FILE *fp_child_output = netdata_popen(script, &command_pid, &fp_child_input);
@@ -1276,10 +1275,10 @@ int get_system_info(struct rrdhost_system_info *system_info) {
                 coverity_remove_taint(value);
 
                 if(unlikely(rrdhost_set_system_info_variable(system_info, line, value))) {
-                    info("Unexpected environment variable %s=%s", line, value);
+                    netdata_log_info("Unexpected environment variable %s=%s", line, value);
                 }
                 else {
-                    info("%s=%s", line, value);
+                    netdata_log_info("%s=%s", line, value);
                     setenv(line, value, 1);
                 }
             }
@@ -1328,9 +1327,9 @@ void post_conf_load(char **user)
     {                                                   \
         usec_t now_ut = now_monotonic_usec();           \
         if(prev_msg)                                    \
-            info("NETDATA STARTUP: in %7llu ms, %s - next: %s", (now_ut - last_ut) / USEC_PER_MS, prev_msg, msg); \
+            netdata_log_info("NETDATA STARTUP: in %7llu ms, %s - next: %s", (now_ut - last_ut) / USEC_PER_MS, prev_msg, msg); \
         else                                            \
-            info("NETDATA STARTUP: next: %s", msg);    \
+            netdata_log_info("NETDATA STARTUP: next: %s", msg);    \
         last_ut = now_ut;                               \
         prev_msg = msg;                                 \
     }
@@ -1350,7 +1349,7 @@ int main(int argc, char **argv) {
     usec_t started_ut = now_monotonic_usec();
     usec_t last_ut = started_ut;
     const char *prev_msg = NULL;
-    // Initialize stderror avoiding coredump when info() or error() is called
+    // Initialize stderror avoiding coredump when netdata_log_info() or error() is called
     stderror = stderr;
 
     int i;
@@ -2019,7 +2018,7 @@ int main(int argc, char **argv) {
     if(become_daemon(dont_fork, user) == -1)
         fatal("Cannot daemonize myself.");
 
-    info("netdata started on pid %d.", getpid());
+    netdata_log_info("netdata started on pid %d.", getpid());
 
     delta_startup_time("initialize threads after fork");
 
@@ -2125,7 +2124,7 @@ int main(int argc, char **argv) {
     delta_startup_time("ready");
 
     usec_t ready_ut = now_monotonic_usec();
-    info("NETDATA STARTUP: completed in %llu ms. Enjoy real-time performance monitoring!", (ready_ut - started_ut) / USEC_PER_MS);
+    netdata_log_info("NETDATA STARTUP: completed in %llu ms. Enjoy real-time performance monitoring!", (ready_ut - started_ut) / USEC_PER_MS);
     netdata_ready = true;
 
     send_statistics("START", "-",  "-");

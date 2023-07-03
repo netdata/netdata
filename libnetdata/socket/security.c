@@ -585,7 +585,7 @@ void netdata_ssl_initialize_ctx(int selector) {
             if(!netdata_ssl_web_server_ctx) {
                 struct stat statbuf;
                 if (stat(netdata_ssl_security_key, &statbuf) || stat(netdata_ssl_security_cert, &statbuf))
-                    info("To use encryption it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
+                    netdata_log_info("To use encryption it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
                 else {
                     netdata_ssl_web_server_ctx = netdata_ssl_create_server_ctx(
                             SSL_MODE_ENABLE_PARTIAL_WRITE |
@@ -705,13 +705,13 @@ int ssl_security_location_for_context(SSL_CTX *ctx, char *file, char *path) {
     int load_custom = 1, load_default = 1;
     if (file || path) {
         if(!SSL_CTX_load_verify_locations(ctx, file, path)) {
-            info("Netdata can not verify custom CAfile or CApath for parent's SSL certificate, so it will use the default OpenSSL configuration to validate certificates!");
+            netdata_log_info("Netdata can not verify custom CAfile or CApath for parent's SSL certificate, so it will use the default OpenSSL configuration to validate certificates!");
             load_custom = 0;
         }
     }
 
     if(!SSL_CTX_set_default_verify_paths(ctx)) {
-        info("Can not verify default OpenSSL configuration to validate certificates!");
+        netdata_log_info("Can not verify default OpenSSL configuration to validate certificates!");
         load_default = 0;
     }
 

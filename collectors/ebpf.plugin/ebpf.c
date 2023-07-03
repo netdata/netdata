@@ -727,7 +727,7 @@ static void ebpf_stop_threads(int sig)
         if (ebpf_modules[i].enabled == NETDATA_THREAD_EBPF_RUNNING) {
             netdata_thread_cancel(*ebpf_modules[i].thread->thread);
 #ifdef NETDATA_DEV_MODE
-            info("Sending cancel for thread %s", ebpf_modules[i].thread_name);
+            netdata_log_info("Sending cancel for thread %s", ebpf_modules[i].thread_name);
 #endif
         }
     }
@@ -736,7 +736,7 @@ static void ebpf_stop_threads(int sig)
     pthread_mutex_lock(&mutex_cgroup_shm);
     netdata_thread_cancel(*cgroup_integration_thread.thread);
 #ifdef NETDATA_DEV_MODE
-    info("Sending cancel for thread %s", cgroup_integration_thread.name);
+    netdata_log_info("Sending cancel for thread %s", cgroup_integration_thread.name);
 #endif
     pthread_mutex_unlock(&mutex_cgroup_shm);
 
@@ -2135,11 +2135,11 @@ static void ebpf_parse_args(int argc, char **argv)
         freq = EBPF_DEFAULT_UPDATE_EVERY;
 
     if (load_collector_config(ebpf_user_config_dir, &disable_apps, &disable_cgroups, freq)) {
-        info(
+        netdata_log_info(
             "Does not have a configuration file inside `%s/ebpf.d.conf. It will try to load stock file.",
             ebpf_user_config_dir);
         if (load_collector_config(ebpf_stock_config_dir, &disable_apps, &disable_cgroups, freq)) {
-            info("Does not have a stock file. It is starting with default options.");
+            netdata_log_info("Does not have a stock file. It is starting with default options.");
         }
     }
 
@@ -2154,112 +2154,112 @@ static void ebpf_parse_args(int argc, char **argv)
             case EBPF_MODULE_PROCESS_IDX: {
                 select_threads |= 1<<EBPF_MODULE_PROCESS_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF enabling \"PROCESS\" charts, because it was started with the option \"[-]-process\".");
+                netdata_log_info("EBPF enabling \"PROCESS\" charts, because it was started with the option \"[-]-process\".");
 #endif
                 break;
             }
             case EBPF_MODULE_SOCKET_IDX: {
                 select_threads |= 1<<EBPF_MODULE_SOCKET_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF enabling \"NET\" charts, because it was started with the option \"[-]-net\".");
+                netdata_log_info("EBPF enabling \"NET\" charts, because it was started with the option \"[-]-net\".");
 #endif
                 break;
             }
             case EBPF_MODULE_CACHESTAT_IDX: {
                 select_threads |= 1<<EBPF_MODULE_CACHESTAT_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF enabling \"CACHESTAT\" charts, because it was started with the option \"[-]-cachestat\".");
+                netdata_log_info("EBPF enabling \"CACHESTAT\" charts, because it was started with the option \"[-]-cachestat\".");
 #endif
                 break;
             }
             case EBPF_MODULE_SYNC_IDX: {
                 select_threads |= 1<<EBPF_MODULE_SYNC_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF enabling \"SYNC\" chart, because it was started with the option \"[-]-sync\".");
+                netdata_log_info("EBPF enabling \"SYNC\" chart, because it was started with the option \"[-]-sync\".");
 #endif
                 break;
             }
             case EBPF_MODULE_DCSTAT_IDX: {
                 select_threads |= 1<<EBPF_MODULE_DCSTAT_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF enabling \"DCSTAT\" charts, because it was started with the option \"[-]-dcstat\".");
+                netdata_log_info("EBPF enabling \"DCSTAT\" charts, because it was started with the option \"[-]-dcstat\".");
 #endif
                 break;
             }
             case EBPF_MODULE_SWAP_IDX: {
                 select_threads |= 1<<EBPF_MODULE_SWAP_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF enabling \"SWAP\" chart, because it was started with the option \"[-]-swap\".");
+                netdata_log_info("EBPF enabling \"SWAP\" chart, because it was started with the option \"[-]-swap\".");
 #endif
                 break;
             }
             case EBPF_MODULE_VFS_IDX: {
                 select_threads |= 1<<EBPF_MODULE_VFS_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF enabling \"VFS\" chart, because it was started with the option \"[-]-vfs\".");
+                netdata_log_info("EBPF enabling \"VFS\" chart, because it was started with the option \"[-]-vfs\".");
 #endif
                 break;
             }
             case EBPF_MODULE_FILESYSTEM_IDX: {
                 select_threads |= 1<<EBPF_MODULE_FILESYSTEM_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF enabling \"FILESYSTEM\" chart, because it was started with the option \"[-]-filesystem\".");
+                netdata_log_info("EBPF enabling \"FILESYSTEM\" chart, because it was started with the option \"[-]-filesystem\".");
 #endif
                 break;
             }
             case EBPF_MODULE_DISK_IDX: {
                 select_threads |= 1<<EBPF_MODULE_DISK_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF enabling \"DISK\" chart, because it was started with the option \"[-]-disk\".");
+                netdata_log_info("EBPF enabling \"DISK\" chart, because it was started with the option \"[-]-disk\".");
 #endif
                 break;
             }
             case EBPF_MODULE_MOUNT_IDX: {
                 select_threads |= 1<<EBPF_MODULE_MOUNT_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF enabling \"MOUNT\" chart, because it was started with the option \"[-]-mount\".");
+                netdata_log_info("EBPF enabling \"MOUNT\" chart, because it was started with the option \"[-]-mount\".");
 #endif
                 break;
             }
             case EBPF_MODULE_FD_IDX: {
                 select_threads |= 1<<EBPF_MODULE_FD_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF enabling \"FILEDESCRIPTOR\" chart, because it was started with the option \"[-]-filedescriptor\".");
+                netdata_log_info("EBPF enabling \"FILEDESCRIPTOR\" chart, because it was started with the option \"[-]-filedescriptor\".");
 #endif
                 break;
             }
             case EBPF_MODULE_HARDIRQ_IDX: {
                 select_threads |= 1<<EBPF_MODULE_HARDIRQ_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF enabling \"HARDIRQ\" chart, because it was started with the option \"[-]-hardirq\".");
+                netdata_log_info("EBPF enabling \"HARDIRQ\" chart, because it was started with the option \"[-]-hardirq\".");
 #endif
                 break;
             }
             case EBPF_MODULE_SOFTIRQ_IDX: {
                 select_threads |= 1<<EBPF_MODULE_SOFTIRQ_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF enabling \"SOFTIRQ\" chart, because it was started with the option \"[-]-softirq\".");
+                netdata_log_info("EBPF enabling \"SOFTIRQ\" chart, because it was started with the option \"[-]-softirq\".");
 #endif
                 break;
             }
             case EBPF_MODULE_OOMKILL_IDX: {
                 select_threads |= 1<<EBPF_MODULE_OOMKILL_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF enabling \"OOMKILL\" chart, because it was started with the option \"[-]-oomkill\".");
+                netdata_log_info("EBPF enabling \"OOMKILL\" chart, because it was started with the option \"[-]-oomkill\".");
 #endif
                 break;
             }
             case EBPF_MODULE_SHM_IDX: {
                 select_threads |= 1<<EBPF_MODULE_SHM_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF enabling \"SHM\" chart, because it was started with the option \"[-]-shm\".");
+                netdata_log_info("EBPF enabling \"SHM\" chart, because it was started with the option \"[-]-shm\".");
 #endif
                 break;
             }
             case EBPF_MODULE_MDFLUSH_IDX: {
                 select_threads |= 1<<EBPF_MODULE_MDFLUSH_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF enabling \"MDFLUSH\" chart, because it was started with the option \"[-]-mdflush\".");
+                netdata_log_info("EBPF enabling \"MDFLUSH\" chart, because it was started with the option \"[-]-mdflush\".");
 #endif
                 break;
             }
@@ -2267,7 +2267,7 @@ static void ebpf_parse_args(int argc, char **argv)
                 disable_apps = 0;
                 disable_cgroups = 0;
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF running with all chart groups, because it was started with the option \"[-]-all\".");
+                netdata_log_info("EBPF running with all chart groups, because it was started with the option \"[-]-all\".");
 #endif
                 break;
             }
@@ -2283,28 +2283,28 @@ static void ebpf_parse_args(int argc, char **argv)
                 disable_apps = 1;
                 disable_cgroups = 1;
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF running with global chart group, because it was started with the option  \"[-]-global\".");
+                netdata_log_info("EBPF running with global chart group, because it was started with the option  \"[-]-global\".");
 #endif
                 break;
             }
             case EBPF_OPTION_RETURN_MODE: {
                 ebpf_set_thread_mode(MODE_RETURN);
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF running in \"RETURN\" mode, because it was started with the option \"[-]-return\".");
+                netdata_log_info("EBPF running in \"RETURN\" mode, because it was started with the option \"[-]-return\".");
 #endif
                 break;
             }
             case EBPF_OPTION_LEGACY: {
                 ebpf_set_load_mode(EBPF_LOAD_LEGACY, EBPF_LOADED_FROM_USER);
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF running with \"LEGACY\" code, because it was started with the option \"[-]-legacy\".");
+                netdata_log_info("EBPF running with \"LEGACY\" code, because it was started with the option \"[-]-legacy\".");
 #endif
                 break;
             }
             case EBPF_OPTION_CORE: {
                 ebpf_set_load_mode(EBPF_LOAD_CORE, EBPF_LOADED_FROM_USER);
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("EBPF running with \"CO-RE\" code, because it was started with the option \"[-]-core\".");
+                netdata_log_info("EBPF running with \"CO-RE\" code, because it was started with the option \"[-]-core\".");
 #endif
                 break;
             }
@@ -2361,7 +2361,7 @@ unittest:
     // Load apps_groups.conf
     if (ebpf_read_apps_groups_conf(
             &apps_groups_default_target, &apps_groups_root_target, ebpf_user_config_dir, "groups")) {
-        info("Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'",
+        netdata_log_info("Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'",
              ebpf_user_config_dir, ebpf_stock_config_dir);
         if (ebpf_read_apps_groups_conf(
                 &apps_groups_default_target, &apps_groups_root_target, ebpf_stock_config_dir, "groups")) {
@@ -2370,7 +2370,7 @@ unittest:
             ebpf_exit();
         }
     } else
-        info("Loaded config file '%s/apps_groups.conf'", ebpf_user_config_dir);
+        netdata_log_info("Loaded config file '%s/apps_groups.conf'", ebpf_user_config_dir);
 }
 
 /*****************************************************************

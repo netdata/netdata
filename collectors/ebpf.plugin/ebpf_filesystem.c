@@ -685,7 +685,7 @@ void *ebpf_filesystem_thread(void *ptr)
 
     if (ebpf_update_partitions(em)) {
         if (em->optional)
-            info("Netdata cannot monitor the filesystems used on this host.");
+            netdata_log_info("Netdata cannot monitor the filesystems used on this host.");
 
         goto endfilesystem;
     }

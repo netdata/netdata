@@ -106,6 +106,7 @@ static int
         enable_file_charts = 1,
         max_fds_cache_seconds = 60,
 #endif
+        enable_function_cmdline = 0,
         enable_detailed_uptime_charts = 0,
         enable_users_charts = 1,
         enable_groups_charts = 1,
@@ -1470,7 +1471,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
 
     if(enable_guest_charts) {
         enable_guest_charts = 0;
-        info("Guest charts aren't supported by FreeBSD");
+        netdata_log_info("Guest charts aren't supported by FreeBSD");
     }
 #else
     pid_incremental_rate(stat, p->minflt,  str2kernel_uint_t(procfile_lineword(ff, 0,  9)));
@@ -4122,6 +4123,10 @@ static void parse_args(int argc, char **argv)
             enable_detailed_uptime_charts = 1;
             continue;
         }
+        if(strcmp("with-function-cmdline", argv[i]) == 0) {
+            enable_function_cmdline = 1;
+            continue;
+        }
 
         if(strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {
             fprintf(stderr,
@@ -4138,6 +4143,11 @@ static void parse_args(int argc, char **argv)
                     " SECONDS                set the data collection frequency\n"
                     "\n"
                     " debug                  enable debugging (lot of output)\n"
+                    "\n"
+                    " with-function-cmdline  enable reporting the complete command line for processes\n"
+                    "                        it includes the command and passed arguments\n"
+                    "                        it may include sensitive data such as passwords and tokens\n"
+                    "                        enabling this could be a security risk\n"
                     "\n"
                     " with-childs\n"
                     " without-childs         enable / disable aggregating exited\n"
@@ -4184,28 +4194,28 @@ static void parse_args(int argc, char **argv)
     if(freq > 0) update_every = freq;
 
     if(read_apps_groups_conf(user_config_dir, "groups")) {
-        info("Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'", user_config_dir, stock_config_dir);
+        netdata_log_info("Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'", user_config_dir, stock_config_dir);
 
         if(read_apps_groups_conf(stock_config_dir, "groups")) {
             error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.", stock_config_dir);
             exit(1);
         }
         else
-            info("Loaded config file '%s/apps_groups.conf'", stock_config_dir);
+            netdata_log_info("Loaded config file '%s/apps_groups.conf'", stock_config_dir);
     }
     else
-        info("Loaded config file '%s/apps_groups.conf'", user_config_dir);
+        netdata_log_info("Loaded config file '%s/apps_groups.conf'", user_config_dir);
 }
 
 static int am_i_running_as_root() {
     uid_t uid = getuid(), euid = geteuid();
 
     if(uid == 0 || euid == 0) {
-        if(debug_enabled) info("I am running with escalated privileges, uid = %u, euid = %u.", uid, euid);
+        if(debug_enabled) netdata_log_info("I am running with escalated privileges, uid = %u, euid = %u.", uid, euid);
         return 1;
     }
 
-    if(debug_enabled) info("I am not running with escalated privileges, uid = %u, euid = %u.", uid, euid);
+    if(debug_enabled) netdata_log_info("I am not running with escalated privileges, uid = %u, euid = %u.", uid, euid);
     return 0;
 }
 
@@ -4217,7 +4227,7 @@ static int check_capabilities() {
         return 0;
     }
     else if(debug_enabled)
-        info("Received my capabilities from the system.");
+        netdata_log_info("Received my capabilities from the system.");
 
     int ret = 1;
 
@@ -4232,7 +4242,7 @@ static int check_capabilities() {
             ret = 0;
         }
         else if(debug_enabled)
-            info("apps.plugin runs with CAP_DAC_READ_SEARCH.");
+            netdata_log_info("apps.plugin runs with CAP_DAC_READ_SEARCH.");
     }
 
     cfv = CAP_CLEAR;
@@ -4246,7 +4256,7 @@ static int check_capabilities() {
             ret = 0;
         }
         else if(debug_enabled)
-            info("apps.plugin runs with CAP_SYS_PTRACE.");
+            netdata_log_info("apps.plugin runs with CAP_SYS_PTRACE.");
     }
 
     cap_free(caps);
@@ -4538,10 +4548,10 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         // cmd
         buffer_json_add_array_item_string(wb, p->comm);
 
-#ifdef NETDATA_DEV_MODE
         // cmdline
-        buffer_json_add_array_item_string(wb, (p->cmdline && *p->cmdline) ? p->cmdline : p->comm);
-#endif
+        if (enable_function_cmdline) {
+            buffer_json_add_array_item_string(wb, (p->cmdline && *p->cmdline) ? p->cmdline : p->comm);
+        }
 
         // ppid
         buffer_json_add_array_item_uint64(wb, p->ppid);
@@ -4648,13 +4658,14 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
 
-#ifdef NETDATA_DEV_MODE
-        buffer_rrdf_table_add_field(wb, field_id++, "CmdLine", "Command Line", RRDF_FIELD_TYPE_DETAIL_STRING,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0,
-                                    NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-#endif
+        if (enable_function_cmdline) {
+            buffer_rrdf_table_add_field(wb, field_id++, "CmdLine", "Command Line", RRDF_FIELD_TYPE_STRING,
+                                        RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0,
+                                        NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                        RRDF_FIELD_FILTER_MULTISELECT,
+                                        RRDF_FIELD_OPTS_NONE, NULL);
+        }
+
         buffer_rrdf_table_add_field(wb, field_id++, "PPID", "Parent Process ID", RRDF_FIELD_TYPE_INTEGER,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL,
                                     NAN, RRDF_FIELD_SORT_ASCENDING, "PID", RRDF_FIELD_SUMMARY_COUNT,
@@ -5300,23 +5311,23 @@ int main(int argc, char **argv) {
 
     user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
     if(user_config_dir == NULL) {
-        // info("NETDATA_CONFIG_DIR is not passed from netdata");
+        // netdata_log_info("NETDATA_CONFIG_DIR is not passed from netdata");
         user_config_dir = CONFIG_DIR;
     }
-    // else info("Found NETDATA_USER_CONFIG_DIR='%s'", user_config_dir);
+    // else netdata_log_info("Found NETDATA_USER_CONFIG_DIR='%s'", user_config_dir);
 
     stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
     if(stock_config_dir == NULL) {
-        // info("NETDATA_CONFIG_DIR is not passed from netdata");
+        // netdata_log_info("NETDATA_CONFIG_DIR is not passed from netdata");
         stock_config_dir = LIBCONFIG_DIR;
     }
-    // else info("Found NETDATA_USER_CONFIG_DIR='%s'", user_config_dir);
+    // else netdata_log_info("Found NETDATA_USER_CONFIG_DIR='%s'", user_config_dir);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {
         struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
         if(setrlimit(RLIMIT_CORE, &rl) != 0)
-            info("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
+            netdata_log_info("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
 #ifdef HAVE_SYS_PRCTL_H
         prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
 #endif
@@ -5356,7 +5367,7 @@ int main(int argc, char **argv) {
 #endif
     }
 
-    info("started on pid %d", getpid());
+    netdata_log_info("started on pid %d", getpid());
 
     snprintfz(all_user_ids.filename, FILENAME_MAX, "%s/etc/passwd", netdata_configured_host_prefix);
     debug_log("passwd file: '%s'", all_user_ids.filename);

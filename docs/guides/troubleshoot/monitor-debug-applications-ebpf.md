@@ -248,7 +248,7 @@ from any number of distributed nodes to see how your application interacts with 
 systems. 
 
 Now that you can see eBPF metrics in Netdata Cloud, you can [invite your
-team](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/invite-your-team.md) and share your findings with others.
+team](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#invite-your-team) and share your findings with others.
 
 
 

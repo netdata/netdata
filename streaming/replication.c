@@ -222,14 +222,14 @@ static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st, STRE
                            sizeof(PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE) - 1 + 2);
         buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
         buffer_fast_strcat(wb, "' ", 2);
-        buffer_print_uint64_encoded(wb, encoding, (usec_t) rd->last_collected_time.tv_sec * USEC_PER_SEC +
-                                    (usec_t) rd->last_collected_time.tv_usec);
+        buffer_print_uint64_encoded(wb, encoding, (usec_t) rd->collector.last_collected_time.tv_sec * USEC_PER_SEC +
+                                    (usec_t) rd->collector.last_collected_time.tv_usec);
         buffer_fast_strcat(wb, " ", 1);
-        buffer_print_int64_encoded(wb, encoding, rd->last_collected_value);
+        buffer_print_int64_encoded(wb, encoding, rd->collector.last_collected_value);
         buffer_fast_strcat(wb, " ", 1);
-        buffer_print_netdata_double_encoded(wb, encoding, rd->last_calculated_value);
+        buffer_print_netdata_double_encoded(wb, encoding, rd->collector.last_calculated_value);
         buffer_fast_strcat(wb, " ", 1);
-        buffer_print_netdata_double_encoded(wb, encoding, rd->last_stored_value);
+        buffer_print_netdata_double_encoded(wb, encoding, rd->collector.last_stored_value);
         buffer_fast_strcat(wb, "\n", 1);
     }
     rrddim_foreach_done(rd);
@@ -1096,7 +1096,7 @@ void replication_set_next_point_in_time(time_t after, size_t unique_id) {
 // ----------------------------------------------------------------------------
 // replication sort entry management
 
-static struct replication_sort_entry *replication_sort_entry_create(struct replication_request *rq) {
+static inline struct replication_sort_entry *replication_sort_entry_create(struct replication_request *rq) {
     struct replication_sort_entry *rse = aral_mallocz(replication_globals.aral_rse);
     __atomic_add_fetch(&replication_globals.atomic.memory, sizeof(struct replication_sort_entry), __ATOMIC_RELAXED);
 
@@ -1120,7 +1120,7 @@ static void replication_sort_entry_destroy(struct replication_sort_entry *rse) {
 }
 
 static void replication_sort_entry_add(struct replication_request *rq) {
-    if(rrdpush_sender_replication_buffer_full_get(rq->sender)) {
+    if(unlikely(rrdpush_sender_replication_buffer_full_get(rq->sender))) {
         rq->indexed_in_judy = false;
         rq->not_indexed_buffer_full = true;
         rq->not_indexed_preprocessing = false;
@@ -1606,7 +1606,7 @@ static void verify_all_hosts_charts_are_streaming_now(void) {
     dfe_done(host);
 
     size_t executed = __atomic_load_n(&replication_globals.atomic.executed, __ATOMIC_RELAXED);
-    info("REPLICATION SUMMARY: finished, executed %zu replication requests, %zu charts pending replication",
+    netdata_log_info("REPLICATION SUMMARY: finished, executed %zu replication requests, %zu charts pending replication",
          executed - replication_globals.main_thread.last_executed, errors);
     replication_globals.main_thread.last_executed = executed;
 }

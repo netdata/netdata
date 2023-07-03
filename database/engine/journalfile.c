@@ -180,6 +180,7 @@ static void njfv2idx_remove(struct rrdengine_datafile *datafile) {
     rw_spinlock_write_lock(&datafile->ctx->njfv2idx.spinlock);
 
     int rc = JudyLDel(&datafile->ctx->njfv2idx.JudyL, datafile->journalfile->njfv2idx.indexed_as, PJE0);
+    (void)rc;
     internal_fatal(!rc, "DBENGINE: NJFV2IDX cannot remove entry");
 
     datafile->journalfile->njfv2idx.indexed_as = 0;
@@ -214,13 +215,21 @@ static struct journal_v2_header *journalfile_v2_mounted_data_get(struct rrdengin
 
             madvise_dontfork(journalfile->mmap.data, journalfile->mmap.size);
             madvise_dontdump(journalfile->mmap.data, journalfile->mmap.size);
-//            madvise_willneed(journalfile->mmap.data, journalfile->v2.size_of_directory);
-//            madvise_random(journalfile->mmap.data, journalfile->mmap.size);
-//            madvise_dontneed(journalfile->mmap.data, journalfile->mmap.size);
 
             spinlock_lock(&journalfile->v2.spinlock);
             journalfile->v2.flags |= JOURNALFILE_FLAG_IS_AVAILABLE | JOURNALFILE_FLAG_IS_MOUNTED;
+            JOURNALFILE_FLAGS flags = journalfile->v2.flags;
             spinlock_unlock(&journalfile->v2.spinlock);
+
+            if(flags & JOURNALFILE_FLAG_MOUNTED_FOR_RETENTION) {
+                // we need the entire metrics directory into memory to process it
+                madvise_willneed(journalfile->mmap.data, journalfile->v2.size_of_directory);
+            }
+            else {
+                // let the kernel know that we don't want read-ahead on this file
+                madvise_random(journalfile->mmap.data, journalfile->mmap.size);
+                // madvise_dontneed(journalfile->mmap.data, journalfile->mmap.size);
+            }
         }
     }
 
@@ -409,7 +418,7 @@ void journalfile_v2_data_set(struct rrdengine_journalfile *journalfile, int fd, 
     struct journal_v2_header *j2_header = journalfile->mmap.data;
     journalfile->v2.first_time_s = (time_t)(j2_header->start_time_ut / USEC_PER_SEC);
     journalfile->v2.last_time_s = (time_t)(j2_header->end_time_ut / USEC_PER_SEC);
-    // journalfile->v2.size_of_directory = j2_header->metric_offset + j2_header->metric_count * sizeof(struct journal_metric_list);
+    journalfile->v2.size_of_directory = j2_header->metric_offset + j2_header->metric_count * sizeof(struct journal_metric_list);
 
     journalfile_v2_mounted_data_unmount(journalfile, true, true);
 
@@ -922,7 +931,7 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
     unsigned entries;
     unsigned total_pages = 0;
 
-    info("DBENGINE: checking %u metrics that exist in the journal", j2_header->metric_count);
+    netdata_log_info("DBENGINE: checking %u metrics that exist in the journal", j2_header->metric_count);
     for (entries = 0; entries < j2_header->metric_count; entries++) {
 
         char uuid_str[UUID_STR_LEN];
@@ -953,16 +962,16 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
 
         metric++;
         if ((uint32_t)((uint8_t *) metric - (uint8_t *) data_start) > (uint32_t) journal_v2_file_size) {
-            info("DBENGINE: verification failed EOF reached -- total entries %u, verified %u", entries, verified);
+            netdata_log_info("DBENGINE: verification failed EOF reached -- total entries %u, verified %u", entries, verified);
             return 1;
         }
     }
 
     if (entries != verified) {
-        info("DBENGINE: verification failed -- total entries %u, verified %u", entries, verified);
+        netdata_log_info("DBENGINE: verification failed -- total entries %u, verified %u", entries, verified);
         return 1;
     }
-    info("DBENGINE: verification succeeded -- total entries %u, verified %u (%u total pages)", entries, verified, total_pages);
+    netdata_log_info("DBENGINE: verification succeeded -- total entries %u, verified %u (%u total pages)", entries, verified, total_pages);
 
     return 0;
 }
@@ -1003,7 +1012,7 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
     journalfile_v2_data_release(journalfile);
     usec_t ended_ut = now_monotonic_usec();
 
-    info("DBENGINE: journal v2 of tier %d, datafile %u populated, size: %0.2f MiB, metrics: %0.2f k, %0.2f ms"
+    netdata_log_info("DBENGINE: journal v2 of tier %d, datafile %u populated, size: %0.2f MiB, metrics: %0.2f k, %0.2f ms"
         , ctx->config.tier, journalfile->datafile->fileno
         , (double)data_size / 1024 / 1024
         , (double)entries / 1000
@@ -1057,7 +1066,7 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
         return 1;
     }
 
-    info("DBENGINE: checking integrity of '%s'", path_v2);
+    netdata_log_info("DBENGINE: checking integrity of '%s'", path_v2);
     usec_t validation_start_ut = now_monotonic_usec();
     int rc = journalfile_v2_validate(data_start, journal_v2_file_size, journal_v1_file_size);
     if (unlikely(rc)) {
@@ -1088,7 +1097,7 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
 
     usec_t finished_ut = now_monotonic_usec();
 
-    info("DBENGINE: journal v2 '%s' loaded, size: %0.2f MiB, metrics: %0.2f k, "
+    netdata_log_info("DBENGINE: journal v2 '%s' loaded, size: %0.2f MiB, metrics: %0.2f k, "
          "mmap: %0.2f ms, validate: %0.2f ms"
          , path_v2
          , (double)journal_v2_file_size / 1024 / 1024
@@ -1264,7 +1273,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
 
     journalfile_v2_generate_path(datafile, path, sizeof(path));
 
-    info("DBENGINE: indexing file '%s': extents %zu, metrics %zu, pages %zu",
+    netdata_log_info("DBENGINE: indexing file '%s': extents %zu, metrics %zu, pages %zu",
         path,
         number_of_extents,
         number_of_metrics,
@@ -1435,7 +1444,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
 
         internal_error(true, "DBENGINE: FILE COMPLETED --------> %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
 
-        info("DBENGINE: migrated journal file '%s', file size %zu", path, total_file_size);
+        netdata_log_info("DBENGINE: migrated journal file '%s', file size %zu", path, total_file_size);
 
         // msync(data_start, total_file_size, MS_SYNC);
         journalfile_v2_data_set(journalfile, fd_v2, data_start, total_file_size);
@@ -1446,7 +1455,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
         return;
     }
     else {
-        info("DBENGINE: failed to build index '%s', file will be skipped", path);
+        netdata_log_info("DBENGINE: failed to build index '%s', file will be skipped", path);
         j2_header.data = NULL;
         j2_header.magic = JOURVAL_V2_SKIP_MAGIC;
         memcpy(data_start, &j2_header, sizeof(j2_header));
@@ -1513,19 +1522,19 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
 
     ret = journalfile_check_superblock(file);
     if (ret) {
-        info("DBENGINE: invalid journal file '%s' ; superblock check failed.", path);
+        netdata_log_info("DBENGINE: invalid journal file '%s' ; superblock check failed.", path);
         error = ret;
         goto cleanup;
     }
     ctx_io_read_op_bytes(ctx, sizeof(struct rrdeng_jf_sb));
 
-    info("DBENGINE: loading journal file '%s'", path);
+    netdata_log_info("DBENGINE: loading journal file '%s'", path);
 
     max_id = journalfile_iterate_transactions(ctx, journalfile);
 
     __atomic_store_n(&ctx->atomic.transaction_id, MAX(__atomic_load_n(&ctx->atomic.transaction_id, __ATOMIC_RELAXED), max_id + 1), __ATOMIC_RELAXED);
 
-    info("DBENGINE: journal file '%s' loaded (size:%"PRIu64").", path, file_size);
+    netdata_log_info("DBENGINE: journal file '%s' loaded (size:%"PRIu64").", path, file_size);
 
     bool is_last_file = (ctx_last_fileno_get(ctx) == journalfile->datafile->fileno);
     if (is_last_file && journalfile->datafile->pos <= rrdeng_target_data_file_size(ctx) / 3) {

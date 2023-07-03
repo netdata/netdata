@@ -249,7 +249,7 @@ struct sender_state {
     size_t not_connected_loops;
     // Metrics are collected asynchronously by collector threads calling rrdset_done_push(). This can also trigger
     // the lazy creation of the sender thread - both cases (buffer access and thread creation) are guarded here.
-    netdata_mutex_t mutex;
+    SPINLOCK spinlock;
     struct circular_buffer *buffer;
     char read_buffer[PLUGINSD_LINE_MAX + 1];
     ssize_t read_len;
@@ -295,6 +295,9 @@ struct sender_state {
         time_t last_buffer_recreate_s;          // true when the sender buffer should be re-created
     } atomic;
 };
+
+#define sender_lock(sender) spinlock_lock(&(sender)->spinlock)
+#define sender_unlock(sender) spinlock_unlock(&(sender)->spinlock)
 
 #define rrdpush_sender_pipe_has_pending_data(sender) __atomic_load_n(&(sender)->atomic.pending_data, __ATOMIC_RELAXED)
 #define rrdpush_sender_pipe_set_pending_data(sender) __atomic_store_n(&(sender)->atomic.pending_data, true, __ATOMIC_RELAXED)
@@ -347,6 +350,19 @@ typedef struct stream_node_instance {
 } STREAM_NODE_INSTANCE;
 */
 
+struct buffered_reader {
+    ssize_t read_len;
+    ssize_t pos;
+    char read_buffer[PLUGINSD_LINE_MAX + 1];
+};
+
+char *buffered_reader_next_line(struct buffered_reader *reader, char *dst, size_t dst_size);
+static inline void buffered_reader_init(struct buffered_reader *reader) {
+    reader->read_buffer[0] = '\0';
+    reader->read_len = 0;
+    reader->pos = 0;
+}
+
 struct receiver_state {
     RRDHOST *host;
     pid_t tid;
@@ -368,8 +384,8 @@ struct receiver_state {
     struct rrdhost_system_info *system_info;
     STREAM_CAPABILITIES capabilities;
     time_t last_msg_t;
-    char read_buffer[PLUGINSD_LINE_MAX + 1];
-    int read_len;
+
+    struct buffered_reader reader;
 
     uint16_t hops;
 

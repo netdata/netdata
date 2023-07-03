@@ -1447,7 +1447,7 @@ static void rrdset_metric_correlations_volume(
     merge_query_value_to_stats(&highlight_countif, stats, 1);
 
     if(!netdata_double_isnumber(highlight_countif.value)) {
-        info("WEIGHTS: highlighted countif query failed, but highlighted average worked - strange...");
+        netdata_log_info("WEIGHTS: highlighted countif query failed, but highlighted average worked - strange...");
         return;
     }
 

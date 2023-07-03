@@ -5,6 +5,33 @@
 // ----------------------------------------------------------------------------
 // RRDCALC helpers
 
+void rrdcalc_flags_to_json_array(BUFFER *wb, const char *key, RRDCALC_FLAGS flags) {
+    buffer_json_member_add_array(wb, key);
+
+    if(flags & RRDCALC_FLAG_DB_ERROR)
+        buffer_json_add_array_item_string(wb, "DB_ERROR");
+    if(flags & RRDCALC_FLAG_DB_NAN)
+        buffer_json_add_array_item_string(wb, "DB_NAN");
+    if(flags & RRDCALC_FLAG_CALC_ERROR)
+        buffer_json_add_array_item_string(wb, "CALC_ERROR");
+    if(flags & RRDCALC_FLAG_WARN_ERROR)
+        buffer_json_add_array_item_string(wb, "WARN_ERROR");
+    if(flags & RRDCALC_FLAG_CRIT_ERROR)
+        buffer_json_add_array_item_string(wb, "CRIT_ERROR");
+    if(flags & RRDCALC_FLAG_RUNNABLE)
+        buffer_json_add_array_item_string(wb, "RUNNABLE");
+    if(flags & RRDCALC_FLAG_DISABLED)
+        buffer_json_add_array_item_string(wb, "DISABLED");
+    if(flags & RRDCALC_FLAG_SILENCED)
+        buffer_json_add_array_item_string(wb, "SILENCED");
+    if(flags & RRDCALC_FLAG_RUN_ONCE)
+        buffer_json_add_array_item_string(wb, "RUN_ONCE");
+    if(flags & RRDCALC_FLAG_FROM_TEMPLATE)
+        buffer_json_add_array_item_string(wb, "FROM_TEMPLATE");
+
+    buffer_json_array_close(wb);
+}
+
 inline const char *rrdcalc_status2string(RRDCALC_STATUS status) {
     switch(status) {
         case RRDCALC_STATUS_REMOVED:
@@ -34,13 +61,13 @@ inline const char *rrdcalc_status2string(RRDCALC_STATUS status) {
     }
 }
 
-uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id) {
+uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, uuid_t *config_hash_id) {
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
     // re-use old IDs, by looking them up in the alarm log
     ALARM_ENTRY *ae = NULL;
     for(ae = host->health_log.alarms; ae ;ae = ae->next) {
-        if(unlikely(name == ae->name && chart == ae->chart)) {
+        if(unlikely(name == ae->name && chart == ae->chart && !uuid_memcmp(&ae->config_hash_id, config_hash_id))) {
             if(next_event_id) *next_event_id = ae->alarm_event_id + 1;
             break;
         }
@@ -52,7 +79,7 @@ uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint3
         alarm_id = ae->alarm_id;
 
     else {
-        alarm_id = sql_get_alarm_id(host, chart, name, next_event_id);
+        alarm_id = sql_get_alarm_id(host, chart, name, next_event_id, config_hash_id);
 
         if (!alarm_id) {
             if (unlikely(!host->health_log.next_alarm_id))
@@ -181,6 +208,7 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
 
     debug(D_HEALTH, "Health linking alarm '%s.%s' to chart '%s' of host '%s'", rrdcalc_chart_name(rc), rrdcalc_name(rc), rrdset_id(st), rrdhost_hostname(host));
 
+    rc->last_status_change_value = rc->value;
     rc->last_status_change = now_realtime_sec();
     rc->rrdset = st;
 
@@ -273,8 +301,8 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
         now - rc->last_status_change,
         rc->old_value,
         rc->value,
+        RRDCALC_STATUS_REMOVED,
         rc->status,
-        RRDCALC_STATUS_UNINITIALIZED,
         rc->source,
         rc->units,
         rc->info,
@@ -503,7 +531,7 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
         ;
     }
 
-    rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->name, &rc->next_event_id);
+    rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->name, &rc->next_event_id, &rc->config_hash_id);
 
     if(rc->calculation) {
         rc->calculation->status = &rc->status;

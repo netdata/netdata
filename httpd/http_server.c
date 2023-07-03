@@ -88,7 +88,7 @@ static int ssl_init()
 
     h2o_ssl_register_alpn_protocols(accept_ctx.ssl_ctx, h2o_http2_alpn_protocols);
 
-    info("SSL support enabled");
+    netdata_log_info("SSL support enabled");
 
     return 0;
 }

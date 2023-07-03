@@ -40,7 +40,7 @@ struct rrdengine_journalfile {
         time_t first_time_s;
         time_t last_time_s;
         time_t not_needed_since_s;
-        // uint32_t size_of_directory;
+        uint32_t size_of_directory;
     } v2;
 
     struct {

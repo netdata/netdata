@@ -83,16 +83,16 @@ void claim_agent(char *claiming_arguments)
               cloud_base_url,
               claiming_arguments);
 
-    info("Executing agent claiming command 'netdata-claim.sh'");
+    netdata_log_info("Executing agent claiming command 'netdata-claim.sh'");
     fp_child_output = netdata_popen(command_buffer, &command_pid, &fp_child_input);
     if(!fp_child_output) {
         error("Cannot popen(\"%s\").", command_buffer);
         return;
     }
-    info("Waiting for claiming command to finish.");
+    netdata_log_info("Waiting for claiming command to finish.");
     while (fgets(command_buffer, CLAIMING_COMMAND_LENGTH, fp_child_output) != NULL) {;}
     exit_code = netdata_pclose(fp_child_input, fp_child_output, command_pid);
-    info("Agent claiming command returned with code %d", exit_code);
+    netdata_log_info("Agent claiming command returned with code %d", exit_code);
     if (0 == exit_code) {
         load_claiming_state();
         return;
@@ -148,7 +148,7 @@ void load_claiming_state(void)
     }
     if (aclk_connected)
     {
-        info("Agent was already connected to Cloud - forcing reconnection under new credentials");
+        netdata_log_info("Agent was already connected to Cloud - forcing reconnection under new credentials");
         aclk_kill_link = 1;
     }
     aclk_disable_runtime = 0;
@@ -174,13 +174,13 @@ void load_claiming_state(void)
     rrdhost_aclk_state_unlock(localhost);
 
     if (!claimed_id) {
-        info("Unable to load '%s', setting state to AGENT_UNCLAIMED", filename);
+        netdata_log_info("Unable to load '%s', setting state to AGENT_UNCLAIMED", filename);
         return;
     }
 
     freez(claimed_id);
 
-    info("File '%s' was found. Setting state to AGENT_CLAIMED.", filename);
+    netdata_log_info("File '%s' was found. Setting state to AGENT_CLAIMED.", filename);
     netdata_cloud_enabled = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1);
 #endif
 }
@@ -202,7 +202,7 @@ void load_cloud_conf(int silent)
 
     ret = appconfig_load(&cloud_config, filename, 1, NULL);
     if(!ret && !silent) {
-        info("CONFIG: cannot load cloud config '%s'. Running with internal defaults.", filename);
+        netdata_log_info("CONFIG: cannot load cloud config '%s'. Running with internal defaults.", filename);
     }
     freez(filename);
 }

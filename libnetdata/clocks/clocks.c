@@ -433,11 +433,11 @@ inline collected_number uptime_msec(char *filename){
 
         if(delta <= 1000 && uptime_boottime != 0) {
             procfile_close(read_proc_uptime_ff);
-            info("Using now_boottime_usec() for uptime (dt is %lld ms)", delta);
+            netdata_log_info("Using now_boottime_usec() for uptime (dt is %lld ms)", delta);
             use_boottime = 1;
         }
         else if(uptime_proc != 0) {
-            info("Using /proc/uptime for uptime (dt is %lld ms)", delta);
+            netdata_log_info("Using /proc/uptime for uptime (dt is %lld ms)", delta);
             use_boottime = 0;
         }
         else {

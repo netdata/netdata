@@ -311,7 +311,7 @@ static void update_disk_table(char *name, int major, int minor, time_t current_t
         error("Internal error, cannot insert the AVL tree.");
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("The Latency is monitoring the hard disk %s (Major = %d, Minor = %d, Device = %u)", name, major, minor,w->dev);
+    netdata_log_info("The Latency is monitoring the hard disk %s (Major = %d, Minor = %d, Device = %u)", name, major, minor,w->dev);
 #endif
 
     w->flags |= NETDATA_DISK_IS_HERE;

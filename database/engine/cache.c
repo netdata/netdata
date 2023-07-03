@@ -2090,7 +2090,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
 
     struct section_pages *sp = *section_pages_pptr;
     if(!spinlock_trylock(&sp->migration_to_v2_spinlock)) {
-        info("DBENGINE: migration to journal v2 for datafile %u is postponed, another jv2 indexer is already running for this section", datafile_fileno);
+        netdata_log_info("DBENGINE: migration to journal v2 for datafile %u is postponed, another jv2 indexer is already running for this section", datafile_fileno);
         pgc_ll_unlock(cache, &cache->hot);
         return;
     }
@@ -2353,7 +2353,7 @@ void *unittest_stress_test_collector(void *ptr) {
     heartbeat_init(&hb);
 
     while(!__atomic_load_n(&pgc_uts.stop, __ATOMIC_RELAXED)) {
-        // info("COLLECTOR %zu: collecting metrics %zu to %zu, from %ld to %lu", id, metric_start, metric_end, start_time_t, start_time_t + pgc_uts.points_per_page);
+        // netdata_log_info("COLLECTOR %zu: collecting metrics %zu to %zu, from %ld to %lu", id, metric_start, metric_end, start_time_t, start_time_t + pgc_uts.points_per_page);
 
         netdata_thread_disable_cancelability();
 
@@ -2483,7 +2483,7 @@ void *unittest_stress_test_service(void *ptr) {
 }
 
 static void unittest_stress_test_save_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused) {
-    // info("SAVE %zu pages", entries);
+    // netdata_log_info("SAVE %zu pages", entries);
     if(!pgc_uts.stop) {
         usec_t t = pgc_uts.time_per_flush_ut;
 
@@ -2623,7 +2623,7 @@ void unittest_stress_test(void) {
         if(stats.events_flush_critical > old_stats.events_flush_critical)
             flushing_status = "F";
 
-        info("PGS %5zuk +%4zuk/-%4zuk "
+        netdata_log_info("PGS %5zuk +%4zuk/-%4zuk "
              "| RF %5zuk "
              "| HOT %5zuk +%4zuk -%4zuk "
              "| DRT %s %5zuk +%4zuk -%4zuk "
@@ -2649,7 +2649,7 @@ void unittest_stress_test(void) {
 #endif
              );
     }
-    info("Waiting for threads to stop...");
+    netdata_log_info("Waiting for threads to stop...");
     __atomic_store_n(&pgc_uts.stop, true, __ATOMIC_RELAXED);
 
     netdata_thread_join(service_thread, NULL);

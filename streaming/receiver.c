@@ -94,19 +94,19 @@ static inline int read_stream(struct receiver_state *r, char* buffer, size_t siz
 
 static inline bool receiver_read_uncompressed(struct receiver_state *r) {
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(r->read_buffer[r->read_len] != '\0')
+    if(r->reader.read_buffer[r->reader.read_len] != '\0')
         fatal("%s(): read_buffer does not start with zero", __FUNCTION__ );
 #endif
 
-    int bytes_read = read_stream(r, r->read_buffer + r->read_len, sizeof(r->read_buffer) - r->read_len - 1);
+    int bytes_read = read_stream(r, r->reader.read_buffer + r->reader.read_len, sizeof(r->reader.read_buffer) - r->reader.read_len - 1);
     if(unlikely(bytes_read <= 0))
         return false;
 
     worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, (NETDATA_DOUBLE)bytes_read);
     worker_set_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_read);
 
-    r->read_len += bytes_read;
-    r->read_buffer[r->read_len] = '\0';
+    r->reader.read_len += bytes_read;
+    r->reader.read_buffer[r->reader.read_len] = '\0';
 
     return true;
 }
@@ -114,24 +114,24 @@ static inline bool receiver_read_uncompressed(struct receiver_state *r) {
 #ifdef ENABLE_COMPRESSION
 static inline bool receiver_read_compressed(struct receiver_state *r) {
 
-    internal_fatal(r->read_buffer[r->read_len] != '\0',
+    internal_fatal(r->reader.read_buffer[r->reader.read_len] != '\0',
                    "%s: read_buffer does not start with zero #2", __FUNCTION__ );
 
     // first use any available uncompressed data
     if (likely(rrdpush_decompressed_bytes_in_buffer(&r->decompressor))) {
-        size_t available = sizeof(r->read_buffer) - r->read_len - 1;
+        size_t available = sizeof(r->reader.read_buffer) - r->reader.read_len - 1;
         if (likely(available)) {
-            size_t len = rrdpush_decompressor_get(&r->decompressor, r->read_buffer + r->read_len, available);
+            size_t len = rrdpush_decompressor_get(&r->decompressor, r->reader.read_buffer + r->reader.read_len, available);
             if (unlikely(!len)) {
                 internal_error(true, "decompressor returned zero length #1");
                 return false;
             }
 
-            r->read_len += (int)len;
-            r->read_buffer[r->read_len] = '\0';
+            r->reader.read_len += (int)len;
+            r->reader.read_buffer[r->reader.read_len] = '\0';
         }
         else
-            internal_fatal(true, "The line to read is too big! Already have %d bytes in read_buffer.", r->read_len);
+            internal_fatal(true, "The line to read is too big! Already have %zd bytes in read_buffer.", r->reader.read_len);
 
         return true;
     }
@@ -139,9 +139,9 @@ static inline bool receiver_read_compressed(struct receiver_state *r) {
     // no decompressed data available
     // read the compression signature of the next block
 
-    if(unlikely(r->read_len + r->decompressor.signature_size > sizeof(r->read_buffer) - 1)) {
+    if(unlikely(r->reader.read_len + r->decompressor.signature_size > sizeof(r->reader.read_buffer) - 1)) {
         internal_error(true, "The last incomplete line does not leave enough room for the next compression header! "
-                             "Already have %d bytes in read_buffer.", r->read_len);
+                             "Already have %zd bytes in read_buffer.", r->reader.read_len);
         return false;
     }
 
@@ -149,7 +149,7 @@ static inline bool receiver_read_compressed(struct receiver_state *r) {
     // we have to do a loop here, because read_stream() may return less than the data we need
     int bytes_read = 0;
     do {
-        int ret = read_stream(r, r->read_buffer + r->read_len + bytes_read, r->decompressor.signature_size - bytes_read);
+        int ret = read_stream(r, r->reader.read_buffer + r->reader.read_len + bytes_read, r->decompressor.signature_size - bytes_read);
         if (unlikely(ret <= 0))
             return false;
 
@@ -161,11 +161,11 @@ static inline bool receiver_read_compressed(struct receiver_state *r) {
     if(unlikely(bytes_read != (int)r->decompressor.signature_size))
         fatal("read %d bytes, but expected compression signature of size %zu", bytes_read, r->decompressor.signature_size);
 
-    size_t compressed_message_size = rrdpush_decompressor_start(&r->decompressor, r->read_buffer + r->read_len, bytes_read);
+    size_t compressed_message_size = rrdpush_decompressor_start(&r->decompressor, r->reader.read_buffer + r->reader.read_len, bytes_read);
     if (unlikely(!compressed_message_size)) {
         internal_error(true, "multiplexed uncompressed data in compressed stream!");
-        r->read_len += bytes_read;
-        r->read_buffer[r->read_len] = '\0';
+        r->reader.read_len += bytes_read;
+        r->reader.read_buffer[r->reader.read_len] = '\0';
         return true;
     }
 
@@ -176,7 +176,7 @@ static inline bool receiver_read_compressed(struct receiver_state *r) {
     }
 
     // delete compression header from our read buffer
-    r->read_buffer[r->read_len] = '\0';
+    r->reader.read_buffer[r->reader.read_len] = '\0';
 
     // Read the entire compressed block of compressed data
     char compressed[compressed_message_size];
@@ -207,13 +207,13 @@ static inline bool receiver_read_compressed(struct receiver_state *r) {
     worker_set_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_to_parse);
 
     // fill read buffer with decompressed data
-    size_t len = (int) rrdpush_decompressor_get(&r->decompressor, r->read_buffer + r->read_len, sizeof(r->read_buffer) - r->read_len - 1);
+    size_t len = (int) rrdpush_decompressor_get(&r->decompressor, r->reader.read_buffer + r->reader.read_len, sizeof(r->reader.read_buffer) - r->reader.read_len - 1);
     if (unlikely(!len)) {
         internal_error(true, "decompressor returned zero length #2");
         return false;
     }
-    r->read_len += (int)len;
-    r->read_buffer[r->read_len] = '\0';
+    r->reader.read_len += (int)len;
+    r->reader.read_buffer[r->reader.read_len] = '\0';
 
     return true;
 }
@@ -226,19 +226,19 @@ static inline bool receiver_read_compressed(struct receiver_state *r) {
 /* Produce a full line if one exists, statefully return where we start next time.
  * When we hit the end of the buffer with a partial line move it to the beginning for the next fill.
  */
-static inline char *receiver_next_line(struct receiver_state *r, char *buffer, size_t buffer_length, size_t *pos) {
-    size_t start = *pos;
+inline char *buffered_reader_next_line(struct buffered_reader *reader, char *dst, size_t dst_size) {
+    size_t start = reader->pos;
 
-    char *ss = &r->read_buffer[start];
-    char *se = &r->read_buffer[r->read_len];
-    char *ds = buffer;
-    char *de = &buffer[buffer_length - 2];
+    char *ss = &reader->read_buffer[start];
+    char *se = &reader->read_buffer[reader->read_len];
+    char *ds = dst;
+    char *de = &dst[dst_size - 2];
 
     if(ss >= se) {
         *ds = '\0';
-        *pos = 0;
-        r->read_len = 0;
-        r->read_buffer[r->read_len] = '\0';
+        reader->pos = 0;
+        reader->read_len = 0;
+        reader->read_buffer[reader->read_len] = '\0';
         return NULL;
     }
 
@@ -253,25 +253,25 @@ static inline char *receiver_next_line(struct receiver_state *r, char *buffer, s
         *ds++ = *ss++; // copy the newline too
         *ds = '\0';
 
-        *pos = ss - r->read_buffer;
-        return buffer;
+        reader->pos = ss - reader->read_buffer;
+        return dst;
     }
 
     // if the destination is full, oops!
     if(ds == de) {
         error("STREAM: received line exceeds %d bytes. Truncating it.", PLUGINSD_LINE_MAX);
         *ds = '\0';
-        *pos = ss - r->read_buffer;
-        return buffer;
+        reader->pos = ss - reader->read_buffer;
+        return dst;
     }
 
     // no newline found in the r->read_buffer
     // move everything to the beginning
-    memmove(r->read_buffer, &r->read_buffer[start], r->read_len - start);
-    r->read_len -= (int)start;
-    r->read_buffer[r->read_len] = '\0';
+    memmove(reader->read_buffer, &reader->read_buffer[start], reader->read_len - start);
+    reader->read_len -= (int)start;
+    reader->read_buffer[reader->read_len] = '\0';
     *ds = '\0';
-    *pos = 0;
+    reader->pos = 0;
     return NULL;
 }
 
@@ -282,31 +282,30 @@ static void receiver_set_exit_reason(struct receiver_state *rpt, STREAM_HANDSHAK
         rpt->exit.reason = reason;
 }
 
-static inline bool receiver_should_continue(struct receiver_state *rpt) {
+static inline bool receiver_should_stop(struct receiver_state *rpt) {
     static __thread size_t counter = 0;
 
     if(unlikely(rpt->exit.shutdown)) {
         receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN, false);
-        return false;
+        return true;
     }
-
-    // check every 1000 lines read
-    if((counter++ % 1000) != 0) return true;
 
     if(unlikely(!service_running(SERVICE_STREAMING))) {
         receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_NETDATA_EXIT, false);
-        return false;
+        return true;
     }
 
-    netdata_thread_testcancel();
+    if(unlikely((counter++ % 1000) == 0)) {
+        // check every 1000 lines read
+        netdata_thread_testcancel();
+        rpt->last_msg_t = now_monotonic_sec();
+    }
 
-    rpt->last_msg_t = now_monotonic_sec();
-
-    return true;
+    return false;
 }
 
 static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, int fd, void *ssl) {
-    size_t result;
+    size_t result = 0;
 
     PARSER *parser = NULL;
     {
@@ -341,14 +340,12 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
         rrdpush_decompressor_destroy(&rpt->decompressor);
 #endif
 
-    rpt->read_buffer[0] = '\0';
-    rpt->read_len = 0;
+    buffered_reader_init(&rpt->reader);
 
-    size_t read_buffer_start = 0;
     char buffer[PLUGINSD_LINE_MAX + 2] = "";
-    while(receiver_should_continue(rpt)) {
+    while(!receiver_should_stop(rpt)) {
 
-        if(!receiver_next_line(rpt, buffer, PLUGINSD_LINE_MAX + 2, &read_buffer_start)) {
+        if(!buffered_reader_next_line(&rpt->reader, buffer, PLUGINSD_LINE_MAX + 2)) {
             bool have_new_data = compressed_connection ? receiver_read_compressed(rpt) : receiver_read_uncompressed(rpt);
 
             if(unlikely(!have_new_data)) {
@@ -534,7 +531,7 @@ void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, con
                           (rpt->hostname && *rpt->hostname) ? rpt->hostname : "-",
                           status);
 
-    info("STREAM '%s' [receive from [%s]:%s]: "
+    netdata_log_info("STREAM '%s' [receive from [%s]:%s]: "
           "%s. "
           "STATUS: %s%s%s%s"
           , rpt->hostname
@@ -672,7 +669,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("STREAM '%s' [receive from [%s]:%s]: "
+    netdata_log_info("STREAM '%s' [receive from [%s]:%s]: "
          "client willing to stream metrics for host '%s' with machine_guid '%s': "
          "update every = %d, history = %d, memory mode = %s, health %s,%s tags '%s'"
          , rpt->hostname
@@ -718,7 +715,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
 #endif
 
     {
-        // info("STREAM %s [receive from [%s]:%s]: initializing communication...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
+        // netdata_log_info("STREAM %s [receive from [%s]:%s]: initializing communication...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
         char initial_response[HTTP_HEADER_SIZE];
         if (stream_has_capability(rpt, STREAM_CAP_VCAPS)) {
             log_receiver_capabilities(rpt);
@@ -818,7 +815,7 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
 
     rrdhost_clear_receiver(rpt);
 
-    info("STREAM '%s' [receive from [%s]:%s]: "
+    netdata_log_info("STREAM '%s' [receive from [%s]:%s]: "
          "receive thread ended (task id %d)"
     , rpt->hostname ? rpt->hostname : "-"
     , rpt->client_ip ? rpt->client_ip : "-", rpt->client_port ? rpt->client_port : "-"
@@ -839,7 +836,7 @@ void *rrdpush_receiver_thread(void *ptr) {
 
     struct receiver_state *rpt = (struct receiver_state *)ptr;
     rpt->tid = gettid();
-    info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, rpt->tid);
+    netdata_log_info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, rpt->tid);
 
     rrdpush_receive(rpt);
 

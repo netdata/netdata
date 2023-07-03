@@ -26,7 +26,7 @@ static inline int bad_request_multiple_dashboard_versions(struct web_client *w) 
     return HTTP_RESP_BAD_REQUEST;
 }
 
-static inline int web_client_crock_socket(struct web_client *w __maybe_unused) {
+static inline int web_client_cork_socket(struct web_client *w __maybe_unused) {
 #ifdef TCP_CORK
     if(likely(web_client_is_corkable(w) && !w->tcp_cork && w->ofd != -1)) {
         w->tcp_cork = true;
@@ -53,9 +53,10 @@ static inline void web_client_enable_wait_from_ssl(struct web_client *w) {
     }
 }
 
-static inline int web_client_uncrock_socket(struct web_client *w __maybe_unused) {
+static inline int web_client_uncork_socket(struct web_client *w __maybe_unused) {
 #ifdef TCP_CORK
     if(likely(w->tcp_cork && w->ofd != -1)) {
+        w->tcp_cork = false;
         if(unlikely(setsockopt(w->ofd, IPPROTO_TCP, TCP_CORK, (char *) &w->tcp_cork, sizeof(int)) != 0)) {
             error("%llu: failed to disable TCP_CORK on socket.", w->id);
             w->tcp_cork = true;
@@ -153,7 +154,7 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
 }
 
 void web_client_request_done(struct web_client *w) {
-    web_client_uncrock_socket(w);
+    web_client_uncork_socket(w);
 
     debug(D_WEB_CLIENT, "%llu: Resetting client.", w->id);
 
@@ -285,7 +286,7 @@ static struct {
 };
 
 static inline uint8_t contenttype_for_filename(const char *filename) {
-    // info("checking filename '%s'", filename);
+    // netdata_log_info("checking filename '%s'", filename);
 
     static int initialized = 0;
     int i;
@@ -306,22 +307,22 @@ static inline uint8_t contenttype_for_filename(const char *filename) {
     }
 
     if(unlikely(!last_dot || !*last_dot || !last_dot[1])) {
-        // info("no extension for filename '%s'", filename);
+        // netdata_log_info("no extension for filename '%s'", filename);
         return CT_APPLICATION_OCTET_STREAM;
     }
     last_dot++;
 
-    // info("extension for filename '%s' is '%s'", filename, last_dot);
+    // netdata_log_info("extension for filename '%s' is '%s'", filename, last_dot);
 
     uint32_t hash = simple_hash(last_dot);
     for(i = 0; mime_types[i].extension ; i++) {
         if(unlikely(hash == mime_types[i].hash && !strcmp(last_dot, mime_types[i].extension))) {
-            // info("matched extension for filename '%s': '%s'", filename, last_dot);
+            // netdata_log_info("matched extension for filename '%s': '%s'", filename, last_dot);
             return mime_types[i].contenttype;
         }
     }
 
-    // info("not matched extension for filename '%s': '%s'", filename, last_dot);
+    // netdata_log_info("not matched extension for filename '%s': '%s'", filename, last_dot);
     return CT_APPLICATION_OCTET_STREAM;
 }
 
@@ -430,24 +431,24 @@ static bool find_filename_to_serve(const char *filename, char *dst, size_t dst_l
         fallback = 3;
     }
 
-    if (lstat(dst, statbuf) != 0) {
+    if (stat(dst, statbuf) != 0) {
         if(fallback == 1) {
             snprintfz(dst, dst_len, "%s/%s", netdata_configured_web_dir, filename);
-            if (lstat(dst, statbuf) != 0)
+            if (stat(dst, statbuf) != 0)
                 return false;
         }
         else if(fallback == 2) {
             if(filename && *filename)
                 web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH);
             snprintfz(dst, dst_len, "%s/v%d", netdata_configured_web_dir, d_version);
-            if (lstat(dst, statbuf) != 0)
+            if (stat(dst, statbuf) != 0)
                 return false;
         }
         else if(fallback == 3) {
             if(filename && *filename)
                 web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH);
             snprintfz(dst, dst_len, "%s", netdata_configured_web_dir);
-            if (lstat(dst, statbuf) != 0)
+            if (stat(dst, statbuf) != 0)
                 return false;
         }
         else
@@ -461,7 +462,7 @@ static bool find_filename_to_serve(const char *filename, char *dst, size_t dst_l
 
         strncpyz(&dst[len], "/index.html", dst_len - len);
 
-        if (lstat(dst, statbuf) != 0)
+        if (stat(dst, statbuf) != 0)
             return false;
 
         *is_dir = true;
@@ -839,7 +840,7 @@ const char *web_response_code_to_string(int code) {
 
 static inline char *http_header_parse(struct web_client *w, char *s, int parse_useragent) {
     static uint32_t hash_origin = 0, hash_connection = 0, hash_donottrack = 0, hash_useragent = 0,
-                    hash_authorization = 0, hash_host = 0, hash_forwarded_proto = 0, hash_forwarded_host = 0;
+                    hash_authorization = 0, hash_host = 0, hash_forwarded_host = 0;
     static uint32_t hash_accept_encoding = 0;
 
     if(unlikely(!hash_origin)) {
@@ -850,7 +851,6 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
         hash_useragent = simple_uhash("User-Agent");
         hash_authorization = simple_uhash("X-Auth-Token");
         hash_host = simple_uhash("Host");
-        hash_forwarded_proto = simple_uhash("X-Forwarded-Proto");
         hash_forwarded_host = simple_uhash("X-Forwarded-Host");
     }
 
@@ -1018,7 +1018,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
         is_it_valid = url_is_request_complete(s, &s[last_pos], w->header_parse_last_size, &w->post_payload, &w->post_payload_size);
         if(!is_it_valid) {
             if(w->header_parse_tries > HTTP_REQ_MAX_HEADER_FETCH_TRIES) {
-                info("Disabling slow client after %zu attempts to read the request (%zu bytes received)", w->header_parse_tries, buffer_strlen(w->response.data));
+                netdata_log_info("Disabling slow client after %zu attempts to read the request (%zu bytes received)", w->header_parse_tries, buffer_strlen(w->response.data));
                 w->header_parse_tries = 0;
                 w->header_parse_last_size = 0;
                 web_client_disable_wait_receive(w);
@@ -1266,7 +1266,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
           , buffer_tostring(w->response.header_output)
     );
 
-    web_client_crock_socket(w);
+    web_client_cork_socket(w);
 
     size_t count = 0;
     ssize_t bytes;

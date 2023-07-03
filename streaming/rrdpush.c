@@ -57,12 +57,12 @@ static void load_stream_conf() {
     errno = 0;
     char *filename = strdupz_path_subpath(netdata_configured_user_config_dir, "stream.conf");
     if(!appconfig_load(&stream_config, filename, 0, NULL)) {
-        info("CONFIG: cannot load user config '%s'. Will try stock config.", filename);
+        netdata_log_info("CONFIG: cannot load user config '%s'. Will try stock config.", filename);
         freez(filename);
 
         filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "stream.conf");
         if(!appconfig_load(&stream_config, filename, 0, NULL))
-            info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
+            netdata_log_info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
     }
     freez(filename);
 }
@@ -156,7 +156,7 @@ int rrdpush_init() {
     netdata_ssl_validate_certificate_sender = !appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "ssl skip certificate verification", !netdata_ssl_validate_certificate);
 
     if(!netdata_ssl_validate_certificate_sender)
-        info("SSL: streaming senders will skip SSL certificates verification.");
+        netdata_log_info("SSL: streaming senders will skip SSL certificates verification.");
 
     netdata_ssl_ca_path = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CApath", NULL);
     netdata_ssl_ca_file = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CAfile", NULL);
@@ -362,7 +362,7 @@ static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_sta
             buffer_fast_strcat(wb, "SET \"", 5);
             buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
             buffer_fast_strcat(wb, "\" = ", 4);
-            buffer_print_int64(wb, rd->collected_value);
+            buffer_print_int64(wb, rd->collector.collected_value);
             buffer_fast_strcat(wb, "\n", 1);
         }
         else {
@@ -436,10 +436,10 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET_V2 " '", sizeof(PLUGINSD_KEYWORD_SET_V2) - 1 + 2);
     buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
     buffer_fast_strcat(wb, "' ", 2);
-    buffer_print_int64_encoded(wb, integer_encoding, rd->last_collected_value);
+    buffer_print_int64_encoded(wb, integer_encoding, rd->collector.last_collected_value);
     buffer_fast_strcat(wb, " ", 1);
 
-    if((NETDATA_DOUBLE)rd->last_collected_value == n)
+    if((NETDATA_DOUBLE)rd->collector.last_collected_value == n)
         buffer_fast_strcat(wb, "#", 1);
     else
         buffer_print_netdata_double_encoded(wb, doubles_encoding, n);
@@ -485,7 +485,7 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
         return (RRDSET_STREAM_BUFFER) { .wb = NULL, };
     }
     else if(unlikely(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS)) {
-        info("STREAM %s [send]: sending metrics to parent...", rrdhost_hostname(host));
+        netdata_log_info("STREAM %s [send]: sending metrics to parent...", rrdhost_hostname(host));
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS);
     }
 
@@ -588,7 +588,7 @@ int connect_to_one_of_destinations(
         if(d->postpone_reconnection_until > now)
             continue;
 
-        info(
+        netdata_log_info(
             "STREAM %s: connecting to '%s' (default port: %d)...",
             rrdhost_hostname(host),
             string2str(d->destination),
@@ -645,7 +645,7 @@ bool destinations_init_add_one(char *entry, void *data) {
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(t->list, d, prev, next);
 
     t->count++;
-    info("STREAM: added streaming destination No %d: '%s' to host '%s'", t->count, string2str(d->destination), rrdhost_hostname(t->host));
+    netdata_log_info("STREAM: added streaming destination No %d: '%s' to host '%s'", t->count, string2str(d->destination), rrdhost_hostname(t->host));
 
     return false; // we return false, so that we will get all defined destinations
 }
@@ -687,7 +687,7 @@ void rrdpush_sender_thread_stop(RRDHOST *host, STREAM_HANDSHAKE reason, bool wai
     if (!host->sender)
         return;
 
-    netdata_mutex_lock(&host->sender->mutex);
+    sender_lock(host->sender);
 
     if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN)) {
 
@@ -698,19 +698,18 @@ void rrdpush_sender_thread_stop(RRDHOST *host, STREAM_HANDSHAKE reason, bool wai
         netdata_thread_cancel(host->rrdpush_sender_thread);
     }
 
-    netdata_mutex_unlock(&host->sender->mutex);
+    sender_unlock(host->sender);
 
     if(wait) {
-        netdata_mutex_lock(&host->sender->mutex);
+        sender_lock(host->sender);
         while(host->sender->tid) {
-            netdata_mutex_unlock(&host->sender->mutex);
+            sender_unlock(host->sender);
             sleep_usec(10 * USEC_PER_MS);
-            netdata_mutex_lock(&host->sender->mutex);
+            sender_lock(host->sender);
         }
-        netdata_mutex_unlock(&host->sender->mutex);
+        sender_unlock(host->sender);
     }
 }
-
 
 // ----------------------------------------------------------------------------
 // rrdpush receiver thread
@@ -721,7 +720,7 @@ void log_stream_connection(const char *client_ip, const char *client_port, const
 
 
 static void rrdpush_sender_thread_spawn(RRDHOST *host) {
-    netdata_mutex_lock(&host->sender->mutex);
+    sender_lock(host->sender);
 
     if(!rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN)) {
         char tag[NETDATA_THREAD_TAG_MAX + 1];
@@ -733,7 +732,7 @@ static void rrdpush_sender_thread_spawn(RRDHOST *host) {
             rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
     }
 
-    netdata_mutex_unlock(&host->sender->mutex);
+    sender_unlock(host->sender);
 }
 
 int rrdpush_receiver_permission_denied(struct web_client *w) {
@@ -883,7 +882,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
                 rpt->capabilities = convert_stream_version_to_capabilities(1, NULL, false);
 
             if (unlikely(rrdhost_set_system_info_variable(rpt->system_info, name, value))) {
-                info("STREAM '%s' [receive from [%s]:%s]: "
+                netdata_log_info("STREAM '%s' [receive from [%s]:%s]: "
                      "request has parameter '%s' = '%s', which is not used."
                      , (rpt->hostname && *rpt->hostname) ? rpt->hostname : "-"
                      , rpt->client_ip, rpt->client_port
@@ -1156,7 +1155,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
             // we can proceed with this connection
             receiver_stale = false;
 
-            info("STREAM '%s' [receive from [%s]:%s]: "
+            netdata_log_info("STREAM '%s' [receive from [%s]:%s]: "
                  "stopped previous stale receiver to accept this one."
                  , rpt->hostname
                  , rpt->client_ip, rpt->client_port
@@ -1311,7 +1310,7 @@ void log_receiver_capabilities(struct receiver_state *rpt) {
     BUFFER *wb = buffer_create(100, NULL);
     stream_capabilities_to_string(wb, rpt->capabilities);
 
-    info("STREAM %s [receive from [%s]:%s]: established link with negotiated capabilities: %s",
+    netdata_log_info("STREAM %s [receive from [%s]:%s]: established link with negotiated capabilities: %s",
          rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, buffer_tostring(wb));
 
     buffer_free(wb);
@@ -1321,7 +1320,7 @@ void log_sender_capabilities(struct sender_state *s) {
     BUFFER *wb = buffer_create(100, NULL);
     stream_capabilities_to_string(wb, s->capabilities);
 
-    info("STREAM %s [send to %s]: established link with negotiated capabilities: %s",
+    netdata_log_info("STREAM %s [send to %s]: established link with negotiated capabilities: %s",
          rrdhost_hostname(s->host), s->connected_to, buffer_tostring(wb));
 
     buffer_free(wb);

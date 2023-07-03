@@ -19,7 +19,7 @@ static void after_pipe_write(uv_write_t* req, int status)
 {
     (void)status;
 #ifdef SPAWN_DEBUG
-    info("CLIENT %s called status=%d", __func__, status);
+    netdata_log_info("CLIENT %s called status=%d", __func__, status);
 #endif
     void **data = req->data;
     freez(data[0]);
@@ -59,7 +59,7 @@ static void client_parse_spawn_protocol(unsigned source_len, char *source)
             cmdinfo->pid = spawn_result->exec_pid;
             if (0 == cmdinfo->pid) { /* Failed to spawn */
 #ifdef SPAWN_DEBUG
-                info("CLIENT %s SPAWN_PROT_SPAWN_RESULT failed to spawn.", __func__);
+                netdata_log_info("CLIENT %s SPAWN_PROT_SPAWN_RESULT failed to spawn.", __func__);
 #endif
                 cmdinfo->flags |= SPAWN_CMD_FAILED_TO_SPAWN | SPAWN_CMD_DONE;
                 uv_cond_signal(&cmdinfo->cond);
@@ -67,7 +67,7 @@ static void client_parse_spawn_protocol(unsigned source_len, char *source)
                 cmdinfo->exec_run_timestamp = spawn_result->exec_run_timestamp;
                 cmdinfo->flags |= SPAWN_CMD_IN_PROGRESS;
 #ifdef SPAWN_DEBUG
-                info("CLIENT %s SPAWN_PROT_SPAWN_RESULT in progress.", __func__);
+                netdata_log_info("CLIENT %s SPAWN_PROT_SPAWN_RESULT in progress.", __func__);
 #endif
             }
             uv_mutex_unlock(&cmdinfo->mutex);
@@ -84,7 +84,7 @@ static void client_parse_spawn_protocol(unsigned source_len, char *source)
             uv_mutex_lock(&cmdinfo->mutex);
             cmdinfo->exit_status = exit_status->exec_exit_status;
 #ifdef SPAWN_DEBUG
-            info("CLIENT %s SPAWN_PROT_CMD_EXIT_STATUS %d.", __func__, exit_status->exec_exit_status);
+            netdata_log_info("CLIENT %s SPAWN_PROT_CMD_EXIT_STATUS %d.", __func__, exit_status->exec_exit_status);
 #endif
             cmdinfo->flags |= SPAWN_CMD_DONE;
             uv_cond_signal(&cmdinfo->cond);
@@ -102,9 +102,9 @@ static void client_parse_spawn_protocol(unsigned source_len, char *source)
 static void on_pipe_read(uv_stream_t* pipe, ssize_t nread, const uv_buf_t* buf)
 {
     if (0 == nread) {
-        info("%s: Zero bytes read from spawn pipe.", __func__);
+        netdata_log_info("%s: Zero bytes read from spawn pipe.", __func__);
     } else if (UV_EOF == nread) {
-        info("EOF found in spawn pipe.");
+        netdata_log_info("EOF found in spawn pipe.");
     } else if (nread < 0) {
         error("%s: %s", __func__, uv_strerror(nread));
     }
@@ -113,7 +113,7 @@ static void on_pipe_read(uv_stream_t* pipe, ssize_t nread, const uv_buf_t* buf)
         (void)uv_read_stop((uv_stream_t *)pipe);
     } else if (nread) {
 #ifdef SPAWN_DEBUG
-        info("CLIENT %s read %u", __func__, (unsigned)nread);
+        netdata_log_info("CLIENT %s read %u", __func__, (unsigned)nread);
 #endif
         client_parse_spawn_protocol(nread, buf->base);
     }
@@ -162,7 +162,7 @@ static void spawn_process_cmd(struct spawn_cmd_info *cmdinfo)
     writebuf[2] = uv_buf_init((char *)cmdinfo->command_to_run, write_ctx->payload.command_length);
 
 #ifdef SPAWN_DEBUG
-    info("CLIENT %s SPAWN_PROT_EXEC_CMD %u", __func__, (unsigned)cmdinfo->serial);
+    netdata_log_info("CLIENT %s SPAWN_PROT_EXEC_CMD %u", __func__, (unsigned)cmdinfo->serial);
 #endif
     ret = uv_write(&write_ctx->write_req, (uv_stream_t *)&spawn_channel, writebuf, 3, after_pipe_write);
     fatal_assert(ret == 0);
@@ -223,12 +223,12 @@ void spawn_client(void *arg)
         }
     }
     /* cleanup operations of the event loop */
-    info("Shutting down spawn client event loop.");
+    netdata_log_info("Shutting down spawn client event loop.");
     uv_close((uv_handle_t *)&spawn_channel, NULL);
     uv_close((uv_handle_t *)&spawn_async, NULL);
     uv_run(loop, UV_RUN_DEFAULT); /* flush all libuv handles */
 
-    info("Shutting down spawn client loop complete.");
+    netdata_log_info("Shutting down spawn client loop complete.");
     fatal_assert(0 == uv_loop_close(loop));
 
     return;

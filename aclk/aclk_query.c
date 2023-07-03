@@ -357,7 +357,7 @@ void *aclk_query_main_thread(void *ptr)
 #define TASK_LEN_MAX 22
 void aclk_query_threads_start(struct aclk_query_threads *query_threads, mqtt_wss_client client)
 {
-    info("Starting %d query threads.", query_threads->count);
+    netdata_log_info("Starting %d query threads.", query_threads->count);
 
     char thread_name[TASK_LEN_MAX];
     query_threads->thread_list = callocz(query_threads->count, sizeof(struct aclk_query_thread));

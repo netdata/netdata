@@ -69,7 +69,7 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
         return 0;
     }
 
-    if (unlikely(uuid_is_null(ae->config_hash_id))) 
+    if (unlikely(uuid_is_null(ae->config_hash_id)))
         return 0;
 
     char sql[ACLK_SYNC_QUERY_SIZE];
@@ -101,7 +101,6 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
         if (sqlite3_column_type(res, 1) != SQLITE_NULL)
             uuid_copy(config_hash_id, *((uuid_t *) sqlite3_column_blob(res, 1)));
         unique_id = (uint32_t) sqlite3_column_int64(res, 2);
-        
     } else {
         send = 1;
         goto done;
@@ -118,11 +117,8 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
     }
 
     //same status, same config
-    if (ae->new_status == RRDCALC_STATUS_CLEAR || ae->new_status == RRDCALC_STATUS_UNDEFINED) {
-        send = 0;
-        update_filtered(ae, unique_id, uuid_str);
-        goto done;
-    }
+    send = 0;
+    update_filtered(ae, unique_id, uuid_str);
 
 done:
     rc = sqlite3_finalize(res);

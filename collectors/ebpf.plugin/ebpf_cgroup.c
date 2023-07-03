@@ -303,7 +303,7 @@ void ebpf_parse_cgroup_shm_data()
     sem_post(shm_sem_ebpf_cgroup);
     pthread_mutex_unlock(&mutex_cgroup_shm);
 #ifdef NETDATA_DEV_MODE
-    info("Updating cgroup %d (Previous: %d, Current: %d)",
+    netdata_log_info("Updating cgroup %d (Previous: %d, Current: %d)",
          send_cgroup_chart, previous, shm_ebpf_cgroup.header->cgroup_root_count);
 #endif
 

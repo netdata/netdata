@@ -555,7 +555,7 @@ static FILE *open_log_file(int fd, FILE *fp, const char *filename, int *enabled_
             if(fd_ptr) *fd_ptr = fd;
             return fp;
         }
-        // info("dup2() new fd %d to old fd %d for '%s'", f, fd, filename);
+        // netdata_log_info("dup2() new fd %d to old fd %d for '%s'", f, fd, filename);
         close(f);
     }
     else fd = f;

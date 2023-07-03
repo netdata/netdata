@@ -211,13 +211,13 @@ struct engine *read_exporting_config()
 
     exporting_config_exists = appconfig_load(&exporting_config, filename, 0, NULL);
     if (!exporting_config_exists) {
-        info("CONFIG: cannot load user exporting config '%s'. Will try the stock version.", filename);
+        netdata_log_info("CONFIG: cannot load user exporting config '%s'. Will try the stock version.", filename);
         freez(filename);
 
         filename = strdupz_path_subpath(netdata_configured_stock_config_dir, EXPORTING_CONF);
         exporting_config_exists = appconfig_load(&exporting_config, filename, 0, NULL);
         if (!exporting_config_exists)
-            info("CONFIG: cannot load stock exporting config '%s'. Running with internal defaults.", filename);
+            netdata_log_info("CONFIG: cannot load stock exporting config '%s'. Running with internal defaults.", filename);
     }
 
     freez(filename);
@@ -276,10 +276,10 @@ struct engine *read_exporting_config()
     }
 
     while (get_connector_instance(&local_ci)) {
-        info("Processing connector instance (%s)", local_ci.instance_name);
+        netdata_log_info("Processing connector instance (%s)", local_ci.instance_name);
 
         if (exporter_get_boolean(local_ci.instance_name, "enabled", 0)) {
-            info(
+            netdata_log_info(
                 "Instance (%s) on connector (%s) is enabled and scheduled for activation",
                 local_ci.instance_name, local_ci.connector_name);
 
@@ -290,11 +290,11 @@ struct engine *read_exporting_config()
             tmp_ci_list_prev = tmp_ci_list;
             instances_to_activate++;
         } else
-            info("Instance (%s) on connector (%s) is not enabled", local_ci.instance_name, local_ci.connector_name);
+            netdata_log_info("Instance (%s) on connector (%s) is not enabled", local_ci.instance_name, local_ci.connector_name);
     }
 
     if (unlikely(!instances_to_activate)) {
-        info("No connector instances to activate");
+        netdata_log_info("No connector instances to activate");
         return NULL;
     }
 
@@ -313,7 +313,7 @@ struct engine *read_exporting_config()
         char *instance_name;
         char *default_destination = "localhost";
 
-        info("Instance %s on %s", tmp_ci_list->local_ci.instance_name, tmp_ci_list->local_ci.connector_name);
+        netdata_log_info("Instance %s on %s", tmp_ci_list->local_ci.instance_name, tmp_ci_list->local_ci.connector_name);
 
         if (tmp_ci_list->exporting_type == EXPORTING_CONNECTOR_TYPE_UNKNOWN) {
             error("Unknown exporting connector type");
@@ -381,7 +381,7 @@ struct engine *read_exporting_config()
         tmp_instance->config.options = exporting_parse_data_source(data_source, tmp_instance->config.options);
         if (EXPORTING_OPTIONS_DATA_SOURCE(tmp_instance->config.options) != EXPORTING_SOURCE_DATA_AS_COLLECTED &&
             tmp_instance->config.update_every % localhost->rrd_update_every)
-            info(
+            netdata_log_info(
                 "The update interval %d for instance %s is not a multiple of the database update interval %d. "
                 "Metric values will deviate at different points in time.",
                 tmp_instance->config.update_every, tmp_instance->config.name, localhost->rrd_update_every);
@@ -488,7 +488,7 @@ struct engine *read_exporting_config()
 #endif
 
 #ifdef NETDATA_INTERNAL_CHECKS
-        info(
+        netdata_log_info(
             "     Dest=[%s], upd=[%d], buffer=[%d] timeout=[%ld] options=[%u]",
             tmp_instance->config.destination,
             tmp_instance->config.update_every,

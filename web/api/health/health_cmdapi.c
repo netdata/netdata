@@ -96,7 +96,7 @@ void health_silencers2file(BUFFER *wb) {
     if(fd) {
         size_t written = (size_t)fprintf(fd, "%s", wb->buffer) ;
         if (written == wb->len ) {
-            info("Silencer changes written to %s", silencers_filename);
+            netdata_log_info("Silencer changes written to %s", silencers_filename);
         }
         fclose(fd);
         return;

@@ -195,7 +195,7 @@ netdata_ebpf_program_loaded_t ebpf_dc_update_load(ebpf_module_t *em)
         return EBPF_LOAD_TRAMPOLINE;
 
     if (em->targets[NETDATA_DC_TARGET_LOOKUP_FAST].mode != EBPF_LOAD_RETPROBE)
-        info("When your kernel was compiled the symbol %s was modified, instead to use `trampoline`, the plugin will use `probes`.",
+        netdata_log_info("When your kernel was compiled the symbol %s was modified, instead to use `trampoline`, the plugin will use `probes`.",
              dc_optional_name[NETDATA_DC_TARGET_LOOKUP_FAST].function_to_attach);
 
     return EBPF_LOAD_RETPROBE;

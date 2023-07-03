@@ -6,7 +6,7 @@
 #define JSON_DATES_TIMESTAMP 2
 
 void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
-    //info("RRD2JSON(): %s: BEGIN", r->st->id);
+    //netdata_log_info("RRD2JSON(): %s: BEGIN", r->st->id);
     int row_annotations = 0, dates, dates_with_new = 0;
     char kq[2] = "",                        // key quote
             sq[2] = "",                     // string quote
@@ -241,7 +241,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
     }
 
     buffer_strcat(wb, finish);
-    //info("RRD2JSON(): %s: END", r->st->id);
+    //netdata_log_info("RRD2JSON(): %s: END", r->st->id);
 }
 
 void rrdr2json_v2(RRDR *r, BUFFER *wb) {

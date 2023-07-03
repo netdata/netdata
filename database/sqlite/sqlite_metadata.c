@@ -665,7 +665,7 @@ static void check_dimension_metadata(struct metadata_wc *wc)
     uint32_t total_deleted= 0;
     uint64_t last_row_id = wc->row_id;
 
-    info("METADATA: Checking dimensions starting after row %"PRIu64, wc->row_id);
+    netdata_log_info("METADATA: Checking dimensions starting after row %"PRIu64, wc->row_id);
 
     while (sqlite3_step_monitored(res) == SQLITE_ROW && total_deleted < MAX_METADATA_CLEANUP) {
         if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
@@ -685,7 +685,7 @@ static void check_dimension_metadata(struct metadata_wc *wc)
         wc->check_metadata_after = now + METADATA_MAINTENANCE_RETRY;
     } else
         wc->row_id = 0;
-    info("METADATA: Checked %u, deleted %u -- will resume after row %"PRIu64" in %lld seconds", total_checked, total_deleted, wc->row_id,
+    netdata_log_info("METADATA: Checked %u, deleted %u -- will resume after row %"PRIu64" in %lld seconds", total_checked, total_deleted, wc->row_id,
          (long long)(wc->check_metadata_after - now));
 
 skip_run:
@@ -1244,7 +1244,7 @@ static void metadata_event_loop(void *arg)
     wc->timer_req.data = wc;
     fatal_assert(0 == uv_timer_start(&wc->timer_req, timer_cb, TIMER_INITIAL_PERIOD_MS, TIMER_REPEAT_PERIOD_MS));
 
-    info("Starting metadata sync thread with %d entries command queue", METADATA_CMD_Q_MAX_SIZE);
+    netdata_log_info("Starting metadata sync thread with %d entries command queue", METADATA_CMD_Q_MAX_SIZE);
 
     struct metadata_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
@@ -1394,7 +1394,7 @@ static void metadata_event_loop(void *arg)
     freez(loop);
     worker_unregister();
 
-    info("METADATA: Shutting down event loop");
+    netdata_log_info("METADATA: Shutting down event loop");
     completion_mark_complete(&wc->init_complete);
     return;
 
@@ -1415,15 +1415,15 @@ void metadata_sync_shutdown(void)
 
     struct metadata_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
-    info("METADATA: Sending a shutdown command");
+    netdata_log_info("METADATA: Sending a shutdown command");
     cmd.opcode = METADATA_SYNC_SHUTDOWN;
     metadata_enq_cmd(&metasync_worker, &cmd);
 
     /* wait for metadata thread to shut down */
-    info("METADATA: Waiting for shutdown ACK");
+    netdata_log_info("METADATA: Waiting for shutdown ACK");
     completion_wait_for(&metasync_worker.init_complete);
     completion_destroy(&metasync_worker.init_complete);
-    info("METADATA: Shutdown complete");
+    netdata_log_info("METADATA: Shutdown complete");
 }
 
 void metadata_sync_shutdown_prepare(void)
@@ -1437,11 +1437,11 @@ void metadata_sync_shutdown_prepare(void)
     struct completion compl;
     completion_init(&compl);
 
-    info("METADATA: Sending a scan host command");
+    netdata_log_info("METADATA: Sending a scan host command");
     uint32_t max_wait_iterations = 2000;
     while (unlikely(metadata_flag_check(&metasync_worker, METADATA_FLAG_SCANNING_HOSTS)) && max_wait_iterations--) {
         if (max_wait_iterations == 1999)
-            info("METADATA: Current worker is running; waiting to finish");
+            netdata_log_info("METADATA: Current worker is running; waiting to finish");
         sleep_usec(1000);
     }
 
@@ -1449,10 +1449,10 @@ void metadata_sync_shutdown_prepare(void)
     cmd.completion = &compl;
     metadata_enq_cmd(&metasync_worker, &cmd);
 
-    info("METADATA: Waiting for host scan completion");
+    netdata_log_info("METADATA: Waiting for host scan completion");
     completion_wait_for(&compl);
     completion_destroy(&compl);
-    info("METADATA: Host scan complete; can continue with shutdown");
+    netdata_log_info("METADATA: Host scan complete; can continue with shutdown");
 }
 
 // -------------------------------------------------------------
@@ -1471,7 +1471,7 @@ void metadata_sync_init(void)
     completion_wait_for(&wc->init_complete);
     completion_destroy(&wc->init_complete);
 
-    info("SQLite metadata sync initialization complete");
+    netdata_log_info("SQLite metadata sync initialization complete");
 }
 
 
