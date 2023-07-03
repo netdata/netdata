@@ -11,8 +11,9 @@
 #include "../compression.h"
 #include "../parser.h"
 #include "../query.h"
+#include "../helper.h"
 
-#define SEVERAL_LOG_RECORDS "\
+#define LOG_RECORDS_PARTIAL "\
 127.0.0.1 - - [30/Jun/2022:16:43:51 +0300] \"GET / HTTP/1.0\" 200 11192 \"-\" \"ApacheBench/2.3\"\n\
 192.168.2.1 - - [30/Jun/2022:16:43:51 +0300] \"PUT / HTTP/1.0\" 400 11192 \"-\" \"ApacheBench/2.3\"\n\
 255.91.204.202 - mann1475 [30/Jun/2023:21:05:09 +0000] \"POST /vertical/turn-key/engineer/e-enable HTTP/1.0\" 401 11411\n\
@@ -76,17 +77,28 @@
 115.179.64.255 - - [30/Jun/2023:21:23:34 +0000] \"PATCH /transform/transparent/b2c/holistic HTTP/1.1\" 406 10208\n\
 48.104.215.32 - - [30/Jun/2023:21:23:34 +0000] \"DELETE /drive/clicks-and-mortar HTTP/1.0\" 501 13752\n\
 75.212.115.12 - pfannerstill5140 [30/Jun/2023:21:23:34 +0000] \"PATCH /leading-edge/mesh/methodologies HTTP/1.0\" 503 4946\n\
-52.75.2.117 - osinski2030 [30/Jun/2023:21:23:34 +0000] \"PUT /incentivize/recontextualize HTTP/1.1\" 301 8785\n\
-82.39.169.93 - streich5722 [30/Jun/2023:21:23:34 +0000] \"GET /action-items/leading-edge/reinvent/maximize HTTP/1.1\" 500 1228\n\
-131.128.33.109 - turcotte6735 [30/Jun/2023:21:23:34 +0000] \"PUT /distributed/strategize HTTP/1.1\" 401 16471\n\
-"
+52.75.2.117 - osinski2030 [30/Jun/2023:21:23:34 +0000] \"PUT /incentivize/recontextualize HTTP/1.1\" 301 8785\n"
+
+#define LOG_RECORD_WITHOUT_NEW_LINE \
+"82.39.169.93 - streich5722 [30/Jun/2023:21:23:34 +0000] \"GET /action-items/leading-edge/reinvent/maximize HTTP/1.1\" 500 1228"
+
+#define LOG_RECORDS_WITHOUT_TERMINATING_NEW_LINE \
+        LOG_RECORDS_PARTIAL \
+        LOG_RECORD_WITHOUT_NEW_LINE
+
+#define LOG_RECORD_WITH_NEW_LINE \
+"131.128.33.109 - turcotte6735 [30/Jun/2023:21:23:34 +0000] \"PUT /distributed/strategize HTTP/1.1\" 401 16471\n"
+
+#define LOG_RECORDS_WITH_TERMINATING_NEW_LINE \
+        LOG_RECORDS_PARTIAL \
+        LOG_RECORD_WITH_NEW_LINE
 
 static int test_compression_decompression() {
     int errors = 0;
     fprintf(stderr, "%s():\n", __FUNCTION__);
 
     Circ_buff_item_t item;
-    item.text_size = sizeof(SEVERAL_LOG_RECORDS);
+    item.text_size = sizeof(LOG_RECORDS_WITH_TERMINATING_NEW_LINE);
     fprintf(stderr, "Testing LZ4_compressBound()...\n");
     size_t required_compressed_space  = LZ4_compressBound(item.text_size);
     if(!required_compressed_space){
@@ -96,7 +108,7 @@ static int test_compression_decompression() {
 
     item.data_max_size = item.text_size + required_compressed_space;
     item.data = mallocz(item.data_max_size);
-    memcpy(item.data, SEVERAL_LOG_RECORDS, sizeof(SEVERAL_LOG_RECORDS));
+    memcpy(item.data, LOG_RECORDS_WITH_TERMINATING_NEW_LINE, sizeof(LOG_RECORDS_WITH_TERMINATING_NEW_LINE));
 
     fprintf(stderr, "Testing LZ4_compress_fast()...\n");    
     item.text_compressed = item.data + item.text_size;
@@ -118,6 +130,56 @@ static int test_compression_decompression() {
         fprintf(stderr, "- Error, original and decompressed data not the same\n");
         ++errors;
     }
+
+    fprintf(stderr, "%s\n", errors ? "FAIL" : "OK");
+    return errors;
+}
+
+static int test_read_last_line() {
+    int errors = 0;
+    fprintf(stderr, "%s():\n", __FUNCTION__);
+
+    #if defined(_WIN32) || defined(_WIN64)
+    char tmpname[MAX_PATH] = "/tmp/tmp.XXXXXX";
+    #else
+    char tmpname[] = "/tmp/tmp.XXXXXX";
+    #endif
+
+    int fd = mkstemp(tmpname);
+    if (fd == -1){
+        fprintf(stderr, "mkstemp() Failed with error %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    FILE *tmpfp = fdopen(fd, "r+");
+    if (tmpfp == NULL) {
+        close(fd);
+        unlink(tmpname);
+        exit(EXIT_FAILURE);
+    }
+
+    if(fprintf(tmpfp, "%s", LOG_RECORDS_WITHOUT_TERMINATING_NEW_LINE) <= 0){
+        close(fd);
+        unlink(tmpname);
+        exit(EXIT_FAILURE);
+    }
+    fflush(tmpfp);
+
+    fprintf(stderr, "Testing read of LOG_RECORD_WITHOUT_NEW_LINE...\n");  
+    errors += strcmp(LOG_RECORD_WITHOUT_NEW_LINE, read_last_line(tmpname, 0)) ? 1 : 0;
+
+    if(fprintf(tmpfp, "\n%s", LOG_RECORD_WITH_NEW_LINE) <= 0){
+        close(fd);
+        unlink(tmpname);
+        exit(EXIT_FAILURE);
+    }
+    fflush(tmpfp);
+
+    fprintf(stderr, "Testing read of LOG_RECORD_WITH_NEW_LINE...\n");
+    errors += strcmp(LOG_RECORD_WITH_NEW_LINE, read_last_line(tmpname, 0)) ? 1 : 0;
+
+    unlink(tmpname);
+    close(fd);
 
     fprintf(stderr, "%s\n", errors ? "FAIL" : "OK");
     return errors;
@@ -484,6 +546,8 @@ int test_logs_management(int argc, char *argv[]){
     fprintf(stderr, "======================================================\n");
     fprintf(stderr, "------------------------------------------------------\n");
     errors += test_compression_decompression();
+    fprintf(stderr, "------------------------------------------------------\n");
+    errors += test_read_last_line();
     fprintf(stderr, "------------------------------------------------------\n");
     setup_parse_config_expected_num_fields();
     fprintf(stderr, "------------------------------------------------------\n");
