@@ -44,6 +44,8 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
                 req.alerts.transition = value;
             } else if (!strcmp(name, "alert")) {
                 req.alerts.alert = value;
+            } else if (!strcmp(name, "anchor")) {
+                req.alerts.anchor = value;
             }
         }
     }

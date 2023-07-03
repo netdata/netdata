@@ -1315,6 +1315,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                     web_client_api_request_v2_contexts_alerts_status_to_buffer_json_array(wb, "status", req->alerts.status);
                     buffer_json_member_add_string(wb, "alert", req->alerts.alert);
                     buffer_json_member_add_string(wb, "transition", req->alerts.transition);
+                    buffer_json_member_add_string(wb, "anchor", req->alerts.anchor);
                     buffer_json_member_add_uint64(wb, "last", req->alerts.last);
                     buffer_json_object_close(wb); // alerts
                 }
@@ -1441,7 +1442,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                     ctl.alerts.alert_instances,
                     ctl.request->after,
                     ctl.request->before,
-                    ctl.request->alerts.transition,
+                    ctl.request->alerts.anchor ? ctl.request->alerts.anchor : ctl.request->alerts.transition,
                     ctl.request->alerts.last ? ctl.request->alerts.last : 1,
                     debug, (req->options & CONTEXT_V2_OPTION_ALERT_INSTANCES));
             buffer_json_array_close(wb); // alerts_transitions
