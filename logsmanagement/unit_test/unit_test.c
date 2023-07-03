@@ -191,6 +191,21 @@ static void setup_parse_config_expected_num_fields() {
     fprintf(stderr, "OK\n");
 }
 
+static int test_count_fields() {
+    int errors = 0;
+    fprintf(stderr, "%s():\n", __FUNCTION__);
+
+    for(int i = 0; i < (int) (sizeof(parse_configs_to_test) / sizeof(parse_configs_to_test[0])); i++){
+        if(count_fields(parse_configs_to_test[i], parse_config_delim) != parse_config_expected_num_fields[i]){
+            fprintf(stderr, "- Error (count_fields() result incorrect) for:\n%s", parse_configs_to_test[i]);
+            ++errors;
+        }
+    }
+
+    fprintf(stderr, "%s\n", errors ? "FAIL" : "OK");
+    return errors;
+}
+
 static int test_auto_detect_web_log_parser_config() {
     int errors = 0;
     fprintf(stderr, "%s():\n", __FUNCTION__);
@@ -471,6 +486,8 @@ int test_logs_management(int argc, char *argv[]){
     errors += test_compression_decompression();
     fprintf(stderr, "------------------------------------------------------\n");
     setup_parse_config_expected_num_fields();
+    fprintf(stderr, "------------------------------------------------------\n");
+    errors += test_count_fields();
     fprintf(stderr, "------------------------------------------------------\n");
     errors += test_auto_detect_web_log_parser_config();
     fprintf(stderr, "------------------------------------------------------\n");

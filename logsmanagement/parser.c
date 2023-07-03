@@ -44,7 +44,7 @@ const char* const csv_auto_format_guess_matrix[] = {
     NULL}
 ;
 
-static inline int count_fields(const char *line, const char delimiter){
+UNIT_STATIC int count_fields(const char *line, const char delimiter){
     const char *ptr;
     int cnt, fQuote;
 

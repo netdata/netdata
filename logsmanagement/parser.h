@@ -259,6 +259,7 @@ typedef struct log_line_parsed{
 Web_log_parser_config_t *read_web_log_parser_config(const char *log_format, const char delimiter);
 #ifdef ENABLE_LOGSMANAGEMENT_TESTS
 /* Used as public only for unit testing, normally defined as static */
+int count_fields(const char *line, const char delimiter);
 void parse_web_log_line(const Web_log_parser_config_t *wblp_config, 
                         char *line, const size_t line_len, 
                         Log_line_parsed_t *log_line_parsed);
