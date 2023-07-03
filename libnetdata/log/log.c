@@ -1133,7 +1133,7 @@ void log_aclk_message_bin( const char *data, const size_t data_len, int tx, cons
 
 void log_collector_severity_level(netdata_log_level_t value)
 {
-    use_severity_level = (netdata_log_level_t) value;
+    use_severity_level = value;
 }
 
 netdata_log_level_t log_severity_string_to_severity_level(char *level)
