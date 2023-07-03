@@ -1742,14 +1742,14 @@ fail:
     return ok;
 }
 
-#define SQL_BUILD_TEMP_ALERT_MATCH "CREATE TEMP TABLE IF NOT EXISTS v_%p (host_id blob, chart text, name text, alarm_id int, aii int, ati int, aci int, ni int)"
+#define SQL_BUILD_TEMP_ALERT_MATCH "CREATE TEMP TABLE IF NOT EXISTS v_%p (host_id blob, chart text, name text, alarm_id int, aii int, ati int, aci int, ni int, key text)"
 
-#define SQL_POPULATE_TEMP_ALERT_MATCH_TABLE "INSERT INTO v_%p (host_id, chart, name, alarm_id, aii, ati, aci, ni) " \
-        "VALUES (@host_id, @chart, @alarm_name, @alarm_id, @aii, @ati, @aci, @ni)"
+#define SQL_POPULATE_TEMP_ALERT_MATCH_TABLE "INSERT INTO v_%p (host_id, chart, name, alarm_id, aii, ati, aci, ni, key) " \
+        "VALUES (@host_id, @chart, @alarm_name, @alarm_id, @aii, @ati, @aci, @ni, @key)"
 
 #define SQL_SEARCH_ALERT_LOG "SELECT when_key, duration, flags, exec_run_timestamp, delay_up_to_timestamp, " \
         "recipient, exec_code, new_status, old_status, new_value, " \
-        "old_value, transition_id, d.global_id, t.aii, t.ati, t.aci, h.exec, h.units, t.ni FROM health_log_detail d, health_log h, v_%p t " \
+        "old_value, transition_id, d.global_id, t.aii, t.ati, t.aci, h.exec, h.units, t.ni, t.key FROM health_log_detail d, health_log h, v_%p t " \
         "WHERE h.host_id = t.host_id AND h.chart = t.chart AND h.alarm_id = t.alarm_id AND h.name = t.name " \
         "AND h.health_log_id = d.health_log_id "
 
@@ -1819,6 +1819,10 @@ void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_
             if (unlikely(rc != SQLITE_OK))
                 error_report("Failed to bind ni parameter.");
 
+            rc = sqlite3_bind_text(res, 9, t_dfe.name, -1, SQLITE_STATIC);
+            if (unlikely(rc != SQLITE_OK))
+                error_report("Failed to bind instance key parameter.");
+
             rc = sqlite3_step_monitored(res);
             if (rc != SQLITE_DONE)
                 error_report("Error while populating temp table");
@@ -1864,10 +1868,21 @@ void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_
         }
     }
 
+    size_t renumbered_aii = 0;
     while (sqlite3_step(res) == SQLITE_ROW) {
         buffer_json_add_array_item_object(wb);
         {
-            size_t aii = sqlite3_column_int64(res, 13);
+            const unsigned char *dict_key = sqlite3_column_text(res, 19);
+
+            struct alert_instance_v2_entry *z = dictionary_get(alert_instances, (const char *)dict_key);
+            if(!z->transitions) {
+                z->transitions = 1;
+                z->aii = renumbered_aii++;
+            }
+            else
+                z->transitions++;
+
+            size_t aii = z->aii;
             size_t ati = sqlite3_column_int64(res, 14);
             size_t aci = sqlite3_column_int64(res, 15);
             size_t ni = sqlite3_column_int64(res, 18);

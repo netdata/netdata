@@ -1095,6 +1095,87 @@ static void rrdcontext_v2_set_transition_filter(const char *machine_guid, const 
     ctl->alerts.alarm_id_filter = alarm_id;
 }
 
+static int alert_instances_aii_compar(const DICTIONARY_ITEM **item1, const DICTIONARY_ITEM **item2) {
+    struct alert_instance_v2_entry *z1 = dictionary_acquired_item_value(*item1);
+    struct alert_instance_v2_entry *z2 = dictionary_acquired_item_value(*item2);
+
+    if(z1->aii < z2->aii)
+        return -1;
+    else
+        return 1;
+}
+
+struct alert_instance_to_json_cb_data {
+    BUFFER *wb;
+    struct rrdcontext_to_json_v2_data *ctl;
+    bool debug;
+};
+
+static int alert_instances_json_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
+    struct alert_instance_v2_entry *t = value;
+    struct alert_instance_to_json_cb_data *d = data;
+    struct rrdcontext_to_json_v2_data *ctl = d->ctl;
+    bool debug = d->debug;
+    BUFFER *wb = d->wb;
+
+    buffer_json_add_array_item_object(wb);
+    {
+        buffer_json_member_add_uint64(wb, "ni", t->ni);
+        buffer_json_member_add_uint64(wb, "ati", t->ati);
+        buffer_json_member_add_uint64(wb, "aii", t->aii);
+        if(ctl->request->options & CONTEXT_V2_OPTION_ALERT_CONFIGURATIONS) {
+            buffer_json_member_add_uint64(wb, "aci", t->aci);
+        }
+        buffer_json_member_add_uint64(wb, "gi", t->global_id);
+
+        if(debug)
+            buffer_json_member_add_string(wb, "nm", string2str(t->name));
+
+        buffer_json_member_add_string(wb, "units", string2str(t->units));
+        buffer_json_member_add_string(wb, "fami", string2str(t->family));
+        buffer_json_member_add_string(wb, "info", string2str(t->info));
+        buffer_json_member_add_string(wb, "ch", string2str(t->chart_name));
+        buffer_json_member_add_string(wb, "st", rrdcalc_status2string(t->status));
+        buffer_json_member_add_double(wb, "v", t->value);
+        buffer_json_member_add_time_t(wb, "t", t->last_updated);
+        buffer_json_member_add_uuid  (wb, "tr_i", &t->last_transition_id);
+        buffer_json_member_add_double(wb, "tr_v", t->last_status_change_value);
+        buffer_json_member_add_time_t(wb, "tr_t", t->last_status_change);
+        buffer_json_member_add_uuid  (wb, "cfg", &t->config_hash_id);
+        rrdcalc_flags_to_json_array  (wb, "flags", t->flags);
+    }
+    buffer_json_object_close(wb); // alert instance
+
+    return 1;
+}
+
+static void show_alert_transitions(BUFFER *wb, struct rrdcontext_to_json_v2_data *ctl, bool debug, bool show_only_with_transitions_sorted) {
+    buffer_json_member_add_array(wb, "alert_instances");
+    {
+        struct alert_instance_to_json_cb_data data = {
+                .wb = wb,
+                .ctl = ctl,
+                .debug = debug,
+        };
+
+        if(show_only_with_transitions_sorted) {
+            struct alert_instance_v2_entry *t;
+            dfe_start_read(ctl->alerts.alert_instances, t) {
+                if(!t->transitions)
+                    dictionary_del(ctl->alerts.alert_instances, t_dfe.name);
+            }
+            dfe_done(t);
+
+            dictionary_sorted_walkthrough_rw(ctl->alerts.alert_instances, DICTIONARY_LOCK_READ,
+                                             alert_instances_json_callback, &data, alert_instances_aii_compar);
+        }
+        else
+            dictionary_walkthrough_rw(ctl->alerts.alert_instances, DICTIONARY_LOCK_READ,
+                                      alert_instances_json_callback, &data);
+    }
+    buffer_json_array_close(wb); // alerts_instances
+}
+
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_MODE mode) {
     int resp = HTTP_RESP_OK;
     bool run = true;
@@ -1353,45 +1434,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         }
         buffer_json_array_close(wb); // alerts
 
-        if(req->options & CONTEXT_V2_OPTION_ALERT_INSTANCES) {
-            buffer_json_member_add_array(wb, "alert_instances");
-            {
-                struct alert_instance_v2_entry *t;
-                dfe_start_read(ctl.alerts.alert_instances, t){
-                    buffer_json_add_array_item_object(wb);
-                    {
-                        buffer_json_member_add_uint64(wb, "ni", t->ni);
-                        buffer_json_member_add_uint64(wb, "ati", t->ati);
-                        buffer_json_member_add_uint64(wb, "aii", t->aii);
-                        if(req->options & CONTEXT_V2_OPTION_ALERT_CONFIGURATIONS) {
-                            buffer_json_member_add_uint64(wb, "aci", t->aci);
-                        }
-                        buffer_json_member_add_uint64(wb, "gi", t->global_id);
-
-                        if(debug)
-                            buffer_json_member_add_string(wb, "nm", string2str(t->name));
-
-                        buffer_json_member_add_string(wb, "units", string2str(t->units));
-                        buffer_json_member_add_string(wb, "fami", string2str(t->family));
-                        buffer_json_member_add_string(wb, "info", string2str(t->info));
-                        buffer_json_member_add_string(wb, "ch", string2str(t->chart_name));
-                        buffer_json_member_add_string(wb, "st", rrdcalc_status2string(t->status));
-                        buffer_json_member_add_double(wb, "v", t->value);
-                        buffer_json_member_add_time_t(wb, "t", t->last_updated);
-                        buffer_json_member_add_uuid  (wb, "tr_i", &t->last_transition_id);
-                        buffer_json_member_add_double(wb, "tr_v", t->last_status_change_value);
-                        buffer_json_member_add_time_t(wb, "tr_t", t->last_status_change);
-                        buffer_json_member_add_uuid  (wb, "cfg", &t->config_hash_id);
-                        rrdcalc_flags_to_json_array  (wb, "flags", t->flags);
-                    }
-                    buffer_json_object_close(wb); // alert instance
-                }
-                dfe_done(t);
-            }
-            buffer_json_array_close(wb); // alerts_instances
-        }
-
-        if((req->options & CONTEXT_V2_OPTION_ALERT_TRANSITIONS) && (req->options & CONTEXT_V2_OPTION_ALERT_INSTANCES_HIDDEN)) {
+        if((req->options & CONTEXT_V2_OPTION_ALERT_TRANSITIONS)) {
             buffer_json_member_add_array(wb, "alert_transitions");
             sql_health_alarm_log2json_v3(
                     wb,
@@ -1402,6 +1445,13 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                     ctl.request->alerts.last ? ctl.request->alerts.last : 1,
                     debug, (req->options & CONTEXT_V2_OPTION_ALERT_INSTANCES));
             buffer_json_array_close(wb); // alerts_transitions
+
+            if(req->options & CONTEXT_V2_OPTION_ALERT_INSTANCES) {
+                show_alert_transitions(wb, &ctl, debug, true);
+            }
+        }
+        else if(req->options & CONTEXT_V2_OPTION_ALERT_INSTANCES) {
+            show_alert_transitions(wb, &ctl, debug, false);
         }
 
         if(req->options & CONTEXT_V2_OPTION_ALERT_CONFIGURATIONS) {

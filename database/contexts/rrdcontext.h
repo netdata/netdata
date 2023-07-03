@@ -422,6 +422,8 @@ struct alert_instance_v2_entry {
     size_t aci;
     size_t aii;
 
+    size_t transitions;
+
     STRING *chart_id;
     STRING *chart_name;
     STRING *name;
