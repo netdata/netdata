@@ -270,13 +270,18 @@
               "type": "array",
               "description": "List of related integrations.",
               "items": {
-                "type": "string",
-                "description": "TODO"
+                "type": "object",
+                "properties": {
+                  "plugin_name": {
+                    "type": "string",
+                    "description": "Related integration plugin name."
+                  },
+                  "module_name": {
+                    "type": "string",
+                    "description": "Related integration module name."
+                  }
+                }
               }
-            },
-            "overview_text": {
-              "type": "string",
-              "description": "TODO"
             }
           }
         }
