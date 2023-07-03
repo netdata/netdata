@@ -5,6 +5,7 @@
 #include "../../daemon/common.h"
 #include "sqlite3.h"
 
+struct alert_transition_data;
 extern sqlite3 *db_meta;
 void sql_health_alarm_log_load(RRDHOST *host);
 void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae);
@@ -18,5 +19,16 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
 int health_migrate_old_health_log_table(char *table);
 uint32_t sql_get_alarm_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, uuid_t *config_hash_id);
 void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_t after, time_t before, const char *transition, uint32_t max, bool debug, bool show_aii);
+void sql_alert_transitions(
+    DICTIONARY *alert_instances,
+    time_t after,
+    time_t before,
+    const char *context,
+    const char *alert_name,
+    void (*cb)(struct alert_transition_data *atd, void *data),
+    void *data,
+    bool debug
+        __maybe_unused);
+
 bool sql_find_alert_transition(const char *transition, void (*cb)(const char *machine_guid, const char *context, time_t alert_id, void *data), void *data);
 #endif //NETDATA_SQLITE_HEALTH_H

@@ -1957,3 +1957,152 @@ fail_only_drop:
     (void) db_execute(db_meta, sql);
     buffer_free(command);
 }
+
+#define SQL_BUILD_ALERT_TRANSITION "CREATE TEMP TABLE IF NOT EXISTS v_%p (host_id blob)"
+
+#define SQL_POPULATE_TEMP_ALERT_TRANSITION_TABLE "INSERT INTO v_%p (host_id) VALUES (@host_id)"
+
+#define SQL_SEARCH_ALERT_TRANSITION "SELECT h.host_id, h.alarm_id, h.config_hash_id, h.name, h.chart, h.family, h.recipient, h.units, h.exec, h.chart_context,  d.when_key, " \
+    "d.duration, d.non_clear_duration, d.flags, d.delay_up_to_timestamp, d.info, d.exec_code, d.new_status, d.old_status, d.delay, " \
+    " d.new_value, d.old_value, d.last_repeat, d.transition_id,  d.global_id FROM health_log h, health_log_detail d, v_%p t " \
+    " WHERE h.host_id = t.host_id AND h.health_log_id = d.health_log_id AND d.global_id BETWEEN @after AND @before "
+
+void sql_alert_transitions(DICTIONARY *alert_instances, time_t after, time_t before, const char *context, const char *alert_name,
+        void (*cb)(struct alert_transition_data *atd, void *data), void *data,
+        bool debug __maybe_unused)
+{
+    char sql[512];
+    int rc;
+    sqlite3_stmt *res = NULL;
+    BUFFER *command = NULL;
+
+    if (unlikely(!alert_instances))
+        return;
+
+    snprintfz(sql, 511, SQL_BUILD_ALERT_TRANSITION, alert_instances);
+    rc = db_execute(db_meta, sql);
+    if (rc)
+        return;
+
+    snprintfz(sql, 511, SQL_POPULATE_TEMP_ALERT_TRANSITION_TABLE, alert_instances);
+
+    // Prepare statement to add things
+    rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to INSERT into v_%p", alert_instances);
+        goto fail_only_drop;
+    }
+
+    void *t;
+    dfe_start_read(alert_instances, t) {
+        uuid_t host_uuid;
+        uuid_parse( t_dfe.name, host_uuid);
+
+        rc = sqlite3_bind_blob(res, 1, &host_uuid, sizeof(host_uuid), SQLITE_STATIC);
+        if (unlikely(rc != SQLITE_OK))
+            error_report("Failed to bind host_id parameter.");
+
+        rc = sqlite3_step_monitored(res);
+        if (rc != SQLITE_DONE)
+            error_report("Error while populating temp table");
+
+        rc = sqlite3_reset(res);
+        if (rc != SQLITE_OK)
+            error_report("Error while resetting parameters");
+    }
+    dfe_done(t);
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK)) {
+        // log error but continue
+        error_report("Failed to finalize statement for sql_alert_transitions temp table population");
+    }
+
+    command = buffer_create(MAX_HEALTH_SQL_SIZE, NULL);
+
+    buffer_sprintf(command, SQL_SEARCH_ALERT_TRANSITION, alert_instances);
+
+    if (context)
+        buffer_sprintf(command, " AND h.chart_context = @context");
+
+    if (alert_name)
+        buffer_sprintf(command, " AND h.name = @alert_name");
+
+    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(command), -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement sql_health_alarm_log2json_v3");
+        goto fail_only_drop;
+    }
+
+    rc = sqlite3_bind_int64(res, 1, after);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind after parameter");
+        goto fail;
+    }
+
+    rc = sqlite3_bind_int64(res, 2, before);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind before parameter");
+        goto fail;
+    }
+
+    if (context) {
+        rc = sqlite3_bind_text(res, 3, context, -1, SQLITE_STATIC);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to bind context parameter");
+            goto fail;
+        }
+
+    }
+
+    if (alert_name) {
+        rc = sqlite3_bind_text(res, 4, alert_name, -1, SQLITE_STATIC);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to bind alert_name parameter");
+            goto fail;
+        }
+    }
+
+    struct alert_transition_data atd;
+
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        atd.host_id = (uuid_t *) sqlite3_column_blob(res, 0);
+        atd.alarm_id = sqlite3_column_int64(res, 1);
+        atd.config_hash_id = (uuid_t *)sqlite3_column_blob(res, 2);
+        atd.name = (const char *) sqlite3_column_text(res, 3);
+        atd.chart = (const char *) sqlite3_column_text(res, 4);
+        atd.family = (const char *) sqlite3_column_text(res, 5);
+        atd.recipient = (const char *) sqlite3_column_text(res, 6);
+        atd.units = (const char *) sqlite3_column_text(res, 7);
+        atd.exec = (const char *) sqlite3_column_text(res, 8);
+        atd.chart_context = (const char *) sqlite3_column_text(res, 9);
+        atd.when_key = sqlite3_column_int64(res, 10);
+        atd.duration = sqlite3_column_int64(res, 11);
+        atd.non_clear_duration = sqlite3_column_int64(res, 12);
+        atd.flags = sqlite3_column_int64(res, 13);
+        atd.delay_up_to_timestamp = sqlite3_column_int64(res, 14);
+        atd.info = (const char *) sqlite3_column_text(res, 15);
+        atd.exec_code = sqlite3_column_int(res, 16);
+        atd.new_status = sqlite3_column_int(res, 17);
+        atd.old_status = sqlite3_column_int(res, 18);
+        atd.delay = (int) sqlite3_column_int(res, 19);
+        atd.new_value = (NETDATA_DOUBLE) sqlite3_column_double(res, 20);
+        atd.old_value = (NETDATA_DOUBLE) sqlite3_column_double(res, 21);
+        atd.last_repeat = sqlite3_column_int64(res, 22);
+        atd.transition_id = (uuid_t *) sqlite3_column_blob(res, 23);
+        atd.global_id = sqlite3_column_int64(res, 24);
+
+        cb(&atd, data);
+    }
+
+fail:
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement for sql_alert_transitions");
+
+fail_only_drop:
+    (void) snprintfz(sql, 511, "DROP TABLE IF EXISTS v_%p", alert_instances);
+    (void) db_execute(db_meta, sql);
+    buffer_free(command);
+}
+
