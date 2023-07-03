@@ -533,7 +533,7 @@ static inline time_t storage_engine_global_first_time_s(STORAGE_ENGINE_BACKEND b
         return rrdeng_global_first_time_s(db_instance);
 #endif
 
-    return now_realtime_sec() - default_rrd_history_entries * default_rrd_update_every;
+    return now_realtime_sec() - (time_t)(default_rrd_history_entries * default_rrd_update_every);
 }
 
 size_t rrdeng_currently_collected_metrics(STORAGE_INSTANCE *db_instance);
