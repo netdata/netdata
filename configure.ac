@@ -1396,6 +1396,30 @@ if test "${enable_sentry}" = "yes"; then
         \$(abs_top_srcdir)/externaldeps/sentry-native/lib/libbreakpad_client.a \
         -lcurl"
 fi
+# Sentry env vars
+
+AC_ARG_VAR([GLOBAL_ENVIRONMENT], [Specify the environment,varies between Developent and production])
+
+# Default value for the variable
+GLOBAL_ENVIRONMENT="Development"
+
+# Check if the variable is set in the environment
+if test "x$GLOBAL_ENVIRONMENT" != "x"; then
+  AC_DEFINE_UNQUOTED([GLOBAL_ENVIRONMENT], ["$GLOBAL_ENVIRONMENT"], [Specify the environment,varies between Developent and production])
+fi
+
+AC_ARG_VAR([BUILD_DESTINATION], [Define the build destination OS and ARCH])
+
+# Default value for the variable
+BUILD_DESTINATION="Unknown"
+
+# Check if the variable is set in the environment
+if test "x$BUILD_DESTINATION" != "x"; then
+  AC_DEFINE_UNQUOTED([BUILD_DESTINATION], ["$BUILD_DESTINATION"], [Define the build destination OS and ARCH])
+fi
+
+
+
 
 # -----------------------------------------------------------------------------
 # ml - anomaly detection

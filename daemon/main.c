@@ -331,6 +331,7 @@ static void init_sentry(void) {
     // TODO: we should get this from CI (SENTRY_RELEASE)
     sentry_options_set_release(options, PACKAGE_VERSION);
 
+    sentry_set_tag("BUILD_DESTINATION", BUILD_DESTINATION);
     // TODO: use config_get() to (un)set this
     sentry_options_set_debug(options, 1);
 
