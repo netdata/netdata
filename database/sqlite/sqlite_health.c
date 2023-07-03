@@ -1792,45 +1792,64 @@ void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_
     struct alert_instance_v2_entry *t;
     dfe_start_read(alert_instances, t) {
             rc = sqlite3_bind_blob(res, 1, &t->host->host_uuid, sizeof(t->host->host_uuid), SQLITE_STATIC);
-            if (unlikely(rc != SQLITE_OK))
+            if (unlikely(rc != SQLITE_OK)) {
                 error_report("Failed to bind host_id parameter.");
+                goto skip_failed;
+            }
 
             rc = sqlite3_bind_text(res, 2, string2str(t->chart_name), -1, SQLITE_STATIC);
-            if (unlikely(rc != SQLITE_OK))
+            if (unlikely(rc != SQLITE_OK)) {
                 error_report("Failed to bind chart_name parameter.");
+                goto skip_failed;
+            }
 
             rc = sqlite3_bind_text(res, 3, string2str(t->name), -1, SQLITE_STATIC);
-            if (unlikely(rc != SQLITE_OK))
+            if (unlikely(rc != SQLITE_OK)) {
                 error_report("Failed to bind alert_name parameter.");
+                goto skip_failed;
+            }
 
             rc = sqlite3_bind_int(res, 4, (int) t->alarm_id);
-            if (unlikely(rc != SQLITE_OK))
+            if (unlikely(rc != SQLITE_OK)) {
                 error_report("Failed to bind alarm_id parameter.");
+                goto skip_failed;
+            }
 
             rc = sqlite3_bind_int(res, 5, (int) t->aii);
-            if (unlikely(rc != SQLITE_OK))
+            if (unlikely(rc != SQLITE_OK)) {
                 error_report("Failed to bind aii parameter.");
+                goto skip_failed;
+            }
 
             rc = sqlite3_bind_int(res, 6, (int) t->ati);
-            if (unlikely(rc != SQLITE_OK))
+            if (unlikely(rc != SQLITE_OK)) {
                 error_report("Failed to bind ati parameter.");
+                goto skip_failed;
+            }
 
             rc = sqlite3_bind_int(res, 7, (int) t->aci);
-            if (unlikely(rc != SQLITE_OK))
+            if (unlikely(rc != SQLITE_OK)) {
                 error_report("Failed to bind aci parameter.");
+                goto skip_failed;
+            }
 
             rc = sqlite3_bind_int(res, 8, (int) t->ni);
-            if (unlikely(rc != SQLITE_OK))
+            if (unlikely(rc != SQLITE_OK)) {
                 error_report("Failed to bind ni parameter.");
+                goto skip_failed;
+            }
 
             rc = sqlite3_bind_text(res, 9, t_dfe.name, -1, SQLITE_STATIC);
-            if (unlikely(rc != SQLITE_OK))
+            if (unlikely(rc != SQLITE_OK)) {
                 error_report("Failed to bind instance key parameter.");
+                goto skip_failed;
+            }
 
             rc = sqlite3_step_monitored(res);
             if (rc != SQLITE_DONE)
                 error_report("Error while populating temp table");
 
+skip_failed:
             rc = sqlite3_reset(res);
             if (rc != SQLITE_OK)
                 error_report("Error while resetting parameters");
