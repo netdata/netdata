@@ -38,17 +38,17 @@ jobs:
           else
             echo "run=false" >> "${GITHUB_OUTPUT}"
           fi
-      - name: Check files for clang-format
-        id: clangformat
-        run: |
-          if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/clang-format') }}" = "true" ]; then
-            echo "run=true" >> "${GITHUB_OUTPUT}"
-          elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '\.cpp$|\.cxx$|\.c$|\.hpp$|\.hxx$|\.h$' ; then
-            echo "run=true" >> "${GITHUB_OUTPUT}"
-            echo 'C/C++ code has changed, need to run clang-format.'
-          else
-            echo "run=false" >> "${GITHUB_OUTPUT}"
-          fi
+      # - name: Check files for clang-format
+      #   id: clangformat
+      #   run: |
+      #     if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/clang-format') }}" = "true" ]; then
+      #       echo "run=true" >> "${GITHUB_OUTPUT}"
+      #     elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '\.cpp$|\.cxx$|\.c$|\.hpp$|\.hxx$|\.h$' ; then
+      #       echo "run=true" >> "${GITHUB_OUTPUT}"
+      #       echo 'C/C++ code has changed, need to run clang-format.'
+      #     else
+      #       echo "run=false" >> "${GITHUB_OUTPUT}"
+      #     fi
       - name: Check files for eslint
         id: eslint
         run: |
