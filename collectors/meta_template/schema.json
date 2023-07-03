@@ -326,12 +326,20 @@
       "type": "object",
       "description": "Collected metrics grouped by scope. The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.",
       "properties": {
+        "folding": {
+          "$ref": "#/$defs/_folding"
+        },
         "description": {
           "type": "string",
           "description": "General description of collected metrics/scopes."
         },
-        "folding": {
-          "$ref": "#/$defs/_folding"
+        "availability": {
+          "type": "array",
+          "description": "Metrics collection availability conditions. Some metrics are only available when certain conditions are met. For example, Apache exposes additional metrics when Extended status is configured, Consul exposes different set of metrics depends on its mode. This field should list the available conditions that will later be matched for each of the metrics.",
+          "items": {
+            "type": "string",
+            "description": "Availability condition name."
+          }
         },
         "scopes": {
           "type": "array",
@@ -373,6 +381,14 @@
                     "name": {
                       "type": "string",
                       "description": "Metric name (chart context)."
+                    },
+                    "availability": {
+                      "type": "array",
+                      "description": "Metric collection availability conditions. An empty list means that it is available for all conditions defined in 'metrics.availability'.",
+                      "items": {
+                        "type": "string",
+                        "description": "Availability condition name."
+                      }
                     },
                     "description": {
                       "type": "string",
