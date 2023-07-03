@@ -999,12 +999,16 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
     struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
     time_t header_start_time_s  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
     time_t now_s = max_acceptable_collected_time();
+    time_t global_first_time_s = LONG_MAX;
     for (size_t i=0; i < entries; i++) {
         time_t start_time_s = header_start_time_s + metric->delta_start_s;
         time_t end_time_s = header_start_time_s + metric->delta_end_s;
 
-        mrg_update_metric_retention_and_granularity_by_uuid(
+        start_time_s = mrg_update_metric_retention_and_granularity_by_uuid(
                 main_mrg, (Word_t)ctx, &metric->uuid, start_time_s, end_time_s, (time_t) metric->update_every_s, now_s);
+
+        if(start_time_s < global_first_time_s)
+            global_first_time_s = start_time_s;
 
         metric++;
     }
@@ -1018,6 +1022,12 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
         , (double)entries / 1000
         , ((double)(ended_ut - started_ut) / USEC_PER_MS)
         );
+
+    time_t old = __atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED);;
+    do {
+        if(old <= global_first_time_s)
+            break;
+    } while(!__atomic_compare_exchange_n(&ctx->atomic.first_time_s, &old, global_first_time_s, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 }
 
 int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)

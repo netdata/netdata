@@ -1140,6 +1140,8 @@ void find_uuid_first_time(
 }
 
 static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile_to_delete, struct rrdengine_datafile *first_datafile_remaining, bool worker) {
+    time_t global_first_time_s = LONG_MAX;
+
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_FIND_ROTATED_METRICS);
 
@@ -1196,7 +1198,10 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     for (size_t index = 0; index < added; ++index) {
         uuid_first_t_entry = &uuid_first_entry_list[index];
         if (likely(uuid_first_t_entry->first_time_s != LONG_MAX)) {
-            mrg_metric_set_first_time_s_if_bigger(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s);
+            if(mrg_metric_set_first_time_s_if_bigger(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s)) {
+                if(uuid_first_t_entry->first_time_s < global_first_time_s)
+                    global_first_time_s = uuid_first_t_entry->first_time_s;
+            }
             mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
         }
         else {
@@ -1222,6 +1227,9 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     internal_error(zero_disk_retention,
                    "DBENGINE: deleted %zu metrics, zero retention but referenced %zu (out of %zu total, of which %zu have main cache retention) zero on-disk retention tier %d metrics from metrics registry",
                    deleted_metrics, zero_retention_referenced, zero_disk_retention, zero_disk_but_live, ctx->config.tier);
+
+    if(global_first_time_s != LONG_MAX)
+        __atomic_store_n(&ctx->atomic.first_time_s, global_first_time_s, __ATOMIC_RELAXED);
 
     if(worker)
         worker_is_idle();

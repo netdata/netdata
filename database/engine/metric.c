@@ -657,7 +657,7 @@ inline bool mrg_metric_clear_writer(MRG *mrg, METRIC *metric) {
     return done;
 }
 
-inline void mrg_update_metric_retention_and_granularity_by_uuid(
+inline time_t mrg_update_metric_retention_and_granularity_by_uuid(
         MRG *mrg, Word_t section, uuid_t *uuid,
         time_t first_time_s, time_t last_time_s,
         time_t update_every_s, time_t now_s)
@@ -703,7 +703,11 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
     if (likely(!added))
         mrg_metric_expand_retention(mrg, metric, first_time_s, last_time_s, update_every_s);
 
+    first_time_s = mrg_metric_get_first_time_s(mrg, metric);
+
     mrg_metric_release(mrg, metric);
+
+    return first_time_s;
 }
 
 inline void mrg_get_statistics(MRG *mrg, struct mrg_statistics *s) {

@@ -1375,11 +1375,6 @@ static void populate_packaging_info() {
 // ----------------------------------------------------------------------------
 
 static void populate_directories(void) {
-    static bool populated = false;
-
-    if(populated)
-        return;
-
     build_info_set_value(BIB_DIR_USER_CONFIG, netdata_configured_user_config_dir);
     build_info_set_value(BIB_DIR_STOCK_CONFIG, netdata_configured_stock_config_dir);
     build_info_set_value(BIB_DIR_CACHE, netdata_configured_cache_dir);
@@ -1389,7 +1384,6 @@ static void populate_directories(void) {
     build_info_set_value(BIB_DIR_LOG, netdata_configured_log_dir);
     build_info_set_value(BIB_DIR_LOCK, netdata_configured_lock_dir);
     build_info_set_value(BIB_DIR_HOME, netdata_configured_home_dir);
-    populated = true;
 }
 
 // ----------------------------------------------------------------------------
