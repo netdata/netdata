@@ -34,7 +34,7 @@ and unfortunately not something we can realistically work around.
 You can create a new Agent container using either `docker run` or `docker-compose`. After using either method, you can
 visit the Agent dashboard `http://NODE:19999`.
 
-Both methods create a [bind mount](https://docs.docker.com/storage/bind-mounts/) for Netdata's configuration files
+Both methods create a [volume](https://docs.docker.com/storage/volumes/) for Netdata's configuration files
 _within the container_ at `/etc/netdata`. See the [configuration section](#configure-agent-containers) for details. If
 you want to access the configuration files from your _host_ machine, see [host-editable
 configuration](#host-editable-configuration).
@@ -193,7 +193,7 @@ to restart the container: `docker restart netdata`.
 > the host system.
 
 If you want to make your container's configuration directory accessible from the host system, you need to use a
-[volume](https://docs.docker.com/storage/bind-mounts/) rather than a bind mount. The following commands create a
+[bind mount](https://docs.docker.com/storage/bind-mounts/) rather than a volume. The following commands create a
 temporary `netdata_tmp` container, which is used to populate a `netdataconfig` directory, which is then mounted inside
 the container at `/etc/netdata`.
 
