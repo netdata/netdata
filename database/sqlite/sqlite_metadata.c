@@ -418,7 +418,7 @@ static int add_host_sysinfo_key_value(const char *name, const char *value, uuid_
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to reset statement to store host info value %s, rc = %d", name, rc);
 
-    return rc != SQLITE_DONE;
+    return store_rc == SQLITE_DONE;
 bind_fail:
     error_report("Failed to bind %d parameter to store host info values %s, rc = %d", param, name, rc);
     rc = sqlite3_reset(res);
