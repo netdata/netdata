@@ -415,7 +415,7 @@ if [ "${HTTP_STATUS_CODE}" = "204" ] || [ "${ERROR_KEY}" = "ErrAlreadyClaimed" ]
   cloud base url = $URL_BASE
 HERE_DOC
         if [ "$EUID" == "0" ]; then
-            chown -R "${NETDATA_USER}:${NETDATA_USER}" ${CLAIMING_DIR} || (echo >&2 "Claiming failed"; set -e; exit 2)
+            chown -R "${NETDATA_USER}:${NETDATA_USER}" "${CLAIMING_DIR}" || (echo >&2 "Claiming failed"; set -e; exit 2)
         fi
         if [ "${RELOAD}" == "0" ] ; then
             exit $EXIT_CODE
