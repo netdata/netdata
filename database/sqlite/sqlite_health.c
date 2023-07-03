@@ -1742,18 +1742,18 @@ fail:
     return ok;
 }
 
-#define SQL_BUILD_TEMP_ALERT_MATCH "CREATE TEMP TABLE IF NOT EXISTS v_%p (host_id blob, chart text, name text, alarm_id int, aii int, ati int, aci int)"
+#define SQL_BUILD_TEMP_ALERT_MATCH "CREATE TEMP TABLE IF NOT EXISTS v_%p (host_id blob, chart text, name text, alarm_id int, aii int, ati int, aci int, ni int)"
 
-#define SQL_POPULATE_TEMP_ALERT_MATCH_TABLE "INSERT INTO v_%p (host_id, chart, name, alarm_id, aii, ati, aci) " \
-        "VALUES (@host_id, @chart, @alarm_name, @alarm_id, @aii, @ati, @aci)"
+#define SQL_POPULATE_TEMP_ALERT_MATCH_TABLE "INSERT INTO v_%p (host_id, chart, name, alarm_id, aii, ati, aci, ni) " \
+        "VALUES (@host_id, @chart, @alarm_name, @alarm_id, @aii, @ati, @aci, @ni)"
 
 #define SQL_SEARCH_ALERT_LOG "SELECT when_key, duration, flags, exec_run_timestamp, delay_up_to_timestamp, " \
         "recipient, exec_code, new_status, old_status, new_value, " \
-        "old_value, transition_id, d.global_id, t.aii, t.ati, t.aci, h.exec FROM health_log_detail d, health_log h, v_%p t " \
+        "old_value, transition_id, d.global_id, t.aii, t.ati, t.aci, h.exec, h.units, t.ni FROM health_log_detail d, health_log h, v_%p t " \
         "WHERE h.host_id = t.host_id AND h.chart = t.chart AND h.alarm_id = t.alarm_id AND h.name = t.name " \
         "AND h.health_log_id = d.health_log_id "
 
-void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_t after, time_t before, const char *transition, uint32_t max, bool debug __maybe_unused)
+void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_t after, time_t before, const char *transition, uint32_t max, bool debug __maybe_unused, bool show_aii)
 {
     uuid_t transition_uuid;
     char sql[512];
@@ -1815,6 +1815,10 @@ void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_
             if (unlikely(rc != SQLITE_OK))
                 error_report("Failed to bind aci parameter.");
 
+            rc = sqlite3_bind_int(res, 8, (int) t->ni);
+            if (unlikely(rc != SQLITE_OK))
+                error_report("Failed to bind ni parameter.");
+
             rc = sqlite3_step_monitored(res);
             if (rc != SQLITE_DONE)
                 error_report("Error while populating temp table");
@@ -1866,9 +1870,14 @@ void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_
             size_t aii = sqlite3_column_int64(res, 13);
             size_t ati = sqlite3_column_int64(res, 14);
             size_t aci = sqlite3_column_int64(res, 15);
-            buffer_json_member_add_uint64(wb, "aii", aii);
+            size_t ni = sqlite3_column_int64(res, 18);
+
+            if(show_aii)
+                buffer_json_member_add_uint64(wb, "aii", aii);
+
             buffer_json_member_add_uint64(wb, "ati", ati);
             buffer_json_member_add_uint64(wb, "aci", aci);
+            buffer_json_member_add_uint64(wb, "ni", ni);
 
             uuid_t *transition_id = (sqlite3_column_type(res, 11) != SQLITE_NULL) ? ((uuid_t *)sqlite3_column_blob(res, 11)) : NULL;
             buffer_json_member_add_uuid(wb, "tr_i", transition_id);
@@ -1887,11 +1896,16 @@ void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_
             buffer_json_object_close(wb); //st
             buffer_json_member_add_object(wb, "v");
             {
+                const char *units = (const char *)sqlite3_column_text(res, 17);
+
                 NETDATA_DOUBLE n = (sqlite3_column_type(res, 9) == SQLITE_NULL) ? NAN : sqlite3_column_double(res, 9);
                 buffer_json_member_add_double(wb, "new", n);
 
                 NETDATA_DOUBLE o = (sqlite3_column_type(res, 10) == SQLITE_NULL) ? NAN : sqlite3_column_double(res, 10);
                 buffer_json_member_add_double(wb, "old", o);
+
+                buffer_json_member_add_string(
+                        wb, "units", units ? (const char *)units : NULL);
             }
             buffer_json_object_close(wb); // v
 
@@ -1906,9 +1920,7 @@ void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_
                 buffer_json_member_add_string(
                     wb, "method", exec ? (const char *)exec : string2str(localhost->health.health_default_exec));
                 buffer_json_member_add_string(
-                    wb,
-                    "to",
-                    recipient ? recipient : string2str(localhost->health.health_default_recipient));
+                    wb, "to", recipient ? recipient : string2str(localhost->health.health_default_recipient));
                 buffer_json_member_add_uint64(wb, "code", sqlite3_column_int(res, 6));
             }
             buffer_json_object_close(wb); // notification
