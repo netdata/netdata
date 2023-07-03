@@ -921,10 +921,7 @@ void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time
 
     if(info) {
         buffer_json_member_add_object(wb, "application");
-        buffer_json_member_add_string(wb, "version", string2str(localhost->program_version));
-        buffer_json_member_add_object(wb, "build_info");
         build_info_to_json_object(wb);
-        buffer_json_object_close(wb); // build_info
         buffer_json_object_close(wb); // netdata
 
         buffer_json_member_add_object(wb, "cloud");
