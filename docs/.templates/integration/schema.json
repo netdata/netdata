@@ -1,0 +1,60 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "title": "Netdata Integrations file",
+    "properties": {
+        "categories_list": {
+            "type": "object",
+            "description": "A list defining all the available categories for the integrations",
+            "properties": {
+                "list": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "Name of the category"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "integrations": {
+            "type": "array",
+            "description": "A list of single module templates",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": "string",
+                        "description": "Where this integration belongs, in category/sub_category/.. format."
+                    },
+                    "icon": {
+                        "type": "string",
+                        "description": "path to the icon for this integration"
+                    },
+                    "meta": {
+                        "$ref": "../../../collectors/meta_template/schema.json"
+                    },
+                    "related_blog_posts": {
+                        "type": "array",
+                        "description": "A list with links to related blog posts",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {
+                                    "type": "string"
+                                },
+                                "link": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
