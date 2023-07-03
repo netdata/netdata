@@ -260,14 +260,15 @@
     },
     "related_resources": {
       "type": "object",
-      "description": "TODO",
+      "description": "Available related resources for the monitored instance.",
       "properties": {
         "integrations": {
           "type": "object",
-          "description": "TODO",
+          "description": "All collectors that provide additional metrics for the monitored instance. This may include generic collectors, e.g. 'httpcheck' for web servers to monitor specific endpoints.",
           "properties": {
             "list": {
               "type": "array",
+              "description": "List of related integrations.",
               "items": {
                 "type": "string",
                 "description": "TODO"
@@ -293,93 +294,107 @@
     },
     "alerts": {
       "type": "array",
-      "description": "TODO",
+      "description": "The list of configured alerts shipped with Netdata for this collector.",
       "items": {
         "type": "object",
+        "description": "Information about the configured alert.",
         "properties": {
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "Alert's 'alarm' or 'template' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-alarm-or-template)."
           },
           "link": {
-            "type": "string"
-          },
-          "metric": {
             "type": "string",
             "description": "TODO"
           },
+          "metric": {
+            "type": "string",
+            "description": "Alert's 'on' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-on)."
+          },
           "info": {
-            "type": "string"
+            "type": "string",
+            "description": "Alert's 'info' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-info)."
           },
           "os": {
-            "type": "string"
+            "type": "string",
+            "description": "Alert's 'os' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-os)."
           }
         }
       }
     },
     "metrics": {
       "type": "object",
-      "description": "TODO",
+      "description": "Collected metrics grouped by scope. The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.",
       "properties": {
         "description": {
           "type": "string",
-          "description": "TODO"
+          "description": "General description of collected metrics/scopes."
         },
         "folding": {
           "$ref": "#/$defs/_folding"
         },
         "scopes": {
           "type": "array",
-          "description": "TODO",
+          "description": "List of scopes and their metrics.",
           "items": {
             "type": "object",
             "properties": {
               "name": {
-                "type": "string"
+                "type": "string",
+                "description": "Scope name."
               },
               "description": {
                 "type": "string",
-                "description": "TODO"
+                "description": "Scope description."
               },
               "labels": {
                 "type": "array",
-                "description": "TODO",
+                "description": "Label set of the scope.",
                 "items": {
                   "type": "object",
                   "properties": {
                     "name": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Label name."
                     },
                     "description": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Label description."
                     }
                   }
                 }
               },
               "metrics": {
                 "type": "array",
-                "description": "TODO",
+                "description": "List of collected metrics (chart contexts) in the scope.",
                 "items": {
                   "type": "object",
                   "properties": {
                     "name": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Metric name (chart context)."
                     },
                     "description": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Metric description (chart title)."
                     },
                     "unit": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Metric description (chart unit)."
                     },
                     "chart_type": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Metric description (chart type)."
                     },
                     "dimensions": {
                       "type": "array",
+                      "description": "",
                       "items": {
                         "type": "object",
                         "properties": {
                           "name": {
-                            "type": "string"
+                            "type": "string",
+                            "description": "Dimension name."
                           }
                         }
                       }
