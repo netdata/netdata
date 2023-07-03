@@ -632,7 +632,7 @@ static inline BITMAPX *bitmapX_create(uint32_t bits) {
 
 #define bitmapX_get_bit(ptr, idx) ((ptr)->data[(idx) >> 5] & (1U << ((idx) & 31)))
 #define bitmapX_set_bit(ptr, idx, value) do {           \
-    register uint32_t _bitmask = 1U << ((idx) & 31);  \
+    register uint32_t _bitmask = 1U << ((idx) & 31);    \
     if (value)                                          \
         (ptr)->data[(idx) >> 5] |= _bitmask;            \
     else                                                \

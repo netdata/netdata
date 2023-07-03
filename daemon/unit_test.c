@@ -1722,9 +1722,9 @@ static int bitmapX_test(BITMAPX *ptr, char *expected, const char *msg) {
     return errors;
 }
 
-#define bitmap256_set_bit_and_track(ptr, bit, value, expected) do { \
-    bitmap256_set_bit(ptr, bit, value);                             \
-    (expected)[bit] = value;                                        \
+#define bitmapX_set_bit_and_track(ptr, bit, value, expected) do { \
+    bitmapX_set_bit(ptr, bit, value);                             \
+    (expected)[bit] = value;                                      \
 } while(0)
 
 int unit_test_bitmaps(void) {
@@ -1761,19 +1761,19 @@ int unit_test_bitmaps(void) {
         memset(bmp->data, 0, bmp->bits / 8);
 
         snprintf(msg, 100, "TEST 1 BITMAP %u", bmp->bits);
-        bitmap256_set_bit_and_track(bmp, 0, true, expected);
+        bitmapX_set_bit_and_track(bmp, 0, true, expected);
         errors += bitmapX_test(bmp, expected, msg);
 
         snprintf(msg, 100, "TEST 2 BITMAP %u", bmp->bits);
-        bitmap256_set_bit_and_track(bmp, 64, true, expected);
+        bitmapX_set_bit_and_track(bmp, 64, true, expected);
         errors += bitmapX_test(bmp, expected, msg);
 
         snprintf(msg, 100, "TEST 3 BITMAP %u", bmp->bits);
-        bitmap256_set_bit_and_track(bmp, 128, true, expected);
+        bitmapX_set_bit_and_track(bmp, 128, true, expected);
         errors += bitmapX_test(bmp, expected, msg);
 
         snprintf(msg, 100, "TEST 4 BITMAP %u", bmp->bits);
-        bitmap256_set_bit_and_track(bmp, 192, true, expected);
+        bitmapX_set_bit_and_track(bmp, 192, true, expected);
         errors += bitmapX_test(bmp, expected, msg);
 
         for (uint32_t step = 1; step < 256; step++) {
@@ -1784,7 +1784,7 @@ int unit_test_bitmaps(void) {
             memset(bmp->data, 0, bmp->bits / 8);
 
             for (uint32_t i = 0; i < bmp->bits ; i += step)
-                bitmap256_set_bit_and_track(bmp, i, true, expected);
+                bitmapX_set_bit_and_track(bmp, i, true, expected);
 
             errors += bitmapX_test(bmp, expected, msg);
         }
@@ -1797,10 +1797,10 @@ int unit_test_bitmaps(void) {
             memset(bmp->data, 0, bmp->bits / 8);
 
             for (uint32_t i = 0; i < bmp->bits ; i++)
-                bitmap256_set_bit_and_track(bmp, i, true, expected);
+                bitmapX_set_bit_and_track(bmp, i, true, expected);
 
             for (uint32_t i = 0; i < bmp->bits ; i += step)
-                bitmap256_set_bit_and_track(bmp, i, false, expected);
+                bitmapX_set_bit_and_track(bmp, i, false, expected);
 
             errors += bitmapX_test(bmp, expected, msg);
         }

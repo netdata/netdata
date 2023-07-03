@@ -546,7 +546,7 @@ static struct {
                 .category = BIC_CONNECTIVITY,
                 .type = BIT_BOOLEAN,
                 .analytics = NULL,
-                .print = "static (Netdata's internal web server)",
+                .print = "static (Netdata internal web server)",
                 .json = "static",
                 .value = NULL,
         },
@@ -1243,7 +1243,7 @@ static void populate_system_info(void) {
     struct rrdhost_system_info *system_info;
     bool free_system_info = false;
 
-    if(localhost && !localhost->system_info) {
+    if(localhost && localhost->system_info) {
         system_info = localhost->system_info;
     }
     else {
