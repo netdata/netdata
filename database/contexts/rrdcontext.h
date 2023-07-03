@@ -415,6 +415,35 @@ typedef struct query_target {
     } internal;
 } QUERY_TARGET;
 
+
+struct alert_transition_data {
+    usec_t global_id;
+    uuid_t *transition_id;
+    uuid_t *host_id;
+    uuid_t *config_hash_id;
+    uint32_t alarm_id;
+    const char *name;
+    const char *chart;
+    const char *chart_context;
+    const char *family;
+    const char *recipient;
+    const char *units;
+    const char *exec;
+    const char *info;
+    time_t when_key;
+    time_t duration;
+    time_t non_clear_duration;
+    uint64_t flags;
+    time_t delay_up_to_timestamp;
+    int exec_code;
+    int new_status;
+    int old_status;
+    int delay;
+    time_t last_repeat;
+    NETDATA_DOUBLE new_value;
+    NETDATA_DOUBLE old_value;
+};
+
 struct alert_instance_v2_entry {
     RRDCALC *tmp;
 
