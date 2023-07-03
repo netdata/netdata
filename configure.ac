@@ -1357,6 +1357,7 @@ AC_MSG_CHECKING([if git submodules are present for machine learning functionalit
 if test -f "ml/dlib/dlib/all/source.cpp"; then
     AC_MSG_RESULT([yes])
     have_ml_submodules="yes"
+    AC_DEFINE([HAVE_DLIB], [1], [dlib availability])
 else
     AC_MSG_RESULT([no])
     have_ml_submodules="no"
