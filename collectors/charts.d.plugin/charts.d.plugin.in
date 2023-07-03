@@ -187,8 +187,8 @@ while [ ! -z "$1" ]; do
 	    security_level_set=1
 	  else
 	    security_level_set=0
-	    if [ "$1" != "info" -a "$1" != "error" ]; then
-	      error "Wrong security_level given, plugin will work with default info."
+	    if [ "$1" != "info" ] && [ "$1" != "error" ]; then
+	      error "Wrong security-level given, plugin will work with default info."
 	    else
 	      if [ "$1" = "error" ]; then
 	        security_level=1
