@@ -325,21 +325,21 @@ static int dyncfg_top(h2o_req_t *req)
 
         req->res.status = 200;
         req->res.reason = "OK";
-        json_object *modules = get_list_of_modules_json();
+        json_object *plugins = get_list_of_plugins_json();
         json_object *wrapper = json_object_new_object();
-        json_object_object_add(wrapper, "configurable_modules", modules);
+        json_object_object_add(wrapper, "configurable_plugins", plugins);
         const char *str = json_object_to_json_string_ext(wrapper, JSON_C_TO_STRING_PRETTY);
 
         h2o_add_header(&req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL, CONTENT_JSON_UTF8);        
         h2o_send_inline(req, str, strlen(str));
-        json_object_put(modules);
+        json_object_put(plugins);
         return 0;
 }
 
 static int dyncfg_module_top(h2o_req_t *req, struct configurable_module *mod)
 {
     if (h2o_memis(req->method.base, req->method.len, H2O_STRLIT("GET"))) {
-        json_object *cfg = get_config_of_module_json(mod);
+        json_object *cfg = get_config_of_plugin_json(mod);
         if (cfg == NULL) {
             error_report("netdata_dynamic_configuration: failed to get config of module");
             req->res.status = HTTP_RESP_INTERNAL_SERVER_ERROR;
@@ -367,7 +367,7 @@ static int dyncfg_module_top(h2o_req_t *req, struct configurable_module *mod)
         }
 
         const char *e_reason;
-        if ((e_reason = set_module_config_json(mod, cfg)) != NULL) {
+        if ((e_reason = set_plugin_config_json(mod, cfg)) != NULL) {
             error_report("netdata_dynamic_configuration: failed to set module configuration");
             req->res.status = HTTP_RESP_INTERNAL_SERVER_ERROR;
             req->res.reason = HTTP_RESP_INTERNAL_SERVER_ERROR_STR;
@@ -389,6 +389,7 @@ static int dyncfg_module_top(h2o_req_t *req, struct configurable_module *mod)
 
 static int netdata_dyncfg(h2o_handler_t *self, h2o_req_t *req)
 {
+    error_report("httpd netdata_dynamic_configuration: got request");
     UNUSED(self);
 
     if (!h2o_memis(req->path_normalized.base, MIN(req->path_normalized.len, strlen(CONFIG_PREFIX)), H2O_STRLIT(CONFIG_PREFIX))) {
@@ -412,9 +413,9 @@ static int netdata_dyncfg(h2o_handler_t *self, h2o_req_t *req)
         iovec_mod.len = end_loc;
 
     char *c_mod = iovec_to_cstr(&iovec_mod);
-    struct configurable_module *mod = get_module_by_name(c_mod);
+    struct configurable_plugin *plugin = get_plugin_by_name(c_mod);
     freez(c_mod);
-    if (mod == NULL) {
+    if (plugin == NULL) {
         BUFFER *b = buffer_create(128, NULL);
         buffer_sprintf(b, "netdata_dynamic_configuration: requested module %s not found", c_mod);
         error_report(buffer_tostring(b));
@@ -433,7 +434,7 @@ static int netdata_dyncfg(h2o_handler_t *self, h2o_req_t *req)
         path.len--;
     }
     if (path.len == 0) {
-        return dyncfg_module_top(req, mod);
+        return dyncfg_module_top(req, plugin);
     }
 
     req->res.status = 200;
@@ -454,10 +455,10 @@ int set_current_config_http_check(json_object *cfg)
     return 0;
 }
 
-struct configurable_module module = {
+struct configurable_plugin module = {
     .name = "http_check",
-    .submodules = NULL,
-    .submodule_count = 0,
+    .modules = NULL,
+    .module_count = 0,
     .schema = NULL,
     .set_config_cb = set_current_config_http_check,
 };
@@ -476,7 +477,7 @@ void *httpd_main(void *ptr) {
     o = json_object_new_int(5);
     json_object_object_add(obj, "update_every", o);
     module.default_config = obj;
-    register_module(&module);
+    register_plugin(&module);
 
     h2o_pathconf_t *pathconf;
     h2o_hostconf_t *hostconf;

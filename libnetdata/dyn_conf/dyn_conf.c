@@ -5,39 +5,40 @@
 #define DYN_CONF_PATH_MAX (4096)
 #define DYN_CONF_DIR VARLIB_DIR "/etc"
 
-DICTIONARY *modules_dict = NULL;
+DICTIONARY *plugins_dict = NULL;
 
-static int _get_list_of_modules_json_cb(const DICTIONARY_ITEM *item, void *entry, void *data)
+static int _get_list_of_plugins_json_cb(const DICTIONARY_ITEM *item, void *entry, void *data)
 {
+    UNUSED(item);
     json_object *obj = (json_object *)data;
-    struct configurable_module *module = (struct configurable_module *)entry;
+    struct configurable_plugin *plugin = (struct configurable_plugin *)entry;
 
-    json_object *module_name = json_object_new_string(module->name);
-    json_object_array_add(obj, module_name);
+    json_object *plugin_name = json_object_new_string(plugin->name);
+    json_object_array_add(obj, plugin_name);
 
     return 0;
 }
 
-json_object *get_list_of_modules_json()
+json_object *get_list_of_plugins_json()
 {
     json_object *obj = json_object_new_array();
 
-    dictionary_walkthrough_read(modules_dict, _get_list_of_modules_json_cb, obj);
+    dictionary_walkthrough_read(plugins_dict, _get_list_of_plugins_json_cb, obj);
 
     return obj;
 }
 
-inline struct configurable_module *get_module_by_name(const char *name)
+inline struct configurable_plugin *get_plugin_by_name(const char *name)
 {
-    return dictionary_get(modules_dict, name);
+    return dictionary_get(plugins_dict, name);
 }
 
-json_object *get_config_of_module_json(struct configurable_module *module)
+json_object *get_config_of_plugin_json(struct configurable_plugin *plugin)
 {
-    pthread_mutex_lock(&module->lock);
+    pthread_mutex_lock(&plugin->lock);
     json_object *cfg = NULL;
-    json_object_deep_copy(module->config, &cfg, NULL);
-    pthread_mutex_unlock(&module->lock);
+    json_object_deep_copy(plugin->config, &cfg, NULL);
+    pthread_mutex_unlock(&plugin->lock);
     return cfg;
 }
 
@@ -84,15 +85,15 @@ int store_config(const char *module_name, const char *submodule_name, const char
     return 0;
 }
 
-json_object *load_config(const char *module_name, const char *submodule_name, const char *cfg_idx)
+json_object *load_config(const char *plugin_name, const char *module_name, const char *job_id)
 {
     BUFFER *filename = buffer_create(DYN_CONF_PATH_MAX, NULL);
-    buffer_sprintf(filename, DYN_CONF_DIR "/%s", module_name);
-    if (submodule_name != NULL)
-        buffer_sprintf(filename, "/%s", submodule_name);
+    buffer_sprintf(filename, DYN_CONF_DIR "/%s", plugin_name);
+    if (module_name != NULL)
+        buffer_sprintf(filename, "/%s", module_name);
 
-    if (cfg_idx != NULL)
-        buffer_sprintf(filename, "/%s", cfg_idx);
+    if (job_id != NULL)
+        buffer_sprintf(filename, "/%s", job_id);
 
     buffer_strcat(filename, ".json");
 
@@ -103,7 +104,7 @@ json_object *load_config(const char *module_name, const char *submodule_name, co
     return ret;
 }
 
-const char *set_module_config_json(struct configurable_module *module, json_object *cfg)
+const char *set_plugin_config_json(struct configurable_plugin *module, json_object *cfg)
 {
     if (store_config(module->name, NULL, NULL, cfg)) {
         error_report("DYNCFG could not store config for module \"%s\"", module->name);
@@ -128,30 +129,30 @@ const char *set_module_config_json(struct configurable_module *module, json_obje
     return NULL;
 }
 
-int register_module(struct configurable_module *module)
+int register_plugin(struct configurable_plugin *plugin)
 {
-    if (get_module_by_name(module->name) != NULL) {
-        error_report("DYNCFG module \"%s\" already registered", module->name);
+    if (get_plugin_by_name(plugin->name) != NULL) {
+        error_report("DYNCFG plugin \"%s\" already registered", plugin->name);
         return 1;
     }
 
-    if (module->set_config_cb == NULL) {
-        error_report("DYNCFG module \"%s\" has no set_config_cb", module->name);
+    if (plugin->set_config_cb == NULL) {
+        error_report("DYNCFG plugin \"%s\" has no set_config_cb", plugin->name);
         return 1;
     }
 
-    pthread_mutex_init(&module->lock, NULL);
+    pthread_mutex_init(&plugin->lock, NULL);
 
-    module->config = load_config(module->name, NULL, NULL);
-    if (module->config == NULL) {
-        module->config = module->default_config;
-        if (module->config == NULL) {
-            error_report("DYNCFG module \"%s\" has no default config", module->name);
+    plugin->config = load_config(plugin->name, NULL, NULL);
+    if (plugin->config == NULL) {
+        plugin->config = plugin->default_config;
+        if (plugin->config == NULL) {
+            error_report("DYNCFG module \"%s\" has no default config", plugin->name);
             return 1;
         }
     }
 
-    dictionary_set(modules_dict, module->name, module, sizeof(module));
+    dictionary_set(plugins_dict, plugin->name, plugin, sizeof(plugin));
 
     return 0;
 }
@@ -165,7 +166,7 @@ int dyn_conf_init(void)
         }
     }
 
-    modules_dict = dictionary_create(DICT_OPTION_VALUE_LINK_DONT_CLONE);
+    plugins_dict = dictionary_create(DICT_OPTION_VALUE_LINK_DONT_CLONE);
 
     return 0;
 }

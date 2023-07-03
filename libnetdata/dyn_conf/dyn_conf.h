@@ -5,23 +5,23 @@
 
 #include "../libnetdata.h"
 
-enum submodule_type {
+enum module_type {
     ARRAY,
     SINGLE
 };
 
-struct submodule
+struct module
 {
     char *name;
-    enum submodule_type type;
+    enum module_type type;
     const char *schema;
 };
 
-struct configurable_module {
+struct configurable_plugin {
     pthread_mutex_t lock;
     char *name;
-    struct submodule *submodules;
-    size_t submodule_count;
+    struct module *modules;
+    size_t module_count;
     const char *schema;
 
     json_object *config;
@@ -32,15 +32,15 @@ struct configurable_module {
 
 //int has_module
 
-// API to be used by modules
-int register_module(struct configurable_module *module);
+// API to be used by plugins
+int register_plugin(struct configurable_plugin *plugin);
 
 
-// API to be used by the web server
-json_object *get_list_of_modules_json();
-struct configurable_module *get_module_by_name(const char *name);
-json_object *get_config_of_module_json(struct configurable_module *module);
-const char *set_module_config_json(struct configurable_module *module, json_object *cfg);
+// API to be used by the web server(s)
+json_object *get_list_of_plugins_json();
+struct configurable_plugin *get_plugin_by_name(const char *name);
+json_object *get_config_of_plugin_json(struct configurable_plugin *plugin);
+const char *set_plugin_config_json(struct configurable_plugin *plugin, json_object *cfg);
 
 // API to be used by main netdata process, initialization and destruction etc.
 int dyn_conf_init(void);
