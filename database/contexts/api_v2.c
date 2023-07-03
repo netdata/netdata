@@ -957,6 +957,7 @@ void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time
             size_t max = storage_engine_disk_space_max(eng->backend, localhost->db[tier].instance);
             size_t used = storage_engine_disk_space_used(eng->backend, localhost->db[tier].instance);
             time_t first_time_s = storage_engine_global_first_time_s(eng->backend, localhost->db[tier].instance);
+            size_t currently_collected_metrics = storage_engine_collected_metrics(eng->backend, localhost->db[tier].instance);
 
             NETDATA_DOUBLE percent;
             if (used && max)
@@ -973,6 +974,7 @@ void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time
             buffer_json_member_add_time_t(wb, "to", now_s);
             buffer_json_member_add_time_t(wb, "retention", now_s - first_time_s);
             buffer_json_member_add_time_t(wb, "expected_retention", (time_t)((NETDATA_DOUBLE)(now_s - first_time_s) * 100.0 / percent));
+            buffer_json_member_add_uint64(wb, "currently_collected_metrics", currently_collected_metrics);
 
             buffer_json_object_close(wb);
         }

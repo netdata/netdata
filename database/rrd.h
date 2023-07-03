@@ -533,7 +533,17 @@ static inline time_t storage_engine_global_first_time_s(STORAGE_ENGINE_BACKEND b
         return rrdeng_global_first_time_s(db_instance);
 #endif
 
-    // TODO - calculate the global first time for memory mode save and map
+    return now_realtime_sec() - default_rrd_history_entries * default_rrd_update_every;
+}
+
+size_t rrdeng_currently_collected_metrics(STORAGE_INSTANCE *db_instance);
+static inline size_t storage_engine_collected_metrics(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance) {
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_currently_collected_metrics(db_instance);
+#endif
+
+    // TODO - calculate the total host disk space for memory mode save and map
     return 0;
 }
 
