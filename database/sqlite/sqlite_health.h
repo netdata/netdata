@@ -5,7 +5,7 @@
 #include "../../daemon/common.h"
 #include "sqlite3.h"
 
-struct alert_transition_data;
+struct sql_alert_transition_data;
 extern sqlite3 *db_meta;
 void sql_health_alarm_log_load(RRDHOST *host);
 void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae);
@@ -26,7 +26,7 @@ void sql_alert_transitions(
     const char *context,
     const char *alert_name,
     const char *transition,
-    void (*cb)(struct alert_transition_data *, void *),
+    void (*cb)(struct sql_alert_transition_data *, void *),
     void *data,
     bool debug);
 

@@ -51,20 +51,14 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
             else if(mode & CONTEXTS_V2_ALERT_TRANSITIONS) {
                 if(!strcmp(name, "context"))
                     req.contexts = value;
-                else if(!strcmp(name, "facet_status"))
-                    req.alerts.facets[ATF_STATUS] = value;
-                else if(!strcmp(name, "facet_class"))
-                    req.alerts.facets[ATF_CLASS] = value;
-                else if(!strcmp(name, "facet_type"))
-                    req.alerts.facets[ATF_TYPE] = value;
-                else if(!strcmp(name, "facet_component"))
-                    req.alerts.facets[ATF_COMPONENT] = value;
-                else if(!strcmp(name, "facet_role"))
-                    req.alerts.facets[ATF_ROLE] = value;
-                else if(!strcmp(name, "facet_node"))
-                    req.alerts.facets[ATF_NODE] = value;
                 else if (!strcmp(name, "global_id_anchor")) {
                     req.alerts.global_id_anchor = str2ull(value, NULL);
+                }
+                else {
+                    for(int i = 0; i < ATF_TOTAL_ENTRIES ;i++) {
+                        if(!strcmp(name, alert_transition_facets[i].query_param))
+                            req.alerts.facets[i] = value;
+                    }
                 }
             }
         }

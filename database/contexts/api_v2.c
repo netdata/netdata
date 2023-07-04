@@ -262,7 +262,7 @@ static void alert_configs_delete_callback(const DICTIONARY_ITEM *item __maybe_un
 
 static void alert_instances_v2_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
     struct rrdcontext_to_json_v2_data *ctl = data;
-    struct alert_instance_v2_entry *t = value;
+    struct sql_alert_instance_v2_entry *t = value;
     RRDCALC *rc = t->tmp;
 
     t->chart_id = rc->rrdset->id;
@@ -438,7 +438,7 @@ static bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRD
                     char key[20 + 1];
                     snprintfz(key, 20, "%p", rcl);
 
-                    struct alert_instance_v2_entry z = {
+                    struct sql_alert_instance_v2_entry z = {
                             .ati = ati,
                             .aci = aci,
                             .tmp = rcl,
@@ -1117,8 +1117,8 @@ static void rrdcontext_v2_set_transition_filter(const char *machine_guid, const 
 }
 
 static int alert_instances_aii_compar(const DICTIONARY_ITEM **item1, const DICTIONARY_ITEM **item2) {
-    struct alert_instance_v2_entry *z1 = dictionary_acquired_item_value(*item1);
-    struct alert_instance_v2_entry *z2 = dictionary_acquired_item_value(*item2);
+    struct sql_alert_instance_v2_entry *z1 = dictionary_acquired_item_value(*item1);
+    struct sql_alert_instance_v2_entry *z2 = dictionary_acquired_item_value(*item2);
 
     if(z1->aii < z2->aii)
         return -1;
@@ -1133,7 +1133,7 @@ struct alert_instances_callback_data {
 };
 
 static int contexts_v2_alert_instance_to_json_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
-    struct alert_instance_v2_entry *t = value;
+    struct sql_alert_instance_v2_entry *t = value;
     struct alert_instances_callback_data *d = data;
     struct rrdcontext_to_json_v2_data *ctl = d->ctl;
     bool debug = d->debug;
@@ -1180,7 +1180,7 @@ static void contexts_v2_alert_instances_to_json(BUFFER *wb, const char *key, str
         };
 
         if(show_only_with_transitions_sorted) {
-            struct alert_instance_v2_entry *t;
+            struct sql_alert_instance_v2_entry *t;
             // remove the instances without transitions
             // so that we can sort the instances that have transitions
             dfe_start_read(ctl->alerts.alert_instances, t) {
@@ -1360,6 +1360,49 @@ static void contexts_v2_alerts_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_
     }
 }
 
+struct alert_transitions_facets alert_transition_facets[] = {
+        [ATF_STATUS] = {
+            .query_param = "facet_status",
+            .json_entry = "status",
+        },
+        [ATF_TYPE] = {
+                .query_param = "facet_type",
+                .json_entry = "type",
+        },
+        [ATF_ROLE] = {
+                .query_param = "facet_role",
+                .json_entry = "role",
+        },
+        [ATF_CLASS] = {
+                .query_param = "facet_class",
+                .json_entry = "class",
+        },
+        [ATF_COMPONENT] = {
+                .query_param = "facet_component",
+                .json_entry = "component",
+        },
+        [ATF_ALERT] = {
+                .query_param = "facet_alert",
+                .json_entry = "alert",
+        },
+        [ATF_CONTEXT] = {
+                .query_param = "facet_context",
+                .json_entry = "context",
+        },
+        [ATF_INSTANCE] = {
+                .query_param = "facet_instance",
+                .json_entry = "instance",
+        },
+        [ATF_NODE] = {
+                .query_param = "facet_node",
+                .json_entry = "node",
+        },
+        [ATF_TOTAL_ENTRIES] = {
+                .query_param = NULL,
+                .json_entry = NULL,
+        }
+};
+
 struct facet_entry {
     uint32_t count;
 };
@@ -1376,9 +1419,9 @@ struct alert_transitions_callback_data {
 
     uint32_t limit;
     uint32_t items;
-    struct alert_transition_data *base;
 
-    struct alert_transition_data *last_added;
+    struct sql_alert_transition_data *base; // double linked list - last item is base->prev
+    struct sql_alert_transition_data *last_added; // the last item added, not the last of the list
 
     struct {
         size_t items;
@@ -1393,8 +1436,8 @@ struct alert_transitions_callback_data {
     } stats;
 };
 
-static struct alert_transition_data *contexts_v2_alert_transition_dup(struct alert_transition_data *t, const char *machine_guid) {
-    struct alert_transition_data *n = mallocz(sizeof(*t));
+static struct sql_alert_transition_data *contexts_v2_alert_transition_dup(struct sql_alert_transition_data *t, const char *machine_guid) {
+    struct sql_alert_transition_data *n = mallocz(sizeof(*t));
     memcpy(n, t, sizeof(*t));
 
     n->transition_id = mallocz(sizeof(*t->transition_id));
@@ -1426,7 +1469,7 @@ static struct alert_transition_data *contexts_v2_alert_transition_dup(struct ale
     return n;
 }
 
-static void contexts_v2_alert_transition_free(struct alert_transition_data *t) {
+static void contexts_v2_alert_transition_free(struct sql_alert_transition_data *t) {
     freez(t->transition_id);
     freez(t->host_id);
     freez(t->config_hash_id);
@@ -1443,7 +1486,7 @@ static void contexts_v2_alert_transition_free(struct alert_transition_data *t) {
     freez(t);
 }
 
-static inline void contexts_v2_alert_transition_keep(struct alert_transitions_callback_data *d, struct alert_transition_data *t, const char *machine_guid) {
+static inline void contexts_v2_alert_transition_keep(struct alert_transitions_callback_data *d, struct sql_alert_transition_data *t, const char *machine_guid) {
     if(unlikely(t->global_id <= d->ctl->request->alerts.global_id_anchor)) {
         // this is in our past, we are not interested
         d->stats.skips_before++;
@@ -1458,7 +1501,7 @@ static inline void contexts_v2_alert_transition_keep(struct alert_transitions_ca
         return;
     }
 
-    struct alert_transition_data *last = d->last_added;
+    struct sql_alert_transition_data *last = d->last_added;
     while(last != d->base && last->prev->global_id > t->global_id) {
         last = last->prev;
         d->stats.backwards++;
@@ -1489,7 +1532,7 @@ static inline void contexts_v2_alert_transition_keep(struct alert_transitions_ca
     while(d->items > d->limit) {
         // we have to remove something
 
-        struct alert_transition_data *tmp = d->base->prev;
+        struct sql_alert_transition_data *tmp = d->base->prev;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(d->base, tmp, prev, next);
         d->items--;
 
@@ -1502,7 +1545,7 @@ static inline void contexts_v2_alert_transition_keep(struct alert_transitions_ca
     }
 }
 
-static void contexts_v2_alert_transition_callback(struct alert_transition_data *t, void *data) {
+static void contexts_v2_alert_transition_callback(struct sql_alert_transition_data *t, void *data) {
     struct alert_transitions_callback_data *d = data;
     d->stats.items++;
 
@@ -1515,6 +1558,9 @@ static void contexts_v2_alert_transition_callback(struct alert_transition_data *
             [ATF_TYPE] = t->type,
             [ATF_COMPONENT] = t->component,
             [ATF_ROLE] = t->recipient,
+            [ATF_ALERT] = t->name,
+            [ATF_CONTEXT] = t->chart_context,
+            [ATF_INSTANCE] = t->chart,
             [ATF_NODE] = machine_guid,
     };
 
@@ -1597,35 +1643,7 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
 
     buffer_json_member_add_object(wb, "facets");
     for (size_t i = 0; i < ATF_TOTAL_ENTRIES; i++) {
-        const char *key;
-        switch(i) {
-            default:
-            case ATF_STATUS:
-                key = "status";
-                break;
-
-            case ATF_CLASS:
-                key = "class";
-                break;
-
-            case ATF_TYPE:
-                key = "type";
-                break;
-
-            case ATF_COMPONENT:
-                key = "component";
-                break;
-
-            case ATF_ROLE:
-                key = "role";
-                break;
-
-            case ATF_NODE:
-                key = "node";
-                break;
-        }
-
-        buffer_json_member_add_object(wb, key);
+        buffer_json_member_add_object(wb, alert_transition_facets[i].json_entry);
         struct facet_entry *x;
         dfe_start_read(data.facets[i].dict, x) {
             buffer_json_member_add_uint64(wb, x_dfe.name, x->count);
@@ -1636,7 +1654,7 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
     buffer_json_object_close(wb);
 
     buffer_json_member_add_array(wb, "transitions");
-    for(struct alert_transition_data *t = data.base; t ; t = t->next) {
+    for(struct sql_alert_transition_data *t = data.base; t ; t = t->next) {
         buffer_json_add_array_item_object(wb);
         {
             buffer_json_member_add_uuid(wb, "transition_id", t->transition_id);
@@ -1679,7 +1697,7 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
     buffer_json_array_close(wb); // all transitions
 
     while(data.base) {
-        struct alert_transition_data *t = data.base;
+        struct sql_alert_transition_data *t = data.base;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(data.base, t, prev, next);
         contexts_v2_alert_transition_free(t);
     }
@@ -1788,7 +1806,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
         if(ctl.options & (CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES | CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES_HIDDEN)) {
             ctl.alerts.alert_instances = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-                                                                    NULL, sizeof(struct alert_instance_v2_entry));
+                                                                    NULL, sizeof(struct sql_alert_instance_v2_entry));
 
             dictionary_register_insert_callback(ctl.alerts.alert_instances, alert_instances_v2_insert_callback, &ctl);
             dictionary_register_conflict_callback(ctl.alerts.alert_instances, alert_instances_v2_conflict_callback, &ctl);

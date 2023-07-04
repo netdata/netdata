@@ -416,7 +416,7 @@ typedef struct query_target {
 } QUERY_TARGET;
 
 
-struct alert_transition_data {
+struct sql_alert_transition_data {
     usec_t global_id;
     uuid_t *transition_id;
     uuid_t *host_id;
@@ -447,11 +447,11 @@ struct alert_transition_data {
     NETDATA_DOUBLE old_value;
 
     char machine_guid[UUID_STR_LEN];
-    struct alert_transition_data *next;
-    struct alert_transition_data *prev;
+    struct sql_alert_transition_data *next;
+    struct sql_alert_transition_data *prev;
 };
 
-struct alert_instance_v2_entry {
+struct sql_alert_instance_v2_entry {
     RRDCALC *tmp;
 
     size_t ati;
@@ -531,11 +531,21 @@ typedef enum __attribute__((packed)) {
     ATF_TYPE,
     ATF_COMPONENT,
     ATF_ROLE,
+    ATF_ALERT,
+    ATF_CONTEXT,
+    ATF_INSTANCE,
     ATF_NODE,
 
     // total
     ATF_TOTAL_ENTRIES,
-} ALERT_TRANSITION_FACETS;
+} ALERT_TRANSITION_FACET;
+
+struct alert_transitions_facets {
+    const char *query_param;
+    const char *json_entry;
+};
+
+extern struct alert_transitions_facets alert_transition_facets[];
 
 struct api_v2_contexts_request {
     char *scope_nodes;

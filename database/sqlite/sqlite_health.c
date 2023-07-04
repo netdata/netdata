@@ -1789,7 +1789,7 @@ void sql_health_alarm_log2json_v3(BUFFER *wb, DICTIONARY *alert_instances, time_
         goto fail_only_drop;
     }
 
-    struct alert_instance_v2_entry *t;
+    struct sql_alert_instance_v2_entry *t;
     dfe_start_read(alert_instances, t) {
             rc = sqlite3_bind_blob(res, 1, &t->host->host_uuid, sizeof(t->host->host_uuid), SQLITE_STATIC);
             if (unlikely(rc != SQLITE_OK)) {
@@ -1897,7 +1897,7 @@ skip_failed:
         {
             const unsigned char *dict_key = sqlite3_column_text(res, 19);
 
-            struct alert_instance_v2_entry *z = dictionary_get(alert_instances, (const char *)dict_key);
+            struct sql_alert_instance_v2_entry *z = dictionary_get(alert_instances, (const char *)dict_key);
             if(!z->transitions) {
                 z->transitions = 1;
                 z->aii = renumbered_aii++;
@@ -1998,7 +1998,7 @@ void sql_alert_transitions(
     const char *context,
     const char *alert_name,
     const char *transition,
-    void (*cb)(struct alert_transition_data *, void *),
+    void (*cb)(struct sql_alert_transition_data *, void *),
     void *data,
     bool debug __maybe_unused)
 {
@@ -2113,7 +2113,7 @@ void sql_alert_transitions(
 
 run_query:;
 
-    struct alert_transition_data atd = { 0 };
+    struct sql_alert_transition_data atd = {0 };
 
     while (sqlite3_step(res) == SQLITE_ROW) {
         atd.host_id = (uuid_t *) sqlite3_column_blob(res, 0);
