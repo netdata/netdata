@@ -1714,9 +1714,9 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
                 buffer_json_member_add_time_t(wb, "delay", t->delay);
                 buffer_json_member_add_time_t(wb, "delay_up_to_time", t->delay_up_to_timestamp);
                 health_entry_flags_to_json_array(wb, "flags", t->flags);
-                buffer_json_member_add_string(wb, "method", (t->exec && *t->exec) ? t->exec : string2str(localhost->health.health_default_exec));
+                buffer_json_member_add_string(wb, "exec", (t->exec && *t->exec) ? t->exec : string2str(localhost->health.health_default_exec));
+                buffer_json_member_add_uint64(wb, "exec_code", t->exec_code);
                 buffer_json_member_add_string(wb, "to", t->recipient && *t->recipient ? t->recipient : string2str(localhost->health.health_default_recipient));
-                buffer_json_member_add_uint64(wb, "code", t->exec_code);
             }
             buffer_json_object_close(wb); // notification
         }
