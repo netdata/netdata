@@ -1983,8 +1983,8 @@ fail_only_drop:
 
 #define SQL_SEARCH_ALERT_TRANSITION "SELECT h.host_id, h.alarm_id, h.config_hash_id, h.name, h.chart, h.family, h.recipient, h.units, h.exec, h.chart_context,  d.when_key, " \
     "d.duration, d.non_clear_duration, d.flags, d.delay_up_to_timestamp, d.info, d.exec_code, d.new_status, d.old_status, d.delay, " \
-    " d.new_value, d.old_value, d.last_repeat, d.transition_id,  d.global_id FROM health_log h, health_log_detail d, v_%p t " \
-    " WHERE h.host_id = t.host_id AND h.health_log_id = d.health_log_id AND d.global_id BETWEEN @after AND @before "
+    " d.new_value, d.old_value, d.last_repeat, d.transition_id, d.global_id, ah.class, ah.type, ah.component FROM health_log h, health_log_detail d, v_%p t, alert_hash ah " \
+    " WHERE h.host_id = t.host_id AND h.config_hash_id = ah.hash_id AND h.health_log_id = d.health_log_id AND d.global_id BETWEEN @after AND @before "
 
 void sql_alert_transitions(DICTIONARY *nodes, time_t after, time_t before, const char *context, const char *alert_name,
                            void (*cb)(struct alert_transition_data *atd, void *data), void *data,
@@ -2110,6 +2110,9 @@ void sql_alert_transitions(DICTIONARY *nodes, time_t after, time_t before, const
         atd.last_repeat = sqlite3_column_int64(res, 22);
         atd.transition_id = (uuid_t *) sqlite3_column_blob(res, 23);
         atd.global_id = sqlite3_column_int64(res, 24);
+        atd.classification = (const char *) sqlite3_column_text(res, 25);
+        atd.type = (const char *) sqlite3_column_text(res, 26);
+        atd.component = (const char *) sqlite3_column_text(res, 27);
 
         cb(&atd, data);
     }

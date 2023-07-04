@@ -430,6 +430,9 @@ struct alert_transition_data {
     const char *units;
     const char *exec;
     const char *info;
+    const char *classification;
+    const char *type;
+    const char *component;
     time_t when_key;
     time_t duration;
     time_t non_clear_duration;
