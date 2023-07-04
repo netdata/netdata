@@ -6,11 +6,16 @@
 
 **Merged pull requests:**
 
+- ci: disable clang format [\#15305](https://github.com/netdata/netdata/pull/15305) ([ilyam8](https://github.com/ilyam8))
+- Change info to netdata\_log\_info in sqlite\_db\_migration.c [\#15303](https://github.com/netdata/netdata/pull/15303) ([MrZammler](https://github.com/MrZammler))
+- s/info/netdata\_log\_info/ [\#15299](https://github.com/netdata/netdata/pull/15299) ([vkalintiris](https://github.com/vkalintiris))
 - Optimizations part 3 [\#15293](https://github.com/netdata/netdata/pull/15293) ([ktsaou](https://github.com/ktsaou))
 - docs: update stream.conf "health enabled by default" description [\#15291](https://github.com/netdata/netdata/pull/15291) ([ilyam8](https://github.com/ilyam8))
+- Remove extra parenthesis from doc [\#15290](https://github.com/netdata/netdata/pull/15290) ([Ancairon](https://github.com/Ancairon))
 - merged spaces, war rooms and invite your team to one place [\#15289](https://github.com/netdata/netdata/pull/15289) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - use stat\(\) instead of lstat\(\) [\#15287](https://github.com/netdata/netdata/pull/15287) ([ktsaou](https://github.com/ktsaou))
 - Only try to enable \_FORTIFY\_SOURCE if the user has not disabled optimizations [\#15284](https://github.com/netdata/netdata/pull/15284) ([Ferroin](https://github.com/Ferroin))
+- Send alert chart labels config key to cloud [\#15283](https://github.com/netdata/netdata/pull/15283) ([MrZammler](https://github.com/MrZammler))
 - Fixed mistype for 'send automatic labels' Prometheus option [\#15282](https://github.com/netdata/netdata/pull/15282) ([k0ste](https://github.com/k0ste))
 - Optimizations part 2 [\#15280](https://github.com/netdata/netdata/pull/15280) ([ktsaou](https://github.com/ktsaou))
 - Revert "Optimizations Part 2" [\#15279](https://github.com/netdata/netdata/pull/15279) ([ktsaou](https://github.com/ktsaou))
@@ -20,6 +25,7 @@
 - Small readme improvements [\#15270](https://github.com/netdata/netdata/pull/15270) ([andrewm4894](https://github.com/andrewm4894))
 - Optimizations Part 2 [\#15267](https://github.com/netdata/netdata/pull/15267) ([ktsaou](https://github.com/ktsaou))
 - Replace `info` macro with a less generic name [\#15266](https://github.com/netdata/netdata/pull/15266) ([carlocab](https://github.com/carlocab))
+- Yaml template finalization [\#15265](https://github.com/netdata/netdata/pull/15265) ([Ancairon](https://github.com/Ancairon))
 - fix tc.plugin charts labels [\#15262](https://github.com/netdata/netdata/pull/15262) ([ilyam8](https://github.com/ilyam8))
 - Update libbpf version [\#15258](https://github.com/netdata/netdata/pull/15258) ([thiagoftsm](https://github.com/thiagoftsm))
 - rewrite /api/v2/alerts [\#15257](https://github.com/netdata/netdata/pull/15257) ([ktsaou](https://github.com/ktsaou))
@@ -396,13 +402,6 @@
 - Update change-metrics-storage.md [\#14641](https://github.com/netdata/netdata/pull/14641) ([cakrit](https://github.com/cakrit))
 - Update change-metrics-storage.md [\#14640](https://github.com/netdata/netdata/pull/14640) ([cakrit](https://github.com/cakrit))
 - Collect additional BTRFS metrics [\#14636](https://github.com/netdata/netdata/pull/14636) ([Dim-P](https://github.com/Dim-P))
-- Fix broken links [\#14634](https://github.com/netdata/netdata/pull/14634) ([Ancairon](https://github.com/Ancairon))
-- Add link to native packages also on the list [\#14633](https://github.com/netdata/netdata/pull/14633) ([cakrit](https://github.com/cakrit))
-- Assorted installer code cleanup. [\#14632](https://github.com/netdata/netdata/pull/14632) ([Ferroin](https://github.com/Ferroin))
-- Re-add link from install page to DEB/RPM package documentation. [\#14631](https://github.com/netdata/netdata/pull/14631) ([Ferroin](https://github.com/Ferroin))
-- Fix broken link [\#14630](https://github.com/netdata/netdata/pull/14630) ([cakrit](https://github.com/cakrit))
-- Fix intermittent permissions issues in some Docker builds. [\#14629](https://github.com/netdata/netdata/pull/14629) ([Ferroin](https://github.com/Ferroin))
-- Update REFERENCE.md [\#14627](https://github.com/netdata/netdata/pull/14627) ([cakrit](https://github.com/cakrit))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
