@@ -1590,7 +1590,7 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
         ctl->window.before,
         ctl->request->contexts,
         ctl->request->alerts.alert,
-        NULL,
+        ctl->request->alerts.transition,
         contexts_v2_alert_transition_callback,
         &data,
         debug);
