@@ -1988,7 +1988,7 @@ fail_only_drop:
 
 #define SQL_SEARCH_ALERT_TRANSITION_DIRECT "SELECT h.host_id, h.alarm_id, h.config_hash_id, h.name, h.chart, h.family, h.recipient, h.units, h.exec, h.chart_context,  d.when_key, " \
     "d.duration, d.non_clear_duration, d.flags, d.delay_up_to_timestamp, d.info, d.exec_code, d.new_status, d.old_status, d.delay, " \
-    " d.new_value, d.old_value, d.last_repeat, d.transition_id, d.global_id, ah.class, ah.type, ah.component FROM health_log h, health_log_detail d, alert_hash ah " \
+    " d.new_value, d.old_value, d.last_repeat, d.transition_id, d.global_id, ah.class, ah.type, ah.component, d.exec_run_timestamp FROM health_log h, health_log_detail d, alert_hash ah " \
     " WHERE h.config_hash_id = ah.hash_id AND h.health_log_id = d.health_log_id AND transition_id = @transition "
 
 void sql_alert_transitions(
@@ -2144,6 +2144,7 @@ run_query:;
         atd.classification = (const char *) sqlite3_column_text(res, 25);
         atd.type = (const char *) sqlite3_column_text(res, 26);
         atd.component = (const char *) sqlite3_column_text(res, 27);
+        atd.exec_run_timestamp = sqlite3_column_int64(res, 28);
 
         cb(&atd, data);
     }
@@ -2154,8 +2155,10 @@ fail:
         error_report("Failed to finalize statement for sql_alert_transitions");
 
 fail_only_drop:
-    (void) snprintfz(sql, 511, "DROP TABLE IF EXISTS v_%p", nodes);
-    (void) db_execute(db_meta, sql);
-    buffer_free(command);
+    if (likely(!transition)) {
+        (void)snprintfz(sql, 511, "DROP TABLE IF EXISTS v_%p", nodes);
+        (void)db_execute(db_meta, sql);
+        buffer_free(command);
+    }
 }
 
