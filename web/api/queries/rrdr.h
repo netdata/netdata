@@ -55,9 +55,9 @@ typedef enum context_v2_options {
     CONTEXT_V2_OPTION_MINIFY                        = (1 << 0), // remove JSON spaces and newlines from JSON output
     CONTEXT_V2_OPTION_DEBUG                         = (1 << 1), // show the request
     CONTEXT_V2_OPTION_ALERTS_WITH_CONFIGURATIONS    = (1 << 2), // include alert configurations
-    CONTEXT_V2_OPTION_ALERTS_WITH_TRANSITIONS       = (1 << 3), // include alert transitions
+    // CONTEXT_V2_OPTION_ALERTS_WITH_TRANSITIONS       = (1 << 3), // include alert transitions
     CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES         = (1 << 4), // include alert instances
-    CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES_HIDDEN  = (1 << 5), // query alert instances (but don't show them if CONTEXT_V2_OPTION_ALERT_INSTANCES is not there)
+    // CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES_HIDDEN  = (1 << 5), // query alert instances (but don't show them if CONTEXT_V2_OPTION_ALERT_INSTANCES is not there)
 } CONTEXTS_V2_OPTIONS;
 
 typedef enum context_v2_alert_status {

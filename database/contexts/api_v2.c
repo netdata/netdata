@@ -434,7 +434,7 @@ static bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRD
                     aci = a2c->aci;
                 }
 
-                if (ctl->options & (CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES | CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES_HIDDEN)) {
+                if (ctl->options & (CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES /* | CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES_HIDDEN */)) {
                     char key[20 + 1];
                     snprintfz(key, 20, "%p", rcl);
 
@@ -1226,23 +1226,24 @@ static void contexts_v2_alerts_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_
     }
     buffer_json_array_close(wb); // alerts
 
-    if((ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_TRANSITIONS)) {
-        buffer_json_member_add_array(wb, "alert_transitions");
-        sql_health_alarm_log2json_v3(
-                wb,
-                ctl->alerts.alert_instances,
-                ctl->request->after,
-                ctl->request->before,
-                ctl->request->alerts.anchor ? ctl->request->alerts.anchor : ctl->request->alerts.transition,
-                ctl->request->alerts.last ? ctl->request->alerts.last : 1,
-                debug, (ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES));
-        buffer_json_array_close(wb); // alerts_transitions
-
-        if(ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES) {
-            contexts_v2_alert_instances_to_json(wb, "alert_instances", ctl, debug, true);
-        }
-    }
-    else if(ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES) {
+//    if((ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_TRANSITIONS)) {
+//        buffer_json_member_add_array(wb, "alert_transitions");
+//        sql_health_alarm_log2json_v3(
+//                wb,
+//                ctl->alerts.alert_instances,
+//                ctl->request->after,
+//                ctl->request->before,
+//                ctl->request->alerts.anchor ? ctl->request->alerts.anchor : ctl->request->alerts.transition,
+//                ctl->request->alerts.last ? ctl->request->alerts.last : 1,
+//                debug, (ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES));
+//        buffer_json_array_close(wb); // alerts_transitions
+//
+//        if(ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES) {
+//            contexts_v2_alert_instances_to_json(wb, "alert_instances", ctl, debug, true);
+//        }
+//    }
+//    else
+    if(ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES) {
         contexts_v2_alert_instances_to_json(wb, "alert_instances", ctl, debug, false);
     }
 
@@ -1365,31 +1366,37 @@ struct alert_transitions_facets alert_transition_facets[] = {
                 .id = "status",
                 .name = "Alert Status",
                 .query_param = "status",
+                .order = 1,
         },
         [ATF_TYPE] = {
                 .id = "type",
                 .name = "Alert Type",
                 .query_param = "type",
+                .order = 2,
         },
         [ATF_ROLE] = {
                 .id = "role",
                 .name = "Recipient Role",
                 .query_param = "role",
+                .order = 3,
         },
         [ATF_CLASS] = {
                 .id = "class",
                 .name = "Alert Class",
                 .query_param = "class",
+                .order = 4,
         },
         [ATF_COMPONENT] = {
                 .id = "component",
                 .name = "Alert Component",
                 .query_param = "component",
+                .order = 5,
         },
         [ATF_NODE] = {
                 .id = "node",
                 .name = "Alert Node",
                 .query_param = "node",
+                .order = 6,
         },
 
         // terminator
@@ -1397,6 +1404,7 @@ struct alert_transitions_facets alert_transition_facets[] = {
                 .id = NULL,
                 .name = NULL,
                 .query_param = NULL,
+                .order = 9999,
         }
 };
 
@@ -1445,16 +1453,17 @@ static struct sql_alert_transition_data *contexts_v2_alert_transition_dup(struct
     n->config_hash_id = mallocz(sizeof(*t->config_hash_id));
     memcpy(n->config_hash_id, t->config_hash_id, sizeof(*t->config_hash_id));
 
-    n->name = strdupz(t->name);
-    n->chart = strdupz(t->chart);
-    n->chart_context = strdupz(t->chart_context);
-    n->family = strdupz(t->family);
-    n->recipient = t->recipient ? strdupz(t->recipient) : NULL;
-    n->units = strdupz(t->units);
-    n->info = strdupz(t->info);
-    n->classification = strdupz(t->classification);
-    n->type = strdupz(t->type);
-    n->component = strdupz(t->component);
+    n->name = t->name && *t->name ? strdupz(t->name) : NULL;
+    n->chart = t->chart && *t->chart ? strdupz(t->chart) : NULL;
+    n->chart_context = t->chart_context && *t->chart_context ? strdupz(t->chart_context) : NULL;
+    n->family = NULL;
+    n->recipient = t->recipient && *t->recipient ? strdupz(t->recipient) : NULL;
+    n->units = t->units && *t->units ? strdupz(t->units) : NULL;
+    n->info = t->info && *t->info ? strdupz(t->info) : NULL;
+    n->classification = t->classification && *t->classification ? strdupz(t->classification) : NULL;
+    n->type = t->type && *t->type ? strdupz(t->type) : NULL;
+    n->component = t->component && *t->component ? strdupz(t->component) : NULL;
+    n->exec = (t->exec && *t->exec) ? strdupz(t->exec) : NULL;
 
     memcpy(n->machine_guid, machine_guid, sizeof(n->machine_guid));
 
@@ -1475,6 +1484,7 @@ static void contexts_v2_alert_transition_free(struct sql_alert_transition_data *
     freez((void *)t->classification);
     freez((void *)t->type);
     freez((void *)t->component);
+    freez((void *)t->exec);
     freez(t);
 }
 
@@ -1549,7 +1559,7 @@ static void contexts_v2_alert_transition_callback(struct sql_alert_transition_da
             [ATF_CLASS] = t->classification,
             [ATF_TYPE] = t->type,
             [ATF_COMPONENT] = t->component,
-            [ATF_ROLE] = t->recipient,
+            [ATF_ROLE] = t->recipient && *t->recipient ? t->recipient : string2str(localhost->health.health_default_recipient),
             [ATF_NODE] = machine_guid,
     };
 
@@ -1631,13 +1641,12 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
         debug);
 
     buffer_json_member_add_array(wb, "facets");
-    size_t order = 0;
     for (size_t i = 0; i < ATF_TOTAL_ENTRIES; i++) {
         buffer_json_add_array_item_object(wb);
         {
             buffer_json_member_add_string(wb, "id", alert_transition_facets[i].id);
             buffer_json_member_add_string(wb, "name", alert_transition_facets[i].name);
-            buffer_json_member_add_uint64(wb, "order", order++);
+            buffer_json_member_add_uint64(wb, "order", alert_transition_facets[i].order);
             buffer_json_member_add_array(wb, "options");
             {
                 struct facet_entry *x;
@@ -1669,18 +1678,18 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
     for(struct sql_alert_transition_data *t = data.base; t ; t = t->next) {
         buffer_json_add_array_item_object(wb);
         {
+            buffer_json_member_add_uint64(wb, "gi", t->global_id);
             buffer_json_member_add_uuid(wb, "transition_id", t->transition_id);
             buffer_json_member_add_uuid(wb, "config_hash_id", t->config_hash_id);
             buffer_json_member_add_string(wb, "machine_guid", t->machine_guid);
             buffer_json_member_add_string(wb, "alert", t->name);
             buffer_json_member_add_string(wb, "instance", t->chart);
             buffer_json_member_add_string(wb, "context", t->chart_context);
-            buffer_json_member_add_string(wb, "family", t->family);
+            // buffer_json_member_add_string(wb, "family", t->family);
             buffer_json_member_add_string(wb, "component", t->component);
             buffer_json_member_add_string(wb, "classification", t->classification);
             buffer_json_member_add_string(wb, "type", t->type);
 
-            buffer_json_member_add_uint64(wb, "gi", t->global_id);
             buffer_json_member_add_time_t(wb, "when", t->when_key);
             buffer_json_member_add_string(wb, "info", t->info);
             buffer_json_member_add_string(wb, "units", t->units);
@@ -1695,14 +1704,18 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
                 buffer_json_member_add_string(wb, "status", rrdcalc_status2string(t->old_status));
                 buffer_json_member_add_double(wb, "value", t->old_value);
                 buffer_json_member_add_time_t(wb, "duration", t->duration);
+                buffer_json_member_add_time_t(wb, "raised_duration", t->non_clear_duration);
             }
             buffer_json_object_close(wb); // old
+
             buffer_json_member_add_object(wb, "notification");
             {
-                buffer_json_member_add_string(wb, "type", "agent");
+                buffer_json_member_add_time_t(wb, "when", t->exec_run_timestamp);
+                buffer_json_member_add_time_t(wb, "delay", t->delay);
+                buffer_json_member_add_time_t(wb, "delay_up_to_time", t->delay_up_to_timestamp);
                 health_entry_flags_to_json_array(wb, "flags", t->flags);
-                buffer_json_member_add_string(wb, "method", t->exec);
-                buffer_json_member_add_string(wb, "to", t->recipient);
+                buffer_json_member_add_string(wb, "method", (t->exec && *t->exec) ? t->exec : string2str(localhost->health.health_default_exec));
+                buffer_json_member_add_string(wb, "to", t->recipient && *t->recipient ? t->recipient : string2str(localhost->health.health_default_recipient));
                 buffer_json_member_add_uint64(wb, "code", t->exec_code);
             }
             buffer_json_object_close(wb); // notification
@@ -1750,8 +1763,8 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     if(mode & (CONTEXTS_V2_ALERTS | CONTEXTS_V2_ALERT_TRANSITIONS | CONTEXTS_V2_FUNCTIONS | CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODE_INSTANCES))
         mode |= CONTEXTS_V2_NODES;
 
-    if(req->options & CONTEXT_V2_OPTION_ALERTS_WITH_TRANSITIONS)
-        req->options |= CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES_HIDDEN;
+//    if(req->options & CONTEXT_V2_OPTION_ALERTS_WITH_TRANSITIONS)
+//        req->options |= CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES_HIDDEN;
 
     struct rrdcontext_to_json_v2_data ctl = {
             .wb = wb,
@@ -1804,7 +1817,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
     if(mode & CONTEXTS_V2_ALERTS) {
         if(req->alerts.transition) {
-            ctl.options |= CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES | CONTEXT_V2_OPTION_ALERTS_WITH_CONFIGURATIONS | CONTEXT_V2_OPTION_ALERTS_WITH_TRANSITIONS;
+            ctl.options |= CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES | CONTEXT_V2_OPTION_ALERTS_WITH_CONFIGURATIONS /* | CONTEXT_V2_OPTION_ALERTS_WITH_TRANSITIONS */;
             run = sql_find_alert_transition(req->alerts.transition, rrdcontext_v2_set_transition_filter, &ctl);
             if(!run) {
                 resp = HTTP_RESP_NOT_FOUND;
@@ -1819,7 +1832,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         dictionary_register_conflict_callback(ctl.alerts.alerts, alerts_v2_conflict_callback, &ctl);
         dictionary_register_delete_callback(ctl.alerts.alerts, alerts_v2_delete_callback, &ctl);
 
-        if(ctl.options & (CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES | CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES_HIDDEN)) {
+        if(ctl.options & (CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES /* | CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES_HIDDEN */ )) {
             ctl.alerts.alert_instances = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
                                                                     NULL, sizeof(struct sql_alert_instance_v2_entry));
 
@@ -1880,7 +1893,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                     }
                     if(mode & CONTEXTS_V2_ALERT_TRANSITIONS) {
                         buffer_json_member_add_string(wb, "context", req->contexts);
-                        buffer_json_member_add_uint64(wb, "global_id_anchor", req->alerts.global_id_anchor);
+                        buffer_json_member_add_uint64(wb, "anchor_gi", req->alerts.global_id_anchor);
                     }
                     buffer_json_member_add_string(wb, "alert", req->alerts.alert);
                     buffer_json_member_add_string(wb, "transition", req->alerts.transition);

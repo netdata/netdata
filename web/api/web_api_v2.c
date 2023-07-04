@@ -51,7 +51,7 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
             else if(mode & CONTEXTS_V2_ALERT_TRANSITIONS) {
                 if(!strcmp(name, "context"))
                     req.contexts = value;
-                else if (!strcmp(name, "global_id_anchor")) {
+                else if (!strcmp(name, "anchor_gi")) {
                     req.alerts.global_id_anchor = str2ull(value, NULL);
                 }
                 else {

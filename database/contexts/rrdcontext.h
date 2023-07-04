@@ -438,6 +438,7 @@ struct sql_alert_transition_data {
     time_t non_clear_duration;
     uint64_t flags;
     time_t delay_up_to_timestamp;
+    time_t exec_run_timestamp;
     int exec_code;
     int new_status;
     int old_status;
@@ -541,6 +542,7 @@ struct alert_transitions_facets {
     const char *name;
     const char *query_param;
     const char *id;
+    size_t order;
 };
 
 extern struct alert_transitions_facets alert_transition_facets[];
