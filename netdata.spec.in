@@ -4,6 +4,23 @@
 %global ENABLE_SENTRY_OPT 0
 %global ENABLE_SENTRY_OPT %(echo $ENABLE_SENTRY_OPT)
 
+
+%if %{?rhel}%{?fedora}
+    %define distro_arch %{rhel}%{?rhel}%{?fedora}%{?fedora}_%{_arch}
+%else
+    %define distro_arch %{?centos:centos}%{?oraclelinux:ol}%{?sl:sles}%{?suse:suse}\
+        %{?opensuse:opensuse}%{?mageia:mageia}%{?mandriva:mandriva}%{?rocks:rocks}\
+        %{?cloudlinux:cln}%{?ovs:ovs}%{?xenserver:xen}%{?scientific:slc}\
+        %{?scientific_linux:slc}%{?scientific_linux_cern:sclcern}%{?redflag:redflag}\
+        %{?cos:cos}%{?clearos:cos}%{?meego:meego}%{?vmware_linux:vmware}\
+        %{?xcp:xcp}%{?os_puddle:puddle}%{?os_update_server:uos}%{?os_prjbuild:pbuild}\
+        %{?prjbuild:pbuild}%{?build_os:pbuild}%{?kitkat:kitkat}%{?alpine_linux:alpine}\
+        %{?osname}%{!?osname:%{_target_os}}%{!?distro_version}%{?opensuse_bsproject}\
+        %{!?opensuse_bsproject:%{_target_os}_%{_target_cpu}}
+%endif
+
+%global ENV_BUILD_DESTINATION %{distro_arch}
+
 #TODO: Temporary fix for the build-id error during go.d plugin set up
 %global _missing_build_ids_terminate_build 0
 

@@ -2,7 +2,7 @@
 # Copyright (C) 2015 Alon Bar-Lev <alon.barlev@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-AC_PREREQ(2.60)
+AC_PREREQ(2.69)
 
 # We do not use m4_esyscmd_s to support older autoconf.
 define([VERSION_STRING], m4_esyscmd([git describe 2>/dev/null | tr -d '\n']))
@@ -1400,25 +1400,24 @@ fi
 
 AC_ARG_VAR([GLOBAL_ENVIRONMENT], [Specify the environment,varies between Developent and production])
 
-# Default value for the variable
-GLOBAL_ENVIRONMENT="Development"
+AS_IF([test "x$GLOBAL_ENVIRONMENT" != "x"],
+    [GLOBAL_ENVIRONMENT="${GLOBAL_ENVIRONMENT}"],
+    [GLOBAL_ENVIRONMENT="Development"])
 
-# Check if the variable is set in the environment
-if test "x$GLOBAL_ENVIRONMENT" != "x"; then
-  AC_DEFINE_UNQUOTED([GLOBAL_ENVIRONMENT], ["$GLOBAL_ENVIRONMENT"], [Specify the environment,varies between Developent and production])
-fi
+# Define a macro with the value of the environment variable
+AC_DEFINE_UNQUOTED([ENV_GLOBAL_ENVIRONMENT], ["${GLOBAL_ENVIRONMENT}"], [Value of GLOBAL_ENVIRONMENT])
 
 AC_ARG_VAR([BUILD_DESTINATION], [Define the build destination OS and ARCH])
 
-# Default value for the variable
-BUILD_DESTINATION="Unknown"
+AS_IF([test "x$BUILD_DESTINATION" != "x"],
+    [BUILD_DESTINATION="${BUILD_DESTINATION}"],
+    [BUILD_DESTINATION="Unknown"])
 
-# Check if the variable is set in the environment
-if test "x$BUILD_DESTINATION" != "x"; then
-  AC_DEFINE_UNQUOTED([BUILD_DESTINATION], ["$BUILD_DESTINATION"], [Define the build destination OS and ARCH])
-fi
+# Define a macro with the value of the environment variable
+AC_DEFINE_UNQUOTED([ENV_BUILD_DESTINATION], ["${BUILD_DESTINATION}"], [Value of BUILD_DESTINATION])
 
-
+# Substitute the environment variable value in config.h
+# AC_SUBST([BUILD_DESTINATION], [$BUILD_DESTINATION])
 
 
 # -----------------------------------------------------------------------------

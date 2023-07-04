@@ -215,7 +215,8 @@ jobs:
         run: |
           docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e VERSION=${{ needs.version-check.outputs.version }} \
                      -e ENABLE_SENTRY=${{env.ENABLE_SENTRY}} -e GLOBAL_ENVIRONMENT=${{env.GLOBAL_ENVIRONMENT}} \
-                     --platform=${{ matrix.platform }} -v "$PWD":/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}
+                     -e BUILD_DESTINATION="${{ matrix.distro }}${{ matrix.version }}_${{ matrix.platform }}" --platform=${{ matrix.platform }} \ 
+                     -v "$PWD":/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}
       - name: Save Packages
         id: artifacts
         continue-on-error: true

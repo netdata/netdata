@@ -326,12 +326,12 @@ static void init_sentry(void) {
     sentry_options_set_auto_session_tracking(options, false);
 
     // TODO: we should get this from CI (SENTRY_ENVIRONMENT)
-    sentry_options_set_environment(options, GLOBAL_ENVIRONMENT);
+    sentry_options_set_environment(options, ENV_GLOBAL_ENVIRONMENT);
 
     // TODO: we should get this from CI (SENTRY_RELEASE)
     sentry_options_set_release(options, PACKAGE_VERSION);
 
-    sentry_set_tag("BUILD_DESTINATION", BUILD_DESTINATION);
+    sentry_options_set_dist(options, ENV_BUILD_DESTINATION);
     // TODO: use config_get() to (un)set this
     sentry_options_set_debug(options, 1);
 
