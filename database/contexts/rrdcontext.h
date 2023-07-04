@@ -446,6 +446,7 @@ struct alert_transition_data {
     NETDATA_DOUBLE new_value;
     NETDATA_DOUBLE old_value;
 
+    char machine_guid[UUID_STR_LEN];
     struct alert_transition_data *next;
     struct alert_transition_data *prev;
 };

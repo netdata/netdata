@@ -1379,17 +1379,30 @@ struct alert_transitions_callback_data {
     struct alert_transition_data *base;
 
     struct alert_transition_data *last_added;
+
+    struct {
+        size_t items;
+        size_t first;
+        size_t skips_before;
+        size_t skips_after;
+        size_t backwards;
+        size_t forwards;
+        size_t prepend;
+        size_t append;
+        size_t shifts;
+    } stats;
 };
 
-static struct alert_transition_data *contexts_v2_alert_transition_dup(struct alert_transition_data *t) {
+static struct alert_transition_data *contexts_v2_alert_transition_dup(struct alert_transition_data *t, const char *machine_guid) {
     struct alert_transition_data *n = mallocz(sizeof(*t));
     memcpy(n, t, sizeof(*t));
 
     n->transition_id = mallocz(sizeof(*t->transition_id));
     memcpy(n->transition_id, t->transition_id, sizeof(*t->transition_id));
 
-    n->host_id = mallocz(sizeof(*t->host_id));
-    memcpy(n->host_id, t->host_id, sizeof(*t->host_id));
+//    n->host_id = mallocz(sizeof(*t->host_id));
+//    memcpy(n->host_id, t->host_id, sizeof(*t->host_id));
+    n->host_id = NULL;
 
     n->config_hash_id = mallocz(sizeof(*t->config_hash_id));
     memcpy(n->config_hash_id, t->config_hash_id, sizeof(*t->config_hash_id));
@@ -1401,6 +1414,8 @@ static struct alert_transition_data *contexts_v2_alert_transition_dup(struct ale
     n->recipient = t->recipient ? strdupz(t->recipient) : NULL;
     n->units = strdupz(t->units);
     n->info = strdupz(t->info);
+
+    memcpy(n->machine_guid, machine_guid, sizeof(n->machine_guid));
 
     return n;
 }
@@ -1419,32 +1434,48 @@ static void contexts_v2_alert_transition_free(struct alert_transition_data *t) {
     freez(t);
 }
 
-static inline void contexts_v2_alert_transition_keep(struct alert_transitions_callback_data *d, struct alert_transition_data *t) {
-    if(t->global_id < d->ctl->request->alerts.global_id_anchor)
+static inline void contexts_v2_alert_transition_keep(struct alert_transitions_callback_data *d, struct alert_transition_data *t, const char *machine_guid) {
+    if(unlikely(t->global_id <= d->ctl->request->alerts.global_id_anchor)) {
         // this is in our past, we are not interested
+        d->stats.skips_before++;
         return;
+    }
 
     if(unlikely(!d->base)) {
-        d->last_added = contexts_v2_alert_transition_dup(t);
+        d->last_added = contexts_v2_alert_transition_dup(t, machine_guid);
         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(d->base, d->last_added, prev, next);
         d->items++;
+        d->stats.first++;
         return;
     }
 
     struct alert_transition_data *last = d->last_added;
-    while(last != d->base && last->prev->global_id > t->global_id)
+    while(last != d->base && last->prev->global_id > t->global_id) {
         last = last->prev;
+        d->stats.backwards++;
+    }
 
-    while(last->next && last->next->global_id < t->global_id)
+    while(last->next && last->next->global_id < t->global_id) {
         last = last->next;
+        d->stats.forwards++;
+    }
+
+    if(d->items >= d->limit && last == d->base->prev && last->global_id < t->global_id) {
+        d->stats.skips_after++;
+        return;
+    }
 
     d->items++;
-    d->last_added = contexts_v2_alert_transition_dup(t);
+    d->last_added = contexts_v2_alert_transition_dup(t, machine_guid);
 
-    if(last->global_id > t->global_id)
+    if(last->global_id > t->global_id) {
         DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(d->base, d->last_added, prev, next);
-    else
+        d->stats.prepend++;
+    }
+    else {
         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(d->base, d->last_added, prev, next);
+        d->stats.append++;
+    }
 
     while(d->items > d->limit) {
         // we have to remove something
@@ -1457,23 +1488,35 @@ static inline void contexts_v2_alert_transition_keep(struct alert_transitions_ca
             d->last_added = d->base;
 
         contexts_v2_alert_transition_free(tmp);
+
+        d->stats.shifts++;
     }
 }
 
 static void contexts_v2_alert_transition_callback(struct alert_transition_data *t, void *data) {
     struct alert_transitions_callback_data *d = data;
+    d->stats.items++;
+
+    char machine_guid[UUID_STR_LEN] = "";
+    uuid_unparse_lower(*t->host_id, machine_guid);
 
     const char *facets[ATF_TOTAL_ENTRIES] = {
             [ATF_STATUS] = rrdcalc_status2string(t->new_status),
-            [ATF_CLASS] = NULL, // TODO - get this from SQL
-            [ATF_TYPE] = NULL, // TODO - get this from SQL
-            [ATF_COMPONENT] = NULL, // TODO - get this from SQL
+            [ATF_CLASS] = t->classification,
+            [ATF_TYPE] = t->type,
+            [ATF_COMPONENT] = t->component,
             [ATF_ROLE] = t->recipient,
-            [ATF_NODE] = NULL, // TODO - get this from SQL
+            [ATF_NODE] = machine_guid,
     };
 
-    for(size_t i = 0; i < ATF_TOTAL_ENTRIES ;i++)
-        if(!facets[i] || !*facets[i]) facets[i] = "unknown";
+    for(size_t i = 0; i < ATF_TOTAL_ENTRIES ;i++) {
+        if (!facets[i] || !*facets[i]) facets[i] = "unknown";
+
+        struct facet_entry tmp = {
+                .count = 0,
+        };
+        dictionary_set(d->facets[i].dict, facets[i], &tmp, sizeof(tmp));
+    }
 
     bool selected[ATF_TOTAL_ENTRIES] = { 0 };
 
@@ -1487,7 +1530,7 @@ static void contexts_v2_alert_transition_callback(struct alert_transition_data *
     if(selected_by == ATF_TOTAL_ENTRIES) {
         // this item is selected by all facets
         // put it in our result (if it fits)
-        contexts_v2_alert_transition_keep(d, t);
+        contexts_v2_alert_transition_keep(d, t, machine_guid);
     }
 
     if(selected_by >= ATF_TOTAL_ENTRIES - 1) {
@@ -1498,6 +1541,7 @@ static void contexts_v2_alert_transition_callback(struct alert_transition_data *
             uint32_t counted_by = selected_by;
 
             if (counted_by != ATF_TOTAL_ENTRIES) {
+                counted_by = 0;
                 for (size_t j = 0; j < ATF_TOTAL_ENTRIES; j++) {
                     if (i == j || selected[j])
                         counted_by++;
@@ -1506,12 +1550,10 @@ static void contexts_v2_alert_transition_callback(struct alert_transition_data *
 
             if (counted_by == ATF_TOTAL_ENTRIES) {
                 // we need to count it on this facet
-                struct facet_entry tmp = {
-                        .count = 0,
-                };
-
-                struct facet_entry *x = dictionary_set(d->facets[i].dict, facets[i], &tmp, sizeof(tmp));
-                x->count++;
+                struct facet_entry *x = dictionary_get(d->facets[i].dict, facets[i]);
+                internal_fatal(!x, "facet is not found");
+                if(x)
+                    x->count++;
             }
         }
     }
@@ -1576,10 +1618,47 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
     }
     buffer_json_object_close(wb);
 
+    buffer_json_member_add_array(wb, "transitions");
     for(struct alert_transition_data *t = data.base; t ; t = t->next) {
-        // TODO print the item
-        ;
+        buffer_json_add_array_item_object(wb);
+        {
+            buffer_json_member_add_uuid(wb, "transition_id", t->transition_id);
+            buffer_json_member_add_uuid(wb, "config_hash_id", t->config_hash_id);
+            buffer_json_member_add_string(wb, "machine_guid", t->machine_guid);
+            buffer_json_member_add_string(wb, "alert", t->name);
+            buffer_json_member_add_string(wb, "instance", t->chart);
+            buffer_json_member_add_string(wb, "context", t->chart_context);
+
+            buffer_json_member_add_uint64(wb, "gi", t->global_id);
+            buffer_json_member_add_time_t(wb, "when", t->when_key);
+            buffer_json_member_add_string(wb, "info", t->info);
+            buffer_json_member_add_string(wb, "units", t->units);
+            buffer_json_member_add_object(wb, "new");
+            {
+                buffer_json_member_add_string(wb, "status", rrdcalc_status2string(t->new_status));
+                buffer_json_member_add_double(wb, "value", t->new_value);
+            }
+            buffer_json_object_close(wb); // new
+            buffer_json_member_add_object(wb, "old");
+            {
+                buffer_json_member_add_string(wb, "status", rrdcalc_status2string(t->old_status));
+                buffer_json_member_add_double(wb, "value", t->old_value);
+                buffer_json_member_add_time_t(wb, "duration", t->duration);
+            }
+            buffer_json_object_close(wb); // old
+            buffer_json_member_add_object(wb, "notification");
+            {
+                buffer_json_member_add_string(wb, "type", "agent");
+                health_entry_flags_to_json_array(wb, "flags", t->flags);
+                buffer_json_member_add_string(wb, "method", t->exec);
+                buffer_json_member_add_string(wb, "to", t->recipient);
+                buffer_json_member_add_uint64(wb, "code", t->exec_code);
+            }
+            buffer_json_object_close(wb); // notification
+        }
+        buffer_json_object_close(wb); // a transition
     }
+    buffer_json_array_close(wb); // all transitions
 
     for(size_t i = 0; i < ATF_TOTAL_ENTRIES ;i++) {
         dictionary_destroy(data.facets[i].dict);
@@ -1591,6 +1670,20 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(data.base, t, prev, next);
         contexts_v2_alert_transition_free(t);
     }
+
+    buffer_json_member_add_object(wb, "stats");
+    {
+        buffer_json_member_add_uint64(wb, "items", data.stats.items);
+        buffer_json_member_add_uint64(wb, "first", data.stats.first);
+        buffer_json_member_add_uint64(wb, "prepend", data.stats.prepend);
+        buffer_json_member_add_uint64(wb, "append", data.stats.append);
+        buffer_json_member_add_uint64(wb, "backwards", data.stats.backwards);
+        buffer_json_member_add_uint64(wb, "forwards", data.stats.forwards);
+        buffer_json_member_add_uint64(wb, "shifts", data.stats.shifts);
+        buffer_json_member_add_uint64(wb, "skips_before", data.stats.skips_before);
+        buffer_json_member_add_uint64(wb, "skips_after", data.stats.skips_after);
+    }
+    buffer_json_object_close(wb);
 }
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_MODE mode) {

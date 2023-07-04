@@ -36,35 +36,37 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
         else if(!strcmp(name, "timeout"))
             req.timeout_ms = str2l(value);
         else if(mode & (CONTEXTS_V2_ALERTS | CONTEXTS_V2_ALERT_TRANSITIONS)) {
-            if(!strcmp(name, "status"))
-                req.alerts.status = web_client_api_request_v2_alert_status(value);
-            else if (!strcmp(name, "last")) {
+            if (!strcmp(name, "last")) {
                 req.alerts.last = strtoul(value, NULL, 0);
-            } else if (!strcmp(name, "transition")) {
-                req.alerts.transition = value;
             } else if (!strcmp(name, "alert")) {
                 req.alerts.alert = value;
             } else if (!strcmp(name, "anchor")) {
                 req.alerts.anchor = value;
             }
-        }
-        else if(mode & CONTEXTS_V2_ALERT_TRANSITIONS) {
-            if(!strcmp(name, "context"))
-                req.contexts = value;
-            else if(!strcmp(name, "facet_status"))
-                req.alerts.facets[ATF_STATUS] = value;
-            else if(!strcmp(name, "facet_class"))
-                req.alerts.facets[ATF_CLASS] = value;
-            else if(!strcmp(name, "facet_type"))
-                req.alerts.facets[ATF_TYPE] = value;
-            else if(!strcmp(name, "facet_component"))
-                req.alerts.facets[ATF_COMPONENT] = value;
-            else if(!strcmp(name, "facet_role"))
-                req.alerts.facets[ATF_ROLE] = value;
-            else if(!strcmp(name, "facet_node"))
-                req.alerts.facets[ATF_NODE] = value;
-            else if (!strcmp(name, "global_id_anchor")) {
-                req.alerts.global_id_anchor = str2ull(value, NULL);
+            else if(mode & CONTEXTS_V2_ALERTS) {
+                if (!strcmp(name, "status"))
+                    req.alerts.status = web_client_api_request_v2_alert_status(value);
+                else if (!strcmp(name, "transition"))
+                    req.alerts.transition = value;
+            }
+            else if(mode & CONTEXTS_V2_ALERT_TRANSITIONS) {
+                if(!strcmp(name, "context"))
+                    req.contexts = value;
+                else if(!strcmp(name, "facet_status"))
+                    req.alerts.facets[ATF_STATUS] = value;
+                else if(!strcmp(name, "facet_class"))
+                    req.alerts.facets[ATF_CLASS] = value;
+                else if(!strcmp(name, "facet_type"))
+                    req.alerts.facets[ATF_TYPE] = value;
+                else if(!strcmp(name, "facet_component"))
+                    req.alerts.facets[ATF_COMPONENT] = value;
+                else if(!strcmp(name, "facet_role"))
+                    req.alerts.facets[ATF_ROLE] = value;
+                else if(!strcmp(name, "facet_node"))
+                    req.alerts.facets[ATF_NODE] = value;
+                else if (!strcmp(name, "global_id_anchor")) {
+                    req.alerts.global_id_anchor = str2ull(value, NULL);
+                }
             }
         }
     }

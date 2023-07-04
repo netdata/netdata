@@ -1942,8 +1942,7 @@ skip_failed:
                 NETDATA_DOUBLE o = (sqlite3_column_type(res, 10) == SQLITE_NULL) ? NAN : sqlite3_column_double(res, 10);
                 buffer_json_member_add_double(wb, "old", o);
 
-                buffer_json_member_add_string(
-                        wb, "units", units ? (const char *)units : NULL);
+                buffer_json_member_add_string(wb, "units", units ? (const char *)units : NULL);
             }
             buffer_json_object_close(wb); // v
 
