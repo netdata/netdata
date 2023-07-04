@@ -1345,7 +1345,7 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
         if (sqlite3_column_type(res, 31) != SQLITE_NULL)
             uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 31)), transition_id);
 
-        char *edit_command = health_edit_command_from_source((char *)sqlite3_column_text(res, 17));
+        char *edit_command = sqlite3_column_bytes(res, 17) > 0 ? health_edit_command_from_source((char *)sqlite3_column_text(res, 17)) : strdupz("UNKNOWN=0=UNKNOWN");
 
         if (count)
             buffer_sprintf(wb, ",");
@@ -1415,7 +1415,7 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
             sqlite3_column_text(res, 15) ? (const char *) sqlite3_column_text(res, 15) : string2str(host->health.health_default_exec),
             sqlite3_column_text(res, 16) ? (const char *) sqlite3_column_text(res, 16) : string2str(host->health.health_default_recipient),
             sqlite3_column_int(res, 20),
-            sqlite3_column_text(res, 17),
+            sqlite3_column_text(res, 17) ? (const char *) sqlite3_column_text(res, 17) : (char *) "Unknown",
             edit_command,
             sqlite3_column_text(res, 18),
             (long unsigned int)sqlite3_column_int64(res, 6),
