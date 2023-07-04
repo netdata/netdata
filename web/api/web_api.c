@@ -23,9 +23,9 @@ int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_pat
     for(int i = 0; api_commands[i].command ; i++) {
         if(unlikely(hash == api_commands[i].hash && !strcmp(api_command, api_commands[i].command))) {
             if(unlikely(!api_commands[i].allow_subpaths && api_command != url_path_endpoint)) {
-                freez(api_command);
                 buffer_flush(w->response.data);
                 buffer_sprintf(w->response.data, "API command '%s' does not support subpaths.", api_command);
+                freez(api_command);
                 return HTTP_RESP_BAD_REQUEST;
             }
 
