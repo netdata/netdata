@@ -15,6 +15,17 @@
                             "name": {
                                 "type": "string",
                                 "description": "Name of the category"
+                            },
+                            "priority_id": {
+                                "type": "string",
+                                "description": "Priority of the category that will also be used as this category's ID"
+                            },
+                            "parent": {
+                                "type": [
+                                    "null",
+                                    "string"
+                                ],
+                                "description": "The category's parent ID (priority_id), make it null if no parent"
                             }
                         }
                     }
@@ -28,8 +39,17 @@
                 "type": "object",
                 "properties": {
                     "category": {
-                        "type": "string",
-                        "description": "Where this integration belongs, in category/sub_category/.. format."
+                        "type": "object",
+                        "properties": {
+                            "category_name": {
+                                "type": "string",
+                                "description": "Where this integration belongs, in category/sub_category/.. format."
+                            },
+                            "integration_priority": {
+                                "type": "string",
+                                "description": "the priority of the integration in its final level sub_category"
+                            }
+                        }
                     },
                     "icon": {
                         "type": "string",

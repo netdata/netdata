@@ -2,13 +2,18 @@
     "categories_list": {
         "list": [
             {
-                "name": ""
+                "name": "",
+                "parent": null,
+                "priority_id": ""
             }
         ]
     },
     "integrations": [
         {
-            "category": "",
+            "category": {
+                "category_name": "",
+                "integration_priority": ""
+            },
             "icon": "",
             "meta": {
                 "plugin_name": "",
