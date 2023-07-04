@@ -683,6 +683,8 @@ static void ebpf_create_hd_charts(netdata_ebpf_disks_t *w, int update_every)
     order++;
 
     w->flags |= NETDATA_DISK_CHART_CREATED;
+
+    fflush(stdout);
 }
 
 /**

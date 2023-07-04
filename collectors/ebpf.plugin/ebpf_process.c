@@ -418,6 +418,8 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK],
                           2, em->update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
     }
+
+    fflush(stdout);
 }
 
 /**

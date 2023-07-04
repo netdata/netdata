@@ -1217,6 +1217,8 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF],
                           2, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
     }
+
+    fflush(stdout);
 }
 
 /**

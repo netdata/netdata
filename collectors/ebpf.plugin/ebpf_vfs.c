@@ -2164,6 +2164,8 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_CREATE],
                           1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
     }
+
+    fflush(stdout);
 }
 
 /**

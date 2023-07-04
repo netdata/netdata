@@ -920,6 +920,8 @@ static void ebpf_create_swap_charts(int update_every)
                       ebpf_create_global_dimension,
                       swap_publish_aggregated, NETDATA_SWAP_END,
                       update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+
+    fflush(stdout);
 }
 
 /*

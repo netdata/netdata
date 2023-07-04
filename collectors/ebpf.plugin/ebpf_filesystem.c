@@ -455,6 +455,8 @@ static void ebpf_create_fs_charts(int update_every)
             efp->flags |= NETDATA_FILESYSTEM_FLAG_CHART_CREATED;
         }
     }
+
+    fflush(stdout);
 }
 
 /**

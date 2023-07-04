@@ -1263,6 +1263,8 @@ static void ebpf_create_fd_global_charts(ebpf_module_t *em)
                           NETDATA_FD_SYSCALL_END,
                           em->update_every, NETDATA_EBPF_MODULE_NAME_FD);
     }
+
+    fflush(stdout);
 }
 
 /*****************************************************************

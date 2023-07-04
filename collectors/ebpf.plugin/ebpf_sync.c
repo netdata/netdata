@@ -653,6 +653,8 @@ static void ebpf_create_sync_charts(int update_every)
         ebpf_create_sync_chart(NETDATA_EBPF_FILE_SEGMENT_CHART,
                                "Monitor calls for <code>sync_file_range(2)</code>.", 21303,
                                NETDATA_SYNC_SYNC_FILE_RANGE_IDX, NETDATA_SYNC_SYNC_FILE_RANGE_IDX, update_every);
+
+    fflush(stdout);
 }
 
 /**
