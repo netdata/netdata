@@ -2053,13 +2053,13 @@ void sql_alert_transitions(DICTIONARY *nodes, time_t after, time_t before, const
         goto fail_only_drop;
     }
 
-    rc = sqlite3_bind_int64(res, 1, after);
+    rc = sqlite3_bind_int64(res, 1, (sqlite3_int64) (after * USEC_PER_SEC));
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind after parameter");
         goto fail;
     }
 
-    rc = sqlite3_bind_int64(res, 2, before);
+    rc = sqlite3_bind_int64(res, 2,  (sqlite3_int64) (before * USEC_PER_SEC));
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind before parameter");
         goto fail;

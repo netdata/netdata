@@ -1398,7 +1398,7 @@ static struct alert_transition_data *contexts_v2_alert_transition_dup(struct ale
     n->chart = strdupz(t->chart);
     n->chart_context = strdupz(t->chart_context);
     n->family = strdupz(t->family);
-    n->recipient = strdupz(t->recipient);
+    n->recipient = t->recipient ? strdupz(t->recipient) : NULL;
     n->units = strdupz(t->units);
     n->info = strdupz(t->info);
 
