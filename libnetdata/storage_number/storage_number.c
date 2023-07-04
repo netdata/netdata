@@ -121,7 +121,7 @@ storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags) {
 
         if(n > (NETDATA_DOUBLE)0x00ffffff) {
             #ifdef NETDATA_INTERNAL_CHECKS
-            error("Number " NETDATA_DOUBLE_FORMAT " is too big.", value);
+            netdata_log_error("Number " NETDATA_DOUBLE_FORMAT " is too big.", value);
             #endif
             r += 0x00ffffff;
             return r;
