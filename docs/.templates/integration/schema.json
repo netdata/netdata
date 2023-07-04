@@ -34,7 +34,7 @@
         },
         "integrations": {
             "type": "array",
-            "description": "A list of single module templates",
+            "description": "A list of integration elements, combination of metadata.yaml and other sources",
             "items": {
                 "type": "object",
                 "properties": {
@@ -56,7 +56,8 @@
                         "description": "path to the icon for this integration"
                     },
                     "meta": {
-                        "$ref": "../../../collectors/meta_template/schema.json"
+                        "$ref": "../../../collectors/meta_template/schema.json",
+                        "description": "the metadata.yaml structure"
                     },
                     "related_blog_posts": {
                         "type": "array",
