@@ -227,7 +227,7 @@ static inline char *read_last_line(const char *filename, int max_line_width){
     
     if(found_ln){
         char *line = callocz(1, (size_t) (bytes_read - line_pos - 1) * sizeof(char));
-        memcpy(line, &buff[line_pos + 1], (size_t) (bytes_read - line_pos - 1));
+        memcpy(line, &buff[line_pos + 1], (size_t) (bytes_read - line_pos - 2));
         freez(buff);
         uv_fs_close(NULL, &req, file_handle, NULL);
         return line;

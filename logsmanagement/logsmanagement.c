@@ -25,6 +25,8 @@
 #include "query.h"
 #include "parser.h"
 #include "flb_plugin.h"
+#include "rrd_api/rrd_api.h"
+#include "rrd_api/rrd_api_stats.h"
 
 #if defined(LOGS_MANAGEMENT_STRESS_TEST) && LOGS_MANAGEMENT_STRESS_TEST == 1
 #include "query_test.h"
@@ -46,7 +48,17 @@ static struct config log_management_config = {
 
 struct File_infos_arr *p_file_infos_arr = NULL;
 
-volatile sig_atomic_t p_file_infos_arr_ready = 0;
+// volatile sig_atomic_t p_file_infos_arr_ready = 0;
+
+static struct Chart_meta chart_types[] = {
+    {.type = FLB_GENERIC,   .init = generic_chart_init,   .update = generic_chart_update},
+    {.type = FLB_WEB_LOG,   .init = web_log_chart_init,   .update = web_log_chart_update},
+    {.type = FLB_KMSG,      .init = kernel_chart_init,    .update = kernel_chart_update},
+    {.type = FLB_SYSTEMD,   .init = systemd_chart_init,   .update = systemd_chart_update},
+    {.type = FLB_DOCKER_EV, .init = docker_ev_chart_init, .update = docker_ev_chart_update},
+    {.type = FLB_SYSLOG,    .init = systemd_chart_init,   .update = systemd_chart_update},
+    {.type = FLB_SERIAL,    .init = generic_chart_init,   .update = generic_chart_update}
+};
 
 g_logs_manag_config_t g_logs_manag_config = {
     .update_every = 1,
@@ -87,6 +99,8 @@ static bool metrics_dict_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused,
  * @param p_file_info The struct of File_info type to be cleaned up.
  * @todo  Pass p_file_info by reference, so that it can be set to NULL. */
 static void p_file_info_destroy(struct File_info *p_file_info){
+
+    // TODO: Clean up rrd / chart stuff.
 
     if(unlikely(!p_file_info)){
         collector_info("p_file_info_destroy() called but p_file_info == NULL - already destroyed?");
@@ -159,7 +173,7 @@ static void p_file_info_destroy(struct File_info *p_file_info){
         freez(p_file_info->parser_config);
     }
 
-    if(p_file_info->parser_metrics_mut) freez(p_file_info->parser_metrics_mut); 
+    // if(p_file_info->parser_metrics_mut) freez(p_file_info->parser_metrics_mut); 
 
     Flb_output_config_t *output_next = p_file_info->flb_outputs;
     while(output_next){
@@ -1009,6 +1023,15 @@ static void logs_management_init(uv_loop_t *main_loop,
 
 
     /* -------------------------------------------------------------------------
+     * Initialize rrd related structures.
+     * ------------------------------------------------------------------------- */
+    p_file_info->chart_meta = callocz(1, sizeof(struct Chart_meta));
+    memcpy(p_file_info->chart_meta, &chart_types[p_file_info->log_type], sizeof(struct Chart_meta));
+    p_file_info->chart_meta->base_prio = NETDATA_CHART_PRIO_LOGS_BASE + p_file_infos_arr->count * NETDATA_CHART_PRIO_LOGS_INCR;
+    p_file_info->chart_meta->init(p_file_info);
+
+
+    /* -------------------------------------------------------------------------
      * Initialize input plugin for local log sources.
      * ------------------------------------------------------------------------- */
     switch(p_file_info->log_type){
@@ -1048,9 +1071,9 @@ static void logs_management_init(uv_loop_t *main_loop,
     /* -------------------------------------------------------------------------
      * Allocate and initialise parser mutex.
      * ------------------------------------------------------------------------- */
-    p_file_info->parser_metrics_mut = callocz(1, sizeof(uv_mutex_t));
-    if(unlikely(uv_mutex_init(p_file_info->parser_metrics_mut)))
-        fatal("Failed to initialise parser_metrics_mut for %s", p_file_info->chart_name);
+    // p_file_info->parser_metrics_mut = callocz(1, sizeof(uv_mutex_t));
+    // if(unlikely(uv_mutex_init(p_file_info->parser_metrics_mut)))
+    //     fatal("Failed to initialise parser_metrics_mut for %s", p_file_info->chart_name);
 
 
     /* -------------------------------------------------------------------------
@@ -1077,6 +1100,8 @@ static void logsmanagement_main_cleanup(void *ptr) {
         freez(p_file_infos_arr);
         p_file_infos_arr = NULL;
     }
+
+    // TODO: Clean up stats charts memory
 
     // TODO: Additional work to do here on exit? Maybe flush buffers to DB?
 
@@ -1133,6 +1158,14 @@ void *logsmanagement_main(void *ptr) {
         goto cleanup; // No log sources - nothing to do
     }
 
+    stats_charts_init();
+    uv_timer_t stats_charts_timer;
+    uv_timer_init(main_loop, &stats_charts_timer);
+
+    // TODO: stats_charts_update() is run as a timer callback, so not as precise as if heartbeat_next() was used.
+    // Needs to be changed ideally.
+    uv_timer_start(&stats_charts_timer, stats_charts_update, 0, g_logs_manag_config.update_every * MSEC_PER_SEC); 
+
     /* Run Fluent Bit engine
      * NOTE: flb_run() ideally would be executed after db_init(), but in case of
      * a db_init() failure, it is easier to call flb_stop_and_cleanup() rather 
@@ -1167,7 +1200,7 @@ void *logsmanagement_main(void *ptr) {
     uv_thread_create(&run_stress_test_queries_thread_id, run_stress_test_queries_thread, NULL);
 #endif  // LOGS_MANAGEMENT_STRESS_TEST
 
-    p_file_infos_arr_ready = 1; // All good, inform other threads of ready state
+    // p_file_infos_arr_ready = 1; // All good, inform other threads of ready state
 
     collector_info("logsmanagement_main() setup completed successfully");
 

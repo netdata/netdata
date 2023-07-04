@@ -1051,18 +1051,31 @@ ELSE()
 ENDIF()
 
 set(LOGSMANAGEMENT_FILES
-        collectors/logsmanagement.plugin/plugin_logsmanagement_docker_ev.c
-        collectors/logsmanagement.plugin/plugin_logsmanagement_docker_ev.h
-        collectors/logsmanagement.plugin/plugin_logsmanagement_generic.c
-        collectors/logsmanagement.plugin/plugin_logsmanagement_generic.h
-        collectors/logsmanagement.plugin/plugin_logsmanagement_kernel.c
-        collectors/logsmanagement.plugin/plugin_logsmanagement_kernel.h
-        collectors/logsmanagement.plugin/plugin_logsmanagement_systemd.c
-        collectors/logsmanagement.plugin/plugin_logsmanagement_systemd.h
-        collectors/logsmanagement.plugin/plugin_logsmanagement_web_log.c
-        collectors/logsmanagement.plugin/plugin_logsmanagement_web_log.h
-        collectors/logsmanagement.plugin/plugin_logsmanagement.c
-        collectors/logsmanagement.plugin/plugin_logsmanagement.h
+        // collectors/logsmanagement.plugin/plugin_logsmanagement_docker_ev.c
+        // collectors/logsmanagement.plugin/plugin_logsmanagement_docker_ev.h
+        // collectors/logsmanagement.plugin/plugin_logsmanagement_generic.c
+        // collectors/logsmanagement.plugin/plugin_logsmanagement_generic.h
+        // collectors/logsmanagement.plugin/plugin_logsmanagement_kernel.c
+        // collectors/logsmanagement.plugin/plugin_logsmanagement_kernel.h
+        // collectors/logsmanagement.plugin/plugin_logsmanagement_systemd.c
+        // collectors/logsmanagement.plugin/plugin_logsmanagement_systemd.h
+        // collectors/logsmanagement.plugin/plugin_logsmanagement_web_log.c
+        // collectors/logsmanagement.plugin/plugin_logsmanagement_web_log.h
+        // collectors/logsmanagement.plugin/plugin_logsmanagement.c
+        // collectors/logsmanagement.plugin/plugin_logsmanagement.h
+        logsmanagement/rrd_api/rrd_api_docker_ev.c
+        logsmanagement/rrd_api/rrd_api_docker_ev.h
+        logsmanagement/rrd_api/rrd_api_generic.c
+        logsmanagement/rrd_api/rrd_api_generic.h
+        logsmanagement/rrd_api/rrd_api_kernel.c
+        logsmanagement/rrd_api/rrd_api_kernel.h
+        logsmanagement/rrd_api/rrd_api_stats.c
+        logsmanagement/rrd_api/rrd_api_stats.h
+        logsmanagement/rrd_api/rrd_api_systemd.c
+        logsmanagement/rrd_api/rrd_api_systemd.h
+        logsmanagement/rrd_api/rrd_api_web_log.c
+        logsmanagement/rrd_api/rrd_api_web_log.h
+        logsmanagement/rrd_api/rrd_api.h
         logsmanagement/circular_buffer.c
         logsmanagement/circular_buffer.h
         logsmanagement/compression.c

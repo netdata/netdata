@@ -242,40 +242,40 @@ static void flb_complete_buff_item(struct File_info *p_file_info){
     tv.tv_usec = (buff->in->timestamp % 1000) * 1000; // TODO: Is tv_usec used by charts?
 
     /* Extract metrics */
-    uv_mutex_lock(p_file_info->parser_metrics_mut);
-    if(p_file_info->log_type == FLB_WEB_LOG){
-        // if(unlikely(0 != parse_web_log_buf( buff->in->data, 
-        //                                     buff->in->text_size, 
-        //                                     p_file_info->parser_config, 
-        //                                     p_file_info->parser_metrics))) 
-        //     m_assert(0, "Parsed buffer did not contain any text or was of 0 size.");
-    }
-    else if(p_file_info->log_type == FLB_KMSG){
-        for(int i = 0; i < SYSLOG_SEVER_ARR_SIZE; i++){
-            p_file_info->parser_metrics->kernel->sever[i] = p_file_info->flb_tmp_kernel_metrics.sever[i];
-            p_file_info->flb_tmp_kernel_metrics.sever[i] = 0;
-        }
-    }
-    else if(p_file_info->log_type == FLB_SYSTEMD || 
-            p_file_info->log_type == FLB_SYSLOG) {
-        for(int i = 0; i < SYSLOG_SEVER_ARR_SIZE; i++){
-            p_file_info->parser_metrics->systemd->sever[i] = p_file_info->flb_tmp_systemd_metrics.sever[i];
-            p_file_info->flb_tmp_systemd_metrics.sever[i] = 0;
-        }
-        for(int i = 0; i < SYSLOG_FACIL_ARR_SIZE; i++){
-            p_file_info->parser_metrics->systemd->facil[i] = p_file_info->flb_tmp_systemd_metrics.facil[i];
-            p_file_info->flb_tmp_systemd_metrics.facil[i] = 0;
-        }
-        for(int i = 0; i < SYSLOG_PRIOR_ARR_SIZE; i++){
-            p_file_info->parser_metrics->systemd->prior[i] = p_file_info->flb_tmp_systemd_metrics.prior[i];
-            p_file_info->flb_tmp_systemd_metrics.prior[i] = 0;
-        }
-    } else if(p_file_info->log_type == FLB_DOCKER_EV) {
-        for(int i = 0; i < NUM_OF_DOCKER_EV_TYPES; i++){
-            p_file_info->parser_metrics->docker_ev->ev_type[i] = p_file_info->flb_tmp_docker_ev_metrics.ev_type[i];
-            p_file_info->flb_tmp_docker_ev_metrics.ev_type[i] = 0;
-        }
-    } 
+    // uv_mutex_lock(p_file_info->parser_metrics_mut);
+    // if(p_file_info->log_type == FLB_WEB_LOG){
+    //     // if(unlikely(0 != parse_web_log_buf( buff->in->data, 
+    //     //                                     buff->in->text_size, 
+    //     //                                     p_file_info->parser_config, 
+    //     //                                     p_file_info->parser_metrics))) 
+    //     //     m_assert(0, "Parsed buffer did not contain any text or was of 0 size.");
+    // }
+    // else if(p_file_info->log_type == FLB_KMSG){
+    //     for(int i = 0; i < SYSLOG_SEVER_ARR_SIZE; i++){
+    //         p_file_info->parser_metrics->kernel->sever[i] = p_file_info->flb_tmp_kernel_metrics.sever[i];
+    //         p_file_info->flb_tmp_kernel_metrics.sever[i] = 0;
+    //     }
+    // }
+    // else if(p_file_info->log_type == FLB_SYSTEMD || 
+    //         p_file_info->log_type == FLB_SYSLOG) {
+    //     for(int i = 0; i < SYSLOG_SEVER_ARR_SIZE; i++){
+    //         p_file_info->parser_metrics->systemd->sever[i] = p_file_info->flb_tmp_systemd_metrics.sever[i];
+    //         p_file_info->flb_tmp_systemd_metrics.sever[i] = 0;
+    //     }
+    //     for(int i = 0; i < SYSLOG_FACIL_ARR_SIZE; i++){
+    //         p_file_info->parser_metrics->systemd->facil[i] = p_file_info->flb_tmp_systemd_metrics.facil[i];
+    //         p_file_info->flb_tmp_systemd_metrics.facil[i] = 0;
+    //     }
+    //     for(int i = 0; i < SYSLOG_PRIOR_ARR_SIZE; i++){
+    //         p_file_info->parser_metrics->systemd->prior[i] = p_file_info->flb_tmp_systemd_metrics.prior[i];
+    //         p_file_info->flb_tmp_systemd_metrics.prior[i] = 0;
+    //     }
+    // } else if(p_file_info->log_type == FLB_DOCKER_EV) {
+    //     for(int i = 0; i < NUM_OF_DOCKER_EV_TYPES; i++){
+    //         p_file_info->parser_metrics->docker_ev->ev_type[i] = p_file_info->parser_metrics->docker_ev->ev_type[i];
+    //         p_file_info->parser_metrics->docker_ev->ev_type[i] = 0;
+    //     }
+    // } 
 
     p_file_info->parser_metrics->tv = tv;
     p_file_info->parser_metrics->num_lines += buff->in->num_lines;
@@ -286,7 +286,9 @@ static void flb_complete_buff_item(struct File_info *p_file_info){
             search_keyword( buff->in->data, buff->in->text_size, NULL, NULL, 
                             NULL, &p_file_info->parser_cus_config[i]->regex, 0);
     }
-    uv_mutex_unlock(p_file_info->parser_metrics_mut);
+    // uv_mutex_unlock(p_file_info->parser_metrics_mut);
+
+    p_file_info->chart_meta->update(p_file_info);
 
     circ_buff_insert(buff);
 
@@ -299,11 +301,12 @@ void flb_complete_item_timer_timeout_cb(uv_timer_t *handle) {
     
     uv_mutex_lock(&p_file_info->flb_tmp_buff_mut);
     if(!buff->in->data || !*buff->in->data || !buff->in->text_size){
-        uv_mutex_lock(p_file_info->parser_metrics_mut);
+        // uv_mutex_lock(p_file_info->parser_metrics_mut);
         struct timeval now;
         now_realtime_timeval(&now);
         p_file_info->parser_metrics->tv = now;
-        uv_mutex_unlock(p_file_info->parser_metrics_mut);
+        p_file_info->chart_meta->update(p_file_info);
+        // uv_mutex_unlock(p_file_info->parser_metrics_mut);
         uv_mutex_unlock(&p_file_info->flb_tmp_buff_mut);
         return; 
     }
@@ -463,12 +466,12 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                             debug(D_LOGS_MANAG, "LOG:[%.*s]", (int) message_size, message);
                             if(unlikely(0 != parse_web_log_buf( message, message_size, 
                                                                 p_file_info->parser_config, 
-                                                                &p_file_info->flb_tmp_web_log_metrics))){
+                                                                p_file_info->parser_metrics->web_log))){
                                 collector_error("parse_web_log_buf() error");
                                 m_assert(0, "Parsed buffer did not contain any text or was of 0 size.");
                             }
 
-                            timestamp = p_file_info->flb_tmp_web_log_metrics.timestamp * MSEC_PER_SEC; // convert to msec from sec
+                            timestamp = p_file_info->parser_metrics->web_log->timestamp * MSEC_PER_SEC; // convert to msec from sec
                         }
 
                         new_tmp_text_size = message_size + 1; // +1 for '\n'
@@ -553,7 +556,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                         new_tmp_text_size += message_size + 1; // +1 for '\n'
                     }
                     else if(!strncmp(p->key.via.str.ptr, "priority", (size_t) p->key.via.str.size)){
-                        p_file_info->flb_tmp_kernel_metrics.sever[p->val.via.u64]++;
+                        p_file_info->parser_metrics->kernel->sever[p->val.via.u64]++;
                     }
                     ++p;
                     continue;
@@ -808,18 +811,18 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
             * see https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.1 */
             if(likely(syslog_severity[0])){            
                 if(likely(str2int(&syslog_severity_d, syslog_severity, 10) == STR2XX_SUCCESS)){
-                    p_file_info->flb_tmp_systemd_metrics.sever[syslog_severity_d]++;
+                    p_file_info->parser_metrics->systemd->sever[syslog_severity_d]++;
                 } // else parsing errors ++ ??
-            } else p_file_info->flb_tmp_systemd_metrics.sever[SYSLOG_SEVER_ARR_SIZE - 1]++; // 'unknown'
+            } else p_file_info->parser_metrics->systemd->sever[SYSLOG_SEVER_ARR_SIZE - 1]++; // 'unknown'
 
             /* Parse syslog_facility char* field into int and extract metrics. 
             * syslog_facility_s will consist of up to 2 chars (plus '\0'), 
             * see https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.1 */
             if(likely(syslog_facility[0])){
                 if(likely(str2int(&syslog_facility_d, syslog_facility, 10) == STR2XX_SUCCESS)){
-                    p_file_info->flb_tmp_systemd_metrics.facil[syslog_facility_d]++;
+                    p_file_info->parser_metrics->systemd->facil[syslog_facility_d]++;
                 } // else parsing errors ++ ??
-            } else p_file_info->flb_tmp_systemd_metrics.facil[SYSLOG_FACIL_ARR_SIZE - 1]++; // 'unknown'
+            } else p_file_info->parser_metrics->systemd->facil[SYSLOG_FACIL_ARR_SIZE - 1]++; // 'unknown'
 
             if(likely(syslog_severity[0] && syslog_facility[0])){
                 /* Definition of syslog priority value == facility * 8 + severity */
@@ -829,10 +832,10 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
         
                 new_tmp_text_size += syslog_prival_size + 2; // +2 for '<' and '>'
 
-                p_file_info->flb_tmp_systemd_metrics.prior[syslog_prival_d]++;
+                p_file_info->parser_metrics->systemd->prior[syslog_prival_d]++;
             } else {
                 new_tmp_text_size += 3; // +3 for "<->" string
-                p_file_info->flb_tmp_systemd_metrics.prior[SYSLOG_PRIOR_ARR_SIZE - 1]++; // 'unknown'
+                p_file_info->parser_metrics->systemd->prior[SYSLOG_PRIOR_ARR_SIZE - 1]++; // 'unknown'
             } 
 
         } else if(p_file_info->log_type == FLB_SYSLOG){
@@ -842,18 +845,18 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                     syslog_severity_d = syslog_prival_d % 8;
                     syslog_facility_d = syslog_prival_d / 8;
 
-                    p_file_info->flb_tmp_systemd_metrics.prior[syslog_prival_d]++;
-                    p_file_info->flb_tmp_systemd_metrics.sever[syslog_severity_d]++;
-                    p_file_info->flb_tmp_systemd_metrics.facil[syslog_facility_d]++;
+                    p_file_info->parser_metrics->systemd->prior[syslog_prival_d]++;
+                    p_file_info->parser_metrics->systemd->sever[syslog_severity_d]++;
+                    p_file_info->parser_metrics->systemd->facil[syslog_facility_d]++;
 
                     new_tmp_text_size += syslog_prival_size + 2; // +2 for '<' and '>'
 
                 } // else parsing errors ++ ??
             } else {
                 new_tmp_text_size += 3; // +3 for "<->" string
-                p_file_info->flb_tmp_systemd_metrics.prior[SYSLOG_PRIOR_ARR_SIZE - 1]++; // 'unknown'
-                p_file_info->flb_tmp_systemd_metrics.sever[SYSLOG_SEVER_ARR_SIZE - 1]++; // 'unknown'
-                p_file_info->flb_tmp_systemd_metrics.facil[SYSLOG_FACIL_ARR_SIZE - 1]++; // 'unknown'
+                p_file_info->parser_metrics->systemd->prior[SYSLOG_PRIOR_ARR_SIZE - 1]++; // 'unknown'
+                p_file_info->parser_metrics->systemd->sever[SYSLOG_SEVER_ARR_SIZE - 1]++; // 'unknown'
+                p_file_info->parser_metrics->systemd->facil[SYSLOG_FACIL_ARR_SIZE - 1]++; // 'unknown'
             }
 
         } else m_assert(0, "shoudn't get here");
@@ -963,12 +966,12 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
             int i;
             for(i = 0; i < NUM_OF_DOCKER_EV_TYPES - 1; i++){
                 if(!strncmp(docker_ev_type, docker_ev_type_string[i], docker_ev_type_size)){
-                    p_file_info->flb_tmp_docker_ev_metrics.ev_type[i]++;
+                    p_file_info->parser_metrics->docker_ev->ev_type[i]++;
                     break;
                 }
             }
             if(unlikely(i >= NUM_OF_DOCKER_EV_TYPES - 1)){
-                p_file_info->flb_tmp_docker_ev_metrics.ev_type[i]++; // 'unknown'
+                p_file_info->parser_metrics->docker_ev->ev_type[i]++; // 'unknown'
             }
 
             new_tmp_text_size += docker_ev_type_size + 1; // +1 for ' ' char
@@ -979,12 +982,12 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
         //     int i;
         //     for(i = 0; i < NUM_OF_DOCKER_EV_TYPES - 1; i++){
         //         if(!strncmp(docker_ev_action, docker_ev_action_string[i], docker_ev_action_size)){
-        //             p_file_info->flb_tmp_docker_ev_metrics.ev_action[i]++;
+        //             p_file_info->parser_metrics->docker_ev->ev_action[i]++;
         //             break;
         //         }
         //     }
         //     if(unlikely(i >= NUM_OF_DOCKER_EV_TYPES - 1)){
-        //         p_file_info->flb_tmp_docker_ev_metrics.ev_action[i]++; // 'unknown'
+        //         p_file_info->parser_metrics->docker_ev->ev_action[i]++; // 'unknown'
         //     }
 
             new_tmp_text_size += docker_ev_action_size + 1; // +1 for ' ' char
@@ -995,12 +998,12 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
         //     int i;
         //     for(i = 0; i < NUM_OF_DOCKER_EV_TYPES - 1; i++){
         //         if(!strncmp(docker_ev_action, docker_ev_action_string[i], docker_ev_action_size)){
-        //             p_file_info->flb_tmp_docker_ev_metrics.ev_action[i]++;
+        //             p_file_info->parser_metrics->docker_ev->ev_action[i]++;
         //             break;
         //         }
         //     }
         //     if(unlikely(i >= NUM_OF_DOCKER_EV_TYPES - 1)){
-        //         p_file_info->flb_tmp_docker_ev_metrics.ev_action[i]++; // 'unknown'
+        //         p_file_info->parser_metrics->docker_ev->ev_action[i]++; // 'unknown'
         //     }
 
             new_tmp_text_size += docker_ev_id_size + 1; // +1 for ' ' char

@@ -756,12 +756,12 @@ void *logsmanagement_plugin_main(void *ptr){
                                   stats_chart_data->dim_db_timings_rotate[i], 
                                   stats_chart_data->num_db_timings_rotate[i]);
 
-            uv_mutex_lock(p_file_info->parser_metrics_mut);
+            // uv_mutex_lock(p_file_info->parser_metrics_mut);
 
             /* Update all charts including number of collected logs and custom charts. */
             chart_data_arr[i]->update(p_file_info, chart_data_arr[i]);
 
-            uv_mutex_unlock(p_file_info->parser_metrics_mut);
+            // uv_mutex_unlock(p_file_info->parser_metrics_mut);
 
             if(unlikely(netdata_exit)) break;
 

@@ -33,6 +33,8 @@ enum log_src_t {LOG_SRCS};
 static const char * const log_src_t_str[] = {LOG_SRCS};
 #undef LST
 
+#include "rrd_api/rrd_api.h"
+
 // Forward declaration to break circular dependency
 struct Circ_buff;
 struct Circ_buff_item_ptrs;
@@ -95,6 +97,7 @@ struct File_info {
     int compression_accel;                          /**< LZ4 compression acceleration factor for collected logs, see also: https://github.com/lz4/lz4/blob/90d68e37093d815e7ea06b0ee3c168cccffc84b8/lib/lz4.h#L195 **/
     int update_every;                               /**< Interval (in sec) of how often to collect and update charts **/
     int update_timeout;                             /**< Timeout to update charts after, since last update */
+    struct Chart_meta *chart_meta;
 
     /* Struct members related to disk database */
     sqlite3 *db;                                    /**< SQLite3 DB connection to DB that contains metadata for this log source **/
@@ -116,7 +119,7 @@ struct File_info {
     Log_parser_config_t *parser_config;             /**< Configuration to be user by log parser - read from logsmanagement.conf **/ 
     Log_parser_cus_config_t **parser_cus_config;    /**< Array of custom log parsing configurations **/
     Log_parser_metrics_t *parser_metrics;           /**< Extracted metrics **/
-    uv_mutex_t *parser_metrics_mut;                 /**< Mutex controlling access to parser_metrics **/
+    // uv_mutex_t *parser_metrics_mut;                 /**< Mutex controlling access to parser_metrics **/
 
     /* Struct members related to Fluent-Bit inputs, filters, buffers, outputs */
     int flb_input;                                  /**< Fluent-bit input interface property for this log source **/
