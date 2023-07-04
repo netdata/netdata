@@ -2162,3 +2162,130 @@ fail_only_drop:
     }
 }
 
+#define SQL_BUILD_CONFIG_TARGET_LIST "CREATE TEMP TABLE IF NOT EXISTS c_%p (hash_id blob)"
+
+#define SQL_POPULATE_TEMP_CONFIG_TARGET_TABLE "INSERT INTO c_%p (hash_id) VALUES (@hash_id)"
+
+#define SQL_SEARCH_CONFIG_LIST "SELECT hash_id, alarm, template, on_key, class, component, type, os, hosts, lookup, every, " \
+    " units, calc, families, plugin, module, charts, green, red, warn, crit, " \
+    " exec, to_key, info, delay, options, repeat, host_labels, p_db_lookup_dimensions, p_db_lookup_method, " \
+    " p_db_lookup_options, p_db_lookup_after, p_db_lookup_before, p_update_every, source, chart_labels " \
+    " FROM alert_hash ah, c_%p t where ah.hash_id = t.hash_id"
+
+void sql_get_alert_configuration(
+    DICTIONARY *configs,
+    void (*cb)(struct sql_alert_config_data *, void *),
+    void *data,
+    bool debug __maybe_unused)
+{
+    char sql[512];
+    int rc;
+    sqlite3_stmt *res = NULL;
+    BUFFER *command = NULL;
+
+    if (unlikely(!configs))
+        return;
+
+    snprintfz(sql, 511, SQL_BUILD_CONFIG_TARGET_LIST, configs);
+    rc = db_execute(db_meta, sql);
+    if (rc)
+        return;
+
+    snprintfz(sql, 511, SQL_POPULATE_TEMP_CONFIG_TARGET_TABLE, configs);
+
+    // Prepare statement to add things
+    rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to INSERT into c_%p", configs);
+        goto fail_only_drop;
+    }
+
+    void *t;
+    dfe_start_read(configs, t) {
+        uuid_t hash_id;
+        uuid_parse( t_dfe.name, hash_id);
+
+        rc = sqlite3_bind_blob(res, 1, &hash_id, sizeof(hash_id), SQLITE_STATIC);
+        if (unlikely(rc != SQLITE_OK))
+            error_report("Failed to bind host_id parameter.");
+
+        rc = sqlite3_step_monitored(res);
+        if (rc != SQLITE_DONE)
+            error_report("Error while populating temp table");
+
+        rc = sqlite3_reset(res);
+        if (rc != SQLITE_OK)
+            error_report("Error while resetting parameters");
+    }
+    dfe_done(t);
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK)) {
+        // log error but continue
+        error_report("Failed to finalize statement for sql_get_alert_configuration temp table population");
+    }
+
+    command = buffer_create(MAX_HEALTH_SQL_SIZE, NULL);
+
+    buffer_sprintf(command, SQL_SEARCH_CONFIG_LIST, configs);
+
+    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(command), -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement sql_get_alert_configuration");
+        goto fail_only_drop;
+    }
+
+    struct sql_alert_config_data acd = {0 };
+
+    int param = 0;
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        acd.config_hash_id = (uuid_t *) sqlite3_column_blob(res, param++);
+        acd.alarm = (const char *) sqlite3_column_text(res, param++);
+        acd.on_template = (const char *) sqlite3_column_text(res, param++);
+        acd.on_key = (const char *) sqlite3_column_text(res, param++);
+        acd.classification = (const char *) sqlite3_column_text(res, param++);
+        acd.component = (const char *) sqlite3_column_text(res, param++);
+        acd.type = (const char *) sqlite3_column_text(res, param++);
+        acd.os = (const char *) sqlite3_column_text(res, param++);
+        acd.hosts = (const char *) sqlite3_column_text(res, param++);
+        acd.lookup = (const char *) sqlite3_column_text(res, param++);
+        acd.every = (const char *) sqlite3_column_text(res, param++);
+        acd.units = (const char *) sqlite3_column_text(res, param++);
+        acd.calc = (const char *) sqlite3_column_text(res, param++);
+        acd.families = (const char *) sqlite3_column_text(res, param++);
+        acd.plugin = (const char *) sqlite3_column_text(res, param++);
+        acd.module = (const char *) sqlite3_column_text(res, param++);
+        acd.charts = (const char *) sqlite3_column_text(res, param++);
+        acd.green = (const char *) sqlite3_column_text(res, param++);
+        acd.red = (const char *) sqlite3_column_text(res, param++);
+        acd.warn = (const char *) sqlite3_column_text(res, param++);
+        acd.crit = (const char *) sqlite3_column_text(res, param++);
+        acd.exec = (const char *) sqlite3_column_text(res, param++);
+        acd.to_key = (const char *) sqlite3_column_text(res, param++);
+        acd.info = (const char *) sqlite3_column_text(res, param++);
+        acd.delay = (const char *) sqlite3_column_text(res, param++);
+        acd.options = (const char *) sqlite3_column_text(res, param++);
+        acd.repeat = (const char *) sqlite3_column_text(res, param++);
+        acd.host_labels = (const char *) sqlite3_column_text(res, param++);
+        acd.p_db_lookup_dimensions = (const char *) sqlite3_column_text(res, param++);
+        acd.p_db_lookup_method = (const char *) sqlite3_column_text(res, param++);
+        acd.p_db_lookup_options = (uint32_t) sqlite3_column_int(res, param++);
+        acd.p_db_lookup_after = (int32_t) sqlite3_column_int(res, param++);
+        acd.p_db_lookup_before = (int32_t) sqlite3_column_int(res, param++);
+        acd.p_update_every = (int32_t) sqlite3_column_int(res, param++);
+        acd.source = (const char *) sqlite3_column_text(res, param++);
+        acd.chart_labels = (const char *) sqlite3_column_text(res, param++);
+
+        cb(&acd, data);
+    }
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement for sql_get_alert_configuration");
+
+fail_only_drop:
+    (void)snprintfz(sql, 511, "DROP TABLE IF EXISTS c_%p", configs);
+    (void)db_execute(db_meta, sql);
+    buffer_free(command);
+}
+

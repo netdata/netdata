@@ -6,6 +6,7 @@
 #include "sqlite3.h"
 
 struct sql_alert_transition_data;
+struct sql_alert_config_data;
 extern sqlite3 *db_meta;
 void sql_health_alarm_log_load(RRDHOST *host);
 void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae);
@@ -29,6 +30,12 @@ void sql_alert_transitions(
     void (*cb)(struct sql_alert_transition_data *, void *),
     void *data,
     bool debug);
+
+void sql_get_alert_configuration(
+    DICTIONARY *configs,
+    void (*cb)(struct sql_alert_config_data *, void *),
+    void *data,
+    bool debug __maybe_unused);
 
 bool sql_find_alert_transition(const char *transition, void (*cb)(const char *machine_guid, const char *context, time_t alert_id, void *data), void *data);
 #endif //NETDATA_SQLITE_HEALTH_H

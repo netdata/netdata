@@ -452,6 +452,45 @@ struct sql_alert_transition_data {
     struct sql_alert_transition_data *prev;
 };
 
+struct sql_alert_config_data {
+    uuid_t *config_hash_id;
+    const char *alarm;
+    const char *on_template;
+    const char *on_key;
+    const char *classification;
+    const char *component;
+    const char *type;
+    const char *os;
+    const char *hosts;
+    const char *lookup;
+    const char *every;
+    const char *units;
+    const char *calc;
+    const char *families;
+    const char *plugin;
+    const char *module;
+    const char *charts;
+    const char *green;
+    const char *red;
+    const char *warn;
+    const char *crit;
+    const char *exec;
+    const char *to_key;
+    const char *info;
+    const char *delay;
+    const char *options;
+    const char *repeat;
+    const char *host_labels;
+    const char *p_db_lookup_dimensions;
+    const char *p_db_lookup_method;
+    const char *source;
+    const char *chart_labels;
+    uint32_t p_db_lookup_options;
+    int32_t p_db_lookup_after;
+    int32_t p_db_lookup_before;
+    int32_t p_update_every;
+};
+
 struct sql_alert_instance_v2_entry {
     RRDCALC *tmp;
 
