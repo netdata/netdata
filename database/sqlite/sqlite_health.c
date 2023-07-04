@@ -1986,34 +1986,34 @@ fail_only_drop:
     " d.new_value, d.old_value, d.last_repeat, d.transition_id,  d.global_id FROM health_log h, health_log_detail d, v_%p t " \
     " WHERE h.host_id = t.host_id AND h.health_log_id = d.health_log_id AND d.global_id BETWEEN @after AND @before "
 
-void sql_alert_transitions(DICTIONARY *alert_instances, time_t after, time_t before, const char *context, const char *alert_name,
-        void (*cb)(struct alert_transition_data *atd, void *data), void *data,
-        bool debug __maybe_unused)
+void sql_alert_transitions(DICTIONARY *nodes, time_t after, time_t before, const char *context, const char *alert_name,
+                           void (*cb)(struct alert_transition_data *atd, void *data), void *data,
+                           bool debug __maybe_unused)
 {
     char sql[512];
     int rc;
     sqlite3_stmt *res = NULL;
     BUFFER *command = NULL;
 
-    if (unlikely(!alert_instances))
+    if (unlikely(!nodes))
         return;
 
-    snprintfz(sql, 511, SQL_BUILD_ALERT_TRANSITION, alert_instances);
+    snprintfz(sql, 511, SQL_BUILD_ALERT_TRANSITION, nodes);
     rc = db_execute(db_meta, sql);
     if (rc)
         return;
 
-    snprintfz(sql, 511, SQL_POPULATE_TEMP_ALERT_TRANSITION_TABLE, alert_instances);
+    snprintfz(sql, 511, SQL_POPULATE_TEMP_ALERT_TRANSITION_TABLE, nodes);
 
     // Prepare statement to add things
     rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to INSERT into v_%p", alert_instances);
+        error_report("Failed to prepare statement to INSERT into v_%p", nodes);
         goto fail_only_drop;
     }
 
     void *t;
-    dfe_start_read(alert_instances, t) {
+    dfe_start_read(nodes, t) {
         uuid_t host_uuid;
         uuid_parse( t_dfe.name, host_uuid);
 
@@ -2039,7 +2039,7 @@ void sql_alert_transitions(DICTIONARY *alert_instances, time_t after, time_t bef
 
     command = buffer_create(MAX_HEALTH_SQL_SIZE, NULL);
 
-    buffer_sprintf(command, SQL_SEARCH_ALERT_TRANSITION, alert_instances);
+    buffer_sprintf(command, SQL_SEARCH_ALERT_TRANSITION, nodes);
 
     if (context)
         buffer_sprintf(command, " AND h.chart_context = @context");
@@ -2082,7 +2082,7 @@ void sql_alert_transitions(DICTIONARY *alert_instances, time_t after, time_t bef
         }
     }
 
-    struct alert_transition_data atd;
+    struct alert_transition_data atd = { 0 };
 
     while (sqlite3_step(res) == SQLITE_ROW) {
         atd.host_id = (uuid_t *) sqlite3_column_blob(res, 0);
@@ -2120,7 +2120,7 @@ fail:
         error_report("Failed to finalize statement for sql_alert_transitions");
 
 fail_only_drop:
-    (void) snprintfz(sql, 511, "DROP TABLE IF EXISTS v_%p", alert_instances);
+    (void) snprintfz(sql, 511, "DROP TABLE IF EXISTS v_%p", nodes);
     (void) db_execute(db_meta, sql);
     buffer_free(command);
 }

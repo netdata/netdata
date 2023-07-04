@@ -422,7 +422,7 @@ static bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRD
                 size_t aci = 0;
                 matches++;
 
-                if (ctl->options & CONTEXT_V2_OPTION_ALERT_CONFIGURATIONS) {
+                if (ctl->options & CONTEXT_V2_OPTION_ALERTS_WITH_CONFIGURATIONS) {
                     char key[UUID_STR_LEN + 1];
                     uuid_unparse_lower(rcl->config_hash_id, key);
                     struct alert_config_v2_entry t2 = {
@@ -434,7 +434,7 @@ static bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRD
                     aci = a2c->aci;
                 }
 
-                if (ctl->options & (CONTEXT_V2_OPTION_ALERT_INSTANCES | CONTEXT_V2_OPTION_ALERT_INSTANCES_HIDDEN)) {
+                if (ctl->options & (CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES | CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES_HIDDEN)) {
                     char key[20 + 1];
                     snprintfz(key, 20, "%p", rcl);
 
@@ -677,9 +677,9 @@ static inline void rrdhost_health_to_json_v2(BUFFER *wb, const char *key, RRDHOS
 static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdcontext_to_json_v2_data *ctl, size_t node_id) {
     buffer_json_add_array_item_object(wb); // this node
     buffer_json_node_add_v2(wb, host, node_id, 0,
-                            (ctl->mode & CONTEXTS_V2_AGENTS) && !(ctl->mode & CONTEXTS_V2_NODES_INSTANCES));
+                            (ctl->mode & CONTEXTS_V2_AGENTS) && !(ctl->mode & CONTEXTS_V2_NODE_INSTANCES));
 
-    if(ctl->mode & (CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODES_INSTANCES)) {
+    if(ctl->mode & (CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODE_INSTANCES)) {
         RRDHOST_STATUS s;
         rrdhost_status(host, ctl->now, &s);
 
@@ -725,7 +725,7 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
             agent_capabilities_to_json(wb, host, "capabilities");
         }
 
-        if (ctl->mode & (CONTEXTS_V2_NODES_INSTANCES)) {
+        if (ctl->mode & (CONTEXTS_V2_NODE_INSTANCES)) {
             buffer_json_member_add_array(wb, "instances");
             buffer_json_add_array_item_object(wb); // this instance
             {
@@ -796,7 +796,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
         return -1; // stop the query
 
     bool host_matched = (ctl->mode & CONTEXTS_V2_NODES);
-    bool do_contexts = (ctl->mode & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_ALERTS));
+    bool do_contexts = (ctl->mode & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_ALERTS));
 
     ctl->q.host_match = FTS_MATCHED_NONE;
     if((ctl->mode & CONTEXTS_V2_SEARCH)) {
@@ -876,7 +876,7 @@ static void buffer_json_contexts_v2_mode_to_array(BUFFER *wb, const char *key, C
     if(mode & CONTEXTS_V2_NODES_INFO)
         buffer_json_add_array_item_string(wb, "nodes-info");
 
-    if(mode & CONTEXTS_V2_NODES_INSTANCES)
+    if(mode & CONTEXTS_V2_NODE_INSTANCES)
         buffer_json_add_array_item_string(wb, "nodes-instances");
 
     if(mode & CONTEXTS_V2_CONTEXTS)
@@ -887,6 +887,9 @@ static void buffer_json_contexts_v2_mode_to_array(BUFFER *wb, const char *key, C
 
     if(mode & CONTEXTS_V2_ALERTS)
         buffer_json_add_array_item_string(wb, "alerts");
+
+    if(mode & CONTEXTS_V2_ALERT_TRANSITIONS)
+        buffer_json_add_array_item_string(wb, "alert_transitions");
 
     buffer_json_array_close(wb);
 }
@@ -1123,15 +1126,15 @@ static int alert_instances_aii_compar(const DICTIONARY_ITEM **item1, const DICTI
         return 1;
 }
 
-struct alert_instance_to_json_cb_data {
+struct alert_instances_callback_data {
     BUFFER *wb;
     struct rrdcontext_to_json_v2_data *ctl;
     bool debug;
 };
 
-static int alert_instances_json_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
+static int contexts_v2_alert_instance_to_json_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
     struct alert_instance_v2_entry *t = value;
-    struct alert_instance_to_json_cb_data *d = data;
+    struct alert_instances_callback_data *d = data;
     struct rrdcontext_to_json_v2_data *ctl = d->ctl;
     bool debug = d->debug;
     BUFFER *wb = d->wb;
@@ -1141,7 +1144,7 @@ static int alert_instances_json_callback(const DICTIONARY_ITEM *item __maybe_unu
         buffer_json_member_add_uint64(wb, "ni", t->ni);
         buffer_json_member_add_uint64(wb, "ati", t->ati);
         buffer_json_member_add_uint64(wb, "aii", t->aii);
-        if(ctl->request->options & CONTEXT_V2_OPTION_ALERT_CONFIGURATIONS) {
+        if(ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_CONFIGURATIONS) {
             buffer_json_member_add_uint64(wb, "aci", t->aci);
         }
         buffer_json_member_add_uint64(wb, "gi", t->global_id);
@@ -1167,10 +1170,10 @@ static int alert_instances_json_callback(const DICTIONARY_ITEM *item __maybe_unu
     return 1;
 }
 
-static void show_alert_transitions(BUFFER *wb, struct rrdcontext_to_json_v2_data *ctl, bool debug, bool show_only_with_transitions_sorted) {
-    buffer_json_member_add_array(wb, "alert_instances");
+static void contexts_v2_alert_instances_to_json(BUFFER *wb, const char *key, struct rrdcontext_to_json_v2_data *ctl, bool debug, bool show_only_with_transitions_sorted) {
+    buffer_json_member_add_array(wb, key);
     {
-        struct alert_instance_to_json_cb_data data = {
+        struct alert_instances_callback_data data = {
                 .wb = wb,
                 .ctl = ctl,
                 .debug = debug,
@@ -1178,20 +1181,416 @@ static void show_alert_transitions(BUFFER *wb, struct rrdcontext_to_json_v2_data
 
         if(show_only_with_transitions_sorted) {
             struct alert_instance_v2_entry *t;
+            // remove the instances without transitions
+            // so that we can sort the instances that have transitions
             dfe_start_read(ctl->alerts.alert_instances, t) {
                 if(!t->transitions)
                     dictionary_del(ctl->alerts.alert_instances, t_dfe.name);
             }
             dfe_done(t);
 
+            // aii has already been renumbered (during SQL query) for sorting to work
             dictionary_sorted_walkthrough_rw(ctl->alerts.alert_instances, DICTIONARY_LOCK_READ,
-                                             alert_instances_json_callback, &data, alert_instances_aii_compar);
+                                             contexts_v2_alert_instance_to_json_callback, &data,
+                                             alert_instances_aii_compar);
         }
         else
             dictionary_walkthrough_rw(ctl->alerts.alert_instances, DICTIONARY_LOCK_READ,
-                                      alert_instances_json_callback, &data);
+                                      contexts_v2_alert_instance_to_json_callback, &data);
     }
     buffer_json_array_close(wb); // alerts_instances
+}
+
+static void contexts_v2_alerts_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_data *ctl, bool debug) {
+    buffer_json_member_add_array(wb, "alerts");
+    {
+        struct alert_v2_entry *t;
+        dfe_start_read(ctl->alerts.alerts, t){
+                    buffer_json_add_array_item_object(wb);
+                    {
+                        buffer_json_member_add_uint64(wb, "ati", t->ati);
+                        buffer_json_member_add_string(wb, "nm", string2str(t->name));
+
+                        buffer_json_member_add_uint64(wb, "cr", t->critical);
+                        buffer_json_member_add_uint64(wb, "wr", t->warning);
+                        buffer_json_member_add_uint64(wb, "cl", t->clear);
+                        buffer_json_member_add_uint64(wb, "er", t->error);
+
+                        buffer_json_member_add_uint64(wb, "in", t->instances);
+                        buffer_json_member_add_uint64(wb, "nd", dictionary_entries(t->nodes));
+                        buffer_json_member_add_uint64(wb, "cfg", dictionary_entries(t->configs));
+                    }
+                    buffer_json_object_close(wb); // alert name
+                }
+        dfe_done(t);
+    }
+    buffer_json_array_close(wb); // alerts
+
+    if((ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_TRANSITIONS)) {
+        buffer_json_member_add_array(wb, "alert_transitions");
+        sql_health_alarm_log2json_v3(
+                wb,
+                ctl->alerts.alert_instances,
+                ctl->request->after,
+                ctl->request->before,
+                ctl->request->alerts.anchor ? ctl->request->alerts.anchor : ctl->request->alerts.transition,
+                ctl->request->alerts.last ? ctl->request->alerts.last : 1,
+                debug, (ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES));
+        buffer_json_array_close(wb); // alerts_transitions
+
+        if(ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES) {
+            contexts_v2_alert_instances_to_json(wb, "alert_instances", ctl, debug, true);
+        }
+    }
+    else if(ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES) {
+        contexts_v2_alert_instances_to_json(wb, "alert_instances", ctl, debug, false);
+    }
+
+    if(ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_CONFIGURATIONS) {
+        buffer_json_member_add_array(wb, "alert_configurations");
+        {
+            struct alert_config_v2_entry *t;
+            dfe_start_read(ctl->alerts.alert_configs, t){
+                        RRDCALC *rc = t->tmp;
+
+                        buffer_json_add_array_item_object(wb);
+                        {
+                            buffer_json_member_add_uint64(wb, "ati", t->ati);
+                            buffer_json_member_add_uint64(wb, "aci", t->aci);
+                            buffer_json_member_add_string(wb, "cfg", t_dfe.name);
+
+                            if(debug)
+                                buffer_json_member_add_string(wb, "nm", string2str(rc->name));
+
+                            buffer_json_member_add_string(wb, "ctx", string2str(rc->rrdset->context));
+                            buffer_json_member_add_string(wb, "class", string2str(rc->classification));
+                            buffer_json_member_add_string(wb, "component", string2str(rc->component));
+                            buffer_json_member_add_string(wb, "type", string2str(rc->type));
+                            buffer_json_member_add_string(wb, "info", string2str(rc->original_info));
+
+                            buffer_json_member_add_object(wb, "v"); // value
+                            {
+                                buffer_json_member_add_uint64(wb, "update_every", rc->update_every);
+                                buffer_json_member_add_string(wb, "units", string2str(rc->units));
+
+                                if (RRDCALC_HAS_DB_LOOKUP(rc) || debug) {
+                                    buffer_json_member_add_object(wb, "db");
+                                    {
+                                        if (rc->dimensions || debug)
+                                            buffer_json_member_add_string(wb, "dimensions", rrdcalc_dimensions(rc));
+
+                                        buffer_json_member_add_string(wb, "method", time_grouping_method2string(rc->group));
+                                        buffer_json_member_add_time_t(wb, "after", rc->after);
+                                        buffer_json_member_add_time_t(wb, "before", rc->before);
+
+                                        web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", (RRDR_OPTIONS) rc->options);
+                                    }
+                                    buffer_json_object_close(wb); // db
+                                }
+
+                                if (rc->calculation || debug) {
+                                    buffer_json_member_add_string(wb, "calc", rc->calculation ? rc->calculation->source : NULL);
+                                    // buffer_json_member_add_string(wb, "calc_parsed", rc->calculation->parsed_as);
+                                }
+                            }
+                            buffer_json_object_close(wb); // value
+
+                            if(rc->warning || rc->critical || debug) {
+                                buffer_json_member_add_object(wb, "st"); // conditions
+                                {
+                                    if(!isnan(rc->green) || debug)
+                                        buffer_json_member_add_double(wb, "green", rc->green);
+
+                                    if(!isnan(rc->red) || debug)
+                                        buffer_json_member_add_double(wb, "red", rc->red);
+
+                                    if (rc->warning || debug) {
+                                        buffer_json_member_add_string(wb, "warn", rc->warning ? rc->warning->source : NULL);
+                                        // buffer_json_member_add_string(wb, "warn_parsed", rc->warning ? rc->warning->parsed_as : NULL);
+                                    }
+
+                                    if (rc->critical || debug) {
+                                        buffer_json_member_add_string(wb, "crit", rc->critical ? rc->critical->source : NULL);
+                                        // buffer_json_member_add_string(wb, "crit_parsed", rc->critical ? rc->critical->parsed_as : NULL);
+                                    }
+                                }
+                                buffer_json_object_close(wb); // conditions
+                            }
+
+                            buffer_json_member_add_object(wb, "nf");
+                            {
+                                buffer_json_member_add_string(wb, "type", "agent");
+                                buffer_json_member_add_string(wb, "method", rc->exec ? rrdcalc_exec(rc) : string2str(localhost->health.health_default_exec));
+                                buffer_json_member_add_string(wb, "to", rc->recipient ? string2str(rc->recipient) : string2str(rc->rrdset->rrdhost->health.health_default_recipient));
+
+                                if(rc->delay_up_duration || rc->delay_down_duration || debug) {
+                                    buffer_json_member_add_object(wb, "delay");
+                                    {
+                                        buffer_json_member_add_time_t(wb, "up", rc->delay_up_duration);
+                                        buffer_json_member_add_time_t(wb, "down", rc->delay_down_duration);
+                                        buffer_json_member_add_time_t(wb, "max", rc->delay_max_duration);
+                                        buffer_json_member_add_double(wb, "multiplier", rc->delay_multiplier);
+                                    }
+                                    buffer_json_object_close(wb); //delay
+                                }
+
+                                if(rc->warn_repeat_every || rc->crit_repeat_every || debug) {
+                                    buffer_json_member_add_object(wb, "repeat");
+                                    {
+                                        if(rc->warn_repeat_every || debug)
+                                            buffer_json_member_add_time_t(wb, "warn", rc->warn_repeat_every);
+
+                                        if(rc->crit_repeat_every || debug)
+                                            buffer_json_member_add_time_t(wb, "crit", rc->crit_repeat_every);
+                                    }
+                                    buffer_json_object_close(wb); // repeat
+                                }
+
+                                if (unlikely((rc->options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION) || debug))
+                                    buffer_json_member_add_boolean(wb, "no_clear_notification", rc->options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION);
+                            }
+                            buffer_json_object_close(wb); // notification
+                            buffer_json_member_add_string(wb, "src", string2str(rc->source));
+                        }
+                        buffer_json_object_close(wb); // alert config
+                    }
+            dfe_done(t);
+        }
+        buffer_json_array_close(wb); // alerts_configs
+    }
+}
+
+struct facet_entry {
+    uint32_t count;
+};
+
+struct alert_transitions_callback_data {
+    struct rrdcontext_to_json_v2_data *ctl;
+    BUFFER *wb;
+    bool debug;
+
+    struct {
+        SIMPLE_PATTERN *pattern;
+        DICTIONARY *dict;
+    } facets[ATF_TOTAL_ENTRIES];
+
+    uint32_t limit;
+    uint32_t items;
+    struct alert_transition_data *base;
+
+    struct alert_transition_data *last_added;
+};
+
+static struct alert_transition_data *contexts_v2_alert_transition_dup(struct alert_transition_data *t) {
+    struct alert_transition_data *n = mallocz(sizeof(*t));
+    memcpy(n, t, sizeof(*t));
+
+    n->transition_id = mallocz(sizeof(*t->transition_id));
+    memcpy(n->transition_id, t->transition_id, sizeof(*t->transition_id));
+
+    n->host_id = mallocz(sizeof(*t->host_id));
+    memcpy(n->host_id, t->host_id, sizeof(*t->host_id));
+
+    n->config_hash_id = mallocz(sizeof(*t->config_hash_id));
+    memcpy(n->config_hash_id, t->config_hash_id, sizeof(*t->config_hash_id));
+
+    n->name = strdupz(t->name);
+    n->chart = strdupz(t->chart);
+    n->chart_context = strdupz(t->chart_context);
+    n->family = strdupz(t->family);
+    n->recipient = strdupz(t->recipient);
+    n->units = strdupz(t->units);
+    n->info = strdupz(t->info);
+
+    return n;
+}
+
+static void contexts_v2_alert_transition_free(struct alert_transition_data *t) {
+    freez(t->transition_id);
+    freez(t->host_id);
+    freez(t->config_hash_id);
+    freez((void *)t->name);
+    freez((void *)t->chart);
+    freez((void *)t->chart_context);
+    freez((void *)t->family);
+    freez((void *)t->recipient);
+    freez((void *)t->units);
+    freez((void *)t->info);
+    freez(t);
+}
+
+static inline void contexts_v2_alert_transition_keep(struct alert_transitions_callback_data *d, struct alert_transition_data *t) {
+    if(t->global_id < d->ctl->request->alerts.global_id_anchor)
+        // this is in our past, we are not interested
+        return;
+
+    if(unlikely(!d->base)) {
+        d->last_added = contexts_v2_alert_transition_dup(t);
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(d->base, d->last_added, prev, next);
+        d->items++;
+        return;
+    }
+
+    struct alert_transition_data *last = d->last_added;
+    while(last != d->base && last->prev->global_id > t->global_id)
+        last = last->prev;
+
+    while(last->next && last->next->global_id < t->global_id)
+        last = last->next;
+
+    d->items++;
+    d->last_added = contexts_v2_alert_transition_dup(t);
+
+    if(last->global_id > t->global_id)
+        DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(d->base, d->last_added, prev, next);
+    else
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(d->base, d->last_added, prev, next);
+
+    while(d->items > d->limit) {
+        // we have to remove something
+
+        struct alert_transition_data *tmp = d->base->prev;
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(d->base, tmp, prev, next);
+        d->items--;
+
+        if(unlikely(d->last_added == tmp))
+            d->last_added = d->base;
+
+        contexts_v2_alert_transition_free(tmp);
+    }
+}
+
+static void contexts_v2_alert_transition_callback(struct alert_transition_data *t, void *data) {
+    struct alert_transitions_callback_data *d = data;
+
+    const char *facets[ATF_TOTAL_ENTRIES] = {
+            [ATF_STATUS] = rrdcalc_status2string(t->new_status),
+            [ATF_CLASS] = NULL, // TODO - get this from SQL
+            [ATF_TYPE] = NULL, // TODO - get this from SQL
+            [ATF_COMPONENT] = NULL, // TODO - get this from SQL
+            [ATF_ROLE] = t->recipient,
+            [ATF_NODE] = NULL, // TODO - get this from SQL
+    };
+
+    for(size_t i = 0; i < ATF_TOTAL_ENTRIES ;i++)
+        if(!facets[i] || !*facets[i]) facets[i] = "unknown";
+
+    bool selected[ATF_TOTAL_ENTRIES] = { 0 };
+
+    uint32_t selected_by = 0;
+    for(size_t i = 0; i < ATF_TOTAL_ENTRIES ;i++) {
+        selected[i] = !d->facets[i].pattern || simple_pattern_matches(d->facets[i].pattern, facets[i]);
+        if(selected[i])
+            selected_by++;
+    }
+
+    if(selected_by == ATF_TOTAL_ENTRIES) {
+        // this item is selected by all facets
+        // put it in our result (if it fits)
+        contexts_v2_alert_transition_keep(d, t);
+    }
+
+    if(selected_by >= ATF_TOTAL_ENTRIES - 1) {
+        // this item is selected by all, or all except one facet
+        // in both cases we need to add it to our counters
+
+        for (size_t i = 0; i < ATF_TOTAL_ENTRIES; i++) {
+            uint32_t counted_by = selected_by;
+
+            if (counted_by != ATF_TOTAL_ENTRIES) {
+                for (size_t j = 0; j < ATF_TOTAL_ENTRIES; j++) {
+                    if (i == j || selected[j])
+                        counted_by++;
+                }
+            }
+
+            if (counted_by == ATF_TOTAL_ENTRIES) {
+                // we need to count it on this facet
+                struct facet_entry tmp = {
+                        .count = 0,
+                };
+
+                struct facet_entry *x = dictionary_set(d->facets[i].dict, facets[i], &tmp, sizeof(tmp));
+                x->count++;
+            }
+        }
+    }
+}
+
+static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_data *ctl, bool debug) {
+    struct alert_transitions_callback_data data = {
+            .wb = wb,
+            .ctl = ctl,
+            .debug = debug,
+            .limit = ctl->request->alerts.last,
+            .items = 0,
+            .base = NULL,
+    };
+
+    for(size_t i = 0; i < ATF_TOTAL_ENTRIES ;i++) {
+        data.facets[i].dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_FIXED_SIZE | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, sizeof(struct facet_entry));
+        if(ctl->request->alerts.facets[i])
+            data.facets[i].pattern = simple_pattern_create(ctl->request->alerts.facets[i], ",|", SIMPLE_PATTERN_EXACT, false);
+    }
+
+    sql_alert_transitions(ctl->nodes.dict, ctl->window.after, ctl->window.before, ctl->request->contexts,
+                          ctl->request->alerts.alert, contexts_v2_alert_transition_callback, &data, debug);
+
+    buffer_json_member_add_object(wb, "facets");
+    for (size_t i = 0; i < ATF_TOTAL_ENTRIES; i++) {
+        const char *key;
+        switch(i) {
+            default:
+            case ATF_STATUS:
+                key = "status";
+                break;
+
+            case ATF_CLASS:
+                key = "class";
+                break;
+
+            case ATF_TYPE:
+                key = "type";
+                break;
+
+            case ATF_COMPONENT:
+                key = "component";
+                break;
+
+            case ATF_ROLE:
+                key = "role";
+                break;
+
+            case ATF_NODE:
+                key = "node";
+                break;
+        }
+
+        buffer_json_member_add_object(wb, key);
+        struct facet_entry *x;
+        dfe_start_read(data.facets[i].dict, x) {
+            buffer_json_member_add_uint64(wb, x_dfe.name, x->count);
+        }
+        dfe_done(x);
+        buffer_json_object_close(wb); // key
+    }
+    buffer_json_object_close(wb);
+
+    for(struct alert_transition_data *t = data.base; t ; t = t->next) {
+        // TODO print the item
+        ;
+    }
+
+    for(size_t i = 0; i < ATF_TOTAL_ENTRIES ;i++) {
+        dictionary_destroy(data.facets[i].dict);
+        simple_pattern_free(data.facets[i].pattern);
+    }
+
+    while(data.base) {
+        struct alert_transition_data *t = data.base;
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(data.base, t, prev, next);
+        contexts_v2_alert_transition_free(t);
+    }
 }
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_MODE mode) {
@@ -1204,11 +1603,11 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     if(mode & (CONTEXTS_V2_AGENTS_INFO))
         mode |= CONTEXTS_V2_AGENTS;
 
-    if(mode & (CONTEXTS_V2_ALERTS | CONTEXTS_V2_FUNCTIONS | CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODES_INSTANCES))
+    if(mode & (CONTEXTS_V2_ALERTS | CONTEXTS_V2_ALERT_TRANSITIONS | CONTEXTS_V2_FUNCTIONS | CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODE_INSTANCES))
         mode |= CONTEXTS_V2_NODES;
 
-    if(req->options & CONTEXT_V2_OPTION_ALERT_TRANSITIONS)
-        req->options |= CONTEXT_V2_OPTION_ALERT_INSTANCES_HIDDEN;
+    if(req->options & CONTEXT_V2_OPTION_ALERTS_WITH_TRANSITIONS)
+        req->options |= CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES_HIDDEN;
 
     struct rrdcontext_to_json_v2_data ctl = {
             .wb = wb,
@@ -1261,7 +1660,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
     if(mode & CONTEXTS_V2_ALERTS) {
         if(req->alerts.transition) {
-            ctl.options |= CONTEXT_V2_OPTION_ALERT_INSTANCES | CONTEXT_V2_OPTION_ALERT_CONFIGURATIONS | CONTEXT_V2_OPTION_ALERT_TRANSITIONS;
+            ctl.options |= CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES | CONTEXT_V2_OPTION_ALERTS_WITH_CONFIGURATIONS | CONTEXT_V2_OPTION_ALERTS_WITH_TRANSITIONS;
             run = sql_find_alert_transition(req->alerts.transition, rrdcontext_v2_set_transition_filter, &ctl);
             if(!run) {
                 resp = HTTP_RESP_NOT_FOUND;
@@ -1276,7 +1675,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         dictionary_register_conflict_callback(ctl.alerts.alerts, alerts_v2_conflict_callback, &ctl);
         dictionary_register_delete_callback(ctl.alerts.alerts, alerts_v2_delete_callback, &ctl);
 
-        if(ctl.options & (CONTEXT_V2_OPTION_ALERT_INSTANCES | CONTEXT_V2_OPTION_ALERT_INSTANCES_HIDDEN)) {
+        if(ctl.options & (CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES | CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES_HIDDEN)) {
             ctl.alerts.alert_instances = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
                                                                     NULL, sizeof(struct alert_instance_v2_entry));
 
@@ -1285,7 +1684,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
             dictionary_register_delete_callback(ctl.alerts.alert_instances, alert_instances_delete_callback, &ctl);
         }
 
-        if(ctl.options & CONTEXT_V2_OPTION_ALERT_CONFIGURATIONS) {
+        if(ctl.options & CONTEXT_V2_OPTION_ALERTS_WITH_CONFIGURATIONS) {
             ctl.alerts.alert_configs = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
                                                                   NULL, sizeof(struct alert_config_v2_entry));
 
@@ -1375,233 +1774,82 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
     ctl.timings.executed_ut = now_monotonic_usec();
 
-    if(mode & CONTEXTS_V2_NODES) {
-        buffer_json_member_add_array(wb, "nodes");
-        struct contexts_v2_node *t;
-        dfe_start_read(ctl.nodes.dict, t) {
-            rrdcontext_to_json_v2_rrdhost(wb, t->host, &ctl, t->ni);
-        }
-        dfe_done(t);
-        buffer_json_array_close(wb);
+    if(mode & CONTEXTS_V2_ALERT_TRANSITIONS) {
+        contexts_v2_alert_transitions_to_json(wb, &ctl, debug);
     }
-
-    if(mode & CONTEXTS_V2_FUNCTIONS) {
-        buffer_json_member_add_array(wb, "functions");
-        {
-            struct function_v2_entry *t;
-            dfe_start_read(ctl.functions.dict, t) {
-                buffer_json_add_array_item_object(wb);
-                buffer_json_member_add_string(wb, "name", t_dfe.name);
-                buffer_json_member_add_string(wb, "help", string2str(t->help));
-                buffer_json_member_add_array(wb, "ni");
-                for(size_t i = 0; i < t->used ;i++)
-                    buffer_json_add_array_item_uint64(wb, t->node_ids[i]);
-                buffer_json_array_close(wb);
-                buffer_json_object_close(wb);
+    else {
+        if (mode & CONTEXTS_V2_NODES) {
+            buffer_json_member_add_array(wb, "nodes");
+            struct contexts_v2_node *t;
+            dfe_start_read(ctl.nodes.dict, t) {
+                rrdcontext_to_json_v2_rrdhost(wb, t->host, &ctl, t->ni);
             }
             dfe_done(t);
-        }
-        buffer_json_array_close(wb);
-    }
-
-    if(mode & CONTEXTS_V2_CONTEXTS) {
-        buffer_json_member_add_object(wb, "contexts");
-        {
-            struct context_v2_entry *z;
-            dfe_start_read(ctl.contexts.dict, z) {
-                bool collected = z->flags & RRD_FLAG_COLLECTED;
-
-                buffer_json_member_add_object(wb, string2str(z->id));
-                {
-                    buffer_json_member_add_string(wb, "family", string2str(z->family));
-                    buffer_json_member_add_uint64(wb, "priority", z->priority);
-                    buffer_json_member_add_time_t(wb, "first_entry", z->first_time_s);
-                    buffer_json_member_add_time_t(wb, "last_entry", collected ? ctl.now : z->last_time_s);
-                    buffer_json_member_add_boolean(wb, "live", collected);
-                    if (mode & CONTEXTS_V2_SEARCH)
-                        buffer_json_member_add_string(wb, "match", fts_match_to_string(z->match));
-                }
-                buffer_json_object_close(wb);
-            }
-            dfe_done(z);
-        }
-        buffer_json_object_close(wb); // contexts
-    }
-
-    if(mode & CONTEXTS_V2_ALERTS) {
-        buffer_json_member_add_array(wb, "alerts");
-        {
-            struct alert_v2_entry *t;
-            dfe_start_read(ctl.alerts.alerts, t){
-                buffer_json_add_array_item_object(wb);
-                {
-                    buffer_json_member_add_uint64(wb, "ati", t->ati);
-                    buffer_json_member_add_string(wb, "nm", string2str(t->name));
-
-                    buffer_json_member_add_uint64(wb, "cr", t->critical);
-                    buffer_json_member_add_uint64(wb, "wr", t->warning);
-                    buffer_json_member_add_uint64(wb, "cl", t->clear);
-                    buffer_json_member_add_uint64(wb, "er", t->error);
-
-                    buffer_json_member_add_uint64(wb, "in", t->instances);
-                    buffer_json_member_add_uint64(wb, "nd", dictionary_entries(t->nodes));
-                    buffer_json_member_add_uint64(wb, "cfg", dictionary_entries(t->configs));
-                }
-                buffer_json_object_close(wb); // alert name
-            }
-            dfe_done(t);
-        }
-        buffer_json_array_close(wb); // alerts
-
-        if((req->options & CONTEXT_V2_OPTION_ALERT_TRANSITIONS)) {
-            buffer_json_member_add_array(wb, "alert_transitions");
-            sql_health_alarm_log2json_v3(
-                    wb,
-                    ctl.alerts.alert_instances,
-                    ctl.request->after,
-                    ctl.request->before,
-                    ctl.request->alerts.anchor ? ctl.request->alerts.anchor : ctl.request->alerts.transition,
-                    ctl.request->alerts.last ? ctl.request->alerts.last : 1,
-                    debug, (req->options & CONTEXT_V2_OPTION_ALERT_INSTANCES));
-            buffer_json_array_close(wb); // alerts_transitions
-
-            if(req->options & CONTEXT_V2_OPTION_ALERT_INSTANCES) {
-                show_alert_transitions(wb, &ctl, debug, true);
-            }
-        }
-        else if(req->options & CONTEXT_V2_OPTION_ALERT_INSTANCES) {
-            show_alert_transitions(wb, &ctl, debug, false);
+            buffer_json_array_close(wb);
         }
 
-        if(req->options & CONTEXT_V2_OPTION_ALERT_CONFIGURATIONS) {
-            buffer_json_member_add_array(wb, "alert_configurations");
+        if (mode & CONTEXTS_V2_FUNCTIONS) {
+            buffer_json_member_add_array(wb, "functions");
             {
-                struct alert_config_v2_entry *t;
-                dfe_start_read(ctl.alerts.alert_configs, t){
-                    RRDCALC *rc = t->tmp;
-
+                struct function_v2_entry *t;
+                dfe_start_read(ctl.functions.dict, t) {
                     buffer_json_add_array_item_object(wb);
-                    {
-                        buffer_json_member_add_uint64(wb, "ati", t->ati);
-                        buffer_json_member_add_uint64(wb, "aci", t->aci);
-                        buffer_json_member_add_string(wb, "cfg", t_dfe.name);
-
-                        if(debug)
-                            buffer_json_member_add_string(wb, "nm", string2str(rc->name));
-
-                        buffer_json_member_add_string(wb, "ctx", string2str(rc->rrdset->context));
-                        buffer_json_member_add_string(wb, "class", string2str(rc->classification));
-                        buffer_json_member_add_string(wb, "component", string2str(rc->component));
-                        buffer_json_member_add_string(wb, "type", string2str(rc->type));
-                        buffer_json_member_add_string(wb, "info", string2str(rc->original_info));
-
-                        buffer_json_member_add_object(wb, "v"); // value
-                        {
-                            buffer_json_member_add_uint64(wb, "update_every", rc->update_every);
-                            buffer_json_member_add_string(wb, "units", string2str(rc->units));
-
-                            if (RRDCALC_HAS_DB_LOOKUP(rc) || debug) {
-                                buffer_json_member_add_object(wb, "db");
-                                {
-                                    if (rc->dimensions || debug)
-                                        buffer_json_member_add_string(wb, "dimensions", rrdcalc_dimensions(rc));
-
-                                    buffer_json_member_add_string(wb, "method", time_grouping_method2string(rc->group));
-                                    buffer_json_member_add_time_t(wb, "after", rc->after);
-                                    buffer_json_member_add_time_t(wb, "before", rc->before);
-
-                                    web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", (RRDR_OPTIONS) rc->options);
-                                }
-                                buffer_json_object_close(wb); // db
-                            }
-
-                            if (rc->calculation || debug) {
-                                buffer_json_member_add_string(wb, "calc", rc->calculation ? rc->calculation->source : NULL);
-                                // buffer_json_member_add_string(wb, "calc_parsed", rc->calculation->parsed_as);
-                            }
-                        }
-                        buffer_json_object_close(wb); // value
-
-                        if(rc->warning || rc->critical || debug) {
-                            buffer_json_member_add_object(wb, "st"); // conditions
-                            {
-                                if(!isnan(rc->green) || debug)
-                                    buffer_json_member_add_double(wb, "green", rc->green);
-
-                                if(!isnan(rc->red) || debug)
-                                    buffer_json_member_add_double(wb, "red", rc->red);
-
-                                if (rc->warning || debug) {
-                                    buffer_json_member_add_string(wb, "warn", rc->warning ? rc->warning->source : NULL);
-                                    // buffer_json_member_add_string(wb, "warn_parsed", rc->warning ? rc->warning->parsed_as : NULL);
-                                }
-
-                                if (rc->critical || debug) {
-                                    buffer_json_member_add_string(wb, "crit", rc->critical ? rc->critical->source : NULL);
-                                    // buffer_json_member_add_string(wb, "crit_parsed", rc->critical ? rc->critical->parsed_as : NULL);
-                                }
-                            }
-                            buffer_json_object_close(wb); // conditions
-                        }
-
-                        buffer_json_member_add_object(wb, "nf");
-                        {
-                            buffer_json_member_add_string(wb, "type", "agent");
-                            buffer_json_member_add_string(wb, "method", rc->exec ? rrdcalc_exec(rc) : string2str(localhost->health.health_default_exec));
-                            buffer_json_member_add_string(wb, "to", rc->recipient ? string2str(rc->recipient) : string2str(rc->rrdset->rrdhost->health.health_default_recipient));
-
-                            if(rc->delay_up_duration || rc->delay_down_duration || debug) {
-                                buffer_json_member_add_object(wb, "delay");
-                                {
-                                    buffer_json_member_add_time_t(wb, "up", rc->delay_up_duration);
-                                    buffer_json_member_add_time_t(wb, "down", rc->delay_down_duration);
-                                    buffer_json_member_add_time_t(wb, "max", rc->delay_max_duration);
-                                    buffer_json_member_add_double(wb, "multiplier", rc->delay_multiplier);
-                                }
-                                buffer_json_object_close(wb); //delay
-                            }
-
-                            if(rc->warn_repeat_every || rc->crit_repeat_every || debug) {
-                                buffer_json_member_add_object(wb, "repeat");
-                                {
-                                    if(rc->warn_repeat_every || debug)
-                                        buffer_json_member_add_time_t(wb, "warn", rc->warn_repeat_every);
-
-                                    if(rc->crit_repeat_every || debug)
-                                        buffer_json_member_add_time_t(wb, "crit", rc->crit_repeat_every);
-                                }
-                                buffer_json_object_close(wb); // repeat
-                            }
-
-                            if (unlikely((rc->options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION) || debug))
-                                buffer_json_member_add_boolean(wb, "no_clear_notification", rc->options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION);
-                        }
-                        buffer_json_object_close(wb); // notification
-                        buffer_json_member_add_string(wb, "src", string2str(rc->source));
-                    }
-                    buffer_json_object_close(wb); // alert config
+                    buffer_json_member_add_string(wb, "name", t_dfe.name);
+                    buffer_json_member_add_string(wb, "help", string2str(t->help));
+                    buffer_json_member_add_array(wb, "ni");
+                    for (size_t i = 0; i < t->used; i++)
+                        buffer_json_add_array_item_uint64(wb, t->node_ids[i]);
+                    buffer_json_array_close(wb);
+                    buffer_json_object_close(wb);
                 }
                 dfe_done(t);
             }
-            buffer_json_array_close(wb); // alerts_configs
+            buffer_json_array_close(wb);
         }
-    }
 
-    if(mode & CONTEXTS_V2_SEARCH) {
-        buffer_json_member_add_object(wb, "searches");
-        {
-            buffer_json_member_add_uint64(wb, "strings", ctl.q.fts.string_searches);
-            buffer_json_member_add_uint64(wb, "char", ctl.q.fts.char_searches);
-            buffer_json_member_add_uint64(wb, "total", ctl.q.fts.searches);
+        if (mode & CONTEXTS_V2_CONTEXTS) {
+            buffer_json_member_add_object(wb, "contexts");
+            {
+                struct context_v2_entry *z;
+                dfe_start_read(ctl.contexts.dict, z) {
+                    bool collected = z->flags & RRD_FLAG_COLLECTED;
+
+                    buffer_json_member_add_object(wb, string2str(z->id));
+                    {
+                        buffer_json_member_add_string(wb, "family", string2str(z->family));
+                        buffer_json_member_add_uint64(wb, "priority", z->priority);
+                        buffer_json_member_add_time_t(wb, "first_entry", z->first_time_s);
+                        buffer_json_member_add_time_t(wb, "last_entry", collected ? ctl.now : z->last_time_s);
+                        buffer_json_member_add_boolean(wb, "live", collected);
+                        if (mode & CONTEXTS_V2_SEARCH)
+                            buffer_json_member_add_string(wb, "match", fts_match_to_string(z->match));
+                    }
+                    buffer_json_object_close(wb);
+                }
+                dfe_done(z);
+            }
+            buffer_json_object_close(wb); // contexts
         }
-        buffer_json_object_close(wb);
+
+        if (mode & CONTEXTS_V2_ALERTS)
+            contexts_v2_alerts_to_json(wb, &ctl, debug);
+
+        if (mode & CONTEXTS_V2_SEARCH) {
+            buffer_json_member_add_object(wb, "searches");
+            {
+                buffer_json_member_add_uint64(wb, "strings", ctl.q.fts.string_searches);
+                buffer_json_member_add_uint64(wb, "char", ctl.q.fts.char_searches);
+                buffer_json_member_add_uint64(wb, "total", ctl.q.fts.searches);
+            }
+            buffer_json_object_close(wb);
+        }
+
+        if (mode & (CONTEXTS_V2_VERSIONS))
+            version_hashes_api_v2(wb, &ctl.versions);
+
+        if (mode & CONTEXTS_V2_AGENTS)
+            buffer_json_agents_array_v2(wb, &ctl.timings, ctl.now, mode & (CONTEXTS_V2_AGENTS_INFO));
     }
-
-    if(mode & (CONTEXTS_V2_VERSIONS))
-        version_hashes_api_v2(wb, &ctl.versions);
-
-    if(mode & CONTEXTS_V2_AGENTS)
-        buffer_json_agents_array_v2(wb, &ctl.timings, ctl.now, mode & (CONTEXTS_V2_AGENTS_INFO));
 
     buffer_json_cloud_timings(wb, "timings", &ctl.timings);
 

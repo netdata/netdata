@@ -442,6 +442,9 @@ struct alert_transition_data {
     time_t last_repeat;
     NETDATA_DOUBLE new_value;
     NETDATA_DOUBLE old_value;
+
+    struct alert_transition_data *next;
+    struct alert_transition_data *prev;
 };
 
 struct alert_instance_v2_entry {
@@ -518,6 +521,18 @@ void query_target_release(QUERY_TARGET *qt);
 
 QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr);
 
+typedef enum __attribute__((packed)) {
+    ATF_STATUS = 0,
+    ATF_CLASS,
+    ATF_TYPE,
+    ATF_COMPONENT,
+    ATF_ROLE,
+    ATF_NODE,
+
+    // total
+    ATF_TOTAL_ENTRIES,
+} ALERT_TRANSITION_FACETS;
+
 struct api_v2_contexts_request {
     char *scope_nodes;
     char *scope_contexts;
@@ -533,6 +548,9 @@ struct api_v2_contexts_request {
         char *anchor;
         char *transition;
         uint32_t last;
+
+        const char *facets[ATF_TOTAL_ENTRIES];
+        usec_t global_id_anchor;
     } alerts;
 
     time_t after;
@@ -544,16 +562,17 @@ struct api_v2_contexts_request {
 };
 
 typedef enum __attribute__ ((__packed__)) {
-    CONTEXTS_V2_SEARCH          = (1 << 1),
-    CONTEXTS_V2_NODES           = (1 << 2),
-    CONTEXTS_V2_NODES_INFO      = (1 << 3),
-    CONTEXTS_V2_NODES_INSTANCES = (1 << 4),
-    CONTEXTS_V2_CONTEXTS        = (1 << 5),
-    CONTEXTS_V2_AGENTS          = (1 << 6),
-    CONTEXTS_V2_AGENTS_INFO     = (1 << 7),
-    CONTEXTS_V2_VERSIONS        = (1 << 8),
-    CONTEXTS_V2_FUNCTIONS       = (1 << 9),
-    CONTEXTS_V2_ALERTS          = (1 << 10),
+    CONTEXTS_V2_SEARCH              = (1 << 1),
+    CONTEXTS_V2_NODES               = (1 << 2),
+    CONTEXTS_V2_NODES_INFO          = (1 << 3),
+    CONTEXTS_V2_NODE_INSTANCES      = (1 << 4),
+    CONTEXTS_V2_CONTEXTS            = (1 << 5),
+    CONTEXTS_V2_AGENTS              = (1 << 6),
+    CONTEXTS_V2_AGENTS_INFO         = (1 << 7),
+    CONTEXTS_V2_VERSIONS            = (1 << 8),
+    CONTEXTS_V2_FUNCTIONS           = (1 << 9),
+    CONTEXTS_V2_ALERTS              = (1 << 10),
+    CONTEXTS_V2_ALERT_TRANSITIONS   = (1 << 11),
 } CONTEXTS_V2_MODE;
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_MODE mode);

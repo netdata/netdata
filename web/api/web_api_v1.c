@@ -57,9 +57,9 @@ static struct {
 } contexts_v2_options[] = {
           {"minify"           , 0    , CONTEXT_V2_OPTION_MINIFY}
         , {"debug"            , 0    , CONTEXT_V2_OPTION_DEBUG}
-        , {"config"           , 0    , CONTEXT_V2_OPTION_ALERT_CONFIGURATIONS}
-        , {"transitions"      , 0    , CONTEXT_V2_OPTION_ALERT_TRANSITIONS}
-        , {"instances"        , 0    , CONTEXT_V2_OPTION_ALERT_INSTANCES}
+        , {"config"           , 0    , CONTEXT_V2_OPTION_ALERTS_WITH_CONFIGURATIONS}
+        , {"transitions"      , 0    , CONTEXT_V2_OPTION_ALERTS_WITH_TRANSITIONS}
+        , {"instances"        , 0    , CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES}
         , {NULL               , 0    , 0}
 };
 
