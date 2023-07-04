@@ -8,16 +8,16 @@
 extern unsigned int default_health_enabled;
 
 typedef enum __attribute__((packed)) {
-    HEALTH_ENTRY_FLAG_PROCESSED             = 0x00000001,
-    HEALTH_ENTRY_FLAG_UPDATED               = 0x00000002,
-    HEALTH_ENTRY_FLAG_EXEC_RUN              = 0x00000004,
-    HEALTH_ENTRY_FLAG_EXEC_FAILED           = 0x00000008,
+    HEALTH_ENTRY_FLAG_PROCESSED             = 0x00000001, // notifications engine has processed this
+    HEALTH_ENTRY_FLAG_UPDATED               = 0x00000002, // there is a more recent update about this transition
+    HEALTH_ENTRY_FLAG_EXEC_RUN              = 0x00000004, // notification script has been run (this is the intent, not the result)
+    HEALTH_ENTRY_FLAG_EXEC_FAILED           = 0x00000008, // notification script couldn't be run
     HEALTH_ENTRY_FLAG_SILENCED              = 0x00000010,
     HEALTH_ENTRY_RUN_ONCE                   = 0x00000020,
     HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS      = 0x00000040,
     HEALTH_ENTRY_FLAG_IS_REPEATING          = 0x00000080,
-    HEALTH_ENTRY_FLAG_SAVED                 = 0x10000000,
-    HEALTH_ENTRY_FLAG_ACLK_QUEUED           = 0x20000000,
+    HEALTH_ENTRY_FLAG_SAVED                 = 0x10000000, // Saved to SQL
+    HEALTH_ENTRY_FLAG_ACLK_QUEUED           = 0x20000000, // Sent to Netdata Cloud
     HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION = 0x80000000,
 } HEALTH_ENTRY_FLAGS;
 
