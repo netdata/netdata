@@ -1400,9 +1400,10 @@ static struct alert_transition_data *contexts_v2_alert_transition_dup(struct ale
     n->transition_id = mallocz(sizeof(*t->transition_id));
     memcpy(n->transition_id, t->transition_id, sizeof(*t->transition_id));
 
-//    n->host_id = mallocz(sizeof(*t->host_id));
-//    memcpy(n->host_id, t->host_id, sizeof(*t->host_id));
     n->host_id = NULL;
+    n->classification = NULL;
+    n->component = NULL;
+    n->type = NULL;
 
     n->config_hash_id = mallocz(sizeof(*t->config_hash_id));
     memcpy(n->config_hash_id, t->config_hash_id, sizeof(*t->config_hash_id));
@@ -1414,6 +1415,11 @@ static struct alert_transition_data *contexts_v2_alert_transition_dup(struct ale
     n->recipient = t->recipient ? strdupz(t->recipient) : NULL;
     n->units = strdupz(t->units);
     n->info = strdupz(t->info);
+
+    // do not copy
+    // t->classification
+    // t->type
+    // t->component
 
     memcpy(n->machine_guid, machine_guid, sizeof(n->machine_guid));
 
@@ -1431,6 +1437,9 @@ static void contexts_v2_alert_transition_free(struct alert_transition_data *t) {
     freez((void *)t->recipient);
     freez((void *)t->units);
     freez((void *)t->info);
+    freez((void *)t->classification);
+    freez((void *)t->type);
+    freez((void *)t->component);
     freez(t);
 }
 
@@ -1628,6 +1637,7 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
             buffer_json_member_add_string(wb, "alert", t->name);
             buffer_json_member_add_string(wb, "instance", t->chart);
             buffer_json_member_add_string(wb, "context", t->chart_context);
+            buffer_json_member_add_string(wb, "family", t->family);
 
             buffer_json_member_add_uint64(wb, "gi", t->global_id);
             buffer_json_member_add_time_t(wb, "when", t->when_key);
@@ -1660,15 +1670,15 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
     }
     buffer_json_array_close(wb); // all transitions
 
-    for(size_t i = 0; i < ATF_TOTAL_ENTRIES ;i++) {
-        dictionary_destroy(data.facets[i].dict);
-        simple_pattern_free(data.facets[i].pattern);
-    }
-
     while(data.base) {
         struct alert_transition_data *t = data.base;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(data.base, t, prev, next);
         contexts_v2_alert_transition_free(t);
+    }
+
+    for(size_t i = 0; i < ATF_TOTAL_ENTRIES ;i++) {
+        dictionary_destroy(data.facets[i].dict);
+        simple_pattern_free(data.facets[i].pattern);
     }
 
     buffer_json_member_add_object(wb, "stats");
