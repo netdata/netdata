@@ -1889,7 +1889,6 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
                     if(mode & CONTEXTS_V2_ALERTS) {
                         web_client_api_request_v2_contexts_alerts_status_to_buffer_json_array(wb, "status", req->alerts.status);
-                        buffer_json_member_add_string(wb, "anchor", req->alerts.anchor);
                     }
                     if(mode & CONTEXTS_V2_ALERT_TRANSITIONS) {
                         buffer_json_member_add_string(wb, "context", req->contexts);

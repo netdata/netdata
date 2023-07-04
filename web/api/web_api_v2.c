@@ -40,8 +40,6 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
                 req.alerts.last = strtoul(value, NULL, 0);
             else if (!strcmp(name, "alert"))
                 req.alerts.alert = value;
-            else if (!strcmp(name, "anchor"))
-                req.alerts.anchor = value;
             else if (!strcmp(name, "transition"))
                 req.alerts.transition = value;
             else if(mode & CONTEXTS_V2_ALERTS) {
