@@ -1362,44 +1362,41 @@ static void contexts_v2_alerts_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_
 
 struct alert_transitions_facets alert_transition_facets[] = {
         [ATF_STATUS] = {
-            .query_param = "facet_status",
-            .json_entry = "status",
+                .id = "status",
+                .name = "Alert Status",
+                .query_param = "status",
         },
         [ATF_TYPE] = {
-                .query_param = "facet_type",
-                .json_entry = "type",
+                .id = "type",
+                .name = "Alert Type",
+                .query_param = "type",
         },
         [ATF_ROLE] = {
-                .query_param = "facet_role",
-                .json_entry = "role",
+                .id = "role",
+                .name = "Recipient Role",
+                .query_param = "role",
         },
         [ATF_CLASS] = {
-                .query_param = "facet_class",
-                .json_entry = "class",
+                .id = "class",
+                .name = "Alert Class",
+                .query_param = "class",
         },
         [ATF_COMPONENT] = {
-                .query_param = "facet_component",
-                .json_entry = "component",
+                .id = "component",
+                .name = "Alert Component",
+                .query_param = "component",
         },
-//        [ATF_ALERT] = {
-//                .query_param = "facet_alert",
-//                .json_entry = "alert",
-//        },
-//        [ATF_CONTEXT] = {
-//                .query_param = "facet_context",
-//                .json_entry = "context",
-//        },
-//        [ATF_INSTANCE] = {
-//                .query_param = "facet_instance",
-//                .json_entry = "instance",
-//        },
         [ATF_NODE] = {
-                .query_param = "facet_node",
-                .json_entry = "node",
+                .id = "node",
+                .name = "Alert Node",
+                .query_param = "node",
         },
+
+        // terminator
         [ATF_TOTAL_ENTRIES] = {
+                .id = NULL,
+                .name = NULL,
                 .query_param = NULL,
-                .json_entry = NULL,
         }
 };
 
@@ -1444,9 +1441,6 @@ static struct sql_alert_transition_data *contexts_v2_alert_transition_dup(struct
     memcpy(n->transition_id, t->transition_id, sizeof(*t->transition_id));
 
     n->host_id = NULL;
-    n->classification = NULL;
-    n->component = NULL;
-    n->type = NULL;
 
     n->config_hash_id = mallocz(sizeof(*t->config_hash_id));
     memcpy(n->config_hash_id, t->config_hash_id, sizeof(*t->config_hash_id));
@@ -1458,11 +1452,9 @@ static struct sql_alert_transition_data *contexts_v2_alert_transition_dup(struct
     n->recipient = t->recipient ? strdupz(t->recipient) : NULL;
     n->units = strdupz(t->units);
     n->info = strdupz(t->info);
-
-    // do not copy
-    // t->classification
-    // t->type
-    // t->component
+    n->classification = strdupz(t->classification);
+    n->type = strdupz(t->type);
+    n->component = strdupz(t->component);
 
     memcpy(n->machine_guid, machine_guid, sizeof(n->machine_guid));
 
@@ -1558,9 +1550,6 @@ static void contexts_v2_alert_transition_callback(struct sql_alert_transition_da
             [ATF_TYPE] = t->type,
             [ATF_COMPONENT] = t->component,
             [ATF_ROLE] = t->recipient,
-//            [ATF_ALERT] = t->name,
-//            [ATF_CONTEXT] = t->chart_context,
-//            [ATF_INSTANCE] = t->chart,
             [ATF_NODE] = machine_guid,
     };
 
@@ -1641,17 +1630,40 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
         &data,
         debug);
 
-    buffer_json_member_add_object(wb, "facets");
+    buffer_json_member_add_array(wb, "facets");
+    size_t order = 0;
     for (size_t i = 0; i < ATF_TOTAL_ENTRIES; i++) {
-        buffer_json_member_add_object(wb, alert_transition_facets[i].json_entry);
-        struct facet_entry *x;
-        dfe_start_read(data.facets[i].dict, x) {
-            buffer_json_member_add_uint64(wb, x_dfe.name, x->count);
+        buffer_json_add_array_item_object(wb);
+        {
+            buffer_json_member_add_string(wb, "id", alert_transition_facets[i].id);
+            buffer_json_member_add_string(wb, "name", alert_transition_facets[i].name);
+            buffer_json_member_add_uint64(wb, "order", order++);
+            buffer_json_member_add_array(wb, "options");
+            {
+                struct facet_entry *x;
+                dfe_start_read(data.facets[i].dict, x) {
+                    buffer_json_add_array_item_object(wb);
+                    {
+                        buffer_json_member_add_string(wb, "id", x_dfe.name);
+                        if (i == ATF_NODE) {
+                            RRDHOST *host = rrdhost_find_by_guid(x_dfe.name);
+                            if (host)
+                                buffer_json_member_add_string(wb, "name", rrdhost_hostname(host));
+                            else
+                                buffer_json_member_add_string(wb, "name", x_dfe.name);
+                        } else
+                            buffer_json_member_add_string(wb, "name", x_dfe.name);
+                        buffer_json_member_add_uint64(wb, "count", x->count);
+                    }
+                    buffer_json_object_close(wb);
+                }
+                dfe_done(x);
+            }
+            buffer_json_array_close(wb); // options
         }
-        dfe_done(x);
-        buffer_json_object_close(wb); // key
+        buffer_json_object_close(wb); // facet
     }
-    buffer_json_object_close(wb);
+    buffer_json_array_close(wb); // facets
 
     buffer_json_member_add_array(wb, "transitions");
     for(struct sql_alert_transition_data *t = data.base; t ; t = t->next) {
@@ -1664,6 +1676,9 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
             buffer_json_member_add_string(wb, "instance", t->chart);
             buffer_json_member_add_string(wb, "context", t->chart_context);
             buffer_json_member_add_string(wb, "family", t->family);
+            buffer_json_member_add_string(wb, "component", t->component);
+            buffer_json_member_add_string(wb, "classification", t->classification);
+            buffer_json_member_add_string(wb, "type", t->type);
 
             buffer_json_member_add_uint64(wb, "gi", t->global_id);
             buffer_json_member_add_time_t(wb, "when", t->when_key);

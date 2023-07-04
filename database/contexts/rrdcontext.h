@@ -531,9 +531,6 @@ typedef enum __attribute__((packed)) {
     ATF_TYPE,
     ATF_COMPONENT,
     ATF_ROLE,
-//    ATF_ALERT,
-//    ATF_CONTEXT,
-//    ATF_INSTANCE,
     ATF_NODE,
 
     // total
@@ -541,8 +538,9 @@ typedef enum __attribute__((packed)) {
 } ALERT_TRANSITION_FACET;
 
 struct alert_transitions_facets {
+    const char *name;
     const char *query_param;
-    const char *json_entry;
+    const char *id;
 };
 
 extern struct alert_transitions_facets alert_transition_facets[];
