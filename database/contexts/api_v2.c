@@ -1381,18 +1381,18 @@ struct alert_transitions_facets alert_transition_facets[] = {
                 .query_param = "facet_component",
                 .json_entry = "component",
         },
-        [ATF_ALERT] = {
-                .query_param = "facet_alert",
-                .json_entry = "alert",
-        },
-        [ATF_CONTEXT] = {
-                .query_param = "facet_context",
-                .json_entry = "context",
-        },
-        [ATF_INSTANCE] = {
-                .query_param = "facet_instance",
-                .json_entry = "instance",
-        },
+//        [ATF_ALERT] = {
+//                .query_param = "facet_alert",
+//                .json_entry = "alert",
+//        },
+//        [ATF_CONTEXT] = {
+//                .query_param = "facet_context",
+//                .json_entry = "context",
+//        },
+//        [ATF_INSTANCE] = {
+//                .query_param = "facet_instance",
+//                .json_entry = "instance",
+//        },
         [ATF_NODE] = {
                 .query_param = "facet_node",
                 .json_entry = "node",
@@ -1558,9 +1558,9 @@ static void contexts_v2_alert_transition_callback(struct sql_alert_transition_da
             [ATF_TYPE] = t->type,
             [ATF_COMPONENT] = t->component,
             [ATF_ROLE] = t->recipient,
-            [ATF_ALERT] = t->name,
-            [ATF_CONTEXT] = t->chart_context,
-            [ATF_INSTANCE] = t->chart,
+//            [ATF_ALERT] = t->name,
+//            [ATF_CONTEXT] = t->chart_context,
+//            [ATF_INSTANCE] = t->chart,
             [ATF_NODE] = machine_guid,
     };
 
@@ -1825,7 +1825,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
     if(req->after || req->before) {
         ctl.window.relative = rrdr_relative_window_to_absolute(&ctl.window.after, &ctl.window.before, &ctl.now);
-        ctl.window.enabled = true;
+        ctl.window.enabled = !(mode & CONTEXTS_V2_ALERT_TRANSITIONS);
     }
     else
         ctl.now = now_realtime_sec();
@@ -1856,17 +1856,24 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                 if (mode & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_ALERTS))
                     buffer_json_member_add_string(wb, "contexts", req->contexts);
 
-                if(mode & CONTEXTS_V2_ALERTS) {
+                if(mode & (CONTEXTS_V2_ALERTS | CONTEXTS_V2_ALERT_TRANSITIONS)) {
                     buffer_json_member_add_object(wb, "alerts");
-                    web_client_api_request_v2_contexts_alerts_status_to_buffer_json_array(wb, "status", req->alerts.status);
+
+                    if(mode & CONTEXTS_V2_ALERTS) {
+                        web_client_api_request_v2_contexts_alerts_status_to_buffer_json_array(wb, "status", req->alerts.status);
+                        buffer_json_member_add_string(wb, "anchor", req->alerts.anchor);
+                    }
+                    if(mode & CONTEXTS_V2_ALERT_TRANSITIONS) {
+                        buffer_json_member_add_string(wb, "context", req->contexts);
+                        buffer_json_member_add_uint64(wb, "global_id_anchor", req->alerts.global_id_anchor);
+                    }
                     buffer_json_member_add_string(wb, "alert", req->alerts.alert);
                     buffer_json_member_add_string(wb, "transition", req->alerts.transition);
-                    buffer_json_member_add_string(wb, "anchor", req->alerts.anchor);
                     buffer_json_member_add_uint64(wb, "last", req->alerts.last);
                     buffer_json_object_close(wb); // alerts
                 }
             }
-            buffer_json_object_close(wb);
+            buffer_json_object_close(wb); // selectors
 
             buffer_json_member_add_object(wb, "filters");
             {
@@ -1876,7 +1883,17 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                 buffer_json_member_add_time_t(wb, "after", req->after);
                 buffer_json_member_add_time_t(wb, "before", req->before);
             }
-            buffer_json_object_close(wb);
+            buffer_json_object_close(wb); // filters
+
+            if(mode & CONTEXTS_V2_ALERT_TRANSITIONS) {
+                buffer_json_member_add_object(wb, "facets");
+                {
+                    for (int i = 0; i < ATF_TOTAL_ENTRIES; i++) {
+                        buffer_json_member_add_string(wb, alert_transition_facets[i].query_param, req->alerts.facets[i]);
+                    }
+                }
+                buffer_json_object_close(wb); // facets
+            }
         }
         buffer_json_object_close(wb);
     }

@@ -531,9 +531,9 @@ typedef enum __attribute__((packed)) {
     ATF_TYPE,
     ATF_COMPONENT,
     ATF_ROLE,
-    ATF_ALERT,
-    ATF_CONTEXT,
-    ATF_INSTANCE,
+//    ATF_ALERT,
+//    ATF_CONTEXT,
+//    ATF_INSTANCE,
     ATF_NODE,
 
     // total
