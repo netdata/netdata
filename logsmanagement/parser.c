@@ -475,7 +475,7 @@ UNIT_STATIC void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
         while(*field == '"' || *field == delimiter) field++, offset++;
 
         /* Find offset boundaries of next field in line */
-        while(*offset != delimiter && ((size_t)(offset - line) < line_len)) offset++;
+        while(((size_t)(offset - line) < line_len) && *offset != delimiter) offset++;
         
         if(unlikely(*(offset - 1) == '"')) offset--;
 

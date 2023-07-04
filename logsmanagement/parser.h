@@ -89,7 +89,7 @@ typedef struct log_parser_config{
 #define WEB_LOG_INVALID_CLIENT_IP_STR "inv"
 
 /* Web log configuration */
-#define ENABLE_PARSE_WEB_LOG_LINE_DEBUG 1
+#define ENABLE_PARSE_WEB_LOG_LINE_DEBUG 0
 #define MEASURE_WEB_LOG_PARSE_EXTRACT_TIME 0
 #define SKIP_WEB_LOG_TIME_PARSING 0
 

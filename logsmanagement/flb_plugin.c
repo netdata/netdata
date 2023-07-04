@@ -463,7 +463,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                         message_size = p->val.via.str.size;
 
                         if(p_file_info->log_type == FLB_WEB_LOG){
-                            debug(D_LOGS_MANAG, "LOG:[%.*s]", (int) message_size, message);
+                            debug(D_LOGS_MANAG, "LOG line:[%.*s]", (int) message_size, message);
                             if(unlikely(0 != parse_web_log_buf( message, message_size, 
                                                                 p_file_info->parser_config, 
                                                                 p_file_info->parser_metrics->web_log))){
