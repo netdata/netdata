@@ -2429,7 +2429,7 @@ void ebpf_send_statistic_data()
     int i;
     for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
         ebpf_module_t *wem = &ebpf_modules[i];
-        write_chart_dimension((char *)wem->thread_name, (wem->enabled != NETDATA_THREAD_EBPF_NOT_RUNNING) ? 1 : 0);
+        write_chart_dimension((char *)wem->thread_name, (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ? 1 : 0);
     }
     write_end_chart();
 
@@ -2437,7 +2437,7 @@ void ebpf_send_statistic_data()
     for (i = 0; i < EBPF_MODULE_FUNCTION_IDX ; i++) {
         ebpf_module_t *wem = &ebpf_modules[i];
         write_chart_dimension((char *)wem->thread_name,
-                              (wem->enabled != NETDATA_THREAD_EBPF_NOT_RUNNING) ?
+                              (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ?
                               (long long) (wem->lifetime - wem->running_time):
                               0) ;
     }
