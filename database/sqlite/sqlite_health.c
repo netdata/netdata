@@ -2052,29 +2052,29 @@ void sql_alert_transitions(DICTIONARY *nodes, time_t after, time_t before, const
         goto fail_only_drop;
     }
 
-    rc = sqlite3_bind_int64(res, 1, (sqlite3_int64) (after * USEC_PER_SEC));
+    int param = 1;
+    rc = sqlite3_bind_int64(res, param++, (sqlite3_int64)(after * USEC_PER_SEC));
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind after parameter");
         goto fail;
     }
 
-    rc = sqlite3_bind_int64(res, 2,  (sqlite3_int64) (before * USEC_PER_SEC));
+    rc = sqlite3_bind_int64(res, param++, (sqlite3_int64)(before * USEC_PER_SEC));
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind before parameter");
         goto fail;
     }
 
     if (context) {
-        rc = sqlite3_bind_text(res, 3, context, -1, SQLITE_STATIC);
+        rc = sqlite3_bind_text(res, param++, context, -1, SQLITE_STATIC);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to bind context parameter");
             goto fail;
         }
-
     }
 
     if (alert_name) {
-        rc = sqlite3_bind_text(res, 4, alert_name, -1, SQLITE_STATIC);
+        rc = sqlite3_bind_text(res, param++, alert_name, -1, SQLITE_STATIC);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to bind alert_name parameter");
             goto fail;
