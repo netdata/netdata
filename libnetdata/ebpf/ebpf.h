@@ -181,6 +181,17 @@ enum netdata_controller {
     NETDATA_CONTROLLER_APPS_ENABLED,
     NETDATA_CONTROLLER_APPS_LEVEL,
 
+    // These index show the number of elements
+    // stored inside hash tables.
+    //
+    // We have indexes to count increase and
+    // decrease events, because __sync_fetch_and_sub
+    // generates compilation errors.
+    NETDATA_CONTROLLER_PID_TABLE_ADD,
+    NETDATA_CONTROLLER_PID_TABLE_DEL,
+    NETDATA_CONTROLLER_TEMP_TABLE_ADD,
+    NETDATA_CONTROLLER_TEMP_TABLE_DEL,
+
     NETDATA_CONTROLLER_END
 };
 
