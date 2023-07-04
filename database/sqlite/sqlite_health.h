@@ -25,10 +25,10 @@ void sql_alert_transitions(
     time_t before,
     const char *context,
     const char *alert_name,
-    void (*cb)(struct alert_transition_data *atd, void *data),
+    const char *transition,
+    void (*cb)(struct alert_transition_data *, void *),
     void *data,
-    bool debug
-        __maybe_unused);
+    bool debug);
 
 bool sql_find_alert_transition(const char *transition, void (*cb)(const char *machine_guid, const char *context, time_t alert_id, void *data), void *data);
 #endif //NETDATA_SQLITE_HEALTH_H

@@ -1584,8 +1584,16 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
             data.facets[i].pattern = simple_pattern_create(ctl->request->alerts.facets[i], ",|", SIMPLE_PATTERN_EXACT, false);
     }
 
-    sql_alert_transitions(ctl->nodes.dict, ctl->window.after, ctl->window.before, ctl->request->contexts,
-                          ctl->request->alerts.alert, contexts_v2_alert_transition_callback, &data, debug);
+    sql_alert_transitions(
+        ctl->nodes.dict,
+        ctl->window.after,
+        ctl->window.before,
+        ctl->request->contexts,
+        ctl->request->alerts.alert,
+        NULL,
+        contexts_v2_alert_transition_callback,
+        &data,
+        debug);
 
     buffer_json_member_add_object(wb, "facets");
     for (size_t i = 0; i < ATF_TOTAL_ENTRIES; i++) {
