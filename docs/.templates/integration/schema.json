@@ -16,16 +16,20 @@
                                 "type": "string",
                                 "description": "Name of the category"
                             },
-                            "priority_id": {
+                            "priority": {
                                 "type": "string",
-                                "description": "Priority of the category that will also be used as this category's ID"
+                                "description": "Priority of the category"
+                            },
+                            "id": {
+                                "type": "string",
+                                "description": "ID of the category that will be used by integrations"
                             },
                             "parent": {
                                 "type": [
                                     "null",
                                     "string"
                                 ],
-                                "description": "The category's parent ID (priority_id), make it null if no parent"
+                                "description": "The category's parent ID, make it null if no parent"
                             }
                         }
                     }
@@ -38,41 +42,40 @@
             "items": {
                 "type": "object",
                 "properties": {
+                    "integrations_name": {
+                        "type": "string"
+                    },
                     "category": {
-                        "type": "object",
-                        "properties": {
-                            "category_name": {
-                                "type": "string",
-                                "description": "Where this integration belongs, in category/sub_category/.. format."
-                            },
-                            "integration_priority": {
-                                "type": "string",
-                                "description": "the priority of the integration in its final level sub_category"
-                            }
-                        }
+                        "type": "string",
+                        "description": "The ID for this category"
                     },
                     "icon": {
                         "type": "string",
-                        "description": "path to the icon for this integration"
+                        "description": "path to the icon for this integration."
                     },
-                    "meta": {
-                        "$ref": "../../../collectors/meta_template/schema.json",
-                        "description": "the metadata.yaml structure"
+                    "overview": {
+                        "type": "string",
+                        "description": "The text that will go in the top of the page, in markdown format."
                     },
-                    "related_blog_posts": {
-                        "type": "array",
-                        "description": "A list with links to related blog posts",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "name": {
-                                    "type": "string"
-                                },
-                                "link": {
-                                    "type": "string"
-                                }
-                            }
-                        }
+                    "metrics": {
+                        "type": "string",
+                        "description": "Metrics section rendered in markdown format."
+                    },
+                    "alerts": {
+                        "type": "string",
+                        "description": "Alerts section rendered in markdown format."
+                    },
+                    "setup": {
+                        "type": "string",
+                        "description": "Setup section rendered in markdown format."
+                    },
+                    "troubleshooting": {
+                        "type": "string",
+                        "description": "troubleshooting section rendered in markdown format."
+                    },
+                    "related_resources": {
+                        "type": "string",
+                        "description": "Related Resources section rendered in markdown format."
                     }
                 }
             }
