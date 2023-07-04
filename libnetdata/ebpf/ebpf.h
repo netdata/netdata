@@ -264,6 +264,12 @@ typedef struct ebpf_plugin_stats {
 
     uint32_t hash_percpu; // Number of threads running per cpu maps
     uint32_t hash_unique; // Number of threads running an unique map for all cores.
+    
+    uint64_t count_global_table; // Count elements inside global table
+    uint64_t count_pid_table_add; // Count elements added inside PID table
+    uint64_t count_pid_table_del; // Count elements removed from PID table
+    uint64_t count_temp_table_add; // Count elements added inside TEMP table
+    uint64_t count_temp_table_del; // Count elements removed from TEMP table
 } ebpf_plugin_stats_t;
 
 typedef enum ebpf_stats_action {
