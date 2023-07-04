@@ -355,7 +355,7 @@ static struct web_api_command api_commands_v2[] = {
         {"rtc_offer", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_webrtc, 0},
 
         // terminator
-        {NULL, 0, WEB_CLIENT_ACL_NONE, NULL},
+        {NULL, 0, WEB_CLIENT_ACL_NONE, NULL, 0},
 };
 
 inline int web_client_api_request_v2(RRDHOST *host, struct web_client *w, char *url_path_endpoint) {
