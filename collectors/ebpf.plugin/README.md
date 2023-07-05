@@ -1025,3 +1025,14 @@ It is also possible to stop any thread running using keywork `disable`, for exaa
 request:
 
 `http://localhost:19999/api/v1/function?function=ebpf_thread%20disable:cachestat`
+
+### Debugging threads
+
+You can verify the impact of threads on host running the
+[ebpf_thread_function.sh](https://github.com/netdata/netdata/blob/master/tests/ebpf/ebpf_thread_function.sh)
+script on your environment.
+
+You can check the results of to have threads running on your environment in Netdata monitoring section on your
+dashboard
+
+<img src="https://github.com/netdata/netdata/assets/49162938/b97e32e0-1ebe-4c44-8801-8a3aab2c7632" alt="Threads running." />
