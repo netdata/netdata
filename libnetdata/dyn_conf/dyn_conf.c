@@ -5,6 +5,8 @@
 #define DYN_CONF_PATH_MAX (4096)
 #define DYN_CONF_DIR VARLIB_DIR "/etc"
 
+#define DYN_CONF_SCHEMA "schema"
+
 DICTIONARY *plugins_dict = NULL;
 
 static int _get_list_of_plugins_json_cb(const DICTIONARY_ITEM *item, void *entry, void *data)
@@ -68,7 +70,7 @@ int store_config(const char *module_name, const char *submodule_name, const char
     if (cfg_idx != NULL)
         buffer_sprintf(filename, "/%s", cfg_idx);
 
-    buffer_strcat(filename, ".json");
+    buffer_strcat(filename, ".cfg");
 
 
     error_report("DYNCFG store_config: %s", buffer_tostring(filename));
@@ -187,6 +189,27 @@ struct uni_http_response dyn_conf_process_http_request(int method, const char *p
         resp.status = HTTP_RESP_NOT_FOUND;
         return resp;
     }
+    if (module == NULL) {
+        if (method != HTTP_METHOD_GET && method != HTTP_METHOD_PUT) {
+            resp.content = "method not allowed";
+            resp.status = HTTP_RESP_METHOD_NOT_ALLOWED;
+            return resp;
+        }
+        json_object *obj = get_config_of_plugin_json(plug);
+        resp.content = strdup(json_object_to_json_string_ext(obj, JSON_C_TO_STRING_PRETTY));
+        json_object_put(obj);
+        resp.status = HTTP_RESP_OK;
+        resp.content_type = CT_APPLICATION_JSON;
+        resp.content_free = free;
+        return resp;
+    }
+    if (strncmp(module, DYN_CONF_SCHEMA, strlen(DYN_CONF_SCHEMA)) != 0) {
+        resp.content = "not implemented yet";
+        resp.status = HTTP_RESP_NOT_FOUND;
+        return resp;
+    }
+
+
     return resp;
 }
 
