@@ -532,8 +532,11 @@ void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *m
  *
  * @param report  the output structure
  * @param map     pointer to a map. Last map must fish with name = NULL
+ * @param action  should plugin add or remove values from amount.
  */
-void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report, ebpf_local_maps_t *maps)
+void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report,
+                                           ebpf_local_maps_t *maps,
+                                           ebpf_stats_action_t action)
 {
     if (!maps)
         return;
@@ -545,7 +548,7 @@ void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report, ebpf_loc
         if (fd == ND_EBPF_MAP_FD_NOT_INITIALIZED)
             continue;
 
-        ebpf_update_kernel_memory(report, map, EBPF_ACTION_STAT_ADD);
+        ebpf_update_kernel_memory(report, map, action);
     }
 }
 

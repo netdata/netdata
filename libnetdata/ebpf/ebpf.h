@@ -437,7 +437,8 @@ void ebpf_update_map_type(struct bpf_map *map, ebpf_local_maps_t *w);
 void ebpf_define_map_type(ebpf_local_maps_t *maps, int maps_per_core, int kver);
 #endif
 
-void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report, ebpf_local_maps_t *maps);
+void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report, ebpf_local_maps_t *maps,
+                                           ebpf_stats_action_t action);
 void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *map, ebpf_stats_action_t action);
 void ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em);
 void ebpf_send_data_aral_chart(ARAL *memory, ebpf_module_t *em);

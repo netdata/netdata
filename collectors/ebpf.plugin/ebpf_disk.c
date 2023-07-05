@@ -923,7 +923,7 @@ void *ebpf_disk_thread(void *ptr)
 
     pthread_mutex_lock(&lock);
     ebpf_update_stats(&plugin_statistics, em);
-    ebpf_update_kernel_memory_with_vector(&plugin_statistics, disk_maps);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, disk_maps, EBPF_ACTION_STAT_ADD);
     pthread_mutex_unlock(&lock);
 
     disk_collector(em);
