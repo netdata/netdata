@@ -1299,89 +1299,92 @@ static void contexts_v2_alert_config_to_json_from_sql_alert_config_data(struct s
     bool debug = d->debug;
     d->configs_added++;
 
-    buffer_json_member_add_string(wb, "name", t->name);
-    buffer_json_member_add_uuid(wb, "config_hash_id", t->config_hash_id);
-
-    buffer_json_member_add_object(wb, "selectors");
+    buffer_json_add_array_item_array(wb); // alert config
     {
-        bool is_template = t->selectors.on_template && *t->selectors.on_template ? true : false;
-        buffer_json_member_add_string(wb, "type",  is_template ? "template" : "alert");
-        buffer_json_member_add_string(wb, "on", is_template ? t->selectors.on_template : t->selectors.on_key);
+        buffer_json_member_add_string(wb, "name", t->name);
+        buffer_json_member_add_uuid(wb, "config_hash_id", t->config_hash_id);
 
-        buffer_json_member_add_string(wb, "os", t->selectors.os);
-        buffer_json_member_add_string(wb, "hosts", t->selectors.hosts);
-        buffer_json_member_add_string(wb, "families", t->selectors.families);
-        buffer_json_member_add_string(wb, "plugin", t->selectors.plugin);
-        buffer_json_member_add_string(wb, "module", t->selectors.module);
-        buffer_json_member_add_string(wb, "host_labels", t->selectors.host_labels);
-        buffer_json_member_add_string(wb, "chart_labels", t->selectors.chart_labels);
-        buffer_json_member_add_string(wb, "charts", t->selectors.charts);
-    }
-    buffer_json_object_close(wb); // selectors
-
-    buffer_json_member_add_object(wb, "value"); // value
-    {
-        buffer_json_member_add_string(wb, "every", t->value.every);
-        buffer_json_member_add_string(wb, "units", t->value.units);
-        buffer_json_member_add_uint64(wb, "update_every", t->value.update_every);
-
-        if (t->value.db.after || debug) {
-            buffer_json_member_add_object(wb, "db");
-            {
-                buffer_json_member_add_string(wb, "lookup", t->value.db.lookup);
-
-                buffer_json_member_add_time_t(wb, "after", t->value.db.after);
-                buffer_json_member_add_time_t(wb, "before", t->value.db.before);
-                buffer_json_member_add_string(wb, "method", t->value.db.method);
-                buffer_json_member_add_string(wb, "dimensions", t->value.db.dimensions);
-                web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", (RRDR_OPTIONS) t->value.db.options);
-            }
-            buffer_json_object_close(wb); // db
-        }
-
-        if (t->value.calc || debug)
-            buffer_json_member_add_string(wb, "calc", t->value.calc);
-    }
-    buffer_json_object_close(wb); // value
-
-    if(t->status.warn || t->status.crit || debug) {
-        buffer_json_member_add_object(wb, "status"); // status
+        buffer_json_member_add_object(wb, "selectors");
         {
-            NETDATA_DOUBLE green = t->status.green ? str2ndd(t->status.green, NULL) : NAN;
-            NETDATA_DOUBLE red = t->status.red ? str2ndd(t->status.red, NULL) : NAN;
+            bool is_template = t->selectors.on_template && *t->selectors.on_template ? true : false;
+            buffer_json_member_add_string(wb, "type", is_template ? "template" : "alert");
+            buffer_json_member_add_string(wb, "on", is_template ? t->selectors.on_template : t->selectors.on_key);
 
-            if(!isnan(green) || debug)
-                buffer_json_member_add_double(wb, "green", green);
+            buffer_json_member_add_string(wb, "os", t->selectors.os);
+            buffer_json_member_add_string(wb, "hosts", t->selectors.hosts);
+            buffer_json_member_add_string(wb, "families", t->selectors.families);
+            buffer_json_member_add_string(wb, "plugin", t->selectors.plugin);
+            buffer_json_member_add_string(wb, "module", t->selectors.module);
+            buffer_json_member_add_string(wb, "host_labels", t->selectors.host_labels);
+            buffer_json_member_add_string(wb, "chart_labels", t->selectors.chart_labels);
+            buffer_json_member_add_string(wb, "charts", t->selectors.charts);
+        }
+        buffer_json_object_close(wb); // selectors
 
-            if(!isnan(red) || debug)
-                buffer_json_member_add_double(wb, "red", red);
+        buffer_json_member_add_object(wb, "value"); // value
+        {
+            buffer_json_member_add_string(wb, "every", t->value.every);
+            buffer_json_member_add_string(wb, "units", t->value.units);
+            buffer_json_member_add_uint64(wb, "update_every", t->value.update_every);
 
-            if (t->status.warn || debug) {
-                buffer_json_member_add_string(wb, "warn", t->status.warn);
+            if (t->value.db.after || debug) {
+                buffer_json_member_add_object(wb, "db");
+                {
+                    buffer_json_member_add_string(wb, "lookup", t->value.db.lookup);
+
+                    buffer_json_member_add_time_t(wb, "after", t->value.db.after);
+                    buffer_json_member_add_time_t(wb, "before", t->value.db.before);
+                    buffer_json_member_add_string(wb, "method", t->value.db.method);
+                    buffer_json_member_add_string(wb, "dimensions", t->value.db.dimensions);
+                    web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options",(RRDR_OPTIONS) t->value.db.options);
+                }
+                buffer_json_object_close(wb); // db
             }
 
-            if (t->status.crit || debug)
-                buffer_json_member_add_string(wb, "crit", t->status.crit);
+            if (t->value.calc || debug)
+                buffer_json_member_add_string(wb, "calc", t->value.calc);
         }
-        buffer_json_object_close(wb); // status
-    }
+        buffer_json_object_close(wb); // value
 
-    buffer_json_member_add_object(wb, "notification");
-    {
-        buffer_json_member_add_string(wb, "type", "agent");
-        buffer_json_member_add_string(wb, "method", t->notification.exec ? t->notification.exec : string2str(localhost->health.health_default_exec));
-        buffer_json_member_add_string(wb, "to", t->notification.to_key ? t->notification.to_key : string2str(localhost->health.health_default_recipient));
-        buffer_json_member_add_string(wb, "delay", t->notification.delay);
-        buffer_json_member_add_string(wb, "repeat", t->notification.repeat);
-        buffer_json_member_add_string(wb, "options", t->notification.options);
-    }
-    buffer_json_object_close(wb); // notification
+        if (t->status.warn || t->status.crit || debug) {
+            buffer_json_member_add_object(wb, "status"); // status
+            {
+                NETDATA_DOUBLE green = t->status.green ? str2ndd(t->status.green, NULL) : NAN;
+                NETDATA_DOUBLE red = t->status.red ? str2ndd(t->status.red, NULL) : NAN;
 
-    buffer_json_member_add_string(wb, "class", t->classification);
-    buffer_json_member_add_string(wb, "component", t->component);
-    buffer_json_member_add_string(wb, "type", t->type);
-    buffer_json_member_add_string(wb, "info", t->info);
-    buffer_json_member_add_string(wb, "src", t->source);
+                if (!isnan(green) || debug)
+                    buffer_json_member_add_double(wb, "green", green);
+
+                if (!isnan(red) || debug)
+                    buffer_json_member_add_double(wb, "red", red);
+
+                if (t->status.warn || debug)
+                    buffer_json_member_add_string(wb, "warn", t->status.warn);
+
+                if (t->status.crit || debug)
+                    buffer_json_member_add_string(wb, "crit", t->status.crit);
+            }
+            buffer_json_object_close(wb); // status
+        }
+
+        buffer_json_member_add_object(wb, "notification");
+        {
+            buffer_json_member_add_string(wb, "type", "agent");
+            buffer_json_member_add_string(wb, "method", t->notification.exec ? t->notification.exec : string2str(localhost->health.health_default_exec));
+            buffer_json_member_add_string(wb, "to", t->notification.to_key ? t->notification.to_key : string2str(localhost->health.health_default_recipient));
+            buffer_json_member_add_string(wb, "delay", t->notification.delay);
+            buffer_json_member_add_string(wb, "repeat", t->notification.repeat);
+            buffer_json_member_add_string(wb, "options", t->notification.options);
+        }
+        buffer_json_object_close(wb); // notification
+
+        buffer_json_member_add_string(wb, "class", t->classification);
+        buffer_json_member_add_string(wb, "component", t->component);
+        buffer_json_member_add_string(wb, "type", t->type);
+        buffer_json_member_add_string(wb, "info", t->info);
+        buffer_json_member_add_string(wb, "src", t->source);
+    }
+    buffer_json_object_close(wb);
 }
 
 int contexts_v2_alert_config_to_json(struct web_client *w, const char *config_hash_id) {
