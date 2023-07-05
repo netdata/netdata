@@ -391,9 +391,10 @@ static void ebpf_mount_name(char *out, size_t len, char *path, uint32_t kver, co
  * Count the information from targets.
  *
  * @param report  the output structure
- * @param targets  vector with information about the eBPF plugin.
+ * @param targets vector with information about the eBPF plugin.
+ * @param value    factor used to update calculation
  */
-static void ebpf_stats_targets(ebpf_plugin_stats_t *report, netdata_ebpf_targets_t *targets)
+static void ebpf_stats_targets(ebpf_plugin_stats_t *report, netdata_ebpf_targets_t *targets, int value)
 {
     if (!targets) {
         report->probes = report->tracepoints = report->trampolines = 0;
@@ -404,19 +405,19 @@ static void ebpf_stats_targets(ebpf_plugin_stats_t *report, netdata_ebpf_targets
     while (targets[i].name) {
         switch (targets[i].mode) {
             case EBPF_LOAD_PROBE: {
-                report->probes++;
+                report->probes += value;
                 break;
             }
             case EBPF_LOAD_RETPROBE: {
-                report->retprobes++;
+                report->retprobes += value;
                 break;
             }
             case EBPF_LOAD_TRACEPOINT: {
-                report->tracepoints++;
+                report->tracepoints += value;
                 break;
             }
             case EBPF_LOAD_TRAMPOLINE: {
-                report->trampolines++;
+                report->trampolines += value;
                 break;
             }
         }
@@ -437,27 +438,30 @@ static void ebpf_stats_targets(ebpf_plugin_stats_t *report, netdata_ebpf_targets
  */
 void ebpf_update_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em)
 {
-    report->threads++;
+    int value;
 
     // It is not necessary to report more information.
-    if (em->enabled != NETDATA_THREAD_EBPF_RUNNING)
-        return;
+    if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING)
+        value = -1;
+    else
+        value = 1;
 
-    report->running++;
+    report->threads += value;
+    report->running += value;
 
     // In theory the `else if` is useless, because when this function is called, the module should not stay in
     // EBPF_LOAD_PLAY_DICE. We have this additional condition to detect errors from developers.
     if (em->load & EBPF_LOAD_LEGACY)
-        report->legacy++;
+        report->legacy += value;
     else if (em->load & EBPF_LOAD_CORE)
-        report->core++;
+        report->core += value;
 
     if (em->maps_per_core)
-        report->hash_percpu++;
+        report->hash_percpu += value;
     else
-        report->hash_unique++;
+        report->hash_unique += value;
 
-    ebpf_stats_targets(report, em->targets);
+    ebpf_stats_targets(report, em->targets, value);
 }
 
 /**
