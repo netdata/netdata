@@ -417,6 +417,14 @@ int api_v2_claim(struct web_client *w, char *url) {
                 break;
         }
 
+        // our status may have changed
+        // refresh the status in our output
+        buffer_flush(wb);
+        buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+        now_s = now_realtime_sec();
+        buffer_json_cloud_status(wb, now_s);
+
+        // and this is the status of the claiming command we run
         buffer_json_member_add_boolean(wb, "success", success);
         buffer_json_member_add_string(wb, "message", msg);
     }
