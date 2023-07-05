@@ -2500,6 +2500,14 @@ void ebpf_send_statistic_data()
     write_chart_dimension(hash_table_core[NETDATA_EBPF_THREAD_PER_CORE], (long long)plugin_statistics.hash_percpu);
     write_chart_dimension(hash_table_core[NETDATA_EBPF_THREAD_UNIQUE], (long long)plugin_statistics.hash_unique);
     write_end_chart();
+
+    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_HASH_TABLES_GLOBAL_ELEMENTS);
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
+        ebpf_module_t *wem = &ebpf_modules[i];
+        write_chart_dimension((char *)wem->thread_name,
+                              (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ? NETDATA_CONTROLLER_END: 0);
+    }
+    write_end_chart();
 }
 
 /**
@@ -2682,6 +2690,34 @@ static inline void ebpf_create_statistic_hash_per_core(int update_every)
 }
 
 /**
+ * Hash table global elements
+ *
+ * Write to standard output current values inside global tables.
+ *
+ * @param update_every time used to update charts
+ */
+static void ebpf_create_statistic_hash_global_elements(int update_every)
+{
+    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
+                         NETDATA_EBPF_HASH_TABLES_GLOBAL_ELEMENTS,
+                         "Controllers inside global table",
+                         "rows",
+                         NETDATA_EBPF_FAMILY,
+                         NETDATA_EBPF_CHART_TYPE_LINE,
+                         NULL,
+                         NETDATA_EBPF_ORDER_STAT_HASH_GLOBAL_TABLE_TOTAL,
+                         update_every,
+                         NETDATA_EBPF_MODULE_NAME_PROCESS);
+
+    int i;
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
+        ebpf_write_global_dimension((char *)ebpf_modules[i].thread_name,
+                                    (char *)ebpf_modules[i].thread_name,
+                                    ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+    }
+}
+
+/**
  * Create Statistics Charts
  *
  * Create charts that will show statistics related to eBPF plugin.
@@ -2717,6 +2753,8 @@ static void ebpf_create_statistic_charts(int update_every)
     ebpf_create_statistic_hash_tables(update_every);
 
     ebpf_create_statistic_hash_per_core(update_every);
+
+    ebpf_create_statistic_hash_global_elements(update_every);
 }
 
 /*****************************************************************
