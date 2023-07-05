@@ -994,7 +994,7 @@ required to run `ebpf.plugin`.
 
 The eBPF plugin has a [function](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md) named
 `ebpf_thread` that controls its internal threads and helps to reduce the overhead on host. Using the function you
-can run eBPF plugin with all threads disabled and enable them only when to take a look in specific areas is necessary.
+can run the plugin with all threads disabled and enable them only when you want to take a look in specific areas.
 
 ### List threads
 
