@@ -257,7 +257,7 @@ bool netdata_random_session_id_generate(void) {
         ret = false;
     }
 
-    write(fd, "\n", 1);
+    (void)write(fd, "\n", 1);
 
     close(fd);
 
