@@ -360,6 +360,8 @@ int api_v2_claim(struct web_client *w, char *url) {
             return HTTP_RESP_BAD_REQUEST;
         }
 
+        netdata_cloud_enabled = CONFIG_BOOLEAN_AUTO;
+        appconfig_set_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", CONFIG_BOOLEAN_AUTO);
         appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", base_url);
 
         BUFFER *t = buffer_create(1024, NULL);
