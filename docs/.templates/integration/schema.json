@@ -71,6 +71,13 @@
                         "type": "string",
                         "description": "path to the icon for this integration."
                     },
+                    "keywords": {
+                        "type":"array",
+                        "description": "An array of terms related to the integration.",
+                        "items": {
+                            "type":"string"
+                        }
+                    },
                     "overview": {
                         "type": "string",
                         "description": "The text that will go in the top of the page, in markdown format."
