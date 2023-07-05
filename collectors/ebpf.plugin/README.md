@@ -1028,7 +1028,7 @@ request:
 
 ### Debugging threads
 
-You can verify the impact of threads on host running the
+You can verify the impact of threads on the host by running the
 [ebpf_thread_function.sh](https://github.com/netdata/netdata/blob/master/tests/ebpf/ebpf_thread_function.sh)
 script on your environment.
 
