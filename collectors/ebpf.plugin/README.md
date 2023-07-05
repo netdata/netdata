@@ -1012,7 +1012,7 @@ It is possible to enable a specific thread using the keyword `enable`:
 
 `http://localhost:19999/api/v1/function?function=ebpf_thread%20enable:mount`
 
-this will run thread `mount` during 300 seconds (5 minutes). You can specify a specific period appending the period
+this will run thread `mount` during 300 seconds (5 minutes). You can specify a specific period by appending the period
 after the thread name:
 
 `http://localhost:19999/api/v1/function?function=ebpf_thread%20enable:mount:600`
