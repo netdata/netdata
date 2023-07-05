@@ -469,6 +469,8 @@ static void ebpf_shm_exit(void *ptr)
         pthread_mutex_unlock(&lock);
     }
 
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
+
 #ifdef LIBBPF_MAJOR_VERSION
     if (shm_bpf_obj) {
         shm_bpf__destroy(shm_bpf_obj);
@@ -485,7 +487,6 @@ static void ebpf_shm_exit(void *ptr)
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     ebpf_update_stats(&plugin_statistics, em);
-    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
