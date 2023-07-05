@@ -36,9 +36,7 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
         else if(!strcmp(name, "timeout"))
             req.timeout_ms = str2l(value);
         else if(mode & (CONTEXTS_V2_ALERTS | CONTEXTS_V2_ALERT_TRANSITIONS)) {
-            if (!strcmp(name, "last"))
-                req.alerts.last = strtoul(value, NULL, 0);
-            else if (!strcmp(name, "alert"))
+            if (!strcmp(name, "alert"))
                 req.alerts.alert = value;
             else if (!strcmp(name, "transition"))
                 req.alerts.transition = value;
@@ -47,7 +45,9 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
                     req.alerts.status = web_client_api_request_v2_alert_status(value);
             }
             else if(mode & CONTEXTS_V2_ALERT_TRANSITIONS) {
-                if(!strcmp(name, "context"))
+                if (!strcmp(name, "last"))
+                    req.alerts.last = strtoul(value, NULL, 0);
+                else if(!strcmp(name, "context"))
                     req.contexts = value;
                 else if (!strcmp(name, "anchor_gi")) {
                     req.alerts.global_id_anchor = str2ull(value, NULL);

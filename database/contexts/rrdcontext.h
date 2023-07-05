@@ -529,6 +529,7 @@ struct sql_alert_instance_v2_entry {
     STRING *name;
     STRING *family;
     STRING *units;
+    STRING *source;
     RRDCALC_STATUS status;
     RRDCALC_FLAGS flags;
     STRING *info;
