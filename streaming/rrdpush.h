@@ -400,6 +400,7 @@ struct receiver_state {
         int update_every;
         int health_enabled; // CONFIG_BOOLEAN_YES, CONFIG_BOOLEAN_NO, CONFIG_BOOLEAN_AUTO
         time_t alarms_delay;
+        uint32_t alarms_history;
         int rrdpush_enabled;
         char *rrdpush_api_key; // DONT FREE - it is allocated in appconfig
         char *rrdpush_send_charts_matching; // DONT FREE - it is allocated in appconfig

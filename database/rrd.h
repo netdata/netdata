@@ -1105,6 +1105,7 @@ typedef struct alarm_log {
     uint32_t next_alarm_id;
     unsigned int count;
     unsigned int max;
+    uint32_t health_log_history;                   // the health log history in seconds to be kept in db
     ALARM_ENTRY *alarms;
     netdata_rwlock_t alarm_log_rwlock;
 } ALARM_LOG;
