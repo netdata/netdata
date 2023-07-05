@@ -6,6 +6,8 @@ monitored_instance:
 alternative_monitored_instances:
   - name: ""
     link: ""
+keywords:
+  - ""
 overview:
   data_collection:
     metrics_description: ""
