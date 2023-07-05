@@ -59,6 +59,7 @@ static struct {
         , {"debug"            , 0    , CONTEXT_V2_OPTION_DEBUG}
         , {"config"           , 0    , CONTEXT_V2_OPTION_ALERTS_WITH_CONFIGURATIONS}
         , {"instances"        , 0    , CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES}
+        , {"values"           , 0    , CONTEXT_V2_OPTION_ALERTS_WITH_VALUES}
         , {NULL               , 0    , 0}
 };
 

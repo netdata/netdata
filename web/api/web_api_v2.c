@@ -62,10 +62,7 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
         }
     }
 
-    if (    (
-                ((mode & CONTEXTS_V2_ALERTS) && (req.options & CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES)) ||
-                (mode & CONTEXTS_V2_ALERT_TRANSITIONS)
-            ) && !req.alerts.last)
+    if ((mode & CONTEXTS_V2_ALERT_TRANSITIONS) && !req.alerts.last)
         req.alerts.last = 1;
 
     buffer_flush(w->response.data);

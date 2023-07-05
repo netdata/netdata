@@ -1319,11 +1319,15 @@ static int contexts_v2_alert_instance_to_json_callback(const DICTIONARY_ITEM *it
         buffer_json_member_add_uuid  (wb, "cfg", &t->config_hash_id);
         buffer_json_member_add_string(wb, "src", string2str(t->source));
 
-        // FIXME these are not available on Netdata Cloud
+        if(ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_VALUES) {
+            // Netdata Cloud fetched these by querying the agents
+            buffer_json_member_add_double(wb, "v", t->value);
+            buffer_json_member_add_time_t(wb, "t", t->last_updated);
+        }
+
+        // Agent specific fields
         buffer_json_member_add_uint64(wb, "gi", t->global_id);
-        buffer_json_member_add_double(wb, "v", t->value);
-        buffer_json_member_add_time_t(wb, "t", t->last_updated);
-        rrdcalc_flags_to_json_array  (wb, "flags", t->flags);
+        // rrdcalc_flags_to_json_array  (wb, "flags", t->flags);
     }
     buffer_json_object_close(wb); // alert instance
 
@@ -1733,6 +1737,9 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     if(mode & CONTEXTS_V2_ALERTS) {
         mode |= CONTEXTS_V2_NODES;
         req->options &= ~CONTEXT_V2_OPTION_ALERTS_WITH_CONFIGURATIONS;
+
+        if(req->options & CONTEXT_V2_OPTION_ALERTS_WITH_VALUES)
+            req->options |= CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES;
     }
 
     if(mode & CONTEXTS_V2_ALERT_TRANSITIONS) {
