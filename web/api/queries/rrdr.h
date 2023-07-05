@@ -57,6 +57,7 @@ typedef enum context_v2_options {
     CONTEXT_V2_OPTION_ALERTS_WITH_CONFIGURATIONS    = (1 << 2), // include alert configurations (used by /api/v2/alert_transitions)
     CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES         = (1 << 3), // include alert instances      (used by /api/v2/alerts)
     CONTEXT_V2_OPTION_ALERTS_WITH_VALUES            = (1 << 4), // include alert latest values  (used by /api/v2/alerts)
+    CONTEXT_V2_OPTION_ALERTS_WITH_SUMMARY           = (1 << 5), // include alerts summary counters  (used by /api/v2/alerts)
 } CONTEXTS_V2_OPTIONS;
 
 typedef enum context_v2_alert_status {

@@ -60,6 +60,7 @@ static struct {
         , {"config"           , 0    , CONTEXT_V2_OPTION_ALERTS_WITH_CONFIGURATIONS}
         , {"instances"        , 0    , CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES}
         , {"values"           , 0    , CONTEXT_V2_OPTION_ALERTS_WITH_VALUES}
+        , {"summary"          , 0    , CONTEXT_V2_OPTION_ALERTS_WITH_SUMMARY}
         , {NULL               , 0    , 0}
 };
 

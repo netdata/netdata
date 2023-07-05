@@ -518,10 +518,6 @@ struct sql_alert_instance_v2_entry {
     RRDCALC *tmp;
 
     size_t ati;
-    size_t aci;
-    size_t aii;
-
-    size_t transitions;
 
     STRING *context;
     STRING *chart_id;
