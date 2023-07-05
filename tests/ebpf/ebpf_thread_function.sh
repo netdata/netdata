@@ -45,5 +45,6 @@ do
     netdata_ebpf_test_functions "${MURL}/api/v1/function?function=ebpf_thread%20disable:${THREAD}"
     sleep 6
     netdata_ebpf_test_functions "${MURL}/api/v1/function?function=ebpf_thread%20thread:${THREAD}" "stopped"
+    sleep 6
 done
 
