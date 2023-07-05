@@ -3,7 +3,7 @@
     "type": "object",
     "title": "Netdata Integrations file",
     "properties": {
-        "categories_list": {
+        "categories": {
             "type": "object",
             "description": "A list defining all the available categories for the integrations",
             "properties": {
@@ -42,10 +42,10 @@
             "items": {
                 "type": "object",
                 "properties": {
-                    "integrations_name": {
+                    "name": {
                         "type": "string"
                     },
-                    "category": {
+                    "category_id": {
                         "type": "string",
                         "description": "The ID for this category"
                     },
