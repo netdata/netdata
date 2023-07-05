@@ -422,7 +422,7 @@ struct sql_alert_transition_data {
     uuid_t *host_id;
     uuid_t *config_hash_id;
     uint32_t alarm_id;
-    const char *name;
+    const char *alert_name;
     const char *chart;
     const char *chart_context;
     const char *family;
@@ -454,7 +454,7 @@ struct sql_alert_transition_data {
 
 struct sql_alert_config_data {
     uuid_t *config_hash_id;
-    const char *alarm;
+    const char *alert_name;
     const char *on_template;
     const char *on_key;
     const char *classification;
@@ -486,9 +486,9 @@ struct sql_alert_config_data {
     const char *source;
     const char *chart_labels;
     uint32_t p_db_lookup_options;
-    int32_t p_db_lookup_after;
-    int32_t p_db_lookup_before;
-    int32_t p_update_every;
+    int32_t after;
+    int32_t before;
+    int32_t update_every;
 };
 
 struct sql_alert_instance_v2_entry {

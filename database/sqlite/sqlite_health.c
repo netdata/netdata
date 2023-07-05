@@ -2119,7 +2119,7 @@ run_query:;
         atd.host_id = (uuid_t *) sqlite3_column_blob(res, 0);
         atd.alarm_id = sqlite3_column_int64(res, 1);
         atd.config_hash_id = (uuid_t *)sqlite3_column_blob(res, 2);
-        atd.name = (const char *) sqlite3_column_text(res, 3);
+        atd.alert_name = (const char *) sqlite3_column_text(res, 3);
         atd.chart = (const char *) sqlite3_column_text(res, 4);
         atd.family = (const char *) sqlite3_column_text(res, 5);
         atd.recipient = (const char *) sqlite3_column_text(res, 6);
@@ -2240,7 +2240,7 @@ void sql_get_alert_configuration(
     int param = 0;
     while (sqlite3_step(res) == SQLITE_ROW) {
         acd.config_hash_id = (uuid_t *) sqlite3_column_blob(res, param++);
-        acd.alarm = (const char *) sqlite3_column_text(res, param++);
+        acd.alert_name = (const char *) sqlite3_column_text(res, param++);
         acd.on_template = (const char *) sqlite3_column_text(res, param++);
         acd.on_key = (const char *) sqlite3_column_text(res, param++);
         acd.classification = (const char *) sqlite3_column_text(res, param++);
@@ -2270,9 +2270,9 @@ void sql_get_alert_configuration(
         acd.p_db_lookup_dimensions = (const char *) sqlite3_column_text(res, param++);
         acd.p_db_lookup_method = (const char *) sqlite3_column_text(res, param++);
         acd.p_db_lookup_options = (uint32_t) sqlite3_column_int(res, param++);
-        acd.p_db_lookup_after = (int32_t) sqlite3_column_int(res, param++);
-        acd.p_db_lookup_before = (int32_t) sqlite3_column_int(res, param++);
-        acd.p_update_every = (int32_t) sqlite3_column_int(res, param++);
+        acd.after = (int32_t) sqlite3_column_int(res, param++);
+        acd.before = (int32_t) sqlite3_column_int(res, param++);
+        acd.update_every = (int32_t) sqlite3_column_int(res, param++);
         acd.source = (const char *) sqlite3_column_text(res, param++);
         acd.chart_labels = (const char *) sqlite3_column_text(res, param++);
 
