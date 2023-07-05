@@ -441,7 +441,7 @@ void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report, ebpf_loc
                                            ebpf_stats_action_t action);
 void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *map, ebpf_stats_action_t action);
 int ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em);
-void ebpf_statistic_disable_aral_chart(ebpf_module_t *em, int prio);
+void ebpf_statistic_obsolete_aral_chart(ebpf_module_t *em, int prio);
 void ebpf_send_data_aral_chart(ARAL *memory, ebpf_module_t *em);
 
 #endif /* NETDATA_EBPF_H */
