@@ -1299,7 +1299,7 @@ static void contexts_v2_alert_config_to_json_from_sql_alert_config_data(struct s
     bool debug = d->debug;
     d->configs_added++;
 
-    buffer_json_add_array_item_array(wb); // alert config
+    buffer_json_add_array_item_object(wb); // alert config
     {
         buffer_json_member_add_string(wb, "name", t->name);
         buffer_json_member_add_uuid(wb, "config_hash_id", t->config_hash_id);
