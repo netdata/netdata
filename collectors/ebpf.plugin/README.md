@@ -1032,7 +1032,7 @@ You can verify the impact of threads on the host by running the
 [ebpf_thread_function.sh](https://github.com/netdata/netdata/blob/master/tests/ebpf/ebpf_thread_function.sh)
 script on your environment.
 
-You can check the results of to have threads running on your environment in Netdata monitoring section on your
+You can check the results of having threads running on your environment in the Netdata monitoring section on your
 dashboard
 
 <img src="https://github.com/netdata/netdata/assets/49162938/b97e32e0-1ebe-4c44-8801-8a3aab2c7632" alt="Threads running." />
