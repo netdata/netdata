@@ -313,135 +313,84 @@ static int hdl_stream(h2o_handler_t *self, h2o_req_t *req)
     return 0;
 }
 
-static int dyncfg_top(h2o_req_t *req)
-{
-        if (!h2o_memis(req->method.base, req->method.len, H2O_STRLIT("GET"))) {
-            error_report("netdata_dynamic_configuration: method is not GET");
-            req->res.status = HTTP_RESP_METHOD_NOT_ALLOWED;
-            req->res.reason = HTTP_RESP_METHOD_NOT_ALLOWED_STR;
-            h2o_send_inline(req, H2O_STRLIT(HTTP_RESP_METHOD_NOT_ALLOWED_STR));
-            return 0;
-        }
-
-        req->res.status = 200;
-        req->res.reason = "OK";
-        json_object *plugins = get_list_of_plugins_json();
-        json_object *wrapper = json_object_new_object();
-        json_object_object_add(wrapper, "configurable_plugins", plugins);
-        const char *str = json_object_to_json_string_ext(wrapper, JSON_C_TO_STRING_PRETTY);
-
-        h2o_add_header(&req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL, CONTENT_JSON_UTF8);        
-        h2o_send_inline(req, str, strlen(str));
-        json_object_put(plugins);
-        return 0;
-}
-
-static int dyncfg_module_top(h2o_req_t *req, struct configurable_module *mod)
-{
-    if (h2o_memis(req->method.base, req->method.len, H2O_STRLIT("GET"))) {
-        json_object *cfg = get_config_of_plugin_json(mod);
-        if (cfg == NULL) {
-            error_report("netdata_dynamic_configuration: failed to get config of module");
-            req->res.status = HTTP_RESP_INTERNAL_SERVER_ERROR;
-            req->res.reason = HTTP_RESP_INTERNAL_SERVER_ERROR_STR;
-            h2o_send_inline(req, H2O_STRLIT(HTTP_RESP_INTERNAL_SERVER_ERROR_STR));
-            return 0;
-        }
-        req->res.status = 200;
-        req->res.reason = "OK";
-        const char *str = json_object_to_json_string_ext(cfg, JSON_C_TO_STRING_PRETTY);
-        h2o_add_header(&req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL, CONTENT_JSON_UTF8);
-        h2o_send_inline(req, str, strlen(str));
-        json_object_put(cfg);
-        return 0;
-    }
-    if (h2o_memis(req->method.base, req->method.len, H2O_STRLIT("POST")) || h2o_memis(req->method.base, req->method.len, H2O_STRLIT("PUT"))) {
-        char *str = iovec_to_cstr(&req->entity);
-        json_object *cfg = json_tokener_parse(str);
-        if (cfg == NULL) {
-            error_report("netdata_dynamic_configuration: failed to parse json");
-            req->res.status = HTTP_RESP_BAD_REQUEST;
-            req->res.reason = HTTP_RESP_BAD_REQUEST_STR;
-            h2o_send_inline(req, H2O_STRLIT(HTTP_RESP_BAD_REQUEST_STR));
-            return 0;
-        }
-
-        const char *e_reason;
-        if ((e_reason = set_plugin_config_json(mod, cfg)) != NULL) {
-            error_report("netdata_dynamic_configuration: failed to set module configuration");
-            req->res.status = HTTP_RESP_INTERNAL_SERVER_ERROR;
-            req->res.reason = HTTP_RESP_INTERNAL_SERVER_ERROR_STR;
-            h2o_send_inline(req, e_reason, strlen(e_reason));
-            return 0;
-        }
-        req->res.status = 200;
-        req->res.reason = "OK";
-        h2o_send_inline(req, H2O_STRLIT("OK"));
-        return 0;
-    }
-
-    error_report("netdata_dynamic_configuration: method is not GET, POST or PUT");
-    req->res.status = HTTP_RESP_METHOD_NOT_ALLOWED;
-    req->res.reason = HTTP_RESP_METHOD_NOT_ALLOWED_STR;
-    h2o_send_inline(req, H2O_STRLIT(HTTP_RESP_METHOD_NOT_ALLOWED_STR));
-    return 0;
-}
-
 static int netdata_dyncfg(h2o_handler_t *self, h2o_req_t *req)
 {
-    error_report("httpd netdata_dynamic_configuration: got request");
     UNUSED(self);
 
     if (!h2o_memis(req->path_normalized.base, MIN(req->path_normalized.len, strlen(CONFIG_PREFIX)), H2O_STRLIT(CONFIG_PREFIX))) {
         error_report("netdata_dynamic_configuration: path does not start with " CONFIG_PREFIX);
         return -1;
     }
+    error_report("dynamic dyncfg " PRINTF_H2O_IOVEC_FMT, PRINTF_H2O_IOVEC(&req->path_normalized));
 
     h2o_iovec_t path = h2o_iovec_init(req->path_normalized.base + strlen(CONFIG_PREFIX), req->path_normalized.len - strlen(CONFIG_PREFIX));
     if (path.len > 1 && path.base[0] == '/') {
         path.base++;
         path.len--;
     }
-    if (path.len == 0) {
-        return dyncfg_top(req);
+
+    error_report("netdata_dynamic_configuration: got request for path (%d) %.*s", path.len, (int)path.len, path.base);
+
+    char *c_path = NULL;
+    char *plugin_name = NULL;
+    char *module_name = NULL;
+    char *job_id = NULL;
+
+    if (path.len) {
+        c_path = iovec_to_cstr(&path);
+        char *p;
+        plugin_name = c_path;
+        if ( (p = strchr(c_path, '/')) != NULL) {
+            *p = '\0';
+            module_name = p + 1;
+            if ( (p = strchr(module_name, '/')) != NULL) {
+                *p = '\0';
+                job_id = p + 1;
+                if ( (p = strchr(job_id, '/')) != NULL) {
+                    error_report("netdata_dynamic_configuration: path is too long");
+                    req->res.status = HTTP_RESP_NOT_FOUND;
+                    req->res.reason = HTTP_RESP_NOT_FOUND_STR;
+                    h2o_send_inline(req, H2O_STRLIT(HTTP_RESP_NOT_FOUND_STR));
+                    freez(c_path);
+                    return 0;
+                }
+            }
+        }
     }
 
-    h2o_iovec_t iovec_mod = path;
-    // find / in path
-    size_t end_loc = h2o_strstr(path.base, path.len, "/", 1);
-    if (end_loc != SIZE_MAX)
-        iovec_mod.len = end_loc;
+    int method = -1;
+    if (h2o_memis(req->method.base, req->method.len, H2O_STRLIT("GET")))
+        method = HTTP_METHOD_GET;
+    else if (h2o_memis(req->method.base, req->method.len, H2O_STRLIT("POST")))
+        method = HTTP_METHOD_POST;
+    else if (h2o_memis(req->method.base, req->method.len, H2O_STRLIT("PUT")))
+        method = HTTP_METHOD_PUT;
+    else if (h2o_memis(req->method.base, req->method.len, H2O_STRLIT("DELETE")))
+        method = HTTP_METHOD_DELETE;
 
-    char *c_mod = iovec_to_cstr(&iovec_mod);
-    struct configurable_plugin *plugin = get_plugin_by_name(c_mod);
-    freez(c_mod);
-    if (plugin == NULL) {
-        BUFFER *b = buffer_create(128, NULL);
-        buffer_sprintf(b, "netdata_dynamic_configuration: requested module %s not found", c_mod);
-        error_report(buffer_tostring(b));
-        req->res.status = HTTP_RESP_NOT_FOUND;
-        req->res.reason = HTTP_RESP_NOT_FOUND_STR;
-        h2o_send_inline(req, buffer_tostring(b), b->len);
-        buffer_free(b);
+    if (method == -1) {
+        error_report("dyncfg: method is not GET, POST, PUT or DELETE");
+        req->res.status = HTTP_RESP_METHOD_NOT_ALLOWED;
+        req->res.reason = HTTP_RESP_METHOD_NOT_ALLOWED_STR;
+        h2o_send_inline(req, H2O_STRLIT(HTTP_RESP_METHOD_NOT_ALLOWED_STR));
         return 0;
     }
 
+    struct uni_http_response resp = dyn_conf_process_http_request(method, plugin_name, module_name, job_id);
 
-    path.base += iovec_mod.len;
-    path.len -= iovec_mod.len;
-    if (path.len > 1 && path.base[0] == '/') {
-        path.base++;
-        path.len--;
-    }
-    if (path.len == 0) {
-        return dyncfg_module_top(req, plugin);
-    }
+    req->res.status = resp.status;
+    req->res.reason = resp.content;
+    h2o_send_inline(req, resp.content, strlen(resp.content));
 
-    req->res.status = 200;
-    req->res.reason = "OK";
-    h2o_send_inline(req, H2O_STRLIT("you should never see this!\n"));
+    if (resp.content_free)
+        free(resp.content);
+
+    req->res.status = HTTP_RESP_INTERNAL_SERVER_ERROR;
+    req->res.reason = HTTP_RESP_INTERNAL_SERVER_ERROR_STR;
+    h2o_send_inline(req, H2O_STRLIT("you should never see this!"));
+
+    freez(c_path);
     return 0;
-
 }
 
 // TODO this is hardcoded for now, as virtual module during development

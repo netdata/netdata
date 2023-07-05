@@ -345,12 +345,62 @@ static int web_client_api_request_v2_webrtc(RRDHOST *host __maybe_unused, struct
     return webrtc_new_connection(w->post_payload, w->response.data);
 }
 
+#define CONFIG_API_V2_URL "/api/v2/config"
+static int web_client_api_request_v2_config(RRDHOST *host __maybe_unused, struct web_client *w, char *query) {
+
+    char *url = strdupz(buffer_tostring(w->url_as_received));
+
+    if (strncmp(url, CONFIG_API_V2_URL, strlen(CONFIG_API_V2_URL)) != 0) {
+        buffer_sprintf(w->response.data, "Invalid URL");
+        return HTTP_RESP_BAD_REQUEST;
+    }
+    url += strlen(CONFIG_API_V2_URL);
+
+    char *save_ptr = NULL;
+    char *plugin = strtok_r(url, "/", &save_ptr);
+    char *module = strtok_r(NULL, "/", &save_ptr);
+    char *job_id = strtok_r(NULL, "/", &save_ptr);
+    char *extra = strtok_r(NULL, "/", &save_ptr);
+    error_report("plugin: %s, module: %s, job_id: %s, extra: %s", plugin, module, job_id, extra);
+    if (extra != NULL) {
+        buffer_sprintf(w->response.data, "Invalid URL");
+        return HTTP_RESP_BAD_REQUEST;
+    }
+
+    buffer_flush(w->response.data);
+
+    int http_method;
+    switch (w->mode)
+    {
+        case WEB_CLIENT_MODE_GET:
+            http_method = HTTP_METHOD_GET;
+            break;
+        case WEB_CLIENT_MODE_POST:
+            http_method = HTTP_METHOD_POST;
+            break;
+        case WEB_CLIENT_MODE_PUT:
+            http_method = HTTP_METHOD_PUT;
+            break;
+        default:
+            buffer_sprintf(w->response.data, "Invalid HTTP method");
+            return HTTP_RESP_BAD_REQUEST;
+    }
+
+    struct uni_http_response resp = dyn_conf_process_http_request(http_method, plugin, module, job_id);
+    buffer_strcat(w->response.data, resp.content);
+    if (resp.content_free)
+        resp.content_free(resp.content);
+    w->response.data->content_type = resp.content_type;
+    return resp.status;
+}
+
 static struct web_api_command api_commands_v2[] = {
         {"data", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_data, 0},
         {"nodes", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_nodes, 0},
         {"contexts", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_contexts, 0},
         {"weights", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_weights, 0},
         {"q", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_q, 0},
+        {"config", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_config, 1},
 
         {"rtc_offer", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_webrtc, 0},
 

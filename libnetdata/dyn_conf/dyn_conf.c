@@ -157,6 +157,39 @@ int register_plugin(struct configurable_plugin *plugin)
     return 0;
 }
 
+struct uni_http_response dyn_conf_process_http_request(int method, const char *plugin, const char *module, const char *job_id)
+{
+    struct uni_http_response resp = {
+        .status = HTTP_RESP_INTERNAL_SERVER_ERROR,
+        .content_type = CT_TEXT_PLAIN,
+        .content = HTTP_RESP_INTERNAL_SERVER_ERROR_STR,
+        .content_free = NULL
+    };
+    if (plugin == NULL) {
+        if (method != HTTP_METHOD_GET) {
+            resp.content = "method not allowed";
+            resp.status = HTTP_RESP_METHOD_NOT_ALLOWED;
+            return resp;
+        }
+        json_object *obj = get_list_of_plugins_json();
+        json_object *wrapper = json_object_new_object();
+        json_object_object_add(wrapper, "configurable_plugins", obj);
+        resp.content = strdup(json_object_to_json_string_ext(wrapper, JSON_C_TO_STRING_PRETTY));
+        json_object_put(wrapper);
+        resp.status = HTTP_RESP_OK;
+        resp.content_type = CT_APPLICATION_JSON;
+        resp.content_free = free;
+        return resp;
+    }
+    struct configurable_plugin *plug = get_plugin_by_name(plugin);
+    if (plug == NULL) {
+        resp.content = "plugin not found";
+        resp.status = HTTP_RESP_NOT_FOUND;
+        return resp;
+    }
+    return resp;
+}
+
 int dyn_conf_init(void)
 {
     if (mkdir(DYN_CONF_DIR, 0755) == -1) {

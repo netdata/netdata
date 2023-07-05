@@ -42,6 +42,16 @@ struct configurable_plugin *get_plugin_by_name(const char *name);
 json_object *get_config_of_plugin_json(struct configurable_plugin *plugin);
 const char *set_plugin_config_json(struct configurable_plugin *plugin, json_object *cfg);
 
+// helper struct to make interface between internal webserver and h2o same
+struct uni_http_response {
+    int status;
+    char *content;
+    HTTP_CONTENT_TYPE content_type;
+    void (*content_free)(void *);
+};
+
+struct uni_http_response dyn_conf_process_http_request(int method, const char *plugin, const char *module, const char *job_id);
+
 // API to be used by main netdata process, initialization and destruction etc.
 int dyn_conf_init(void);
 
