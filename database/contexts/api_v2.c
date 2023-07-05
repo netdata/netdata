@@ -347,6 +347,7 @@ static void alert_instances_v2_insert_callback(const DICTIONARY_ITEM *item __may
     struct sql_alert_instance_v2_entry *t = value;
     RRDCALC *rc = t->tmp;
 
+    t->context = rc->rrdset->context;
     t->chart_id = rc->rrdset->id;
     t->chart_name = rc->rrdset->name;
     t->family = rc->rrdset->family;
@@ -1446,6 +1447,7 @@ static int contexts_v2_alert_instance_to_json_callback(const DICTIONARY_ITEM *it
         buffer_json_member_add_string(wb, "fami", string2str(t->family));
         buffer_json_member_add_string(wb, "info", string2str(t->info));
         buffer_json_member_add_string(wb, "ch", string2str(t->chart_name));
+        buffer_json_member_add_string(wb, "ctx", string2str(t->context));
         buffer_json_member_add_string(wb, "st", rrdcalc_status2string(t->status));
         buffer_json_member_add_double(wb, "v", t->value);
         buffer_json_member_add_time_t(wb, "t", t->last_updated);

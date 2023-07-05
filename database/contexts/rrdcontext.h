@@ -523,6 +523,7 @@ struct sql_alert_instance_v2_entry {
 
     size_t transitions;
 
+    STRING *context;
     STRING *chart_id;
     STRING *chart_name;
     STRING *name;
