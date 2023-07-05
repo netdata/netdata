@@ -348,12 +348,12 @@ int api_v2_claim(struct web_client *w, char *url) {
     switch(status) {
         case CLOUD_STATUS_AVAILABLE:
         case CLOUD_STATUS_DISABLED:
+        case CLOUD_STATUS_OFFLINE:
             can_be_claimed = true;
             break;
 
         case CLOUD_STATUS_UNAVAILABLE:
         case CLOUD_STATUS_BANNED:
-        case CLOUD_STATUS_OFFLINE:
         case CLOUD_STATUS_ONLINE:
             can_be_claimed = false;
             break;
@@ -380,11 +380,16 @@ int api_v2_claim(struct web_client *w, char *url) {
         appconfig_set_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", CONFIG_BOOLEAN_AUTO);
         appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", base_url);
 
+        uuid_t claimed_id;
+        uuid_generate_random(claimed_id);
+        char claimed_id_str[UUID_STR_LEN];
+        uuid_unparse_lower(claimed_id, claimed_id_str);
+
         BUFFER *t = buffer_create(1024, NULL);
         if(rooms)
-            buffer_sprintf(t, "-token=%s -rooms=%s", token, rooms);
+            buffer_sprintf(t, "-id=%s -token=%s -rooms=%s", claimed_id_str, token, rooms);
         else
-            buffer_sprintf(t, "-token=%s", token);
+            buffer_sprintf(t, "-id=%s -token=%s", claimed_id_str, token);
 
         bool success = false;
         const char *msg = NULL;
