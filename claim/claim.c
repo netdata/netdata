@@ -222,14 +222,14 @@ bool netdata_random_session_id_generate(void) {
     bool ret = true;
 
     // save it
-    int fd = open(netdata_random_session_id_filename, O_WRONLY|O_CREAT|O_TRUNC, 644);
+    int fd = open(filename, O_WRONLY|O_CREAT|O_TRUNC, 644);
     if(fd == -1) {
-        error("Cannot create random session id file '%s'.", netdata_random_session_id_filename);
+        error("Cannot create random session id file '%s'.", filename);
         ret = false;
     }
 
     if(write(fd, guid, UUID_STR_LEN - 1) != UUID_STR_LEN - 1) {
-        error("Cannot write the random session id file '%s'.", netdata_random_session_id_filename);
+        error("Cannot write the random session id file '%s'.", filename);
         ret = false;
     }
 
