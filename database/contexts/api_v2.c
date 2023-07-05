@@ -1290,7 +1290,7 @@ int contexts_v2_alert_config_to_json(struct web_client *w, const char *config_ha
 static int contexts_v2_alert_instance_to_json_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
     struct sql_alert_instance_v2_entry *t = value;
     struct alert_instances_callback_data *d = data;
-    struct rrdcontext_to_json_v2_data *ctl = d->ctl;
+    struct rrdcontext_to_json_v2_data *ctl = d->ctl; (void)ctl;
     bool debug = d->debug;
     BUFFER *wb = d->wb;
 
