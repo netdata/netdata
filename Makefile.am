@@ -281,6 +281,10 @@ CGROUP_NETWORK_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
+LOCAL_LISTENERS_FILES = \
+    collectors/plugins.d/local_listeners.c \
+    $(NULL)
+
 DISKSPACE_PLUGIN_FILES = \
     collectors/diskspace.plugin/plugin_diskspace.c \
     $(NULL)
@@ -1202,6 +1206,13 @@ if ENABLE_PLUGIN_CGROUP_NETWORK
     cgroup_network_SOURCES = $(CGROUP_NETWORK_FILES)
     cgroup_network_LDADD = \
         $(NETDATA_COMMON_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_LOCAL_LISTENERS
+    plugins_PROGRAMS += local-listeners
+    local_listeners_SOURCES = $(LOCAL_LISTENERS_FILES)
+    local_listeners_LDADD = \
         $(NULL)
 endif
 

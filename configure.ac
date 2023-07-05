@@ -390,6 +390,8 @@ then
     AC_DEFINE([COMPILED_FOR_LINUX], [1], [Compiled for Linux])
 fi
 
+AM_CONDITIONAL([ENABLE_PLUGIN_LOCAL_LISTENERS], [test "${build_target}" = "linux"])
+
 AC_MSG_RESULT([Host OS: ${build_target}])
 
 # -----------------------------------------------------------------------------
@@ -397,7 +399,7 @@ AC_MSG_RESULT([Host OS: ${build_target}])
 
 HARDENING_CFLAGS=""
 
-if ! echo "${originalCFLAGS}" | grep -q '-fstack-protector'; then
+if ! echo "${originalCFLAGS}" | grep -q '\-fstack-protector'; then
     AX_CHECK_COMPILE_FLAG(
         [-fstack-protector-strong],
         [HARDENING_CFLAGS="${HARDENING_CFLAGS} -fstack-protector-strong"],
@@ -411,7 +413,7 @@ if ! echo "${originalCFLAGS}" | grep -q '-fstack-protector'; then
     )
 fi
 
-if ! echo "${originalCFLAGS}" | grep -q '-fno-stack-clash-protection'; then
+if ! echo "${originalCFLAGS}" | grep -q '\-fno-stack-clash-protection'; then
     AX_CHECK_COMPILE_FLAG(
         [-fstack-clash-protection],
         [HARDENING_CFLAGS="${HARDENING_CFLAGS} -fstack-clash-protection"],
@@ -420,7 +422,7 @@ if ! echo "${originalCFLAGS}" | grep -q '-fno-stack-clash-protection'; then
     )
 fi
 
-if ! echo "${originalCFLAGS}" | grep -q '-fcf-protection'; then
+if ! echo "${originalCFLAGS}" | grep -q '\-fcf-protection'; then
     AX_CHECK_COMPILE_FLAG(
         [-fcf-protection=full],
         [HARDENING_CFLAGS="${HARDENING_CFLAGS} -fcf-protection=full"],
@@ -429,7 +431,7 @@ if ! echo "${originalCFLAGS}" | grep -q '-fcf-protection'; then
     )
 fi
 
-if ! echo "${originalCFLAGS}" | grep -q '-mbranch-protection'; then
+if ! echo "${originalCFLAGS}" | grep -q '\-mbranch-protection'; then
     AX_CHECK_COMPILE_FLAG(
         [-mbranch-protection=standard],
         [HARDENING_CFLAGS="${HARDENING_CFLAGS} -mbranch-protection=standard"],
@@ -438,7 +440,7 @@ if ! echo "${originalCFLAGS}" | grep -q '-mbranch-protection'; then
     )
 fi
 
-if ! echo "${originalCFLAGS}" | grep -q '-D_FORTIFY_SOURCE'; then
+if ! echo "${originalCFLAGS}" | grep -q '\-D_FORTIFY_SOURCE'; then
     # This complex set of checks is needed because there is no clean
     # way to verify _FORTIFY_SOURCE support without having to check for
     # the required compiler builtins.
@@ -449,7 +451,7 @@ if ! echo "${originalCFLAGS}" | grep -q '-D_FORTIFY_SOURCE'; then
         [HAVE_FORTIFY_SOURCE=2]
     )
 
-    if test "x${HAVE_FORTIFY_SOURCE}" = "x2" && echo "${originalCFLAGS}" | grep -qv '-O0'; then
+    if test "x${HAVE_FORTIFY_SOURCE}" = "x2" && echo "${originalCFLAGS}" | grep -qv '\-O0'; then
         AC_CHECK_DECL(
             __builtin_dynamic_object_size,
             [AX_CHECK_COMPILE_FLAG(
@@ -1180,7 +1182,6 @@ PKG_CHECK_MODULES(
     )],
     [have_libmnl=no]
 )
-
 
 LIBS="${LIBS}"
 

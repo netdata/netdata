@@ -259,7 +259,8 @@ bool netdata_random_session_id_generate(void) {
         ret = false;
     }
 
-    (void)write(fd, "\n", 1);
+    ssize_t rc = write(fd, "\n", 1);
+    (void)rc;
 
     close(fd);
 
