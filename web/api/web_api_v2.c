@@ -362,12 +362,12 @@ static int web_client_api_request_v2_config(RRDHOST *host __maybe_unused, struct
     char *job_id = strtok_r(NULL, "/", &save_ptr);
     char *extra = strtok_r(NULL, "/", &save_ptr);
     error_report("plugin: %s, module: %s, job_id: %s, extra: %s", plugin, module, job_id, extra);
+
+    buffer_flush(w->response.data);
     if (extra != NULL) {
         buffer_sprintf(w->response.data, "Invalid URL");
         return HTTP_RESP_BAD_REQUEST;
     }
-
-    buffer_flush(w->response.data);
 
     int http_method;
     switch (w->mode)
