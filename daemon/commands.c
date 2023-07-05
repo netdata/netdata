@@ -209,12 +209,8 @@ static cmd_status_t cmd_reload_claiming_state_execute(char *args, char **message
     *message = strdupz("This agent cannot be claimed, it was built without support for Cloud");
     return CMD_STATUS_FAILURE;
 #endif
-    error_log_limit_unlimited();
     netdata_log_info("COMMAND: Reloading Agent Claiming configuration.");
-    load_claiming_state();
-    registry_update_cloud_base_url();
-    rrdpush_send_claimed_id(localhost);
-    error_log_limit_reset();
+    claim_reload_all();
     return CMD_STATUS_SUCCESS;
 }
 

@@ -22,6 +22,7 @@ CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, con
 char *get_agent_claimid(void);
 void load_claiming_state(void);
 void load_cloud_conf(int silent);
+void claim_reload_all(void);
 
 bool netdata_random_session_id_generate(void);
 const char *netdata_random_session_id_get_filename(void);

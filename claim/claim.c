@@ -289,6 +289,14 @@ static bool check_claim_param(const char *s) {
     return true;
 }
 
+void claim_reload_all(void) {
+    error_log_limit_unlimited();
+    load_claiming_state();
+    registry_update_cloud_base_url();
+    rrdpush_send_claimed_id(localhost);
+    error_log_limit_reset();
+}
+
 int api_v2_claim(struct web_client *w, char *url) {
     char *key = NULL;
     char *token = NULL;
@@ -317,7 +325,8 @@ int api_v2_claim(struct web_client *w, char *url) {
     buffer_flush(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, false);
 
-    CLOUD_STATUS status = buffer_json_cloud_status(wb, now_realtime_sec());
+    time_t now_s = now_realtime_sec();
+    CLOUD_STATUS status = buffer_json_cloud_status(wb, now_s);
 
     bool can_be_claimed = false;
     switch(status) {
@@ -366,6 +375,19 @@ int api_v2_claim(struct web_client *w, char *url) {
             case CLAIM_AGENT_OK:
                 msg = "ok";
                 success = true;
+                can_be_claimed = false;
+                claim_reload_all();
+                {
+                    int ms = 0;
+                    do {
+                        status = cloud_status();
+                        if (status == CLOUD_STATUS_ONLINE || status == CLOUD_STATUS_OFFLINE)
+                            break;
+
+                        sleep_usec(100 * USEC_PER_MS);
+                        ms += 100;
+                    } while (ms < 5000);
+                }
                 break;
 
             case CLAIM_AGENT_NO_CLOUD_URL:
@@ -398,9 +420,9 @@ int api_v2_claim(struct web_client *w, char *url) {
         buffer_json_member_add_boolean(wb, "success", success);
         buffer_json_member_add_string(wb, "message", msg);
     }
-    else if(can_be_claimed) {
+
+    if(can_be_claimed)
         buffer_json_member_add_string(wb, "key_filename", netdata_random_session_id_get_filename());
-    }
 
     buffer_json_finalize(wb);
 
