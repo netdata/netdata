@@ -1021,7 +1021,7 @@ in this example thread `mount` will run during 600 seconds (10 minutes).
 
 ### Disable thread
 
-It is also possible to stop any thread running using keywork `disable`, for exaample, to disable `cachestat` you can
+It is also possible to stop any thread running using the keyword `disable`. For example, to disable `cachestat` you can
 request:
 
 `http://localhost:19999/api/v1/function?function=ebpf_thread%20disable:cachestat`
