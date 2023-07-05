@@ -42,16 +42,16 @@ char *get_agent_claimid()
 }
 
 #define CLAIMING_COMMAND_LENGTH 16384
-#define CLAIMING_PROXY_LENGTH CLAIMING_COMMAND_LENGTH/4
+#define CLAIMING_PROXY_LENGTH (CLAIMING_COMMAND_LENGTH/4)
 
 extern struct registry registry;
 
 /* rrd_init() and post_conf_load() must have been called before this function */
-void claim_agent(char *claiming_arguments)
+CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, const char **msg)
 {
-    if (!netdata_cloud_enabled) {
+    if (!force || !netdata_cloud_enabled) {
         error("Refusing to claim agent -> cloud functionality has been disabled");
-        return;
+        return CLAIM_AGENT_CLOUD_DISABLED;
     }
 
 #ifndef DISABLE_CLOUD
@@ -62,8 +62,11 @@ void claim_agent(char *claiming_arguments)
 
     // This is guaranteed to be set early in main via post_conf_load()
     char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
-    if (cloud_base_url == NULL)
-        fatal("Do not move the cloud base url out of post_conf_load!!");
+    if (cloud_base_url == NULL) {
+        internal_fatal(true, "Do not move the cloud base url out of post_conf_load!!");
+        return CLAIM_AGENT_NO_CLOUD_URL;
+    }
+
     const char *proxy_str;
     ACLK_PROXY_TYPE proxy_type;
     char proxy_flag[CLAIMING_PROXY_LENGTH] = "-noproxy";
@@ -76,7 +79,6 @@ void claim_agent(char *claiming_arguments)
     snprintfz(command_buffer,
               CLAIMING_COMMAND_LENGTH,
               "exec netdata-claim.sh %s -hostname=%s -id=%s -url=%s -noreload %s",
-
               proxy_flag,
               netdata_configured_hostname,
               localhost->machine_guid,
@@ -87,7 +89,7 @@ void claim_agent(char *claiming_arguments)
     fp_child_output = netdata_popen(command_buffer, &command_pid, &fp_child_input);
     if(!fp_child_output) {
         error("Cannot popen(\"%s\").", command_buffer);
-        return;
+        return CLAIM_AGENT_CANNOT_EXECUTE_CLAIM_SCRIPT;
     }
     netdata_log_info("Waiting for claiming command to finish.");
     while (fgets(command_buffer, CLAIMING_COMMAND_LENGTH, fp_child_output) != NULL) {;}
@@ -95,25 +97,31 @@ void claim_agent(char *claiming_arguments)
     netdata_log_info("Agent claiming command returned with code %d", exit_code);
     if (0 == exit_code) {
         load_claiming_state();
-        return;
+        return CLAIM_AGENT_OK;
     }
     if (exit_code < 0) {
         error("Agent claiming command failed to complete its run.");
-        return;
+        return CLAIM_AGENT_CLAIM_SCRIPT_FAILED;
     }
     errno = 0;
     unsigned maximum_known_exit_code = sizeof(claiming_errors) / sizeof(claiming_errors[0]) - 1;
 
     if ((unsigned)exit_code > maximum_known_exit_code) {
         error("Agent failed to be claimed with an unknown error.");
-        return;
+        return CLAIM_AGENT_CLAIM_SCRIPT_RETURNED_INVALID_CODE;
     }
+
     error("Agent failed to be claimed with the following error message:");
     error("\"%s\"", claiming_errors[exit_code]);
+
+    if(msg) *msg = claiming_errors[exit_code];
+
 #else
     UNUSED(claiming_arguments);
     UNUSED(claiming_errors);
 #endif
+
+    return CLAIM_AGENT_FAILED_WITH_MESSAGE;
 }
 
 #ifdef ENABLE_ACLK
@@ -237,8 +245,10 @@ bool netdata_random_session_id_generate(void) {
 
     close(fd);
 
-    if(ret)
+    if(ret && (!netdata_random_session_id_filename || strcmp(netdata_random_session_id_filename, filename) != 0)) {
+        freez(netdata_random_session_id_filename);
         netdata_random_session_id_filename = strdupz(filename);
+    }
 
     return ret;
 }
@@ -263,6 +273,20 @@ bool netdata_random_session_id_matches(const char *guid) {
         return true;
 
     return false;
+}
+
+static bool check_claim_param(const char *s) {
+    if(!s || !*s) return true;
+
+    do {
+        if(isalnum(*s) || *s == '.' || *s == ',' || *s == '-' || *s == ':' || *s == '/' || *s == '_')
+            ;
+        else
+            return false;
+
+    } while(*++s);
+
+    return true;
 }
 
 int api_v2_claim(struct web_client *w, char *url) {
@@ -312,8 +336,67 @@ int api_v2_claim(struct web_client *w, char *url) {
 
     buffer_json_member_add_boolean(wb, "can_be_claimed", can_be_claimed);
 
-    if(can_be_claimed && key && token) {
-        ;
+    if(can_be_claimed && key) {
+        if(!netdata_random_session_id_matches(key)) {
+            buffer_reset(wb);
+            buffer_strcat(wb, "invalid key");
+            netdata_random_session_id_generate(); // generate a new key, to avoid an attack to find it
+            return HTTP_RESP_FORBIDDEN;
+        }
+
+        if(!token || !base_url || !check_claim_param(token) || !check_claim_param(base_url) || (rooms && !check_claim_param(rooms))) {
+            buffer_reset(wb);
+            buffer_strcat(wb, "invalid parameters");
+            netdata_random_session_id_generate(); // generate a new key, to avoid an attack to find it
+            return HTTP_RESP_BAD_REQUEST;
+        }
+
+        appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", base_url);
+
+        BUFFER *t = buffer_create(1024, NULL);
+        if(rooms)
+            buffer_sprintf(t, "-token=%s -rooms=%s", token, rooms);
+        else
+            buffer_sprintf(t, "-token=%s", token);
+
+        bool success = false;
+        const char *msg = NULL;
+        CLAIM_AGENT_RESPONSE rc = claim_agent(buffer_tostring(t), true, &msg);
+        switch(rc) {
+            case CLAIM_AGENT_OK:
+                msg = "ok";
+                success = true;
+                break;
+
+            case CLAIM_AGENT_NO_CLOUD_URL:
+                msg = "No Netdata Cloud URL.";
+                break;
+
+            case CLAIM_AGENT_CLAIM_SCRIPT_FAILED:
+                msg = "Claiming script failed.";
+                break;
+
+            case CLAIM_AGENT_CLOUD_DISABLED:
+                msg = "Netdata Cloud is disabled on this agent.";
+                break;
+
+            case CLAIM_AGENT_CANNOT_EXECUTE_CLAIM_SCRIPT:
+                msg = "Failed to execute claiming script.";
+                break;
+
+            case CLAIM_AGENT_CLAIM_SCRIPT_RETURNED_INVALID_CODE:
+                msg = "Claiming script returned invalid code.";
+                break;
+
+            default:
+            case CLAIM_AGENT_FAILED_WITH_MESSAGE:
+                if(!msg)
+                    msg = "Unknown error";
+                break;
+        }
+
+        buffer_json_member_add_boolean(wb, "success", success);
+        buffer_json_member_add_string(wb, "message", msg);
     }
     else if(can_be_claimed) {
         buffer_json_member_add_string(wb, "key_filename", netdata_random_session_id_get_filename());
