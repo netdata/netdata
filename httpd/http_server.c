@@ -385,10 +385,6 @@ static int netdata_dyncfg(h2o_handler_t *self, h2o_req_t *req)
     if (resp.content_free)
         free(resp.content);
 
-    req->res.status = HTTP_RESP_INTERNAL_SERVER_ERROR;
-    req->res.reason = HTTP_RESP_INTERNAL_SERVER_ERROR_STR;
-    h2o_send_inline(req, H2O_STRLIT("you should never see this!"));
-
     freez(c_path);
     return 0;
 }
