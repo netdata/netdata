@@ -31,7 +31,7 @@ void sql_alert_transitions(
     void *data,
     bool debug);
 
-void sql_get_alert_configuration(
+int sql_get_alert_configuration(
     DICTIONARY *configs,
     void (*cb)(struct sql_alert_config_data *, void *),
     void *data,

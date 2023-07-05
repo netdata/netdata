@@ -85,6 +85,8 @@ struct alert_transitions_callback_data {
         size_t append;
         size_t shifts;
     } stats;
+
+    uint32_t configs_added;
 };
 
 typedef enum __attribute__ ((__packed__)) {
@@ -1315,48 +1317,58 @@ static void contexts_v2_alert_config_to_json_from_sql_alert_config_data(struct s
     struct alert_transitions_callback_data *d = data;
     BUFFER *wb = d->wb;
     bool debug = d->debug;
+    d->configs_added++;
 
-    buffer_json_member_add_uuid(wb, "cfg", t->config_hash_id);
+    buffer_json_member_add_string(wb, "name", t->name);
+    buffer_json_member_add_uuid(wb, "config_hash_id", t->config_hash_id);
 
-    if(debug)
-        buffer_json_member_add_string(wb, "nm", t->alert_name);
-
-    buffer_json_member_add_string(wb, "ctx", t->on_template);
-    buffer_json_member_add_string(wb, "class", t->classification);
-    buffer_json_member_add_string(wb, "component", t->component);
-    buffer_json_member_add_string(wb, "type", t->type);
-    buffer_json_member_add_string(wb, "info", t->info);
-
-    buffer_json_member_add_object(wb, "v"); // value
+    buffer_json_member_add_object(wb, "selectors");
     {
-        buffer_json_member_add_uint64(wb, "update_every", t->update_every);
-        buffer_json_member_add_string(wb, "units", t->units);
+        bool is_template = t->selectors.on_template && *t->selectors.on_template ? true : false;
+        buffer_json_member_add_string(wb, "type",  is_template ? "template" : "alert");
+        buffer_json_member_add_string(wb, "on", is_template ? t->selectors.on_template : t->selectors.on_key);
 
-        if (RRDCALC_HAS_DB_LOOKUP(t) || debug) {
+        buffer_json_member_add_string(wb, "os", t->selectors.os);
+        buffer_json_member_add_string(wb, "hosts", t->selectors.hosts);
+        buffer_json_member_add_string(wb, "families", t->selectors.families);
+        buffer_json_member_add_string(wb, "plugin", t->selectors.plugin);
+        buffer_json_member_add_string(wb, "module", t->selectors.module);
+        buffer_json_member_add_string(wb, "host_labels", t->selectors.host_labels);
+        buffer_json_member_add_string(wb, "chart_labels", t->selectors.chart_labels);
+        buffer_json_member_add_string(wb, "charts", t->selectors.charts);
+    }
+    buffer_json_object_close(wb); // selectors
+
+    buffer_json_member_add_object(wb, "value"); // value
+    {
+        buffer_json_member_add_string(wb, "every", t->value.every);
+        buffer_json_member_add_string(wb, "units", t->value.units);
+        buffer_json_member_add_uint64(wb, "update_every", t->value.update_every);
+
+        if (t->value.db.after || debug) {
             buffer_json_member_add_object(wb, "db");
             {
-                if (t->p_db_lookup_dimensions || debug)
-                    buffer_json_member_add_string(wb, "dimensions", t->p_db_lookup_dimensions);
+                buffer_json_member_add_string(wb, "lookup", t->value.db.lookup);
 
-                buffer_json_member_add_string(wb, "method", t->p_db_lookup_method);
-                buffer_json_member_add_time_t(wb, "after", t->after);
-                buffer_json_member_add_time_t(wb, "before", t->before);
-
-                web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", (RRDR_OPTIONS) t->p_db_lookup_options);
+                buffer_json_member_add_time_t(wb, "after", t->value.db.after);
+                buffer_json_member_add_time_t(wb, "before", t->value.db.before);
+                buffer_json_member_add_string(wb, "method", t->value.db.method);
+                buffer_json_member_add_string(wb, "dimensions", t->value.db.dimensions);
+                web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", (RRDR_OPTIONS) t->value.db.options);
             }
             buffer_json_object_close(wb); // db
         }
 
-        if (t->calc || debug)
-            buffer_json_member_add_string(wb, "calc", t->calc);
+        if (t->value.calc || debug)
+            buffer_json_member_add_string(wb, "calc", t->value.calc);
     }
     buffer_json_object_close(wb); // value
 
-    if(t->warn || t->crit || debug) {
-        buffer_json_member_add_object(wb, "st"); // conditions
+    if(t->status.warn || t->status.crit || debug) {
+        buffer_json_member_add_object(wb, "status"); // status
         {
-            NETDATA_DOUBLE green = t->green ? str2ndd(t->green, NULL) : NAN;
-            NETDATA_DOUBLE red = t->red ? str2ndd(t->red, NULL) : NAN;
+            NETDATA_DOUBLE green = t->status.green ? str2ndd(t->status.green, NULL) : NAN;
+            NETDATA_DOUBLE red = t->status.red ? str2ndd(t->status.red, NULL) : NAN;
 
             if(!isnan(green) || debug)
                 buffer_json_member_add_double(wb, "green", green);
@@ -1364,27 +1376,67 @@ static void contexts_v2_alert_config_to_json_from_sql_alert_config_data(struct s
             if(!isnan(red) || debug)
                 buffer_json_member_add_double(wb, "red", red);
 
-            if (t->warn || debug) {
-                buffer_json_member_add_string(wb, "warn", t->warn);
+            if (t->status.warn || debug) {
+                buffer_json_member_add_string(wb, "warn", t->status.warn);
             }
 
-            if (t->crit || debug)
-                buffer_json_member_add_string(wb, "crit", t->crit);
+            if (t->status.crit || debug)
+                buffer_json_member_add_string(wb, "crit", t->status.crit);
         }
-        buffer_json_object_close(wb); // conditions
+        buffer_json_object_close(wb); // status
     }
 
-    buffer_json_member_add_object(wb, "nf");
+    buffer_json_member_add_object(wb, "notification");
     {
         buffer_json_member_add_string(wb, "type", "agent");
-        buffer_json_member_add_string(wb, "method", t->exec ? t->exec : string2str(localhost->health.health_default_exec));
-        buffer_json_member_add_string(wb, "to", t->to_key ? t->to_key : string2str(localhost->health.health_default_recipient));
-        buffer_json_member_add_string(wb, "delay", t->delay);
-        buffer_json_member_add_string(wb, "repeat", t->repeat);
-        buffer_json_member_add_string(wb, "options", t->options);
+        buffer_json_member_add_string(wb, "method", t->notification.exec ? t->notification.exec : string2str(localhost->health.health_default_exec));
+        buffer_json_member_add_string(wb, "to", t->notification.to_key ? t->notification.to_key : string2str(localhost->health.health_default_recipient));
+        buffer_json_member_add_string(wb, "delay", t->notification.delay);
+        buffer_json_member_add_string(wb, "repeat", t->notification.repeat);
+        buffer_json_member_add_string(wb, "options", t->notification.options);
     }
     buffer_json_object_close(wb); // notification
+
+    buffer_json_member_add_string(wb, "class", t->classification);
+    buffer_json_member_add_string(wb, "component", t->component);
+    buffer_json_member_add_string(wb, "type", t->type);
+    buffer_json_member_add_string(wb, "info", t->info);
     buffer_json_member_add_string(wb, "src", t->source);
+}
+
+int contexts_v2_alert_config_to_json(struct web_client *w, const char *config_hash_id) {
+    struct alert_transitions_callback_data data = {
+            .wb = w->response.data,
+            .debug = false,
+    };
+    DICTIONARY *configs = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
+    dictionary_set(configs, config_hash_id, NULL, 0);
+
+    buffer_flush(w->response.data);
+
+    buffer_json_initialize(w->response.data, "\"", "\"", 0, true, false);
+
+    buffer_json_member_add_array(w->response.data, "configurations");
+    int added = sql_get_alert_configuration(configs, contexts_v2_alert_config_to_json_from_sql_alert_config_data, &data, false);
+    buffer_json_array_close(w->response.data);
+    buffer_json_finalize(w->response.data);
+
+    int ret = HTTP_RESP_OK;
+
+    if(added <= 0) {
+        buffer_flush(w->response.data);
+        w->response.data->content_type = CT_TEXT_PLAIN;
+        if(added < 0) {
+            buffer_strcat(w->response.data, "Failed to execute SQL query.");
+            ret = HTTP_RESP_INTERNAL_SERVER_ERROR;
+        }
+        else {
+            buffer_strcat(w->response.data, "Config is not found.");
+            ret = HTTP_RESP_NOT_FOUND;
+        }
+    }
+
+    return ret;
 }
 
 static int contexts_v2_alert_instance_to_json_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {

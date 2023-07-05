@@ -113,6 +113,36 @@ static int web_client_api_request_v2_weights(RRDHOST *host __maybe_unused, struc
     return web_client_api_request_weights(host, w, url, WEIGHTS_METHOD_VALUE, WEIGHTS_FORMAT_MULTINODE, 2);
 }
 
+static int web_client_api_request_v2_alert_config(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    const char *config = NULL;
+
+    while(url) {
+        char *value = strsep_skip_consecutive_separators(&url, "&");
+        if(!value || !*value) continue;
+
+        char *name = strsep_skip_consecutive_separators(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        // name and value are now the parameters
+        // they are not null and not empty
+
+        if(!strcmp(name, "config"))
+            config = value;
+    }
+
+    buffer_flush(w->response.data);
+
+    if(!config) {
+        w->response.data->content_type = CT_TEXT_PLAIN;
+        buffer_strcat(w->response.data, "A config hash ID is required. Add ?config=UUID query param");
+        return HTTP_RESP_BAD_REQUEST;
+    }
+
+    return contexts_v2_alert_config_to_json(w, config);
+}
+
+
 #define GROUP_BY_KEY_MAX_LENGTH 30
 static struct {
     char group_by[GROUP_BY_KEY_MAX_LENGTH + 1];
@@ -420,6 +450,7 @@ static struct web_api_command api_commands_v2[] = {
         {"functions", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,           web_client_api_request_v2_functions},
         {"alerts", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,              web_client_api_request_v2_alerts},
         {"alert_transitions", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,   web_client_api_request_v2_alert_transitions},
+        {"alert_config", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,   web_client_api_request_v2_alert_config},
         {"q", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                   web_client_api_request_v2_q},
 
         {"rtc_offer", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_webrtc},

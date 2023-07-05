@@ -2172,24 +2172,25 @@ fail_only_drop:
     " p_db_lookup_options, p_db_lookup_after, p_db_lookup_before, p_update_every, source, chart_labels " \
     " FROM alert_hash ah, c_%p t where ah.hash_id = t.hash_id"
 
-void sql_get_alert_configuration(
+int sql_get_alert_configuration(
     DICTIONARY *configs,
     void (*cb)(struct sql_alert_config_data *, void *),
     void *data,
     bool debug __maybe_unused)
 {
+    int added = -1;
     char sql[512];
     int rc;
     sqlite3_stmt *res = NULL;
     BUFFER *command = NULL;
 
     if (unlikely(!configs))
-        return;
+        return added;
 
     snprintfz(sql, 511, SQL_BUILD_CONFIG_TARGET_LIST, configs);
     rc = db_execute(db_meta, sql);
     if (rc)
-        return;
+        return added;
 
     snprintfz(sql, 511, SQL_POPULATE_TEMP_CONFIG_TARGET_TABLE, configs);
 
@@ -2237,46 +2238,49 @@ void sql_get_alert_configuration(
 
     struct sql_alert_config_data acd = {0 };
 
-    int param = 0;
+    added = 0;
+    int param;
     while (sqlite3_step(res) == SQLITE_ROW) {
+        param = 0;
         acd.config_hash_id = (uuid_t *) sqlite3_column_blob(res, param++);
-        acd.alert_name = (const char *) sqlite3_column_text(res, param++);
-        acd.on_template = (const char *) sqlite3_column_text(res, param++);
-        acd.on_key = (const char *) sqlite3_column_text(res, param++);
+        acd.name = (const char *) sqlite3_column_text(res, param++);
+        acd.selectors.on_template = (const char *) sqlite3_column_text(res, param++);
+        acd.selectors.on_key = (const char *) sqlite3_column_text(res, param++);
         acd.classification = (const char *) sqlite3_column_text(res, param++);
         acd.component = (const char *) sqlite3_column_text(res, param++);
         acd.type = (const char *) sqlite3_column_text(res, param++);
-        acd.os = (const char *) sqlite3_column_text(res, param++);
-        acd.hosts = (const char *) sqlite3_column_text(res, param++);
-        acd.lookup = (const char *) sqlite3_column_text(res, param++);
-        acd.every = (const char *) sqlite3_column_text(res, param++);
-        acd.units = (const char *) sqlite3_column_text(res, param++);
-        acd.calc = (const char *) sqlite3_column_text(res, param++);
-        acd.families = (const char *) sqlite3_column_text(res, param++);
-        acd.plugin = (const char *) sqlite3_column_text(res, param++);
-        acd.module = (const char *) sqlite3_column_text(res, param++);
-        acd.charts = (const char *) sqlite3_column_text(res, param++);
-        acd.green = (const char *) sqlite3_column_text(res, param++);
-        acd.red = (const char *) sqlite3_column_text(res, param++);
-        acd.warn = (const char *) sqlite3_column_text(res, param++);
-        acd.crit = (const char *) sqlite3_column_text(res, param++);
-        acd.exec = (const char *) sqlite3_column_text(res, param++);
-        acd.to_key = (const char *) sqlite3_column_text(res, param++);
+        acd.selectors.os = (const char *) sqlite3_column_text(res, param++);
+        acd.selectors.hosts = (const char *) sqlite3_column_text(res, param++);
+        acd.value.db.lookup = (const char *) sqlite3_column_text(res, param++);
+        acd.value.every = (const char *) sqlite3_column_text(res, param++);
+        acd.value.units = (const char *) sqlite3_column_text(res, param++);
+        acd.value.calc = (const char *) sqlite3_column_text(res, param++);
+        acd.selectors.families = (const char *) sqlite3_column_text(res, param++);
+        acd.selectors.plugin = (const char *) sqlite3_column_text(res, param++);
+        acd.selectors.module = (const char *) sqlite3_column_text(res, param++);
+        acd.selectors.charts = (const char *) sqlite3_column_text(res, param++);
+        acd.status.green = (const char *) sqlite3_column_text(res, param++);
+        acd.status.red = (const char *) sqlite3_column_text(res, param++);
+        acd.status.warn = (const char *) sqlite3_column_text(res, param++);
+        acd.status.crit = (const char *) sqlite3_column_text(res, param++);
+        acd.notification.exec = (const char *) sqlite3_column_text(res, param++);
+        acd.notification.to_key = (const char *) sqlite3_column_text(res, param++);
         acd.info = (const char *) sqlite3_column_text(res, param++);
-        acd.delay = (const char *) sqlite3_column_text(res, param++);
-        acd.options = (const char *) sqlite3_column_text(res, param++);
-        acd.repeat = (const char *) sqlite3_column_text(res, param++);
-        acd.host_labels = (const char *) sqlite3_column_text(res, param++);
-        acd.p_db_lookup_dimensions = (const char *) sqlite3_column_text(res, param++);
-        acd.p_db_lookup_method = (const char *) sqlite3_column_text(res, param++);
-        acd.p_db_lookup_options = (uint32_t) sqlite3_column_int(res, param++);
-        acd.after = (int32_t) sqlite3_column_int(res, param++);
-        acd.before = (int32_t) sqlite3_column_int(res, param++);
-        acd.update_every = (int32_t) sqlite3_column_int(res, param++);
+        acd.notification.delay = (const char *) sqlite3_column_text(res, param++);
+        acd.notification.options = (const char *) sqlite3_column_text(res, param++);
+        acd.notification.repeat = (const char *) sqlite3_column_text(res, param++);
+        acd.selectors.host_labels = (const char *) sqlite3_column_text(res, param++);
+        acd.value.db.dimensions = (const char *) sqlite3_column_text(res, param++);
+        acd.value.db.method = (const char *) sqlite3_column_text(res, param++);
+        acd.value.db.options = (uint32_t) sqlite3_column_int(res, param++);
+        acd.value.db.after = (int32_t) sqlite3_column_int(res, param++);
+        acd.value.db.before = (int32_t) sqlite3_column_int(res, param++);
+        acd.value.update_every = (int32_t) sqlite3_column_int(res, param++);
         acd.source = (const char *) sqlite3_column_text(res, param++);
-        acd.chart_labels = (const char *) sqlite3_column_text(res, param++);
+        acd.selectors.chart_labels = (const char *) sqlite3_column_text(res, param++);
 
         cb(&acd, data);
+        added++;
     }
 
     rc = sqlite3_finalize(res);
@@ -2287,5 +2291,6 @@ fail_only_drop:
     (void)snprintfz(sql, 511, "DROP TABLE IF EXISTS c_%p", configs);
     (void)db_execute(db_meta, sql);
     buffer_free(command);
+    return added;
 }
 

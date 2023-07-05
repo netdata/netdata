@@ -315,6 +315,8 @@ void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value
 
     if(add_anonymous_object)
         buffer_fast_strcat(wb, "{", 1);
+
+    wb->content_type = CT_APPLICATION_JSON;
 }
 
 void buffer_json_finalize(BUFFER *wb) {

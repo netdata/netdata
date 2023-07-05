@@ -454,42 +454,65 @@ struct sql_alert_transition_data {
 
 struct sql_alert_config_data {
     uuid_t *config_hash_id;
-    const char *alert_name;
-    const char *on_template;
-    const char *on_key;
+    const char *name;
+
+    struct {
+        const char *on_template;
+        const char *on_key;
+
+        const char *os;
+        const char *hosts;
+        const char *families;
+        const char *plugin;
+        const char *module;
+        const char *host_labels;
+        const char *chart_labels;
+        const char *charts;
+    } selectors;
+
+    const char *info;
     const char *classification;
     const char *component;
     const char *type;
-    const char *os;
-    const char *hosts;
-    const char *lookup;
-    const char *every;
-    const char *units;
-    const char *calc;
-    const char *families;
-    const char *plugin;
-    const char *module;
-    const char *charts;
-    const char *green;
-    const char *red;
-    const char *warn;
-    const char *crit;
-    const char *exec;
-    const char *to_key;
-    const char *info;
-    const char *delay;
-    const char *options;
-    const char *repeat;
-    const char *host_labels;
-    const char *p_db_lookup_dimensions;
-    const char *p_db_lookup_method;
-    const char *source;
-    const char *chart_labels;
-    uint32_t p_db_lookup_options;
-    int32_t after;
-    int32_t before;
-    int32_t update_every;
+
+    struct {
+        struct {
+            const char *dimensions;
+            const char *method;
+            uint32_t options;
+
+            int32_t after;
+            int32_t before;
+
+            const char *lookup;         // the lookup line, unparsed
+        } db;
+
+        const char *calc;               // the calculation expression, unparsed
+        const char *units;
+
+        int32_t update_every;           // the update frequency of the alert, in seconds
+        const char *every;              // the every line, unparsed
+    } value;
+
+    struct {
+        const char *green;              // the green threshold, unparsed
+        const char *red;                // the red threshold, unparsed
+        const char *warn;               // the warning expression, unparsed
+        const char *crit;               // the critical expression, unparsed
+    } status;
+
+    struct {
+        const char *exec;               // the script to execute, or NULL to execute the default script
+        const char *to_key;             // the recipient, or NULL for the default recipient
+        const char *delay;              // the delay line, unparsed
+        const char *repeat;             // the repeat line, unparsed
+        const char *options;            // FIXME what is this?
+    } notification;
+
+    const char *source;                 // the configuration file and line this alert came from
 };
+
+int contexts_v2_alert_config_to_json(struct web_client *w, const char *config_hash_id);
 
 struct sql_alert_instance_v2_entry {
     RRDCALC *tmp;
