@@ -65,6 +65,10 @@ struct config process_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
 
+#ifdef NETDATA_DEV_MODE
+int process_disable_priority;
+#endif
+
 /*****************************************************************
  *
  *  PROCESS DATA AND SEND TO NETDATA
@@ -738,6 +742,12 @@ static void ebpf_process_exit(void *ptr)
 
         ebpf_obsolete_process_global(em);
 
+#ifdef NETDATA_DEV_MODE
+    if (ebpf_aral_process_stat)
+        ebpf_statistic_obsolete_aral_chart(em, process_disable_priority);
+#endif
+
+
         fflush(stdout);
         pthread_mutex_unlock(&lock);
     }
@@ -1298,7 +1308,7 @@ void *ebpf_process_thread(void *ptr)
 
 #ifdef NETDATA_DEV_MODE
     if (ebpf_aral_process_stat)
-        ebpf_statistic_create_aral_chart(NETDATA_EBPF_PROC_ARAL_NAME, em);
+        process_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_PROC_ARAL_NAME, em);
 #endif
 
     pthread_mutex_unlock(&lock);

@@ -1223,7 +1223,7 @@ void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, 
  * @param name    the name used to create aral
  * @param em      a pointer to the structure with the default values.
  */
-void ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em)
+int ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em)
 {
     static int priority = 140100;
     char *mem = { NETDATA_EBPF_STAT_DIMENSION_MEMORY };
@@ -1261,6 +1261,40 @@ void ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em)
     ebpf_write_global_dimension(aral,
                                 aral,
                                 ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+
+    return priority - 2;
+}
+
+/**
+ * ARAL Charts
+ *
+ * Add chart to monitor ARAL usage
+ * Caller must call this function with mutex locked.
+ *
+ * @param em      a pointer to the structure with the default values.
+ * @param prio    the initial priority used to disable charts.
+ */
+void ebpf_statistic_obsolete_aral_chart(ebpf_module_t *em, int prio)
+{
+    ebpf_write_chart_obsolete(NETDATA_MONITORING_FAMILY,
+                              em->memory_allocations,
+                              "Calls to allocate memory.",
+                              "calls",
+                              NETDATA_EBPF_FAMILY,
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                              "netdata.ebpf_aral_stat_alloc",
+                              prio++,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_MONITORING_FAMILY,
+                              em->memory_allocations,
+                              "Calls to allocate memory.",
+                              "calls",
+                              NETDATA_EBPF_FAMILY,
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                              "netdata.ebpf_aral_stat_alloc",
+                              prio++,
+                              em->update_every);
 }
 
 /**

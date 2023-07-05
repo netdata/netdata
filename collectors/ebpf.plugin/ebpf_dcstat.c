@@ -59,6 +59,10 @@ netdata_ebpf_targets_t dc_targets[] = { {.name = "lookup_fast", .mode = EBPF_LOA
                                         {.name = "d_lookup", .mode = EBPF_LOAD_TRAMPOLINE},
                                         {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
+#ifdef NETDATA_DEV_MODE
+int dcstat_disable_priority;
+#endif
+
 #ifdef LIBBPF_MAJOR_VERSION
 /**
  * Disable probe
@@ -462,6 +466,11 @@ static void ebpf_dcstat_exit(void *ptr)
         }
 
         ebpf_obsolete_dc_global(em);
+
+#ifdef NETDATA_DEV_MODE
+        if (ebpf_aral_dcstat_pid)
+            ebpf_statistic_obsolete_aral_chart(em, dcstat_disable_priority);
+#endif
 
         fflush(stdout);
         pthread_mutex_unlock(&lock);
@@ -1350,7 +1359,7 @@ void *ebpf_dcstat_thread(void *ptr)
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
 #ifdef NETDATA_DEV_MODE
     if (ebpf_aral_dcstat_pid)
-        ebpf_statistic_create_aral_chart(NETDATA_EBPF_DCSTAT_ARAL_NAME, em);
+        dcstat_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_DCSTAT_ARAL_NAME, em);
 #endif
 
     pthread_mutex_unlock(&lock);

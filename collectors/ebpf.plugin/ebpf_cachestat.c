@@ -58,6 +58,10 @@ netdata_ebpf_targets_t cachestat_targets[] = { {.name = "add_to_page_cache_lru",
 static char *account_page[NETDATA_CACHESTAT_ACCOUNT_DIRTY_END] ={ "account_page_dirtied",
                                                                   "__set_page_dirty", "__folio_mark_dirty"  };
 
+#ifdef NETDATA_DEV_MODE
+int cachestat_disable_priority;
+#endif
+
 #ifdef LIBBPF_MAJOR_VERSION
 /**
  * Disable probe
@@ -532,6 +536,12 @@ static void ebpf_cachestat_exit(void *ptr)
         }
 
         ebpf_obsolete_cachestat_global(em);
+
+#ifdef NETDATA_DEV_MODE
+    if (ebpf_aral_cachestat_pid)
+        ebpf_statistic_obsolete_aral_chart(em, cachestat_disable_priority);
+#endif
+
 
         fflush(stdout);
         pthread_mutex_unlock(&lock);
@@ -1518,7 +1528,7 @@ void *ebpf_cachestat_thread(void *ptr)
     ebpf_create_memory_charts(em);
 #ifdef NETDATA_DEV_MODE
     if (ebpf_aral_cachestat_pid)
-        ebpf_statistic_create_aral_chart(NETDATA_EBPF_CACHESTAT_ARAL_NAME, em);
+        cachestat_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_CACHESTAT_ARAL_NAME, em);
 #endif
 
     pthread_mutex_unlock(&lock);

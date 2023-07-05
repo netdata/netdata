@@ -50,6 +50,10 @@ netdata_ebpf_targets_t shm_targets[] = { {.name = "shmget", .mode = EBPF_LOAD_TR
                                          {.name = "shmctl", .mode = EBPF_LOAD_TRAMPOLINE},
                                          {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
+#ifdef NETDATA_DEV_MODE
+int shm_disable_priority;
+#endif
+
 #ifdef LIBBPF_MAJOR_VERSION
 /*****************************************************************
  *
@@ -455,6 +459,11 @@ static void ebpf_shm_exit(void *ptr)
         }
 
         ebpf_obsolete_shm_global(em);
+
+#ifdef NETDATA_DEV_MODE
+    if (ebpf_aral_shm_pid)
+        ebpf_statistic_obsolete_aral_chart(em, shm_disable_priority);
+#endif
 
         fflush(stdout);
         pthread_mutex_unlock(&lock);
@@ -1266,7 +1275,7 @@ void *ebpf_shm_thread(void *ptr)
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
 #ifdef NETDATA_DEV_MODE
     if (ebpf_aral_shm_pid)
-        ebpf_statistic_create_aral_chart(NETDATA_EBPF_SHM_ARAL_NAME, em);
+        shm_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_SHM_ARAL_NAME, em);
 #endif
 
     pthread_mutex_unlock(&lock);

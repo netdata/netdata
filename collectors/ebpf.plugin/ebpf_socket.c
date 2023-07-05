@@ -130,6 +130,10 @@ struct netdata_static_thread socket_threads = {
     .start_routine = NULL
 };
 
+#ifdef NETDATA_DEV_MODE
+int socket_disable_priority;
+#endif
+
 #ifdef LIBBPF_MAJOR_VERSION
 /**
  * Disable Probe
@@ -4036,7 +4040,7 @@ void *ebpf_socket_thread(void *ptr)
 
 #ifdef NETDATA_DEV_MODE
     if (ebpf_aral_socket_pid)
-        ebpf_statistic_create_aral_chart(NETDATA_EBPF_SOCKET_ARAL_NAME, em);
+        socket_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_SOCKET_ARAL_NAME, em);
 #endif
 
     pthread_mutex_unlock(&lock);
