@@ -52,7 +52,7 @@
                     },
                     "categories": {
                         "type": "array",
-                        "description": "an array of category IDs that the integration belongs to",
+                        "description": "an array of categories that the integration belongs to",
                         "items": {
                             "type": "object",
                             "properties": {
