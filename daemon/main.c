@@ -1206,7 +1206,22 @@ static void get_netdata_configured_variables() {
 
 }
 
-int load_netdata_conf(char *filename, char overwrite_used) {
+static void post_conf_load(char **user)
+{
+    // --------------------------------------------------------------------
+    // get the user we should run
+
+    // IMPORTANT: this is required before web_files_uid()
+    if(getuid() == 0) {
+        *user = config_get(CONFIG_SECTION_GLOBAL, "run as user", NETDATA_USER);
+    }
+    else {
+        struct passwd *passwd = getpwuid(getuid());
+        *user = config_get(CONFIG_SECTION_GLOBAL, "run as user", (passwd && passwd->pw_name)?passwd->pw_name:"");
+    }
+}
+
+static bool load_netdata_conf(char *filename, char overwrite_used, char **user) {
     errno = 0;
 
     int ret = 0;
@@ -1233,6 +1248,7 @@ int load_netdata_conf(char *filename, char overwrite_used) {
         freez(filename);
     }
 
+    post_conf_load(user);
     return ret;
 }
 
@@ -1298,30 +1314,6 @@ void set_silencers_filename() {
 /* Any config setting that can be accessed without a default value i.e. configget(...,...,NULL) *MUST*
    be set in this procedure to be called in all the relevant code paths.
 */
-void post_conf_load(char **user)
-{
-    // --------------------------------------------------------------------
-    // get the user we should run
-
-    // IMPORTANT: this is required before web_files_uid()
-    if(getuid() == 0) {
-        *user = config_get(CONFIG_SECTION_GLOBAL, "run as user", NETDATA_USER);
-    }
-    else {
-        struct passwd *passwd = getpwuid(getuid());
-        *user = config_get(CONFIG_SECTION_GLOBAL, "run as user", (passwd && passwd->pw_name)?passwd->pw_name:"");
-    }
-
-    // --------------------------------------------------------------------
-    // Check if the cloud is enabled
-#if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
-    netdata_cloud_enabled = CONFIG_BOOLEAN_NO;
-#else
-    netdata_cloud_enabled = appconfig_get_boolean_ondemand(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", netdata_cloud_enabled);
-#endif
-    // This must be set before any point in the code that accesses it. Do not move it from this function.
-    appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", DEFAULT_CLOUD_BASE_URL);
-}
 
 #define delta_startup_time(msg)                         \
     {                                                   \
@@ -1393,13 +1385,12 @@ int main(int argc, char **argv) {
         while( (opt = getopt(argc, argv, optstring)) != -1 ) {
             switch(opt) {
                 case 'c':
-                    if(load_netdata_conf(optarg, 1) != 1) {
+                    if(!load_netdata_conf(optarg, 1, &user)) {
                         error("Cannot load configuration file %s.", optarg);
                         return 1;
                     }
                     else {
                         debug(D_OPTIONS, "Configuration loaded from %s.", optarg);
-                        post_conf_load(&user);
                         load_cloud_conf(1);
                         config_loaded = 1;
                     }
@@ -1736,8 +1727,7 @@ int main(int argc, char **argv) {
 
                             if(!config_loaded) {
                                 fprintf(stderr, "warning: no configuration file has been loaded. Use -c CONFIG_FILE, before -W get. Using default config.\n");
-                                load_netdata_conf(NULL, 0);
-                                post_conf_load(&user);
+                                load_netdata_conf(NULL, 0, &user);
                             }
 
                             get_netdata_configured_variables();
@@ -1764,8 +1754,7 @@ int main(int argc, char **argv) {
 
                             if(!config_loaded) {
                                 fprintf(stderr, "warning: no configuration file has been loaded. Use -c CONFIG_FILE, before -W get. Using default config.\n");
-                                load_netdata_conf(NULL, 0);
-                                post_conf_load(&user);
+                                load_netdata_conf(NULL, 0, &user);
                                 load_cloud_conf(1);
                             }
 
@@ -1820,15 +1809,8 @@ int main(int argc, char **argv) {
 
 
     if(!config_loaded) {
-        load_netdata_conf(NULL, 0);
-        post_conf_load(&user);
+        load_netdata_conf(NULL, 0, &user);
         load_cloud_conf(0);
-    }
-
-    char *nd_disable_cloud = getenv("NETDATA_DISABLE_CLOUD");
-    if (nd_disable_cloud && !strncmp(nd_disable_cloud, "1", 1)) {
-        netdata_cloud_enabled = CONFIG_BOOLEAN_NO;
-        appconfig_set_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", CONFIG_BOOLEAN_NO);
     }
 
     // ------------------------------------------------------------------------
