@@ -264,10 +264,10 @@ bool netdata_random_session_id_matches(const char *guid) {
 }
 
 int api_v2_claim(struct web_client *w, char *url) {
-    char *key;
-    char *token;
-    char *rooms;
-    char *base_url;
+    char *key = NULL;
+    char *token = NULL;
+    char *rooms = NULL;
+    char *base_url = NULL;
 
     while (url) {
         char *value = strsep_skip_consecutive_separators(&url, "&");

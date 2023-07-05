@@ -1041,8 +1041,10 @@ void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time
                 buffer_json_member_add_time_t(wb, "from", first_time_s);
                 buffer_json_member_add_time_t(wb, "to", now_s);
                 buffer_json_member_add_time_t(wb, "retention", now_s - first_time_s);
-                buffer_json_member_add_time_t(wb, "expected_retention",
-                                              (time_t) ((NETDATA_DOUBLE) (now_s - first_time_s) * 100.0 / percent));
+
+                if(used || max) // we have disk space information
+                    buffer_json_member_add_time_t(wb, "expected_retention",
+                                                  (time_t) ((NETDATA_DOUBLE) (now_s - first_time_s) * 100.0 / percent));
             }
 
             if(currently_collected_metrics)
