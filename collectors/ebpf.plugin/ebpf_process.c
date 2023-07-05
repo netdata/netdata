@@ -757,6 +757,7 @@ static void ebpf_process_exit(void *ptr)
     process_pid_fd = -1;
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     ebpf_update_stats(&plugin_statistics, em);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
