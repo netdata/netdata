@@ -1035,4 +1035,4 @@ script on your environment.
 You can check the results of having threads running on your environment in the Netdata monitoring section on your
 dashboard
 
-<img src="https://github.com/netdata/netdata/assets/49162938/b97e32e0-1ebe-4c44-8801-8a3aab2c7632" alt="Threads running." />
+<img src="https://github.com/netdata/netdata/assets/49162938/91823573-114c-4c16-b634-cc46f7bb1bcf" alt="Threads running." />
