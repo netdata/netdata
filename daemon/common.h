@@ -133,5 +133,6 @@ time_t cloud_next_connection_attempt(void);
 size_t cloud_connection_id(void);
 const char *cloud_offline_reason(void);
 const char *cloud_base_url(void);
+CLOUD_STATUS buffer_json_cloud_status(BUFFER *wb, time_t now_s);
 
 #endif /* NETDATA_COMMON_H */

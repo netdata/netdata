@@ -13,4 +13,9 @@ char *get_agent_claimid(void);
 void load_claiming_state(void);
 void load_cloud_conf(int silent);
 
+bool netdata_random_session_id_generate(void);
+const char *netdata_random_session_id_get_filename(void);
+bool netdata_random_session_id_matches(const char *guid);
+int api_v2_claim(struct web_client *w, char *url);
+
 #endif //NETDATA_CLAIM_H

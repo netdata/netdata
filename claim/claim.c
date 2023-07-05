@@ -206,3 +206,118 @@ void load_cloud_conf(int silent)
     }
     freez(filename);
 }
+
+static char *netdata_random_session_id_filename = NULL;
+static uuid_t netdata_random_session_id = { 0 };
+
+bool netdata_random_session_id_generate(void) {
+    static char guid[UUID_STR_LEN] = "";
+
+    uuid_generate_random(netdata_random_session_id);
+    uuid_unparse_lower(netdata_random_session_id, guid);
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/netdata_random_session_id", netdata_configured_varlib_dir);
+
+    bool ret = true;
+
+    // save it
+    int fd = open(netdata_random_session_id_filename, O_WRONLY|O_CREAT|O_TRUNC, 644);
+    if(fd == -1) {
+        error("Cannot create random session id file '%s'.", netdata_random_session_id_filename);
+        ret = false;
+    }
+
+    if(write(fd, guid, UUID_STR_LEN - 1) != UUID_STR_LEN - 1) {
+        error("Cannot write the random session id file '%s'.", netdata_random_session_id_filename);
+        ret = false;
+    }
+
+    close(fd);
+
+    if(ret)
+        netdata_random_session_id_filename = strdupz(filename);
+
+    return ret;
+}
+
+const char *netdata_random_session_id_get_filename(void) {
+    if(!netdata_random_session_id_filename)
+        netdata_random_session_id_generate();
+
+    return netdata_random_session_id_filename;
+}
+
+bool netdata_random_session_id_matches(const char *guid) {
+    if(uuid_is_null(netdata_random_session_id))
+        return false;
+
+    uuid_t uuid;
+
+    if(uuid_parse(guid, uuid))
+        return false;
+
+    if(uuid_compare(netdata_random_session_id, uuid) == 0)
+        return true;
+
+    return false;
+}
+
+int api_v2_claim(struct web_client *w, char *url) {
+    char *key;
+    char *token;
+    char *rooms;
+    char *base_url;
+
+    while (url) {
+        char *value = strsep_skip_consecutive_separators(&url, "&");
+        if (!value || !*value) continue;
+
+        char *name = strsep_skip_consecutive_separators(&value, "=");
+        if (!name || !*name) continue;
+        if (!value || !*value) continue;
+
+        if(!strcmp(name, "key"))
+            key = value;
+        else if(!strcmp(name, "token"))
+            token = value;
+        else if(!strcmp(name, "rooms"))
+            rooms = value;
+        else if(!strcmp(name, "url"))
+            base_url = value;
+    }
+
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+
+    CLOUD_STATUS status = buffer_json_cloud_status(wb, now_realtime_sec());
+
+    bool can_be_claimed = false;
+    switch(status) {
+        case CLOUD_STATUS_AVAILABLE:
+        case CLOUD_STATUS_DISABLED:
+            can_be_claimed = true;
+            break;
+
+        case CLOUD_STATUS_UNAVAILABLE:
+        case CLOUD_STATUS_BANNED:
+        case CLOUD_STATUS_OFFLINE:
+        case CLOUD_STATUS_ONLINE:
+            can_be_claimed = false;
+            break;
+    }
+
+    buffer_json_member_add_boolean(wb, "can_be_claimed", can_be_claimed);
+
+    if(can_be_claimed && key && token) {
+        ;
+    }
+    else if(can_be_claimed) {
+        buffer_json_member_add_string(wb, "key_filename", netdata_random_session_id_get_filename());
+    }
+
+    buffer_json_finalize(wb);
+
+    return HTTP_RESP_OK;
+}

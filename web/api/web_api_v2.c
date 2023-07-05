@@ -113,6 +113,10 @@ static int web_client_api_request_v2_weights(RRDHOST *host __maybe_unused, struc
     return web_client_api_request_weights(host, w, url, WEIGHTS_METHOD_VALUE, WEIGHTS_FORMAT_MULTINODE, 2);
 }
 
+static int web_client_api_request_v2_claim(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return api_v2_claim(w, url);
+}
+
 static int web_client_api_request_v2_alert_config(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     const char *config = NULL;
 
@@ -450,8 +454,9 @@ static struct web_api_command api_commands_v2[] = {
         {"functions", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,           web_client_api_request_v2_functions},
         {"alerts", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,              web_client_api_request_v2_alerts},
         {"alert_transitions", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,   web_client_api_request_v2_alert_transitions},
-        {"alert_config", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,   web_client_api_request_v2_alert_config},
-        {"q", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                   web_client_api_request_v2_q},
+        {"alert_config", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,       web_client_api_request_v2_alert_config},
+        {"claim", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,              web_client_api_request_v2_claim},
+        {"q", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                  web_client_api_request_v2_q},
 
         {"rtc_offer", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_webrtc},
 

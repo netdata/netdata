@@ -1010,29 +1010,7 @@ void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time
         build_info_to_json_object(wb);
         buffer_json_object_close(wb); // netdata
 
-        buffer_json_member_add_object(wb, "cloud");
-        {
-            size_t id = cloud_connection_id();
-            CLOUD_STATUS status = cloud_status();
-            time_t last_change = cloud_last_change();
-            time_t next_connect = cloud_next_connection_attempt();
-            buffer_json_member_add_uint64(wb, "id", id);
-            buffer_json_member_add_string(wb, "status", cloud_status_to_string(status));
-            buffer_json_member_add_time_t(wb, "since", last_change);
-            buffer_json_member_add_time_t(wb, "age", now_s - last_change);
-
-            if (status != CLOUD_STATUS_ONLINE)
-                buffer_json_member_add_string(wb, "reason", cloud_offline_reason());
-
-            if (status == CLOUD_STATUS_OFFLINE && next_connect > now_s) {
-                buffer_json_member_add_time_t(wb, "next_check", next_connect);
-                buffer_json_member_add_time_t(wb, "next_in", next_connect - now_s);
-            }
-
-            if (status != CLOUD_STATUS_DISABLED && cloud_base_url())
-                buffer_json_member_add_string(wb, "url", cloud_base_url());
-        }
-        buffer_json_object_close(wb); // cloud
+        buffer_json_cloud_status(wb, now_s);
 
         buffer_json_member_add_array(wb, "db_size");
         for (size_t tier = 0; tier < storage_tiers; tier++) {
