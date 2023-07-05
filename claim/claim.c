@@ -362,17 +362,17 @@ int api_v2_claim(struct web_client *w, char *url) {
     buffer_json_member_add_boolean(wb, "can_be_claimed", can_be_claimed);
 
     if(can_be_claimed && key) {
+        netdata_random_session_id_generate(); // generate a new key, to avoid an attack to find it
+
         if(!netdata_random_session_id_matches(key)) {
             buffer_reset(wb);
             buffer_strcat(wb, "invalid key");
-            netdata_random_session_id_generate(); // generate a new key, to avoid an attack to find it
             return HTTP_RESP_FORBIDDEN;
         }
 
         if(!token || !base_url || !check_claim_param(token) || !check_claim_param(base_url) || (rooms && !check_claim_param(rooms))) {
             buffer_reset(wb);
             buffer_strcat(wb, "invalid parameters");
-            netdata_random_session_id_generate(); // generate a new key, to avoid an attack to find it
             return HTTP_RESP_BAD_REQUEST;
         }
 
@@ -404,7 +404,7 @@ int api_v2_claim(struct web_client *w, char *url) {
                     int ms = 0;
                     do {
                         status = cloud_status();
-                        if (status == CLOUD_STATUS_ONLINE || status == CLOUD_STATUS_OFFLINE)
+                        if (status == CLOUD_STATUS_ONLINE)
                             break;
 
                         sleep_usec(100 * USEC_PER_MS);
