@@ -31,13 +31,14 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
     rrdset_foreach_read(st, host) {
         if (filter && !simple_pattern_matches_string(filter, st->name))
             continue;
+        if (rrdset_is_available_for_viewers(st)) {
+            NETDATA_DOUBLE total = 0.0;
 
-        NETDATA_DOUBLE total = 0.0;
-        char chart[SHELL_ELEMENT_MAX + 1];
-        shell_name_copy(chart, st->name?rrdset_name(st):rrdset_id(st), SHELL_ELEMENT_MAX);
+            char chart[SHELL_ELEMENT_MAX + 1];
+            shell_name_copy(chart, st->name ? rrdset_name(st) : rrdset_id(st), SHELL_ELEMENT_MAX);
 
-        buffer_sprintf(wb, "\n# chart: %s (name: %s)\n", rrdset_id(st), rrdset_name(st));
-        if(rrdset_is_available_for_viewers(st)) {
+            buffer_sprintf(wb, "\n# chart: %s (name: %s)\n", rrdset_id(st), rrdset_name(st));
+
             // for each dimension
             RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
