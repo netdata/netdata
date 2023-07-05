@@ -2681,7 +2681,6 @@ static inline void ebpf_create_statistic_hash_per_core(int update_every)
                                 ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
 }
 
-
 /**
  * Create Statistics Charts
  *
