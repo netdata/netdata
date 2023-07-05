@@ -6,9 +6,14 @@
 
 **Merged pull requests:**
 
+- move collectors meta to metadata/ [\#15308](https://github.com/netdata/netdata/pull/15308) ([ilyam8](https://github.com/ilyam8))
+- Release acquired dimensions [\#15307](https://github.com/netdata/netdata/pull/15307) ([stelfrag](https://github.com/stelfrag))
+- Check for source field when requesting /api/v1/alarm\_log [\#15306](https://github.com/netdata/netdata/pull/15306) ([MrZammler](https://github.com/MrZammler))
 - ci: disable clang format [\#15305](https://github.com/netdata/netdata/pull/15305) ([ilyam8](https://github.com/ilyam8))
 - Change info to netdata\_log\_info in sqlite\_db\_migration.c [\#15303](https://github.com/netdata/netdata/pull/15303) ([MrZammler](https://github.com/MrZammler))
+- Change query to store host system info values [\#15300](https://github.com/netdata/netdata/pull/15300) ([MrZammler](https://github.com/MrZammler))
 - s/info/netdata\_log\_info/ [\#15299](https://github.com/netdata/netdata/pull/15299) ([vkalintiris](https://github.com/vkalintiris))
+- Update metrics-streaming-and-replication.md [\#15297](https://github.com/netdata/netdata/pull/15297) ([Ancairon](https://github.com/Ancairon))
 - Optimizations part 3 [\#15293](https://github.com/netdata/netdata/pull/15293) ([ktsaou](https://github.com/ktsaou))
 - docs: update stream.conf "health enabled by default" description [\#15291](https://github.com/netdata/netdata/pull/15291) ([ilyam8](https://github.com/ilyam8))
 - Remove extra parenthesis from doc [\#15290](https://github.com/netdata/netdata/pull/15290) ([Ancairon](https://github.com/Ancairon))
@@ -395,13 +400,6 @@
 - Fix broken links in glossary.md [\#14653](https://github.com/netdata/netdata/pull/14653) ([Ancairon](https://github.com/Ancairon))
 - Fix links [\#14651](https://github.com/netdata/netdata/pull/14651) ([cakrit](https://github.com/cakrit))
 - Fix doc links [\#14650](https://github.com/netdata/netdata/pull/14650) ([cakrit](https://github.com/cakrit))
-- Update guidelines.md [\#14649](https://github.com/netdata/netdata/pull/14649) ([cakrit](https://github.com/cakrit))
-- Update README.md [\#14647](https://github.com/netdata/netdata/pull/14647) ([cakrit](https://github.com/cakrit))
-- Update pi-hole-raspberry-pi.md [\#14644](https://github.com/netdata/netdata/pull/14644) ([tkatsoulas](https://github.com/tkatsoulas))
-- Fix handling of missing release codename on DEB systems. [\#14642](https://github.com/netdata/netdata/pull/14642) ([Ferroin](https://github.com/Ferroin))
-- Update change-metrics-storage.md [\#14641](https://github.com/netdata/netdata/pull/14641) ([cakrit](https://github.com/cakrit))
-- Update change-metrics-storage.md [\#14640](https://github.com/netdata/netdata/pull/14640) ([cakrit](https://github.com/cakrit))
-- Collect additional BTRFS metrics [\#14636](https://github.com/netdata/netdata/pull/14636) ([Dim-P](https://github.com/Dim-P))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
