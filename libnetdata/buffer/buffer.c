@@ -315,6 +315,8 @@ void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value
 
     if(add_anonymous_object)
         buffer_fast_strcat(wb, "{", 1);
+
+    wb->content_type = CT_APPLICATION_JSON;
 }
 
 void buffer_json_finalize(BUFFER *wb) {
@@ -503,7 +505,7 @@ int buffer_unittest(void) {
     return errors;
 }
 
-#ifdef ENABLE_HTTPD
+#ifdef ENABLE_H2O
 h2o_iovec_t buffer_to_h2o_iovec(BUFFER *wb) {
     h2o_iovec_t ret;
     ret.base = wb->buffer;

@@ -998,12 +998,14 @@ struct rrdengine_datafile *datafile_release_and_acquire_next_for_retention(struc
     return next_datafile;
 }
 
-void find_uuid_first_time(
+time_t find_uuid_first_time(
     struct rrdengine_instance *ctx,
     struct rrdengine_datafile *datafile,
     struct uuid_first_time_s *uuid_first_entry_list,
     size_t count)
 {
+    time_t global_first_time_s = LONG_MAX;
+
     // acquire the datafile to work with it
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
     while(datafile && !datafile_acquire(datafile, DATAFILE_ACQUIRE_RETENTION))
@@ -1011,7 +1013,7 @@ void find_uuid_first_time(
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
     if (unlikely(!datafile))
-        return;
+        return global_first_time_s;
 
     unsigned journalfile_count = 0;
     size_t binary_match = 0;
@@ -1025,6 +1027,10 @@ void find_uuid_first_time(
         }
 
         time_t journal_start_time_s = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
+
+        if(journal_start_time_s < global_first_time_s)
+            global_first_time_s = journal_start_time_s;
+
         struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + j2_header->metric_offset);
         struct uuid_first_time_s *uuid_original_entry;
 
@@ -1137,9 +1143,13 @@ void find_uuid_first_time(
          without_retention,
          without_metric
     );
+
+    return global_first_time_s;
 }
 
 static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile_to_delete, struct rrdengine_datafile *first_datafile_remaining, bool worker) {
+    time_t global_first_time_s = LONG_MAX;
+
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_FIND_ROTATED_METRICS);
 
@@ -1184,7 +1194,7 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_FIND_REMAINING_RETENTION);
 
-    find_uuid_first_time(ctx, first_datafile_remaining, uuid_first_entry_list, added);
+    global_first_time_s = find_uuid_first_time(ctx, first_datafile_remaining, uuid_first_entry_list, added);
 
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_POPULATE_MRG);
@@ -1222,6 +1232,9 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     internal_error(zero_disk_retention,
                    "DBENGINE: deleted %zu metrics, zero retention but referenced %zu (out of %zu total, of which %zu have main cache retention) zero on-disk retention tier %d metrics from metrics registry",
                    deleted_metrics, zero_retention_referenced, zero_disk_retention, zero_disk_but_live, ctx->config.tier);
+
+    if(global_first_time_s != LONG_MAX)
+        __atomic_store_n(&ctx->atomic.first_time_s, global_first_time_s, __ATOMIC_RELAXED);
 
     if(worker)
         worker_is_idle();

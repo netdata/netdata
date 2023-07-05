@@ -5,209 +5,1301 @@
 #include "common.h"
 #include "buildinfo.h"
 
-// Optional features
+typedef enum __attribute__((packed)) {
+    BIB_PACKAGING_NETDATA_VERSION,
+    BIB_PACKAGING_INSTALL_TYPE,
+    BIB_PACKAGING_ARCHITECTURE,
+    BIB_PACKAGING_DISTRO,
+    BIB_PACKAGING_CONFIGURE_OPTIONS,
+    BIB_DIR_USER_CONFIG,
+    BIB_DIR_STOCK_CONFIG,
+    BIB_DIR_CACHE,
+    BIB_DIR_LIB,
+    BIB_DIR_PLUGINS,
+    BIB_DIR_WEB,
+    BIB_DIR_LOG,
+    BIB_DIR_LOCK,
+    BIB_DIR_HOME,
+    BIB_OS_KERNEL_NAME,
+    BIB_OS_KERNEL_VERSION,
+    BIB_OS_NAME,
+    BIB_OS_ID,
+    BIB_OS_ID_LIKE,
+    BIB_OS_VERSION,
+    BIB_OS_VERSION_ID,
+    BIB_OS_DETECTION,
+    BIB_HW_CPU_CORES,
+    BIB_HW_CPU_FREQUENCY,
+    BIB_HW_RAM_SIZE,
+    BIB_HW_DISK_SPACE,
+    BIB_HW_ARCHITECTURE,
+    BIB_HW_VIRTUALIZATION,
+    BIB_HW_VIRTUALIZATION_DETECTION,
+    BIB_CONTAINER_NAME,
+    BIB_CONTAINER_DETECTION,
+    BIB_CONTAINER_ORCHESTRATOR,
+    BIB_CONTAINER_OS_NAME,
+    BIB_CONTAINER_OS_ID,
+    BIB_CONTAINER_OS_ID_LIKE,
+    BIB_CONTAINER_OS_VERSION,
+    BIB_CONTAINER_OS_VERSION_ID,
+    BIB_CONTAINER_OS_DETECTION,
+    BIB_FEATURE_BUILT_FOR,
+    BIB_FEATURE_CLOUD,
+    BIB_FEATURE_HEALTH,
+    BIB_FEATURE_STREAMING,
+    BIB_FEATURE_REPLICATION,
+    BIB_FEATURE_STREAMING_COMPRESSION,
+    BIB_FEATURE_CONTEXTS,
+    BIB_FEATURE_TIERING,
+    BIB_FEATURE_ML,
+    BIB_DB_DBENGINE,
+    BIB_DB_ALLOC,
+    BIB_DB_RAM,
+    BIB_DB_MAP,
+    BIB_DB_SAVE,
+    BIB_DB_NONE,
+    BIB_CONNECTIVITY_ACLK,
+    BIB_CONNECTIVITY_HTTPD_STATIC,
+    BIB_CONNECTIVITY_HTTPD_H2O,
+    BIB_CONNECTIVITY_WEBRTC,
+    BIB_CONNECTIVITY_NATIVE_HTTPS,
+    BIB_CONNECTIVITY_TLS_HOST_VERIFY,
+    BIB_LIB_LZ4,
+    BIB_LIB_ZLIB,
+    BIB_LIB_JUDY,
+    BIB_LIB_DLIB,
+    BIB_LIB_PROTOBUF,
+    BIB_LIB_OPENSSL,
+    BIB_LIB_LIBDATACHANNEL,
+    BIB_LIB_JSONC,
+    BIB_LIB_LIBCAP,
+    BIB_LIB_LIBCRYPTO,
+    BIB_LIB_LIBM,
+    BIB_LIB_JEMALLOC,
+    BIB_LIB_TCMALLOC,
+    BIB_PLUGIN_APPS,
+    BIB_PLUGIN_LINUX_CGROUPS,
+    BIB_PLUGIN_LINUX_CGROUP_NETWORK,
+    BIB_PLUGIN_LINUX_PROC,
+    BIB_PLUGIN_LINUX_TC,
+    BIB_PLUGIN_LINUX_DISKSPACE,
+    BIB_PLUGIN_FREEBSD,
+    BIB_PLUGIN_MACOS,
+    BIB_PLUGIN_STATSD,
+    BIB_PLUGIN_TIMEX,
+    BIB_PLUGIN_IDLEJITTER,
+    BIB_PLUGIN_BASH,
+    BIB_PLUGIN_DEBUGFS,
+    BIB_PLUGIN_CUPS,
+    BIB_PLUGIN_EBPF,
+    BIB_PLUGIN_FREEIPMI,
+    BIB_PLUGIN_NFACCT,
+    BIB_PLUGIN_PERF,
+    BIB_PLUGIN_SLABINFO,
+    BIB_PLUGIN_XEN,
+    BIB_PLUGIN_XEN_VBD_ERROR,
+    BIB_EXPORT_AWS_KINESIS,
+    BIB_EXPORT_GCP_PUBSUB,
+    BIB_EXPORT_MONGOC,
+    BIB_EXPORT_PROMETHEUS_EXPORTER,
+    BIB_EXPORT_PROMETHEUS_REMOTE_WRITE,
+    BIB_EXPORT_GRAPHITE,
+    BIB_EXPORT_GRAPHITE_HTTP,
+    BIB_EXPORT_JSON,
+    BIB_EXPORT_JSON_HTTP,
+    BIB_EXPORT_OPENTSDB,
+    BIB_EXPORT_OPENTSDB_HTTP,
+    BIB_EXPORT_ALLMETRICS,
+    BIB_EXPORT_SHELL,
+    BIB_DEVEL_TRACE_ALLOCATIONS,
+    BIB_DEVELOPER_MODE,
+
+    // leave this last
+    BIB_TERMINATOR,
+} BUILD_INFO_SLOT;
+
+typedef enum __attribute__((packed)) {
+    BIC_PACKAGING,
+    BIC_DIRECTORIES,
+    BIC_OPERATING_SYSTEM,
+    BIC_HARDWARE,
+    BIC_CONTAINER,
+    BIC_FEATURE,
+    BIC_DATABASE,
+    BIC_CONNECTIVITY,
+    BIC_LIBS,
+    BIC_PLUGINS,
+    BIC_EXPORTERS,
+    BIC_DEBUG_DEVEL
+} BUILD_INFO_CATEGORY;
+
+typedef enum __attribute__((packed)) {
+    BIT_BOOLEAN,
+    BIT_STRING,
+} BUILD_INFO_TYPE;
+
+static struct {
+    BUILD_INFO_CATEGORY category;
+    BUILD_INFO_TYPE type;
+    const char *analytics;
+    const char *print;
+    const char *json;
+    bool status;
+    const char *value;
+} BUILD_INFO[] = {
+        [BIB_PACKAGING_NETDATA_VERSION] = {
+                .category = BIC_PACKAGING,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Netdata Version",
+                .json = "version",
+                .value = "unknown",
+        },
+        [BIB_PACKAGING_INSTALL_TYPE] = {
+                .category = BIC_PACKAGING,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Installation Type",
+                .json = "type",
+                .value = "unknown",
+        },
+        [BIB_PACKAGING_ARCHITECTURE] = {
+                .category = BIC_PACKAGING,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Package Architecture",
+                .json = "arch",
+                .value = "unknown",
+        },
+        [BIB_PACKAGING_DISTRO] = {
+                .category = BIC_PACKAGING,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Package Distro",
+                .json = "distro",
+                .value = "unknown",
+        },
+        [BIB_PACKAGING_CONFIGURE_OPTIONS] = {
+                .category = BIC_PACKAGING,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Configure Options",
+                .json = "configure",
+                .value = "unknown",
+        },
+        [BIB_DIR_USER_CONFIG] = {
+                .category = BIC_DIRECTORIES,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "User Configurations",
+                .json = "user_config",
+                .value = CONFIG_DIR,
+        },
+        [BIB_DIR_STOCK_CONFIG] = {
+                .category = BIC_DIRECTORIES,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Stock Configurations",
+                .json = "stock_config",
+                .value = LIBCONFIG_DIR,
+        },
+        [BIB_DIR_CACHE] = {
+                .category = BIC_DIRECTORIES,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Ephemeral Databases (metrics data, metadata)",
+                .json = "ephemeral_db",
+                .value = CACHE_DIR,
+        },
+        [BIB_DIR_LIB] = {
+                .category = BIC_DIRECTORIES,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Permanent Databases",
+                .json = "permanent_db",
+                .value = VARLIB_DIR,
+        },
+        [BIB_DIR_PLUGINS] = {
+                .category = BIC_DIRECTORIES,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Plugins",
+                .json = "plugins",
+                .value = PLUGINS_DIR,
+        },
+        [BIB_DIR_WEB] = {
+                .category = BIC_DIRECTORIES,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Static Web Files",
+                .json = "web",
+                .value = WEB_DIR,
+        },
+        [BIB_DIR_LOG] = {
+                .category = BIC_DIRECTORIES,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Log Files",
+                .json = "logs",
+                .value = LOG_DIR,
+        },
+        [BIB_DIR_LOCK] = {
+                .category = BIC_DIRECTORIES,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Lock Files",
+                .json = "locks",
+                .value = VARLIB_DIR "/lock",
+        },
+        [BIB_DIR_HOME] = {
+                .category = BIC_DIRECTORIES,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Home",
+                .json = "home",
+                .value = VARLIB_DIR,
+        },
+        [BIB_OS_KERNEL_NAME] = {
+                .category = BIC_OPERATING_SYSTEM,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Kernel",
+                .json = "kernel",
+                .value = "unknown",
+        },
+        [BIB_OS_KERNEL_VERSION] = {
+                .category = BIC_OPERATING_SYSTEM,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Kernel Version",
+                .json = "kernel_version",
+                .value = "unknown",
+        },
+        [BIB_OS_NAME] = {
+                .category = BIC_OPERATING_SYSTEM,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Operating System",
+                .json = "os",
+                .value = "unknown",
+        },
+        [BIB_OS_ID] = {
+                .category = BIC_OPERATING_SYSTEM,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Operating System ID",
+                .json = "id",
+                .value = "unknown",
+        },
+        [BIB_OS_ID_LIKE] = {
+                .category = BIC_OPERATING_SYSTEM,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Operating System ID Like",
+                .json = "id_like",
+                .value = "unknown",
+        },
+        [BIB_OS_VERSION] = {
+                .category = BIC_OPERATING_SYSTEM,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Operating System Version",
+                .json = "version",
+                .value = "unknown",
+        },
+        [BIB_OS_VERSION_ID] = {
+                .category = BIC_OPERATING_SYSTEM,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Operating System Version ID",
+                .json = "version_id",
+                .value = "unknown",
+        },
+        [BIB_OS_DETECTION] = {
+                .category = BIC_OPERATING_SYSTEM,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Detection",
+                .json = "detection",
+                .value = "unknown",
+        },
+        [BIB_HW_CPU_CORES] = {
+                .category = BIC_HARDWARE,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "CPU Cores",
+                .json = "cpu_cores",
+                .value = "unknown",
+        },
+        [BIB_HW_CPU_FREQUENCY] = {
+                .category = BIC_HARDWARE,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "CPU Frequency",
+                .json = "cpu_frequency",
+                .value = "unknown",
+        },
+        [BIB_HW_RAM_SIZE] = {
+                .category = BIC_HARDWARE,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "CPU Architecture",
+                .json = "cpu_architecture",
+                .value = "unknown",
+        },
+        [BIB_HW_DISK_SPACE] = {
+                .category = BIC_HARDWARE,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "RAM Bytes",
+                .json = "ram",
+                .value = "unknown",
+        },
+        [BIB_HW_ARCHITECTURE] = {
+                .category = BIC_HARDWARE,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Disk Capacity",
+                .json = "disk",
+                .value = "unknown",
+        },
+        [BIB_HW_VIRTUALIZATION] = {
+                .category = BIC_HARDWARE,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Virtualization Technology",
+                .json = "virtualization",
+                .value = "unknown",
+        },
+        [BIB_HW_VIRTUALIZATION_DETECTION] = {
+                .category = BIC_HARDWARE,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Virtualization Detection",
+                .json = "virtualization_detection",
+                .value = "unknown",
+        },
+        [BIB_CONTAINER_NAME] = {
+                .category = BIC_CONTAINER,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Container",
+                .json = "container",
+                .value = "unknown",
+        },
+        [BIB_CONTAINER_DETECTION] = {
+                .category = BIC_CONTAINER,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Container Detection",
+                .json = "container_detection",
+                .value = "unknown",
+        },
+        [BIB_CONTAINER_ORCHESTRATOR] = {
+                .category = BIC_CONTAINER,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Container Orchestrator",
+                .json = "orchestrator",
+                .value = "unknown",
+        },
+        [BIB_CONTAINER_OS_NAME] = {
+                .category = BIC_CONTAINER,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Container Operating System",
+                .json = "os",
+                .value = "unknown",
+        },
+        [BIB_CONTAINER_OS_ID] = {
+                .category = BIC_CONTAINER,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Container Operating System ID",
+                .json = "os_id",
+                .value = "unknown",
+        },
+        [BIB_CONTAINER_OS_ID_LIKE] = {
+                .category = BIC_CONTAINER,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Container Operating System ID Like",
+                .json = "os_id_like",
+                .value = "unknown",
+        },
+        [BIB_CONTAINER_OS_VERSION] = {
+                .category = BIC_CONTAINER,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Container Operating System Version",
+                .json = "version",
+                .value = "unknown",
+        },
+        [BIB_CONTAINER_OS_VERSION_ID] = {
+                .category = BIC_CONTAINER,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Container Operating System Version ID",
+                .json = "version_id",
+                .value = "unknown",
+        },
+        [BIB_CONTAINER_OS_DETECTION] = {
+                .category = BIC_CONTAINER,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Container Operating System Detection",
+                .json = "detection",
+                .value = "unknown",
+        },
+        [BIB_FEATURE_BUILT_FOR] = {
+                .category = BIC_FEATURE,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Built For",
+                .json = "built-for",
+                .value = "unknown",
+        },
+        [BIB_FEATURE_CLOUD] = {
+                .category = BIC_FEATURE,
+                .type = BIT_BOOLEAN,
+                .analytics = "Netdata Cloud",
+                .print = "Netdata Cloud",
+                .json = "cloud",
+                .value = NULL,
+        },
+        [BIB_FEATURE_HEALTH] = {
+                .category = BIC_FEATURE,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "Health (trigger alerts and send notifications)",
+                .json = "health",
+                .value = NULL,
+        },
+        [BIB_FEATURE_STREAMING] = {
+                .category = BIC_FEATURE,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "Streaming (stream metrics to parent Netdata servers)",
+                .json = "streaming",
+                .value = NULL,
+        },
+        [BIB_FEATURE_REPLICATION] = {
+                .category = BIC_FEATURE,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "Replication (fill the gaps of parent Netdata servers)",
+                .json = "replication",
+                .value = NULL,
+        },
+        [BIB_FEATURE_STREAMING_COMPRESSION] = {
+                .category = BIC_FEATURE,
+                .type = BIT_BOOLEAN,
+                .analytics = "Stream Compression",
+                .print = "Streaming and Replication Compression",
+                .json = "stream-compression",
+                .value = "none",
+        },
+        [BIB_FEATURE_CONTEXTS] = {
+                .category = BIC_FEATURE,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "Contexts (index all active and archived metrics)",
+                .json = "contexts",
+                .value = NULL,
+        },
+        [BIB_FEATURE_TIERING] = {
+                .category = BIC_FEATURE,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "Tiering (multiple dbs with different metrics resolution)",
+                .json = "tiering",
+                .value = TOSTRING(RRD_STORAGE_TIERS),
+        },
+        [BIB_FEATURE_ML] = {
+                .category = BIC_FEATURE,
+                .type = BIT_BOOLEAN,
+                .analytics = "Machine Learning",
+                .print = "Machine Learning",
+                .json = "ml",
+                .value = NULL,
+        },
+        [BIB_DB_DBENGINE] = {
+                .category = BIC_DATABASE,
+                .type = BIT_BOOLEAN,
+                .analytics = "dbengine",
+                .print = "dbengine",
+                .json = "dbengine",
+                .value = NULL,
+        },
+        [BIB_DB_ALLOC] = {
+                .category = BIC_DATABASE,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "alloc",
+                .json = "alloc",
+                .value = NULL,
+        },
+        [BIB_DB_RAM] = {
+                .category = BIC_DATABASE,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "ram",
+                .json = "ram",
+                .value = NULL,
+        },
+        [BIB_DB_MAP] = {
+                .category = BIC_DATABASE,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "map",
+                .json = "map",
+                .value = NULL,
+        },
+        [BIB_DB_SAVE] = {
+                .category = BIC_DATABASE,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "save",
+                .json = "save",
+                .value = NULL,
+        },
+        [BIB_DB_NONE] = {
+                .category = BIC_DATABASE,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "none",
+                .json = "none",
+                .value = NULL,
+        },
+        [BIB_CONNECTIVITY_ACLK] = {
+                .category = BIC_CONNECTIVITY,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "ACLK (Agent-Cloud Link: MQTT over WebSockets over TLS)",
+                .json = "aclk",
+                .value = NULL,
+        },
+        [BIB_CONNECTIVITY_HTTPD_STATIC] = {
+                .category = BIC_CONNECTIVITY,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "static (Netdata internal web server)",
+                .json = "static",
+                .value = NULL,
+        },
+        [BIB_CONNECTIVITY_HTTPD_H2O] = {
+                .category = BIC_CONNECTIVITY,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "h2o (web server)",
+                .json = "h2o",
+                .value = NULL,
+        },
+        [BIB_CONNECTIVITY_WEBRTC] = {
+                .category = BIC_CONNECTIVITY,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "WebRTC (experimental)",
+                .json = "webrtc",
+                .value = NULL,
+        },
+        [BIB_CONNECTIVITY_NATIVE_HTTPS] = {
+                .category = BIC_CONNECTIVITY,
+                .type = BIT_BOOLEAN,
+                .analytics = "Native HTTPS",
+                .print = "Native HTTPS (TLS Support)",
+                .json = "native-https",
+                .value = NULL,
+        },
+        [BIB_CONNECTIVITY_TLS_HOST_VERIFY] = {
+                .category = BIC_CONNECTIVITY,
+                .type = BIT_BOOLEAN,
+                .analytics = "TLS Host Verification",
+                .print = "TLS Host Verification",
+                .json = "tls-host-verify",
+                .value = NULL,
+        },
+        [BIB_LIB_LZ4] = {
+                .category = BIC_LIBS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "LZ4 (extremely fast lossless compression algorithm)",
+                .json = "lz4",
+                .value = NULL,
+        },
+        [BIB_LIB_ZLIB] = {
+                .category = BIC_LIBS,
+                .type = BIT_BOOLEAN,
+                .analytics = "zlib",
+                .print = "zlib (lossless data-compression library)",
+                .json = "zlib",
+                .value = NULL,
+        },
+        [BIB_LIB_JUDY] = {
+                .category = BIC_LIBS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "Judy (high-performance dynamic arrays and hashtables)",
+                .json = "judy",
+                .status = true,
+                .value = "bundled",
+        },
+        [BIB_LIB_DLIB] = {
+                .category = BIC_LIBS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "dlib (robust machine learning toolkit)",
+                .json = "dlib",
+                .value = NULL,
+        },
+        [BIB_LIB_PROTOBUF] = {
+                .category = BIC_LIBS,
+                .type = BIT_BOOLEAN,
+                .analytics = "protobuf",
+                .print = "protobuf (platform-neutral data serialization protocol)",
+                .json = "protobuf",
+                .value = NULL,
+        },
+        [BIB_LIB_OPENSSL] = {
+                .category = BIC_LIBS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "OpenSSL (cryptography)",
+                .json = "openssl",
+                .value = NULL,
+        },
+        [BIB_LIB_LIBDATACHANNEL] = {
+                .category = BIC_LIBS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "libdatachannel (stand-alone WebRTC data channels)",
+                .json = "libdatachannel",
+                .value = NULL,
+        },
+        [BIB_LIB_JSONC] = {
+                .category = BIC_LIBS,
+                .type = BIT_BOOLEAN,
+                .analytics = "JSON-C",
+                .print = "JSON-C (lightweight JSON manipulation)",
+                .json = "jsonc",
+                .value = NULL,
+        },
+        [BIB_LIB_LIBCAP] = {
+                .category = BIC_LIBS,
+                .type = BIT_BOOLEAN,
+                .analytics = "libcap",
+                .print = "libcap (Linux capabilities system operations)",
+                .json = "libcap",
+                .value = NULL,
+        },
+        [BIB_LIB_LIBCRYPTO] = {
+                .category = BIC_LIBS,
+                .type = BIT_BOOLEAN,
+                .analytics = "libcrypto",
+                .print = "libcrypto (cryptographic functions)",
+                .json = "libcrypto",
+                .value = NULL,
+        },
+        [BIB_LIB_LIBM] = {
+                .category = BIC_LIBS,
+                .type = BIT_BOOLEAN,
+                .analytics = "libm",
+                .print = "libm (mathematical functions)",
+                .json = "libm",
+                .value = NULL,
+        },
+        [BIB_LIB_JEMALLOC] = {
+                .category = BIC_LIBS,
+                .type = BIT_BOOLEAN,
+                .analytics = "jemalloc",
+                .print = "jemalloc",
+                .json = "jemalloc",
+                .value = NULL,
+        },
+        [BIB_LIB_TCMALLOC] = {
+                .category = BIC_LIBS,
+                .type = BIT_BOOLEAN,
+                .analytics = "tcmalloc",
+                .print = "TCMalloc",
+                .json = "tcmalloc",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_APPS] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = "apps",
+                .print = "apps (monitor processes)",
+                .json = "apps",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_LINUX_CGROUPS] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "cgroups (monitor containers and VMs)",
+                .json = "cgroups",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_LINUX_CGROUP_NETWORK] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = "cgroup Network Tracking",
+                .print = "cgroup-network (associate interfaces to CGROUPS)",
+                .json = "cgroup-network",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_LINUX_PROC] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "proc (monitor Linux systems)",
+                .json = "proc",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_LINUX_TC] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "tc (monitor Linux network QoS)",
+                .json = "tc",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_LINUX_DISKSPACE] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "diskspace (monitor Linux mount points)",
+                .json = "diskspace",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_FREEBSD] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "freebsd (monitor FreeBSD systems)",
+                .json = "freebsd",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_MACOS] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "macos (monitor MacOS systems)",
+                .json = "macos",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_STATSD] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "statsd (collect custom application metrics)",
+                .json = "statsd",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_TIMEX] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "timex (check system clock synchronization)",
+                .json = "timex",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_IDLEJITTER] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "idlejitter (check system latency and jitter)",
+                .json = "idlejitter",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_BASH] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "bash (support shell data collection jobs - charts.d)",
+                .json = "charts.d",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_DEBUGFS] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = "debugfs",
+                .print = "debugfs (kernel debugging metrics)",
+                .json = "debugfs",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_CUPS] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = "CUPS",
+                .print = "cups (monitor printers and print jobs)",
+                .json = "cups",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_EBPF] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = "EBPF",
+                .print = "ebpf (monitor system calls)",
+                .json = "ebpf",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_FREEIPMI] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = "IPMI",
+                .print = "freeipmi (monitor enterprise server H/W)",
+                .json = "freeipmi",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_NFACCT] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = "NFACCT",
+                .print = "nfacct (gather netfilter accounting)",
+                .json = "nfacct",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_PERF] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = "perf",
+                .print = "perf (collect kernel performance events)",
+                .json = "perf",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_SLABINFO] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = "slabinfo",
+                .print = "slabinfo (monitor kernel object caching)",
+                .json = "slabinfo",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_XEN] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = "Xen",
+                .print = "Xen",
+                .json = "xen",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_XEN_VBD_ERROR] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = "Xen VBD Error Tracking",
+                .print = "Xen VBD Error Tracking",
+                .json = "xen-vbd-error",
+                .value = NULL,
+        },
+        [BIB_EXPORT_MONGOC] = {
+                .category = BIC_EXPORTERS,
+                .type = BIT_BOOLEAN,
+                .analytics = "MongoDB",
+                .print = "MongoDB",
+                .json = "mongodb",
+                .value = NULL,
+        },
+        [BIB_EXPORT_GRAPHITE] = {
+                .category = BIC_EXPORTERS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "Graphite",
+                .json = "graphite",
+                .value = NULL,
+        },
+        [BIB_EXPORT_GRAPHITE_HTTP] = {
+                .category = BIC_EXPORTERS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "Graphite HTTP / HTTPS",
+                .json = "graphite:http",
+                .value = NULL,
+        },
+        [BIB_EXPORT_JSON] = {
+                .category = BIC_EXPORTERS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "JSON",
+                .json = "json",
+                .value = NULL,
+        },
+        [BIB_EXPORT_JSON_HTTP] = {
+                .category = BIC_EXPORTERS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "JSON HTTP / HTTPS",
+                .json = "json:http",
+                .value = NULL,
+        },
+        [BIB_EXPORT_OPENTSDB] = {
+                .category = BIC_EXPORTERS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "OpenTSDB",
+                .json = "opentsdb",
+                .value = NULL,
+        },
+        [BIB_EXPORT_OPENTSDB_HTTP] = {
+                .category = BIC_EXPORTERS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "OpenTSDB HTTP / HTTPS",
+                .json = "opentsdb:http",
+                .value = NULL,
+        },
+        [BIB_EXPORT_ALLMETRICS] = {
+                .category = BIC_EXPORTERS,
+                .analytics = NULL,
+                .type = BIT_BOOLEAN,
+                .print = "All Metrics API",
+                .json = "allmetrics",
+                .value = NULL,
+        },
+        [BIB_EXPORT_SHELL] = {
+                .category = BIC_EXPORTERS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "Shell (use metrics in shell scripts)",
+                .json = "shell",
+                .value = NULL,
+        },
+        [BIB_EXPORT_PROMETHEUS_EXPORTER] = {
+                .category = BIC_EXPORTERS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "Prometheus (OpenMetrics) Exporter",
+                .json = "openmetrics",
+                .value = NULL,
+        },
+        [BIB_EXPORT_PROMETHEUS_REMOTE_WRITE] = {
+                .category = BIC_EXPORTERS,
+                .type = BIT_BOOLEAN,
+                .analytics = "Prometheus Remote Write",
+                .print = "Prometheus Remote Write",
+                .json = "prom-remote-write",
+                .value = NULL,
+        },
+        [BIB_EXPORT_AWS_KINESIS] = {
+                .category = BIC_EXPORTERS,
+                .type = BIT_BOOLEAN,
+                .analytics = "AWS Kinesis",
+                .print = "AWS Kinesis",
+                .json = "kinesis",
+                .value = NULL,
+        },
+        [BIB_EXPORT_GCP_PUBSUB] = {
+                .category = BIC_EXPORTERS,
+                .type = BIT_BOOLEAN,
+                .analytics = "GCP PubSub",
+                .print = "GCP PubSub",
+                .json = "pubsub",
+                .value = NULL,
+        },
+        [BIB_DEVEL_TRACE_ALLOCATIONS] = {
+                .category = BIC_DEBUG_DEVEL,
+                .type = BIT_BOOLEAN,
+                .analytics = "DebugTraceAlloc",
+                .print = "Trace All Netdata Allocations (with charts)",
+                .json = "trace-allocations",
+                .value = NULL,
+        },
+        [BIB_DEVELOPER_MODE] = {
+                .category = BIC_DEBUG_DEVEL,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "Developer Mode (more runtime checks, slower)",
+                .json = "dev-mode",
+                .value = NULL,
+        },
+
+        // leave this last
+        [BIB_TERMINATOR] = {
+                .category = 0,
+                .type = 0,
+                .analytics = NULL,
+                .print = NULL,
+                .json = NULL,
+                .value = NULL,
+        },
+};
+
+static void build_info_set_value(BUILD_INFO_SLOT slot, const char *value) {
+    BUILD_INFO[slot].value = value;
+}
+
+static void build_info_set_value_strdupz(BUILD_INFO_SLOT slot, const char *value) {
+    if(!value) value = "";
+    build_info_set_value(slot, strdupz(value));
+}
+
+static void build_info_set_status(BUILD_INFO_SLOT slot, bool status) {
+    BUILD_INFO[slot].status = status;
+}
+
+__attribute__((constructor)) void initialize_build_info(void) {
+    build_info_set_value(BIB_PACKAGING_NETDATA_VERSION, program_version);
+    build_info_set_value(BIB_PACKAGING_CONFIGURE_OPTIONS, CONFIGURE_COMMAND);
+
+#ifdef COMPILED_FOR_LINUX
+    build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
+    build_info_set_value(BIB_FEATURE_BUILT_FOR, "Linux");
+    build_info_set_status(BIB_PLUGIN_LINUX_CGROUPS, true);
+    build_info_set_status(BIB_PLUGIN_LINUX_PROC, true);
+    build_info_set_status(BIB_PLUGIN_LINUX_DISKSPACE, true);
+    build_info_set_status(BIB_PLUGIN_LINUX_TC, true);
+#endif
+#ifdef COMPILED_FOR_FREEBSD
+    build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
+    build_info_set_value(BIB_FEATURE_BUILT_FOR, "FreeBSD");
+    build_info_set_status(BIB_PLUGIN_FREEBSD, true);
+#endif
+#ifdef COMPILED_FOR_MACOS
+    build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
+    build_info_set_value(BIB_FEATURE_BUILT_FOR, "MacOS");
+    build_info_set_status(BIB_PLUGIN_MACOS, true);
+#endif
 
 #ifdef ENABLE_ACLK
-#define FEAT_CLOUD 1
-#define FEAT_CLOUD_MSG ""
+    build_info_set_status(BIB_FEATURE_CLOUD, true);
+    build_info_set_status(BIB_CONNECTIVITY_ACLK, true);
 #else
+    build_info_set_status(BIB_FEATURE_CLOUD, false);
 #ifdef DISABLE_CLOUD
-#define FEAT_CLOUD 0
-#define FEAT_CLOUD_MSG "(by user request)"
+    build_info_set_value(BIB_FEATURE_CLOUD, "disabled");
 #else
-#define FEAT_CLOUD 0
-#define FEAT_CLOUD_MSG ""
+    build_info_set_value(BIB_FEATURE_CLOUD, "unavailable");
 #endif
 #endif
 
-#ifdef ENABLE_HTTPD
-#define FEAT_HTTPD 1
-#else
-#define FEAT_HTTPD 0
+    build_info_set_status(BIB_FEATURE_HEALTH, true);
+    build_info_set_status(BIB_FEATURE_STREAMING, true);
+    build_info_set_status(BIB_FEATURE_REPLICATION, true);
+
+#ifdef ENABLE_RRDPUSH_COMPRESSION
+    build_info_set_status(BIB_FEATURE_STREAMING_COMPRESSION, true);
+#ifdef ENABLE_LZ4
+    build_info_set_value(BIB_FEATURE_STREAMING_COMPRESSION, "lz4");
+#endif
+#endif
+
+    build_info_set_status(BIB_FEATURE_CONTEXTS, true);
+    build_info_set_status(BIB_FEATURE_TIERING, true);
+
+#ifdef ENABLE_ML
+    build_info_set_status(BIB_FEATURE_ML, true);
 #endif
 
 #ifdef ENABLE_DBENGINE
-#define FEAT_DBENGINE 1
-#else
-#define FEAT_DBENGINE 0
+    build_info_set_status(BIB_DB_DBENGINE, true);
 #endif
+    build_info_set_status(BIB_DB_ALLOC, true);
+    build_info_set_status(BIB_DB_RAM, true);
+    build_info_set_status(BIB_DB_MAP, true);
+    build_info_set_status(BIB_DB_SAVE, true);
+    build_info_set_status(BIB_DB_NONE, true);
 
-#if defined(HAVE_X509_VERIFY_PARAM_set1_host) && HAVE_X509_VERIFY_PARAM_set1_host == 1
-#define FEAT_TLS_HOST_VERIFY 1
-#else
-#define FEAT_TLS_HOST_VERIFY 0
+    build_info_set_status(BIB_CONNECTIVITY_HTTPD_STATIC, true);
+#ifdef ENABLE_H2O
+    build_info_set_status(BIB_CONNECTIVITY_HTTPD_H2O, true);
 #endif
-
+#ifdef ENABLE_WEBRTC
+    build_info_set_status(BIB_CONNECTIVITY_WEBRTC, true);
+#endif
 #ifdef ENABLE_HTTPS
-#define FEAT_NATIVE_HTTPS 1
-#else
-#define FEAT_NATIVE_HTTPS 0
+    build_info_set_status(BIB_CONNECTIVITY_NATIVE_HTTPS, true);
+#endif
+#if defined(HAVE_X509_VERIFY_PARAM_set1_host) && HAVE_X509_VERIFY_PARAM_set1_host == 1
+    build_info_set_status(BIB_CONNECTIVITY_TLS_HOST_VERIFY, true);
 #endif
 
-#ifdef ENABLE_ML
-#define FEAT_ML 1
-#else
-#define FEAT_ML 0
+#ifdef ENABLE_LZ4
+    build_info_set_status(BIB_LIB_LZ4, true);
 #endif
 
-#ifdef  ENABLE_COMPRESSION
-#define  FEAT_STREAM_COMPRESSION 1
-#else
-#define  FEAT_STREAM_COMPRESSION 0
-#endif  //ENABLE_COMPRESSION
+    build_info_set_status(BIB_LIB_ZLIB, true);
 
-
-// Optional libraries
+#ifdef HAVE_DLIB
+    build_info_set_status(BIB_LIB_DLIB, true);
+    build_info_set_value(BIB_LIB_DLIB, "bundled");
+#endif
 
 #ifdef HAVE_PROTOBUF
-#define FEAT_PROTOBUF 1
+    build_info_set_status(BIB_LIB_PROTOBUF, true);
 #ifdef BUNDLED_PROTOBUF
-#define FEAT_PROTOBUF_BUNDLED " (bundled)"
+    build_info_set_value(BIB_LIB_PROTOBUF, "bundled");
 #else
-#define FEAT_PROTOBUF_BUNDLED " (system)"
+    build_info_set_value(BIB_LIB_PROTOBUF, "system");
 #endif
-#else
-#define FEAT_PROTOBUF 0
-#define FEAT_PROTOBUF_BUNDLED ""
 #endif
 
+#ifdef HAVE_LIBDATACHANNEL
+    build_info_set_status(BIB_LIB_LIBDATACHANNEL, true);
+#endif
+#ifdef ENABLE_OPENSSL
+    build_info_set_status(BIB_LIB_OPENSSL, true);
+#endif
 #ifdef ENABLE_JSONC
-#define FEAT_JSONC 1
-#else
-#define FEAT_JSONC 0
+    build_info_set_status(BIB_LIB_JSONC, true);
 #endif
-
-#ifdef ENABLE_JEMALLOC
-#define FEAT_JEMALLOC 1
-#else
-#define FEAT_JEMALLOC 0
-#endif
-
-#ifdef ENABLE_TCMALLOC
-#define FEAT_TCMALLOC 1
-#else
-#define FEAT_TCMALLOC 0
-#endif
-
 #ifdef HAVE_CAPABILITY
-#define FEAT_LIBCAP 1
-#else
-#define FEAT_LIBCAP 0
+    build_info_set_status(BIB_LIB_LIBCAP, true);
 #endif
-
-#ifdef STORAGE_WITH_MATH
-#define FEAT_LIBM 1
-#else
-#define FEAT_LIBM 0
-#endif
-
 #ifdef HAVE_CRYPTO
-#define FEAT_CRYPTO 1
-#else
-#define FEAT_CRYPTO 0
+    build_info_set_status(BIB_LIB_LIBCRYPTO, true);
 #endif
-
-// Optional plugins
+#ifdef STORAGE_WITH_MATH
+    build_info_set_status(BIB_LIB_LIBM, true);
+#endif
+#ifdef ENABLE_JEMALLOC
+    build_info_set_status(BIB_LIB_JEMALLOC, true);
+#endif
+#ifdef ENABLE_TCMALLOC
+    build_info_set_status(BIB_LIB_TCMALLOC, true);
+#endif
 
 #ifdef ENABLE_APPS_PLUGIN
-#define FEAT_APPS_PLUGIN 1
-#else
-#define FEAT_APPS_PLUGIN 0
+    build_info_set_status(BIB_PLUGIN_APPS, true);
 #endif
+#ifdef HAVE_SETNS
+    build_info_set_status(BIB_PLUGIN_LINUX_CGROUP_NETWORK, true);
+#endif
+
+    build_info_set_status(BIB_PLUGIN_STATSD, true);
+    build_info_set_status(BIB_PLUGIN_TIMEX, true);
+    build_info_set_status(BIB_PLUGIN_IDLEJITTER, true);
+    build_info_set_status(BIB_PLUGIN_BASH, true);
 
 #ifdef ENABLE_DEBUGFS_PLUGIN
-#define FEAT_DEBUGFS_PLUGIN 1
-#else
-#define FEAT_DEBUGFS_PLUGIN 0
+    build_info_set_status(BIB_PLUGIN_DEBUGFS, true);
 #endif
-
-#ifdef HAVE_FREEIPMI
-#define FEAT_IPMI 1
-#else
-#define FEAT_IPMI 0
-#endif
-
 #ifdef HAVE_CUPS
-#define FEAT_CUPS 1
-#else
-#define FEAT_CUPS 0
+    build_info_set_status(BIB_PLUGIN_CUPS, true);
 #endif
-
-#ifdef HAVE_NFACCT
-#define FEAT_NFACCT 1
-#else
-#define FEAT_NFACCT 0
-#endif
-
-#ifdef HAVE_LIBXENSTAT
-#define FEAT_XEN 1
-#else
-#define FEAT_XEN 0
-#endif
-
-#ifdef HAVE_XENSTAT_VBD_ERROR
-#define FEAT_XEN_VBD_ERROR 1
-#else
-#define FEAT_XEN_VBD_ERROR 0
-#endif
-
 #ifdef HAVE_LIBBPF
-#define FEAT_EBPF 1
-#else
-#define FEAT_EBPF 0
+    build_info_set_status(BIB_PLUGIN_EBPF, true);
 #endif
-
-#ifdef HAVE_SETNS
-#define FEAT_CGROUP_NET 1
-#else
-#define FEAT_CGROUP_NET 0
+#ifdef HAVE_FREEIPMI
+    build_info_set_status(BIB_PLUGIN_FREEIPMI, true);
 #endif
-
+#ifdef HAVE_NFACCT
+    build_info_set_status(BIB_PLUGIN_NFACCT, true);
+#endif
 #ifdef ENABLE_PERF_PLUGIN
-#define FEAT_PERF 1
-#else
-#define FEAT_PERF 0
+    build_info_set_status(BIB_PLUGIN_PERF, true);
 #endif
-
 #ifdef ENABLE_SLABINFO
-#define FEAT_SLABINFO 1
-#else
-#define FEAT_SLABINFO 0
+    build_info_set_status(BIB_PLUGIN_SLABINFO, true);
+#endif
+#ifdef HAVE_LIBXENSTAT
+    build_info_set_status(BIB_PLUGIN_XEN, true);
+#endif
+#ifdef HAVE_XENSTAT_VBD_ERROR
+    build_info_set_status(BIB_PLUGIN_XEN_VBD_ERROR, true);
 #endif
 
-// Optional Exporters
+    build_info_set_status(BIB_EXPORT_PROMETHEUS_EXPORTER, true);
+    build_info_set_status(BIB_EXPORT_GRAPHITE, true);
+    build_info_set_status(BIB_EXPORT_GRAPHITE_HTTP, true);
+    build_info_set_status(BIB_EXPORT_JSON, true);
+    build_info_set_status(BIB_EXPORT_JSON_HTTP, true);
+    build_info_set_status(BIB_EXPORT_OPENTSDB, true);
+    build_info_set_status(BIB_EXPORT_OPENTSDB_HTTP, true);
+    build_info_set_status(BIB_EXPORT_ALLMETRICS, true);
+    build_info_set_status(BIB_EXPORT_SHELL, true);
 
 #ifdef HAVE_KINESIS
-#define FEAT_KINESIS 1
-#else
-#define FEAT_KINESIS 0
+    build_info_set_status(BIB_EXPORT_AWS_KINESIS, true);
 #endif
-
 #ifdef ENABLE_EXPORTING_PUBSUB
-#define FEAT_PUBSUB 1
-#else
-#define FEAT_PUBSUB 0
+    build_info_set_status(BIB_EXPORT_GCP_PUBSUB, true);
 #endif
-
 #ifdef HAVE_MONGOC
-#define FEAT_MONGO 1
-#else
-#define FEAT_MONGO 0
+    build_info_set_status(BIB_EXPORT_MONGOC, true);
 #endif
-
 #ifdef ENABLE_PROMETHEUS_REMOTE_WRITE
-#define FEAT_REMOTE_WRITE 1
-#else
-#define FEAT_REMOTE_WRITE 0
+    build_info_set_status(BIB_EXPORT_PROMETHEUS_REMOTE_WRITE, true);
 #endif
-
-#define FEAT_YES_NO(x) ((x) ? "YES" : "NO")
 
 #ifdef NETDATA_TRACE_ALLOCATIONS
-#define FEAT_TRACE_ALLOC 1
-#else
-#define FEAT_TRACE_ALLOC 0
+    build_info_set_status(BIB_DEVEL_TRACE_ALLOCATIONS, true);
 #endif
+
+#if defined(NETDATA_DEV_MODE) || defined(NETDATA_INTERNAL_CHECKS)
+    build_info_set_status(BIB_DEVELOPER_MODE, true);
+#endif
+}
+
+// ----------------------------------------------------------------------------
+// system info
+
+int get_system_info(struct rrdhost_system_info *system_info, bool log);
+static void populate_system_info(void) {
+    static bool populated = false;
+    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+
+    if(populated)
+        return;
+
+    spinlock_lock(&spinlock);
+
+    if(populated) {
+        spinlock_unlock(&spinlock);
+        return;
+    }
+
+    struct rrdhost_system_info *system_info;
+    bool free_system_info = false;
+
+    if(localhost && localhost->system_info) {
+        system_info = localhost->system_info;
+    }
+    else {
+        system_info = callocz(1, sizeof(struct rrdhost_system_info));
+        get_system_info(system_info, false);
+        free_system_info = true;
+    }
+
+    build_info_set_value_strdupz(BIB_OS_KERNEL_NAME, system_info->kernel_name);
+    build_info_set_value_strdupz(BIB_OS_KERNEL_VERSION, system_info->kernel_version);
+    build_info_set_value_strdupz(BIB_OS_NAME, system_info->host_os_name);
+    build_info_set_value_strdupz(BIB_OS_ID, system_info->host_os_id);
+    build_info_set_value_strdupz(BIB_OS_ID_LIKE, system_info->host_os_id_like);
+    build_info_set_value_strdupz(BIB_OS_VERSION, system_info->host_os_version);
+    build_info_set_value_strdupz(BIB_OS_VERSION_ID, system_info->container_os_version_id);
+    build_info_set_value_strdupz(BIB_OS_DETECTION, system_info->host_os_detection);
+    build_info_set_value_strdupz(BIB_HW_CPU_CORES, system_info->host_cores);
+    build_info_set_value_strdupz(BIB_HW_CPU_FREQUENCY, system_info->host_cpu_freq);
+    build_info_set_value_strdupz(BIB_HW_RAM_SIZE, system_info->host_ram_total);
+    build_info_set_value_strdupz(BIB_HW_DISK_SPACE, system_info->host_disk_space);
+    build_info_set_value_strdupz(BIB_HW_ARCHITECTURE, system_info->architecture);
+    build_info_set_value_strdupz(BIB_HW_VIRTUALIZATION, system_info->virtualization);
+    build_info_set_value_strdupz(BIB_HW_VIRTUALIZATION_DETECTION, system_info->virt_detection);
+    build_info_set_value_strdupz(BIB_CONTAINER_NAME, system_info->container);
+    build_info_set_value_strdupz(BIB_CONTAINER_DETECTION, system_info->container_detection);
+
+    if(system_info->is_k8s_node && !strcmp(system_info->is_k8s_node, "true"))
+        build_info_set_value_strdupz(BIB_CONTAINER_ORCHESTRATOR, "kubernetes");
+    else
+        build_info_set_value_strdupz(BIB_CONTAINER_ORCHESTRATOR, "none");
+
+    build_info_set_value_strdupz(BIB_CONTAINER_OS_NAME, system_info->container_os_name);
+    build_info_set_value_strdupz(BIB_CONTAINER_OS_ID, system_info->container_os_id);
+    build_info_set_value_strdupz(BIB_CONTAINER_OS_ID_LIKE, system_info->container_os_id_like);
+    build_info_set_value_strdupz(BIB_CONTAINER_OS_VERSION, system_info->container_os_version);
+    build_info_set_value_strdupz(BIB_CONTAINER_OS_VERSION_ID, system_info->container_os_version_id);
+    build_info_set_value_strdupz(BIB_CONTAINER_OS_DETECTION, system_info->container_os_detection);
+
+    if(free_system_info)
+        rrdhost_system_info_free(system_info);
+
+    populated = true;
+    spinlock_unlock(&spinlock);
+}
+
+// ----------------------------------------------------------------------------
+// packaging info
 
 char *get_value_from_key(char *buffer, char *key) {
     char *s = NULL, *t = NULL;
@@ -247,235 +1339,160 @@ void get_install_type(char **install_type, char **prebuilt_arch, char **prebuilt
     freez(install_type_filename);
 }
 
+static struct {
+    SPINLOCK spinlock;
+    bool populated;
+    char *install_type;
+    char *prebuilt_arch;
+    char *prebuilt_distro;
+} BUILD_PACKAGING_INFO = { 0 };
+
+static void populate_packaging_info() {
+    if(!BUILD_PACKAGING_INFO.populated) {
+        spinlock_lock(&BUILD_PACKAGING_INFO.spinlock);
+        if(!BUILD_PACKAGING_INFO.populated) {
+            BUILD_PACKAGING_INFO.populated = true;
+
+            get_install_type(&BUILD_PACKAGING_INFO.install_type, &BUILD_PACKAGING_INFO.prebuilt_arch, &BUILD_PACKAGING_INFO.prebuilt_distro);
+
+            if(!BUILD_PACKAGING_INFO.install_type)
+                BUILD_PACKAGING_INFO.install_type = "unknown";
+
+            if(!BUILD_PACKAGING_INFO.prebuilt_arch)
+                BUILD_PACKAGING_INFO.prebuilt_arch = "unknown";
+
+            if(!BUILD_PACKAGING_INFO.prebuilt_distro)
+                BUILD_PACKAGING_INFO.prebuilt_distro = "unknown";
+
+            build_info_set_value(BIB_PACKAGING_INSTALL_TYPE, strdupz(BUILD_PACKAGING_INFO.install_type));
+            build_info_set_value(BIB_PACKAGING_ARCHITECTURE, strdupz(BUILD_PACKAGING_INFO.prebuilt_arch));
+            build_info_set_value(BIB_PACKAGING_DISTRO, strdupz(BUILD_PACKAGING_INFO.prebuilt_distro));
+        }
+        spinlock_unlock(&BUILD_PACKAGING_INFO.spinlock);
+    }
+}
+
+// ----------------------------------------------------------------------------
+
+static void populate_directories(void) {
+    build_info_set_value(BIB_DIR_USER_CONFIG, netdata_configured_user_config_dir);
+    build_info_set_value(BIB_DIR_STOCK_CONFIG, netdata_configured_stock_config_dir);
+    build_info_set_value(BIB_DIR_CACHE, netdata_configured_cache_dir);
+    build_info_set_value(BIB_DIR_LIB, netdata_configured_varlib_dir);
+    build_info_set_value(BIB_DIR_PLUGINS, netdata_configured_primary_plugins_dir);
+    build_info_set_value(BIB_DIR_WEB, netdata_configured_web_dir);
+    build_info_set_value(BIB_DIR_LOG, netdata_configured_log_dir);
+    build_info_set_value(BIB_DIR_LOCK, netdata_configured_lock_dir);
+    build_info_set_value(BIB_DIR_HOME, netdata_configured_home_dir);
+}
+
+// ----------------------------------------------------------------------------
+
+static void print_build_info_category_to_json(BUFFER *b, BUILD_INFO_CATEGORY category, const char *key) {
+    buffer_json_member_add_object(b, key);
+    for(size_t i = 0; i < BIB_TERMINATOR ;i++) {
+        if(BUILD_INFO[i].category == category && BUILD_INFO[i].json) {
+            if(BUILD_INFO[i].value)
+                buffer_json_member_add_string(b, BUILD_INFO[i].json, BUILD_INFO[i].value);
+            else
+                buffer_json_member_add_boolean(b, BUILD_INFO[i].json, BUILD_INFO[i].status);
+        }
+    }
+    buffer_json_object_close(b); // key
+}
+
+static void print_build_info_category_to_console(BUILD_INFO_CATEGORY category, const char *title) {
+    printf("%s:\n", title);
+    for(size_t i = 0; i < BIB_TERMINATOR ;i++) {
+        if(BUILD_INFO[i].category == category && BUILD_INFO[i].print) {
+            const char *v = BUILD_INFO[i].status ? "YES" : "NO";
+            const char *k = BUILD_INFO[i].print;
+            const char *d = BUILD_INFO[i].value;
+
+            int padding_length = 60 - strlen(k) - 1;
+            if (padding_length < 0) padding_length = 0;
+
+            char padding[padding_length + 1];
+            memset(padding, '_', padding_length);
+            padding[padding_length] = '\0';
+
+            if(BUILD_INFO[i].type == BIT_STRING)
+                printf("    %s %s : %s\n", k, padding, d?d:"unknown");
+            else
+                printf("    %s %s : %s%s%s%s\n", k, padding, v,
+                       d?" (":"", d?d:"", d?")":"");
+        }
+    }
+}
+
 void print_build_info(void) {
-    char *install_type = NULL;
-    char *prebuilt_arch = NULL;
-    char *prebuilt_distro = NULL;
-    get_install_type(&install_type, &prebuilt_arch, &prebuilt_distro);
+    populate_packaging_info();
+    populate_system_info();
+    populate_directories();
 
-    printf("Configure options: %s\n", CONFIGURE_COMMAND);
-
-    if (install_type == NULL) {
-        printf("Install type: unknown\n");
-    } else {
-        printf("Install type: %s\n", install_type);
-    }
-
-    if (prebuilt_arch != NULL) {
-        printf("    Binary architecture: %s\n", prebuilt_arch);
-    }
-
-    if (prebuilt_distro != NULL) {
-        printf("    Packaging distro: %s\n", prebuilt_distro);
-    }
-
-    freez(install_type);
-    freez(prebuilt_arch);
-    freez(prebuilt_distro);
-
-    printf("Features:\n");
-    printf("    dbengine:                   %s\n", FEAT_YES_NO(FEAT_DBENGINE));
-    printf("    Native HTTPS:               %s\n", FEAT_YES_NO(FEAT_NATIVE_HTTPS));
-    printf("    Netdata Cloud:              %s %s\n", FEAT_YES_NO(FEAT_CLOUD), FEAT_CLOUD_MSG);
-    printf("    ACLK:                       %s\n", FEAT_YES_NO(FEAT_CLOUD));
-    printf("    TLS Host Verification:      %s\n", FEAT_YES_NO(FEAT_TLS_HOST_VERIFY));
-    printf("    Machine Learning:           %s\n", FEAT_YES_NO(FEAT_ML));
-    printf("    Stream Compression:         %s\n", FEAT_YES_NO(FEAT_STREAM_COMPRESSION));
-    printf("    HTTPD (h2o):                %s\n", FEAT_YES_NO(FEAT_HTTPD));
-
-    printf("Libraries:\n");
-    printf("    protobuf:                %s%s\n", FEAT_YES_NO(FEAT_PROTOBUF), FEAT_PROTOBUF_BUNDLED);
-    printf("    jemalloc:                %s\n", FEAT_YES_NO(FEAT_JEMALLOC));
-    printf("    JSON-C:                  %s\n", FEAT_YES_NO(FEAT_JSONC));
-    printf("    libcap:                  %s\n", FEAT_YES_NO(FEAT_LIBCAP));
-    printf("    libcrypto:               %s\n", FEAT_YES_NO(FEAT_CRYPTO));
-    printf("    libm:                    %s\n", FEAT_YES_NO(FEAT_LIBM));
-    printf("    tcalloc:                 %s\n", FEAT_YES_NO(FEAT_TCMALLOC));
-    printf("    zlib:                    %s\n", FEAT_YES_NO(1));
-
-    printf("Plugins:\n");
-    printf("    apps:                    %s\n", FEAT_YES_NO(FEAT_APPS_PLUGIN));
-    printf("    cgroup Network Tracking: %s\n", FEAT_YES_NO(FEAT_CGROUP_NET));
-    printf("    CUPS:                    %s\n", FEAT_YES_NO(FEAT_CUPS));
-    printf("    debugfs:                 %s\n", FEAT_YES_NO(FEAT_DEBUGFS_PLUGIN));
-    printf("    EBPF:                    %s\n", FEAT_YES_NO(FEAT_EBPF));
-    printf("    IPMI:                    %s\n", FEAT_YES_NO(FEAT_IPMI));
-    printf("    NFACCT:                  %s\n", FEAT_YES_NO(FEAT_NFACCT));
-    printf("    perf:                    %s\n", FEAT_YES_NO(FEAT_PERF));
-    printf("    slabinfo:                %s\n", FEAT_YES_NO(FEAT_SLABINFO));
-    printf("    Xen:                     %s\n", FEAT_YES_NO(FEAT_XEN));
-    printf("    Xen VBD Error Tracking:  %s\n", FEAT_YES_NO(FEAT_XEN_VBD_ERROR));
-
-    printf("Exporters:\n");
-    printf("    AWS Kinesis:             %s\n", FEAT_YES_NO(FEAT_KINESIS));
-    printf("    GCP PubSub:              %s\n", FEAT_YES_NO(FEAT_PUBSUB));
-    printf("    MongoDB:                 %s\n", FEAT_YES_NO(FEAT_MONGO));
-    printf("    Prometheus Remote Write: %s\n", FEAT_YES_NO(FEAT_REMOTE_WRITE));
-
-    printf("Debug/Developer Features:\n");
-    printf("    Trace Allocations:       %s\n", FEAT_YES_NO(FEAT_TRACE_ALLOC));
+    print_build_info_category_to_console(BIC_PACKAGING, "Packaging");
+    print_build_info_category_to_console(BIC_DIRECTORIES, "Default Directories");
+    print_build_info_category_to_console(BIC_OPERATING_SYSTEM, "Operating System");
+    print_build_info_category_to_console(BIC_HARDWARE, "Hardware");
+    print_build_info_category_to_console(BIC_CONTAINER, "Container");
+    print_build_info_category_to_console(BIC_FEATURE, "Features");
+    print_build_info_category_to_console(BIC_DATABASE, "Database Engines");
+    print_build_info_category_to_console(BIC_CONNECTIVITY, "Connectivity Capabilities");
+    print_build_info_category_to_console(BIC_LIBS, "Libraries");
+    print_build_info_category_to_console(BIC_PLUGINS, "Plugins");
+    print_build_info_category_to_console(BIC_EXPORTERS, "Exporters");
+    print_build_info_category_to_console(BIC_DEBUG_DEVEL, "Debug/Developer Features");
 };
 
-#define FEAT_JSON_BOOL(x) ((x) ? "true" : "false")
-// This intentionally does not use JSON-C so it works even if JSON-C is not present
-// This is used for anonymous statistics reporting, so it intentionally
-// does not include the configure options, which would be very easy to use
-// for tracking custom builds (and complicate outputting valid JSON).
+void build_info_to_json_object(BUFFER *b) {
+    populate_packaging_info();
+    populate_system_info();
+    populate_directories();
+
+    print_build_info_category_to_json(b, BIC_PACKAGING, "package");
+    print_build_info_category_to_json(b, BIC_DIRECTORIES, "directories");
+    print_build_info_category_to_json(b, BIC_OPERATING_SYSTEM, "os");
+    print_build_info_category_to_json(b, BIC_HARDWARE, "hw");
+    print_build_info_category_to_json(b, BIC_CONTAINER, "container");
+    print_build_info_category_to_json(b, BIC_FEATURE, "features");
+    print_build_info_category_to_json(b, BIC_DATABASE, "databases");
+    print_build_info_category_to_json(b, BIC_CONNECTIVITY, "connectivity");
+    print_build_info_category_to_json(b, BIC_LIBS, "libs");
+    print_build_info_category_to_json(b, BIC_PLUGINS, "plugins");
+    print_build_info_category_to_json(b, BIC_EXPORTERS, "exporters");
+    print_build_info_category_to_json(b, BIC_DEBUG_DEVEL, "debug-n-devel");
+}
+
 void print_build_info_json(void) {
-    printf("{\n");
-    printf("  \"features\": {\n");
-    printf("    \"dbengine\": %s,\n",         FEAT_JSON_BOOL(FEAT_DBENGINE));
-    printf("    \"native-https\": %s,\n",     FEAT_JSON_BOOL(FEAT_NATIVE_HTTPS));
-    printf("    \"cloud\": %s,\n",            FEAT_JSON_BOOL(FEAT_CLOUD));
-#ifdef DISABLE_CLOUD
-    printf("    \"cloud-disabled\": true,\n");
-#else
-    printf("    \"cloud-disabled\": false,\n");
-#endif
-    printf("    \"aclk\": %s,\n", FEAT_JSON_BOOL(FEAT_CLOUD));
+    populate_packaging_info();
+    populate_system_info();
+    populate_directories();
 
-    printf("    \"tls-host-verify\": %s,\n",   FEAT_JSON_BOOL(FEAT_TLS_HOST_VERIFY));
-    printf("    \"machine-learning\": %s\n",   FEAT_JSON_BOOL(FEAT_ML));
-    printf("    \"stream-compression\": %s\n", FEAT_JSON_BOOL(FEAT_STREAM_COMPRESSION));
-    printf("    \"httpd-h2o\": %s\n",          FEAT_JSON_BOOL(FEAT_HTTPD));
-    printf("  },\n");
+    BUFFER *b = buffer_create(0, NULL);
+    buffer_json_initialize(b, "\"", "\"", 0, true, false);
 
-    printf("  \"libs\": {\n");
-    printf("    \"protobuf\": %s,\n",         FEAT_JSON_BOOL(FEAT_PROTOBUF));
-    printf("    \"protobuf-source\": \"%s\",\n", FEAT_PROTOBUF_BUNDLED);
-    printf("    \"jemalloc\": %s,\n",         FEAT_JSON_BOOL(FEAT_JEMALLOC));
-    printf("    \"jsonc\": %s,\n",            FEAT_JSON_BOOL(FEAT_JSONC));
-    printf("    \"libcap\": %s,\n",           FEAT_JSON_BOOL(FEAT_LIBCAP));
-    printf("    \"libcrypto\": %s,\n",        FEAT_JSON_BOOL(FEAT_CRYPTO));
-    printf("    \"libm\": %s,\n",             FEAT_JSON_BOOL(FEAT_LIBM));
-    printf("    \"tcmalloc\": %s,\n",         FEAT_JSON_BOOL(FEAT_TCMALLOC));
-    printf("    \"zlib\": %s\n",              FEAT_JSON_BOOL(1));
-    printf("  },\n");
+    build_info_to_json_object(b);
 
-    printf("  \"plugins\": {\n");
-    printf("    \"apps\": %s,\n",             FEAT_JSON_BOOL(FEAT_APPS_PLUGIN));
-    printf("    \"cgroup-net\": %s,\n",       FEAT_JSON_BOOL(FEAT_CGROUP_NET));
-    printf("    \"cups\": %s,\n",             FEAT_JSON_BOOL(FEAT_CUPS));
-    printf("    \"debugfs\": %s,\n",          FEAT_JSON_BOOL(FEAT_DEBUGFS_PLUGIN));
-    printf("    \"ebpf\": %s,\n",             FEAT_JSON_BOOL(FEAT_EBPF));
-    printf("    \"ipmi\": %s,\n",             FEAT_JSON_BOOL(FEAT_IPMI));
-    printf("    \"nfacct\": %s,\n",           FEAT_JSON_BOOL(FEAT_NFACCT));
-    printf("    \"perf\": %s,\n",             FEAT_JSON_BOOL(FEAT_PERF));
-    printf("    \"slabinfo\": %s,\n",         FEAT_JSON_BOOL(FEAT_SLABINFO));
-    printf("    \"xen\": %s,\n",              FEAT_JSON_BOOL(FEAT_XEN));
-    printf("    \"xen-vbd-error\": %s\n",     FEAT_JSON_BOOL(FEAT_XEN_VBD_ERROR));
-    printf("  },\n");
-
-    printf("  \"exporters\": {\n");
-    printf("    \"kinesis\": %s,\n",          FEAT_JSON_BOOL(FEAT_KINESIS));
-    printf("    \"pubsub\": %s,\n",           FEAT_JSON_BOOL(FEAT_PUBSUB));
-    printf("    \"mongodb\": %s,\n",          FEAT_JSON_BOOL(FEAT_MONGO));
-    printf("    \"prom-remote-write\": %s\n", FEAT_JSON_BOOL(FEAT_REMOTE_WRITE));
-    printf("  }\n");
-    printf("  \"debug-n-devel\": {\n");
-    printf("    \"trace-allocations\": %s\n  }\n",FEAT_JSON_BOOL(FEAT_TRACE_ALLOC));
-    printf("}\n");
+    buffer_json_finalize(b);
+    printf("%s\n", buffer_tostring(b));
+    buffer_free(b);
 };
-
-#define add_to_bi(buffer, str)       \
-    { if(first) {                    \
-        buffer_strcat (b, str);      \
-        first = 0;                   \
-    } else                           \
-        buffer_strcat (b, "|" str); }
 
 void analytics_build_info(BUFFER *b) {
-    int first = 1;
-#ifdef ENABLE_DBENGINE
-    add_to_bi(b, "dbengine");
-#endif
-#ifdef ENABLE_HTTPS
-    add_to_bi(b, "Native HTTPS");
-#endif
-#ifdef ENABLE_ACLK
-    add_to_bi(b, "Netdata Cloud");
-#endif
-#if (FEAT_TLS_HOST_VERIFY!=0)
-    add_to_bi(b, "TLS Host Verification");
-#endif
-#ifdef ENABLE_ML
-    add_to_bi(b, "Machine Learning");
-#endif
-#ifdef ENABLE_COMPRESSION
-    add_to_bi(b, "Stream Compression");
-#endif
+    populate_packaging_info();
+    populate_system_info();
+    populate_directories();
 
-#ifdef HAVE_PROTOBUF
-    add_to_bi(b, "protobuf");
-#endif
-#ifdef ENABLE_JEMALLOC
-    add_to_bi(b, "jemalloc");
-#endif
-#ifdef ENABLE_JSONC
-    add_to_bi(b, "JSON-C");
-#endif
-#ifdef HAVE_CAPABILITY
-    add_to_bi(b, "libcap");
-#endif
-#ifdef HAVE_CRYPTO
-    add_to_bi(b, "libcrypto");
-#endif
-#ifdef STORAGE_WITH_MATH
-    add_to_bi(b, "libm");
-#endif
+    size_t added = 0;
+    for(size_t i = 0; i < BIB_TERMINATOR ;i++) {
+        if(BUILD_INFO[i].analytics && BUILD_INFO[i].status) {
 
-#ifdef ENABLE_TCMALLOC
-    add_to_bi(b, "tcalloc");
-#endif
-    add_to_bi(b, "zlib");
+            if(added)
+                buffer_strcat(b, "|");
 
-#ifdef ENABLE_APPS_PLUGIN
-    add_to_bi(b, "apps");
-#endif
-#ifdef ENABLE_DEBUGFS_PLUGIN
-    add_to_bi(b, "debugfs");
-#endif
-#ifdef HAVE_SETNS
-    add_to_bi(b, "cgroup Network Tracking");
-#endif
-#ifdef HAVE_CUPS
-    add_to_bi(b, "CUPS");
-#endif
-#ifdef HAVE_LIBBPF
-    add_to_bi(b, "EBPF");
-#endif
-#ifdef HAVE_FREEIPMI
-    add_to_bi(b, "IPMI");
-#endif
-#ifdef HAVE_NFACCT
-    add_to_bi(b, "NFACCT");
-#endif
-#ifdef ENABLE_PERF_PLUGIN
-    add_to_bi(b, "perf");
-#endif
-#ifdef ENABLE_SLABINFO
-    add_to_bi(b, "slabinfo");
-#endif
-#ifdef HAVE_LIBXENSTAT
-    add_to_bi(b, "Xen");
-#endif
-#ifdef HAVE_XENSTAT_VBD_ERROR
-    add_to_bi(b, "Xen VBD Error Tracking");
-#endif
-
-#ifdef HAVE_KINESIS
-    add_to_bi(b, "AWS Kinesis");
-#endif
-#ifdef ENABLE_EXPORTING_PUBSUB
-    add_to_bi(b, "GCP PubSub");
-#endif
-#ifdef HAVE_MONGOC
-    add_to_bi(b, "MongoDB");
-#endif
-#ifdef ENABLE_PROMETHEUS_REMOTE_WRITE
-    add_to_bi(b, "Prometheus Remote Write");
-#endif
-#ifdef NETDATA_TRACE_ALLOCATIONS
-    add_to_bi(b, "DebugTraceAlloc");
-#endif
+            buffer_strcat (b, BUILD_INFO[i].analytics);
+            added++;
+        }
+    }
 }
+

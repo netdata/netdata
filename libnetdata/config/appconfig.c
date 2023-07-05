@@ -518,9 +518,9 @@ int appconfig_get_boolean_ondemand(struct config *root, const char *section, con
     s = appconfig_get(root, section, name, s);
     if(!s) return value;
 
-    if(!strcmp(s, "yes"))
+    if(!strcmp(s, "yes") || !strcmp(s, "true") || !strcmp(s, "on"))
         return CONFIG_BOOLEAN_YES;
-    else if(!strcmp(s, "no"))
+    else if(!strcmp(s, "no") || !strcmp(s, "false") || !strcmp(s, "off"))
         return CONFIG_BOOLEAN_NO;
     else if(!strcmp(s, "auto") || !strcmp(s, "on demand"))
         return CONFIG_BOOLEAN_AUTO;

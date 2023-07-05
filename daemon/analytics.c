@@ -657,7 +657,7 @@ void set_late_global_environment(struct rrdhost_system_info *system_info)
 #else
     analytics_set_data(
         &analytics_data.netdata_host_cloud_enabled,
-        appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", CONFIG_BOOLEAN_YES) ? "true" : "false");
+        appconfig_get_boolean_ondemand(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", netdata_cloud_enabled) ? "true" : "false");
 #endif
 
 #ifdef ENABLE_DBENGINE

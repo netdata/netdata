@@ -154,16 +154,16 @@ AC_ARG_ENABLE(
     [enable_lto="no"]
 )
 AC_ARG_ENABLE(
-    [https],
-    [AS_HELP_STRING([--enable-https], [Enable SSL support @<:@default autodetect@:>@])],
+    [openssl],
+    [AS_HELP_STRING([--enable-openssl], [Enable OpenSSL support @<:@default autodetect@:>@])],
     ,
-    [enable_https="detect"]
+    [enable_openssl="detect"]
 )
 AC_ARG_ENABLE(
-    [compression],
-    [AS_HELP_STRING([--enable-compression], [Enable LZ4 compression support @<:@default autodetect@:>@])],
+    [lz4],
+    [AS_HELP_STRING([--enable-lz4], [Enable LZ4 support @<:@default autodetect@:>@])],
     ,
-    [enable_compression="detect"]
+    [enable_lz4="detect"]
 )
 AC_ARG_ENABLE(
     [dbengine],
@@ -208,10 +208,10 @@ AC_ARG_ENABLE(
     [aclk_ssl_debug="no"]
 )
 AC_ARG_ENABLE(
-    [httpd],
-    [AS_HELP_STRING([--disable-httpd], [Disable webserver (h2o based) @<:@default autodetect@:>@])],
+    [h2o],
+    [AS_HELP_STRING([--disable-h2o], [Disable H2O webserver @<:@default autodetect@:>@])],
     ,
-    [enable_httpd="detect"]
+    [enable_h2o="detect"]
 )
 
 # -----------------------------------------------------------------------------
@@ -373,8 +373,25 @@ darwin*)
 esac
 
 AM_CONDITIONAL([FREEBSD], [test "${build_target}" = "freebsd"])
+if test "${build_target}" = "freebsd"
+then
+    AC_DEFINE([COMPILED_FOR_FREEBSD], [1], [Compiled for FreeBSD])
+fi
+
 AM_CONDITIONAL([MACOS], [test "${build_target}" = "macos"])
+if test "${build_target}" = "macos"
+then
+    AC_DEFINE([COMPILED_FOR_MACOS], [1], [Compiled for MacOS])
+fi
+
 AM_CONDITIONAL([LINUX], [test "${build_target}" = "linux"])
+if test "${build_target}" = "linux"
+then
+    AC_DEFINE([COMPILED_FOR_LINUX], [1], [Compiled for Linux])
+fi
+
+AM_CONDITIONAL([ENABLE_PLUGIN_LOCAL_LISTENERS], [test "${build_target}" = "linux"])
+
 AC_MSG_RESULT([Host OS: ${build_target}])
 
 # -----------------------------------------------------------------------------
@@ -382,7 +399,7 @@ AC_MSG_RESULT([Host OS: ${build_target}])
 
 HARDENING_CFLAGS=""
 
-if ! echo "${originalCFLAGS}" | grep -q '-fstack-protector'; then
+if ! echo "${originalCFLAGS}" | grep -q '\-fstack-protector'; then
     AX_CHECK_COMPILE_FLAG(
         [-fstack-protector-strong],
         [HARDENING_CFLAGS="${HARDENING_CFLAGS} -fstack-protector-strong"],
@@ -396,7 +413,7 @@ if ! echo "${originalCFLAGS}" | grep -q '-fstack-protector'; then
     )
 fi
 
-if ! echo "${originalCFLAGS}" | grep -q '-fno-stack-clash-protection'; then
+if ! echo "${originalCFLAGS}" | grep -q '\-fno-stack-clash-protection'; then
     AX_CHECK_COMPILE_FLAG(
         [-fstack-clash-protection],
         [HARDENING_CFLAGS="${HARDENING_CFLAGS} -fstack-clash-protection"],
@@ -405,7 +422,7 @@ if ! echo "${originalCFLAGS}" | grep -q '-fno-stack-clash-protection'; then
     )
 fi
 
-if ! echo "${originalCFLAGS}" | grep -q '-fcf-protection'; then
+if ! echo "${originalCFLAGS}" | grep -q '\-fcf-protection'; then
     AX_CHECK_COMPILE_FLAG(
         [-fcf-protection=full],
         [HARDENING_CFLAGS="${HARDENING_CFLAGS} -fcf-protection=full"],
@@ -414,7 +431,7 @@ if ! echo "${originalCFLAGS}" | grep -q '-fcf-protection'; then
     )
 fi
 
-if ! echo "${originalCFLAGS}" | grep -q '-mbranch-protection'; then
+if ! echo "${originalCFLAGS}" | grep -q '\-mbranch-protection'; then
     AX_CHECK_COMPILE_FLAG(
         [-mbranch-protection=standard],
         [HARDENING_CFLAGS="${HARDENING_CFLAGS} -mbranch-protection=standard"],
@@ -423,7 +440,7 @@ if ! echo "${originalCFLAGS}" | grep -q '-mbranch-protection'; then
     )
 fi
 
-if ! echo "${originalCFLAGS}" | grep -q '-D_FORTIFY_SOURCE'; then
+if ! echo "${originalCFLAGS}" | grep -q '\-D_FORTIFY_SOURCE'; then
     # This complex set of checks is needed because there is no clean
     # way to verify _FORTIFY_SOURCE support without having to check for
     # the required compiler builtins.
@@ -434,7 +451,7 @@ if ! echo "${originalCFLAGS}" | grep -q '-D_FORTIFY_SOURCE'; then
         [HAVE_FORTIFY_SOURCE=2]
     )
 
-    if test "x${HAVE_FORTIFY_SOURCE}" = "x2" && echo "${originalCFLAGS}" | grep -qv '-O0'; then
+    if test "x${HAVE_FORTIFY_SOURCE}" = "x2" && echo "${originalCFLAGS}" | grep -qv '\-O0'; then
         AC_CHECK_DECL(
             __builtin_dynamic_object_size,
             [AX_CHECK_COMPILE_FLAG(
@@ -528,7 +545,7 @@ OPTIONAL_UV_LIBS="${UV_LIBS}"
 
 
 # -----------------------------------------------------------------------------
-# lz4 Extremely Fast Compression algorithm
+# lz4
 
 AC_CHECK_LIB(
     [lz4],
@@ -617,7 +634,8 @@ AC_CHECK_LIB(
 OPTIONAL_YAML_LIBS="${YAML_LIBS}"
 
 # -----------------------------------------------------------------------------
-# DB engine and HTTPS
+# DB engine and OpenSSL
+
 test "${enable_dbengine}" = "yes" -a -z "${LZ4_LIBS}" && \
     AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
 
@@ -638,8 +656,8 @@ AC_SUBST([LIBJUDY_CFLAGS])
 
 JUDY_CFLAGS="-I \$(abs_top_srcdir)/libnetdata/libjudy/src"
 
-test "${enable_https}" = "yes" -a -z "${SSL_LIBS}" && \
-    AC_MSG_ERROR([OpenSSL required for HTTPS but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
+test "${enable_openssl}" = "yes" -a -z "${SSL_LIBS}" && \
+    AC_MSG_ERROR([OpenSSL required but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
 
 test "${enable_dbengine}" = "yes" -a -z "${SSL_LIBS}" && \
     AC_MSG_ERROR([OpenSSL required for DBENGINE but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
@@ -658,20 +676,20 @@ fi
 AC_MSG_RESULT([${enable_dbengine}])
 AM_CONDITIONAL([ENABLE_DBENGINE], [test "${enable_dbengine}" = "yes"])
 
-AC_MSG_CHECKING([if netdata https should be used])
-if test "${enable_https}" != "no" -a "${SSL_LIBS}"; then
-    enable_https="yes"
-    AC_DEFINE([ENABLE_HTTPS], [1], [netdata HTTPS usability])
+AC_MSG_CHECKING([if openssl should be used])
+if test "${enable_openssl}" != "no" -a "${SSL_LIBS}"; then
+    enable_openssl="yes"
+    AC_DEFINE([ENABLE_OPENSSL], [1], [openssl usability])
     OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
     OPTIONAL_SSL_LIBS="${SSL_LIBS}"
 else
-    enable_https="no"
+    enable_openssl="no"
 fi
-AC_MSG_RESULT([${enable_https}])
-AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
+AC_MSG_RESULT([${enable_openssl}])
+AM_CONDITIONAL([ENABLE_OPENSSL], [test "${enable_openssl}" = "yes"])
 
-AC_MSG_CHECKING([if netdata compression should be used])
-if test "${enable_compression}" != "no"; then
+AC_MSG_CHECKING([if lz4 should be used])
+if test "${enable_lz4}" != "no"; then
     if test "${LZ4_LIBS_FAST}"; then
         LIBS_BKP="${LIBS}"
         LIBS="${LZ4_LIBS_FAST}"
@@ -680,26 +698,26 @@ if test "${enable_compression}" != "no"; then
             [
                 LZ4_stream_t* stream = LZ4_initStream(NULL, 0);
             ],
-            [ enable_compression="yes"],
-            [ enable_compression="no" ]
+            [ enable_lz4="yes"],
+            [ enable_lz4="no" ]
         )
         LIBS="${LIBS_BKP}"
-        if test "${enable_compression}" == "yes"; then
+        if test "${enable_lz4}" == "yes"; then
             OPTIONAL_LZ4_LIBS="${LZ4_LIBS_FAST}"
-            AC_DEFINE([ENABLE_COMPRESSION], [1], [netdata compression usability])
+            AC_DEFINE([ENABLE_LZ4], [1], [lz4 usability])
         fi
     else
-        if test "${enable_compression}" == "yes"; then
-            AC_MSG_ERROR([liblz4 with version >= 1.9.0 required to enable_compression. Try installing the required version of 'liblz4-dev' or 'liblz4-devel'.])
-            enable_compression="no"
+        if test "${enable_lz4}" == "yes"; then
+            AC_MSG_ERROR([liblz4 with version >= 1.9.0 required to enable lz4. Try installing the required version of 'liblz4-dev' or 'liblz4-devel'.])
+            enable_lz4="no"
         fi
-        enable_compression="no"
+        enable_lz4="no"
     fi
 else
-    enable_compression="no"
+    enable_lz4="no"
 fi
-AC_MSG_RESULT([${enable_compression}])
-AM_CONDITIONAL([ENABLE_COMPRESSION], [test "${enable_compression}" = "yes"])
+AC_MSG_RESULT([${enable_lz4}])
+AM_CONDITIONAL([ENABLE_LZ4], [test "${enable_lz4}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # JSON-C
@@ -864,36 +882,36 @@ AC_MSG_RESULT([${with_libcap}])
 AM_CONDITIONAL([ENABLE_CAPABILITY], [test "${with_libcap}" = "yes"])
 
 # -----------------------------------------------------------------------------
-# HTTPD and h2o related
+# H2O related
 
-can_build_httpd="no"
-if test "${enable_httpd}" != "no"; then
-    can_build_httpd="yes"
-    AC_MSG_CHECKING([can build HTTPD])
+can_build_h2o="no"
+if test "${enable_h2o}" != "no"; then
+    can_build_h2o="yes"
+    AC_MSG_CHECKING([can build H2O])
     if test -z "${UV_LIBS}"; then
-        can_build_httpd="no"
+        can_build_h2o="no"
     fi
     if test -n "${SSL_LIBS}"; then
         OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
         OPTIONAL_SSL_LIBS="${SSL_LIBS}"
     else
-        can_build_httpd="no"
+        can_build_h2o="no"
     fi
     if test "${with_zlib}" != "yes"; then
-        can_build_httpd="no"
+        can_build_h2o="no"
     fi
-    AC_MSG_RESULT([${can_build_httpd}])
+    AC_MSG_RESULT([${can_build_h2o}])
 
-    if test "${can_build_httpd}" = "no" -a "${enable_httpd}" = "yes"; then
-        AC_MSG_ERROR([HTTPD was requested but it cannot be built])
+    if test "${can_build_h2o}" = "no" -a "${enable_h2o}" = "yes"; then
+        AC_MSG_ERROR([H2O was requested but it cannot be built])
     fi
 
-    if test "${can_build_httpd}" = "yes"; then
-        AC_DEFINE([ENABLE_HTTPD], [1], [HTTPD (h2o based web server)])
-        HTTPD_CFLAGS="-I\$(abs_top_srcdir)/httpd/h2o/include -I\$(abs_top_srcdir)/httpd/h2o/deps/picotls/include -I\$(abs_top_srcdir)/httpd/h2o/deps/quicly/include -DH2O_USE_LIBUV=0"
+    if test "${can_build_h2o}" = "yes"; then
+        AC_DEFINE([ENABLE_H2O], [1], [H2O web server])
+        H2O_CFLAGS="-I\$(abs_top_srcdir)/web/server/h2o/libh2o/include -I\$(abs_top_srcdir)/web/server/h2o/libh2o/deps/picotls/include -I\$(abs_top_srcdir)/web/server/h2o/libh2o/deps/quicly/include -DH2O_USE_LIBUV=0"
     fi
 fi
-AM_CONDITIONAL([ENABLE_HTTPD], [test "${can_build_httpd}" = "yes"])
+AM_CONDITIONAL([ENABLE_H2O], [test "${can_build_h2o}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # ACLK
@@ -1165,7 +1183,6 @@ PKG_CHECK_MODULES(
     [have_libmnl=no]
 )
 
-
 LIBS="${LIBS}"
 
 PKG_CHECK_MODULES(
@@ -1341,6 +1358,7 @@ AC_MSG_CHECKING([if git submodules are present for machine learning functionalit
 if test -f "ml/dlib/dlib/all/source.cpp"; then
     AC_MSG_RESULT([yes])
     have_ml_submodules="yes"
+    AC_DEFINE([HAVE_DLIB], [1], [dlib availability])
 else
     AC_MSG_RESULT([no])
     have_ml_submodules="no"
@@ -1800,7 +1818,7 @@ CFLAGS="${originalCFLAGS} ${OPTIONAL_LTO_CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${O
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
     ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PUBSUB_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} \
     ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_YAML_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${JUDY_CFLAGS} \
-    ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS} ${HTTPD_CFLAGS} ${HARDENING_CFLAGS}"
+    ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS} ${H2O_CFLAGS} ${HARDENING_CFLAGS}"
 
 CXXFLAGS="${CFLAGS} ${OPTIONAL_KINESIS_CXXFLAGS} ${CPP_STD_FLAG}"
 
@@ -1886,6 +1904,7 @@ AC_SUBST([TEST_LIBS])
 
 # -----------------------------------------------------------------------------
 # save configure options for build info
+
 AC_DEFINE_UNQUOTED(
     [CONFIGURE_COMMAND],
     ["$ac_configure_args"],

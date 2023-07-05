@@ -84,7 +84,7 @@ dist_noinst_DATA = \
     packaging/protobuf.version \
     packaging/version \
     database/engine/journalfile_v2.ksy.in \
-    httpd/h2o \
+    web/server/h2o/libh2o \
     $(NULL)
 
 # until integrated within build
@@ -279,6 +279,10 @@ CGROUPS_PLUGIN_FILES = \
 CGROUP_NETWORK_FILES = \
     collectors/cgroups.plugin/cgroup-network.c \
     $(LIBNETDATA_FILES) \
+    $(NULL)
+
+LOCAL_LISTENERS_FILES = \
+    collectors/plugins.d/local_listeners.c \
     $(NULL)
 
 DISKSPACE_PLUGIN_FILES = \
@@ -945,111 +949,111 @@ DAEMON_FILES = \
     daemon/unit_test.h \
     $(NULL)
 
-HTTPD_FILES = \
-    httpd/http_server.c \
-    httpd/http_server.h \
-    httpd/h2o_utils.c \
-    httpd/h2o_utils.h \
+H2O_FILES = \
+    web/server/h2o/http_server.c \
+    web/server/h2o/http_server.h \
+    web/server/h2o/h2o_utils.c \
+    web/server/h2o/h2o_utils.h \
     $(NULL)
 
 libh2o_a_SOURCES = \
-    httpd/h2o/deps/cloexec/cloexec.c \
-    httpd/h2o/deps/libgkc/gkc.c \
-    httpd/h2o/deps/libyrmcds/close.c \
-    httpd/h2o/deps/libyrmcds/connect.c \
-    httpd/h2o/deps/libyrmcds/recv.c \
-    httpd/h2o/deps/libyrmcds/send.c \
-    httpd/h2o/deps/libyrmcds/send_text.c \
-    httpd/h2o/deps/libyrmcds/socket.c \
-    httpd/h2o/deps/libyrmcds/strerror.c \
-    httpd/h2o/deps/libyrmcds/text_mode.c \
-    httpd/h2o/deps/picohttpparser/picohttpparser.c \
-    httpd/h2o/lib/common/cache.c \
-    httpd/h2o/lib/common/file.c \
-    httpd/h2o/lib/common/filecache.c \
-    httpd/h2o/lib/common/hostinfo.c \
-    httpd/h2o/lib/common/http1client.c \
-    httpd/h2o/lib/common/memcached.c \
-    httpd/h2o/lib/common/memory.c \
-    httpd/h2o/lib/common/multithread.c \
-    httpd/h2o/lib/common/serverutil.c \
-    httpd/h2o/lib/common/socket.c \
-    httpd/h2o/lib/common/socketpool.c \
-    httpd/h2o/lib/common/string.c \
-    httpd/h2o/lib/common/time.c \
-    httpd/h2o/lib/common/timeout.c \
-    httpd/h2o/lib/common/url.c \
-    httpd/h2o/lib/core/config.c \
-    httpd/h2o/lib/core/configurator.c \
-    httpd/h2o/lib/core/context.c \
-    httpd/h2o/lib/core/headers.c \
-    httpd/h2o/lib/core/logconf.c \
-    httpd/h2o/lib/core/proxy.c \
-    httpd/h2o/lib/core/request.c \
-    httpd/h2o/lib/core/token.c \
-    httpd/h2o/lib/core/util.c \
-    httpd/h2o/lib/handler/access_log.c \
-    httpd/h2o/lib/handler/chunked.c \
-    httpd/h2o/lib/handler/compress.c \
-    httpd/h2o/lib/handler/compress/gzip.c \
-    httpd/h2o/lib/handler/errordoc.c \
-    httpd/h2o/lib/handler/expires.c \
-    httpd/h2o/lib/handler/fastcgi.c \
-    httpd/h2o/lib/handler/file.c \
-    httpd/h2o/lib/handler/headers.c \
-    httpd/h2o/lib/handler/mimemap.c \
-    httpd/h2o/lib/handler/proxy.c \
-    httpd/h2o/lib/handler/redirect.c \
-    httpd/h2o/lib/handler/reproxy.c \
-    httpd/h2o/lib/handler/throttle_resp.c \
-    httpd/h2o/lib/handler/status.c \
-    httpd/h2o/lib/handler/headers_util.c \
-    httpd/h2o/lib/handler/status/events.c \
-    httpd/h2o/lib/handler/status/requests.c \
-    httpd/h2o/lib/handler/http2_debug_state.c \
-    httpd/h2o/lib/handler/status/durations.c \
-    httpd/h2o/lib/handler/configurator/access_log.c \
-    httpd/h2o/lib/handler/configurator/compress.c \
-    httpd/h2o/lib/handler/configurator/errordoc.c \
-    httpd/h2o/lib/handler/configurator/expires.c \
-    httpd/h2o/lib/handler/configurator/fastcgi.c \
-    httpd/h2o/lib/handler/configurator/file.c \
-    httpd/h2o/lib/handler/configurator/headers.c \
-    httpd/h2o/lib/handler/configurator/proxy.c \
-    httpd/h2o/lib/handler/configurator/redirect.c \
-    httpd/h2o/lib/handler/configurator/reproxy.c \
-    httpd/h2o/lib/handler/configurator/throttle_resp.c \
-    httpd/h2o/lib/handler/configurator/status.c \
-    httpd/h2o/lib/handler/configurator/http2_debug_state.c \
-    httpd/h2o/lib/handler/configurator/headers_util.c \
-    httpd/h2o/lib/http1.c \
-    httpd/h2o/lib/tunnel.c \
-    httpd/h2o/lib/http2/cache_digests.c \
-    httpd/h2o/lib/http2/casper.c \
-    httpd/h2o/lib/http2/connection.c \
-    httpd/h2o/lib/http2/frame.c \
-    httpd/h2o/lib/http2/hpack.c \
-    httpd/h2o/lib/http2/scheduler.c \
-    httpd/h2o/lib/http2/stream.c \
-    httpd/h2o/lib/http2/http2_debug_state.c \
+    web/server/h2o/libh2o/deps/cloexec/cloexec.c \
+    web/server/h2o/libh2o/deps/libgkc/gkc.c \
+    web/server/h2o/libh2o/deps/libyrmcds/close.c \
+    web/server/h2o/libh2o/deps/libyrmcds/connect.c \
+    web/server/h2o/libh2o/deps/libyrmcds/recv.c \
+    web/server/h2o/libh2o/deps/libyrmcds/send.c \
+    web/server/h2o/libh2o/deps/libyrmcds/send_text.c \
+    web/server/h2o/libh2o/deps/libyrmcds/socket.c \
+    web/server/h2o/libh2o/deps/libyrmcds/strerror.c \
+    web/server/h2o/libh2o/deps/libyrmcds/text_mode.c \
+    web/server/h2o/libh2o/deps/picohttpparser/picohttpparser.c \
+    web/server/h2o/libh2o/lib/common/cache.c \
+    web/server/h2o/libh2o/lib/common/file.c \
+    web/server/h2o/libh2o/lib/common/filecache.c \
+    web/server/h2o/libh2o/lib/common/hostinfo.c \
+    web/server/h2o/libh2o/lib/common/http1client.c \
+    web/server/h2o/libh2o/lib/common/memcached.c \
+    web/server/h2o/libh2o/lib/common/memory.c \
+    web/server/h2o/libh2o/lib/common/multithread.c \
+    web/server/h2o/libh2o/lib/common/serverutil.c \
+    web/server/h2o/libh2o/lib/common/socket.c \
+    web/server/h2o/libh2o/lib/common/socketpool.c \
+    web/server/h2o/libh2o/lib/common/string.c \
+    web/server/h2o/libh2o/lib/common/time.c \
+    web/server/h2o/libh2o/lib/common/timeout.c \
+    web/server/h2o/libh2o/lib/common/url.c \
+    web/server/h2o/libh2o/lib/core/config.c \
+    web/server/h2o/libh2o/lib/core/configurator.c \
+    web/server/h2o/libh2o/lib/core/context.c \
+    web/server/h2o/libh2o/lib/core/headers.c \
+    web/server/h2o/libh2o/lib/core/logconf.c \
+    web/server/h2o/libh2o/lib/core/proxy.c \
+    web/server/h2o/libh2o/lib/core/request.c \
+    web/server/h2o/libh2o/lib/core/token.c \
+    web/server/h2o/libh2o/lib/core/util.c \
+    web/server/h2o/libh2o/lib/handler/access_log.c \
+    web/server/h2o/libh2o/lib/handler/chunked.c \
+    web/server/h2o/libh2o/lib/handler/compress.c \
+    web/server/h2o/libh2o/lib/handler/compress/gzip.c \
+    web/server/h2o/libh2o/lib/handler/errordoc.c \
+    web/server/h2o/libh2o/lib/handler/expires.c \
+    web/server/h2o/libh2o/lib/handler/fastcgi.c \
+    web/server/h2o/libh2o/lib/handler/file.c \
+    web/server/h2o/libh2o/lib/handler/headers.c \
+    web/server/h2o/libh2o/lib/handler/mimemap.c \
+    web/server/h2o/libh2o/lib/handler/proxy.c \
+    web/server/h2o/libh2o/lib/handler/redirect.c \
+    web/server/h2o/libh2o/lib/handler/reproxy.c \
+    web/server/h2o/libh2o/lib/handler/throttle_resp.c \
+    web/server/h2o/libh2o/lib/handler/status.c \
+    web/server/h2o/libh2o/lib/handler/headers_util.c \
+    web/server/h2o/libh2o/lib/handler/status/events.c \
+    web/server/h2o/libh2o/lib/handler/status/requests.c \
+    web/server/h2o/libh2o/lib/handler/http2_debug_state.c \
+    web/server/h2o/libh2o/lib/handler/status/durations.c \
+    web/server/h2o/libh2o/lib/handler/configurator/access_log.c \
+    web/server/h2o/libh2o/lib/handler/configurator/compress.c \
+    web/server/h2o/libh2o/lib/handler/configurator/errordoc.c \
+    web/server/h2o/libh2o/lib/handler/configurator/expires.c \
+    web/server/h2o/libh2o/lib/handler/configurator/fastcgi.c \
+    web/server/h2o/libh2o/lib/handler/configurator/file.c \
+    web/server/h2o/libh2o/lib/handler/configurator/headers.c \
+    web/server/h2o/libh2o/lib/handler/configurator/proxy.c \
+    web/server/h2o/libh2o/lib/handler/configurator/redirect.c \
+    web/server/h2o/libh2o/lib/handler/configurator/reproxy.c \
+    web/server/h2o/libh2o/lib/handler/configurator/throttle_resp.c \
+    web/server/h2o/libh2o/lib/handler/configurator/status.c \
+    web/server/h2o/libh2o/lib/handler/configurator/http2_debug_state.c \
+    web/server/h2o/libh2o/lib/handler/configurator/headers_util.c \
+    web/server/h2o/libh2o/lib/http1.c \
+    web/server/h2o/libh2o/lib/tunnel.c \
+    web/server/h2o/libh2o/lib/http2/cache_digests.c \
+    web/server/h2o/libh2o/lib/http2/casper.c \
+    web/server/h2o/libh2o/lib/http2/connection.c \
+    web/server/h2o/libh2o/lib/http2/frame.c \
+    web/server/h2o/libh2o/lib/http2/hpack.c \
+    web/server/h2o/libh2o/lib/http2/scheduler.c \
+    web/server/h2o/libh2o/lib/http2/stream.c \
+    web/server/h2o/libh2o/lib/http2/http2_debug_state.c \
     $(NULL)
 
 libh2o_a_INCLUDES = \
-    -I$(srcdir)/httpd/h2o/include \
-    -I$(srcdir)/httpd/h2o/deps/cloexec \
-    -I$(srcdir)/httpd/h2o/deps/brotli/enc \
-    -I$(srcdir)/httpd/h2o/deps/golombset \
-    -I$(srcdir)/httpd/h2o/deps/libgkc \
-    -I$(srcdir)/httpd/h2o/deps/libyrmcds \
-    -I$(srcdir)/httpd/h2o/deps/klib \
-    -I$(srcdir)/httpd/h2o/deps/neverbleed \
-    -I$(srcdir)/httpd/h2o/deps/picohttpparser \
-    -I$(srcdir)/httpd/h2o/deps/picotest \
-    -I$(srcdir)/httpd/h2o/deps/yaml/include \
-    -I$(srcdir)/httpd/h2o/deps/yoml \
+    -I$(srcdir)/web/server/h2o/libh2o/include \
+    -I$(srcdir)/web/server/h2o/libh2o/deps/cloexec \
+    -I$(srcdir)/web/server/h2o/libh2o/deps/brotli/enc \
+    -I$(srcdir)/web/server/h2o/libh2o/deps/golombset \
+    -I$(srcdir)/web/server/h2o/libh2o/deps/libgkc \
+    -I$(srcdir)/web/server/h2o/libh2o/deps/libyrmcds \
+    -I$(srcdir)/web/server/h2o/libh2o/deps/klib \
+    -I$(srcdir)/web/server/h2o/libh2o/deps/neverbleed \
+    -I$(srcdir)/web/server/h2o/libh2o/deps/picohttpparser \
+    -I$(srcdir)/web/server/h2o/libh2o/deps/picotest \
+    -I$(srcdir)/web/server/h2o/libh2o/deps/yaml/include \
+    -I$(srcdir)/web/server/h2o/libh2o/deps/yoml \
     $(NULL)
 
-if ENABLE_HTTPD
+if ENABLE_H2O
 noinst_LIBRARIES += libh2o.a
 
 # until h2o updates support for OpenSSL 3.0 we silence the warnings
@@ -1058,7 +1062,7 @@ libh2o_a_CFLAGS = $(CFLAGS) -Wno-deprecated-declarations -Wno-unused-parameter -
 if LINUX
     libh2o_a_CFLAGS += -D_GNU_SOURCE
 endif
-endif #ENABLE_HTTPD
+endif #ENABLE_H2O
 
 NETDATA_FILES = \
     collectors/all.h \
@@ -1129,8 +1133,8 @@ if ENABLE_ACLK
     NETDATA_COMMON_LIBS += libmqttwebsockets.a
 endif
 
-if ENABLE_HTTPD
-    NETDATA_FILES += $(HTTPD_FILES)
+if ENABLE_H2O
+    NETDATA_FILES += $(H2O_FILES)
     NETDATA_COMMON_LIBS += libh2o.a
 endif
 
@@ -1202,6 +1206,13 @@ if ENABLE_PLUGIN_CGROUP_NETWORK
     cgroup_network_SOURCES = $(CGROUP_NETWORK_FILES)
     cgroup_network_LDADD = \
         $(NETDATA_COMMON_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_LOCAL_LISTENERS
+    plugins_PROGRAMS += local-listeners
+    local_listeners_SOURCES = $(LOCAL_LISTENERS_FILES)
+    local_listeners_LDADD = \
         $(NULL)
 endif
 

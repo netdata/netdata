@@ -207,6 +207,12 @@ override_dh_fixperms:
 	# NFACCT plugin package
 	chmod 4750 $(TOP)-plugin-nfacct/usr/libexec/netdata/plugins.d/nfacct.plugin
 
+	# cgroup-network
+	chmod 4750 $(TOP)/usr/libexec/netdata/plugins.d/cgroup-network
+
+	# local-listeners
+	chmod 4750 $(TOP)/usr/libexec/netdata/plugins.d/local-listeners
+
 override_dh_installlogrotate:
 	cp system/logrotate/netdata debian/netdata.logrotate
 	dh_installlogrotate

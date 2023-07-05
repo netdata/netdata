@@ -28,7 +28,7 @@ void receiver_state_free(struct receiver_state *rpt) {
         close(rpt->fd);
     }
 
-#ifdef ENABLE_COMPRESSION
+#ifdef ENABLE_RRDPUSH_COMPRESSION
     rrdpush_decompressor_destroy(&rpt->decompressor);
 #endif
 
@@ -111,7 +111,7 @@ static inline bool receiver_read_uncompressed(struct receiver_state *r) {
     return true;
 }
 
-#ifdef ENABLE_COMPRESSION
+#ifdef ENABLE_RRDPUSH_COMPRESSION
 static inline bool receiver_read_compressed(struct receiver_state *r) {
 
     internal_fatal(r->reader.read_buffer[r->reader.read_len] != '\0',
@@ -217,11 +217,11 @@ static inline bool receiver_read_compressed(struct receiver_state *r) {
 
     return true;
 }
-#else // !ENABLE_COMPRESSION
+#else // !ENABLE_RRDPUSH_COMPRESSION
 static inline bool receiver_read_compressed(struct receiver_state *r) {
     return receiver_read_uncompressed(r);
 }
-#endif // ENABLE_COMPRESSION
+#endif // ENABLE_RRDPUSH_COMPRESSION
 
 /* Produce a full line if one exists, statefully return where we start next time.
  * When we hit the end of the buffer with a partial line move it to the beginning for the next fill.
@@ -331,7 +331,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
 
     bool compressed_connection = false;
 
-#ifdef ENABLE_COMPRESSION
+#ifdef ENABLE_RRDPUSH_COMPRESSION
     if(stream_has_capability(rpt, STREAM_CAP_COMPRESSION)) {
         compressed_connection = true;
         rrdpush_decompressor_reset(&rpt->decompressor);
@@ -609,11 +609,11 @@ static void rrdpush_receive(struct receiver_state *rpt)
     rpt->config.rrdpush_replication_step = appconfig_get_number(&stream_config, rpt->key, "seconds per replication step", rpt->config.rrdpush_replication_step);
     rpt->config.rrdpush_replication_step = appconfig_get_number(&stream_config, rpt->machine_guid, "seconds per replication step", rpt->config.rrdpush_replication_step);
 
-#ifdef  ENABLE_COMPRESSION
-    rpt->config.rrdpush_compression = default_compression_enabled;
+#ifdef  ENABLE_RRDPUSH_COMPRESSION
+    rpt->config.rrdpush_compression = default_rrdpush_compression_enabled;
     rpt->config.rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->key, "enable compression", rpt->config.rrdpush_compression);
     rpt->config.rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->machine_guid, "enable compression", rpt->config.rrdpush_compression);
-#endif  //ENABLE_COMPRESSION
+#endif  // ENABLE_RRDPUSH_COMPRESSION
 
     (void)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
 
@@ -707,12 +707,12 @@ static void rrdpush_receive(struct receiver_state *rpt)
     snprintfz(cd.fullfilename, FILENAME_MAX,     "%s:%s", rpt->client_ip, rpt->client_port);
     snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", rpt->client_ip, rpt->client_port);
 
-#ifdef ENABLE_COMPRESSION
+#ifdef ENABLE_RRDPUSH_COMPRESSION
     if (stream_has_capability(rpt, STREAM_CAP_COMPRESSION)) {
         if (!rpt->config.rrdpush_compression)
             rpt->capabilities &= ~STREAM_CAP_COMPRESSION;
     }
-#endif
+#endif // ENABLE_RRDPUSH_COMPRESSION
 
     {
         // netdata_log_info("STREAM %s [receive from [%s]:%s]: initializing communication...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);

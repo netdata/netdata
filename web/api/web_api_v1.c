@@ -57,9 +57,10 @@ static struct {
 } contexts_v2_options[] = {
           {"minify"           , 0    , CONTEXT_V2_OPTION_MINIFY}
         , {"debug"            , 0    , CONTEXT_V2_OPTION_DEBUG}
-        , {"config"           , 0    , CONTEXT_V2_OPTION_ALERT_CONFIGURATIONS}
-        , {"transitions"      , 0    , CONTEXT_V2_OPTION_ALERT_TRANSITIONS}
-        , {"instances"        , 0    , CONTEXT_V2_OPTION_ALERT_INSTANCES}
+        , {"config"           , 0    , CONTEXT_V2_OPTION_ALERTS_WITH_CONFIGURATIONS}
+        , {"instances"        , 0    , CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES}
+        , {"values"           , 0    , CONTEXT_V2_OPTION_ALERTS_WITH_VALUES}
+        , {"summary"          , 0    , CONTEXT_V2_OPTION_ALERTS_WITH_SUMMARY}
         , {NULL               , 0    , 0}
 };
 
@@ -1235,12 +1236,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     host_functions2json(host, wb);
     host_collectors(host, wb);
 
-#ifdef DISABLE_CLOUD
-    buffer_json_member_add_boolean(wb, "cloud-enabled", false);
-#else
-    buffer_json_member_add_boolean(wb, "cloud-enabled",
-                   appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", true));
-#endif
+    buffer_json_member_add_boolean(wb, "cloud-enabled", netdata_cloud_enabled);
 
 #ifdef ENABLE_ACLK
     buffer_json_member_add_boolean(wb, "cloud-available", true);
@@ -1266,12 +1262,12 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_json_member_add_boolean(wb, "web-enabled", web_server_mode != WEB_SERVER_MODE_NONE);
     buffer_json_member_add_boolean(wb, "stream-enabled", default_rrdpush_enabled);
 
-#ifdef  ENABLE_COMPRESSION
+#ifdef  ENABLE_RRDPUSH_COMPRESSION
     buffer_json_member_add_boolean(wb, "stream-compression",
                                    host->sender && stream_has_capability(host->sender, STREAM_CAP_COMPRESSION));
-#else
+#else // ! ENABLE_RRDPUSH_COMPRESSION
     buffer_json_member_add_boolean(wb, "stream-compression", false);
-#endif  //ENABLE_COMPRESSION
+#endif  // ENABLE_RRDPUSH_COMPRESSION
 
 #ifdef ENABLE_HTTPS
     buffer_json_member_add_boolean(wb, "https-enabled", true);

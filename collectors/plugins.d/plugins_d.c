@@ -3,7 +3,7 @@
 #include "plugins_d.h"
 #include "pluginsd_parser.h"
 
-char *plugin_directories[PLUGINSD_MAX_DIRECTORIES] = { NULL };
+char *plugin_directories[PLUGINSD_MAX_DIRECTORIES] = { [0] = PLUGINS_DIR, };
 struct plugind *pluginsd_root = NULL;
 
 inline size_t pluginsd_initialize_plugin_directories()

@@ -1701,131 +1701,115 @@ error:
     return 1;
 }
 
-int unit_test_bitmap256(void) {
+static int bitmapX_test(BITMAPX *ptr, char *expected, const char *msg) {
+    int errors = 0;
+
+    for(uint32_t idx = 0; idx < ptr->bits ; idx++) {
+        bool found_set = bitmapX_get_bit(ptr, idx);
+        bool expected_set = expected[idx];
+
+        if(found_set != expected_set) {
+            fprintf(stderr, " >>> %s(): %s, bit %u is expected %s but found %s\n",
+                    __FUNCTION__, msg, idx, expected_set?"SET":"UNSET", found_set?"SET":"UNSET");
+            errors++;
+        }
+    }
+
+    if(errors)
+        fprintf(stderr,"%s(): %s, found %d errors\n",
+                __FUNCTION__, msg, errors);
+
+    return errors;
+}
+
+#define bitmapX_set_bit_and_track(ptr, bit, value, expected) do { \
+    bitmapX_set_bit(ptr, bit, value);                             \
+    (expected)[bit] = value;                                      \
+} while(0)
+
+int unit_test_bitmaps(void) {
     fprintf(stderr, "%s() running...\n", __FUNCTION__ );
 
-    BITMAP256 test_bitmap = {0};
+    int errors = 0;
 
-    bitmap256_set_bit(&test_bitmap, 0, 1);
-    bitmap256_set_bit(&test_bitmap, 64, 1);
-    bitmap256_set_bit(&test_bitmap, 128, 1);
-    bitmap256_set_bit(&test_bitmap, 192, 1);
-    if (test_bitmap.data[0] == 1)
-        fprintf(stderr, "%s() INDEX 1 is OK\n", __FUNCTION__ );
-    if (test_bitmap.data[1] == 1)
-        fprintf(stderr, "%s() INDEX 65 is OK\n", __FUNCTION__ );
-    if (test_bitmap.data[2] == 1)
-        fprintf(stderr, "%s() INDEX 129 is OK\n", __FUNCTION__ );
-    if (test_bitmap.data[3] == 1)
-        fprintf(stderr, "%s() INDEX 192 is OK\n", __FUNCTION__ );
+    char expected[8192];
 
-    uint8_t i=0;
-    int j = 0;
-    do {
-        bitmap256_set_bit(&test_bitmap, i++, 1);
-        j++;
-    } while (j < 256);
+    BITMAP256 bmp256 = BITMAP256_INITIALIZER;
+    BITMAP1024 bmp1024 = BITMAP1024_INITIALIZER;
+    BITMAPX *bmp = NULL;
 
-    if (test_bitmap.data[0] == 0xffffffffffffffff)
-        fprintf(stderr, "%s() INDEX 0 is fully set OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 0 is %"PRIu64" expected 0xffffffffffffffff\n", __FUNCTION__, test_bitmap.data[0]);
-        return 1;
+    for(int x = 0; x < 3 ; x++) {
+        char msg[100 + 1];
+
+        switch (x) {
+            default:
+            case 0:
+                bmp = (BITMAPX *) &bmp256;
+                break;
+
+            case 1:
+                bmp = (BITMAPX *) &bmp1024;
+                break;
+
+            case 2:
+                bmp = bitmapX_create(8192);
+                break;
+        }
+
+        // reset
+        memset(expected, 0, bmp->bits);
+        memset(bmp->data, 0, bmp->bits / 8);
+
+        snprintf(msg, 100, "TEST 1 BITMAP %u", bmp->bits);
+        bitmapX_set_bit_and_track(bmp, 0, true, expected);
+        errors += bitmapX_test(bmp, expected, msg);
+
+        snprintf(msg, 100, "TEST 2 BITMAP %u", bmp->bits);
+        bitmapX_set_bit_and_track(bmp, 64, true, expected);
+        errors += bitmapX_test(bmp, expected, msg);
+
+        snprintf(msg, 100, "TEST 3 BITMAP %u", bmp->bits);
+        bitmapX_set_bit_and_track(bmp, 128, true, expected);
+        errors += bitmapX_test(bmp, expected, msg);
+
+        snprintf(msg, 100, "TEST 4 BITMAP %u", bmp->bits);
+        bitmapX_set_bit_and_track(bmp, 192, true, expected);
+        errors += bitmapX_test(bmp, expected, msg);
+
+        for (uint32_t step = 1; step < 256; step++) {
+            snprintf(msg, 100, "TEST 5 (setting) BITMAP %u STEP %u", bmp->bits, step);
+
+            // reset
+            memset(expected, 0, bmp->bits);
+            memset(bmp->data, 0, bmp->bits / 8);
+
+            for (uint32_t i = 0; i < bmp->bits ; i += step)
+                bitmapX_set_bit_and_track(bmp, i, true, expected);
+
+            errors += bitmapX_test(bmp, expected, msg);
+        }
+
+        for (uint32_t step = 1; step < 256; step++) {
+            snprintf(msg, 100, "TEST 6 (clearing) BITMAP %u STEP %u", bmp->bits, step);
+
+            // reset
+            memset(expected, 0, bmp->bits);
+            memset(bmp->data, 0, bmp->bits / 8);
+
+            for (uint32_t i = 0; i < bmp->bits ; i++)
+                bitmapX_set_bit_and_track(bmp, i, true, expected);
+
+            for (uint32_t i = 0; i < bmp->bits ; i += step)
+                bitmapX_set_bit_and_track(bmp, i, false, expected);
+
+            errors += bitmapX_test(bmp, expected, msg);
+        }
     }
 
-    if (test_bitmap.data[1] == 0xffffffffffffffff)
-        fprintf(stderr, "%s() INDEX 1 is fully set OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 1 is %"PRIu64" expected 0xffffffffffffffff\n", __FUNCTION__, test_bitmap.data[0]);
-        return 1;
-    }
+    freez(bmp);
 
-    if (test_bitmap.data[2] == 0xffffffffffffffff)
-        fprintf(stderr, "%s() INDEX 2 is fully set OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 2 is %"PRIu64" expected 0xffffffffffffffff\n", __FUNCTION__, test_bitmap.data[0]);
-        return 1;
-    }
-
-    if (test_bitmap.data[3] == 0xffffffffffffffff)
-        fprintf(stderr, "%s() INDEX 3 is fully set OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 3 is %"PRIu64" expected 0xffffffffffffffff\n", __FUNCTION__, test_bitmap.data[0]);
-        return 1;
-    }
-
-    i = 0;
-    j = 0;
-    do {
-        bitmap256_set_bit(&test_bitmap, i++, 0);
-        j++;
-    } while (j < 256);
-
-    if (test_bitmap.data[0] == 0)
-        fprintf(stderr, "%s() INDEX 0 is reset OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 0 is not reset FAILED\n", __FUNCTION__);
-        return 1;
-    }
-    if (test_bitmap.data[1] == 0)
-        fprintf(stderr, "%s() INDEX 1 is reset OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 1 is not reset FAILED\n", __FUNCTION__);
-        return 1;
-    }
-
-    if (test_bitmap.data[2] == 0)
-        fprintf(stderr, "%s() INDEX 2 is reset OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 2 is not reset FAILED\n", __FUNCTION__);
-        return 1;
-    }
-
-    if (test_bitmap.data[3] == 0)
-        fprintf(stderr, "%s() INDEX 3 is reset OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 3 is not reset FAILED\n", __FUNCTION__);
-        return 1;
-    }
-
-    i=0;
-    j = 0;
-    do {
-        bitmap256_set_bit(&test_bitmap, i, 1);
-        i += 4;
-        j += 4;
-    } while (j < 256);
-
-    if (test_bitmap.data[0] == 0x1111111111111111)
-        fprintf(stderr, "%s() INDEX 0 is 0x1111111111111111 set OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 0 is %"PRIu64" expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[0]);
-        return 1;
-    }
-
-    if (test_bitmap.data[1] == 0x1111111111111111)
-        fprintf(stderr, "%s() INDEX 1 is 0x1111111111111111 set OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 1 is %"PRIu64" expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[1]);
-        return 1;
-    }
-
-    if (test_bitmap.data[2] == 0x1111111111111111)
-        fprintf(stderr, "%s() INDEX 2 is 0x1111111111111111 set OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 2 is %"PRIu64" expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[2]);
-        return 1;
-    }
-
-    if (test_bitmap.data[3] == 0x1111111111111111)
-        fprintf(stderr, "%s() INDEX 3 is 0x1111111111111111 set OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 3 is %"PRIu64" expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[3]);
-        return 1;
-    }
-
-    fprintf(stderr, "%s() tests passed\n", __FUNCTION__);
-    return 0;
+    fprintf(stderr, "%s() %d errors\n", __FUNCTION__, errors);
+    return errors;
 }
 
 #ifdef ENABLE_DBENGINE

@@ -52,11 +52,12 @@ typedef enum rrdr_options {
 } RRDR_OPTIONS;
 
 typedef enum context_v2_options {
-    CONTEXT_V2_OPTION_MINIFY                = (1 << 0), // remove JSON spaces and newlines from JSON output
-    CONTEXT_V2_OPTION_DEBUG                 = (1 << 1), // show the request
-    CONTEXT_V2_OPTION_ALERT_CONFIGURATIONS  = (1 << 2), // include alert configurations
-    CONTEXT_V2_OPTION_ALERT_TRANSITIONS     = (1 << 3), // include alert transitions
-    CONTEXT_V2_OPTION_ALERT_INSTANCES       = (1 << 4), // include alert instances
+    CONTEXT_V2_OPTION_MINIFY                        = (1 << 0), // remove JSON spaces and newlines from JSON output
+    CONTEXT_V2_OPTION_DEBUG                         = (1 << 1), // show the request
+    CONTEXT_V2_OPTION_ALERTS_WITH_CONFIGURATIONS    = (1 << 2), // include alert configurations (used by /api/v2/alert_transitions)
+    CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES         = (1 << 3), // include alert instances      (used by /api/v2/alerts)
+    CONTEXT_V2_OPTION_ALERTS_WITH_VALUES            = (1 << 4), // include alert latest values  (used by /api/v2/alerts)
+    CONTEXT_V2_OPTION_ALERTS_WITH_SUMMARY           = (1 << 5), // include alerts summary counters  (used by /api/v2/alerts)
 } CONTEXTS_V2_OPTIONS;
 
 typedef enum context_v2_alert_status {

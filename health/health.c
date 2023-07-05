@@ -33,13 +33,13 @@ void health_entry_flags_to_json_array(BUFFER *wb, const char *key, HEALTH_ENTRY_
     if(flags & HEALTH_ENTRY_FLAG_EXEC_RUN)
         buffer_json_add_array_item_string(wb, "EXEC_RUN");
     if(flags & HEALTH_ENTRY_FLAG_EXEC_FAILED)
-        buffer_json_add_array_item_string(wb, "FAILED");
+        buffer_json_add_array_item_string(wb, "EXEC_FAILED");
     if(flags & HEALTH_ENTRY_FLAG_SILENCED)
         buffer_json_add_array_item_string(wb, "SILENCED");
     if(flags & HEALTH_ENTRY_RUN_ONCE)
-        buffer_json_add_array_item_string(wb, "ONCE");
+        buffer_json_add_array_item_string(wb, "RUN_ONCE");
     if(flags & HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS)
-        buffer_json_add_array_item_string(wb, "IN_PROGRESS");
+        buffer_json_add_array_item_string(wb, "EXEC_IN_PROGRESS");
     if(flags & HEALTH_ENTRY_FLAG_IS_REPEATING)
         buffer_json_add_array_item_string(wb, "RECURRING");
     if(flags & HEALTH_ENTRY_FLAG_SAVED)

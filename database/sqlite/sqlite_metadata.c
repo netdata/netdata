@@ -406,7 +406,7 @@ static int add_host_sysinfo_key_value(const char *name, const char *value, uuid_
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = bind_text_null(res, ++param, value, 1);
+    rc = bind_text_null(res, ++param, value ? value : "unknown", 0);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 

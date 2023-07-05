@@ -526,6 +526,27 @@ static inline size_t storage_engine_disk_space_used(STORAGE_ENGINE_BACKEND backe
     return 0;
 }
 
+time_t rrdeng_global_first_time_s(STORAGE_INSTANCE *db_instance);
+static inline time_t storage_engine_global_first_time_s(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance) {
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_global_first_time_s(db_instance);
+#endif
+
+    return now_realtime_sec() - (time_t)(default_rrd_history_entries * default_rrd_update_every);
+}
+
+size_t rrdeng_currently_collected_metrics(STORAGE_INSTANCE *db_instance);
+static inline size_t storage_engine_collected_metrics(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance) {
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_currently_collected_metrics(db_instance);
+#endif
+
+    // TODO - calculate the total host disk space for memory mode save and map
+    return 0;
+}
+
 void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle);
 void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *collection_handle);
 static inline void storage_engine_store_flush(STORAGE_COLLECT_HANDLE *collection_handle) {

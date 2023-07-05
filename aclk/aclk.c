@@ -489,15 +489,15 @@ static int aclk_get_transport_idx(aclk_env_t *env) {
 }
 #endif
 
-ACLK_STATUS aclk_status = ACLK_STATUS_INITIALIZING;
+ACLK_STATUS aclk_status = ACLK_STATUS_NONE;
 
 const char *aclk_status_to_string(void) {
     switch(aclk_status) {
         case ACLK_STATUS_CONNECTED:
             return "connected";
 
-        case ACLK_STATUS_INITIALIZING:
-            return "initializing";
+        case ACLK_STATUS_NONE:
+            return "none";
 
         case ACLK_STATUS_DISABLED:
             return "disabled";

@@ -651,7 +651,7 @@ static int journalfile_check_superblock(uv_file file)
 
 static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile, void *buf, unsigned max_size)
 {
-    static BITMAP256 page_error_map;
+    static BITMAP256 page_error_map = BITMAP256_INITIALIZER;
     unsigned i, count, payload_length, descr_size;
     struct rrdeng_jf_store_data *jf_metric_data;
 
@@ -998,6 +998,7 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
 
     struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
     time_t header_start_time_s  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
+    time_t global_first_time_s = header_start_time_s;
     time_t now_s = max_acceptable_collected_time();
     for (size_t i=0; i < entries; i++) {
         time_t start_time_s = header_start_time_s + metric->delta_start_s;
@@ -1018,6 +1019,12 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
         , (double)entries / 1000
         , ((double)(ended_ut - started_ut) / USEC_PER_MS)
         );
+
+    time_t old = __atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED);;
+    do {
+        if(old <= global_first_time_s)
+            break;
+    } while(!__atomic_compare_exchange_n(&ctx->atomic.first_time_s, &old, global_first_time_s, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 }
 
 int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)

@@ -1206,7 +1206,22 @@ static void get_netdata_configured_variables() {
 
 }
 
-int load_netdata_conf(char *filename, char overwrite_used) {
+static void post_conf_load(char **user)
+{
+    // --------------------------------------------------------------------
+    // get the user we should run
+
+    // IMPORTANT: this is required before web_files_uid()
+    if(getuid() == 0) {
+        *user = config_get(CONFIG_SECTION_GLOBAL, "run as user", NETDATA_USER);
+    }
+    else {
+        struct passwd *passwd = getpwuid(getuid());
+        *user = config_get(CONFIG_SECTION_GLOBAL, "run as user", (passwd && passwd->pw_name)?passwd->pw_name:"");
+    }
+}
+
+static bool load_netdata_conf(char *filename, char overwrite_used, char **user) {
     errno = 0;
 
     int ret = 0;
@@ -1233,6 +1248,7 @@ int load_netdata_conf(char *filename, char overwrite_used) {
         freez(filename);
     }
 
+    post_conf_load(user);
     return ret;
 }
 
@@ -1242,19 +1258,17 @@ static inline void coverity_remove_taint(char *s)
     (void)s;
 }
 
-int get_system_info(struct rrdhost_system_info *system_info) {
+int get_system_info(struct rrdhost_system_info *system_info, bool log) {
     char *script;
     script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("system-info.sh") + 2));
     sprintf(script, "%s/%s", netdata_configured_primary_plugins_dir, "system-info.sh");
     if (unlikely(access(script, R_OK) != 0)) {
-        netdata_log_info("System info script %s not found.",script);
+        error("System info script %s not found.",script);
         freez(script);
         return 1;
     }
 
     pid_t command_pid;
-
-    netdata_log_info("Executing %s", script);
 
     FILE *fp_child_input;
     FILE *fp_child_output = netdata_popen(script, &command_pid, &fp_child_input);
@@ -1275,10 +1289,12 @@ int get_system_info(struct rrdhost_system_info *system_info) {
                 coverity_remove_taint(value);
 
                 if(unlikely(rrdhost_set_system_info_variable(system_info, line, value))) {
-                    netdata_log_info("Unexpected environment variable %s=%s", line, value);
+                    error("Unexpected environment variable %s=%s", line, value);
                 }
                 else {
-                    netdata_log_info("%s=%s", line, value);
+                    if(log)
+                        netdata_log_info("%s=%s", line, value);
+
                     setenv(line, value, 1);
                 }
             }
@@ -1298,30 +1314,6 @@ void set_silencers_filename() {
 /* Any config setting that can be accessed without a default value i.e. configget(...,...,NULL) *MUST*
    be set in this procedure to be called in all the relevant code paths.
 */
-void post_conf_load(char **user)
-{
-    // --------------------------------------------------------------------
-    // get the user we should run
-
-    // IMPORTANT: this is required before web_files_uid()
-    if(getuid() == 0) {
-        *user = config_get(CONFIG_SECTION_GLOBAL, "run as user", NETDATA_USER);
-    }
-    else {
-        struct passwd *passwd = getpwuid(getuid());
-        *user = config_get(CONFIG_SECTION_GLOBAL, "run as user", (passwd && passwd->pw_name)?passwd->pw_name:"");
-    }
-
-    // --------------------------------------------------------------------
-    // Check if the cloud is enabled
-#if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
-    netdata_cloud_enabled = false;
-#else
-    netdata_cloud_enabled = appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1);
-#endif
-    // This must be set before any point in the code that accesses it. Do not move it from this function.
-    appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", DEFAULT_CLOUD_BASE_URL);
-}
 
 #define delta_startup_time(msg)                         \
     {                                                   \
@@ -1393,13 +1385,12 @@ int main(int argc, char **argv) {
         while( (opt = getopt(argc, argv, optstring)) != -1 ) {
             switch(opt) {
                 case 'c':
-                    if(load_netdata_conf(optarg, 1) != 1) {
+                    if(!load_netdata_conf(optarg, 1, &user)) {
                         error("Cannot load configuration file %s.", optarg);
                         return 1;
                     }
                     else {
                         debug(D_OPTIONS, "Configuration loaded from %s.", optarg);
-                        post_conf_load(&user);
                         load_cloud_conf(1);
                         config_loaded = 1;
                     }
@@ -1473,7 +1464,7 @@ int main(int argc, char **argv) {
                                 return 1;
                             if (buffer_unittest())
                                 return 1;
-                            if (unit_test_bitmap256())
+                            if (unit_test_bitmaps())
                                 return 1;
                             // No call to load the config file on this code-path
                             post_conf_load(&user);
@@ -1736,8 +1727,7 @@ int main(int argc, char **argv) {
 
                             if(!config_loaded) {
                                 fprintf(stderr, "warning: no configuration file has been loaded. Use -c CONFIG_FILE, before -W get. Using default config.\n");
-                                load_netdata_conf(NULL, 0);
-                                post_conf_load(&user);
+                                load_netdata_conf(NULL, 0, &user);
                             }
 
                             get_netdata_configured_variables();
@@ -1764,8 +1754,7 @@ int main(int argc, char **argv) {
 
                             if(!config_loaded) {
                                 fprintf(stderr, "warning: no configuration file has been loaded. Use -c CONFIG_FILE, before -W get. Using default config.\n");
-                                load_netdata_conf(NULL, 0);
-                                post_conf_load(&user);
+                                load_netdata_conf(NULL, 0, &user);
                                 load_cloud_conf(1);
                             }
 
@@ -1785,7 +1774,6 @@ int main(int argc, char **argv) {
                             claiming_pending_arguments = optarg + strlen(claim_string);
                         }
                         else if(strcmp(optarg, "buildinfo") == 0) {
-                            printf("Version: %s %s\n", program_name, program_version);
                             print_build_info();
                             return 0;
                         }
@@ -1821,14 +1809,8 @@ int main(int argc, char **argv) {
 
 
     if(!config_loaded) {
-        load_netdata_conf(NULL, 0);
-        post_conf_load(&user);
+        load_netdata_conf(NULL, 0, &user);
         load_cloud_conf(0);
-    }
-
-    char *nd_disable_cloud = getenv("NETDATA_DISABLE_CLOUD");
-    if (nd_disable_cloud && !strncmp(nd_disable_cloud, "1", 1)) {
-        appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", "false");
     }
 
     // ------------------------------------------------------------------------
@@ -1988,10 +1970,10 @@ int main(int argc, char **argv) {
         if(web_server_mode != WEB_SERVER_MODE_NONE)
             api_listen_sockets_setup();
 
-#ifdef ENABLE_HTTPD
-        delta_startup_time("initialize httpd server");
+#ifdef ENABLE_H2O
+        delta_startup_time("initialize h2o server");
         for (int i = 0; static_threads[i].name; i++) {
-            if (static_threads[i].start_routine == httpd_main)
+            if (static_threads[i].start_routine == h2o_main)
                 static_threads[i].enabled = httpd_is_enabled();
         }
 #endif
@@ -2049,7 +2031,7 @@ int main(int argc, char **argv) {
     netdata_anonymous_statistics_enabled=-1;
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
-    get_system_info(system_info);
+    get_system_info(system_info, true);
     (void) registry_get_this_machine_guid();
     system_info->hops = 0;
     get_install_type(&system_info->install_type, &system_info->prebuilt_arch, &system_info->prebuilt_dist);
@@ -2080,7 +2062,7 @@ int main(int argc, char **argv) {
     delta_startup_time("collect claiming info");
 
     if (claiming_pending_arguments)
-         claim_agent(claiming_pending_arguments);
+         claim_agent(claiming_pending_arguments, false, NULL);
     load_claiming_state();
 
     // ------------------------------------------------------------------------

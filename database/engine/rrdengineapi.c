@@ -1012,6 +1012,16 @@ size_t rrdeng_disk_space_used(STORAGE_INSTANCE *db_instance) {
     return __atomic_load_n(&ctx->atomic.current_disk_space, __ATOMIC_RELAXED);
 }
 
+time_t rrdeng_global_first_time_s(STORAGE_INSTANCE *db_instance) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+    return __atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED);
+}
+
+size_t rrdeng_currently_collected_metrics(STORAGE_INSTANCE *db_instance) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+    return __atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED);
+}
+
 /*
  * Gathers Database Engine statistics.
  * Careful when modifying this function.
@@ -1181,6 +1191,9 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
 
     ctx->atomic.transaction_id = 1;
     ctx->quiesce.enabled = false;
+
+    rw_spinlock_init(&ctx->njfv2idx.spinlock);
+    ctx->atomic.first_time_s = LONG_MAX;
 
     if (rrdeng_dbengine_spawn(ctx) && !init_rrd_files(ctx)) {
         // success - we run this ctx too

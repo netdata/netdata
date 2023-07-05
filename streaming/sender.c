@@ -66,7 +66,7 @@ BUFFER *sender_start(struct sender_state *s) {
 
 static inline void rrdpush_sender_thread_close_socket(RRDHOST *host);
 
-#ifdef ENABLE_COMPRESSION
+#ifdef ENABLE_RRDPUSH_COMPRESSION
 /*
 * In case of stream compression buffer overflow
 * Inform the user through the error log file and 
@@ -117,7 +117,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
         s->buffer->max_size = (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE;
     }
 
-#ifdef ENABLE_COMPRESSION
+#ifdef ENABLE_RRDPUSH_COMPRESSION
     if (stream_has_capability(s, STREAM_CAP_COMPRESSION) && s->compressor.initialized) {
         while(src_len) {
             size_t size_to_compress = src_len;
@@ -590,11 +590,11 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     // reset our capabilities to default
     s->capabilities = stream_our_capabilities(host, true);
 
-#ifdef  ENABLE_COMPRESSION
+#ifdef  ENABLE_RRDPUSH_COMPRESSION
     // If we don't want compression, remove it from our capabilities
     if(!(s->flags & SENDER_FLAG_COMPRESSION))
         s->capabilities &= ~STREAM_CAP_COMPRESSION;
-#endif  // ENABLE_COMPRESSION
+#endif  // ENABLE_RRDPUSH_COMPRESSION
 
     /* TODO: During the implementation of #7265 switch the set of variables to HOST_* and CONTAINER_* if the
              version negotiation resulted in a high enough version.
@@ -756,12 +756,12 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     if(!rrdpush_sender_validate_response(host, s, http, bytes))
         return false;
 
-#ifdef ENABLE_COMPRESSION
+#ifdef ENABLE_RRDPUSH_COMPRESSION
     if(stream_has_capability(s, STREAM_CAP_COMPRESSION))
         rrdpush_compressor_reset(&s->compressor);
     else
         rrdpush_compressor_destroy(&s->compressor);
-#endif  //ENABLE_COMPRESSION
+#endif  // ENABLE_RRDPUSH_COMPRESSION
 
     log_sender_capabilities(s);
 

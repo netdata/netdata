@@ -50,6 +50,7 @@ struct registry {
     char *db_filename;
     char *log_filename;
     char *machine_guid_filename;
+    char *session_key_filename;
 
     // open files
     FILE *log_fp;

@@ -415,17 +415,117 @@ typedef struct query_target {
     } internal;
 } QUERY_TARGET;
 
-struct alert_instance_v2_entry {
+
+struct sql_alert_transition_data {
+    usec_t global_id;
+    uuid_t *transition_id;
+    uuid_t *host_id;
+    uuid_t *config_hash_id;
+    uint32_t alarm_id;
+    const char *alert_name;
+    const char *chart;
+    const char *chart_context;
+    const char *family;
+    const char *recipient;
+    const char *units;
+    const char *exec;
+    const char *info;
+    const char *classification;
+    const char *type;
+    const char *component;
+    time_t when_key;
+    time_t duration;
+    time_t non_clear_duration;
+    uint64_t flags;
+    time_t delay_up_to_timestamp;
+    time_t exec_run_timestamp;
+    int exec_code;
+    int new_status;
+    int old_status;
+    int delay;
+    time_t last_repeat;
+    NETDATA_DOUBLE new_value;
+    NETDATA_DOUBLE old_value;
+
+    char machine_guid[UUID_STR_LEN];
+    struct sql_alert_transition_data *next;
+    struct sql_alert_transition_data *prev;
+};
+
+struct sql_alert_config_data {
+    uuid_t *config_hash_id;
+    const char *name;
+
+    struct {
+        const char *on_template;
+        const char *on_key;
+
+        const char *os;
+        const char *hosts;
+        const char *families;
+        const char *plugin;
+        const char *module;
+        const char *host_labels;
+        const char *chart_labels;
+        const char *charts;
+    } selectors;
+
+    const char *info;
+    const char *classification;
+    const char *component;
+    const char *type;
+
+    struct {
+        struct {
+            const char *dimensions;
+            const char *method;
+            uint32_t options;
+
+            int32_t after;
+            int32_t before;
+
+            const char *lookup;         // the lookup line, unparsed
+        } db;
+
+        const char *calc;               // the calculation expression, unparsed
+        const char *units;
+
+        int32_t update_every;           // the update frequency of the alert, in seconds
+        const char *every;              // the every line, unparsed
+    } value;
+
+    struct {
+        const char *green;              // the green threshold, unparsed
+        const char *red;                // the red threshold, unparsed
+        const char *warn;               // the warning expression, unparsed
+        const char *crit;               // the critical expression, unparsed
+    } status;
+
+    struct {
+        const char *exec;               // the script to execute, or NULL to execute the default script
+        const char *to_key;             // the recipient, or NULL for the default recipient
+        const char *delay;              // the delay line, unparsed
+        const char *repeat;             // the repeat line, unparsed
+        const char *options;            // FIXME what is this?
+    } notification;
+
+    const char *source;                 // the configuration file and line this alert came from
+};
+
+int contexts_v2_alert_config_to_json(struct web_client *w, const char *config_hash_id);
+
+struct sql_alert_instance_v2_entry {
     RRDCALC *tmp;
 
     size_t ati;
-    size_t aci;
-    size_t aii;
 
+    STRING *context;
     STRING *chart_id;
     STRING *chart_name;
     STRING *name;
     STRING *family;
+    STRING *units;
+    STRING *source;
     RRDCALC_STATUS status;
     RRDCALC_FLAGS flags;
     STRING *info;
@@ -486,6 +586,27 @@ void query_target_release(QUERY_TARGET *qt);
 
 QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr);
 
+typedef enum __attribute__((packed)) {
+    ATF_STATUS = 0,
+    ATF_CLASS,
+    ATF_TYPE,
+    ATF_COMPONENT,
+    ATF_ROLE,
+    ATF_NODE,
+
+    // total
+    ATF_TOTAL_ENTRIES,
+} ALERT_TRANSITION_FACET;
+
+struct alert_transitions_facets {
+    const char *name;
+    const char *query_param;
+    const char *id;
+    size_t order;
+};
+
+extern struct alert_transitions_facets alert_transition_facets[];
+
 struct api_v2_contexts_request {
     char *scope_nodes;
     char *scope_contexts;
@@ -500,6 +621,9 @@ struct api_v2_contexts_request {
         char *alert;
         char *transition;
         uint32_t last;
+
+        const char *facets[ATF_TOTAL_ENTRIES];
+        usec_t global_id_anchor;
     } alerts;
 
     time_t after;
@@ -511,16 +635,17 @@ struct api_v2_contexts_request {
 };
 
 typedef enum __attribute__ ((__packed__)) {
-    CONTEXTS_V2_SEARCH          = (1 << 1),
-    CONTEXTS_V2_NODES           = (1 << 2),
-    CONTEXTS_V2_NODES_INFO      = (1 << 3),
-    CONTEXTS_V2_NODES_INSTANCES = (1 << 4),
-    CONTEXTS_V2_CONTEXTS        = (1 << 5),
-    CONTEXTS_V2_AGENTS          = (1 << 6),
-    CONTEXTS_V2_AGENTS_INFO     = (1 << 7),
-    CONTEXTS_V2_VERSIONS        = (1 << 8),
-    CONTEXTS_V2_FUNCTIONS       = (1 << 9),
-    CONTEXTS_V2_ALERTS          = (1 << 10),
+    CONTEXTS_V2_SEARCH              = (1 << 1),
+    CONTEXTS_V2_NODES               = (1 << 2),
+    CONTEXTS_V2_NODES_INFO          = (1 << 3),
+    CONTEXTS_V2_NODE_INSTANCES      = (1 << 4),
+    CONTEXTS_V2_CONTEXTS            = (1 << 5),
+    CONTEXTS_V2_AGENTS              = (1 << 6),
+    CONTEXTS_V2_AGENTS_INFO         = (1 << 7),
+    CONTEXTS_V2_VERSIONS            = (1 << 8),
+    CONTEXTS_V2_FUNCTIONS           = (1 << 9),
+    CONTEXTS_V2_ALERTS              = (1 << 10),
+    CONTEXTS_V2_ALERT_TRANSITIONS   = (1 << 11),
 } CONTEXTS_V2_MODE;
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_MODE mode);
