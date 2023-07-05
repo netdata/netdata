@@ -5,7 +5,7 @@
     "properties": {
         "categories": {
             "type": "object",
-            "description": "A list defining all the available categories for the integrations",
+            "description": "A list defining all the available categories for the integrations.",
             "properties": {
                 "list": {
                     "type": "array",
@@ -39,16 +39,20 @@
         },
         "integrations": {
             "type": "array",
-            "description": "A list of integration elements, combination of metadata.yaml and other sources",
+            "description": "A list of integration elements, combination of metadata.yaml and other sources.",
             "items": {
                 "type": "object",
                 "properties": {
+                    "id": {
+                        "type": "integer",
+                        "description": "A unique numeric identifier for the integration."
+                    },
                     "name": {
                         "type": "string"
                     },
                     "category_id": {
                         "type": "string",
-                        "description": "The category_ID for this integration"
+                        "description": "The category_ID for this integration."
                     },
                     "icon": {
                         "type": "string",
