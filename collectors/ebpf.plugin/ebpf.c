@@ -1229,7 +1229,7 @@ void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, 
  */
 int ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em)
 {
-    static int priority = 140100;
+    static int priority = NETATA_EBPF_ORDER_STAT_ARAL_BEGIN;
     char *mem = { NETDATA_EBPF_STAT_DIMENSION_MEMORY };
     char *aral = { NETDATA_EBPF_STAT_DIMENSION_ARAL };
 
