@@ -2236,8 +2236,6 @@ int sql_get_alert_configuration(
         goto fail_only_drop;
     }
 
-    netdata_log_info("DEBUG: %s", sqlite3_expanded_sql(res));
-
     struct sql_alert_config_data acd = {0 };
 
     added = 0;
