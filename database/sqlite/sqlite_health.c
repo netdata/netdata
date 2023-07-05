@@ -2166,7 +2166,7 @@ fail_only_drop:
 
 #define SQL_POPULATE_TEMP_CONFIG_TARGET_TABLE "INSERT INTO c_%p (hash_id) VALUES (@hash_id)"
 
-#define SQL_SEARCH_CONFIG_LIST "SELECT hash_id, alarm, template, on_key, class, component, type, os, hosts, lookup, every, " \
+#define SQL_SEARCH_CONFIG_LIST "SELECT ah.hash_id, alarm, template, on_key, class, component, type, os, hosts, lookup, every, " \
     " units, calc, families, plugin, module, charts, green, red, warn, crit, " \
     " exec, to_key, info, delay, options, repeat, host_labels, p_db_lookup_dimensions, p_db_lookup_method, " \
     " p_db_lookup_options, p_db_lookup_after, p_db_lookup_before, p_update_every, source, chart_labels " \
@@ -2235,6 +2235,8 @@ int sql_get_alert_configuration(
         error_report("Failed to prepare statement sql_get_alert_configuration");
         goto fail_only_drop;
     }
+
+    netdata_log_info("DEBUG: %s", sqlite3_expanded_sql(res));
 
     struct sql_alert_config_data acd = {0 };
 
