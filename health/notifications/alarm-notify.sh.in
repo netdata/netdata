@@ -768,6 +768,15 @@ if [ "${SEND_AWSSNS}" = "YES" ] && [ -z "${aws}" ]; then
   fi
 fi
 
+# if we need nc, check for the nc command
+if [ "${SEND_IRC}" = "YES" ] && [ -z "${nc}" ]; then
+  nc="$(command -v nc 2>/dev/null)"
+  if [ -z "${nc}" ]; then
+    debug "Cannot find nc command in the system path.  Disabling IRC notifications."
+    SEND_IRC="NO"
+  fi
+fi
+
 if [ ${dump_methods} ]; then
     for name in "${!SEND_@}"; do
         if [ "${!name}" = "YES" ]; then
@@ -1913,7 +1922,7 @@ send_irc() {
     SNDMESSAGE="${MESSAGE//$'\n'/", "}"
     for CHANNEL in ${CHANNELS}; do
       error=0
-      send_alarm=$(echo -e "USER ${NICKNAME} guest ${REALNAME} ${SERVERNAME}\\nNICK ${NICKNAME}\\nJOIN ${CHANNEL}\\nPRIVMSG ${CHANNEL} :${SNDMESSAGE}\\nQUIT\\n" \  | nc "${NETWORK}" "${PORT}")
+      send_alarm=$(echo -e "USER ${NICKNAME} guest ${REALNAME} ${SERVERNAME}\\nNICK ${NICKNAME}\\nJOIN ${CHANNEL}\\nPRIVMSG ${CHANNEL} :${SNDMESSAGE}\\nQUIT\\n" \  | ${nc} "${NETWORK}" "${PORT}")
       reply_codes=$(echo "${send_alarm}" | cut -d ' ' -f 2 | grep -o '[0-9]*')
       for code in ${reply_codes}; do
         if [ "${code}" -ge 400 ] && [ "${code}" -le 599 ]; then
