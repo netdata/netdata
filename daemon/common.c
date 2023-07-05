@@ -95,14 +95,16 @@ CLOUD_STATUS cloud_status(void) {
     if(aclk_connected)
         return CLOUD_STATUS_ONLINE;
 
-    char *agent_id = get_agent_claimid();
-    bool claimed = agent_id != NULL;
-    freez(agent_id);
+    if(netdata_cloud_enabled == CONFIG_BOOLEAN_YES) {
+        char *agent_id = get_agent_claimid();
+        bool claimed = agent_id != NULL;
+        freez(agent_id);
 
-    if(netdata_cloud_enabled == CONFIG_BOOLEAN_YES && claimed)
-        return CLOUD_STATUS_OFFLINE;
+        if(claimed)
+            return CLOUD_STATUS_OFFLINE;
+    }
 
-    if(netdata_cloud_enabled == CONFIG_BOOLEAN_AUTO)
+    if(netdata_cloud_enabled != CONFIG_BOOLEAN_NO)
         return CLOUD_STATUS_AVAILABLE;
 
     return CLOUD_STATUS_DISABLED;
