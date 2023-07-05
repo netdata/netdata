@@ -245,8 +245,10 @@ bool netdata_random_session_id_generate(void) {
 
     bool ret = true;
 
+    (void)unlink(filename);
+
     // save it
-    int fd = open(filename, O_WRONLY|O_CREAT|O_TRUNC, 644);
+    int fd = open(filename, O_WRONLY|O_CREAT|O_TRUNC, 640);
     if(fd == -1) {
         error("Cannot create random session id file '%s'.", filename);
         ret = false;
