@@ -2470,8 +2470,10 @@ void ebpf_send_statistic_data()
     write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_LIFE_TIME);
     for (i = 0; i < EBPF_MODULE_FUNCTION_IDX ; i++) {
         ebpf_module_t *wem = &ebpf_modules[i];
+        // Threads like VFS is slow to load and this can create an invalid number, this is the motive
+        // we are also testing wem->lifetime value.
         write_chart_dimension((char *)wem->thread_name,
-                              (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ?
+                              (wem->lifetime && wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ?
                               (long long) (wem->lifetime - wem->running_time):
                               0) ;
     }
