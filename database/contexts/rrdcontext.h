@@ -446,10 +446,6 @@ struct sql_alert_transition_data {
     time_t last_repeat;
     NETDATA_DOUBLE new_value;
     NETDATA_DOUBLE old_value;
-
-    char machine_guid[UUID_STR_LEN];
-    struct sql_alert_transition_data *next;
-    struct sql_alert_transition_data *prev;
 };
 
 struct sql_alert_config_data {

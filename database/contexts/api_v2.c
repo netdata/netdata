@@ -72,8 +72,8 @@ struct alert_transitions_callback_data {
     uint32_t limit;
     uint32_t items;
 
-    struct sql_alert_transition_data *base; // double linked list - last item is base->prev
-    struct sql_alert_transition_data *last_added; // the last item added, not the last of the list
+    struct sql_alert_transition_fixed_size *base; // double linked list - last item is base->prev
+    struct sql_alert_transition_fixed_size *last_added; // the last item added, not the last of the list
 
     struct {
         size_t items;
@@ -1368,50 +1368,86 @@ static void contexts_v2_alerts_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_
     }
 }
 
-static struct sql_alert_transition_data *contexts_v2_alert_transition_dup(struct sql_alert_transition_data *t, const char *machine_guid) {
-    struct sql_alert_transition_data *n = mallocz(sizeof(*t));
-    memcpy(n, t, sizeof(*t));
+#define SQL_TRANSITION_DATA_SMALL_STRING (6 * 8)
+#define SQL_TRANSITION_DATA_MEDIUM_STRING (12 * 8)
+#define SQL_TRANSITION_DATA_BIG_STRING 512
 
-    n->transition_id = mallocz(sizeof(*t->transition_id));
-    memcpy(n->transition_id, t->transition_id, sizeof(*t->transition_id));
+struct sql_alert_transition_fixed_size {
+    usec_t global_id;
+    uuid_t transition_id;
+    uuid_t host_id;
+    uuid_t config_hash_id;
+    uint32_t alarm_id;
+    char alert_name[SQL_TRANSITION_DATA_SMALL_STRING];
+    char chart[RRD_ID_LENGTH_MAX];
+    char chart_context[SQL_TRANSITION_DATA_MEDIUM_STRING];
+    char family[SQL_TRANSITION_DATA_SMALL_STRING];
+    char recipient[SQL_TRANSITION_DATA_MEDIUM_STRING];
+    char units[SQL_TRANSITION_DATA_SMALL_STRING];
+    char exec[SQL_TRANSITION_DATA_BIG_STRING];
+    char info[SQL_TRANSITION_DATA_BIG_STRING];
+    char classification[SQL_TRANSITION_DATA_SMALL_STRING];
+    char type[SQL_TRANSITION_DATA_SMALL_STRING];
+    char component[SQL_TRANSITION_DATA_SMALL_STRING];
+    time_t when_key;
+    time_t duration;
+    time_t non_clear_duration;
+    uint64_t flags;
+    time_t delay_up_to_timestamp;
+    time_t exec_run_timestamp;
+    int exec_code;
+    int new_status;
+    int old_status;
+    int delay;
+    time_t last_repeat;
+    NETDATA_DOUBLE new_value;
+    NETDATA_DOUBLE old_value;
 
-    n->host_id = NULL;
+    char machine_guid[UUID_STR_LEN];
+    struct sql_alert_transition_fixed_size *next;
+    struct sql_alert_transition_fixed_size *prev;
+};
 
-    n->config_hash_id = mallocz(sizeof(*t->config_hash_id));
-    memcpy(n->config_hash_id, t->config_hash_id, sizeof(*t->config_hash_id));
+static struct sql_alert_transition_fixed_size *contexts_v2_alert_transition_dup(struct sql_alert_transition_data *t, const char *machine_guid, struct sql_alert_transition_fixed_size *dst) {
+    struct sql_alert_transition_fixed_size *n = dst ? dst : mallocz(sizeof(*n));
 
-    n->alert_name = t->alert_name && *t->alert_name ? strdupz(t->alert_name) : NULL;
-    n->chart = t->chart && *t->chart ? strdupz(t->chart) : NULL;
-    n->chart_context = t->chart_context && *t->chart_context ? strdupz(t->chart_context) : NULL;
-    n->family = NULL;
-    n->recipient = t->recipient && *t->recipient ? strdupz(t->recipient) : NULL;
-    n->units = t->units && *t->units ? strdupz(t->units) : NULL;
-    n->info = t->info && *t->info ? strdupz(t->info) : NULL;
-    n->classification = t->classification && *t->classification ? strdupz(t->classification) : NULL;
-    n->type = t->type && *t->type ? strdupz(t->type) : NULL;
-    n->component = t->component && *t->component ? strdupz(t->component) : NULL;
-    n->exec = (t->exec && *t->exec) ? strdupz(t->exec) : NULL;
+    n->global_id = t->global_id;
+    uuid_copy(n->transition_id, *t->transition_id);
+    uuid_copy(n->host_id, *t->host_id);
+    uuid_copy(n->config_hash_id, *t->config_hash_id);
+    n->alarm_id = t->alarm_id;
+    strncpyz(n->alert_name, t->alert_name ? t->alert_name : "", sizeof(n->alert_name) - 1);
+    strncpyz(n->chart, t->chart ? t->chart : "", sizeof(n->chart) - 1);
+    strncpyz(n->chart_context, t->chart_context ? t->chart_context : "", sizeof(n->chart_context) - 1);
+    strncpyz(n->family, t->family ? t->family : "", sizeof(n->family) - 1);
+    strncpyz(n->recipient, t->recipient ? t->recipient : "", sizeof(n->recipient) - 1);
+    strncpyz(n->units, t->units ? t->units : "", sizeof(n->units) - 1);
+    strncpyz(n->exec, t->exec ? t->exec : "", sizeof(n->exec) - 1);
+    strncpyz(n->info, t->info ? t->info : "", sizeof(n->info) - 1);
+    strncpyz(n->classification, t->classification ? t->classification : "", sizeof(n->classification) - 1);
+    strncpyz(n->type, t->type ? t->type : "", sizeof(n->type) - 1);
+    strncpyz(n->component, t->component ? t->component : "", sizeof(n->component) - 1);
+    n->when_key = t->when_key;
+    n->duration = t->duration;
+    n->non_clear_duration = t->non_clear_duration;
+    n->flags = t->flags;
+    n->delay_up_to_timestamp = t->delay_up_to_timestamp;
+    n->exec_run_timestamp = t->exec_run_timestamp;
+    n->exec_code = t->exec_code;
+    n->new_status = t->new_status;
+    n->old_status = t->old_status;
+    n->delay = t->delay;
+    n->last_repeat = t->last_repeat;
+    n->new_value = t->new_value;
+    n->old_value = t->old_value;
 
     memcpy(n->machine_guid, machine_guid, sizeof(n->machine_guid));
+    n->next = n->prev = NULL;
 
     return n;
 }
 
-static void contexts_v2_alert_transition_free(struct sql_alert_transition_data *t) {
-    freez(t->transition_id);
-    freez(t->host_id);
-    freez(t->config_hash_id);
-    freez((void *)t->alert_name);
-    freez((void *)t->chart);
-    freez((void *)t->chart_context);
-    freez((void *)t->family);
-    freez((void *)t->recipient);
-    freez((void *)t->units);
-    freez((void *)t->info);
-    freez((void *)t->classification);
-    freez((void *)t->type);
-    freez((void *)t->component);
-    freez((void *)t->exec);
+static void contexts_v2_alert_transition_free(struct sql_alert_transition_fixed_size *t) {
     freez(t);
 }
 
@@ -1423,14 +1459,14 @@ static inline void contexts_v2_alert_transition_keep(struct alert_transitions_ca
     }
 
     if(unlikely(!d->base)) {
-        d->last_added = contexts_v2_alert_transition_dup(t, machine_guid);
+        d->last_added = contexts_v2_alert_transition_dup(t, machine_guid, NULL);
         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(d->base, d->last_added, prev, next);
         d->items++;
         d->stats.first++;
         return;
     }
 
-    struct sql_alert_transition_data *last = d->last_added;
+    struct sql_alert_transition_fixed_size *last = d->last_added;
     while(last->prev != d->base->prev && t->global_id > last->prev->global_id) {
         last = last->prev;
         d->stats.backwards++;
@@ -1449,13 +1485,20 @@ static inline void contexts_v2_alert_transition_keep(struct alert_transitions_ca
     }
 
     d->items++;
-    d->last_added = contexts_v2_alert_transition_dup(t, machine_guid);
 
     if(t->global_id > last->global_id) {
+        if(d->items > d->limit) {
+            d->items--;
+            d->stats.shifts++;
+            d->last_added = d->base->prev;
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(d->base, d->last_added, prev, next);
+            d->last_added = contexts_v2_alert_transition_dup(t, machine_guid, d->last_added);
+        }
         DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(d->base, d->last_added, prev, next);
         d->stats.prepend++;
     }
     else {
+        d->last_added = contexts_v2_alert_transition_dup(t, machine_guid, NULL);
         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(d->base, d->last_added, prev, next);
         d->stats.append++;
     }
@@ -1463,7 +1506,7 @@ static inline void contexts_v2_alert_transition_keep(struct alert_transitions_ca
     while(d->items > d->limit) {
         // we have to remove something
 
-        struct sql_alert_transition_data *tmp = d->base->prev;
+        struct sql_alert_transition_fixed_size *tmp = d->base->prev;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(d->base, tmp, prev, next);
         d->items--;
 
@@ -1605,30 +1648,30 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
     buffer_json_array_close(wb); // facets
 
     buffer_json_member_add_array(wb, "transitions");
-    for(struct sql_alert_transition_data *t = data.base; t ; t = t->next) {
+    for(struct sql_alert_transition_fixed_size *t = data.base; t ; t = t->next) {
         buffer_json_add_array_item_object(wb);
         {
             RRDHOST *host = rrdhost_find_by_guid(t->machine_guid);
 
             buffer_json_member_add_uint64(wb, "gi", t->global_id);
-            buffer_json_member_add_uuid(wb, "transition_id", t->transition_id);
-            buffer_json_member_add_uuid(wb, "config_hash_id", t->config_hash_id);
+            buffer_json_member_add_uuid(wb, "transition_id", &t->transition_id);
+            buffer_json_member_add_uuid(wb, "config_hash_id", &t->config_hash_id);
             buffer_json_member_add_string(wb, "machine_guid", t->machine_guid);
 
             if(host && host->node_id)
                 buffer_json_member_add_uuid(wb, "node_id", host->node_id);
 
-            buffer_json_member_add_string(wb, "alert", t->alert_name);
-            buffer_json_member_add_string(wb, "instance", t->chart);
-            buffer_json_member_add_string(wb, "context", t->chart_context);
-            // buffer_json_member_add_string(wb, "family", t->family);
-            buffer_json_member_add_string(wb, "component", t->component);
-            buffer_json_member_add_string(wb, "classification", t->classification);
-            buffer_json_member_add_string(wb, "type", t->type);
+            buffer_json_member_add_string(wb, "alert", *t->alert_name ? t->alert_name : NULL);
+            buffer_json_member_add_string(wb, "instance", *t->chart ? t->chart : NULL);
+            buffer_json_member_add_string(wb, "context", *t->chart_context ? t->chart_context : NULL);
+            // buffer_json_member_add_string(wb, "family", *t->family ? t->family : NULL);
+            buffer_json_member_add_string(wb, "component", *t->component ? t->component : NULL);
+            buffer_json_member_add_string(wb, "classification", *t->classification ? t->classification : NULL);
+            buffer_json_member_add_string(wb, "type", *t->type ? t->type : NULL);
 
             buffer_json_member_add_time_t(wb, "when", t->when_key);
-            buffer_json_member_add_string(wb, "info", t->info);
-            buffer_json_member_add_string(wb, "units", t->units);
+            buffer_json_member_add_string(wb, "info", *t->info ? t->info : "");
+            buffer_json_member_add_string(wb, "units", *t->units ? t->units : NULL);
             buffer_json_member_add_object(wb, "new");
             {
                 buffer_json_member_add_string(wb, "status", rrdcalc_status2string(t->new_status));
@@ -1650,9 +1693,9 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
                 buffer_json_member_add_time_t(wb, "delay", t->delay);
                 buffer_json_member_add_time_t(wb, "delay_up_to_time", t->delay_up_to_timestamp);
                 health_entry_flags_to_json_array(wb, "flags", t->flags);
-                buffer_json_member_add_string(wb, "exec", (t->exec && *t->exec) ? t->exec : string2str(localhost->health.health_default_exec));
+                buffer_json_member_add_string(wb, "exec", *t->exec ? t->exec : string2str(localhost->health.health_default_exec));
                 buffer_json_member_add_uint64(wb, "exec_code", t->exec_code);
-                buffer_json_member_add_string(wb, "to", t->recipient && *t->recipient ? t->recipient : string2str(localhost->health.health_default_recipient));
+                buffer_json_member_add_string(wb, "to", *t->recipient ? t->recipient : string2str(localhost->health.health_default_recipient));
             }
             buffer_json_object_close(wb); // notification
         }
@@ -1663,9 +1706,9 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
     if(ctl->options & CONTEXT_V2_OPTION_ALERTS_WITH_CONFIGURATIONS) {
         DICTIONARY *configs = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
 
-        for(struct sql_alert_transition_data *t = data.base; t ; t = t->next) {
+        for(struct sql_alert_transition_fixed_size *t = data.base; t ; t = t->next) {
             char guid[UUID_STR_LEN];
-            uuid_unparse_lower(*t->config_hash_id, guid);
+            uuid_unparse_lower(t->config_hash_id, guid);
             dictionary_set(configs, guid, NULL, 0);
         }
 
@@ -1677,7 +1720,7 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
     }
 
     while(data.base) {
-        struct sql_alert_transition_data *t = data.base;
+        struct sql_alert_transition_fixed_size *t = data.base;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(data.base, t, prev, next);
         contexts_v2_alert_transition_free(t);
     }
