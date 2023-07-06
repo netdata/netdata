@@ -1,121 +1,37 @@
 name: cgroups.plugin
-title: TBD
 modules:
-  - name: /sys/fs/cgroup
-    title: COLLECTORNAME Monitoring
-    duplicate_for_virtual_integrations:
-      list:
-        - '[Ubuntu](link to ubuntu)'
-        - '[Redhat](link to redhat)'
-    overview:
-      operation:
-        description: This collector periodically does http requests to one or more
-          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
-          are for replacing with the virtual integrations, to replace the link each
-          time) web servers to collect the metrics mod_status plugin that apache exposes
-      platforms:
-        description: If this collector can't run on some platforms specify them here
-          and set it to false, otherwise set this to true and this text will not be
-          rendered, instead a templated message will appear
-        use_templated_text: true
-      multi-instance:
-        boolean: true
-      permissions:
-        description: if there are any notable permission requirements, eg running
-          as root and so on, specify them here and set it to false, otherwise set
-          it to true and a templated message will appear
-        use_templated_text: true
-      related:
-        description: give a simple description if there are any other collectors related
-          to this collector. Example -> To get the most out of your apache servers,
-          you can monitor its processes for resources utilization and their log files
-          to turn them into real-time metrics. Check our related resources for more
-          information. (if not, leave empty)
-    setup:
-      prerequisites:
-        list:
-          - title: Prerequisite title for heading
-            text: List like with dashes, TBD, use | and newline for multiline
-      behavior:
-        auto_detection:
-          description: The collector auto-detects apache web servers running on localhost
-            ports 80, 443, and 8080.
-        limits:
-          description: The collector is limited to x amount of tables or any other
-            limitation, leave empty if none
-        impact:
-          description: Is there any impact on the application when using the default
-            configuration? Maybe on a db collector having to many tables might slow
-            down the db if collection happens per second, leave empty if none
-      configuration:
-        file:
-          description: 'which file the user has to edit. Example: go.d/apache.conf'
-        options:
-          description: TBD, use | and newline for multiline
-          folding:
-            title: Config options
-            enabled: true
-          list:
-            - name: option name
-              description: option description
-              default: a number or a string
-              required: true or false
-        examples:
-          folding:
-            title: Config
-            enabled: false
-          list:
-            - name: Basic / else describe what this example is about
-              description: A basic example configuration / describe your example
-              data: input the example data in yaml format
-    troubleshooting:
-      problems:
-        list:
-          - name: possible troubleshooting title
-            text: describe
-      debugging:
-        description: How to run this in debug mode? Use | and newline with indent,
-          to write in markdown
-      logs:
-        description: How can I monitor logs for this plugin?
-    related_resources:
-      integrations:
-        list:
-          - apache
-          - weblog
-          - httpcheck
-          - etc
-        provide:
-          description: What info I can provide for other plugins that reference me?
-            this will only be visible in their end, they will scrape this text. Example
-            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
-            I/O and many more resources utilization.
+  - module_name: /sys/fs/cgroup
+    plugin_name: cgroups.plugin
     alerts:
-      - name: '[cgroup_10min_cpu_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/cgroups.conf)'
+      - name: cgroup_10min_cpu_usage
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
         metric: cgroup.cpu_limit
         info: average cgroup CPU utilization over the last 10 minutes
         os: linux
-      - name: '[cgroup_ram_in_use](https://gihtub.com/netdata/netdata/blob/master/health/health.d/cgroups.conf)'
+      - name: cgroup_ram_in_use
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
         metric: cgroup.mem_usage
         info: cgroup memory utilization
         os: linux
-      - name: '[k8s_cgroup_10min_cpu_usage](https://gihtub.com/netdata/netdata/blob/master/health/health.d/cgroups.conf)'
+      - name: k8s_cgroup_10min_cpu_usage
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
         metric: k8s.cgroup.cpu_limit
         info: average cgroup CPU utilization over the last 10 minutes
         os: linux
-      - name: '[k8s_cgroup_ram_in_use](https://gihtub.com/netdata/netdata/blob/master/health/health.d/cgroups.conf)'
+      - name: k8s_cgroup_ram_in_use
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
         metric: k8s.cgroup.mem_usage
         info: cgroup memory utilization
         os: linux
     metrics:
-      description: some description for this section, or leave empty
       folding:
         title: Metrics
         enabled: false
-      scope:
-        cgroup:
-          name: cgroup
-          description: TBD
+      description: ''
+      availability: []
+      scopes:
+        - name: cgroup
+          description: ''
           labels:
             - name: container_name
               description: TBD
@@ -123,39 +39,53 @@ modules:
               description: TBD
           metrics:
             - name: cgroup.cpu_limit
+              availability: []
               description: CPU Usage within the limits
               unit: percentage
+              chart_type: line
               dimensions:
                 - name: used
             - name: cgroup.cpu
+              availability: []
               description: CPU Usage (100% = 1 core)
               unit: percentage
+              chart_type: stacked
               dimensions:
                 - name: user
                 - name: system
             - name: cgroup.cpu_per_core
+              availability: []
               description: CPU Usage (100% = 1 core) Per Core
               unit: percentage
+              chart_type: line
               dimensions:
                 - name: a dimension per core
             - name: cgroup.throttled
+              availability: []
               description: CPU Throttled Runnable Periods
               unit: percentage
+              chart_type: line
               dimensions:
                 - name: throttled
             - name: cgroup.throttled_duration
+              availability: []
               description: CPU Throttled Time Duration
               unit: ms
+              chart_type: line
               dimensions:
                 - name: duration
             - name: cgroup.cpu_shares
+              availability: []
               description: CPU Time Relative Share
               unit: shares
+              chart_type: line
               dimensions:
                 - name: shares
             - name: cgroup.mem
+              availability: []
               description: Memory Usage
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: cache
                 - name: rss
@@ -163,156 +93,205 @@ modules:
                 - name: rss_huge
                 - name: mapped_file
             - name: cgroup.writeback
+              availability: []
               description: Writeback Memory
               unit: MiB
+              chart_type: area
               dimensions:
                 - name: dirty
                 - name: writeback
             - name: cgroup.mem_activity
+              availability: []
               description: Memory Activity
               unit: MiB/s
+              chart_type: line
               dimensions:
                 - name: in
                 - name: out
             - name: cgroup.pgfaults
+              availability: []
               description: Memory Page Faults
               unit: MiB/s
+              chart_type: line
               dimensions:
                 - name: pgfault
                 - name: swap
             - name: cgroup.mem_usage
+              availability: []
               description: Used Memory
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: ram
                 - name: swap
             - name: cgroup.mem_usage_limit
+              availability: []
               description: Used RAM within the limits
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: available
                 - name: used
             - name: cgroup.mem_utilization
+              availability: []
               description: Memory Utilization
               unit: percentage
+              chart_type: line
               dimensions:
                 - name: utilization
             - name: cgroup.mem_failcnt
+              availability: []
               description: Memory Limit Failures
               unit: count
+              chart_type: line
               dimensions:
                 - name: failures
             - name: cgroup.io
+              availability: []
               description: I/O Bandwidth (all disks)
               unit: KiB/s
+              chart_type: area
               dimensions:
                 - name: read
                 - name: write
             - name: cgroup.serviced_ops
+              availability: []
               description: Serviced I/O Operations (all disks)
               unit: operations/s
+              chart_type: line
               dimensions:
                 - name: read
                 - name: write
             - name: cgroup.throttle_io
+              availability: []
               description: Throttle I/O Bandwidth (all disks)
               unit: KiB/s
+              chart_type: area
               dimensions:
                 - name: read
                 - name: write
             - name: cgroup.throttle_serviced_ops
+              availability: []
               description: Throttle Serviced I/O Operations (all disks)
               unit: operations/s
+              chart_type: line
               dimensions:
                 - name: read
                 - name: write
             - name: cgroup.queued_ops
+              availability: []
               description: Queued I/O Operations (all disks)
               unit: operations
+              chart_type: line
               dimensions:
                 - name: read
                 - name: write
             - name: cgroup.merged_ops
+              availability: []
               description: Merged I/O Operations (all disks)
               unit: operations/s
+              chart_type: line
               dimensions:
                 - name: read
                 - name: write
             - name: cgroup.cpu_some_pressure
+              availability: []
               description: CPU some pressure
               unit: percentage
+              chart_type: line
               dimensions:
                 - name: some10
                 - name: some60
                 - name: some300
             - name: cgroup.cpu_some_pressure_stall_time
+              availability: []
               description: CPU some pressure stall time
               unit: ms
+              chart_type: line
               dimensions:
                 - name: time
             - name: cgroup.cpu_full_pressure
+              availability: []
               description: CPU full pressure
               unit: percentage
+              chart_type: line
               dimensions:
                 - name: some10
                 - name: some60
                 - name: some300
             - name: cgroup.cpu_full_pressure_stall_time
+              availability: []
               description: CPU full pressure stall time
               unit: ms
+              chart_type: line
               dimensions:
                 - name: time
             - name: cgroup.memory_some_pressure
+              availability: []
               description: Memory some pressure
               unit: percentage
+              chart_type: line
               dimensions:
                 - name: some10
                 - name: some60
                 - name: some300
             - name: cgroup.memory_some_pressure_stall_time
+              availability: []
               description: Memory some pressure stall time
               unit: ms
+              chart_type: line
               dimensions:
                 - name: time
             - name: cgroup.memory_full_pressure
+              availability: []
               description: Memory full pressure
               unit: percentage
+              chart_type: line
               dimensions:
                 - name: some10
                 - name: some60
                 - name: some300
             - name: cgroup.memory_full_pressure_stall_time
+              availability: []
               description: Memory full pressure stall time
               unit: ms
+              chart_type: line
               dimensions:
                 - name: time
             - name: cgroup.io_some_pressure
+              availability: []
               description: I/O some pressure
               unit: percentage
+              chart_type: line
               dimensions:
                 - name: some10
                 - name: some60
                 - name: some300
             - name: cgroup.io_some_pressure_stall_time
+              availability: []
               description: I/O some pressure stall time
               unit: ms
+              chart_type: line
               dimensions:
                 - name: time
             - name: cgroup.io_full_pressure
+              availability: []
               description: I/O some pressure
               unit: percentage
+              chart_type: line
               dimensions:
                 - name: some10
                 - name: some60
                 - name: some300
             - name: cgroup.io_full_pressure_stall_time
+              availability: []
               description: I/O some pressure stall time
               unit: ms
+              chart_type: line
               dimensions:
                 - name: time
-        k8s cgroup:
-          name: k8s cgroup
-          description: TBD
+        - name: k8s cgroup
+          description: ''
           labels:
             - name: k8s_namespace
               description: TBD
@@ -338,39 +317,53 @@ modules:
               description: TBD
           metrics:
             - name: k8s.cgroup.cpu_limit
+              availability: []
               description: CPU Usage within the limits
               unit: percentage
+              chart_type: line
               dimensions:
                 - name: used
             - name: k8s.cgroup.cpu
+              availability: []
               description: CPU Usage (100% = 1000 mCPU)
               unit: percentage
+              chart_type: stacked
               dimensions:
                 - name: user
                 - name: system
             - name: k8s.cgroup.cpu_per_core
+              availability: []
               description: CPU Usage (100% = 1000 mCPU) Per Core
               unit: percentage
+              chart_type: line
               dimensions:
                 - name: a dimension per core
             - name: k8s.cgroup.throttled
+              availability: []
               description: CPU Throttled Runnable Periods
               unit: percentage
+              chart_type: line
               dimensions:
                 - name: throttled
             - name: k8s.cgroup.throttled_duration
+              availability: []
               description: CPU Throttled Time Duration
               unit: ms
+              chart_type: line
               dimensions:
                 - name: duration
             - name: k8s.cgroup.cpu_shares
+              availability: []
               description: CPU Time Relative Share
               unit: shares
+              chart_type: line
               dimensions:
                 - name: shares
             - name: k8s.cgroup.mem
+              availability: []
               description: Memory Usage
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: cache
                 - name: rss
@@ -378,268 +371,234 @@ modules:
                 - name: rss_huge
                 - name: mapped_file
             - name: k8s.cgroup.writeback
+              availability: []
               description: Writeback Memory
               unit: MiB
+              chart_type: area
               dimensions:
                 - name: dirty
                 - name: writeback
             - name: k8s.cgroup.mem_activity
+              availability: []
               description: Memory Activity
               unit: MiB/s
+              chart_type: line
               dimensions:
                 - name: in
                 - name: out
             - name: k8s.cgroup.pgfaults
+              availability: []
               description: Memory Page Faults
               unit: MiB/s
+              chart_type: line
               dimensions:
                 - name: pgfault
                 - name: swap
             - name: k8s.cgroup.mem_usage
+              availability: []
               description: Used Memory
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: ram
                 - name: swap
             - name: k8s.cgroup.mem_usage_limit
+              availability: []
               description: Used RAM within the limits
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: available
                 - name: used
             - name: k8s.cgroup.mem_utilization
+              availability: []
               description: Memory Utilization
               unit: percentage
+              chart_type: line
               dimensions:
                 - name: utilization
             - name: k8s.cgroup.mem_failcnt
+              availability: []
               description: Memory Limit Failures
               unit: count
+              chart_type: line
               dimensions:
                 - name: failures
             - name: k8s.cgroup.io
+              availability: []
               description: I/O Bandwidth (all disks)
               unit: KiB/s
+              chart_type: area
               dimensions:
                 - name: read
                 - name: write
             - name: k8s.cgroup.serviced_ops
+              availability: []
               description: Serviced I/O Operations (all disks)
               unit: operations/s
+              chart_type: line
               dimensions:
                 - name: read
                 - name: write
             - name: k8s.cgroup.throttle_io
+              availability: []
               description: Throttle I/O Bandwidth (all disks)
               unit: KiB/s
+              chart_type: area
               dimensions:
                 - name: read
                 - name: write
             - name: k8s.cgroup.throttle_serviced_ops
+              availability: []
               description: Throttle Serviced I/O Operations (all disks)
               unit: operations/s
+              chart_type: line
               dimensions:
                 - name: read
                 - name: write
             - name: k8s.cgroup.queued_ops
+              availability: []
               description: Queued I/O Operations (all disks)
               unit: operations
+              chart_type: line
               dimensions:
                 - name: read
                 - name: write
             - name: k8s.cgroup.merged_ops
+              availability: []
               description: Merged I/O Operations (all disks)
               unit: operations/s
+              chart_type: line
               dimensions:
                 - name: read
                 - name: write
             - name: k8s.cgroup.cpu_some_pressure
+              availability: []
               description: CPU some pressure
               unit: percentage
+              chart_type: line
               dimensions:
                 - name: some10
                 - name: some60
                 - name: some300
             - name: k8s.cgroup.cpu_some_pressure_stall_time
+              availability: []
               description: CPU some pressure stall time
               unit: ms
+              chart_type: line
               dimensions:
                 - name: time
             - name: k8s.cgroup.cpu_full_pressure
+              availability: []
               description: CPU full pressure
               unit: percentage
+              chart_type: line
               dimensions:
                 - name: some10
                 - name: some60
                 - name: some300
             - name: k8s.cgroup.cpu_full_pressure_stall_time
+              availability: []
               description: CPU full pressure stall time
               unit: ms
+              chart_type: line
               dimensions:
                 - name: time
             - name: k8s.cgroup.memory_some_pressure
+              availability: []
               description: Memory some pressure
               unit: percentage
+              chart_type: line
               dimensions:
                 - name: some10
                 - name: some60
                 - name: some300
             - name: k8s.cgroup.memory_some_pressure_stall_time
+              availability: []
               description: Memory some pressure stall time
               unit: ms
+              chart_type: line
               dimensions:
                 - name: time
             - name: k8s.cgroup.memory_full_pressure
+              availability: []
               description: Memory full pressure
               unit: percentage
+              chart_type: line
               dimensions:
                 - name: some10
                 - name: some60
                 - name: some300
             - name: k8s.cgroup.memory_full_pressure_stall_time
+              availability: []
               description: Memory full pressure stall time
               unit: ms
+              chart_type: line
               dimensions:
                 - name: time
             - name: k8s.cgroup.io_some_pressure
+              availability: []
               description: I/O some pressure
               unit: percentage
+              chart_type: line
               dimensions:
                 - name: some10
                 - name: some60
                 - name: some300
             - name: k8s.cgroup.io_some_pressure_stall_time
+              availability: []
               description: I/O some pressure stall time
               unit: ms
+              chart_type: line
               dimensions:
                 - name: time
             - name: k8s.cgroup.io_full_pressure
+              availability: []
               description: I/O some pressure
               unit: percentage
+              chart_type: line
               dimensions:
                 - name: some10
                 - name: some60
                 - name: some300
             - name: k8s.cgroup.io_full_pressure_stall_time
+              availability: []
               description: I/O some pressure stall time
               unit: ms
+              chart_type: line
               dimensions:
                 - name: time
-  - name: /proc/net/dev
-    title: COLLECTORNAME Monitoring
-    duplicate_for_virtual_integrations:
-      list:
-        - '[Ubuntu](link to ubuntu)'
-        - '[Redhat](link to redhat)'
-    overview:
-      operation:
-        description: This collector periodically does http requests to one or more
-          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
-          are for replacing with the virtual integrations, to replace the link each
-          time) web servers to collect the metrics mod_status plugin that apache exposes
-      platforms:
-        description: If this collector can't run on some platforms specify them here
-          and set it to false, otherwise set this to true and this text will not be
-          rendered, instead a templated message will appear
-        use_templated_text: true
-      multi-instance:
-        boolean: true
-      permissions:
-        description: if there are any notable permission requirements, eg running
-          as root and so on, specify them here and set it to false, otherwise set
-          it to true and a templated message will appear
-        use_templated_text: true
-      related:
-        description: give a simple description if there are any other collectors related
-          to this collector. Example -> To get the most out of your apache servers,
-          you can monitor its processes for resources utilization and their log files
-          to turn them into real-time metrics. Check our related resources for more
-          information. (if not, leave empty)
-    setup:
-      prerequisites:
-        list:
-          - title: Prerequisite title for heading
-            text: List like with dashes, TBD, use | and newline for multiline
-      behavior:
-        auto_detection:
-          description: The collector auto-detects apache web servers running on localhost
-            ports 80, 443, and 8080.
-        limits:
-          description: The collector is limited to x amount of tables or any other
-            limitation, leave empty if none
-        impact:
-          description: Is there any impact on the application when using the default
-            configuration? Maybe on a db collector having to many tables might slow
-            down the db if collection happens per second, leave empty if none
-      configuration:
-        file:
-          description: 'which file the user has to edit. Example: go.d/apache.conf'
-        options:
-          description: TBD, use | and newline for multiline
-          folding:
-            title: Config options
-            enabled: true
-          list:
-            - name: option name
-              description: option description
-              default: a number or a string
-              required: true or false
-        examples:
-          folding:
-            title: Config
-            enabled: false
-          list:
-            - name: Basic / else describe what this example is about
-              description: A basic example configuration / describe your example
-              data: input the example data in yaml format
-    troubleshooting:
-      problems:
-        list:
-          - name: possible troubleshooting title
-            text: describe
-      debugging:
-        description: How to run this in debug mode? Use | and newline with indent,
-          to write in markdown
-      logs:
-        description: How can I monitor logs for this plugin?
-    related_resources:
-      integrations:
-        list:
-          - apache
-          - weblog
-          - httpcheck
-          - etc
-        provide:
-          description: What info I can provide for other plugins that reference me?
-            this will only be visible in their end, they will scrape this text. Example
-            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
-            I/O and many more resources utilization.
+  - module_name: /proc/net/dev
+    plugin_name: cgroups.plugin
     alerts:
-      - name: '[cgroup_1m_received_packets_rate](https://gihtub.com/netdata/netdata/blob/master/health/health.d/cgroups.conf)'
+      - name: cgroup_1m_received_packets_rate
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
         metric: cgroup.net_packets
         info: average number of packets received by the network interface ${label:device}
           over the last minute
         os: linux
-      - name: '[cgroup_10s_received_packets_storm](https://gihtub.com/netdata/netdata/blob/master/health/health.d/cgroups.conf)'
+      - name: cgroup_10s_received_packets_storm
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
         metric: cgroup.net_packets
         info: ratio of average number of received packets for the network interface
           ${label:device} over the last 10 seconds, compared to the rate over the
           last minute
         os: linux
-      - name: '[k8s_cgroup_1m_received_packets_rate](https://gihtub.com/netdata/netdata/blob/master/health/health.d/cgroups.conf)'
+      - name: k8s_cgroup_1m_received_packets_rate
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
         metric: k8s.cgroup.net_packets
         info: average number of packets received by the network interface ${label:device}
           over the last minute
         os: linux
     metrics:
-      description: some description for this section, or leave empty
       folding:
         title: Metrics
         enabled: false
-      scope:
-        cgroup, network device:
-          name: cgroup, network device
-          description: TBD
+      description: ''
+      availability: []
+      scopes:
+        - name: cgroup, network device
+          description: ''
           labels:
             - name: container_name
               description: TBD
@@ -651,52 +610,68 @@ modules:
               description: TBD
           metrics:
             - name: cgroup.net_net
+              availability: []
               description: Bandwidth
               unit: kilobits/s
+              chart_type: area
               dimensions:
                 - name: received
                 - name: sent
             - name: cgroup.net_packets
+              availability: []
               description: Packets
               unit: pps
+              chart_type: line
               dimensions:
                 - name: received
                 - name: sent
                 - name: multicast
             - name: cgroup.net_errors
+              availability: []
               description: Interface Errors
               unit: errors/s
+              chart_type: line
               dimensions:
                 - name: inbound
                 - name: outbound
             - name: cgroup.net_drops
+              availability: []
               description: Interface Drops
               unit: errors/s
+              chart_type: line
               dimensions:
                 - name: inbound
                 - name: outbound
             - name: cgroup.net_fifo
+              availability: []
               description: Interface FIFO Buffer Errors
               unit: errors/s
+              chart_type: line
               dimensions:
                 - name: receive
                 - name: transmit
             - name: cgroup.net_compressed
+              availability: []
               description: Interface FIFO Buffer Errors
               unit: pps
+              chart_type: line
               dimensions:
                 - name: receive
                 - name: sent
             - name: cgroup.net_events
+              availability: []
               description: Network Interface Events
               unit: events/s
+              chart_type: line
               dimensions:
                 - name: frames
                 - name: collisions
                 - name: carrier
             - name: cgroup.net_operstate
+              availability: []
               description: Interface Operational State
               unit: state
+              chart_type: line
               dimensions:
                 - name: up
                 - name: down
@@ -706,19 +681,22 @@ modules:
                 - name: dormant
                 - name: unknown
             - name: cgroup.net_carrier
+              availability: []
               description: Interface Physical Link State
               unit: state
+              chart_type: line
               dimensions:
                 - name: up
                 - name: down
             - name: cgroup.net_mtu
+              availability: []
               description: Interface MTU
               unit: octets
+              chart_type: line
               dimensions:
                 - name: mtu
-        k8s cgroup, network device:
-          name: k8s cgroup, network device
-          description: TBD
+        - name: k8s cgroup, network device
+          description: ''
           labels:
             - name: device
               description: TBD
@@ -748,52 +726,68 @@ modules:
               description: TBD
           metrics:
             - name: k8s.cgroup.net_net
+              availability: []
               description: Bandwidth
               unit: kilobits/s
+              chart_type: area
               dimensions:
                 - name: received
                 - name: sent
             - name: k8s.cgroup.net_packets
+              availability: []
               description: Packets
               unit: pps
+              chart_type: line
               dimensions:
                 - name: received
                 - name: sent
                 - name: multicast
             - name: k8s.cgroup.net_errors
+              availability: []
               description: Interface Errors
               unit: errors/s
+              chart_type: line
               dimensions:
                 - name: inbound
                 - name: outbound
             - name: k8s.cgroup.net_drops
+              availability: []
               description: Interface Drops
               unit: errors/s
+              chart_type: line
               dimensions:
                 - name: inbound
                 - name: outbound
             - name: k8s.cgroup.net_fifo
+              availability: []
               description: Interface FIFO Buffer Errors
               unit: errors/s
+              chart_type: line
               dimensions:
                 - name: receive
                 - name: transmit
             - name: k8s.cgroup.net_compressed
+              availability: []
               description: Interface FIFO Buffer Errors
               unit: pps
+              chart_type: line
               dimensions:
                 - name: receive
                 - name: sent
             - name: k8s.cgroup.net_events
+              availability: []
               description: Network Interface Events
               unit: events/s
+              chart_type: line
               dimensions:
                 - name: frames
                 - name: collisions
                 - name: carrier
             - name: k8s.cgroup.net_operstate
+              availability: []
               description: Interface Operational State
               unit: state
+              chart_type: line
               dimensions:
                 - name: up
                 - name: down
@@ -803,234 +797,199 @@ modules:
                 - name: dormant
                 - name: unknown
             - name: k8s.cgroup.net_carrier
+              availability: []
               description: Interface Physical Link State
               unit: state
+              chart_type: line
               dimensions:
                 - name: up
                 - name: down
             - name: k8s.cgroup.net_mtu
+              availability: []
               description: Interface MTU
               unit: octets
+              chart_type: line
               dimensions:
                 - name: mtu
-  - name: systemd
-    title: COLLECTORNAME Monitoring
-    duplicate_for_virtual_integrations:
-      list:
-        - '[Ubuntu](link to ubuntu)'
-        - '[Redhat](link to redhat)'
-    overview:
-      operation:
-        description: This collector periodically does http requests to one or more
-          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
-          are for replacing with the virtual integrations, to replace the link each
-          time) web servers to collect the metrics mod_status plugin that apache exposes
-      platforms:
-        description: If this collector can't run on some platforms specify them here
-          and set it to false, otherwise set this to true and this text will not be
-          rendered, instead a templated message will appear
-        use_templated_text: true
-      multi-instance:
-        boolean: true
-      permissions:
-        description: if there are any notable permission requirements, eg running
-          as root and so on, specify them here and set it to false, otherwise set
-          it to true and a templated message will appear
-        use_templated_text: true
-      related:
-        description: give a simple description if there are any other collectors related
-          to this collector. Example -> To get the most out of your apache servers,
-          you can monitor its processes for resources utilization and their log files
-          to turn them into real-time metrics. Check our related resources for more
-          information. (if not, leave empty)
-    setup:
-      prerequisites:
-        list:
-          - title: Prerequisite title for heading
-            text: List like with dashes, TBD, use | and newline for multiline
-      behavior:
-        auto_detection:
-          description: The collector auto-detects apache web servers running on localhost
-            ports 80, 443, and 8080.
-        limits:
-          description: The collector is limited to x amount of tables or any other
-            limitation, leave empty if none
-        impact:
-          description: Is there any impact on the application when using the default
-            configuration? Maybe on a db collector having to many tables might slow
-            down the db if collection happens per second, leave empty if none
-      configuration:
-        file:
-          description: 'which file the user has to edit. Example: go.d/apache.conf'
-        options:
-          description: TBD, use | and newline for multiline
-          folding:
-            title: Config options
-            enabled: true
-          list:
-            - name: option name
-              description: option description
-              default: a number or a string
-              required: true or false
-        examples:
-          folding:
-            title: Config
-            enabled: false
-          list:
-            - name: Basic / else describe what this example is about
-              description: A basic example configuration / describe your example
-              data: input the example data in yaml format
-    troubleshooting:
-      problems:
-        list:
-          - name: possible troubleshooting title
-            text: describe
-      debugging:
-        description: How to run this in debug mode? Use | and newline with indent,
-          to write in markdown
-      logs:
-        description: How can I monitor logs for this plugin?
-    related_resources:
-      integrations:
-        list:
-          - apache
-          - weblog
-          - httpcheck
-          - etc
-        provide:
-          description: What info I can provide for other plugins that reference me?
-            this will only be visible in their end, they will scrape this text. Example
-            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
-            I/O and many more resources utilization.
+  - module_name: systemd
+    plugin_name: cgroups.plugin
     alerts: []
     metrics:
-      description: some description for this section, or leave empty
       folding:
         title: Metrics
         enabled: false
-      scope:
-        global:
-          name: global
-          description: TBD
+      description: ''
+      availability: []
+      scopes:
+        - name: global
+          description: ''
           labels: []
           metrics:
             - name: services.cpu
+              availability: []
               description: Systemd Services CPU utilization (100% = 1 core)
               unit: percentage
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.mem_usage
+              availability: []
               description: Systemd Services Used Memory
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.mem_rss
+              availability: []
               description: Systemd Services RSS Memory
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.mem_mapped
+              availability: []
               description: Systemd Services Mapped Memory
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.mem_cache
+              availability: []
               description: Systemd Services Cache Memory
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.mem_writeback
+              availability: []
               description: Systemd Services Writeback Memory
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.mem_pgfault
+              availability: []
               description: Systemd Services Memory Minor Page Faults
               unit: MiB/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.mem_pgmajfault
+              availability: []
               description: Systemd Services Memory Major Page Faults
               unit: MiB/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.mem_pgpgin
+              availability: []
               description: Systemd Services Memory Charging Activity
               unit: MiB/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.mem_pgpgout
+              availability: []
               description: Systemd Services Memory Uncharging Activity
               unit: MiB/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.mem_failcnt
+              availability: []
               description: Systemd Services Memory Limit Failures
               unit: failures
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.swap_usage
+              availability: []
               description: Systemd Services Swap Memory Used
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.io_read
+              availability: []
               description: Systemd Services Disk Read Bandwidth
               unit: KiB/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.io_write
+              availability: []
               description: Systemd Services Disk Write Bandwidth
               unit: KiB/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.io_ops_read
+              availability: []
               description: Systemd Services Disk Read Operations
               unit: operations/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.io_ops_write
+              availability: []
               description: Systemd Services Disk Write Operations
               unit: operations/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.throttle_io_read
+              availability: []
               description: Systemd Services Throttle Disk Read Bandwidth
               unit: KiB/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.services.throttle_io_write
+              availability: []
               description: Systemd Services Throttle Disk Write Bandwidth
               unit: KiB/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.throttle_io_ops_read
+              availability: []
               description: Systemd Services Throttle Disk Read Operations
               unit: operations/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: throttle_io_ops_write
+              availability: []
               description: Systemd Services Throttle Disk Write Operations
               unit: operations/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.queued_io_ops_read
+              availability: []
               description: Systemd Services Queued Disk Read Operations
               unit: operations/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.queued_io_ops_write
+              availability: []
               description: Systemd Services Queued Disk Write Operations
               unit: operations/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.merged_io_ops_read
+              availability: []
               description: Systemd Services Merged Disk Read Operations
               unit: operations/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.merged_io_ops_write
+              availability: []
               description: Systemd Services Merged Disk Write Operations
               unit: operations/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service

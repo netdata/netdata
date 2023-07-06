@@ -1,904 +1,624 @@
 name: apps.plugin
-title: TBD
 modules:
-  - name: system
-    title: COLLECTORNAME Monitoring
-    duplicate_for_virtual_integrations:
-      list:
-        - '[Ubuntu](link to ubuntu)'
-        - '[Redhat](link to redhat)'
-    overview:
-      operation:
-        description: This collector periodically does http requests to one or more
-          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
-          are for replacing with the virtual integrations, to replace the link each
-          time) web servers to collect the metrics mod_status plugin that apache exposes
-      platforms:
-        description: If this collector can't run on some platforms specify them here
-          and set it to false, otherwise set this to true and this text will not be
-          rendered, instead a templated message will appear
-        use_templated_text: true
-      multi-instance:
-        boolean: true
-      permissions:
-        description: if there are any notable permission requirements, eg running
-          as root and so on, specify them here and set it to false, otherwise set
-          it to true and a templated message will appear
-        use_templated_text: true
-      related:
-        description: give a simple description if there are any other collectors related
-          to this collector. Example -> To get the most out of your apache servers,
-          you can monitor its processes for resources utilization and their log files
-          to turn them into real-time metrics. Check our related resources for more
-          information. (if not, leave empty)
-    setup:
-      prerequisites:
-        list:
-          - title: Prerequisite title for heading
-            text: List like with dashes, TBD, use | and newline for multiline
-      behavior:
-        auto_detection:
-          description: The collector auto-detects apache web servers running on localhost
-            ports 80, 443, and 8080.
-        limits:
-          description: The collector is limited to x amount of tables or any other
-            limitation, leave empty if none
-        impact:
-          description: Is there any impact on the application when using the default
-            configuration? Maybe on a db collector having to many tables might slow
-            down the db if collection happens per second, leave empty if none
-      configuration:
-        file:
-          description: 'which file the user has to edit. Example: go.d/apache.conf'
-        options:
-          description: TBD, use | and newline for multiline
-          folding:
-            title: Config options
-            enabled: true
-          list:
-            - name: option name
-              description: option description
-              default: a number or a string
-              required: true or false
-        examples:
-          folding:
-            title: Config
-            enabled: false
-          list:
-            - name: Basic / else describe what this example is about
-              description: A basic example configuration / describe your example
-              data: input the example data in yaml format
-    troubleshooting:
-      problems:
-        list:
-          - name: possible troubleshooting title
-            text: describe
-      debugging:
-        description: How to run this in debug mode? Use | and newline with indent,
-          to write in markdown
-      logs:
-        description: How can I monitor logs for this plugin?
-    related_resources:
-      integrations:
-        list:
-          - apache
-          - weblog
-          - httpcheck
-          - etc
-        provide:
-          description: What info I can provide for other plugins that reference me?
-            this will only be visible in their end, they will scrape this text. Example
-            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
-            I/O and many more resources utilization.
+  - module_name: system
+    plugin_name: apps.plugin
     alerts: []
     metrics:
-      description: some description for this section, or leave empty
       folding:
         title: Metrics
         enabled: false
-      scope:
-        global:
-          name: global
-          description: TBD
+      description: ''
+      availability: []
+      scopes:
+        - name: global
+          description: ''
           labels: []
           metrics:
             - name: system.processes_state
+              availability: []
               description: System Processes State
               unit: processes
+              chart_type: line
               dimensions:
                 - name: running
                 - name: sleeping_interruptible
                 - name: sleeping_uninterruptible
                 - name: zombie
                 - name: stopped
-  - name: apps
-    title: COLLECTORNAME Monitoring
-    duplicate_for_virtual_integrations:
-      list:
-        - '[Ubuntu](link to ubuntu)'
-        - '[Redhat](link to redhat)'
-    overview:
-      operation:
-        description: This collector periodically does http requests to one or more
-          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
-          are for replacing with the virtual integrations, to replace the link each
-          time) web servers to collect the metrics mod_status plugin that apache exposes
-      platforms:
-        description: If this collector can't run on some platforms specify them here
-          and set it to false, otherwise set this to true and this text will not be
-          rendered, instead a templated message will appear
-        use_templated_text: true
-      multi-instance:
-        boolean: true
-      permissions:
-        description: if there are any notable permission requirements, eg running
-          as root and so on, specify them here and set it to false, otherwise set
-          it to true and a templated message will appear
-        use_templated_text: true
-      related:
-        description: give a simple description if there are any other collectors related
-          to this collector. Example -> To get the most out of your apache servers,
-          you can monitor its processes for resources utilization and their log files
-          to turn them into real-time metrics. Check our related resources for more
-          information. (if not, leave empty)
-    setup:
-      prerequisites:
-        list:
-          - title: Prerequisite title for heading
-            text: List like with dashes, TBD, use | and newline for multiline
-      behavior:
-        auto_detection:
-          description: The collector auto-detects apache web servers running on localhost
-            ports 80, 443, and 8080.
-        limits:
-          description: The collector is limited to x amount of tables or any other
-            limitation, leave empty if none
-        impact:
-          description: Is there any impact on the application when using the default
-            configuration? Maybe on a db collector having to many tables might slow
-            down the db if collection happens per second, leave empty if none
-      configuration:
-        file:
-          description: 'which file the user has to edit. Example: go.d/apache.conf'
-        options:
-          description: TBD, use | and newline for multiline
-          folding:
-            title: Config options
-            enabled: true
-          list:
-            - name: option name
-              description: option description
-              default: a number or a string
-              required: true or false
-        examples:
-          folding:
-            title: Config
-            enabled: false
-          list:
-            - name: Basic / else describe what this example is about
-              description: A basic example configuration / describe your example
-              data: input the example data in yaml format
-    troubleshooting:
-      problems:
-        list:
-          - name: possible troubleshooting title
-            text: describe
-      debugging:
-        description: How to run this in debug mode? Use | and newline with indent,
-          to write in markdown
-      logs:
-        description: How can I monitor logs for this plugin?
-    related_resources:
-      integrations:
-        list:
-          - apache
-          - weblog
-          - httpcheck
-          - etc
-        provide:
-          description: What info I can provide for other plugins that reference me?
-            this will only be visible in their end, they will scrape this text. Example
-            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
-            I/O and many more resources utilization.
+  - module_name: apps
+    plugin_name: apps.plugin
     alerts: []
     metrics:
-      description: some description for this section, or leave empty
       folding:
         title: Metrics
         enabled: false
-      scope:
-        global:
-          name: global
-          description: TBD
+      description: ''
+      availability: []
+      scopes:
+        - name: global
+          description: ''
           labels: []
           metrics:
             - name: apps.cpu
+              availability: []
               description: Apps CPU Time (100% = 1 core)
               unit: percentage
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: apps.cpu_user
+              availability: []
               description: Apps CPU User Time (100% = 1 core)
               unit: percentage
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: apps.cpu_system
+              availability: []
               description: Apps CPU System Time (100% = 1 core)
               unit: percentage
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: apps.cpu_guest
+              availability: []
               description: Apps CPU Guest Time (100% = 1 core)
               unit: percentage
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: apps.mem
+              availability: []
               description: Apps Real Memory (w/o shared)
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: apps.rss
+              availability: []
               description: Apps Resident Set Size (w/shared)
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: apps.vmem
+              availability: []
               description: Apps Virtual Memory Size
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: apps.swap
+              availability: []
               description: Apps Swap Memory
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: apps.major_faults
+              availability: []
               description: Apps Major Page Faults (swap read)
               unit: page faults/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: apps.minor_faults
+              availability: []
               description: Apps Minor Page Faults (swap read)
               unit: page faults/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: apps.preads
+              availability: []
               description: Apps Disk Reads
               unit: KiB/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: apps.pwrites
+              availability: []
               description: Apps Disk Writes
               unit: KiB/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: apps.lreads
+              availability: []
               description: Apps Disk Logical Reads
               unit: KiB/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: apps.lwrites
+              availability: []
               description: Apps I/O Logical Writes
               unit: KiB/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: apps.threads
+              availability: []
               description: Apps Threads
               unit: threads
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: apps.processes
+              availability: []
               description: Apps Processes
               unit: processes
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: apps.voluntary_ctxt_switches
+              availability: []
               description: Apps Voluntary Context Switches
               unit: processes
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: apps.involuntary_ctxt_switches
+              availability: []
               description: Apps Involuntary Context Switches
               unit: processes
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: apps.uptime
+              availability: []
               description: Apps Carried Over Uptime
               unit: seconds
+              chart_type: line
               dimensions:
                 - name: a dimension per app group
             - name: apps.uptime_min
+              availability: []
               description: Apps Minimum Uptime
               unit: seconds
+              chart_type: line
               dimensions:
                 - name: a dimension per app group
             - name: apps.uptime_avg
+              availability: []
               description: Apps Average Uptime
               unit: seconds
+              chart_type: line
               dimensions:
                 - name: a dimension per app group
             - name: apps.uptime_max
+              availability: []
               description: Apps Maximum Uptime
               unit: seconds
+              chart_type: line
               dimensions:
                 - name: a dimension per app group
             - name: apps.files
+              availability: []
               description: Apps Open Files
               unit: open files
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: apps.sockets
+              availability: []
               description: Apps Open Sockets
               unit: open sockets
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: apps.pipes
+              availability: []
               description: Apps Open Pipes
               unit: open pipes
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
-  - name: groups
-    title: COLLECTORNAME Monitoring
-    duplicate_for_virtual_integrations:
-      list:
-        - '[Ubuntu](link to ubuntu)'
-        - '[Redhat](link to redhat)'
-    overview:
-      operation:
-        description: This collector periodically does http requests to one or more
-          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
-          are for replacing with the virtual integrations, to replace the link each
-          time) web servers to collect the metrics mod_status plugin that apache exposes
-      platforms:
-        description: If this collector can't run on some platforms specify them here
-          and set it to false, otherwise set this to true and this text will not be
-          rendered, instead a templated message will appear
-        use_templated_text: true
-      multi-instance:
-        boolean: true
-      permissions:
-        description: if there are any notable permission requirements, eg running
-          as root and so on, specify them here and set it to false, otherwise set
-          it to true and a templated message will appear
-        use_templated_text: true
-      related:
-        description: give a simple description if there are any other collectors related
-          to this collector. Example -> To get the most out of your apache servers,
-          you can monitor its processes for resources utilization and their log files
-          to turn them into real-time metrics. Check our related resources for more
-          information. (if not, leave empty)
-    setup:
-      prerequisites:
-        list:
-          - title: Prerequisite title for heading
-            text: List like with dashes, TBD, use | and newline for multiline
-      behavior:
-        auto_detection:
-          description: The collector auto-detects apache web servers running on localhost
-            ports 80, 443, and 8080.
-        limits:
-          description: The collector is limited to x amount of tables or any other
-            limitation, leave empty if none
-        impact:
-          description: Is there any impact on the application when using the default
-            configuration? Maybe on a db collector having to many tables might slow
-            down the db if collection happens per second, leave empty if none
-      configuration:
-        file:
-          description: 'which file the user has to edit. Example: go.d/apache.conf'
-        options:
-          description: TBD, use | and newline for multiline
-          folding:
-            title: Config options
-            enabled: true
-          list:
-            - name: option name
-              description: option description
-              default: a number or a string
-              required: true or false
-        examples:
-          folding:
-            title: Config
-            enabled: false
-          list:
-            - name: Basic / else describe what this example is about
-              description: A basic example configuration / describe your example
-              data: input the example data in yaml format
-    troubleshooting:
-      problems:
-        list:
-          - name: possible troubleshooting title
-            text: describe
-      debugging:
-        description: How to run this in debug mode? Use | and newline with indent,
-          to write in markdown
-      logs:
-        description: How can I monitor logs for this plugin?
-    related_resources:
-      integrations:
-        list:
-          - apache
-          - weblog
-          - httpcheck
-          - etc
-        provide:
-          description: What info I can provide for other plugins that reference me?
-            this will only be visible in their end, they will scrape this text. Example
-            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
-            I/O and many more resources utilization.
+  - module_name: groups
+    plugin_name: apps.plugin
     alerts: []
     metrics:
-      description: some description for this section, or leave empty
       folding:
         title: Metrics
         enabled: false
-      scope:
-        global:
-          name: global
-          description: TBD
+      description: ''
+      availability: []
+      scopes:
+        - name: global
+          description: ''
           labels: []
           metrics:
             - name: groups.cpu
+              availability: []
               description: User Groups CPU Time (100% = 1 core)
               unit: percentage
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user group
             - name: groups.cpu_user
+              availability: []
               description: User Groups CPU User Time (100% = 1 core)
               unit: percentage
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user group
             - name: groups.cpu_system
+              availability: []
               description: User Groups CPU System Time (100% = 1 core)
               unit: percentage
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user group
             - name: groups.cpu_guest
+              availability: []
               description: User Groups CPU Guest Time (100% = 1 core)
               unit: percentage
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user group
             - name: groups.mem
+              availability: []
               description: User Groups Real Memory (w/o shared)
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user group
             - name: groups.rss
+              availability: []
               description: User Groups Resident Set Size (w/shared)
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user group
             - name: groups.vmem
+              availability: []
               description: User Groups Virtual Memory Size
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user group
             - name: groups.swap
+              availability: []
               description: User Groups Swap Memory
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user group
             - name: groups.major_faults
+              availability: []
               description: User Groups Major Page Faults (swap read)
               unit: page faults/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user group
             - name: groups.minor_faults
+              availability: []
               description: User Groups Page Faults (swap read)
               unit: page faults/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user group
             - name: groups.preads
+              availability: []
               description: User Groups Disk Reads
               unit: KiB/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user group
             - name: groups.pwrites
+              availability: []
               description: User Groups Disk Writes
               unit: KiB/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user group
             - name: groups.lreads
+              availability: []
               description: User Groups Disk Logical Reads
               unit: KiB/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user group
             - name: groups.lwrites
+              availability: []
               description: User Groups I/O Logical Writes
               unit: KiB/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user group
             - name: groups.threads
+              availability: []
               description: User Groups Threads
               unit: threads
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user group
             - name: groups.processes
+              availability: []
               description: User Groups Processes
               unit: processes
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user group
             - name: groups.voluntary_ctxt_switches
+              availability: []
               description: User Groups Voluntary Context Switches
               unit: processes
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: groups.involuntary_ctxt_switches
+              availability: []
               description: User Groups Involuntary Context Switches
               unit: processes
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: groups.uptime
+              availability: []
               description: User Groups Carried Over Uptime
               unit: seconds
+              chart_type: line
               dimensions:
                 - name: a dimension per user group
             - name: groups.uptime_min
+              availability: []
               description: User Groups Minimum Uptime
               unit: seconds
+              chart_type: line
               dimensions:
                 - name: a dimension per user group
             - name: groups.uptime_avg
+              availability: []
               description: User Groups Average Uptime
               unit: seconds
+              chart_type: line
               dimensions:
                 - name: a dimension per user group
             - name: groups.uptime_max
+              availability: []
               description: User Groups Maximum Uptime
               unit: seconds
+              chart_type: line
               dimensions:
                 - name: a dimension per user group
             - name: groups.files
+              availability: []
               description: User Groups Open Files
               unit: open files
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user group
             - name: groups.sockets
+              availability: []
               description: User Groups Open Sockets
               unit: open sockets
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user group
             - name: groups.pipes
+              availability: []
               description: User Groups Open Pipes
               unit: open pipes
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user group
-  - name: users
-    title: COLLECTORNAME Monitoring
-    duplicate_for_virtual_integrations:
-      list:
-        - '[Ubuntu](link to ubuntu)'
-        - '[Redhat](link to redhat)'
-    overview:
-      operation:
-        description: This collector periodically does http requests to one or more
-          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
-          are for replacing with the virtual integrations, to replace the link each
-          time) web servers to collect the metrics mod_status plugin that apache exposes
-      platforms:
-        description: If this collector can't run on some platforms specify them here
-          and set it to false, otherwise set this to true and this text will not be
-          rendered, instead a templated message will appear
-        use_templated_text: true
-      multi-instance:
-        boolean: true
-      permissions:
-        description: if there are any notable permission requirements, eg running
-          as root and so on, specify them here and set it to false, otherwise set
-          it to true and a templated message will appear
-        use_templated_text: true
-      related:
-        description: give a simple description if there are any other collectors related
-          to this collector. Example -> To get the most out of your apache servers,
-          you can monitor its processes for resources utilization and their log files
-          to turn them into real-time metrics. Check our related resources for more
-          information. (if not, leave empty)
-    setup:
-      prerequisites:
-        list:
-          - title: Prerequisite title for heading
-            text: List like with dashes, TBD, use | and newline for multiline
-      behavior:
-        auto_detection:
-          description: The collector auto-detects apache web servers running on localhost
-            ports 80, 443, and 8080.
-        limits:
-          description: The collector is limited to x amount of tables or any other
-            limitation, leave empty if none
-        impact:
-          description: Is there any impact on the application when using the default
-            configuration? Maybe on a db collector having to many tables might slow
-            down the db if collection happens per second, leave empty if none
-      configuration:
-        file:
-          description: 'which file the user has to edit. Example: go.d/apache.conf'
-        options:
-          description: TBD, use | and newline for multiline
-          folding:
-            title: Config options
-            enabled: true
-          list:
-            - name: option name
-              description: option description
-              default: a number or a string
-              required: true or false
-        examples:
-          folding:
-            title: Config
-            enabled: false
-          list:
-            - name: Basic / else describe what this example is about
-              description: A basic example configuration / describe your example
-              data: input the example data in yaml format
-    troubleshooting:
-      problems:
-        list:
-          - name: possible troubleshooting title
-            text: describe
-      debugging:
-        description: How to run this in debug mode? Use | and newline with indent,
-          to write in markdown
-      logs:
-        description: How can I monitor logs for this plugin?
-    related_resources:
-      integrations:
-        list:
-          - apache
-          - weblog
-          - httpcheck
-          - etc
-        provide:
-          description: What info I can provide for other plugins that reference me?
-            this will only be visible in their end, they will scrape this text. Example
-            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
-            I/O and many more resources utilization.
+  - module_name: users
+    plugin_name: apps.plugin
     alerts: []
     metrics:
-      description: some description for this section, or leave empty
       folding:
         title: Metrics
         enabled: false
-      scope:
-        global:
-          name: global
-          description: TBD
+      description: ''
+      availability: []
+      scopes:
+        - name: global
+          description: ''
           labels: []
           metrics:
             - name: users.cpu
+              availability: []
               description: Users CPU Time (100% = 1 core)
               unit: percentage
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user
             - name: users.cpu_user
+              availability: []
               description: Users CPU User Time (100% = 1 core)
               unit: percentage
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user
             - name: users.cpu_system
+              availability: []
               description: Users CPU System Time (100% = 1 core)
               unit: percentage
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user
             - name: users.cpu_guest
+              availability: []
               description: Users CPU Guest Time (100% = 1 core)
               unit: percentage
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user
             - name: users.mem
+              availability: []
               description: Users Real Memory (w/o shared)
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user
             - name: users.rss
+              availability: []
               description: Users Resident Set Size (w/shared)
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user
             - name: users.vmem
+              availability: []
               description: Users Virtual Memory Size
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user
             - name: users.swap
+              availability: []
               description: Users Swap Memory
               unit: MiB
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user
             - name: users.major_faults
+              availability: []
               description: Users Major Page Faults (swap read)
               unit: page faults/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user
             - name: users.minor_faults
+              availability: []
               description: Users Page Faults (swap read)
               unit: page faults/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user
             - name: users.preads
+              availability: []
               description: Users Disk Reads
               unit: KiB/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user
             - name: users.pwrites
+              availability: []
               description: Users Disk Writes
               unit: KiB/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user
             - name: users.lreads
+              availability: []
               description: Users Disk Logical Reads
               unit: KiB/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user
             - name: users.lwrites
+              availability: []
               description: Users I/O Logical Writes
               unit: KiB/s
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user
             - name: users.threads
+              availability: []
               description: Users Threads
               unit: threads
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user
             - name: users.processes
+              availability: []
               description: Users Processes
               unit: processes
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user
             - name: users.voluntary_ctxt_switches
+              availability: []
               description: Users Voluntary Context Switches
               unit: processes
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: users.involuntary_ctxt_switches
+              availability: []
               description: Users Involuntary Context Switches
               unit: processes
+              chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: users.uptime
+              availability: []
               description: Users Carried Over Uptime
               unit: seconds
+              chart_type: line
               dimensions:
                 - name: a dimension per user
             - name: users.uptime_min
+              availability: []
               description: Users Minimum Uptime
               unit: seconds
+              chart_type: line
               dimensions:
                 - name: a dimension per user
             - name: users.uptime_avg
+              availability: []
               description: Users Average Uptime
               unit: seconds
+              chart_type: line
               dimensions:
                 - name: a dimension per user
             - name: users.uptime_max
+              availability: []
               description: Users Maximum Uptime
               unit: seconds
+              chart_type: line
               dimensions:
                 - name: a dimension per user
             - name: users.files
+              availability: []
               description: Users Open Files
               unit: open files
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user
             - name: users.sockets
+              availability: []
               description: Users Open Sockets
               unit: open sockets
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user
             - name: users.pipes
+              availability: []
               description: Users Open Pipes
               unit: open pipes
+              chart_type: stacked
               dimensions:
                 - name: a dimension per user
-  - name: netdata
-    title: COLLECTORNAME Monitoring
-    duplicate_for_virtual_integrations:
-      list:
-        - '[Ubuntu](link to ubuntu)'
-        - '[Redhat](link to redhat)'
-    overview:
-      operation:
-        description: This collector periodically does http requests to one or more
-          {[Apache](link to collector)} (<- CI will remove the curly brackets, they
-          are for replacing with the virtual integrations, to replace the link each
-          time) web servers to collect the metrics mod_status plugin that apache exposes
-      platforms:
-        description: If this collector can't run on some platforms specify them here
-          and set it to false, otherwise set this to true and this text will not be
-          rendered, instead a templated message will appear
-        use_templated_text: true
-      multi-instance:
-        boolean: true
-      permissions:
-        description: if there are any notable permission requirements, eg running
-          as root and so on, specify them here and set it to false, otherwise set
-          it to true and a templated message will appear
-        use_templated_text: true
-      related:
-        description: give a simple description if there are any other collectors related
-          to this collector. Example -> To get the most out of your apache servers,
-          you can monitor its processes for resources utilization and their log files
-          to turn them into real-time metrics. Check our related resources for more
-          information. (if not, leave empty)
-    setup:
-      prerequisites:
-        list:
-          - title: Prerequisite title for heading
-            text: List like with dashes, TBD, use | and newline for multiline
-      behavior:
-        auto_detection:
-          description: The collector auto-detects apache web servers running on localhost
-            ports 80, 443, and 8080.
-        limits:
-          description: The collector is limited to x amount of tables or any other
-            limitation, leave empty if none
-        impact:
-          description: Is there any impact on the application when using the default
-            configuration? Maybe on a db collector having to many tables might slow
-            down the db if collection happens per second, leave empty if none
-      configuration:
-        file:
-          description: 'which file the user has to edit. Example: go.d/apache.conf'
-        options:
-          description: TBD, use | and newline for multiline
-          folding:
-            title: Config options
-            enabled: true
-          list:
-            - name: option name
-              description: option description
-              default: a number or a string
-              required: true or false
-        examples:
-          folding:
-            title: Config
-            enabled: false
-          list:
-            - name: Basic / else describe what this example is about
-              description: A basic example configuration / describe your example
-              data: input the example data in yaml format
-    troubleshooting:
-      problems:
-        list:
-          - name: possible troubleshooting title
-            text: describe
-      debugging:
-        description: How to run this in debug mode? Use | and newline with indent,
-          to write in markdown
-      logs:
-        description: How can I monitor logs for this plugin?
-    related_resources:
-      integrations:
-        list:
-          - apache
-          - weblog
-          - httpcheck
-          - etc
-        provide:
-          description: What info I can provide for other plugins that reference me?
-            this will only be visible in their end, they will scrape this text. Example
-            -> apps.plugin allows monitoring individual processes CPU, Memory, Disk
-            I/O and many more resources utilization.
+  - module_name: netdata
+    plugin_name: apps.plugin
     alerts: []
     metrics:
-      description: some description for this section, or leave empty
       folding:
         title: Metrics
         enabled: false
-      scope:
-        global:
-          name: global
-          description: TBD
+      description: ''
+      availability: []
+      scopes:
+        - name: global
+          description: ''
           labels: []
           metrics:
             - name: netdata.apps_cpu
+              availability: []
               description: Apps Plugin CPU
               unit: milliseconds/s
+              chart_type: stacked
               dimensions:
                 - name: user
                 - name: system
             - name: netdata.apps_sizes
+              availability: []
               description: Apps Plugin Files
               unit: files/s
+              chart_type: line
               dimensions:
                 - name: calls
                 - name: files
@@ -910,8 +630,10 @@ modules:
                 - name: targets
                 - name: new_pids
             - name: netdata.apps_fix
+              availability: []
               description: Apps Plugin Normalization Ratios
               unit: percentage
+              chart_type: line
               dimensions:
                 - name: utime
                 - name: stime
@@ -919,8 +641,10 @@ modules:
                 - name: minflt
                 - name: majflt
             - name: netdata.apps_children_fix
+              availability: []
               description: Apps Plugin Exited Children Normalization Ratios
               unit: percentage
+              chart_type: line
               dimensions:
                 - name: utime
                 - name: stime

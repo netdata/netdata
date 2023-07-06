@@ -1,276 +1,259 @@
-name: smartd_log
-title: COLLECTORNAME Monitoring
-duplicate_for_virtual_integrations:
-  list:
-    - '[Ubuntu](link to ubuntu)'
-    - '[Redhat](link to redhat)'
-overview:
-  operation:
-    description: This collector periodically does http requests to one or more {[Apache](link
-      to collector)} (<- CI will remove the curly brackets, they are for replacing
-      with the virtual integrations, to replace the link each time) web servers to
-      collect the metrics mod_status plugin that apache exposes
-  platforms:
-    description: If this collector can't run on some platforms specify them here and
-      set it to false, otherwise set this to true and this text will not be rendered,
-      instead a templated message will appear
-    use_templated_text: true
-  multi-instance:
-    boolean: true
-  permissions:
-    description: if there are any notable permission requirements, eg running as root
-      and so on, specify them here and set it to false, otherwise set it to true and
-      a templated message will appear
-    use_templated_text: true
-  related:
-    description: give a simple description if there are any other collectors related
-      to this collector. Example -> To get the most out of your apache servers, you
-      can monitor its processes for resources utilization and their log files to turn
-      them into real-time metrics. Check our related resources for more information.
-      (if not, leave empty)
-setup:
-  prerequisites:
-    list:
-      - title: Prerequisite title for heading
-        text: List like with dashes, TBD, use | and newline for multiline
-  behavior:
-    auto_detection:
-      description: The collector auto-detects apache web servers running on localhost
-        ports 80, 443, and 8080.
-    limits:
-      description: The collector is limited to x amount of tables or any other limitation,
-        leave empty if none
-    impact:
-      description: Is there any impact on the application when using the default configuration?
-        Maybe on a db collector having to many tables might slow down the db if collection
-        happens per second, leave empty if none
-  configuration:
-    file:
-      description: 'which file the user has to edit. Example: go.d/apache.conf'
-    options:
-      description: TBD, use | and newline for multiline
-      folding:
-        title: Config options
-        enabled: true
-      list:
-        - name: option name
-          description: option description
-          default: a number or a string
-          required: true or false
-    examples:
-      folding:
-        title: Config
-        enabled: false
-      list:
-        - name: Basic / else describe what this example is about
-          description: A basic example configuration / describe your example
-          data: input the example data in yaml format
-troubleshooting:
-  problems:
-    list:
-      - name: possible troubleshooting title
-        text: describe
-  debugging:
-    description: How to run this in debug mode? Use | and newline with indent, to
-      write in markdown
-  logs:
-    description: How can I monitor logs for this plugin?
-related_resources:
-  integrations:
-    list:
-      - apache
-      - weblog
-      - httpcheck
-      - etc
-    provide:
-      description: What info I can provide for other plugins that reference me? this
-        will only be visible in their end, they will scrape this text. Example ->
-        apps.plugin allows monitoring individual processes CPU, Memory, Disk I/O and
-        many more resources utilization.
+module_name: smartd_log
+plugin_name: python.d.plugin
 alerts: []
 metrics:
-  description: some description for this section, or leave empty
   folding:
     title: Metrics
     enabled: false
-  scope:
-    global:
-      name: global
-      description: TBD
+  description: ''
+  availability: []
+  scopes:
+    - name: global
+      description: ''
       labels: []
       metrics:
         - name: smartd_log.read_error_rate
+          availability: []
           description: Read Error Rate
           unit: value
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.seek_error_rate
+          availability: []
           description: Seek Error Rate
           unit: value
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.soft_read_error_rate
+          availability: []
           description: Soft Read Error Rate
           unit: errors
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.write_error_rate
+          availability: []
           description: Write Error Rate
           unit: value
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.read_total_err_corrected
+          availability: []
           description: Read Error Corrected
           unit: errors
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.read_total_unc_errors
+          availability: []
           description: Read Error Uncorrected
           unit: errors
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.write_total_err_corrected
+          availability: []
           description: Write Error Corrected
           unit: errors
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.write_total_unc_errors
+          availability: []
           description: Write Error Uncorrected
           unit: errors
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.verify_total_err_corrected
+          availability: []
           description: Verify Error Corrected
           unit: errors
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.verify_total_unc_errors
+          availability: []
           description: Verify Error Uncorrected
           unit: errors
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.sata_interface_downshift
+          availability: []
           description: SATA Interface Downshift
           unit: events
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.udma_crc_error_count
+          availability: []
           description: UDMA CRC Error Count
           unit: errors
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.throughput_performance
+          availability: []
           description: Throughput Performance
           unit: value
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.seek_time_performance
+          availability: []
           description: Seek Time Performance
           unit: value
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.start_stop_count
+          availability: []
           description: Start/Stop Count
           unit: events
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.power_on_hours_count
+          availability: []
           description: Power-On Hours Count
           unit: hours
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.power_cycle_count
+          availability: []
           description: Power Cycle Count
           unit: events
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.unexpected_power_loss
+          availability: []
           description: Unexpected Power Loss
           unit: events
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.spin_up_time
+          availability: []
           description: Spin-Up Time
           unit: ms
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.spin_up_retries
+          availability: []
           description: Spin-up Retries
           unit: retries
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.calibration_retries
+          availability: []
           description: Calibration Retries
           unit: retries
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.airflow_temperature_celsius
+          availability: []
           description: Airflow Temperature Celsius
           unit: celsius
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.temperature_celsius
+          availability: []
           description: Temperature
           unit: celsius
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.reallocated_sectors_count
+          availability: []
           description: Reallocated Sectors Count
           unit: sectors
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.reserved_block_count
+          availability: []
           description: Reserved Block Count
           unit: percentage
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.program_fail_count
+          availability: []
           description: Program Fail Count
           unit: errors
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.erase_fail_count
+          availability: []
           description: Erase Fail Count
           unit: failures
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.wear_leveller_worst_case_erase_count
+          availability: []
           description: Wear Leveller Worst Case Erase Count
           unit: erases
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.unused_reserved_nand_blocks
+          availability: []
           description: Unused Reserved NAND Blocks
           unit: blocks
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.reallocation_event_count
+          availability: []
           description: Reallocation Event Count
           unit: events
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.current_pending_sector_count
+          availability: []
           description: Current Pending Sector Count
           unit: sectors
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.offline_uncorrectable_sector_count
+          availability: []
           description: Offline Uncorrectable Sector Count
           unit: sectors
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.percent_lifetime_used
+          availability: []
           description: Percent Lifetime Used
           unit: percentage
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.media_wearout_indicator
+          availability: []
           description: Media Wearout Indicator
           unit: percentage
+          chart_type: line
           dimensions:
             - name: a dimension per device
         - name: smartd_log.nand_writes_1gib
+          availability: []
           description: NAND Writes
           unit: GiB
+          chart_type: line
           dimensions:
             - name: a dimension per device
