@@ -2508,6 +2508,28 @@ void ebpf_send_statistic_data()
                               (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ? NETDATA_CONTROLLER_END: 0);
     }
     write_end_chart();
+
+    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_HASH_TABLES_INSERT_PID_ELEMENTS);
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
+        ebpf_module_t *wem = &ebpf_modules[i];
+        if (wem->apps_routine)
+            write_chart_dimension((char *)wem->thread_name,
+                                  (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ?
+                                      wem->hash_table_stats[NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_ADD]:
+                                      0);
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_HASH_TABLES_REMOVE_PID_ELEMENTS);
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
+        ebpf_module_t *wem = &ebpf_modules[i];
+        if (wem->apps_routine)
+            write_chart_dimension((char *)wem->thread_name,
+                                  (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ?
+                                  wem->hash_table_stats[NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_DEL]:
+                                  0);
+    }
+    write_end_chart();
 }
 
 /**
@@ -2718,6 +2740,39 @@ static void ebpf_create_statistic_hash_global_elements(int update_every)
 }
 
 /**
+ * Hash table global elements
+ *
+ * Write to standard output current values inside global tables.
+ *
+ * @param update_every time used to update charts
+ * @param id           chart id
+ * @param title        chart title
+ * @param order        ordder chart will be shown on dashboard.
+ */
+static void ebpf_create_statistic_hash_pid_table(int update_every, char *id, char *title, int order)
+{
+    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
+                         id,
+                         title,
+                         "rows",
+                         NETDATA_EBPF_FAMILY,
+                         NETDATA_EBPF_CHART_TYPE_LINE,
+                         NULL,
+                         order,
+                         update_every,
+                         NETDATA_EBPF_MODULE_NAME_PROCESS);
+
+    int i;
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
+        ebpf_module_t *wem = &ebpf_modules[i];
+        if (wem->apps_routine)
+            ebpf_write_global_dimension((char *)wem->thread_name,
+                                        (char *)wem->thread_name,
+                                        ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
+    }
+}
+
+/**
  * Create Statistics Charts
  *
  * Create charts that will show statistics related to eBPF plugin.
@@ -2755,6 +2810,18 @@ static void ebpf_create_statistic_charts(int update_every)
     ebpf_create_statistic_hash_per_core(update_every);
 
     ebpf_create_statistic_hash_global_elements(update_every);
+
+    ebpf_create_statistic_hash_pid_table(update_every,
+                                         NETDATA_EBPF_HASH_TABLES_INSERT_PID_ELEMENTS,
+                                         "Elements inserted into PID table",
+                                         NETDATA_EBPF_ORDER_STAT_HASH_PID_TABLE_ADDED);
+
+    ebpf_create_statistic_hash_pid_table(update_every,
+                                         NETDATA_EBPF_HASH_TABLES_REMOVE_PID_ELEMENTS,
+                                         "Elements removed from PID table",
+                                         NETDATA_EBPF_ORDER_STAT_HASH_PID_TABLE_REMOVED);
+
+    fflush(stdout);
 }
 
 /*****************************************************************

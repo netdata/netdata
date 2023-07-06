@@ -289,6 +289,15 @@ enum ebpf_threads_status {
     NETDATA_THREAD_EBPF_NOT_RUNNING         // thread was never started
 };
 
+enum ebpf_global_table_values {
+    NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_ADD, // Count elements added inside PID table
+    NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_DEL, // Count elements removed from PID table
+    NETDATA_EBPF_GLOBAL_TABLE_TEMP_TABLE_ADD, // Count elements added inside TEMP table
+    NETDATA_EBPF_GLOBAL_TABLE_TEMP_TABLE_DEL,  // Count elements removed from TEMP table
+
+    NETDATA_EBPF_GLOBAL_TABLE_STATUS_END
+};
+
 typedef struct ebpf_module {
     const char *thread_name;
     const char *config_name;
@@ -325,12 +334,7 @@ typedef struct ebpf_module {
     uint32_t running_time; // internal usage, this is used to reset a value when a new request happens.
     uint32_t lifetime;
 
-    struct {
-        uint64_t count_pid_table_add; // Count elements added inside PID table
-        uint64_t count_pid_table_del; // Count elements removed from PID table
-        uint64_t count_temp_table_add; // Count elements added inside TEMP table
-        uint64_t count_temp_table_del; // Count elements removed from TEMP table
-    } hash_table_stat;
+    uint64_t hash_table_stats[NETDATA_EBPF_GLOBAL_TABLE_STATUS_END];
 } ebpf_module_t;
 
 #define EBPF_DEFAULT_LIFETIME 300

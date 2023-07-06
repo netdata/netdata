@@ -170,6 +170,8 @@ typedef struct ebpf_tracepoint {
 #define NETDATA_EBPF_HASH_TABLES_LOADED "ebpf_hash_tables_count"
 #define NETDATA_EBPF_HASH_TABLES_PER_CORE "ebpf_hash_tables_per_core"
 #define NETDATA_EBPF_HASH_TABLES_GLOBAL_ELEMENTS "ebpf_hash_tables_global_elements"
+#define NETDATA_EBPF_HASH_TABLES_INSERT_PID_ELEMENTS "ebpf_hash_tables_insert_pid_elements"
+#define NETDATA_EBPF_HASH_TABLES_REMOVE_PID_ELEMENTS "ebpf_hash_tables_remove_pid_elements"
 
 // Log file
 #define NETDATA_DEVELOPER_LOG_FILE "developer.log"
