@@ -97,6 +97,7 @@ int api_v2_bearer_token(RRDHOST *host __maybe_unused, struct web_client *w __may
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_member_add_string(wb, "mg", localhost->machine_guid);
     buffer_json_member_add_boolean(wb, "bearer_protection", netdata_is_protected_by_bearer);
     buffer_json_member_add_uuid(wb, "token", &uuid);
     buffer_json_finalize(wb);

@@ -1525,7 +1525,7 @@ static struct web_api_command api_commands_v1[] = {
         { "contexts",        0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_contexts                   },
 
         // registry checks the ACL by itself, so we allow everything
-        { "registry",        0, WEB_CLIENT_ACL_NOCHECK,                         web_client_api_request_v1_registry                   },
+        { "registry",        0, WEB_CLIENT_ACL_NOCHECK,               web_client_api_request_v1_registry                   },
 
         // badges can be fetched with both dashboard and badge permissions
         { "badge.svg",       0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC | WEB_CLIENT_ACL_BADGE, web_client_api_request_v1_badge },
