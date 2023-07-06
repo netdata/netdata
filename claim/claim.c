@@ -253,16 +253,17 @@ bool netdata_random_session_id_generate(void) {
         netdata_log_error("Cannot create random session id file '%s'.", filename);
         ret = false;
     }
+    else {
+        if (write(fd, guid, UUID_STR_LEN - 1) != UUID_STR_LEN - 1) {
+            netdata_log_error("Cannot write the random session id file '%s'.", filename);
+            ret = false;
+        }
 
-    if(write(fd, guid, UUID_STR_LEN - 1) != UUID_STR_LEN - 1) {
-        netdata_log_error("Cannot write the random session id file '%s'.", filename);
-        ret = false;
+        ssize_t rc = write(fd, "\n", 1);
+        (void)rc;
+
+        close(fd);
     }
-
-    ssize_t rc = write(fd, "\n", 1);
-    (void)rc;
-
-    close(fd);
 
     if(ret && (!netdata_random_session_id_filename || strcmp(netdata_random_session_id_filename, filename) != 0)) {
         freez(netdata_random_session_id_filename);
