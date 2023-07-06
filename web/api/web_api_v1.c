@@ -1516,12 +1516,6 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
 }
 #endif
 
-#ifdef NETDATA_DEV_MODE
-#define ACL_DEV_OPEN_ACCESS WEB_CLIENT_ACL_DASHBOARD
-#else
-#define ACL_DEV_OPEN_ACCESS 0
-#endif
-
 static struct web_api_command api_commands_v1[] = {
         { "info",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_info                       },
         { "data",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_data                       },
@@ -1545,16 +1539,16 @@ static struct web_api_command api_commands_v1[] = {
 
 #if defined(ENABLE_ML)
         { "ml_info",         0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_ml_info            },
-        { "ml_models",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_models          },
+        // { "ml_models",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_models          },
 #endif
 
-        { "manage/health",       0, WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_ACLK,      web_client_api_request_v1_mgmt_health           },
+        {"manage/health", 0, WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_ACLK | WEB_CLIENT_ACL_BEARER_REQUIRED, web_client_api_request_v1_mgmt_health           },
         { "aclk",                0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_aclk_state            },
         { "metric_correlations", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_metric_correlations   },
         { "weights",             0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_weights               },
 
-        { "function",            0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_function },
-        { "functions",            0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_functions },
+        {"function", 0, WEB_CLIENT_ACL_ACLK | WEB_CLIENT_ACL_BEARER_REQUIRED | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_function },
+        {"functions", 0, WEB_CLIENT_ACL_ACLK | WEB_CLIENT_ACL_BEARER_REQUIRED | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_functions },
 
         { "dbengine_stats",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_dbengine_stats },
 
