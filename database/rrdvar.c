@@ -175,7 +175,7 @@ void rrdvar_custom_host_variable_set(RRDHOST *host, const RRDVAR_ACQUIRED *rva, 
     if(unlikely(!host->rrdvars || !rva)) return; // when health is not enabled
 
     if(rrdvar_type(rva) != RRDVAR_TYPE_CALCULATED || !(rrdvar_flags(rva) & (RRDVAR_FLAG_CUSTOM_HOST_VAR | RRDVAR_FLAG_ALLOCATED)))
-        error("requested to set variable '%s' to value " NETDATA_DOUBLE_FORMAT " but the variable is not a custom one.", rrdvar_name(rva), value);
+        netdata_log_error("requested to set variable '%s' to value " NETDATA_DOUBLE_FORMAT " but the variable is not a custom one.", rrdvar_name(rva), value);
     else {
         RRDVAR *rv = dictionary_acquired_item_value((const DICTIONARY_ITEM *)rva);
         NETDATA_DOUBLE *v = rv->value;
@@ -228,7 +228,7 @@ NETDATA_DOUBLE rrdvar2number(const RRDVAR_ACQUIRED *rva) {
         }
 
         default:
-            error("I don't know how to convert RRDVAR type %u to NETDATA_DOUBLE", rv->type);
+            netdata_log_error("I don't know how to convert RRDVAR type %u to NETDATA_DOUBLE", rv->type);
             return NAN;
     }
 }

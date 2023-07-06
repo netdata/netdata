@@ -297,7 +297,8 @@ procfile *procfile_readall(procfile *ff) {
         r = read(ff->fd, &ff->data[s], ff->size - s);
         if(unlikely(r == -1)) {
             if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) collector_error(PF_PREFIX ": Cannot read from file '%s' on fd %d", procfile_filename(ff), ff->fd);
-            else if(unlikely(ff->flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG)) error(PF_PREFIX ": Cannot read from file '%s' on fd %d", procfile_filename(ff), ff->fd);
+            else if(unlikely(ff->flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
+                netdata_log_error(PF_PREFIX ": Cannot read from file '%s' on fd %d", procfile_filename(ff), ff->fd);
             procfile_close(ff);
             return NULL;
         }
@@ -308,7 +309,8 @@ procfile *procfile_readall(procfile *ff) {
     // debug(D_PROCFILE, "Rewinding file '%s'", ff->filename);
     if(unlikely(lseek(ff->fd, 0, SEEK_SET) == -1)) {
         if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) collector_error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
-        else if(unlikely(ff->flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG)) error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
+        else if(unlikely(ff->flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
+            netdata_log_error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
         procfile_close(ff);
         return NULL;
     }
@@ -406,7 +408,8 @@ procfile *procfile_open(const char *filename, const char *separators, uint32_t f
     int fd = open(filename, procfile_open_flags, 0666);
     if(unlikely(fd == -1)) {
         if(unlikely(!(flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) collector_error(PF_PREFIX ": Cannot open file '%s'", filename);
-        else if(unlikely(flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG)) error(PF_PREFIX ": Cannot open file '%s'", filename);
+        else if(unlikely(flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
+            netdata_log_error(PF_PREFIX ": Cannot open file '%s'", filename);
         return NULL;
     }
 

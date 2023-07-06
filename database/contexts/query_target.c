@@ -895,12 +895,12 @@ static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
 
     // is the chart given valid?
     if(unlikely(qtl->st && (!qtl->st->rrdinstance || !qtl->st->rrdcontext))) {
-        error("QUERY TARGET: RRDSET '%s' given, but it is not linked to rrdcontext structures. Linking it now.", rrdset_name(qtl->st));
+        netdata_log_error("QUERY TARGET: RRDSET '%s' given, but it is not linked to rrdcontext structures. Linking it now.", rrdset_name(qtl->st));
         rrdinstance_from_rrdset(qtl->st);
 
         if(unlikely(qtl->st && (!qtl->st->rrdinstance || !qtl->st->rrdcontext))) {
-            error("QUERY TARGET: RRDSET '%s' given, but failed to be linked to rrdcontext structures. Switching to context query.",
-                  rrdset_name(qtl->st));
+            netdata_log_error("QUERY TARGET: RRDSET '%s' given, but failed to be linked to rrdcontext structures. Switching to context query.",
+                              rrdset_name(qtl->st));
 
             if (!is_valid_sp(qtl->instances))
                 qtl->instances = rrdset_name(qtl->st);
@@ -1098,7 +1098,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
         }
         else if (unlikely(host != qtl.st->rrdhost)) {
             // Oops! A different host!
-            error("QUERY TARGET: RRDSET '%s' given does not belong to host '%s'. Switching query host to '%s'",
+            netdata_log_error("QUERY TARGET: RRDSET '%s' given does not belong to host '%s'. Switching query host to '%s'",
                   rrdset_name(qtl.st), rrdhost_hostname(host), rrdhost_hostname(qtl.st->rrdhost));
             host = qtl.st->rrdhost;
         }

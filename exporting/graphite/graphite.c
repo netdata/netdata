@@ -49,7 +49,7 @@ int init_graphite_instance(struct instance *instance)
 
     instance->buffer = (void *)buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
     if (!instance->buffer) {
-        error("EXPORTING: cannot create buffer for graphite exporting connector instance %s", instance->config.name);
+        netdata_log_error("EXPORTING: cannot create buffer for graphite exporting connector instance %s", instance->config.name);
         return 1;
     }
 

@@ -175,7 +175,7 @@ int close_data_file(struct rrdengine_datafile *datafile)
 
     ret = uv_fs_close(NULL, &req, datafile->file, NULL);
     if (ret < 0) {
-        error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
+        netdata_log_error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
         ctx_fs_error(ctx);
     }
     uv_fs_req_cleanup(&req);
@@ -194,7 +194,7 @@ int unlink_data_file(struct rrdengine_datafile *datafile)
 
     ret = uv_fs_unlink(NULL, &req, path, NULL);
     if (ret < 0) {
-        error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
+        netdata_log_error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
         ctx_fs_error(ctx);
     }
     uv_fs_req_cleanup(&req);
@@ -215,21 +215,21 @@ int destroy_data_file_unsafe(struct rrdengine_datafile *datafile)
 
     ret = uv_fs_ftruncate(NULL, &req, datafile->file, 0, NULL);
     if (ret < 0) {
-        error("DBENGINE: uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
+        netdata_log_error("DBENGINE: uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
         ctx_fs_error(ctx);
     }
     uv_fs_req_cleanup(&req);
 
     ret = uv_fs_close(NULL, &req, datafile->file, NULL);
     if (ret < 0) {
-        error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
+        netdata_log_error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
         ctx_fs_error(ctx);
     }
     uv_fs_req_cleanup(&req);
 
     ret = uv_fs_unlink(NULL, &req, path, NULL);
     if (ret < 0) {
-        error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
+        netdata_log_error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
         ctx_fs_error(ctx);
     }
     uv_fs_req_cleanup(&req);
@@ -272,7 +272,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
     ret = uv_fs_write(NULL, &req, file, &iov, 1, 0, NULL);
     if (ret < 0) {
         fatal_assert(req.result < 0);
-        error("DBENGINE: uv_fs_write: %s", uv_strerror(ret));
+        netdata_log_error("DBENGINE: uv_fs_write: %s", uv_strerror(ret));
         ctx_io_error(ctx);
     }
     uv_fs_req_cleanup(&req);
@@ -303,7 +303,7 @@ static int check_data_file_superblock(uv_file file)
 
     ret = uv_fs_read(NULL, &req, file, &iov, 1, 0, NULL);
     if (ret < 0) {
-        error("DBENGINE: uv_fs_read: %s", uv_strerror(ret));
+        netdata_log_error("DBENGINE: uv_fs_read: %s", uv_strerror(ret));
         uv_fs_req_cleanup(&req);
         goto error;
     }
@@ -313,7 +313,7 @@ static int check_data_file_superblock(uv_file file)
     if (strncmp(superblock->magic_number, RRDENG_DF_MAGIC, RRDENG_MAGIC_SZ) ||
         strncmp(superblock->version, RRDENG_DF_VER, RRDENG_VER_SZ) ||
         superblock->tier != 1) {
-        error("DBENGINE: file has invalid superblock.");
+        netdata_log_error("DBENGINE: file has invalid superblock.");
         ret = UV_EINVAL;
     } else {
         ret = 0;
@@ -361,7 +361,7 @@ static int load_data_file(struct rrdengine_datafile *datafile)
     error = ret;
     ret = uv_fs_close(NULL, &req, file, NULL);
     if (ret < 0) {
-        error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
+        netdata_log_error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
         ctx_fs_error(ctx);
     }
     uv_fs_req_cleanup(&req);
@@ -394,7 +394,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     if (ret < 0) {
         fatal_assert(req.result < 0);
         uv_fs_req_cleanup(&req);
-        error("DBENGINE: uv_fs_scandir(%s): %s", ctx->config.dbfiles_path, uv_strerror(ret));
+        netdata_log_error("DBENGINE: uv_fs_scandir(%s): %s", ctx->config.dbfiles_path, uv_strerror(ret));
         ctx_fs_error(ctx);
         return ret;
     }
@@ -416,7 +416,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     }
 
     if (matched_files == MAX_DATAFILES)
-        error("DBENGINE: warning: hit maximum database engine file limit of %d files", MAX_DATAFILES);
+        netdata_log_error("DBENGINE: warning: hit maximum database engine file limit of %d files", MAX_DATAFILES);
 
     qsort(datafiles, matched_files, sizeof(*datafiles), scan_data_files_cmp);
 
@@ -441,7 +441,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         if (must_delete_pair) {
             char path[RRDENG_PATH_MAX];
 
-            error("DBENGINE: deleting invalid data and journal file pair.");
+            netdata_log_error("DBENGINE: deleting invalid data and journal file pair.");
             ret = journalfile_unlink(journalfile);
             if (!ret) {
                 journalfile_v1_generate_path(datafile, path, sizeof(path));
@@ -521,14 +521,14 @@ int init_data_files(struct rrdengine_instance *ctx)
     fatal_assert(0 == uv_rwlock_init(&ctx->datafiles.rwlock));
     ret = scan_data_files(ctx);
     if (ret < 0) {
-        error("DBENGINE: failed to scan path \"%s\".", ctx->config.dbfiles_path);
+        netdata_log_error("DBENGINE: failed to scan path \"%s\".", ctx->config.dbfiles_path);
         return ret;
     } else if (0 == ret) {
         netdata_log_info("DBENGINE: data files not found, creating in path \"%s\".", ctx->config.dbfiles_path);
         ctx->atomic.last_fileno = 0;
         ret = create_new_datafile_pair(ctx, false);
         if (ret) {
-            error("DBENGINE: failed to create data and journal files in path \"%s\".", ctx->config.dbfiles_path);
+            netdata_log_error("DBENGINE: failed to create data and journal files in path \"%s\".", ctx->config.dbfiles_path);
             return ret;
         }
     }

@@ -1037,7 +1037,7 @@ static int ebpf_shm_load_bpf(ebpf_module_t *em)
 
 
     if (ret)
-        error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
+        netdata_log_error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
 
     return ret;
 }

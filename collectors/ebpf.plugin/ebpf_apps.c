@@ -35,7 +35,7 @@ void ebpf_aral_init(void)
 {
     size_t max_elements = NETDATA_EBPF_ALLOC_MAX_PID;
     if (max_elements < NETDATA_EBPF_ALLOC_MIN_ELEMENTS) {
-        error("Number of elements given is too small, adjusting it for %d", NETDATA_EBPF_ALLOC_MIN_ELEMENTS);
+        netdata_log_error("Number of elements given is too small, adjusting it for %d", NETDATA_EBPF_ALLOC_MIN_ELEMENTS);
         max_elements = NETDATA_EBPF_ALLOC_MIN_ELEMENTS;
     }
 
@@ -652,7 +652,7 @@ int ebpf_read_apps_groups_conf(struct ebpf_target **agdt, struct ebpf_target **a
             // add this target
             struct ebpf_target *n = get_apps_groups_target(agrt, s, w, name);
             if (!n) {
-                error("Cannot create target '%s' (line %zu, word %zu)", s, line, word);
+                netdata_log_error("Cannot create target '%s' (line %zu, word %zu)", s, line, word);
                 continue;
             }
 
@@ -755,32 +755,32 @@ static inline void debug_log_dummy(void)
 static inline int managed_log(struct ebpf_pid_stat *p, uint32_t log, int status)
 {
     if (unlikely(!status)) {
-        // error("command failed log %u, errno %d", log, errno);
+        // netdata_log_error("command failed log %u, errno %d", log, errno);
 
         if (unlikely(debug_enabled || errno != ENOENT)) {
             if (unlikely(debug_enabled || !(p->log_thrown & log))) {
                 p->log_thrown |= log;
                 switch (log) {
                     case PID_LOG_IO:
-                        error(
+                        netdata_log_error(
                             "Cannot process %s/proc/%d/io (command '%s')", netdata_configured_host_prefix, p->pid,
                             p->comm);
                         break;
 
                     case PID_LOG_STATUS:
-                        error(
+                        netdata_log_error(
                             "Cannot process %s/proc/%d/status (command '%s')", netdata_configured_host_prefix, p->pid,
                             p->comm);
                         break;
 
                     case PID_LOG_CMDLINE:
-                        error(
+                        netdata_log_error(
                             "Cannot process %s/proc/%d/cmdline (command '%s')", netdata_configured_host_prefix, p->pid,
                             p->comm);
                         break;
 
                     case PID_LOG_FDS:
-                        error(
+                        netdata_log_error(
                             "Cannot process entries in %s/proc/%d/fd (command '%s')", netdata_configured_host_prefix,
                             p->pid, p->comm);
                         break;
@@ -789,14 +789,14 @@ static inline int managed_log(struct ebpf_pid_stat *p, uint32_t log, int status)
                         break;
 
                     default:
-                        error("unhandled error for pid %d, command '%s'", p->pid, p->comm);
+                        netdata_log_error("unhandled error for pid %d, command '%s'", p->pid, p->comm);
                         break;
                 }
             }
         }
         errno = 0;
     } else if (unlikely(p->log_thrown & log)) {
-        // error("unsetting log %u on pid %d", log, p->pid);
+        // netdata_log_error("unsetting log %u on pid %d", log, p->pid);
         p->log_thrown &= ~log;
     }
 
@@ -1005,7 +1005,7 @@ static inline int read_proc_pid_stat(struct ebpf_pid_stat *p, void *ptr)
 static inline int collect_data_for_pid(pid_t pid, void *ptr)
 {
     if (unlikely(pid < 0 || pid > pid_max)) {
-        error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, 0, pid_max);
+        netdata_log_error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, 0, pid_max);
         return 0;
     }
 
@@ -1020,7 +1020,7 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr)
 
     // check its parent pid
     if (unlikely(p->ppid < 0 || p->ppid > pid_max)) {
-        error("Pid %d (command '%s') states invalid parent pid %d. Using 0.", pid, p->comm, p->ppid);
+        netdata_log_error("Pid %d (command '%s') states invalid parent pid %d. Using 0.", pid, p->comm, p->ppid);
         p->ppid = 0;
     }
 
@@ -1220,7 +1220,7 @@ static inline void del_pid_entry(pid_t pid)
     struct ebpf_pid_stat *p = ebpf_all_pids[pid];
 
     if (unlikely(!p)) {
-        error("attempted to free pid %d that is not allocated.", pid);
+        netdata_log_error("attempted to free pid %d that is not allocated.", pid);
         return;
     }
 
@@ -1403,7 +1403,7 @@ static inline void aggregate_pid_on_target(struct ebpf_target *w, struct ebpf_pi
     }
 
     if (unlikely(!w)) {
-        error("pid %d %s was left without a target!", p->pid, p->comm);
+        netdata_log_error("pid %d %s was left without a target!", p->pid, p->comm);
         return;
     }
 

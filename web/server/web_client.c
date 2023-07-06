@@ -31,7 +31,7 @@ static inline int web_client_cork_socket(struct web_client *w __maybe_unused) {
     if(likely(web_client_is_corkable(w) && !w->tcp_cork && w->ofd != -1)) {
         w->tcp_cork = true;
         if(unlikely(setsockopt(w->ofd, IPPROTO_TCP, TCP_CORK, (char *) &w->tcp_cork, sizeof(int)) != 0)) {
-            error("%llu: failed to enable TCP_CORK on socket.", w->id);
+            netdata_log_error("%llu: failed to enable TCP_CORK on socket.", w->id);
 
             w->tcp_cork = false;
             return -1;
@@ -58,7 +58,7 @@ static inline int web_client_uncork_socket(struct web_client *w __maybe_unused) 
     if(likely(w->tcp_cork && w->ofd != -1)) {
         w->tcp_cork = false;
         if(unlikely(setsockopt(w->ofd, IPPROTO_TCP, TCP_CORK, (char *) &w->tcp_cork, sizeof(int)) != 0)) {
-            error("%llu: failed to disable TCP_CORK on socket.", w->id);
+            netdata_log_error("%llu: failed to disable TCP_CORK on socket.", w->id);
             w->tcp_cork = true;
             return -1;
         }
@@ -521,7 +521,7 @@ static int mysendfile(struct web_client *w, char *filename) {
         w->ifd = w->ofd;
 
         if(errno == EBUSY || errno == EAGAIN) {
-            error("%llu: File '%s' is busy, sending 307 Moved Temporarily to force retry.", w->id, web_filename);
+            netdata_log_error("%llu: File '%s' is busy, sending 307 Moved Temporarily to force retry.", w->id, web_filename);
             w->response.data->content_type = CT_TEXT_HTML;
             buffer_sprintf(w->response.header, "Location: /%s\r\n", filename);
             buffer_strcat(w->response.data, "File is currently busy, please try again later: ");
@@ -529,7 +529,7 @@ static int mysendfile(struct web_client *w, char *filename) {
             return HTTP_RESP_REDIR_TEMP;
         }
         else {
-            error("%llu: Cannot open file '%s'.", w->id, web_filename);
+            netdata_log_error("%llu: Cannot open file '%s'.", w->id, web_filename);
             w->response.data->content_type = CT_TEXT_HTML;
             buffer_strcat(w->response.data, "Cannot open file: ");
             buffer_strcat_htmlescape(w->response.data, web_filename);
@@ -566,7 +566,7 @@ void web_client_enable_deflate(struct web_client *w, int gzip) {
     }
 
     if(unlikely(w->response.sent)) {
-        error("%llu: Cannot enable compression in the middle of a conversation.", w->id);
+        netdata_log_error("%llu: Cannot enable compression in the middle of a conversation.", w->id);
         return;
     }
 
@@ -587,13 +587,13 @@ void web_client_enable_deflate(struct web_client *w, int gzip) {
     w->response.zstream.opaque = Z_NULL;
 
 //  if(deflateInit(&w->response.zstream, Z_DEFAULT_COMPRESSION) != Z_OK) {
-//      error("%llu: Failed to initialize zlib. Proceeding without compression.", w->id);
+//      netdata_log_error("%llu: Failed to initialize zlib. Proceeding without compression.", w->id);
 //      return;
 //  }
 
     // Select GZIP compression: windowbits = 15 + 16 = 31
     if(deflateInit2(&w->response.zstream, web_gzip_level, Z_DEFLATED, 15 + ((gzip)?16:0), 8, web_gzip_strategy) != Z_OK) {
-        error("%llu: Failed to initialize zlib. Proceeding without compression.", w->id);
+        netdata_log_error("%llu: Failed to initialize zlib. Proceeding without compression.", w->id);
         return;
     }
 
@@ -977,7 +977,7 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
                 memcpy(hostname,"not available",13);
                 hostname[13] = 0x00;
             }
-            error("The server is configured to always use encrypted connections, please enable the SSL on child with hostname '%s'.",hostname);
+            netdata_log_error("The server is configured to always use encrypted connections, please enable the SSL on child with hostname '%s'.",hostname);
             s = NULL;
         }
 #endif
@@ -1281,7 +1281,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
                 count++;
 
                 if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
-                    error("Cannot send HTTP headers to web client.");
+                    netdata_log_error("Cannot send HTTP headers to web client.");
                     break;
                 }
             }
@@ -1292,7 +1292,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
             count++;
 
             if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
-                error("Cannot send HTTP headers to web client.");
+                netdata_log_error("Cannot send HTTP headers to web client.");
                 break;
             }
         }
@@ -1302,7 +1302,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
         count++;
 
         if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
-            error("Cannot send HTTP headers to web client.");
+            netdata_log_error("Cannot send HTTP headers to web client.");
             break;
         }
     }
@@ -1313,8 +1313,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
             w->statistics.sent_bytes += bytes;
 
         if (bytes < 0) {
-
-            error("HTTP headers failed to be sent (I sent %zu bytes but the system sent %zd bytes). Closing web client."
+            netdata_log_error("HTTP headers failed to be sent (I sent %zu bytes but the system sent %zd bytes). Closing web client."
                   , buffer_strlen(w->response.header_output)
                   , bytes);
 
@@ -1519,7 +1518,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             else
                 buffer_strcat(w->response.data, "I am doing it already");
 
-            error("web request to exit received.");
+            netdata_log_error("web request to exit received.");
             netdata_cleanup_and_exit(0);
             return HTTP_RESP_OK;
         }
@@ -1773,7 +1772,7 @@ void web_client_process_request(struct web_client *w) {
                 {
                     long len = sendfile(w->ofd, w->ifd, NULL, w->response.data->rbytes);
                     if(len != w->response.data->rbytes)
-                        error("%llu: sendfile() should copy %ld bytes, but copied %ld. Falling back to manual copy.", w->id, w->response.data->rbytes, len);
+                        netdata_log_error("%llu: sendfile() should copy %ld bytes, but copied %ld. Falling back to manual copy.", w->id, w->response.data->rbytes, len);
                     else
                         web_client_request_done(w);
                 }
@@ -1932,7 +1931,7 @@ ssize_t web_client_send_deflate(struct web_client *w)
 
         // compress
         if(deflate(&w->response.zstream, flush) == Z_STREAM_ERROR) {
-            error("%llu: Compression failed. Closing down client.", w->id);
+            netdata_log_error("%llu: Compression failed. Closing down client.", w->id);
             web_client_request_done(w);
             return(-1);
         }

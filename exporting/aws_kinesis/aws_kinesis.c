@@ -54,7 +54,8 @@ int init_aws_kinesis_instance(struct instance *instance)
 
     instance->buffer = (void *)buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
     if (!instance->buffer) {
-        error("EXPORTING: cannot create buffer for AWS Kinesis exporting connector instance %s", instance->config.name);
+        netdata_log_error("EXPORTING: cannot create buffer for AWS Kinesis exporting connector instance %s",
+                          instance->config.name);
         return 1;
     }
     if (uv_mutex_init(&instance->mutex))
@@ -72,7 +73,7 @@ int init_aws_kinesis_instance(struct instance *instance)
     instance->connector_specific_data = (void *)connector_specific_data;
 
     if (!strcmp(connector_specific_config->stream_name, "")) {
-        error("stream name is a mandatory Kinesis parameter but it is not configured");
+        netdata_log_error("stream name is a mandatory Kinesis parameter but it is not configured");
         return 1;
     }
 
@@ -174,10 +175,11 @@ void aws_kinesis_connector_worker(void *instance_p)
             if (unlikely(kinesis_get_result(
                     connector_specific_data->request_outcomes, error_message, &sent_bytes, &lost_bytes))) {
                 // oops! we couldn't send (all or some of the) data
-                error("EXPORTING: %s", error_message);
-                error(
-                    "EXPORTING: failed to write data to external database '%s'. Willing to write %zu bytes, wrote %zu bytes.",
-                    instance->config.destination, sent_bytes, sent_bytes - lost_bytes);
+                netdata_log_error("EXPORTING: %s", error_message);
+                netdata_log_error("EXPORTING: failed to write data to external database '%s'. Willing to write %zu bytes, wrote %zu bytes.",
+                                  instance->config.destination,
+                                  sent_bytes,
+                                  sent_bytes - lost_bytes);
 
                 stats->transmission_failures++;
                 stats->data_lost_events++;

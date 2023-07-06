@@ -50,7 +50,7 @@ extern struct registry registry;
 CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, const char **msg)
 {
     if (!force || !netdata_cloud_enabled) {
-        error("Refusing to claim agent -> cloud functionality has been disabled");
+        netdata_log_error("Refusing to claim agent -> cloud functionality has been disabled");
         return CLAIM_AGENT_CLOUD_DISABLED;
     }
 
@@ -88,7 +88,7 @@ CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, con
     netdata_log_info("Executing agent claiming command 'netdata-claim.sh'");
     fp_child_output = netdata_popen(command_buffer, &command_pid, &fp_child_input);
     if(!fp_child_output) {
-        error("Cannot popen(\"%s\").", command_buffer);
+        netdata_log_error("Cannot popen(\"%s\").", command_buffer);
         return CLAIM_AGENT_CANNOT_EXECUTE_CLAIM_SCRIPT;
     }
     netdata_log_info("Waiting for claiming command to finish.");
@@ -100,19 +100,19 @@ CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, con
         return CLAIM_AGENT_OK;
     }
     if (exit_code < 0) {
-        error("Agent claiming command failed to complete its run.");
+        netdata_log_error("Agent claiming command failed to complete its run.");
         return CLAIM_AGENT_CLAIM_SCRIPT_FAILED;
     }
     errno = 0;
     unsigned maximum_known_exit_code = sizeof(claiming_errors) / sizeof(claiming_errors[0]) - 1;
 
     if ((unsigned)exit_code > maximum_known_exit_code) {
-        error("Agent failed to be claimed with an unknown error.");
+        netdata_log_error("Agent failed to be claimed with an unknown error.");
         return CLAIM_AGENT_CLAIM_SCRIPT_RETURNED_INVALID_CODE;
     }
 
-    error("Agent failed to be claimed with the following error message:");
-    error("\"%s\"", claiming_errors[exit_code]);
+    netdata_log_error("Agent failed to be claimed with the following error message:");
+    netdata_log_error("\"%s\"", claiming_errors[exit_code]);
 
     if(msg) *msg = claiming_errors[exit_code];
 
@@ -167,7 +167,7 @@ void load_claiming_state(void)
     long bytes_read;
     char *claimed_id = read_by_filename(filename, &bytes_read);
     if(claimed_id && uuid_parse(claimed_id, uuid)) {
-        error("claimed_id \"%s\" doesn't look like valid UUID", claimed_id);
+        netdata_log_error("claimed_id \"%s\" doesn't look like valid UUID", claimed_id);
         freez(claimed_id);
         claimed_id = NULL;
     }
@@ -250,12 +250,12 @@ bool netdata_random_session_id_generate(void) {
     // save it
     int fd = open(filename, O_WRONLY|O_CREAT|O_TRUNC, 640);
     if(fd == -1) {
-        error("Cannot create random session id file '%s'.", filename);
+        netdata_log_error("Cannot create random session id file '%s'.", filename);
         ret = false;
     }
 
     if(write(fd, guid, UUID_STR_LEN - 1) != UUID_STR_LEN - 1) {
-        error("Cannot write the random session id file '%s'.", filename);
+        netdata_log_error("Cannot write the random session id file '%s'.", filename);
         ret = false;
     }
 

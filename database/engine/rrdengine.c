@@ -733,7 +733,7 @@ static void after_extent_write_datafile_io(uv_fs_t *uv_fs_request) {
 
     if (uv_fs_request->result < 0) {
         ctx_io_error(ctx);
-        error("DBENGINE: %s: uv_fs_write(): %s", __func__, uv_strerror((int)uv_fs_request->result));
+        netdata_log_error("DBENGINE: %s: uv_fs_write(): %s", __func__, uv_strerror((int)uv_fs_request->result));
     }
 
     journalfile_v1_extent_write(ctx, xt_io_descr->datafile, xt_io_descr->wal, &rrdeng_main.loop);
@@ -1643,14 +1643,14 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
 
         ret = uv_loop_init(&rrdeng_main.loop);
         if (ret) {
-            error("DBENGINE: uv_loop_init(): %s", uv_strerror(ret));
+            netdata_log_error("DBENGINE: uv_loop_init(): %s", uv_strerror(ret));
             return false;
         }
         rrdeng_main.loop.data = &rrdeng_main;
 
         ret = uv_async_init(&rrdeng_main.loop, &rrdeng_main.async, async_cb);
         if (ret) {
-            error("DBENGINE: uv_async_init(): %s", uv_strerror(ret));
+            netdata_log_error("DBENGINE: uv_async_init(): %s", uv_strerror(ret));
             fatal_assert(0 == uv_loop_close(&rrdeng_main.loop));
             return false;
         }
@@ -1658,7 +1658,7 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
 
         ret = uv_timer_init(&rrdeng_main.loop, &rrdeng_main.timer);
         if (ret) {
-            error("DBENGINE: uv_timer_init(): %s", uv_strerror(ret));
+            netdata_log_error("DBENGINE: uv_timer_init(): %s", uv_strerror(ret));
             uv_close((uv_handle_t *)&rrdeng_main.async, NULL);
             fatal_assert(0 == uv_loop_close(&rrdeng_main.loop));
             return false;

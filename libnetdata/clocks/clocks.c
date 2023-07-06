@@ -14,7 +14,7 @@ usec_t clock_realtime_resolution = 1000;
 inline int clock_gettime(clockid_t clk_id __maybe_unused, struct timespec *ts) {
     struct timeval tv;
     if(unlikely(gettimeofday(&tv, NULL) == -1)) {
-        error("gettimeofday() failed.");
+        netdata_log_error("gettimeofday() failed.");
         return -1;
     }
     ts->tv_sec = tv.tv_sec;
@@ -79,7 +79,7 @@ void clocks_init(void) {
 inline time_t now_sec(clockid_t clk_id) {
     struct timespec ts;
     if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
-        error("clock_gettime(%d, &timespec) failed.", clk_id);
+        netdata_log_error("clock_gettime(%d, &timespec) failed.", clk_id);
         return 0;
     }
     return ts.tv_sec;
@@ -88,7 +88,7 @@ inline time_t now_sec(clockid_t clk_id) {
 inline usec_t now_usec(clockid_t clk_id) {
     struct timespec ts;
     if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
-        error("clock_gettime(%d, &timespec) failed.", clk_id);
+        netdata_log_error("clock_gettime(%d, &timespec) failed.", clk_id);
         return 0;
     }
     return (usec_t)ts.tv_sec * USEC_PER_SEC + (ts.tv_nsec % NSEC_PER_SEC) / NSEC_PER_USEC;
@@ -98,7 +98,7 @@ inline int now_timeval(clockid_t clk_id, struct timeval *tv) {
     struct timespec ts;
 
     if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
-        error("clock_gettime(%d, &timespec) failed.", clk_id);
+        netdata_log_error("clock_gettime(%d, &timespec) failed.", clk_id);
         tv->tv_sec = 0;
         tv->tv_usec = 0;
         return -1;
@@ -200,30 +200,27 @@ void sleep_to_absolute_time(usec_t usec) {
             if (ret == EINVAL) {
                 if (!einval_printed) {
                     einval_printed++;
-                    error(
-                        "Invalid time given to clock_nanosleep(): clockid = %d, tv_sec = %lld, tv_nsec = %ld",
-                        clock,
-                        (long long)req.tv_sec,
-                        req.tv_nsec);
+                    netdata_log_error("Invalid time given to clock_nanosleep(): clockid = %d, tv_sec = %lld, tv_nsec = %ld",
+                                      clock,
+                                      (long long)req.tv_sec,
+                                      req.tv_nsec);
                 }
             } else if (ret == ENOTSUP) {
                 if (!enotsup_printed) {
                     enotsup_printed++;
-                    error(
-                        "Invalid clock id given to clock_nanosleep(): clockid = %d, tv_sec = %lld, tv_nsec = %ld",
-                        clock,
-                        (long long)req.tv_sec,
-                        req.tv_nsec);
+                    netdata_log_error("Invalid clock id given to clock_nanosleep(): clockid = %d, tv_sec = %lld, tv_nsec = %ld",
+                                      clock,
+                                      (long long)req.tv_sec,
+                                      req.tv_nsec);
                 }
             } else {
                 if (!eunknown_printed) {
                     eunknown_printed++;
-                    error(
-                        "Unknown return value %d from clock_nanosleep(): clockid = %d, tv_sec = %lld, tv_nsec = %ld",
-                        ret,
-                        clock,
-                        (long long)req.tv_sec,
-                        req.tv_nsec);
+                    netdata_log_error("Unknown return value %d from clock_nanosleep(): clockid = %d, tv_sec = %lld, tv_nsec = %ld",
+                                      ret,
+                                      clock,
+                                      (long long)req.tv_sec,
+                                      req.tv_nsec);
                 }
             }
             sleep_usec(usec);
@@ -384,7 +381,7 @@ void sleep_usec_with_now(usec_t usec, usec_t started_ut) {
             }
         }
         else {
-            error("Cannot nanosleep() for %llu microseconds.", usec);
+            netdata_log_error("Cannot nanosleep() for %llu microseconds.", usec);
             break;
         }
     }
@@ -394,7 +391,7 @@ static inline collected_number uptime_from_boottime(void) {
 #ifdef CLOCK_BOOTTIME_IS_AVAILABLE
     return (collected_number)(now_boottime_usec() / USEC_PER_MS);
 #else
-    error("uptime cannot be read from CLOCK_BOOTTIME on this system.");
+    netdata_log_error("uptime cannot be read from CLOCK_BOOTTIME on this system.");
     return 0;
 #endif
 }
@@ -410,11 +407,11 @@ static inline collected_number read_proc_uptime(char *filename) {
     if(unlikely(!read_proc_uptime_ff)) return 0;
 
     if(unlikely(procfile_lines(read_proc_uptime_ff) < 1)) {
-        error("/proc/uptime has no lines.");
+        netdata_log_error("/proc/uptime has no lines.");
         return 0;
     }
     if(unlikely(procfile_linewords(read_proc_uptime_ff, 0) < 1)) {
-        error("/proc/uptime has less than 1 word in it.");
+        netdata_log_error("/proc/uptime has less than 1 word in it.");
         return 0;
     }
 
@@ -441,7 +438,7 @@ inline collected_number uptime_msec(char *filename){
             use_boottime = 0;
         }
         else {
-            error("Cannot find any way to read uptime on this system.");
+            netdata_log_error("Cannot find any way to read uptime on this system.");
             return 1;
         }
     }

@@ -180,7 +180,7 @@ static int web_server_file_write_callback(POLLINFO *pi, short int *events) {
     (void)events;
 
     worker_is_busy(WORKER_JOB_WRITE_FILE);
-    error("Writing to web files is not supported!");
+    netdata_log_error("Writing to web files is not supported!");
     worker_is_idle();
 
     return -1;
@@ -325,7 +325,7 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
                     if(fpi)
                         w->pollinfo_filecopy_slot = fpi->slot;
                     else {
-                        error("Failed to add filecopy fd. Closing client.");
+                        netdata_log_error("Failed to add filecopy fd. Closing client.");
                         ret = -1;
                         goto cleanup;
                     }
@@ -483,7 +483,7 @@ static void socket_listen_main_static_threaded_cleanup(void *ptr) {
 //    }
 //
 //    if(found)
-//        error("%d static web threads are taking too long to finish. Giving up.", found);
+//        netdata_log_error("%d static web threads are taking too long to finish. Giving up.", found);
 
     netdata_log_info("closing all web server sockets...");
     listen_sockets_close(&api_sockets);

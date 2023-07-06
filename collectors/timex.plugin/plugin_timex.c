@@ -79,7 +79,7 @@ void *timex_main(void *ptr)
         prev_sync_state = sync_state;
 
         if (non_seq_failure) {
-            error("Cannot get clock synchronization state");
+            netdata_log_error("Cannot get clock synchronization state");
             continue;
         }
 

@@ -176,7 +176,7 @@ void onewayalloc_freez(ONEWAYALLOC *owa __maybe_unused, const void *ptr __maybe_
 
     // not found - it is not ours
     // let's free it with the system allocator
-    error("ONEWAYALLOC: request to free address 0x%p that is not allocated by this OWA", ptr);
+    netdata_log_error("ONEWAYALLOC: request to free address 0x%p that is not allocated by this OWA", ptr);
 #endif
 
     return;

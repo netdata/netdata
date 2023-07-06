@@ -12,7 +12,7 @@ void registry_log(char action, REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY
                 m->guid,
                 name,
                 u->url) < 0))
-            error("Registry: failed to save log. Registry data may be lost in case of abnormal restart.");
+            netdata_log_error("Registry: failed to save log. Registry data may be lost in case of abnormal restart.");
 
         // we increase the counter even on failures
         // so that the registry will be saved periodically
@@ -33,11 +33,11 @@ int registry_log_open(void) {
     registry.log_fp = fopen(registry.log_filename, "a");
     if(registry.log_fp) {
         if (setvbuf(registry.log_fp, NULL, _IOLBF, 0) != 0)
-            error("Cannot set line buffering on registry log file.");
+            netdata_log_error("Cannot set line buffering on registry log file.");
         return 0;
     }
 
-    error("Cannot open registry log file '%s'. Registry data will be lost in case of netdata or server crash.", registry.log_filename);
+    netdata_log_error("Cannot open registry log file '%s'. Registry data will be lost in case of netdata or server crash.", registry.log_filename);
     return -1;
 }
 
@@ -55,7 +55,8 @@ void registry_log_recreate(void) {
         // open it with truncate
         registry.log_fp = fopen(registry.log_filename, "w");
         if(registry.log_fp) fclose(registry.log_fp);
-        else error("Cannot truncate registry log '%s'", registry.log_filename);
+        else
+            netdata_log_error("Cannot truncate registry log '%s'", registry.log_filename);
 
         registry.log_fp = NULL;
         registry_log_open();
@@ -72,7 +73,7 @@ ssize_t registry_log_load(void) {
     debug(D_REGISTRY, "Registry: loading active db from: %s", registry.log_filename);
     FILE *fp = fopen(registry.log_filename, "r");
     if(!fp)
-        error("Registry: cannot open registry file: %s", registry.log_filename);
+        netdata_log_error("Registry: cannot open registry file: %s", registry.log_filename);
     else {
         char *s, buf[4096 + 1];
         line = 0;
@@ -87,7 +88,7 @@ ssize_t registry_log_load(void) {
 
                     // verify it is valid
                     if (unlikely(len < 85 || s[1] != '\t' || s[10] != '\t' || s[47] != '\t' || s[84] != '\t')) {
-                        error("Registry: log line %zd is wrong (len = %zu).", line, len);
+                        netdata_log_error("Registry: log line %zd is wrong (len = %zu).", line, len);
                         continue;
                     }
                     s[1] = s[10] = s[47] = s[84] = '\0';
@@ -102,7 +103,7 @@ ssize_t registry_log_load(void) {
                     char *url = name;
                     while(*url && *url != '\t') url++;
                     if(!*url) {
-                        error("Registry: log line %zd does not have a url.", line);
+                        netdata_log_error("Registry: log line %zd does not have a url.", line);
                         continue;
                     }
                     *url++ = '\0';
@@ -121,7 +122,7 @@ ssize_t registry_log_load(void) {
                     break;
 
                 default:
-                    error("Registry: ignoring line %zd of filename '%s': %s.", line, registry.log_filename, s);
+                    netdata_log_error("Registry: ignoring line %zd of filename '%s': %s.", line, registry.log_filename, s);
                     break;
             }
         }

@@ -283,7 +283,7 @@ static inline size_t rrddim_time2slot(STORAGE_METRIC_HANDLE *db_metric_handle, t
     }
 
     if(unlikely(ret >= entries)) {
-        error("INTERNAL ERROR: rrddim_time2slot() on %s returns values outside entries", rrddim_name(rd));
+        netdata_log_error("INTERNAL ERROR: rrddim_time2slot() on %s returns values outside entries", rrddim_name(rd));
         ret = entries - 1;
     }
 
@@ -304,7 +304,7 @@ static inline time_t rrddim_slot2time(STORAGE_METRIC_HANDLE *db_metric_handle, s
     size_t update_every  = mh->update_every_s;
 
     if(slot >= entries) {
-        error("INTERNAL ERROR: caller of rrddim_slot2time() gives invalid slot %zu", slot);
+        netdata_log_error("INTERNAL ERROR: caller of rrddim_slot2time() gives invalid slot %zu", slot);
         slot = entries - 1;
     }
 
@@ -314,14 +314,14 @@ static inline time_t rrddim_slot2time(STORAGE_METRIC_HANDLE *db_metric_handle, s
         ret = last_entry_s - (time_t)(update_every * (last_slot - slot));
 
     if(unlikely(ret < first_entry_s)) {
-        error("INTERNAL ERROR: rrddim_slot2time() on dimension '%s' of chart '%s' returned time (%ld) too far in the past (before first_entry_s %ld) for slot %zu",
+        netdata_log_error("INTERNAL ERROR: rrddim_slot2time() on dimension '%s' of chart '%s' returned time (%ld) too far in the past (before first_entry_s %ld) for slot %zu",
               rrddim_name(rd), rrdset_id(rd->rrdset), ret, first_entry_s, slot);
 
         ret = first_entry_s;
     }
 
     if(unlikely(ret > last_entry_s)) {
-        error("INTERNAL ERROR: rrddim_slot2time() on dimension '%s' of chart '%s' returned time (%ld) too far into the future (after last_entry_s %ld) for slot %zu",
+        netdata_log_error("INTERNAL ERROR: rrddim_slot2time() on dimension '%s' of chart '%s' returned time (%ld) too far into the future (after last_entry_s %ld) for slot %zu",
               rrddim_name(rd), rrdset_id(rd->rrdset), ret, last_entry_s, slot);
 
         ret = last_entry_s;

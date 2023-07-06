@@ -18,21 +18,22 @@ int mongodb_init(struct instance *instance)
     bson_error_t bson_error;
 
     if (unlikely(!connector_specific_config->collection || !*connector_specific_config->collection)) {
-        error("EXPORTING: collection name is a mandatory MongoDB parameter, but it is not configured");
+        netdata_log_error("EXPORTING: collection name is a mandatory MongoDB parameter, but it is not configured");
         return 1;
     }
 
     uri = mongoc_uri_new_with_error(instance->config.destination, &bson_error);
     if (unlikely(!uri)) {
-        error(
-            "EXPORTING: failed to parse URI: %s. Error message: %s", instance->config.destination, bson_error.message);
+        netdata_log_error("EXPORTING: failed to parse URI: %s. Error message: %s",
+                          instance->config.destination,
+                          bson_error.message);
         return 1;
     }
 
     int32_t socket_timeout =
         mongoc_uri_get_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, instance->config.timeoutms);
     if (!mongoc_uri_set_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, socket_timeout)) {
-        error("EXPORTING: failed to set %s to the value %d", MONGOC_URI_SOCKETTIMEOUTMS, socket_timeout);
+        netdata_log_error("EXPORTING: failed to set %s to the value %d", MONGOC_URI_SOCKETTIMEOUTMS, socket_timeout);
         return 1;
     };
 
@@ -41,12 +42,12 @@ int mongodb_init(struct instance *instance)
 
     connector_specific_data->client = mongoc_client_new_from_uri(uri);
     if (unlikely(!connector_specific_data->client)) {
-        error("EXPORTING: failed to create a new client");
+        netdata_log_error("EXPORTING: failed to create a new client");
         return 1;
     }
 
     if (!mongoc_client_set_appname(connector_specific_data->client, "netdata")) {
-        error("EXPORTING: failed to set client appname");
+        netdata_log_error("EXPORTING: failed to set client appname");
     };
 
     connector_specific_data->collection = mongoc_client_get_collection(
@@ -108,7 +109,8 @@ int init_mongodb_instance(struct instance *instance)
 
     instance->buffer = (void *)buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
     if (!instance->buffer) {
-        error("EXPORTING: cannot create buffer for MongoDB exporting connector instance %s", instance->config.name);
+        netdata_log_error("EXPORTING: cannot create buffer for MongoDB exporting connector instance %s",
+                          instance->config.name);
         return 1;
     }
     if (uv_mutex_init(&instance->mutex))
@@ -128,7 +130,7 @@ int init_mongodb_instance(struct instance *instance)
     }
 
     if (unlikely(mongodb_init(instance))) {
-        error("EXPORTING: cannot initialize MongoDB exporting connector");
+        netdata_log_error("EXPORTING: cannot initialize MongoDB exporting connector");
         return 1;
     }
 
@@ -195,7 +197,7 @@ int format_batch_mongodb(struct instance *instance)
         insert[documents_inserted] = bson_new_from_json((const uint8_t *)start, -1, &bson_error);
 
         if (unlikely(!insert[documents_inserted])) {
-            error(
+            netdata_log_error(
                 "EXPORTING: Failed creating a BSON document from a JSON string \"%s\" : %s", start, bson_error.message);
             free_bson(insert, documents_inserted);
             return 1;
@@ -350,8 +352,8 @@ void mongodb_connector_worker(void *instance_p)
                 stats->receptions++;
             } else {
                 // oops! we couldn't send (all or some of the) data
-                error("EXPORTING: %s", bson_error.message);
-                error(
+                netdata_log_error("EXPORTING: %s", bson_error.message);
+                netdata_log_error(
                     "EXPORTING: failed to write data to the database '%s'. "
                     "Willing to write %zu bytes, wrote %zu bytes.",
                     instance->config.destination, data_size, 0UL);

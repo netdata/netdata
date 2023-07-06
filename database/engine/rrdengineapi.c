@@ -247,7 +247,7 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
         is_1st_metric_writer = false;
         char uuid[UUID_STR_LEN + 1];
         uuid_unparse(*mrg_metric_uuid(main_mrg, metric), uuid);
-        error("DBENGINE: metric '%s' is already collected and should not be collected twice - expect gaps on the charts", uuid);
+        netdata_log_error("DBENGINE: metric '%s' is already collected and should not be collected twice - expect gaps on the charts", uuid);
     }
 
     metric = mrg_metric_dup(main_mrg, metric);
@@ -312,7 +312,7 @@ static bool page_has_only_empty_metrics(struct rrdeng_collect_handle *handle) {
         default: {
             static bool logged = false;
             if(!logged) {
-                error("DBENGINE: cannot check page for nulls on unknown page type id %d", (mrg_metric_ctx(handle->metric))->config.page_type);
+                netdata_log_error("DBENGINE: cannot check page for nulls on unknown page type id %d", (mrg_metric_ctx(handle->metric))->config.page_type);
                 logged = true;
             }
             return false;
@@ -908,7 +908,7 @@ STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim
         default: {
             static bool logged = false;
             if(!logged) {
-                error("DBENGINE: unknown page type %d found. Cannot decode it. Ignoring its metrics.", handle->ctx->config.page_type);
+                netdata_log_error("DBENGINE: unknown page type %d found. Cannot decode it. Ignoring its metrics.", handle->ctx->config.page_type);
                 logged = true;
             }
             storage_point_empty(sp, sp.start_time_s, sp.end_time_s);
@@ -986,7 +986,7 @@ bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *db_instance, uuid_t *dim_
 {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
     if (unlikely(!ctx)) {
-        error("DBENGINE: invalid STORAGE INSTANCE to %s()", __FUNCTION__);
+        netdata_log_error("DBENGINE: invalid STORAGE INSTANCE to %s()", __FUNCTION__);
         return false;
     }
 
@@ -1160,7 +1160,7 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
     /* reserve RRDENG_FD_BUDGET_PER_INSTANCE file descriptors for this instance */
     rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, RRDENG_FD_BUDGET_PER_INSTANCE);
     if (rrdeng_reserved_file_descriptors > max_open_files) {
-        error(
+        netdata_log_error(
             "Exceeded the budget of available file descriptors (%u/%u), cannot create new dbengine instance.",
             (unsigned)rrdeng_reserved_file_descriptors,
             (unsigned)max_open_files);

@@ -240,7 +240,7 @@ static inline void string_index_delete(STRING *string) {
         JError_t J_Error;
         int ret = JudyHSDel(&string_base.JudyHSArray, (void *)string->str, string->length, &J_Error);
         if (unlikely(ret == JERR)) {
-            error(
+            netdata_log_error(
                 "STRING: Cannot delete entry with name '%s' from JudyHS, JU_ERRNO_* == %u, ID == %d",
                 string->str,
                 JU_ERRNO(&J_Error),
@@ -250,7 +250,7 @@ static inline void string_index_delete(STRING *string) {
     }
 
     if (unlikely(!deleted))
-        error("STRING: tried to delete '%s' that is not in the index. Ignoring it.", string->str);
+        netdata_log_error("STRING: tried to delete '%s' that is not in the index. Ignoring it.", string->str);
     else {
         size_t mem_size = sizeof(STRING) + string->length;
         string_base.deletes++;

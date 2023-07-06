@@ -1244,7 +1244,7 @@ static double kstwo(
         return NAN;
 
     if(unlikely(base_size != baseline_points - 1 || high_size != highlight_points - 1)) {
-        error("Metric correlations: internal error - calculate_pairs_diff() returns the wrong number of entries");
+        netdata_log_error("Metric correlations: internal error - calculate_pairs_diff() returns the wrong number of entries");
         return NAN;
     }
 
@@ -1292,7 +1292,7 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
         stats->db_points_per_tier[tr] += r->internal.qt->db.tiers[tr].points;
 
     if(r->d != 1 || r->internal.qt->query.used != 1) {
-        error("WEIGHTS: on query '%s' expected 1 dimension in RRDR but got %zu r->d and %zu qt->query.used",
+        netdata_log_error("WEIGHTS: on query '%s' expected 1 dimension in RRDR but got %zu r->d and %zu qt->query.used",
               r->internal.qt->id, r->d, (size_t)r->internal.qt->query.used);
         goto cleanup;
     }
@@ -1368,11 +1368,11 @@ static void rrdset_metric_correlations_ks2(
 
         // these conditions should never happen, but still let's check
         if(unlikely(prob < 0.0)) {
-            error("Metric correlations: kstwo() returned a negative number: %f", prob);
+            netdata_log_error("Metric correlations: kstwo() returned a negative number: %f", prob);
             prob = -prob;
         }
         if(unlikely(prob > 1.0)) {
-            error("Metric correlations: kstwo() returned a number above 1.0: %f", prob);
+            netdata_log_error("Metric correlations: kstwo() returned a number above 1.0: %f", prob);
             prob = 1.0;
         }
 

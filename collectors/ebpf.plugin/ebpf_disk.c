@@ -341,7 +341,7 @@ static void update_disk_table(char *name, int major, int minor, time_t current_t
     netdata_ebpf_disks_t *check;
     check = (netdata_ebpf_disks_t *) avl_insert_lock(&disk_tree, (avl_t *)w);
     if (check != w)
-        error("Internal error, cannot insert the AVL tree.");
+        netdata_log_error("Internal error, cannot insert the AVL tree.");
 
 #ifdef NETDATA_INTERNAL_CHECKS
     netdata_log_info("The Latency is monitoring the hard disk %s (Major = %d, Minor = %d, Device = %u)", name, major, minor,w->dev);
@@ -424,12 +424,12 @@ static void ebpf_disk_disable_tracepoints()
     char *default_message = { "Cannot disable the tracepoint" };
     if (!was_block_issue_enabled) {
         if (ebpf_disable_tracing_values(tracepoint_block_type, tracepoint_block_issue))
-            error("%s %s/%s.", default_message, tracepoint_block_type, tracepoint_block_issue);
+            netdata_log_error("%s %s/%s.", default_message, tracepoint_block_type, tracepoint_block_issue);
     }
 
     if (!was_block_rq_complete_enabled) {
         if (ebpf_disable_tracing_values(tracepoint_block_type, tracepoint_block_rq_complete))
-            error("%s %s/%s.", default_message, tracepoint_block_type, tracepoint_block_rq_complete);
+            netdata_log_error("%s %s/%s.", default_message, tracepoint_block_type, tracepoint_block_rq_complete);
     }
 }
 
@@ -814,7 +814,7 @@ static int ebpf_disk_load_bpf(ebpf_module_t *em)
 #endif
 
     if (ret)
-        error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
+        netdata_log_error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
 
     return ret;
 }
@@ -845,7 +845,7 @@ void *ebpf_disk_thread(void *ptr)
     }
 
     if (pthread_mutex_init(&plot_mutex, NULL)) {
-        error("Cannot initialize local mutex");
+        netdata_log_error("Cannot initialize local mutex");
         goto enddisk;
     }
 

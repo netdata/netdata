@@ -70,17 +70,17 @@ static int parse_http_hdr(rbuf_t buf, http_parse_ctx *parse_ctx)
     char buf_val[HTTP_HDR_BUFFER_SIZE];
     char *ptr = buf_key;
     if (!rbuf_find_bytes(buf, HTTP_LINE_TERM, strlen(HTTP_LINE_TERM), &idx_end)) {
-        error("CRLF expected");
+        netdata_log_error("CRLF expected");
         return 1;
     }
 
     char *separator = rbuf_find_bytes(buf, HTTP_KEYVAL_SEPARATOR, strlen(HTTP_KEYVAL_SEPARATOR), &idx);
     if (!separator) {
-        error("Missing Key/Value separator");
+        netdata_log_error("Missing Key/Value separator");
         return 1;
     }
     if (idx >= HTTP_HDR_BUFFER_SIZE) {
-        error("Key name is too long");
+        netdata_log_error("Key name is too long");
         return 1;
     }
 
@@ -90,7 +90,7 @@ static int parse_http_hdr(rbuf_t buf, http_parse_ctx *parse_ctx)
     rbuf_bump_tail(buf, strlen(HTTP_KEYVAL_SEPARATOR));
     idx_end -= strlen(HTTP_KEYVAL_SEPARATOR) + idx;
     if (idx_end >= HTTP_HDR_BUFFER_SIZE) {
-        error("Value of key \"%s\" too long", buf_key);
+        netdata_log_error("Value of key \"%s\" too long", buf_key);
         return 1;
     }
 
@@ -116,22 +116,22 @@ static int parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx)
         switch (parse_ctx->state) {
             case HTTP_PARSE_INITIAL:
                 if (rbuf_memcmp_n(buf, RESP_PROTO, strlen(RESP_PROTO))) {
-                    error("Expected response to start with \"%s\"", RESP_PROTO);
+                    netdata_log_error("Expected response to start with \"%s\"", RESP_PROTO);
                     return PARSE_ERROR;
                 }
                 rbuf_bump_tail(buf, strlen(RESP_PROTO));
                 if (rbuf_pop(buf, rc, 4) != 4) {
-                    error("Expected HTTP status code");
+                    netdata_log_error("Expected HTTP status code");
                     return PARSE_ERROR;
                 }
                 if (rc[3] != ' ') {
-                    error("Expected space after HTTP return code");
+                    netdata_log_error("Expected space after HTTP return code");
                     return PARSE_ERROR;
                 }
                 rc[3] = 0;
                 parse_ctx->http_code = atoi(rc);
                 if (parse_ctx->http_code < 100 || parse_ctx->http_code >= 600) {
-                    error("HTTP code not in range 100 to 599");
+                    netdata_log_error("HTTP code not in range 100 to 599");
                     return PARSE_ERROR;
                 }
 
@@ -186,7 +186,7 @@ typedef struct https_req_ctx {
 
 static int https_req_check_timedout(https_req_ctx_t *ctx) {
     if (now_realtime_sec() > ctx->req_start_time + ctx->request->timeout_s) {
-        error("request timed out");
+        netdata_log_error("request timed out");
         return 1;
     }
     return 0;
@@ -220,12 +220,12 @@ static int socket_write_all(https_req_ctx_t *ctx, char *data, size_t data_len) {
     do {
         int ret = poll(&ctx->poll_fd, 1, POLL_TO_MS);
         if (ret < 0) {
-            error("poll error");
+            netdata_log_error("poll error");
             return 1;
         }
         if (ret == 0) {
             if (https_req_check_timedout(ctx)) {
-                error("Poll timed out");
+                netdata_log_error("Poll timed out");
                 return 2;
             }
             continue;
@@ -235,7 +235,7 @@ static int socket_write_all(https_req_ctx_t *ctx, char *data, size_t data_len) {
         if (ret > 0) {
             ctx->written += ret;
         } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
-            error("Error writing to socket");
+            netdata_log_error("Error writing to socket");
             return 3;
         }
     } while (ctx->written < data_len);
@@ -250,12 +250,12 @@ static int ssl_write_all(https_req_ctx_t *ctx, char *data, size_t data_len) {
     do {
         int ret = poll(&ctx->poll_fd, 1, POLL_TO_MS);
         if (ret < 0) {
-            error("poll error");
+            netdata_log_error("poll error");
             return 1;
         }
         if (ret == 0) {
             if (https_req_check_timedout(ctx)) {
-                error("Poll timed out");
+                netdata_log_error("Poll timed out");
                 return 2;
             }
             continue;
@@ -275,7 +275,7 @@ static int ssl_write_all(https_req_ctx_t *ctx, char *data, size_t data_len) {
                     ctx->poll_fd.events |= POLLOUT;
                     break;
                 default:
-                    error("SSL_write Err: %s", _ssl_err_tos(ret));
+                    netdata_log_error("SSL_write Err: %s", _ssl_err_tos(ret));
                     return 3;
             }
         }
@@ -299,12 +299,12 @@ static int read_parse_response(https_req_ctx_t *ctx) {
     do {
         ret = poll(&ctx->poll_fd, 1, POLL_TO_MS);
         if (ret < 0) {
-            error("poll error");
+            netdata_log_error("poll error");
             return 1;
         }
         if (ret == 0) {
             if (https_req_check_timedout(ctx)) {
-                error("Poll timed out");
+                netdata_log_error("Poll timed out");
                 return 2;
             }
             if (!ctx->ssl_ctx)
@@ -332,12 +332,12 @@ static int read_parse_response(https_req_ctx_t *ctx) {
                         ctx->poll_fd.events |= POLLOUT;
                         break;
                     default:
-                        error("SSL_read Err: %s", _ssl_err_tos(ret));
+                        netdata_log_error("SSL_read Err: %s", _ssl_err_tos(ret));
                         return 3;
                 }
             } else {
                 if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                    error("write error");
+                    netdata_log_error("write error");
                     return 3;
                 }
                 ctx->poll_fd.events |= POLLIN;
@@ -346,7 +346,7 @@ static int read_parse_response(https_req_ctx_t *ctx) {
     } while (!(ret = parse_http_response(ctx->buf_rx, &ctx->parse_ctx)));
 
     if (ret != PARSE_SUCCESS) {
-        error("Error parsing HTTP response");
+        netdata_log_error("Error parsing HTTP response");
         return 1;
     }
 
@@ -373,7 +373,7 @@ static int handle_http_request(https_req_ctx_t *ctx) {
             buffer_strcat(hdr, "POST ");
             break;
         default:
-            error("Unknown HTTPS request type!");
+            netdata_log_error("Unknown HTTPS request type!");
             rc = 1;
             goto err_exit;
     }
@@ -419,14 +419,14 @@ static int handle_http_request(https_req_ctx_t *ctx) {
 
     // Send the request
     if (https_client_write_all(ctx, hdr->buffer, hdr->len)) {
-        error("Couldn't write HTTP request header into SSL connection");
+        netdata_log_error("Couldn't write HTTP request header into SSL connection");
         rc = 2;
         goto err_exit;
     }
 
     if (ctx->request->request_type == HTTP_REQ_POST && ctx->request->payload && ctx->request->payload_size) {
         if (https_client_write_all(ctx, ctx->request->payload, ctx->request->payload_size)) {
-            error("Couldn't write payload into SSL connection");
+            netdata_log_error("Couldn't write payload into SSL connection");
             rc = 3;
             goto err_exit;
         }
@@ -434,7 +434,7 @@ static int handle_http_request(https_req_ctx_t *ctx) {
 
     // Read The Response
     if (read_parse_response(ctx)) {
-        error("Error reading or parsing response from server");
+        netdata_log_error("Error reading or parsing response from server");
         rc = 4;
         goto err_exit;
     }
@@ -456,7 +456,7 @@ static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
         err_cert = X509_STORE_CTX_get_current_cert(ctx);
         err_str = X509_NAME_oneline(X509_get_subject_name(err_cert), NULL, 0);
 
-        error("Cert Chain verify error:num=%d:%s:depth=%d:%s", err,
+        netdata_log_error("Cert Chain verify error:num=%d:%s:depth=%d:%s", err,
                  X509_verify_cert_error_string(err), depth, err_str);
 
         free(err_str);
@@ -466,7 +466,7 @@ static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
     if (!preverify_ok && err == X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT)
     {
         preverify_ok = 1;
-        error("Self Signed Certificate Accepted as the agent was built with ACLK_SSL_ALLOW_SELF_SIGNED");
+        netdata_log_error("Self Signed Certificate Accepted as the agent was built with ACLK_SSL_ALLOW_SELF_SIGNED");
     }
 #endif
 
@@ -486,7 +486,7 @@ int https_request(https_req_t *request, https_req_response_t *response) {
 
     ctx->buf_rx = rbuf_create(RX_BUFFER_SIZE);
     if (!ctx->buf_rx) {
-        error("Couldn't allocate buffer for RX data");
+        netdata_log_error("Couldn't allocate buffer for RX data");
         goto exit_req_ctx;
     }
 
@@ -494,12 +494,12 @@ int https_request(https_req_t *request, https_req_response_t *response) {
 
     ctx->sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, connect_host, 0, connect_port_str, &timeout);
     if (ctx->sock < 0) {
-        error("Error connecting TCP socket to \"%s\"", connect_host);
+        netdata_log_error("Error connecting TCP socket to \"%s\"", connect_host);
         goto exit_buf_rx;
     }
 
     if (fcntl(ctx->sock, F_SETFL, fcntl(ctx->sock, F_GETFL, 0) | O_NONBLOCK) == -1) {
-        error("Error setting O_NONBLOCK to TCP socket.");
+        netdata_log_error("Error setting O_NONBLOCK to TCP socket.");
         goto exit_sock;
     }
 
@@ -517,11 +517,11 @@ int https_request(https_req_t *request, https_req_response_t *response) {
         req.proxy_password = request->proxy_password;
         ctx->request = &req;
         if (handle_http_request(ctx)) {
-            error("Failed to CONNECT with proxy");
+            netdata_log_error("Failed to CONNECT with proxy");
             goto exit_sock;
         }
         if (ctx->parse_ctx.http_code != 200) {
-            error("Proxy didn't return 200 OK (got %d)", ctx->parse_ctx.http_code);
+            netdata_log_error("Proxy didn't return 200 OK (got %d)", ctx->parse_ctx.http_code);
             goto exit_sock;
         }
         netdata_log_info("Proxy accepted CONNECT upgrade");
@@ -530,26 +530,26 @@ int https_request(https_req_t *request, https_req_response_t *response) {
 
     ctx->ssl_ctx = netdata_ssl_create_client_ctx(0);
     if (ctx->ssl_ctx==NULL) {
-        error("Cannot allocate SSL context");
+        netdata_log_error("Cannot allocate SSL context");
         goto exit_sock;
     }
 
     if (!SSL_CTX_set_default_verify_paths(ctx->ssl_ctx)) {
-        error("Error setting default verify paths");
+        netdata_log_error("Error setting default verify paths");
         goto exit_CTX;
     }
     SSL_CTX_set_verify(ctx->ssl_ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE, cert_verify_callback);
 
     ctx->ssl = SSL_new(ctx->ssl_ctx);
     if (ctx->ssl==NULL) {
-        error("Cannot allocate SSL");
+        netdata_log_error("Cannot allocate SSL");
         goto exit_CTX;
     }
 
     SSL_set_fd(ctx->ssl, ctx->sock);
     ret = SSL_connect(ctx->ssl);
     if (ret != -1 && ret != 1) {
-        error("SSL could not connect");
+        netdata_log_error("SSL could not connect");
         goto exit_SSL;
     }
     if (ret == -1) {
@@ -557,14 +557,14 @@ int https_request(https_req_t *request, https_req_response_t *response) {
         // consult SSL_connect documentation for details
         int ec = SSL_get_error(ctx->ssl, ret);
         if (ec != SSL_ERROR_WANT_READ && ec != SSL_ERROR_WANT_WRITE) {
-            error("Failed to start SSL connection");
+            netdata_log_error("Failed to start SSL connection");
             goto exit_SSL;
         }
     }
 
     // The actual request here
     if (handle_http_request(ctx)) {
-        error("Couldn't process request");
+        netdata_log_error("Couldn't process request");
         goto exit_SSL;
     }
     response->http_code = ctx->parse_ctx.http_code;
@@ -573,7 +573,7 @@ int https_request(https_req_t *request, https_req_response_t *response) {
         response->payload = mallocz(response->payload_size + 1);
         ret = rbuf_pop(ctx->buf_rx, response->payload, response->payload_size);
         if (ret != (int)response->payload_size) {
-            error("Payload size doesn't match remaining data on the buffer!");
+            netdata_log_error("Payload size doesn't match remaining data on the buffer!");
             response->payload_size = ret;
         }
         // normally we take payload as it is and copy it
@@ -627,16 +627,16 @@ static int parse_host_port(url_t *url) {
     if (ptr) {
         size_t port_len = strlen(ptr + 1);
         if (!port_len) {
-            error(URL_PARSER_LOG_PREFIX ": specified but no port number");
+            netdata_log_error(URL_PARSER_LOG_PREFIX ": specified but no port number");
             return 1;
         }
         if (port_len > 5 /* MAX port length is 5digit long in decimal */) {
-            error(URL_PARSER_LOG_PREFIX "port # is too long");
+            netdata_log_error(URL_PARSER_LOG_PREFIX "port # is too long");
             return 1;
         }
         *ptr = 0;
         if (!strlen(url->host)) {
-            error(URL_PARSER_LOG_PREFIX "host empty after removing port");
+            netdata_log_error(URL_PARSER_LOG_PREFIX "host empty after removing port");
             return 1;
         }
         url->port = atoi (ptr + 1);
@@ -672,7 +672,7 @@ int url_parse(const char *url, url_t *parsed) {
 
     if (end) {
         if (end == start) {
-            error (URL_PARSER_LOG_PREFIX "found " URI_PROTO_SEPARATOR " without protocol specified");
+            netdata_log_error(URL_PARSER_LOG_PREFIX "found " URI_PROTO_SEPARATOR " without protocol specified");
             return 1;
         }
 
@@ -685,7 +685,7 @@ int url_parse(const char *url, url_t *parsed) {
         end = start + strlen(start);
     
     if (start == end) {
-        error(URL_PARSER_LOG_PREFIX "Host empty");
+        netdata_log_error(URL_PARSER_LOG_PREFIX "Host empty");
         return 1;
     }
 

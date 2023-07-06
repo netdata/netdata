@@ -101,7 +101,7 @@ void health_silencers2file(BUFFER *wb) {
         fclose(fd);
         return;
     }
-    error("Silencer changes could not be written to %s. Error %s", silencers_filename, strerror(errno));
+    netdata_log_error("Silencer changes could not be written to %s. Error %s", silencers_filename, strerror(errno));
 }
 
 /**

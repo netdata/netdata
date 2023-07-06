@@ -102,10 +102,10 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         }
 
         if(!initialized)
-            error("Failed to initialize all db tiers for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
+            netdata_log_error("Failed to initialize all db tiers for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
 
         if(!rd->tiers[0].db_metric_handle)
-            error("Failed to initialize the first db tier for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
+            netdata_log_error("Failed to initialize the first db tier for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
     }
 
     // initialize data collection for all tiers
@@ -120,7 +120,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         }
 
         if(!initialized)
-            error("Failed to initialize data collection for all db tiers for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
+            netdata_log_error("Failed to initialize data collection for all db tiers for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
     }
 
     if(rrdset_number_of_dimensions(st) != 0) {
@@ -499,7 +499,7 @@ int rrddim_hide(RRDSET *st, const char *id) {
 
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), rrdhost_hostname(host));
+        netdata_log_error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), rrdhost_hostname(host));
         return 1;
     }
     if (!rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
@@ -518,7 +518,7 @@ int rrddim_unhide(RRDSET *st, const char *id) {
     RRDHOST *host = st->rrdhost;
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), rrdhost_hostname(host));
+        netdata_log_error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), rrdhost_hostname(host));
         return 1;
     }
     if (rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
@@ -582,7 +582,7 @@ collected_number rrddim_set(RRDSET *st, const char *id, collected_number value) 
     RRDHOST *host = st->rrdhost;
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), rrdhost_hostname(host));
+        netdata_log_error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), rrdhost_hostname(host));
         return 0;
     }
 
@@ -711,12 +711,12 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
         reset = 1;
     }
     else if(rd_on_file->memsize != size) {
-        error("File %s does not have the desired size, expected %lu but found %lu. Clearing it.", fullfilename, size, (unsigned long int) rd_on_file->memsize);
+        netdata_log_error("File %s does not have the desired size, expected %lu but found %lu. Clearing it.", fullfilename, size, (unsigned long int) rd_on_file->memsize);
         memset(rd_on_file, 0, size);
         reset = 1;
     }
     else if(rd_on_file->update_every != st->update_every) {
-        error("File %s does not have the same update frequency, expected %d but found %d. Clearing it.", fullfilename, st->update_every, rd_on_file->update_every);
+        netdata_log_error("File %s does not have the same update frequency, expected %d but found %d. Clearing it.", fullfilename, st->update_every, rd_on_file->update_every);
         memset(rd_on_file, 0, size);
         reset = 1;
     }
