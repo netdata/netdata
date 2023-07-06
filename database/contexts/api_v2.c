@@ -1290,10 +1290,10 @@ static int contexts_v2_alert_instance_to_json_callback(const DICTIONARY_ITEM *it
         buffer_json_member_add_string(wb, "nm", string2str(t->name));
         buffer_json_member_add_string(wb, "ch", string2str(t->chart_name));
 
-        if(ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES) {
-            if(ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_SUMMARY)
-                buffer_json_member_add_uint64(wb, "ati", t->ati);
+        if(ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_SUMMARY)
+            buffer_json_member_add_uint64(wb, "ati", t->ati);
 
+        if(ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES) {
             buffer_json_member_add_string(wb, "units", string2str(t->units));
             buffer_json_member_add_string(wb, "fami", string2str(t->family));
             buffer_json_member_add_string(wb, "info", string2str(t->info));
