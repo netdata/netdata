@@ -1431,25 +1431,27 @@ static inline void contexts_v2_alert_transition_keep(struct alert_transitions_ca
     }
 
     struct sql_alert_transition_data *last = d->last_added;
-    while(last != d->base && last->prev->global_id > t->global_id) {
+    while(last->prev != d->base->prev && t->global_id > last->prev->global_id) {
         last = last->prev;
         d->stats.backwards++;
     }
 
-    while(last->next && last->next->global_id < t->global_id) {
+    while(last->next && t->global_id < last->next->global_id) {
         last = last->next;
         d->stats.forwards++;
     }
 
-    if(d->items >= d->limit && last == d->base->prev && last->global_id < t->global_id) {
-        d->stats.skips_after++;
-        return;
+    if(d->items >= d->limit) {
+        if(last == d->base->prev && t->global_id < last->global_id) {
+            d->stats.skips_after++;
+            return;
+        }
     }
 
     d->items++;
     d->last_added = contexts_v2_alert_transition_dup(t, machine_guid);
 
-    if(last->global_id > t->global_id) {
+    if(t->global_id > last->global_id) {
         DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(d->base, d->last_added, prev, next);
         d->stats.prepend++;
     }
@@ -1606,10 +1608,16 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
     for(struct sql_alert_transition_data *t = data.base; t ; t = t->next) {
         buffer_json_add_array_item_object(wb);
         {
+            RRDHOST *host = rrdhost_find_by_guid(t->machine_guid);
+
             buffer_json_member_add_uint64(wb, "gi", t->global_id);
             buffer_json_member_add_uuid(wb, "transition_id", t->transition_id);
             buffer_json_member_add_uuid(wb, "config_hash_id", t->config_hash_id);
             buffer_json_member_add_string(wb, "machine_guid", t->machine_guid);
+
+            if(host && host->node_id)
+                buffer_json_member_add_uuid(wb, "node_id", host->node_id);
+
             buffer_json_member_add_string(wb, "alert", t->alert_name);
             buffer_json_member_add_string(wb, "instance", t->chart);
             buffer_json_member_add_string(wb, "context", t->chart_context);
