@@ -17,6 +17,21 @@
                                 "type": "string",
                                 "description": "Name of the category. This is the actual name of the category or subcategory, (e.g. Web Servers, Operating Systems, Databases)."
                             },
+                            "limit_results": {
+                                "type": [
+                                    "null",
+                                    "integer"
+                                ],
+                                "description": "A value that if set to an integer will limit the amount of subitems that this category will display. Additional subcategories will be hidden behind a `Show more` field."
+                            },
+                            "icon_name": {
+                                "type": "string",
+                                "description": "The name of the icon from the Netdata UI."
+                            },
+                            "description": {
+                                "type": "string",
+                                "description": "Text that will be presented below the category title."
+                            },
                             "priority": {
                                 "type": "integer",
                                 "description": "Priority of the category. A number expressing where the category should be in the menu. The smaller the number the higher the priority, so a category with priority 1 would be above a category with a priority of 50 in terms of menu ordering."
@@ -72,10 +87,10 @@
                         "description": "path to the icon for this integration."
                     },
                     "keywords": {
-                        "type":"array",
+                        "type": "array",
                         "description": "An array of terms related to the integration.",
                         "items": {
-                            "type":"string"
+                            "type": "string"
                         }
                     },
                     "overview": {
