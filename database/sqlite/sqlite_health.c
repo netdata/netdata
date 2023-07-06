@@ -393,7 +393,7 @@ void sql_health_alarm_log_count(RRDHOST *host) {
 /* Health related SQL queries
    Cleans up the health_log_detail table on a non-claimed host
 */
-#define SQL_CLEANUP_HEALTH_LOG_DETAIL_NOT_CLAIMED "DELETE FROM health_log_detail WHERE health_log_id IN (SELECT health_log_id FROM health_log WHERE host_id = ?1) AND when_key + ?2 < unixepoch();"
+#define SQL_CLEANUP_HEALTH_LOG_DETAIL_NOT_CLAIMED "DELETE FROM health_log_detail WHERE health_log_id IN (SELECT health_log_id FROM health_log WHERE host_id = ?1) AND when_key + ?2 < unixepoch() AND updated_by_id <> 0 AND transition_id NOT IN (SELECT transition_id FROM health_log hl WHERE hl.last_transition_id = transition_id);"
 void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host) {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -447,7 +447,7 @@ void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host) {
 /* Health related SQL queries
    Cleans up the health_log_detail table on a claimed host
 */
-#define SQL_CLEANUP_HEALTH_LOG_DETAIL_CLAIMED(guid) "DELETE from health_log_detail WHERE unique_id NOT IN (SELECT filtered_alert_unique_id FROM aclk_alert_%s) AND unique_id IN (SELECT hld.unique_id FROM health_log hl, health_log_detail hld WHERE hl.host_id = ?1 AND hl.health_log_id = hld.health_log_id) AND health_log_id IN (SELECT health_log_id FROM health_log WHERE host_id = ?2) AND when_key + ?3 < unixepoch();", guid
+#define SQL_CLEANUP_HEALTH_LOG_DETAIL_CLAIMED(guid) "DELETE from health_log_detail WHERE unique_id NOT IN (SELECT filtered_alert_unique_id FROM aclk_alert_%s) AND unique_id IN (SELECT hld.unique_id FROM health_log hl, health_log_detail hld WHERE hl.host_id = ?1 AND hl.health_log_id = hld.health_log_id) AND health_log_id IN (SELECT health_log_id FROM health_log WHERE host_id = ?2) AND when_key + ?3 < unixepoch() AND updated_by_id <> 0 AND transition_id NOT IN (SELECT transition_id FROM health_log hl WHERE hl.last_transition_id = transition_id);", guid
 void sql_health_alarm_log_cleanup_claimed(RRDHOST *host) {
     sqlite3_stmt *res = NULL;
     int rc;
