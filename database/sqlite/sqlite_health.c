@@ -1846,6 +1846,8 @@ void sql_alert_transitions(
     if (alert_name)
         buffer_sprintf(command, " AND h.name = @alert_name");
 
+    buffer_strcat(command, " ORDER BY d.global_id DESC");
+
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(command), -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement sql_alert_transitions");
