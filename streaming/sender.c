@@ -581,7 +581,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     );
 
     if(unlikely(s->rrdpush_sender_socket == -1)) {
-        // error("STREAM %s [send to %s]: could not connect to parent node at this time.", rrdhost_hostname(host), host->rrdpush_send_destination);
+        // netdata_log_error("STREAM %s [send to %s]: could not connect to parent node at this time.", rrdhost_hostname(host), host->rrdpush_send_destination);
         return false;
     }
 
