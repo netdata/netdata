@@ -260,13 +260,13 @@ Web_log_parser_config_t *read_web_log_parser_config(const char *log_format, cons
 #ifdef ENABLE_LOGSMANAGEMENT_TESTS
 /* Used as public only for unit testing, normally defined as static */
 int count_fields(const char *line, const char delimiter);
+#endif // ENABLE_LOGSMANAGEMENT_TESTS
 void parse_web_log_line(const Web_log_parser_config_t *wblp_config, 
                         char *line, const size_t line_len, 
                         Log_line_parsed_t *log_line_parsed);
-#endif // ENABLE_LOGSMANAGEMENT_TESTS
-int parse_web_log_buf(  char *text, size_t text_size, 
-                        Log_parser_config_t *parser_config, 
-                        Web_log_metrics_t *parser_metrics);
+void extract_web_log_metrics(Log_parser_config_t *parser_config, 
+                            Log_line_parsed_t *line_parsed, 
+                            Web_log_metrics_t *metrics);
 Web_log_parser_config_t *auto_detect_web_log_parser_config(char *line, const char delimiter);
 
 /* -------------------------------------------------------------------------- */

@@ -452,9 +452,9 @@ Web_log_parser_config_t *read_web_log_parser_config(const char *log_format, cons
  * @param[in] line Web log record to be parsed. '\n', '\r' or '\0' terminated.
  * @param[out] log_line_parsed Struct that stores the results of parsing.
  */
-UNIT_STATIC void parse_web_log_line(const Web_log_parser_config_t *wblp_config, 
-                                    char *line, size_t line_len, 
-                                    Log_line_parsed_t *log_line_parsed){
+void parse_web_log_line(const Web_log_parser_config_t *wblp_config, 
+                        char *line, size_t line_len, 
+                        Log_line_parsed_t *log_line_parsed){
 
     /* Read parsing configuration */
     web_log_line_field_t *fields_format = wblp_config->fields;
@@ -1252,9 +1252,9 @@ next_item:
  * @param[out] metrics Web logs metrics exctracted from the \p line_parsed 
  * web log fields, using the \p parser_config configuration.
  */
-static inline void extract_web_log_metrics( Log_parser_config_t *parser_config, 
-                                            Log_line_parsed_t *line_parsed, 
-                                            Web_log_metrics_t *metrics){
+void extract_web_log_metrics(Log_parser_config_t *parser_config, 
+                            Log_line_parsed_t *line_parsed, 
+                            Web_log_metrics_t *metrics){
 
     /* Extract number of parsed lines */
     /* NOTE: Commented out as it is done in flb_collect_logs_cb() now. */
@@ -1491,82 +1491,6 @@ static inline void extract_web_log_metrics( Log_parser_config_t *parser_config,
     }
 
     metrics->timestamp = line_parsed->timestamp;
-}
-
-/**
- * @brief Extract web log metrics from web log records stored in a buffer.
- * @param[in] text Buffer containing web logs
- * @param[in] text_size Size of \p text
- * @param[in] parser_config Configuration specifying how and what web log 
- * metrics to extract.
- * @param[out] parser_metrics Extracted metrics.
- * @returns -1 in case of error or 0 in case of success.
- */
-int parse_web_log_buf( char *text, size_t text_size, 
-                       Log_parser_config_t *parser_config, 
-                       Web_log_metrics_t *parser_metrics){
-
-    if(unlikely(!text_size || !text || !*text)){
-        m_assert(0, "!text_size || !text || !*text");
-        return -1;
-    } 
-
-    Web_log_parser_config_t *wblp_config = (Web_log_parser_config_t *) parser_config->gen_config;
-
-    Log_line_parsed_t line_parsed = (Log_line_parsed_t) {0};
-
-#if MEASURE_WEB_LOG_PARSE_EXTRACT_TIME
-    struct timespec begin, end;
-    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &begin);
-    struct rusage begin_rusage, end_rusage;
-    if(getrusage(1, &begin_rusage) !=0) exit(-1);
-#endif // MEASURE_WEB_LOG_PARSE_EXTRACT_TIME
-
-    parse_web_log_line(wblp_config, text, text_size, &line_parsed);
-
-    extract_web_log_metrics(parser_config, &line_parsed, parser_metrics);
-
-#if MEASURE_WEB_LOG_PARSE_EXTRACT_TIME
-    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &end);
-    if(getrusage(1, &end_rusage) != 0) exit(-1);
-    fprintf (stderr, "Ru:%.9lfs T:%.9lfs\n", (
-        end_rusage.ru_stime.tv_usec 
-        + end_rusage.ru_utime.tv_usec 
-        - begin_rusage.ru_stime.tv_usec 
-        - begin_rusage.ru_utime.tv_usec) / 1000000.0 
-    + (double) (end_rusage.ru_stime.tv_sec 
-        + end_rusage.ru_utime.tv_sec  
-        - begin_rusage.ru_stime.tv_sec 
-        - begin_rusage.ru_utime.tv_sec), 
-    (end.tv_nsec - begin.tv_nsec) / 1000000000.0 + (end.tv_sec - begin.tv_sec));
-#endif // MEASURE_WEB_LOG_PARSE_EXTRACT_TIME
-
-//     char *line_start = text, *line_end = text;
-//     size_t consumed = 0;
-//     do{
-//         Log_line_parsed_t line_parsed = (Log_line_parsed_t) {0};
-
-
-        
-//         parse_web_log_line(wblp_config, line_start, &line_parsed);
-        
-//         // TODO: Refactor the following, can be done inside parse_log_line() function to save a strcmp() call.
-//         extract_web_log_metrics(parser_config, &line_parsed, parser_metrics);
-
-
-
-//         line_end = strchr(line_start, '\n');
-//         if(line_end == NULL) line_end = strchr(line_start, '\0');
-
-//         consumed += line_end - line_start + 1;
-//         m_assert(consumed <= text_size, "consumed cannot be > text_size");
-
-//         if(consumed == text_size) break;
-//         else line_start = line_end + 1;
-        
-//     } while(1);
-
-    return 0;
 }
 
 /**

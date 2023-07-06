@@ -330,6 +330,10 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
     char timestamp_str[TIMESTAMP_MS_STR_SIZE] = "";
     msec_t timestamp = 0;
 
+    /* FLB_WEB_LOG case */
+    Log_line_parsed_t line_parsed = (Log_line_parsed_t) {0};
+    /* FLB_WEB_LOG case end */
+
     /* FLB_KMSG case */
     static int skip_kmsg_log_buffering = 1;
     const char  subsys_str[] = " SUBSYSTEM=",
@@ -446,8 +450,6 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                 //     }
                 // }                    
                 
-                // m_assert(buff->in->timestamp, "buff->in->timestamp is 0");
-
                 /* FLB_GENERIC, FLB_WEB_LOG and FLB_SERIAL case */
                 if( p_file_info->log_type == FLB_GENERIC || 
                     p_file_info->log_type == FLB_WEB_LOG || 
@@ -463,15 +465,10 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                         message_size = p->val.via.str.size;
 
                         if(p_file_info->log_type == FLB_WEB_LOG){
-                            debug(D_LOGS_MANAG, "LOG line:[%.*s]", (int) message_size, message);
-                            if(unlikely(0 != parse_web_log_buf( message, message_size, 
-                                                                p_file_info->parser_config, 
-                                                                p_file_info->parser_metrics->web_log))){
-                                collector_error("parse_web_log_buf() error");
-                                m_assert(0, "Parsed buffer did not contain any text or was of 0 size.");
-                            }
+                            parse_web_log_line( (Web_log_parser_config_t *) p_file_info->parser_config->gen_config, 
+                                                message, message_size, &line_parsed);
 
-                            timestamp = p_file_info->parser_metrics->web_log->timestamp * MSEC_PER_SEC; // convert to msec from sec
+                            timestamp = line_parsed.timestamp * MSEC_PER_SEC; // convert to msec from sec
                         }
 
                         new_tmp_text_size = message_size + 1; // +1 for '\n'
@@ -749,7 +746,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
     m_assert(TEST_MS_TIMESTAMP_VALID(timestamp), "timestamp is invalid");
 
     /* If input buffer timestamp is not set, now is the time to set it,
-     * else just close the previous buffer */
+     * else just be done with the previous buffer */
     if(unlikely(buff->in->timestamp == 0)) buff->in->timestamp = timestamp / 1000 * 1000; // rounding down
     else if((timestamp - buff->in->timestamp) >= MSEC_PER_SEC) {
         flb_complete_buff_item(p_file_info);
@@ -773,8 +770,10 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
         /* Parse number of log lines */
         buff->in->num_lines++;
 
-        /* For FLB_WEB_LOG, metrics are extracted when flb_complete_buff_item()
-         * is called, not here. Prepare circular buffer for write: */
+        if(p_file_info->log_type == FLB_WEB_LOG)
+            extract_web_log_metrics(p_file_info->parser_config, &line_parsed, 
+                                    p_file_info->parser_metrics->web_log);
+
         // TODO: Fix: Metrics will still be collected if circ_buff_prepare_write() returns 0.
         if(unlikely(!circ_buff_prepare_write(buff, new_tmp_text_size))) goto skip_collect_and_drop_logs;
 

@@ -63,6 +63,27 @@
 #define COMPILE_TIME_ASSERT(X)    COMPILE_TIME_ASSERT2(X,__LINE__)
 #endif  // COMPILE_TIME_ASSERT
 
+#define measure_time_start()                            \
+    struct timespec begin, end;                         \
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &begin);     \
+    struct rusage begin_rusage, end_rusage;             \
+    getrusage(1, &begin_rusage);
+
+#define measure_time_end()                              \
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &end);       \
+    getrusage(1, &end_rusage);                          \
+    debug(D_LOGS_MANAG, "Ru:%.9lfs T:%.9lfs", (         \
+        end_rusage.ru_stime.tv_usec                     \
+        + end_rusage.ru_utime.tv_usec                   \
+        - begin_rusage.ru_stime.tv_usec                 \
+        - begin_rusage.ru_utime.tv_usec) / 1000000.0    \
+    + (double) (end_rusage.ru_stime.tv_sec              \
+        + end_rusage.ru_utime.tv_sec                    \
+        - begin_rusage.ru_stime.tv_sec                  \
+        - begin_rusage.ru_utime.tv_sec),                \
+    (end.tv_nsec - begin.tv_nsec) / 1000000000.0 +      \
+    (end.tv_sec - begin.tv_sec));
+
 
 /**
  * @brief Extract file_basename from full file path
