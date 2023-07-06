@@ -367,8 +367,8 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
 
         buffer_strcat(dest_wb, "         \"");
 
-        /* Unfortunately '\n', '\\' and '"' need to be escaped, so we need to go 
-         * through the result characters one by one. */
+        /* Unfortunately '\n', '\\' (except for "\\n") and '"' need to be 
+         * escaped, so we need to go through the result characters one by one.*/
         char *p = &query_params.results_buff->buffer[res_off] + sizeof(res_hdr);
         size_t remaining = res_hdr.text_size;
         while (remaining--){
@@ -382,7 +382,7 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
                 }
                 
             } 
-            else if(unlikely(*p == '\\')) {
+            else if(unlikely(*p == '\\' && *(p+1) != 'n')) {
                 buffer_need_bytes(dest_wb, 2);
                 dest_wb->buffer[dest_wb->len++] = '\\';
                 dest_wb->buffer[dest_wb->len++] = '\\';
@@ -705,7 +705,7 @@ void *logsmanagement_plugin_main(void *ptr){
             // Check if there is parser configuration to be used for chart generation
             if(!p_file_info->parser_config) continue; 
 
-            /* Circular buffer total memory stats - update (no need to be within p_file_info->parser_metrics_mut lock) */
+            /* Circular buffer total memory stats - update */
             stats_chart_data->num_circ_buff_mem_total_arr[i] = 
                 __atomic_load_n(&p_file_info->circ_buff->total_cached_mem, __ATOMIC_RELAXED);
             rrddim_set_by_pointer(stats_chart_data->st_circ_buff_mem_total, 
@@ -718,7 +718,7 @@ void *logsmanagement_plugin_main(void *ptr){
                                   stats_chart_data->dim_circ_buff_num_of_items_arr[i], 
                                   stats_chart_data->num_circ_buff_num_of_items_arr[i]);
 
-            /* Circular buffer buffered uncompressed & compressed memory stats - collect */
+            /* Circular buffer buffered uncompressed & compressed memory stats - update */
             stats_chart_data->num_circ_buff_mem_uncompressed_arr[i] = 
                 __atomic_load_n(&p_file_info->circ_buff->text_size_total, __ATOMIC_RELAXED);
             stats_chart_data->num_circ_buff_mem_compressed_arr[i] = 
@@ -756,12 +756,9 @@ void *logsmanagement_plugin_main(void *ptr){
                                   stats_chart_data->dim_db_timings_rotate[i], 
                                   stats_chart_data->num_db_timings_rotate[i]);
 
-            // uv_mutex_lock(p_file_info->parser_metrics_mut);
 
             /* Update all charts including number of collected logs and custom charts. */
             chart_data_arr[i]->update(p_file_info, chart_data_arr[i]);
-
-            // uv_mutex_unlock(p_file_info->parser_metrics_mut);
 
             if(unlikely(netdata_exit)) break;
 

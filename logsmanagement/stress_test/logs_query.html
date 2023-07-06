@@ -122,7 +122,7 @@ function submit_query() {
       results_obj.data.forEach(function(data_entry) {
       datetime = new Date(data_entry[0]); // The 0 there is the key, which sets the date to the epoch
       data_entry[1].forEach(function(log_entry) {
-        text += "<tr><td>" + datetime + "</td><td>" + log_entry + "</td></tr>";
+        text += "<tr><td>" + datetime + "</td><td><pre>" + log_entry + "</pre></td></tr>";
       });
     });
     text += "</table>";

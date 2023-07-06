@@ -241,42 +241,6 @@ static void flb_complete_buff_item(struct File_info *p_file_info){
     tv.tv_sec = buff->in->timestamp / 1000;
     tv.tv_usec = (buff->in->timestamp % 1000) * 1000; // TODO: Is tv_usec used by charts?
 
-    /* Extract metrics */
-    // uv_mutex_lock(p_file_info->parser_metrics_mut);
-    // if(p_file_info->log_type == FLB_WEB_LOG){
-    //     // if(unlikely(0 != parse_web_log_buf( buff->in->data, 
-    //     //                                     buff->in->text_size, 
-    //     //                                     p_file_info->parser_config, 
-    //     //                                     p_file_info->parser_metrics))) 
-    //     //     m_assert(0, "Parsed buffer did not contain any text or was of 0 size.");
-    // }
-    // else if(p_file_info->log_type == FLB_KMSG){
-    //     for(int i = 0; i < SYSLOG_SEVER_ARR_SIZE; i++){
-    //         p_file_info->parser_metrics->kernel->sever[i] = p_file_info->flb_tmp_kernel_metrics.sever[i];
-    //         p_file_info->flb_tmp_kernel_metrics.sever[i] = 0;
-    //     }
-    // }
-    // else if(p_file_info->log_type == FLB_SYSTEMD || 
-    //         p_file_info->log_type == FLB_SYSLOG) {
-    //     for(int i = 0; i < SYSLOG_SEVER_ARR_SIZE; i++){
-    //         p_file_info->parser_metrics->systemd->sever[i] = p_file_info->flb_tmp_systemd_metrics.sever[i];
-    //         p_file_info->flb_tmp_systemd_metrics.sever[i] = 0;
-    //     }
-    //     for(int i = 0; i < SYSLOG_FACIL_ARR_SIZE; i++){
-    //         p_file_info->parser_metrics->systemd->facil[i] = p_file_info->flb_tmp_systemd_metrics.facil[i];
-    //         p_file_info->flb_tmp_systemd_metrics.facil[i] = 0;
-    //     }
-    //     for(int i = 0; i < SYSLOG_PRIOR_ARR_SIZE; i++){
-    //         p_file_info->parser_metrics->systemd->prior[i] = p_file_info->flb_tmp_systemd_metrics.prior[i];
-    //         p_file_info->flb_tmp_systemd_metrics.prior[i] = 0;
-    //     }
-    // } else if(p_file_info->log_type == FLB_DOCKER_EV) {
-    //     for(int i = 0; i < NUM_OF_DOCKER_EV_TYPES; i++){
-    //         p_file_info->parser_metrics->docker_ev->ev_type[i] = p_file_info->parser_metrics->docker_ev->ev_type[i];
-    //         p_file_info->parser_metrics->docker_ev->ev_type[i] = 0;
-    //     }
-    // } 
-
     p_file_info->parser_metrics->tv = tv;
     p_file_info->parser_metrics->num_lines += buff->in->num_lines;
 
@@ -286,7 +250,6 @@ static void flb_complete_buff_item(struct File_info *p_file_info){
             search_keyword( buff->in->data, buff->in->text_size, NULL, NULL, 
                             NULL, &p_file_info->parser_cus_config[i]->regex, 0);
     }
-    // uv_mutex_unlock(p_file_info->parser_metrics_mut);
 
     p_file_info->chart_meta->update(p_file_info);
 
@@ -301,12 +264,10 @@ void flb_complete_item_timer_timeout_cb(uv_timer_t *handle) {
     
     uv_mutex_lock(&p_file_info->flb_tmp_buff_mut);
     if(!buff->in->data || !*buff->in->data || !buff->in->text_size){
-        // uv_mutex_lock(p_file_info->parser_metrics_mut);
         struct timeval now;
         now_realtime_timeval(&now);
         p_file_info->parser_metrics->tv = now;
         p_file_info->chart_meta->update(p_file_info);
-        // uv_mutex_unlock(p_file_info->parser_metrics_mut);
         uv_mutex_unlock(&p_file_info->flb_tmp_buff_mut);
         return; 
     }
@@ -340,6 +301,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                 device_str[] = " DEVICE=";
     const size_t subsys_str_len = sizeof(subsys_str) - 1,
                  device_str_len = sizeof(device_str) - 1;
+    int kmsg_sever = -1; // -1 equals invalid
     /* FLB_KMSG case end */
 
     /* FLB_SYSTEMD or FLB_SYSLOG case */
@@ -496,11 +458,11 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                      *               if the user desires to use collection time.
                      */
                     if(!strncmp(p->key.via.str.ptr, "sec", (size_t) p->key.via.str.size)){
-                        timestamp += (now_realtime_sec() - now_boottime_sec() + p->val.via.i64) * MSEC_PER_SEC;
-                        // timestamp = now_realtime_msec();
+                        // timestamp += (now_realtime_sec() - now_boottime_sec() + p->val.via.i64) * MSEC_PER_SEC;
+                        timestamp += now_realtime_msec();
                     }
                     else if(!strncmp(p->key.via.str.ptr, "usec", (size_t) p->key.via.str.size)){
-                        timestamp += p->val.via.i64 / USEC_PER_MS;
+                        // timestamp += p->val.via.i64 / USEC_PER_MS;
                     }
                     else if(!strncmp(p->key.via.str.ptr, LOG_REC_KEY, (size_t) p->key.via.str.size)){
                         message = (char *) p->val.via.str.ptr;
@@ -509,51 +471,10 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                         m_assert(message, "message is NULL");
                         m_assert(message_size, "message_size is 0");
 
-                        char *c;
-                        size_t bytes_remain = message_size;
-
-                        // see https://www.kernel.org/doc/Documentation/ABI/testing/dev-kmsg
-                        if((c = memchr(message, '\n', message_size))){
-                            /* Extract log message */
-                            message_size = c - message;
-                            bytes_remain -= message_size;
-
-                            /* Extract machine-readable info for charts, such as subsystem and device. */
-                            while(bytes_remain){
-                                size_t sz = 0;
-                                while(--bytes_remain && c[++sz] != '\n');
-                                if(bytes_remain) --sz;
-                                c++; // skip new line and space chars
-
-                                DICTIONARY *dict = NULL;
-                                char *str = NULL;
-                                size_t str_len = 0;
-                                if(!strncmp(c, subsys_str, subsys_str_len)){
-                                    dict = p_file_info->parser_metrics->kernel->subsystem;
-                                    str = &c[subsys_str_len];
-                                    str_len = (sz - subsys_str_len);
-                                }
-                                else if (!strncmp(c, device_str, device_str_len)){
-                                    dict = p_file_info->parser_metrics->kernel->device;
-                                    str = &c[device_str_len];
-                                    str_len = (sz - device_str_len);
-                                }
-
-                                if(likely(str)){
-                                    char * const key = mallocz(str_len + 1);
-                                    memcpy(key, str, str_len);
-                                    key[str_len] = '\0';
-                                    Kernel_metrics_dict_item_t item = {.dim = NULL, .num = 1};
-                                    dictionary_set_advanced(dict, key, str_len, &item, sizeof(item), NULL);
-                                }
-                                c = &c[sz];
-                            }
-                        }
-
-                        new_tmp_text_size += message_size + 1; // +1 for '\n'
+                        // new_tmp_text_size += message_size + 1; // +1 for '\n'
                     }
                     else if(!strncmp(p->key.via.str.ptr, "priority", (size_t) p->key.via.str.size)){
-                        p_file_info->parser_metrics->kernel->sever[p->val.via.u64]++;
+                        kmsg_sever = (int) p->val.via.u64;
                     }
                     ++p;
                     continue;
@@ -761,14 +682,13 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
      * Step 2: Extract metrics and reconstruct log record 
      * ====================================================================== */
 
-    /* FLB_GENERIC, FLB_WEB_LOG, FLB_SERIAL and FLB_KMSG case */
+    /* Parse number of log lines - common for all log source types */
+    buff->in->num_lines++;
+
+    /* FLB_GENERIC, FLB_WEB_LOG and FLB_SERIAL case */
     if( p_file_info->log_type == FLB_GENERIC || 
         p_file_info->log_type == FLB_WEB_LOG || 
-        p_file_info->log_type == FLB_SERIAL  ||
-        p_file_info->log_type == FLB_KMSG){
-
-        /* Parse number of log lines */
-        buff->in->num_lines++;
+        p_file_info->log_type == FLB_SERIAL){
 
         if(p_file_info->log_type == FLB_WEB_LOG)
             extract_web_log_metrics(p_file_info->parser_config, &line_parsed, 
@@ -785,14 +705,72 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
         buff->in->data[tmp_item_off++] = '\n';
         m_assert(tmp_item_off == new_tmp_text_size, "tmp_item_off should be == new_tmp_text_size");
         buff->in->text_size = new_tmp_text_size;
-    } /* FLB_GENERIC, FLB_WEB_LOG, FLB_SERIAL and FLB_KMSG case end */
+    } /* FLB_GENERIC, FLB_WEB_LOG and FLB_SERIAL case end */
+
+    /* FLB_KMSG case */
+    else if(p_file_info->log_type == FLB_KMSG){
+
+        char *c;
+
+        // see https://www.kernel.org/doc/Documentation/ABI/testing/dev-kmsg
+        if((c = memchr(message, '\n', message_size))){
+
+            size_t bytes_remain = message_size - (c - message);
+
+            /* Extract machine-readable info for charts, such as subsystem and device. */
+            while(bytes_remain){
+                size_t sz = 0;
+                while(--bytes_remain && c[++sz] != '\n');
+                if(bytes_remain) --sz;
+                *(c++) = '\\';
+                *c = 'n';
+
+                // DICTIONARY *dict = NULL;
+                // char *str = NULL;
+                // size_t str_len = 0;
+                // if(!strncmp(c, subsys_str, subsys_str_len)){
+                //     dict = p_file_info->parser_metrics->kernel->subsystem;
+                //     str = &c[subsys_str_len];
+                //     str_len = (sz - subsys_str_len);
+                // }
+                // else if (!strncmp(c, device_str, device_str_len)){
+                //     dict = p_file_info->parser_metrics->kernel->device;
+                //     str = &c[device_str_len];
+                //     str_len = (sz - device_str_len);
+                // }
+
+                // if(likely(str)){
+                //     char * const key = mallocz(str_len + 1);
+                //     memcpy(key, str, str_len);
+                //     key[str_len] = '\0';
+                //     Kernel_metrics_dict_item_t item = {.dim = NULL, .num = 1};
+                //     dictionary_set_advanced(dict, key, str_len, &item, sizeof(item), NULL);
+                // }
+                c = &c[sz];
+            }
+        }
+
+        new_tmp_text_size += message_size + 1; // +1 for '\n'
+
+        if(likely(kmsg_sever >= 0)) p_file_info->parser_metrics->kernel->sever[kmsg_sever]++;
+
+
+        // TODO: Fix: Metrics will still be collected if circ_buff_prepare_write() returns 0.
+        if(unlikely(!circ_buff_prepare_write(buff, new_tmp_text_size))) goto skip_collect_and_drop_logs;
+
+        size_t tmp_item_off = buff->in->text_size;
+
+        memcpy(&buff->in->data[tmp_item_off], message, message_size);
+        tmp_item_off += message_size;  
+
+        buff->in->data[tmp_item_off++] = '\n';
+        m_assert(tmp_item_off == new_tmp_text_size, "tmp_item_off should be == new_tmp_text_size");
+        buff->in->text_size = new_tmp_text_size;
+    } /* FLB_KMSG case end */
     
     /* FLB_SYSTEMD or FLB_SYSLOG case */
     else if(p_file_info->log_type == FLB_SYSTEMD || 
             p_file_info->log_type == FLB_SYSLOG){
-
-        /* Parse number of log lines */
-        buff->in->num_lines++;
 
         int syslog_prival_d = SYSLOG_PRIOR_ARR_SIZE - 1; // Initialise to 'unknown'
         int syslog_severity_d = SYSLOG_SEVER_ARR_SIZE - 1; // Initialise to 'unknown'
@@ -937,9 +915,6 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
     
     /* FLB_DOCKER_EV case */
     else if(p_file_info->log_type == FLB_DOCKER_EV){ 
-
-        /* Extract docker events metrics */
-        buff->in->num_lines++;
 
         const size_t docker_ev_datetime_size = sizeof "2022-08-26T15:33:20.802840200+0000";
         char docker_ev_datetime[docker_ev_datetime_size];

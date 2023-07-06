@@ -225,6 +225,8 @@ void stats_charts_init(void){
 }
 
 void stats_charts_update(uv_timer_t *handle){
+    UNUSED(handle);
+    
     for(int i = 0; i < p_file_infos_arr->count; i++){
         struct File_info *p_file_info = p_file_infos_arr->data[i];
 
@@ -233,7 +235,7 @@ void stats_charts_update(uv_timer_t *handle){
         // Check if there is parser configuration to be used for chart generation
         if(!p_file_info->parser_config) continue; 
 
-        /* Circular buffer total memory stats - update (no need to be within p_file_info->parser_metrics_mut lock) */
+        /* Circular buffer total memory stats - update */
         stats_chart_data->num_circ_buff_mem_total_arr[i] = 
             __atomic_load_n(&p_file_info->circ_buff->total_cached_mem, __ATOMIC_RELAXED);
         rrddim_set_by_pointer(stats_chart_data->st_circ_buff_mem_total, 
@@ -246,7 +248,7 @@ void stats_charts_update(uv_timer_t *handle){
                                 stats_chart_data->dim_circ_buff_num_of_items_arr[i], 
                                 stats_chart_data->num_circ_buff_num_of_items_arr[i]);
 
-        /* Circular buffer buffered uncompressed & compressed memory stats - collect */
+        /* Circular buffer buffered uncompressed & compressed memory stats - update */
         stats_chart_data->num_circ_buff_mem_uncompressed_arr[i] = 
             __atomic_load_n(&p_file_info->circ_buff->text_size_total, __ATOMIC_RELAXED);
         stats_chart_data->num_circ_buff_mem_compressed_arr[i] = 

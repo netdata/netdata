@@ -1582,8 +1582,8 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
 
         buffer_strcat(w->response.data, "\t\t\t\"");
 
-        /* Unfortunately '\n', '\\' and '"' need to be escaped, so we need to go 
-         * through the result characters one by one. */
+        /* Unfortunately '\n', '\\' (except for "\\n") and '"' need to be 
+         * escaped, so we need to go through the result characters one by one.*/
         char *p = &query_params.results_buff->buffer[res_off] + sizeof(res_hdr);
         size_t remaining = res_hdr.text_size;
         while (remaining--){
@@ -1595,9 +1595,8 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
                     w->response.data->buffer[w->response.data->len++] = '\\';
                     w->response.data->buffer[w->response.data->len++] = 'n';
                 }
-                
             } 
-            else if(unlikely(*p == '\\')) {
+            else if(unlikely(*p == '\\' && *(p+1) != 'n')) {
                 buffer_need_bytes(w->response.data, 2);
                 w->response.data->buffer[w->response.data->len++] = '\\';
                 w->response.data->buffer[w->response.data->len++] = '\\';

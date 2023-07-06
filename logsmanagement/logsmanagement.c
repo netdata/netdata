@@ -173,8 +173,6 @@ static void p_file_info_destroy(struct File_info *p_file_info){
         freez(p_file_info->parser_config);
     }
 
-    // if(p_file_info->parser_metrics_mut) freez(p_file_info->parser_metrics_mut); 
-
     Flb_output_config_t *output_next = p_file_info->flb_outputs;
     while(output_next){
         Flb_output_config_t *output = output_next;
@@ -1066,14 +1064,6 @@ static void logs_management_init(uv_loop_t *main_loop,
         default: 
             return p_file_info_destroy(p_file_info);
     }
-
-
-    /* -------------------------------------------------------------------------
-     * Allocate and initialise parser mutex.
-     * ------------------------------------------------------------------------- */
-    // p_file_info->parser_metrics_mut = callocz(1, sizeof(uv_mutex_t));
-    // if(unlikely(uv_mutex_init(p_file_info->parser_metrics_mut)))
-    //     fatal("Failed to initialise parser_metrics_mut for %s", p_file_info->chart_name);
 
 
     /* -------------------------------------------------------------------------

@@ -119,7 +119,6 @@ struct File_info {
     Log_parser_config_t *parser_config;             /**< Configuration to be user by log parser - read from logsmanagement.conf **/ 
     Log_parser_cus_config_t **parser_cus_config;    /**< Array of custom log parsing configurations **/
     Log_parser_metrics_t *parser_metrics;           /**< Extracted metrics **/
-    // uv_mutex_t *parser_metrics_mut;                 /**< Mutex controlling access to parser_metrics **/
 
     /* Struct members related to Fluent-Bit inputs, filters, buffers, outputs */
     int flb_input;                                  /**< Fluent-bit input interface property for this log source **/
