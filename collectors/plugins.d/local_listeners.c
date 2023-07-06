@@ -1,10 +1,12 @@
+#include "libnetdata/libnetdata.h"
+#include "libnetdata/required_dummies.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <dirent.h>
 #include <string.h>
 #include <unistd.h>
-#include <errno.h>
 #include <ctype.h>
 #include <arpa/inet.h>
 
@@ -14,6 +16,12 @@ typedef enum {
     PROC_NET_PROTOCOL_UDP,
     PROC_NET_PROTOCOL_UDP6,
 } PROC_NET_PROTOCOLS;
+
+#define MAX_ERROR_LOGS 10
+
+static size_t pid_fds_processed = 0;
+static size_t pid_fds_failed = 0;
+static size_t errors_encountered = 0;
 
 static inline const char *protocol_name(PROC_NET_PROTOCOLS protocol) {
     switch(protocol) {
@@ -32,92 +40,14 @@ static inline const char *protocol_name(PROC_NET_PROTOCOLS protocol) {
     }
 }
 
-#define HASH_TABLE_SIZE 100000
-#define MAX_ERROR_LOGS 10
-
-typedef struct Node {
-    unsigned int inode;
-    unsigned int port;
-    char local_address[INET6_ADDRSTRLEN];
-    PROC_NET_PROTOCOLS protocol;
-    bool processed;
-    struct Node *next;
-} Node;
-
-typedef struct HashTable {
-    Node *table[HASH_TABLE_SIZE];
-} HashTable;
-
-static size_t pid_fds_processed = 0;
-static size_t pid_fds_failed = 0;
-static size_t errors_encountered = 0;
-
-static HashTable *hashTable_key_inode_port_value = NULL;
-
-static inline void generate_output(const char *protocol, const char *address, unsigned int port, const char *cmdline) {
-    printf("%s|%s|%u|%s\n", protocol, address, port, cmdline);
-}
-
-HashTable* createHashTable() {
-    HashTable *hashTable = (HashTable*)malloc(sizeof(HashTable));
-    memset(hashTable, 0, sizeof(HashTable));
-    return hashTable;
-}
-
-static inline unsigned int hashFunction(unsigned int inode) {
-    return inode % HASH_TABLE_SIZE;
-}
-
-static inline void insertHashTable(HashTable *hashTable, unsigned int inode, unsigned int port, PROC_NET_PROTOCOLS protocol, char *local_address) {
-    unsigned int index = hashFunction(inode);
-    Node *newNode = (Node*)malloc(sizeof(Node));
-    newNode->inode = inode;
-    newNode->port = port;
-    newNode->protocol = protocol;
-    strncpy(newNode->local_address, local_address, INET6_ADDRSTRLEN);
-    newNode->local_address[INET6_ADDRSTRLEN - 1] = '\0';
-    newNode->next = hashTable->table[index];
-    hashTable->table[index] = newNode;
-}
-
-static inline unsigned int lookupHashTable(HashTable *hashTable, unsigned int inode, PROC_NET_PROTOCOLS *protocol, char **local_address) {
-    unsigned int index = hashFunction(inode);
-    Node *node = hashTable->table[index];
-    while (node) {
-        if (node->inode == inode) {
-            *protocol = node->protocol;
-            *local_address = node->local_address;
-            node->processed = true;
-            return node->port;
-        }
-        node = node->next;
-    }
-    return 0;  // Not found
-}
-
-void freeHashTable(HashTable *hashTable) {
-    for (unsigned int i = 0; i < HASH_TABLE_SIZE; i++) {
-        Node *node = hashTable->table[i];
-        while (node) {
-            Node *tmp = node;
-            if(!tmp->processed)
-                generate_output(protocol_name(tmp->protocol), tmp->local_address, tmp->port, "");
-            node = node->next;
-            free(tmp);
-        }
-    }
-    free(hashTable);
-}
-
 static inline int read_cmdline(pid_t pid, char* buffer, size_t bufferSize) {
     char path[FILENAME_MAX + 1];
-    snprintf(path, sizeof(path), "/proc/%d/cmdline", pid);
-    path[FILENAME_MAX] = '\0';
+    snprintfz(path, FILENAME_MAX, "/proc/%d/cmdline", pid);
 
     FILE* file = fopen(path, "r");
     if (!file) {
         if(++errors_encountered < MAX_ERROR_LOGS)
-            fprintf(stderr, "local-listeners: error opening file: %s\n", path);
+            collector_error("LOCAL-LISTENERS: error opening file: %s\n", path);
 
         return -1;
     }
@@ -153,17 +83,88 @@ static inline void fix_cmdline(char* str) {
         *--s = '\0';
 }
 
-static inline void found_this_socket_inode(pid_t pid, unsigned int inode) {
-    PROC_NET_PROTOCOLS protocol = 0;
-    char *address = NULL;
-    unsigned int port = lookupHashTable(hashTable_key_inode_port_value, inode, &protocol, &address);
+// ----------------------------------------------------------------------------
 
-    if(port) {
-        char cmdline[8192] = "";
-        read_cmdline(pid, cmdline, sizeof(cmdline));
-        fix_cmdline(cmdline);
-        generate_output(protocol_name(protocol), address, port, cmdline);
+#define HASH_TABLE_SIZE 100000
+
+typedef struct Node {
+    unsigned int inode; // key
+
+    // values
+    unsigned int port;
+    char local_address[INET6_ADDRSTRLEN];
+    PROC_NET_PROTOCOLS protocol;
+    bool processed;
+
+    // linking
+    struct Node *prev, *next;
+} Node;
+
+typedef struct HashTable {
+    Node *table[HASH_TABLE_SIZE];
+} HashTable;
+
+static HashTable *hashTable_key_inode_port_value = NULL;
+
+static inline void generate_output(const char *protocol, const char *address, unsigned int port, const char *cmdline) {
+    printf("%s|%s|%u|%s\n", protocol, address, port, cmdline);
+}
+
+HashTable* createHashTable() {
+    HashTable *hashTable = (HashTable*)mallocz(sizeof(HashTable));
+    memset(hashTable, 0, sizeof(HashTable));
+    return hashTable;
+}
+
+static inline unsigned int hashFunction(unsigned int inode) {
+    return inode % HASH_TABLE_SIZE;
+}
+
+static inline void insertHashTable(HashTable *hashTable, unsigned int inode, unsigned int port, PROC_NET_PROTOCOLS protocol, char *local_address) {
+    unsigned int index = hashFunction(inode);
+    Node *newNode = (Node*)mallocz(sizeof(Node));
+    newNode->inode = inode;
+    newNode->port = port;
+    newNode->protocol = protocol;
+    strncpyz(newNode->local_address, local_address, INET6_ADDRSTRLEN - 1);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(hashTable->table[index], newNode, prev, next);
+}
+
+static inline bool lookupHashTable_and_execute(HashTable *hashTable, unsigned int inode, pid_t pid) {
+    unsigned int index = hashFunction(inode);
+    for(Node *node = hashTable->table[index], *next = NULL ; node ; node = next) {
+        next = node->next;
+
+        if(node->inode == inode && node->port) {
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(hashTable->table[index], node, prev, next);
+            char cmdline[8192] = "";
+            read_cmdline(pid, cmdline, sizeof(cmdline));
+            fix_cmdline(cmdline);
+            generate_output(protocol_name(node->protocol), node->local_address, node->port, cmdline);
+            freez(node);
+            return true;
+        }
     }
+
+    return false;
+}
+
+void freeHashTable(HashTable *hashTable) {
+    for (unsigned int i = 0; i < HASH_TABLE_SIZE; i++) {
+        while(hashTable->table[i]) {
+            Node *tmp = hashTable->table[i];
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(hashTable->table[i], tmp, prev, next);
+            generate_output(protocol_name(tmp->protocol), tmp->local_address, tmp->port, "");
+            freez(tmp);
+        }
+    }
+    freez(hashTable);
+}
+
+// ----------------------------------------------------------------------------
+
+static inline void found_this_socket_inode(pid_t pid, unsigned int inode) {
+    lookupHashTable_and_execute(hashTable_key_inode_port_value, inode, pid);
 }
 
 bool find_all_sockets_in_proc(const char *proc_filename) {
@@ -174,7 +175,7 @@ bool find_all_sockets_in_proc(const char *proc_filename) {
     proc_dir = opendir(proc_filename);
     if (proc_dir == NULL) {
         if(++errors_encountered < MAX_ERROR_LOGS)
-            fprintf(stderr, "local-listeners: cannot opendir() '%s' (error: %s)\n", proc_filename, strerror(errno));
+            collector_error("LOCAL-LISTENERS: cannot opendir() '%s'", proc_filename);
 
         pid_fds_failed++;
         return false;
@@ -194,13 +195,12 @@ bool find_all_sockets_in_proc(const char *proc_filename) {
             continue;
 
         // Build the path to the fd directory of the process
-        snprintf(path_buffer, FILENAME_MAX, "%s/%s/fd/", proc_filename, proc_entry->d_name);
-        path_buffer[FILENAME_MAX] = '\0';
+        snprintfz(path_buffer, FILENAME_MAX, "%s/%s/fd/", proc_filename, proc_entry->d_name);
 
         fd_dir = opendir(path_buffer);
         if (fd_dir == NULL) {
             if(++errors_encountered < MAX_ERROR_LOGS)
-                fprintf(stderr, "local-listeners: cannot opendir() '%s' (error: %s)\n", path_buffer, strerror(errno));
+                collector_error("LOCAL-LISTENERS: cannot opendir() '%s'", path_buffer);
 
             pid_fds_failed++;
             continue;
@@ -210,18 +210,17 @@ bool find_all_sockets_in_proc(const char *proc_filename) {
             if(!strcmp(fd_entry->d_name, ".") || !strcmp(fd_entry->d_name, ".."))
                 continue;
 
-            char link_path[512];
-            char link_target[512];
+            char link_path[FILENAME_MAX + 1];
+            char link_target[FILENAME_MAX + 1];
             int inode;
 
             // Build the path to the file descriptor link
-            strncpy(link_path, path_buffer, sizeof(link_path));
-            strncat(link_path, fd_entry->d_name, sizeof(link_path) - strlen(link_path) - 1);
+            snprintfz(link_path, FILENAME_MAX, "%s/%s", path_buffer, fd_entry->d_name);
 
             ssize_t len = readlink(link_path, link_target, sizeof(link_target) - 1);
             if (len == -1) {
                 if(++errors_encountered < MAX_ERROR_LOGS)
-                    fprintf(stderr, "local-listeners: cannot read link '%s' (error: %s)\n", link_path, strerror(errno));
+                    collector_error("LOCAL-LISTENERS: cannot read link '%s'", link_path);
 
                 pid_fds_failed++;
                 continue;
@@ -241,6 +240,8 @@ bool find_all_sockets_in_proc(const char *proc_filename) {
     closedir(proc_dir);
     return true;
 }
+
+// ----------------------------------------------------------------------------
 
 static inline void add_port_and_inode(PROC_NET_PROTOCOLS protocol, unsigned int port, unsigned int inode, char *local_address) {
     insertHashTable(hashTable_key_inode_port_value, inode, port, protocol, local_address);
@@ -336,38 +337,30 @@ bool read_proc_net_x(const char *filename, PROC_NET_PROTOCOLS protocol) {
     return true;
 }
 
-int main(int argc, char **argv) {
-    (void)argc;
-    (void)argv;
+// ----------------------------------------------------------------------------
 
-    char *netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
-    if(!netdata_configured_host_prefix) netdata_configured_host_prefix = "";
-
+int main(int argc __maybe_unused, char **argv __maybe_unused) {
     char path[FILENAME_MAX + 1];
-
     hashTable_key_inode_port_value = createHashTable();
 
-    snprintf(path, FILENAME_MAX, "%s/proc/net/tcp", netdata_configured_host_prefix);
-    path[FILENAME_MAX] = '\0';
+    netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
+    if(!netdata_configured_host_prefix) netdata_configured_host_prefix = "";
+
+    snprintfz(path, FILENAME_MAX, "%s/proc/net/tcp", netdata_configured_host_prefix);
     read_proc_net_x(path, PROC_NET_PROTOCOL_TCP);
 
-    snprintf(path, FILENAME_MAX, "%s/proc/net/udp", netdata_configured_host_prefix);
-    path[FILENAME_MAX] = '\0';
+    snprintfz(path, FILENAME_MAX, "%s/proc/net/udp", netdata_configured_host_prefix);
     read_proc_net_x(path, PROC_NET_PROTOCOL_UDP);
 
-    snprintf(path, FILENAME_MAX, "%s/proc/net/tcp6", netdata_configured_host_prefix);
-    path[FILENAME_MAX] = '\0';
+    snprintfz(path, FILENAME_MAX, "%s/proc/net/tcp6", netdata_configured_host_prefix);
     read_proc_net_x(path, PROC_NET_PROTOCOL_TCP6);
 
-    snprintf(path, FILENAME_MAX, "%s/proc/net/udp6", netdata_configured_host_prefix);
-    path[FILENAME_MAX] = '\0';
+    snprintfz(path, FILENAME_MAX, "%s/proc/net/udp6", netdata_configured_host_prefix);
     read_proc_net_x(path, PROC_NET_PROTOCOL_UDP6);
 
-    snprintf(path, FILENAME_MAX, "%s/proc", netdata_configured_host_prefix);
-    path[FILENAME_MAX] = '\0';
+    snprintfz(path, FILENAME_MAX, "%s/proc", netdata_configured_host_prefix);
     find_all_sockets_in_proc(path);
 
     freeHashTable(hashTable_key_inode_port_value);
-
     return 0;
 }
