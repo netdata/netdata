@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- health: respect overriding nc binary for IRC notifications [\#15310](https://github.com/netdata/netdata/pull/15310) ([ilyam8](https://github.com/ilyam8))
+- hide not available for viewers charts when exporting in shell format [\#15309](https://github.com/netdata/netdata/pull/15309) ([ilyam8](https://github.com/ilyam8))
 - move collectors meta to metadata/ [\#15308](https://github.com/netdata/netdata/pull/15308) ([ilyam8](https://github.com/ilyam8))
 - Release acquired dimensions [\#15307](https://github.com/netdata/netdata/pull/15307) ([stelfrag](https://github.com/stelfrag))
 - Check for source field when requesting /api/v1/alarm\_log [\#15306](https://github.com/netdata/netdata/pull/15306) ([MrZammler](https://github.com/MrZammler))
@@ -13,7 +15,9 @@
 - Change info to netdata\_log\_info in sqlite\_db\_migration.c [\#15303](https://github.com/netdata/netdata/pull/15303) ([MrZammler](https://github.com/MrZammler))
 - Change query to store host system info values [\#15300](https://github.com/netdata/netdata/pull/15300) ([MrZammler](https://github.com/MrZammler))
 - s/info/netdata\_log\_info/ [\#15299](https://github.com/netdata/netdata/pull/15299) ([vkalintiris](https://github.com/vkalintiris))
+- Fix wording issue in Docker README [\#15298](https://github.com/netdata/netdata/pull/15298) ([Ancairon](https://github.com/Ancairon))
 - Update metrics-streaming-and-replication.md [\#15297](https://github.com/netdata/netdata/pull/15297) ([Ancairon](https://github.com/Ancairon))
+- Code reorg and cleanup - enrichment of /api/v2 [\#15294](https://github.com/netdata/netdata/pull/15294) ([ktsaou](https://github.com/ktsaou))
 - Optimizations part 3 [\#15293](https://github.com/netdata/netdata/pull/15293) ([ktsaou](https://github.com/ktsaou))
 - docs: update stream.conf "health enabled by default" description [\#15291](https://github.com/netdata/netdata/pull/15291) ([ilyam8](https://github.com/ilyam8))
 - Remove extra parenthesis from doc [\#15290](https://github.com/netdata/netdata/pull/15290) ([Ancairon](https://github.com/Ancairon))
@@ -394,12 +398,6 @@
 - Handle conffiles for DEB packages explicitly instead of automatically. [\#14662](https://github.com/netdata/netdata/pull/14662) ([Ferroin](https://github.com/Ferroin))
 - Fix cloud node stale status when a virtual host is created [\#14660](https://github.com/netdata/netdata/pull/14660) ([stelfrag](https://github.com/stelfrag))
 - Refactor ML code. [\#14659](https://github.com/netdata/netdata/pull/14659) ([vkalintiris](https://github.com/vkalintiris))
-- Properly handle service type detection failures when installing as a system service. [\#14658](https://github.com/netdata/netdata/pull/14658) ([Ferroin](https://github.com/Ferroin))
-- fix simple\_pattern\_create on freebsd [\#14656](https://github.com/netdata/netdata/pull/14656) ([ilyam8](https://github.com/ilyam8))
-- Move images in "interact-new-charts" from zenhub to github [\#14654](https://github.com/netdata/netdata/pull/14654) ([Ancairon](https://github.com/Ancairon))
-- Fix broken links in glossary.md [\#14653](https://github.com/netdata/netdata/pull/14653) ([Ancairon](https://github.com/Ancairon))
-- Fix links [\#14651](https://github.com/netdata/netdata/pull/14651) ([cakrit](https://github.com/cakrit))
-- Fix doc links [\#14650](https://github.com/netdata/netdata/pull/14650) ([cakrit](https://github.com/cakrit))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
