@@ -1335,7 +1335,7 @@ void ebpf_send_data_aral_chart(ARAL *memory, ebpf_module_t *em)
  * Read Global Table Stats
  *
  * Read data from specified table (map_fd) using array allocated inside thread(values) and storing
- * them in stats vector
+ * them in stats vector starting from the first position.
  *
  * For PID tables is recommended to use a function to parse the specific data.
  *
@@ -1343,7 +1343,7 @@ void ebpf_send_data_aral_chart(ARAL *memory, ebpf_module_t *em)
  * @param values            helper to read data from hash tables.
  * @param map_fd            table that has data
  * @param maps_per_core     Is necessary to read data from all cores?
- * @param begin             initial value
+ * @param begin             initial value to query hash table
  * @param end               last value that will not be used.
  */
 void ebpf_read_global_table_stats(netdata_idx_t *stats,
@@ -1353,9 +1353,9 @@ void ebpf_read_global_table_stats(netdata_idx_t *stats,
                                   uint32_t begin,
                                   uint32_t end)
 {
-    uint32_t idx;
+    uint32_t idx, order;
 
-    for (idx = begin; idx < end; idx++) {
+    for (idx = begin, order = 0; idx < end; idx++, order++) {
         if (!bpf_map_lookup_elem(map_fd, &idx, values)) {
             int i;
             int before = (maps_per_core) ? ebpf_nprocs: 1;
@@ -1363,7 +1363,7 @@ void ebpf_read_global_table_stats(netdata_idx_t *stats,
             for (i = 0; i < before; i++)
                 total += values[i];
 
-            stats[idx] = total;
+            stats[order] = total;
         }
     }
 }
