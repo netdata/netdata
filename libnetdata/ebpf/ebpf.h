@@ -298,6 +298,8 @@ enum ebpf_global_table_values {
     NETDATA_EBPF_GLOBAL_TABLE_STATUS_END
 };
 
+typedef uint64_t netdata_idx_t;
+
 typedef struct ebpf_module {
     const char *thread_name;
     const char *config_name;
@@ -334,7 +336,7 @@ typedef struct ebpf_module {
     uint32_t running_time; // internal usage, this is used to reset a value when a new request happens.
     uint32_t lifetime;
 
-    uint64_t hash_table_stats[NETDATA_EBPF_GLOBAL_TABLE_STATUS_END];
+    netdata_idx_t hash_table_stats[NETDATA_EBPF_GLOBAL_TABLE_STATUS_END];
 } ebpf_module_t;
 
 #define EBPF_DEFAULT_LIFETIME 300
