@@ -119,17 +119,14 @@ static void ebpf_function_thread_manipulation(const char *transaction,
         ebpf_module_t *lem;
         if(strncmp(keyword, EBPF_THREADS_ENABLE_CATEGORY, sizeof(EBPF_THREADS_ENABLE_CATEGORY) -1) == 0) {
             char thread_name[128];
-            int period;
+            int period = -1;
             const char *name = &keyword[sizeof(EBPF_THREADS_ENABLE_CATEGORY) - 1];
             char *separator = strchr(name, ':');
             if (separator) {
                 strncpyz(thread_name, name, separator - name);
                 period = str2i(++separator);
-                if (period <= 0)
-                    period = EBPF_DEFAULT_LIFETIME;
             } else {
                 strncpyz(thread_name, name, strlen(name));
-                period = EBPF_DEFAULT_LIFETIME;
             }
 
             lem = ebpf_functions_select_module(thread_name);
@@ -149,6 +146,9 @@ static void ebpf_function_thread_manipulation(const char *transaction,
                 if (st->thread)
                     freez(st->thread);
 
+                if (period <= 0)
+                    period = EBPF_DEFAULT_LIFETIME;
+
                 st->thread = mallocz(sizeof(netdata_thread_t));
                 lem->thread_id = i;
                 lem->enabled = NETDATA_THREAD_EBPF_FUNCTION_RUNNING;
@@ -160,8 +160,11 @@ static void ebpf_function_thread_manipulation(const char *transaction,
 
                 netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT,
                                       st->start_routine, lem);
-            } else
+            } else {
                 lem->running_time = 0;
+                if (period > 0) // user is modifying period to run
+                    lem->lifetime = period;
+            }
             pthread_mutex_unlock(&ebpf_exit_cleanup);
         } else if(strncmp(keyword, EBPF_THREADS_DISABLE_CATEGORY, sizeof(EBPF_THREADS_DISABLE_CATEGORY) -1) == 0) {
             const char *name = &keyword[sizeof(EBPF_THREADS_DISABLE_CATEGORY) - 1];
