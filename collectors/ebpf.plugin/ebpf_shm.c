@@ -1035,7 +1035,7 @@ static void shm_collector(ebpf_module_t *em)
     uint32_t lifetime = em->lifetime;
     netdata_idx_t *stats = em->hash_table_stats;
     memset(stats, 0, sizeof(em->hash_table_stats));
-    netdata_log_error("KILLME %lu", sizeof(em->hash_table_stats));
+    memset(stats, 0, sizeof(em->hash_table_stats));
     while (!ebpf_exit_plugin && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_exit_plugin || ++counter != update_every)
