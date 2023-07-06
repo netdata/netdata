@@ -42,7 +42,7 @@ static inline const char *protocol_name(PROC_NET_PROTOCOLS protocol) {
 
 static inline int read_cmdline(pid_t pid, char* buffer, size_t bufferSize) {
     char path[FILENAME_MAX + 1];
-    snprintfz(path, FILENAME_MAX, "/proc/%d/cmdline", pid);
+    snprintfz(path, FILENAME_MAX, "%s/proc/%d/cmdline", netdata_configured_host_prefix, pid);
 
     FILE* file = fopen(path, "r");
     if (!file) {
