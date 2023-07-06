@@ -9,8 +9,6 @@ struct config hardirq_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
 
-#define HARDIRQ_MAP_LATENCY 0
-#define HARDIRQ_MAP_LATENCY_STATIC 1
 static ebpf_local_maps_t hardirq_maps[] = {
     {
         .name = "tbl_hardirq",
@@ -137,6 +135,36 @@ static hardirq_static_val_t hardirq_static_vals[] = {
 // store for "published" data from the reader thread, which the collector
 // thread will write to netdata agent.
 static avl_tree_lock hardirq_pub;
+
+#ifdef LIBBPF_MAJOR_VERSION
+/**
+ * Set hash table
+ *
+ * Set the values for maps according the value given by kernel.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static inline void ebpf_hardirq_set_hash_table(struct hardirq_bpf *obj)
+{
+    hardirq_maps[HARDIRQ_MAP_LATENCY].map_fd = bpf_map__fd(obj->maps.tbl_hardirq);
+    hardirq_maps[HARDIRQ_MAP_LATENCY_STATIC].map_fd = bpf_map__fd(obj->maps.tbl_hardirq_static);
+}
+
+/**
+ * Load and Attach
+ *
+ * Load and attach bpf software.
+ */
+static inline int ebpf_hardirq_load_and_attach(struct hardirq_bpf *obj)
+{
+    int ret = hardirq_bpf__load(obj);
+    if (ret) {
+        return -1;
+    }
+
+    return hardirq_bpf__attach(obj);
+}
+#endif
 
 /*****************************************************************
  *
@@ -540,6 +568,40 @@ static void hardirq_collector(ebpf_module_t *em)
  *  EBPF HARDIRQ THREAD
  *****************************************************************/
 
+/*
+ * Load BPF
+ *
+ * Load BPF files.
+ *
+ * @param em the structure with configuration
+ *
+ * @return It returns 0 on success and -1 otherwise.
+ */
+static int ebpf_hardirq_load_bpf(ebpf_module_t *em)
+{
+    int ret = 0;
+    if (em->load & EBPF_LOAD_LEGACY) {
+        em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+        if (!em->probe_links) {
+            ret = -1;
+        }
+    }
+#ifdef LIBBPF_MAJOR_VERSION
+    else {
+        hardirq_bpf_obj = hardirq_bpf__open();
+        if (!hardirq_bpf_obj)
+            ret = -1;
+        else {
+            ret = ebpf_hardirq_load_and_attach(hardirq_bpf_obj);
+            if (!ret)
+                ebpf_hardirq_set_hash_table(hardirq_bpf_obj);
+        }
+    }
+#endif
+
+    return ret;
+}
+
 /**
  * Hard IRQ latency thread.
  *
@@ -559,9 +621,9 @@ void *ebpf_hardirq_thread(void *ptr)
 
 #ifdef LIBBPF_MAJOR_VERSION
     ebpf_define_map_type(em->maps, em->maps_per_core, running_on_kernel);
+    ebpf_adjust_thread_load(em, default_btf);
 #endif
-    em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
-    if (!em->probe_links) {
+    if (ebpf_hardirq_load_bpf(em)) {
         goto endhardirq;
     }
 

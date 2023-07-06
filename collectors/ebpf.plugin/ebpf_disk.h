@@ -54,10 +54,7 @@ typedef struct netdata_ebpf_disks {
     struct netdata_ebpf_disks *next;
 } netdata_ebpf_disks_t;
 
-enum ebpf_disk_tables {
-    NETDATA_DISK_READ,
-    NETDATA_DISK_TMP
-};
+enum ebpf_disk_tables { NETDATA_DISK_IO };
 
 typedef struct block_key {
     uint32_t bin;

@@ -186,7 +186,7 @@ ebpf_module_t ebpf_modules[] = {
       .apps_routine = NULL, .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &mdflush_config,
       .config_file = NETDATA_DIRECTORY_MDFLUSH_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
-      .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL,
+      .load = EBPF_LOAD_LEGACY, .targets = mdflush_targets, .probe_links = NULL, .objects = NULL,
       .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_every = EBPF_DEFAULT_UPDATE_EVERY,
       .global_charts = 0, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO, .apps_level = NETDATA_APPS_NOT_SET,
@@ -378,7 +378,13 @@ ebpf_filesystem_partitions_t localfs[] =
       .enabled = CONFIG_BOOLEAN_YES,
       .addresses = {.function = NULL, .addr = 0},
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4,
-      .fs_maps = NULL},
+      .fs_maps = NULL,
+      .fs_obj = NULL,
+      .functions = {  "ext4_file_read_iter",
+                      "ext4_file_write_iter",
+                      "ext4_file_open",
+                      "ext4_sync_file",
+                      NULL }},
      {.filesystem = "xfs",
       .optional_filesystem = NULL,
       .family = "xfs",
@@ -388,7 +394,13 @@ ebpf_filesystem_partitions_t localfs[] =
       .enabled = CONFIG_BOOLEAN_YES,
       .addresses = {.function = NULL, .addr = 0},
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4,
-      .fs_maps = NULL},
+      .fs_maps = NULL,
+      .fs_obj = NULL,
+      .functions = {  "xfs_file_read_iter",
+                      "xfs_file_write_iter",
+                      "xfs_file_open",
+                      "xfs_file_fsync",
+                      NULL }},
      {.filesystem = "nfs",
       .optional_filesystem = "nfs4",
       .family = "nfs",
@@ -398,7 +410,13 @@ ebpf_filesystem_partitions_t localfs[] =
       .enabled = CONFIG_BOOLEAN_YES,
       .addresses = {.function = NULL, .addr = 0},
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4,
-      .fs_maps = NULL},
+      .fs_maps = NULL,
+      .fs_obj = NULL,
+      .functions = {  "nfs_file_read",
+                      "nfs_file_write",
+                      "nfs_open",
+                      "nfs_getattr",
+                      NULL }}, // // "nfs4_file_open" - not present on all kernels
      {.filesystem = "zfs",
       .optional_filesystem = NULL,
       .family = "zfs",
@@ -408,7 +426,13 @@ ebpf_filesystem_partitions_t localfs[] =
       .enabled = CONFIG_BOOLEAN_YES,
       .addresses = {.function = NULL, .addr = 0},
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4,
-      .fs_maps = NULL},
+      .fs_maps = NULL,
+      .fs_obj = NULL,
+      .functions = {  "zpl_iter_read",
+                      "zpl_iter_write",
+                      "zpl_open",
+                      "zpl_fsync",
+                      NULL }},
      {.filesystem = "btrfs",
       .optional_filesystem = NULL,
       .family = "btrfs",
@@ -418,7 +442,13 @@ ebpf_filesystem_partitions_t localfs[] =
       .enabled = CONFIG_BOOLEAN_YES,
       .addresses = {.function = "btrfs_file_operations", .addr = 0},
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_10,
-      .fs_maps = NULL},
+      .fs_maps = NULL,
+      .fs_obj = NULL,
+      .functions = {  "btrfs_file_read_iter",
+                      "btrfs_file_write_iter",
+                      "btrfs_file_open",
+                      "btrfs_sync_file",
+                      NULL }},
      {.filesystem = NULL,
       .optional_filesystem = NULL,
       .family = NULL,
@@ -427,7 +457,7 @@ ebpf_filesystem_partitions_t localfs[] =
       .flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION,
       .enabled = CONFIG_BOOLEAN_YES,
       .addresses = {.function = NULL, .addr = 0},
-      .kernels = 0, .fs_maps = NULL}};
+      .kernels = 0, .fs_maps = NULL, .fs_obj = NULL}};
 
 ebpf_sync_syscalls_t local_syscalls[] = {
     {.syscall = NETDATA_SYSCALLS_SYNC, .enabled = CONFIG_BOOLEAN_YES, .objects = NULL, .probe_links = NULL,
@@ -493,7 +523,10 @@ ebpf_plugin_stats_t plugin_statistics = {.core = 0, .legacy = 0, .running = 0, .
 struct btf *default_btf = NULL;
 struct cachestat_bpf *cachestat_bpf_obj = NULL;
 struct dc_bpf *dc_bpf_obj = NULL;
+struct disk_bpf *disk_bpf_obj = NULL;
 struct fd_bpf *fd_bpf_obj = NULL;
+struct hardirq_bpf *hardirq_bpf_obj = NULL;
+struct mdflush_bpf *mdflush_bpf_obj = NULL;
 struct mount_bpf *mount_bpf_obj = NULL;
 struct shm_bpf *shm_bpf_obj = NULL;
 struct socket_bpf *socket_bpf_obj = NULL;

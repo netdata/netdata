@@ -131,6 +131,202 @@ static netdata_publish_syscall_t filesystem_publish_aggregated[NETDATA_EBPF_HIST
 char **dimensions = NULL;
 static netdata_idx_t *filesystem_hash_values = NULL;
 
+#ifdef LIBBPF_MAJOR_VERSION
+/**
+ *  FS disable kprobe
+ *
+ *  Disable kprobes, because system will use trampolines.
+ *  We are not calling this function for while, because we are prioritizing kprobes. We opted by this road, because
+ *  distribution are still not deliverying necessary btf files per FS.
+ *
+ *  @param obj FS object loaded.
+ */
+static void ebpf_fs_disable_kprobe(struct filesystem_bpf *obj)
+ {
+    // kprobe
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_read_probe, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_write_probe, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_open_probe, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_2nd_file_open_probe, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_getattr_probe, false);
+    // kretprobe
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_read_retprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_write_retprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_open_retprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_2nd_file_open_retprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_getattr_retprobe, false);
+ }
+
+ /**
+  * Disable trampoline
+  *
+  * Disable trampolines to use kprobes.
+  *
+  *  @param obj FS object loaded.
+  */
+ static void ebpf_fs_disable_trampoline(struct filesystem_bpf *obj)
+ {
+    // entry
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_read_entry, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_write_entry, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_open_entry, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_getattr_entry, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_2nd_file_open_entry, false);
+
+    // exit
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_read_exit, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_write_exit, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_file_open_exit, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_getattr_exit, false);
+    bpf_program__set_autoload(obj->progs.netdata_fs_2nd_file_open_exit, false);
+ }
+
+ /**
+  * Set targets
+  *
+  * Set targets for each objects.
+  *
+  *  @param obj        FS object loaded.
+  *  @param functions  array with function names.
+  */
+ static void ebpf_fs_set_target(struct filesystem_bpf *obj, const char **functions)
+{
+     // entry
+     bpf_program__set_attach_target(obj->progs.netdata_fs_file_read_entry, 0,
+                                    functions[NETDATA_KEY_BTF_READ]);
+     bpf_program__set_attach_target(obj->progs.netdata_fs_file_write_entry, 0,
+                                    functions[NETDATA_KEY_BTF_WRITE]);
+     bpf_program__set_attach_target(obj->progs.netdata_fs_file_open_entry, 0,
+                                    functions[NETDATA_KEY_BTF_OPEN]);
+     bpf_program__set_attach_target(obj->progs.netdata_fs_getattr_entry, 0,
+                                    functions[NETDATA_KEY_BTF_SYNC_ATTR]);
+
+     // exit
+     bpf_program__set_attach_target(obj->progs.netdata_fs_file_read_exit, 0,
+                                    functions[NETDATA_KEY_BTF_READ]);
+     bpf_program__set_attach_target(obj->progs.netdata_fs_file_write_exit, 0,
+                                    functions[NETDATA_KEY_BTF_WRITE]);
+     bpf_program__set_attach_target(obj->progs.netdata_fs_file_open_exit, 0,
+                                    functions[NETDATA_KEY_BTF_OPEN]);
+     bpf_program__set_attach_target(obj->progs.netdata_fs_getattr_exit, 0,
+                                    functions[NETDATA_KEY_BTF_SYNC_ATTR]);
+
+     if (functions[NETDATA_KEY_BTF_OPEN2]) {
+         bpf_program__set_attach_target(obj->progs.netdata_fs_2nd_file_open_entry, 0,
+                                        functions[NETDATA_KEY_BTF_OPEN2]);
+         bpf_program__set_attach_target(obj->progs.netdata_fs_2nd_file_open_exit, 0,
+                                        functions[NETDATA_KEY_BTF_OPEN2]);
+     } else {
+         bpf_program__set_autoload(obj->progs.netdata_fs_2nd_file_open_entry, false);
+         bpf_program__set_autoload(obj->progs.netdata_fs_2nd_file_open_exit, false);
+     }
+}
+
+/**
+ * Attach Kprobe
+ *
+ * Attach kprobe on targets
+ *
+  *  @param obj        FS object loaded.
+  *  @param functions  array with function names.
+ */
+static int ebpf_fs_attach_kprobe(struct filesystem_bpf *obj, const char **functions)
+{
+     // kprobe
+     obj->links.netdata_fs_file_read_probe = bpf_program__attach_kprobe(obj->progs.netdata_fs_file_read_probe,
+                                                                        false, functions[NETDATA_KEY_BTF_READ]);
+     if (libbpf_get_error(obj->links.netdata_fs_file_read_probe))
+         return -1;
+
+     obj->links.netdata_fs_file_write_probe = bpf_program__attach_kprobe(obj->progs.netdata_fs_file_write_probe,
+                                                                         false, functions[NETDATA_KEY_BTF_WRITE]);
+     if (libbpf_get_error(obj->links.netdata_fs_file_write_probe))
+         return -1;
+
+     obj->links.netdata_fs_file_open_probe = bpf_program__attach_kprobe(obj->progs.netdata_fs_file_open_probe,
+                                                                        false, functions[NETDATA_KEY_BTF_OPEN]);
+     if (libbpf_get_error(obj->links.netdata_fs_file_open_probe))
+         return -1;
+
+     obj->links.netdata_fs_getattr_probe = bpf_program__attach_kprobe(obj->progs.netdata_fs_getattr_probe,
+                                                                      false, functions[NETDATA_KEY_BTF_SYNC_ATTR]);
+     if (libbpf_get_error(obj->links.netdata_fs_getattr_probe))
+         return -1;
+
+     // kretprobe
+     obj->links.netdata_fs_file_read_retprobe = bpf_program__attach_kprobe(obj->progs.netdata_fs_file_read_retprobe,
+                                                                           false, functions[NETDATA_KEY_BTF_READ]);
+     if (libbpf_get_error(obj->links.netdata_fs_file_read_retprobe))
+         return -1;
+
+     obj->links.netdata_fs_file_write_retprobe = bpf_program__attach_kprobe(obj->progs.netdata_fs_file_write_retprobe,
+                                                                            false, functions[NETDATA_KEY_BTF_WRITE]);
+     if (libbpf_get_error(obj->links.netdata_fs_file_write_retprobe))
+         return -1;
+
+     obj->links.netdata_fs_file_open_retprobe = bpf_program__attach_kprobe(obj->progs.netdata_fs_file_open_retprobe,
+                                                                           false, functions[NETDATA_KEY_BTF_OPEN]);
+     if (libbpf_get_error(obj->links.netdata_fs_file_open_retprobe))
+         return -1;
+
+     obj->links.netdata_fs_getattr_retprobe = bpf_program__attach_kprobe(obj->progs.netdata_fs_getattr_retprobe,
+                                                                         false, functions[NETDATA_KEY_BTF_SYNC_ATTR]);
+     if (libbpf_get_error(obj->links.netdata_fs_getattr_retprobe))
+         return -1;
+
+     if (functions[NETDATA_KEY_BTF_OPEN2]) {
+         obj->links.netdata_fs_2nd_file_open_probe = bpf_program__attach_kprobe(obj->progs.netdata_fs_2nd_file_open_probe,
+                                                                                false, functions[NETDATA_KEY_BTF_OPEN2]);
+         if (libbpf_get_error(obj->links.netdata_fs_2nd_file_open_probe))
+             return -1;
+
+         obj->links.netdata_fs_2nd_file_open_retprobe = bpf_program__attach_kprobe(obj->progs.netdata_fs_2nd_file_open_retprobe,
+                                                                                   false, functions[NETDATA_KEY_BTF_OPEN2]);
+         if (libbpf_get_error(obj->links.netdata_fs_2nd_file_open_retprobe))
+             return -1;
+     }
+
+     return 0;
+}
+
+/**
+ * Load and Attach
+ *
+ * Load binary and attach to targets.
+ *
+ *  @param map        Structure with information about maps.
+ *  @param obj        FS object loaded.
+ *  @param functions  array with function names.
+ *  @param bf         sttruct with btf file loaded.
+ */
+static inline int ebpf_fs_load_and_attach(ebpf_local_maps_t *map, struct filesystem_bpf *obj,
+                                       const char **functions, struct btf *bf)
+{
+    if (bf) {
+        ebpf_fs_disable_kprobe(obj);
+        ebpf_fs_set_target(obj, functions);
+    } else {
+        ebpf_fs_disable_trampoline(obj);
+    }
+
+    int ret = filesystem_bpf__load(obj);
+    if (ret) {
+        fprintf(stderr, "failed to load BPF object: %d\n", ret);
+        return -1;
+    }
+
+    if (bf)
+        ret = filesystem_bpf__attach(obj);
+    else
+        ret = ebpf_fs_attach_kprobe(obj, functions);
+
+    if (!ret)
+        map->map_fd = bpf_map__fd(obj->maps.tbl_fs);;
+
+    return ret;
+}
+#endif
+
 /*****************************************************************
  *
  *  COMMON FUNCTIONS
@@ -275,13 +471,28 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
 #ifdef LIBBPF_MAJOR_VERSION
             ebpf_define_map_type(em->maps, em->maps_per_core, running_on_kernel);
 #endif
-            efp->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &efp->objects);
-            if (!efp->probe_links) {
-                em->thread_name = saved_name;
-                em->kernels = kernels;
-                em->maps = NULL;
-                return -1;
+            if (em->load & EBPF_LOAD_LEGACY) {
+                efp->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &efp->objects);
+                if (!efp->probe_links) {
+                    em->thread_name = saved_name;
+                    em->kernels = kernels;
+                    return -1;
+                }
             }
+#ifdef LIBBPF_MAJOR_VERSION
+            else {
+                efp->fs_obj = filesystem_bpf__open();
+                if (!efp->fs_obj) {
+                    em->thread_name = saved_name;
+                    em->kernels = kernels;
+                    return -1;
+                } else {
+                    if (ebpf_fs_load_and_attach(em->maps, efp->fs_obj,
+                        efp->functions, NULL))
+                        return -1;
+                }
+            }
+#endif
             efp->flags |= NETDATA_FILESYSTEM_FLAG_HAS_PARTITION;
             pthread_mutex_lock(&lock);
             ebpf_update_kernel_memory(&plugin_statistics, efp->fs_maps, EBPF_ACTION_STAT_ADD);
@@ -683,6 +894,9 @@ void *ebpf_filesystem_thread(void *ptr)
     // Initialize optional as zero, to identify when there are not partitions to monitor
     em->optional = 0;
 
+#ifdef LIBBPF_MAJOR_VERSION
+    ebpf_adjust_thread_load(em, default_btf);
+#endif
     if (ebpf_update_partitions(em)) {
         if (em->optional)
             netdata_log_info("Netdata cannot monitor the filesystems used on this host.");
