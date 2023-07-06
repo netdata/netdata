@@ -385,11 +385,11 @@ void *ebpf_function_thread(void *ptr)
             char *function = get_word(words, num_words, 3);
 
             if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
-                error("Received incomplete %s (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
-                      keyword,
-                      transaction?transaction:"(unset)",
-                      timeout_s?timeout_s:"(unset)",
-                      function?function:"(unset)");
+                netdata_log_error("Received incomplete %s (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
+                                  keyword,
+                                  transaction?transaction:"(unset)",
+                                  timeout_s?timeout_s:"(unset)",
+                                  function?function:"(unset)");
             }
             else {
                 int timeout = str2i(timeout_s);
@@ -407,7 +407,7 @@ void *ebpf_function_thread(void *ptr)
             }
         }
         else
-            error("Received unknown command: %s", keyword ? keyword : "(unset)");
+            netdata_log_error("Received unknown command: %s", keyword ? keyword : "(unset)");
     }
     return NULL;
 }
