@@ -2454,6 +2454,47 @@ static char *hash_table_stat = {"hash_table"};
 static char *hash_table_core[NETDATA_EBPF_LOAD_STAT_END] = {"per_core", "unique"};
 
 /**
+ * Send Hash Table PID data
+ *
+ * Send all information associated with a specific pid table.
+ *
+ * @param chart   chart id
+ * @param idx     index position in hash_table_stats
+ */
+static inline void ebpf_send_hash_table_pid_data(char *chart, uint32_t idx)
+{
+    int i;
+    write_begin_chart(NETDATA_MONITORING_FAMILY, chart);
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
+        ebpf_module_t *wem = &ebpf_modules[i];
+        if (wem->apps_routine)
+            write_chart_dimension((char *)wem->thread_name,
+                                  (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ?
+                                  wem->hash_table_stats[idx]:
+                                  0);
+    }
+    write_end_chart();
+}
+
+/**
+ * Send Global Hash Table data
+ *
+ * Send all information associated with a specific pid table.
+ *
+ */
+static inline void ebpf_send_global_hash_table_data()
+{
+    int i;
+    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_HASH_TABLES_GLOBAL_ELEMENTS);
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
+        ebpf_module_t *wem = &ebpf_modules[i];
+        write_chart_dimension((char *)wem->thread_name,
+                              (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ? NETDATA_CONTROLLER_END: 0);
+    }
+    write_end_chart();
+}
+
+/**
  * Send Statistic Data
  *
  * Send statistic information to netdata.
@@ -2501,35 +2542,10 @@ void ebpf_send_statistic_data()
     write_chart_dimension(hash_table_core[NETDATA_EBPF_THREAD_UNIQUE], (long long)plugin_statistics.hash_unique);
     write_end_chart();
 
-    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_HASH_TABLES_GLOBAL_ELEMENTS);
-    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
-        ebpf_module_t *wem = &ebpf_modules[i];
-        write_chart_dimension((char *)wem->thread_name,
-                              (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ? NETDATA_CONTROLLER_END: 0);
-    }
-    write_end_chart();
+    ebpf_send_global_hash_table_data();
 
-    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_HASH_TABLES_INSERT_PID_ELEMENTS);
-    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
-        ebpf_module_t *wem = &ebpf_modules[i];
-        if (wem->apps_routine)
-            write_chart_dimension((char *)wem->thread_name,
-                                  (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ?
-                                      wem->hash_table_stats[NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_ADD]:
-                                      0);
-    }
-    write_end_chart();
-
-    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_HASH_TABLES_REMOVE_PID_ELEMENTS);
-    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
-        ebpf_module_t *wem = &ebpf_modules[i];
-        if (wem->apps_routine)
-            write_chart_dimension((char *)wem->thread_name,
-                                  (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ?
-                                  wem->hash_table_stats[NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_DEL]:
-                                  0);
-    }
-    write_end_chart();
+    ebpf_send_hash_table_pid_data(NETDATA_EBPF_HASH_TABLES_INSERT_PID_ELEMENTS, NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_ADD);
+    ebpf_send_hash_table_pid_data(NETDATA_EBPF_HASH_TABLES_REMOVE_PID_ELEMENTS, NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_DEL);
 }
 
 /**
