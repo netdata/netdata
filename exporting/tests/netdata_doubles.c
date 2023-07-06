@@ -99,7 +99,7 @@ RRDSET *rrdset_create_custom(
     long priority,
     int update_every,
     RRDSET_TYPE chart_type,
-    RRD_MEMORY_MODE memory_mode,
+    STORAGE_ENGINE_ID storage_engine_id,
     long history_entries)
 {
     check_expected_ptr(host);
@@ -115,7 +115,7 @@ RRDSET *rrdset_create_custom(
     check_expected(priority);
     check_expected(update_every);
     check_expected(chart_type);
-    UNUSED(memory_mode);
+    UNUSED(storage_engine_id);
     UNUSED(history_entries);
 
     function_called();
@@ -145,7 +145,7 @@ RRDDIM *rrddim_add_custom(
     collected_number multiplier,
     collected_number divisor,
     RRD_ALGORITHM algorithm,
-    RRD_MEMORY_MODE memory_mode)
+    STORAGE_ENGINE_ID storage_engine_id)
 {
     check_expected_ptr(st);
     UNUSED(id);
@@ -153,7 +153,7 @@ RRDDIM *rrddim_add_custom(
     check_expected(multiplier);
     check_expected(divisor);
     check_expected(algorithm);
-    UNUSED(memory_mode);
+    UNUSED(storage_engine_id);
 
     function_called();
 
@@ -171,10 +171,10 @@ collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number 
     return 0;
 }
 
-const char *rrd_memory_mode_name(RRD_MEMORY_MODE id)
+const char *storage_engine_name(STORAGE_ENGINE_ID id)
 {
     (void)id;
-    return RRD_MEMORY_MODE_NONE_NAME;
+    return STORAGE_ENGINE_NONE_NAME;
 }
 
 void rrdset_update_heterogeneous_flag(RRDSET *st)

@@ -1268,7 +1268,7 @@ int run_test(struct test *test)
 {
     fprintf(stderr, "\nRunning test '%s':\n%s\n", test->name, test->description);
 
-    default_rrd_memory_mode = RRD_MEMORY_MODE_ALLOC;
+    default_storage_engine_id = STORAGE_ENGINE_ALLOC;
     default_rrd_update_every = test->update_every;
 
     char name[101];
@@ -1537,7 +1537,7 @@ int unit_test(long delay, long shift)
     snprintfz(name, 100, "unittest-%d-%ld-%ld", repeat, delay, shift);
 
     //debug_flags = 0xffffffff;
-    default_rrd_memory_mode = RRD_MEMORY_MODE_ALLOC;
+    default_storage_engine_id = STORAGE_ENGINE_ALLOC;
     default_rrd_update_every = 1;
 
     int do_abs = 1;
@@ -1843,7 +1843,7 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name)
             , program_version
             , default_rrd_update_every
             , default_rrd_history_entries
-            , RRD_MEMORY_MODE_DBENGINE
+            , STORAGE_ENGINE_DBENGINE
             , default_health_enabled
             , default_rrdpush_enabled
             , default_rrdpush_destination
@@ -1934,7 +1934,7 @@ static time_t test_dbengine_create_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS
     // feed it with the test data
     for (i = 0 ; i < CHARTS ; ++i) {
         for (j = 0 ; j < DIMS ; ++j) {
-            storage_engine_store_change_collection_frequency(rd[i][j]->tiers[0].db_collection_handle, update_every);
+            storage_engine_store_change_collection_frequency(st[i]->storage_engine_id, rd[i][j]->tiers[0].db_collection_handle, update_every);
 
             rd[i][j]->collector.last_collected_time.tv_sec =
             st[i]->last_collected_time.tv_sec = st[i]->last_updated.tv_sec = time_now;
@@ -1985,7 +1985,7 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
         time_now = time_start + (c + 1) * update_every;
         for (i = 0 ; i < CHARTS ; ++i) {
             for (j = 0; j < DIMS; ++j) {
-                storage_engine_query_init(rd[i][j]->tiers[0].backend, rd[i][j]->tiers[0].db_metric_handle, &handle, time_now, time_now + QUERY_BATCH * update_every, STORAGE_PRIORITY_NORMAL);
+                storage_engine_query_init(st[i]->storage_engine_id, rd[i][j]->tiers[0].db_metric_handle, &handle, time_now, time_now + QUERY_BATCH * update_every, STORAGE_PRIORITY_NORMAL);
                 for (k = 0; k < QUERY_BATCH; ++k) {
                     last = ((collected_number)i * DIMS) * REGION_POINTS[current_region] +
                            j * REGION_POINTS[current_region] + c + k;
@@ -2120,7 +2120,7 @@ int test_dbengine(void)
     error_log_limit_unlimited();
     fprintf(stderr, "\nRunning DB-engine test\n");
 
-    default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+    default_storage_engine_id = STORAGE_ENGINE_DBENGINE;
 
     fprintf(stderr, "Initializing localhost with hostname 'unittest-dbengine'");
     host = dbengine_rrdhost_find_or_create("unittest-dbengine");
@@ -2336,7 +2336,7 @@ void generate_dbengine_dataset(unsigned history_seconds)
     int i;
     time_t time_present;
 
-    default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+    default_storage_engine_id = STORAGE_ENGINE_DBENGINE;
     default_rrdeng_page_cache_mb = 128;
     // Worst case for uncompressible data
     default_rrdeng_disk_quota_mb = (((uint64_t)DSET_DIMS * DSET_CHARTS) * sizeof(storage_number) * history_seconds) /
@@ -2441,7 +2441,7 @@ static void query_dbengine_chart(void *arg)
             time_before = MIN(time_after + duration, time_max); /* up to 1 hour queries */
         }
 
-        storage_engine_query_init(rd->tiers[0].backend, rd->tiers[0].db_metric_handle, &handle, time_after, time_before, STORAGE_PRIORITY_NORMAL);
+        storage_engine_query_init(st->storage_engine_id, rd->tiers[0].db_metric_handle, &handle, time_after, time_before, STORAGE_PRIORITY_NORMAL);
         ++thread_info->queries_nr;
         for (time_now = time_after ; time_now <= time_before ; time_now += update_every) {
             generatedv = generate_dbengine_chart_value(i, j, time_now);
@@ -2529,7 +2529,7 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     if (PAGE_CACHE_MB < RRDENG_MIN_PAGE_CACHE_SIZE_MB)
         PAGE_CACHE_MB = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
 
-    default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+    default_storage_engine_id = STORAGE_ENGINE_DBENGINE;
     default_rrdeng_page_cache_mb = PAGE_CACHE_MB;
     if (DISK_SPACE_MB) {
         fprintf(stderr, "By setting disk space limit data are allowed to be deleted. "

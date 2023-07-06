@@ -1076,23 +1076,23 @@ static void get_netdata_configured_variables() {
     // get default memory mode for the database
 
     {
-        const char *mode = config_get(CONFIG_SECTION_DB, "mode", rrd_memory_mode_name(default_rrd_memory_mode));
-        default_rrd_memory_mode = rrd_memory_mode_id(mode);
-        if(strcmp(mode, rrd_memory_mode_name(default_rrd_memory_mode)) != 0) {
-            netdata_log_error("Invalid memory mode '%s' given. Using '%s'", mode, rrd_memory_mode_name(default_rrd_memory_mode));
-            config_set(CONFIG_SECTION_DB, "mode", rrd_memory_mode_name(default_rrd_memory_mode));
+        const char *se_name = config_get(CONFIG_SECTION_DB, "mode", storage_engine_name(default_storage_engine_id));
+        if (!storage_engine_id(se_name, &default_storage_engine_id)) {
+            netdata_log_error("Invalid memory mode '%s' given. Using '%s'",
+                              se_name, storage_engine_name(default_storage_engine_id));
+            config_set(CONFIG_SECTION_DB, "mode", storage_engine_name(default_storage_engine_id));
         }
     }
 
     // ------------------------------------------------------------------------
     // get default database size
 
-    if(default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && default_rrd_memory_mode != RRD_MEMORY_MODE_NONE) {
+    if(default_storage_engine_id != STORAGE_ENGINE_DBENGINE && default_storage_engine_id != STORAGE_ENGINE_NONE) {
         default_rrd_history_entries = (int)config_get_number(
             CONFIG_SECTION_DB, "retention",
-            align_entries_to_pagesize(default_rrd_memory_mode, RRD_DEFAULT_HISTORY_ENTRIES));
+            align_entries_to_pagesize(default_storage_engine_id, RRD_DEFAULT_HISTORY_ENTRIES));
 
-        long h = align_entries_to_pagesize(default_rrd_memory_mode, default_rrd_history_entries);
+        long h = align_entries_to_pagesize(default_storage_engine_id, default_rrd_history_entries);
         if (h != default_rrd_history_entries) {
             config_set_number(CONFIG_SECTION_DB, "retention", h);
             default_rrd_history_entries = (int)h;
@@ -1152,9 +1152,9 @@ static void get_netdata_configured_variables() {
         config_set_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", default_multidb_disk_quota_mb);
     }
 #else
-    if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+    if (default_storage_engine == STORAGE_ENGINE_DBENGINE) {
        error_report("RRD_MEMORY_MODE_DBENGINE is not supported in this platform. The agent will use db mode 'save' instead.");
-       default_rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
+       default_storage_engine = STORAGE_ENGINE_SAVE;
     }
 #endif
     // ------------------------------------------------------------------------
@@ -1470,7 +1470,7 @@ int main(int argc, char **argv) {
                             post_conf_load(&user);
                             get_netdata_configured_variables();
                             default_rrd_update_every = 1;
-                            default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+                            default_storage_engine_id = STORAGE_ENGINE_RAM;
                             default_health_enabled = 0;
                             storage_tiers = 1;
                             registry_init();

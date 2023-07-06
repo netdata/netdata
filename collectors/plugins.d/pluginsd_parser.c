@@ -392,7 +392,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
             program_version,
             default_rrd_update_every,
             default_rrd_history_entries,
-            default_rrd_memory_mode,
+            default_storage_engine_id,
             default_health_enabled,
             default_rrdpush_enabled,
             default_rrdpush_destination,

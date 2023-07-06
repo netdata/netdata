@@ -215,7 +215,7 @@ static int store_claim_id(uuid_t *host_id, uuid_t *claim_id)
     int rc;
 
     if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        if (default_storage_engine_id == STORAGE_ENGINE_DBENGINE)
             error_report("Database has not been initialized");
         return 1;
     }
@@ -287,7 +287,7 @@ static int store_host_metadata(RRDHOST *host)
     int rc, param = 0;
 
     if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+        if (default_storage_engine_id != STORAGE_ENGINE_DBENGINE)
             return 0;
         error_report("Database has not been initialized");
         return 1;
@@ -333,7 +333,7 @@ static int store_host_metadata(RRDHOST *host)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, ++param, host->rrd_memory_mode);
+    rc = sqlite3_bind_int(res, ++param, host->storage_engine_id);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -384,7 +384,7 @@ static int add_host_sysinfo_key_value(const char *name, const char *value, uuid_
     int rc, param = 0;
 
     if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+        if (default_storage_engine_id != STORAGE_ENGINE_DBENGINE)
             return 0;
         error_report("Database has not been initialized");
         return 0;
@@ -475,7 +475,7 @@ static int store_chart_metadata(RRDSET *st)
     int rc, param = 0, store_rc = 0;
 
     if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+        if (default_storage_engine_id != STORAGE_ENGINE_DBENGINE)
             return 0;
         error_report("Database has not been initialized");
         return 1;
@@ -549,7 +549,7 @@ static int store_chart_metadata(RRDSET *st)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, ++param, st->rrd_memory_mode);
+    rc = sqlite3_bind_int(res, ++param, st->storage_engine_id);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -584,7 +584,7 @@ static int store_dimension_metadata(RRDDIM *rd)
     int rc, param = 0;
 
     if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+        if (default_storage_engine_id != STORAGE_ENGINE_DBENGINE)
             return 0;
         error_report("Database has not been initialized");
         return 1;

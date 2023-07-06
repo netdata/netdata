@@ -218,7 +218,7 @@ typedef struct statsd_app {
     const char *name;
     SIMPLE_PATTERN *metrics;
     STATS_METRIC_OPTIONS default_options;
-    RRD_MEMORY_MODE rrd_memory_mode;
+    STORAGE_ENGINE_ID storage_engine_id;
     int32_t rrd_history_entries;
     DICTIONARY *dict;
 
@@ -1296,7 +1296,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                 // a new app
                 app = callocz(sizeof(STATSD_APP), 1);
                 app->name = strdupz("unnamed");
-                app->rrd_memory_mode = localhost->rrd_memory_mode;
+                app->storage_engine_id = localhost->storage_engine_id;
                 app->rrd_history_entries = localhost->rrd_history_entries;
 
                 app->next = statsd.apps;
@@ -1409,7 +1409,6 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
             else if (!strcmp(name, "memory mode")) {
                 // this is not supported anymore
                 // with the implementation of storage engines, all charts have the same storage engine always
-                // app->rrd_memory_mode = rrd_memory_mode_id(value);
                 ;
             }
             else if (!strcmp(name, "history")) {
@@ -1612,7 +1611,7 @@ static inline RRDSET *statsd_private_rrdset_create(
             , priority        // priority
             , update_every    // update every
             , chart_type      // chart type
-            , default_rrd_memory_mode     // memory mode
+            , default_storage_engine_id     // memory mode
             , default_rrd_history_entries // history
     );
     rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
@@ -2217,7 +2216,7 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
                 , chart->priority           // priority
                 , statsd.update_every       // update every
                 , chart->chart_type         // chart type
-                , app->rrd_memory_mode      // memory mode
+                , app->storage_engine_id    // storage engine id
                 , app->rrd_history_entries  // history
         );
 

@@ -184,8 +184,6 @@ typedef enum __attribute__ ((__packed__)) {
 } RRDENG_COLLECT_PAGE_FLAGS;
 
 struct rrdeng_collect_handle {
-    struct storage_collect_handle common; // has to be first item
-
     RRDENG_COLLECT_PAGE_FLAGS page_flags;
     RRDENG_COLLECT_HANDLE_OPTIONS options;
     uint8_t type;

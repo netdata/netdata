@@ -2,7 +2,6 @@
 #define NETDATA_RRD_INTERNALS 1
 
 #include "rrd.h"
-#include "storage_engine.h"
 
 // ----------------------------------------------------------------------------
 // globals
@@ -16,55 +15,7 @@ int rrd_delete_unupdated_dimensions = 0;
 
 int default_rrd_update_every = UPDATE_EVERY;
 int default_rrd_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
-#ifdef ENABLE_DBENGINE
-RRD_MEMORY_MODE default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
-#else
-RRD_MEMORY_MODE default_rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
-#endif
 int gap_when_lost_iterations_above = 1;
-
-
-// ----------------------------------------------------------------------------
-// RRD - memory modes
-
-inline const char *rrd_memory_mode_name(RRD_MEMORY_MODE id) {
-    switch(id) {
-        case RRD_MEMORY_MODE_RAM:
-            return RRD_MEMORY_MODE_RAM_NAME;
-
-        case RRD_MEMORY_MODE_MAP:
-            return RRD_MEMORY_MODE_MAP_NAME;
-
-        case RRD_MEMORY_MODE_NONE:
-            return RRD_MEMORY_MODE_NONE_NAME;
-
-        case RRD_MEMORY_MODE_SAVE:
-            return RRD_MEMORY_MODE_SAVE_NAME;
-
-        case RRD_MEMORY_MODE_ALLOC:
-            return RRD_MEMORY_MODE_ALLOC_NAME;
-
-        case RRD_MEMORY_MODE_DBENGINE:
-            return RRD_MEMORY_MODE_DBENGINE_NAME;
-    }
-
-    STORAGE_ENGINE* eng = storage_engine_get(id);
-    if (eng) {
-        return eng->name;
-    }
-
-    return RRD_MEMORY_MODE_SAVE_NAME;
-}
-
-RRD_MEMORY_MODE rrd_memory_mode_id(const char *name) {
-    STORAGE_ENGINE* eng = storage_engine_find(name);
-    if (eng) {
-        return eng->id;
-    }
-
-    return RRD_MEMORY_MODE_SAVE;
-}
-
 
 // ----------------------------------------------------------------------------
 // RRD - algorithms types
@@ -145,7 +96,7 @@ char *rrdhost_cache_dir_for_rrdset_alloc(RRDHOST *host, const char *id) {
     snprintfz(n, FILENAME_MAX, "%s/%s", host->cache_dir, b);
     ret = strdupz(n);
 
-    if(host->rrd_memory_mode == RRD_MEMORY_MODE_MAP || host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
+    if(host->storage_engine_id == STORAGE_ENGINE_MAP || host->storage_engine_id == STORAGE_ENGINE_SAVE) {
         int r = mkdir(ret, 0775);
         if(r != 0 && errno != EEXIST)
             netdata_log_error("Cannot create directory '%s'", ret);

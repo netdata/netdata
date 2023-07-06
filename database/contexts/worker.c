@@ -236,10 +236,8 @@ bool rrdmetric_update_retention(RRDMETRIC *rm) {
     else {
         RRDHOST *rrdhost = rm->ri->rc->rrdhost;
         for (size_t tier = 0; tier < storage_tiers; tier++) {
-            STORAGE_ENGINE *eng = rrdhost->db[tier].eng;
-
             time_t first_time_t, last_time_t;
-            if (eng->api.metric_retention_by_uuid(rrdhost->db[tier].instance, &rm->uuid, &first_time_t, &last_time_t)) {
+            if (storage_engine_metric_retention(rrdhost->db[tier].id, rrdhost->db[tier].instance, &rm->uuid, &first_time_t, &last_time_t)) {
                 if (first_time_t < min_first_time_t)
                     min_first_time_t = first_time_t;
 

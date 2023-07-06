@@ -3,7 +3,6 @@
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 #include <sched.h>
-#include "storage_engine.h"
 
 // ----------------------------------------------------------------------------
 // RRDSET name index
@@ -87,7 +86,7 @@ struct rrdset_constructor {
     long priority;
     int update_every;
     RRDSET_TYPE chart_type;
-    RRD_MEMORY_MODE memory_mode;
+    STORAGE_ENGINE_ID storage_engine_id;
     long history_entries;
 
     enum {
@@ -128,9 +127,9 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     st->module_name = rrd_string_strdupz(ctr->module);
     st->priority = ctr->priority;
 
-    st->db.entries = (ctr->memory_mode != RRD_MEMORY_MODE_DBENGINE) ? align_entries_to_pagesize(ctr->memory_mode, ctr->history_entries) : 5;
+    st->db.entries = (ctr->storage_engine_id != STORAGE_ENGINE_DBENGINE) ? align_entries_to_pagesize(ctr->storage_engine_id, ctr->history_entries) : 5;
     st->update_every = ctr->update_every;
-    st->rrd_memory_mode = ctr->memory_mode;
+    st->storage_engine_id = ctr->storage_engine_id;
 
     st->chart_type = ctr->chart_type;
     st->rrdhost = host;
@@ -145,20 +144,18 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rw_spinlock_init(&st->alerts.spinlock);
 
-    if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
-        if(!rrdset_memory_load_or_create_map_save(st, st->rrd_memory_mode)) {
-            netdata_log_info("Failed to use db mode %s for chart '%s', falling back to ram mode.", (st->rrd_memory_mode == RRD_MEMORY_MODE_MAP)?"map":"save", rrdset_name(st));
-            st->rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+    if(st->storage_engine_id == STORAGE_ENGINE_SAVE || st->storage_engine_id == STORAGE_ENGINE_MAP) {
+        if(!rrdset_memory_load_or_create_map_save(st, st->storage_engine_id)) {
+            netdata_log_info("Failed to use db mode %s for chart '%s', falling back to ram mode.", (st->storage_engine_id == STORAGE_ENGINE_MAP)?"map":"save", rrdset_name(st));
+            st->storage_engine_id = STORAGE_ENGINE_RAM;
         }
     }
 
     // initialize the db tiers
     {
         for(size_t tier = 0; tier < storage_tiers ; tier++) {
-            STORAGE_ENGINE *eng = st->rrdhost->db[tier].eng;
-            if(!eng) continue;
-
-            st->storage_metrics_groups[tier] = storage_engine_metrics_group_get(eng->backend, host->db[tier].instance, &st->chart_uuid);
+            STORAGE_ENGINE_ID storage_engine_id = st->rrdhost->db[tier].id;
+            st->storage_metrics_groups[tier] = storage_engine_metrics_group_get(storage_engine_id, host->db[tier].instance, &st->chart_uuid);
         }
     }
 
@@ -199,11 +196,10 @@ void rrdset_finalize_collection(RRDSET *st, bool dimensions_too) {
     }
 
     for(size_t tier = 0; tier < storage_tiers ; tier++) {
-        STORAGE_ENGINE *eng = st->rrdhost->db[tier].eng;
-        if(!eng) continue;
+        STORAGE_ENGINE_ID storage_engine_id = st->rrdhost->db[tier].id;
 
         if(st->storage_metrics_groups[tier]) {
-            storage_engine_metrics_group_release(eng->backend, host->db[tier].instance, st->storage_metrics_groups[tier]);
+            storage_engine_metrics_group_release(storage_engine_id, host->db[tier].instance, st->storage_metrics_groups[tier]);
             st->storage_metrics_groups[tier] = NULL;
         }
     }
@@ -762,8 +758,10 @@ void rrdset_reset(RRDSET *st) {
         rd->collector.counter = 0;
 
         if(!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-            for(size_t tier = 0; tier < storage_tiers ;tier++)
-                storage_engine_store_flush(rd->tiers[tier].db_collection_handle);
+            for(size_t tier = 0; tier < storage_tiers ;tier++) {
+                if (rd->tiers[tier].db_collection_handle)
+                    storage_engine_store_flush(st->storage_engine_id, rd->tiers[tier].db_collection_handle);
+            }
         }
     }
     rrddim_foreach_done(rd);
@@ -772,17 +770,20 @@ void rrdset_reset(RRDSET *st) {
 // ----------------------------------------------------------------------------
 // RRDSET - helpers for rrdset_create()
 
-inline long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries) {
-    if(mode == RRD_MEMORY_MODE_DBENGINE) return 0;
-    if(mode == RRD_MEMORY_MODE_NONE) return 5;
+inline long align_entries_to_pagesize(STORAGE_ENGINE_ID id, long entries) {
+    if(id == STORAGE_ENGINE_DBENGINE)
+        return 0;
+
+    if(id == STORAGE_ENGINE_NONE)
+        return 5;
 
     if(entries < 5) entries = 5;
     if(entries > RRD_HISTORY_ENTRIES_MAX) entries = RRD_HISTORY_ENTRIES_MAX;
 
-    if(mode == RRD_MEMORY_MODE_MAP || mode == RRD_MEMORY_MODE_SAVE || mode == RRD_MEMORY_MODE_RAM) {
+    if(id == STORAGE_ENGINE_MAP || id == STORAGE_ENGINE_SAVE || id == STORAGE_ENGINE_RAM) {
         long header_size = 0;
 
-        if(mode == RRD_MEMORY_MODE_MAP || mode == RRD_MEMORY_MODE_SAVE)
+        if(id == STORAGE_ENGINE_MAP || id == STORAGE_ENGINE_SAVE)
             header_size = (long)rrddim_memory_file_header_size();
 
         long page = (long)sysconf(_SC_PAGESIZE);
@@ -835,7 +836,7 @@ void rrdset_delete_files(RRDSET *st) {
 
     netdata_log_info("Deleting chart '%s' ('%s') from disk...", rrdset_id(st), rrdset_name(st));
 
-    if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
+    if(st->storage_engine_id == STORAGE_ENGINE_SAVE || st->storage_engine_id == STORAGE_ENGINE_MAP) {
         const char *cache_filename = rrdset_cache_filename(st);
         if(cache_filename) {
             netdata_log_info("Deleting chart header file '%s'.", cache_filename);
@@ -894,7 +895,7 @@ RRDSET *rrdset_create_custom(
         , long priority
         , int update_every
         , RRDSET_TYPE chart_type
-        , RRD_MEMORY_MODE memory_mode
+        , STORAGE_ENGINE_ID storage_engine_id
         , long history_entries
 ) {
     if (host != localhost)
@@ -949,7 +950,7 @@ RRDSET *rrdset_create_custom(
         .priority = priority,
         .update_every = update_every,
         .chart_type = chart_type,
-        .memory_mode = memory_mode,
+        .storage_engine_id = storage_engine_id,
         .history_entries = history_entries,
     };
 
@@ -1142,6 +1143,7 @@ void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAG
         if (likely(!storage_point_is_unset(t->virtual_point))) {
 
             storage_engine_store_metric(
+                rd->rrdset->storage_engine_id,
                 t->db_collection_handle,
                 t->next_point_end_time_s * USEC_PER_SEC,
                 t->virtual_point.sum,
@@ -1153,6 +1155,7 @@ void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAG
         }
         else {
             storage_engine_store_metric(
+                rd->rrdset->storage_engine_id,
                 t->db_collection_handle,
                 t->next_point_end_time_s * USEC_PER_SEC,
                 NAN,
@@ -1224,9 +1227,8 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
 #endif // NETDATA_LOG_COLLECTION_ERRORS
 
     // store the metric on tier 0
-    storage_engine_store_metric(rd->tiers[0].db_collection_handle, point_end_time_ut,
-                                n, 0, 0,
-                                1, 0, flags);
+    storage_engine_store_metric(rd->rrdset->storage_engine_id, rd->tiers[0].db_collection_handle, point_end_time_ut,
+                                n, 0, 0, 1, 0, flags);
 
     rrdset_done_statistics_points_stored_per_tier[0]++;
 
@@ -1583,7 +1585,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
 
     // check if we will re-write the entire data set
     if(unlikely(dt_usec(&st->last_collected_time, &st->last_updated) > st->db.entries * update_every_ut &&
-                st->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)) {
+                st->storage_engine_id != STORAGE_ENGINE_DBENGINE)) {
         netdata_log_info(
             "'%s': too old data (last updated at %"PRId64".%"PRId64", last collected at %"PRId64".%"PRId64"). "
             "Resetting it. Will not store the next entry.",
@@ -1967,7 +1969,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
     // ALL DONE ABOUT THE DATA UPDATE
     // --------------------------------------------------------------------
 
-    if(unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_MAP)) {
+    if(unlikely(st->storage_engine_id == STORAGE_ENGINE_MAP)) {
         // update the memory mapped files with the latest values
 
         rrdset_memory_file_update(st);
@@ -2009,6 +2011,7 @@ time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
         for (size_t tier = 0; tier < storage_tiers; tier++) {
             if (rd->tiers[tier].db_collection_handle)
                 storage_engine_store_change_collection_frequency(
+                        st->storage_engine_id,
                         rd->tiers[tier].db_collection_handle,
                         (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
         }
@@ -2056,7 +2059,7 @@ struct rrdset_map_save_v019 {
     void *exporting_flags;                          // ignored
     int gap_when_lost_iterations_above;             // ignored
     long priority;                                  // ignored
-    uint32_t rrd_memory_mode;                       // ignored
+    uint32_t storage_engine_id;                     // ignored
     void *cache_dir;                                // ignored
     char cache_filename[FILENAME_MAX+1];            // ignored - update on load
     pthread_rwlock_t rrdset_rwlock;                 // ignored
@@ -2138,13 +2141,13 @@ void rrdset_memory_file_save(RRDSET *st) {
     rrdset_memory_file_update(st);
 
     struct rrdset_map_save_v019 *st_on_file = st->db.st_on_file;
-    if(st_on_file->rrd_memory_mode != RRD_MEMORY_MODE_SAVE) return;
+    if(st_on_file->storage_engine_id != STORAGE_ENGINE_SAVE) return;
 
     memory_file_save(st_on_file->cache_filename, st->db.st_on_file, st_on_file->memsize);
 }
 
-bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mode) {
-    if(memory_mode != RRD_MEMORY_MODE_SAVE && memory_mode != RRD_MEMORY_MODE_MAP)
+bool rrdset_memory_load_or_create_map_save(RRDSET *st, STORAGE_ENGINE_ID storage_engine_id) {
+    if(storage_engine_id != STORAGE_ENGINE_SAVE && storage_engine_id != STORAGE_ENGINE_MAP)
         return false;
 
     char fullfilename[FILENAME_MAX + 1];
@@ -2152,7 +2155,7 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
 
     unsigned long size = sizeof(struct rrdset_map_save_v019);
     struct rrdset_map_save_v019 *st_on_file = (struct rrdset_map_save_v019 *)netdata_mmap(
-        fullfilename, size, ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE), 0, false, NULL);
+        fullfilename, size, ((storage_engine_id == STORAGE_ENGINE_MAP) ? MAP_SHARED : MAP_PRIVATE), 0, false, NULL);
 
     if(!st_on_file) return false;
 
@@ -2214,7 +2217,7 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
     st_on_file->memsize = size;
     st_on_file->entries = st->db.entries;
     st_on_file->update_every = st->update_every;
-    st_on_file->rrd_memory_mode = memory_mode;
+    st_on_file->storage_engine_id = storage_engine_id;
 
     if(align_last_updated)
         last_updated_time_align(st);

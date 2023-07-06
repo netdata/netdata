@@ -1078,7 +1078,7 @@ static void test_can_send_rrdset(void **state)
     assert_int_equal(can_send_rrdset(prometheus_exporter_instance, st, NULL), 0);
     rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
 
-    st->rrd_memory_mode = RRD_MEMORY_MODE_NONE;
+    st->storage_engine_id = STORAGE_ENGINE_NONE;
     prometheus_exporter_instance->config.options |= EXPORTING_SOURCE_DATA_AVERAGE;
     assert_int_equal(can_send_rrdset(prometheus_exporter_instance, st, NULL), 0);
 }

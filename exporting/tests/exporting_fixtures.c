@@ -64,7 +64,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     st->name = string_strdupz("chart_name");
 
     st->update_every = 1;
-    st->rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
+    st->storage_engine_id = STORAGE_ENGINE_SAVE;
 
     st->rrdhost = host;
 

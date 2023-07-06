@@ -802,7 +802,7 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
                 {
                     buffer_json_member_add_string(wb, "status", rrdhost_db_status_to_string(s.db.status));
                     buffer_json_member_add_string(wb, "liveness", rrdhost_db_liveness_to_string(s.db.liveness));
-                    buffer_json_member_add_string(wb, "mode", rrd_memory_mode_name(s.db.mode));
+                    buffer_json_member_add_string(wb, "mode", storage_engine_name(s.db.storage_engine_id));
                     buffer_json_member_add_time_t(wb, "first_time", s.db.first_time_s);
                     buffer_json_member_add_time_t(wb, "last_time", s.db.last_time_s);
                     buffer_json_member_add_uint64(wb, "metrics", s.db.metrics);
@@ -1006,13 +1006,12 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
 
         buffer_json_member_add_array(wb, "db_size");
         for (size_t tier = 0; tier < storage_tiers; tier++) {
-            STORAGE_ENGINE *eng = localhost->db[tier].eng;
-            if (!eng) continue;
+            STORAGE_ENGINE_ID storage_engine_id = localhost->db[tier].id;
 
-            size_t max = storage_engine_disk_space_max(eng->backend, localhost->db[tier].instance);
-            size_t used = storage_engine_disk_space_used(eng->backend, localhost->db[tier].instance);
-            time_t first_time_s = storage_engine_global_first_time_s(eng->backend, localhost->db[tier].instance);
-            size_t currently_collected_metrics = storage_engine_collected_metrics(eng->backend, localhost->db[tier].instance);
+            size_t max = storage_engine_disk_space_max(storage_engine_id, localhost->db[tier].instance);
+            size_t used = storage_engine_disk_space_used(storage_engine_id, localhost->db[tier].instance);
+            time_t first_time_s = storage_engine_global_first_time_s(storage_engine_id, localhost->db[tier].instance);
+            size_t currently_collected_metrics = storage_engine_collected_metrics(storage_engine_id, localhost->db[tier].instance);
 
             NETDATA_DOUBLE percent;
             if (used && max)

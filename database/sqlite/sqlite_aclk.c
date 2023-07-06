@@ -117,7 +117,7 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
         , (const char *) (argv[IDX_PROGRAM_VERSION] ? argv[IDX_PROGRAM_VERSION] : "unknown")
         , argv[IDX_UPDATE_EVERY] ? str2i(argv[IDX_UPDATE_EVERY]) : 1
         , argv[IDX_ENTRIES] ? str2i(argv[IDX_ENTRIES]) : 0
-        , default_rrd_memory_mode
+        , default_storage_engine_id
         , 0 // health
         , 0 // rrdpush enabled
         , NULL  //destination
@@ -181,7 +181,7 @@ static int is_host_available(uuid_t *host_id)
     int rc;
 
     if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        if (default_storage_engine == STORAGE_ENGINE_DBENGINE)
             error_report("Database has not been initialized");
         return 1;
     }
@@ -536,7 +536,7 @@ void sql_aclk_sync_init(void)
     int rc;
 
     if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
+        if (default_storage_engine_id != STORAGE_ENGINE_DBENGINE) {
             return;
         }
         error_report("Database has not been initialized");

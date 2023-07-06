@@ -25,7 +25,7 @@ struct array_printer {
 void analytics_log_data(void)
 {
     netdata_log_debug(D_ANALYTICS, "NETDATA_CONFIG_STREAM_ENABLED      : [%s]", analytics_data.netdata_config_stream_enabled);
-    netdata_log_debug(D_ANALYTICS, "NETDATA_CONFIG_MEMORY_MODE         : [%s]", analytics_data.netdata_config_memory_mode);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_CONFIG_MEMORY_MODE         : [%s]", analytics_data.netdata_config_storage_engine_id);
     netdata_log_debug(D_ANALYTICS, "NETDATA_CONFIG_EXPORTING_ENABLED   : [%s]", analytics_data.netdata_config_exporting_enabled);
     netdata_log_debug(D_ANALYTICS, "NETDATA_EXPORTING_CONNECTORS       : [%s]", analytics_data.netdata_exporting_connectors);
     netdata_log_debug(D_ANALYTICS, "NETDATA_ALLMETRICS_PROMETHEUS_USED : [%s]", analytics_data.netdata_allmetrics_prometheus_used);
@@ -71,7 +71,7 @@ void analytics_log_data(void)
 void analytics_free_data(void)
 {
     freez(analytics_data.netdata_config_stream_enabled);
-    freez(analytics_data.netdata_config_memory_mode);
+    freez(analytics_data.netdata_config_storage_engine_id);
     freez(analytics_data.netdata_config_exporting_enabled);
     freez(analytics_data.netdata_exporting_connectors);
     freez(analytics_data.netdata_allmetrics_prometheus_used);
@@ -650,7 +650,7 @@ static const char *verify_or_create_required_directory(const char *dir) {
 void set_late_global_environment(struct rrdhost_system_info *system_info)
 {
     analytics_set_data(&analytics_data.netdata_config_stream_enabled, default_rrdpush_enabled ? "true" : "false");
-    analytics_set_data_str(&analytics_data.netdata_config_memory_mode, (char *)rrd_memory_mode_name(default_rrd_memory_mode));
+    analytics_set_data_str(&analytics_data.netdata_config_storage_engine_id, (char *)storage_engine_name(default_storage_engine_id));
 
 #ifdef DISABLE_CLOUD
     analytics_set_data(&analytics_data.netdata_host_cloud_enabled, "false");
@@ -861,7 +861,7 @@ void set_global_environment()
 
     analytics_data.data_length = 0;
     analytics_set_data(&analytics_data.netdata_config_stream_enabled, "null");
-    analytics_set_data(&analytics_data.netdata_config_memory_mode, "null");
+    analytics_set_data(&analytics_data.netdata_config_storage_engine_id, "null");
     analytics_set_data(&analytics_data.netdata_config_exporting_enabled, "null");
     analytics_set_data(&analytics_data.netdata_exporting_connectors, "null");
     analytics_set_data(&analytics_data.netdata_allmetrics_prometheus_used, "null");
@@ -987,7 +987,7 @@ void send_statistics(const char *action, const char *action_result, const char *
         action_result,
         action_data,
         analytics_data.netdata_config_stream_enabled,
-        analytics_data.netdata_config_memory_mode,
+        analytics_data.netdata_config_storage_engine_id,
         analytics_data.netdata_config_exporting_enabled,
         analytics_data.netdata_exporting_connectors,
         analytics_data.netdata_allmetrics_prometheus_used,

@@ -60,14 +60,14 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN
     }
 
     if (unlikely(
-            st->rrd_memory_mode == RRD_MEMORY_MODE_NONE &&
+            st->storage_engine_id == STORAGE_ENGINE_NONE &&
             !(EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED))) {
         netdata_log_debug(
             D_EXPORTING,
             "EXPORTING: not sending chart '%s' of host '%s' because its memory mode is '%s' and the exporting connector requires database access.",
             rrdset_id(st),
             rrdhost_hostname(host),
-            rrd_memory_mode_name(host->rrd_memory_mode));
+            storage_engine_name(host->storage_engine_id));
         return 0;
     }
 

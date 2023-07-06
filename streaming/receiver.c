@@ -549,7 +549,7 @@ void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, con
 
 static void rrdpush_receive(struct receiver_state *rpt)
 {
-    rpt->config.mode = default_rrd_memory_mode;
+    rpt->config.storage_engine_id = default_storage_engine_id;
     rpt->config.history = default_rrd_history_entries;
 
     rpt->config.health_enabled = (int)default_health_enabled;
@@ -572,17 +572,34 @@ static void rrdpush_receive(struct receiver_state *rpt)
     rpt->config.history = (int)appconfig_get_number(&stream_config, rpt->machine_guid, "history", rpt->config.history);
     if(rpt->config.history < 5) rpt->config.history = 5;
 
-    rpt->config.mode = rrd_memory_mode_id(appconfig_get(&stream_config, rpt->key, "default memory mode", rrd_memory_mode_name(rpt->config.mode)));
-    rpt->config.mode = rrd_memory_mode_id(appconfig_get(&stream_config, rpt->machine_guid, "memory mode", rrd_memory_mode_name(rpt->config.mode)));
+    // figure out storage engine ids for key and/or machine guid
+    {
+        const char *se_name = appconfig_get(&stream_config, rpt->key,
+                                            "default memory mode",
+                                            storage_engine_name(rpt->config.storage_engine_id));
+        if (!storage_engine_id(se_name, &rpt->config.storage_engine_id)) {
+            netdata_log_error("STREAM '%s' [receive from %s:%s]: invalid default memory mode for key %s (given: '%s', will use: '%s').",
+                              rpt->hostname, rpt->client_ip, rpt->client_port,
+                              rpt->key, se_name, storage_engine_name(rpt->config.storage_engine_id));
+        }
 
-    if (unlikely(rpt->config.mode == RRD_MEMORY_MODE_DBENGINE && !dbengine_enabled)) {
-        netdata_log_error("STREAM '%s' [receive from %s:%s]: "
-              "dbengine is not enabled, falling back to default."
-              , rpt->hostname
-              , rpt->client_ip, rpt->client_port
-              );
+        se_name = appconfig_get(&stream_config, rpt->machine_guid,
+                                "memory mode",
+                                storage_engine_name(rpt->config.storage_engine_id));
 
-        rpt->config.mode = default_rrd_memory_mode;
+        if (!storage_engine_id(se_name, &rpt->config.storage_engine_id)) {
+            netdata_log_error("STREAM '%s' [receive from %s:%s]: invalid memory mode for machine guid %s (given: '%s', will use: '%s').",
+                              rpt->hostname, rpt->client_ip, rpt->client_port,
+                              rpt->machine_guid, se_name, storage_engine_name(rpt->config.storage_engine_id));
+        }
+    }
+
+    if (unlikely(rpt->config.storage_engine_id == STORAGE_ENGINE_DBENGINE && !dbengine_enabled))
+    {
+        netdata_log_error("STREAM '%s' [receive from %s:%s]: dbengine is not enabled, falling back to default.",
+                          rpt->hostname, rpt->client_ip, rpt->client_port);
+
+        rpt->config.storage_engine_id = default_storage_engine_id;
     }
 
     rpt->config.health_enabled = appconfig_get_boolean_ondemand(&stream_config, rpt->key, "health enabled by default", rpt->config.health_enabled);
@@ -639,7 +656,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
                 , rpt->program_version
                 , rpt->config.update_every
                 , rpt->config.history
-                , rpt->config.mode
+                , rpt->config.storage_engine_id
                 , (unsigned int)(rpt->config.health_enabled != CONFIG_BOOLEAN_NO)
                 , (unsigned int)(rpt->config.rrdpush_enabled && rpt->config.rrdpush_destination && *rpt->config.rrdpush_destination && rpt->config.rrdpush_api_key && *rpt->config.rrdpush_api_key)
                 , rpt->config.rrdpush_destination
@@ -685,7 +702,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
          , rpt->host->machine_guid
          , rpt->host->rrd_update_every
          , rpt->host->rrd_history_entries
-         , rrd_memory_mode_name(rpt->host->rrd_memory_mode)
+         , storage_engine_name(rpt->host->storage_engine_id)
          , (rpt->config.health_enabled == CONFIG_BOOLEAN_NO)?"disabled":((rpt->config.health_enabled == CONFIG_BOOLEAN_YES)?"enabled":"auto")
 #ifdef ENABLE_HTTPS
          , (rpt->ssl.conn != NULL) ? " SSL," : ""
