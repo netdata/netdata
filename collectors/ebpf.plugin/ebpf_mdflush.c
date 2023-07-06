@@ -150,26 +150,6 @@ static void ebpf_obsolete_mdflush_global(ebpf_module_t *em)
 }
 
 /**
- * Obsolete global
- *
- * Obsolete global charts created by thread.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_mdflush_global(ebpf_module_t *em)
-{
-    ebpf_write_chart_obsolete("mdstat",
-                              "mdstat_flush",
-                              "MD flushes",
-                              "flushes",
-                              "flush (eBPF)",
-                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NULL,
-                              NETDATA_CHART_PRIO_MDSTAT_FLUSH,
-                              em->update_every);
-}
-
-/**
  * MDflush exit
  *
  * Cancel thread and exit.

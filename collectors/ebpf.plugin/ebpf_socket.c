@@ -2928,15 +2928,9 @@ static void socket_collector(ebpf_module_t *em)
     int update_every = em->update_every;
     int maps_per_core = em->maps_per_core;
     int counter = update_every - 1;
-<<<<<<< HEAD
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
     while (!ebpf_exit_plugin && running_time < lifetime) {
-=======
-    int running_time = 0;
-    int life_time = em->lifetime;
-    while (!ebpf_exit_plugin && running_time < life_time) {
->>>>>>> 1bb886d57 (ebpf_functions: rename variable to match option)
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_exit_plugin || ++counter != update_every)
             continue;
