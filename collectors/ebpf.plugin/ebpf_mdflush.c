@@ -393,7 +393,7 @@ void *ebpf_mdflush_thread(void *ptr)
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_mdflush_load_bpf(em)) {
-        error("Cannot load eBPF software.");
+        netdata_log_error("Cannot load eBPF software.");
         goto endmdflush;
     }
 

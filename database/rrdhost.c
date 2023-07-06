@@ -977,7 +977,7 @@ void dbengine_init(char *hostname) {
 #else
     storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", 1);
     if(storage_tiers != 1) {
-        error("DBENGINE is not available on '%s', so only 1 database tier can be supported.", hostname);
+        netdata_log_error("DBENGINE is not available on '%s', so only 1 database tier can be supported.", hostname);
         storage_tiers = 1;
         config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     }
