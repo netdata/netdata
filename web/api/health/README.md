@@ -28,12 +28,12 @@ This API call will return the alarms currently in WARNING or CRITICAL state.
 
 ### Event Log
 
-The size of the alarm log is configured in `netdata.conf`. There are 2 settings: the rotation of the alarm log file and the in memory size of the alarm log.
+The size of the alarm log is configured in `netdata.conf`. There are 2 settings: the event history kept in the DB (in seconds), and the in memory size of the alarm log.
 
 ```
 [health]
 	in memory max health log entries = 1000
-	rotate log every lines = 2000
+	health log history = 432000
 ```
 
 The API call retrieves all entries of the alarm log:
