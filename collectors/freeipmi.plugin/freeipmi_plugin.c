@@ -257,6 +257,7 @@ _get_sensor_type_string (int sensor_type)
 static int debug = 0;
 
 static int netdata_update_every = 5; // this is the minimum update frequency
+static int netdata_update_every_sel = 60; // this is the minimum update frequency for SEL events
 static int netdata_priority_ipmi  = 90000;
 static int netdata_priority_state = 99000;
 
@@ -317,7 +318,7 @@ struct sensors_global_stats {
         usec_t last_iteration_ut;
         size_t events;
         usec_t now;
-        usec_t freq;
+        usec_t freq_ut;
     } sel;
 
     struct {
@@ -1685,7 +1686,7 @@ int host_is_local(const char *host)
 
 struct ipmi_collection_thread {
     struct ipmi_monitoring_ipmi_config ipmi_config;
-    int freq;
+    int freq_s;
     IPMI_COLLECTION_TYPE type;
     SPINLOCK spinlock;
     struct sensors_global_stats stats;
@@ -1702,8 +1703,8 @@ void *netdata_ipmi_collection_thread(void *ptr) {
     if(debug) fprintf(stderr, "freeipmi.plugin: detecting IPMI minimum update frequency for %s...\n",
                       collect_type_to_string(t->type));
 
-    t->freq = netdata_ipmi_detect_speed_secs(&t->ipmi_config, t->type, &t->stats);
-    if(!t->freq) {
+    int freq_s = netdata_ipmi_detect_speed_secs(&t->ipmi_config, t->type, &t->stats);
+    if(!freq_s) {
         if(t->type & IPMI_COLLECT_TYPE_SENSORS) {
             t->stats.sensors.status = ICS_INIT_FAILED;
             t->stats.sensors.last_iteration_ut = 0;
@@ -1726,13 +1727,15 @@ void *netdata_ipmi_collection_thread(void *ptr) {
         }
     }
 
+    freq_s = t->freq_s = MAX(t->freq_s, freq_s);
+
     if(debug) fprintf(stderr, "freeipmi.plugin: IPMI minimum update frequency of %s was calculated to %d seconds.\n",
-                      collect_type_to_string(t->type), t->freq);
+                      collect_type_to_string(t->type), t->freq_s);
 
     if(debug) fprintf(stderr, "freeipmi.plugin: starting data collection of %s\n", collect_type_to_string(t->type));
 
     size_t iteration = 0, failures = 0;
-    usec_t step = t->freq * USEC_PER_SEC;
+    usec_t step = t->freq_s * USEC_PER_SEC;
 
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -1746,12 +1749,12 @@ void *netdata_ipmi_collection_thread(void *ptr) {
 
         if(t->type & IPMI_COLLECT_TYPE_SENSORS) {
             tmp_stats.sensors.last_iteration_ut = now_monotonic_usec();
-            tmp_stats.sensors.freq = t->freq * USEC_PER_SEC;
+            tmp_stats.sensors.freq = t->freq_s * USEC_PER_SEC;
         }
 
         if(t->type & IPMI_COLLECT_TYPE_SEL) {
             tmp_stats.sel.last_iteration_ut = now_monotonic_usec();
-            tmp_stats.sel.freq = t->freq * USEC_PER_SEC;
+            tmp_stats.sel.freq_ut = t->freq_s * USEC_PER_SEC;
         }
 
         if(netdata_ipmi_collect_data(&t->ipmi_config, t->type, &tmp_stats) != 0)
@@ -1806,12 +1809,12 @@ int main (int argc, char **argv) {
     // ------------------------------------------------------------------------
     // parse command line parameters
 
-    int i, freq = 0;
+    int i, freq_s = 0;
     for(i = 1; i < argc ; i++) {
-        if(isdigit(*argv[i]) && !freq) {
+        if(isdigit(*argv[i]) && !freq_s) {
             int n = str2i(argv[i]);
             if(n > 0 && n < 86400) {
-                freq = n;
+                freq_s = n;
                 continue;
             }
         }
@@ -1976,12 +1979,11 @@ int main (int argc, char **argv) {
 
     errno = 0;
 
-    if(freq >= netdata_update_every)
-        netdata_update_every = freq;
+    if(freq_s < netdata_update_every)
+        collector_error("update frequency %d seconds is too small for IPMI. Using %d.", freq_s, netdata_update_every);
 
-    else if(freq)
-        collector_error("update frequency %d seconds is too small for IPMI. Using %d.", freq, netdata_update_every);
-
+    freq_s = netdata_update_every = MAX(freq_s, netdata_update_every);
+    netdata_update_every_sel = MAX(netdata_update_every, netdata_update_every_sel);
 
     // ------------------------------------------------------------------------
     // initialize IPMI
@@ -2001,6 +2003,8 @@ int main (int argc, char **argv) {
 
     struct ipmi_collection_thread sensors_data = {
             .type = IPMI_COLLECT_TYPE_SENSORS,
+            .freq_s = netdata_update_every,
+            .spinlock = NETDATA_SPINLOCK_INITIALIZER,
             .stats = {
                     .sensors = {
                             .status = ICS_INIT,
@@ -2010,11 +2014,13 @@ int main (int argc, char **argv) {
             },
     }, sel_data = {
             .type = IPMI_COLLECT_TYPE_SEL,
+            .freq_s = netdata_update_every_sel,
+            .spinlock = NETDATA_SPINLOCK_INITIALIZER,
             .stats = {
                     .sel = {
                             .status = ICS_INIT,
                             .last_iteration_ut = now_monotonic_usec(),
-                            .freq = netdata_update_every * USEC_PER_SEC,
+                            .freq_ut = netdata_update_every_sel * USEC_PER_SEC,
                     },
             },
     };
