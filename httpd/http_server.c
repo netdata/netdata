@@ -376,7 +376,7 @@ static int netdata_dyncfg(h2o_handler_t *self, h2o_req_t *req)
         return 0;
     }
 
-    struct uni_http_response resp = dyn_conf_process_http_request(method, plugin_name, module_name, job_id);
+    struct uni_http_response resp = dyn_conf_process_http_request(method, plugin_name, module_name, job_id, NULL, 0); //TODOTODO
 
     req->res.status = resp.status;
     req->res.reason = resp.content;
@@ -400,13 +400,15 @@ int set_current_config_http_check(json_object *cfg)
     return 0;
 }
 
-struct configurable_plugin module = {
+struct configurable_plugin plugin = {
     .name = "http_check",
     .modules = NULL,
-    .module_count = 0,
     .schema = NULL,
     .set_config_cb = set_current_config_http_check,
 };
+
+const char *default_config = "{\n\t\"info\": \"I'am http_check and this is my current configuration\",\n\t\"update_every\": 5\n}";
+const char *module1_default_config = "{\n\t\"info\": \"I'am module1 and this is my current configuration\",\n\t\"update_every\": 5\n}";
 
 #define POLL_INTERVAL 100
 
@@ -416,13 +418,21 @@ void *httpd_main(void *ptr) {
     // TODO this should be done from main in future
     dyn_conf_init();
 
-    json_object *obj = json_object_new_object();
-    json_object *o = json_object_new_string("I'am http_check and this is my current configuration");
-    json_object_object_add(obj, "info", o);
-    o = json_object_new_int(5);
-    json_object_object_add(obj, "update_every", o);
-    module.default_config = obj;
-    register_plugin(&module);
+    // register a plugin
+    plugin.default_config.data = default_config;
+    plugin.default_config.data_size = strlen(default_config) + 1;
+    register_plugin(&plugin);
+
+    // register a module
+    struct module *m = callocz(1, sizeof(struct module));
+    m->name = "module1";
+    m->type = SINGLE;
+
+    m->default_config.data = module1_default_config;
+    m->default_config.data_size = strlen(module1_default_config) + 1;
+
+    struct configurable_plugin *plg = get_plugin_by_name("http_check");
+    register_module(plg, m);
 
     h2o_pathconf_t *pathconf;
     h2o_hostconf_t *hostconf;
