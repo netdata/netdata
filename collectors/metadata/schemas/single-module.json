@@ -21,10 +21,10 @@
       }
     },
     "keywords": {
-      "type":"array",
+      "type": "array",
       "description": "An array of terms related to the integration.",
       "items": {
-          "type":"string"
+        "type": "string"
       }
     },
     "overview": {
