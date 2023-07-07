@@ -1106,7 +1106,7 @@ typedef struct alarm_log {
     unsigned int count;
     unsigned int max;
     ALARM_ENTRY *alarms;
-    netdata_rwlock_t alarm_log_rwlock;
+    RW_SPINLOCK alarm_log_rwlock;
 } ALARM_LOG;
 
 typedef struct health {
