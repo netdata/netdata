@@ -21,10 +21,10 @@
       }
     },
     "keywords": {
-      "type":"array",
+      "type": "array",
       "description": "An array of terms related to the integration.",
       "items": {
-          "type":"string"
+        "type": "string"
       }
     },
     "overview": {
@@ -42,7 +42,11 @@
               "type": "string",
               "description": "Description of how metrics are collected (e.g. HTTP requests, establish a TCP connection and send a command, a specific binary execution). A suggested approach here is to provide a detailed description of how the collector gathers metrics: how many connections are established, exact requests/commands executed, exact endpoints used."
             }
-          }
+          },
+          "required": [
+            "metrics_description",
+            "method_description"
+          ]
         },
         "supported_platforms": {
           "type": "object",
@@ -62,7 +66,11 @@
                 "type": "string"
               }
             }
-          }
+          },
+          "required": [
+            "include",
+            "exclude"
+          ]
         },
         "multi-instance": {
           "type": "boolean",
@@ -75,7 +83,10 @@
             "description": {
               "type": "string"
             }
-          }
+          },
+          "required": [
+            "description"
+          ]
         },
         "default_behavior": {
           "type": "object",
@@ -88,7 +99,10 @@
                 "description": {
                   "type": "string"
                 }
-              }
+              },
+              "required": [
+                "description"
+              ]
             },
             "limits": {
               "type": "object",
@@ -97,7 +111,10 @@
                 "description": {
                   "type": "string"
                 }
-              }
+              },
+              "required": [
+                "description"
+              ]
             },
             "performance_impact": {
               "type": "object",
@@ -106,11 +123,26 @@
                 "description": {
                   "type": "string"
                 }
-              }
+              },
+              "required": [
+                "description"
+              ]
             }
-          }
+          },
+          "required": [
+            "auto_detection",
+            "limits",
+            "performance_impact"
+          ]
         }
-      }
+      },
+      "required": [
+        "data_collection",
+        "supported_platforms",
+        "multi-instance",
+        "additional_permissions",
+        "default_behavior"
+      ]
     },
     "setup": {
       "type": "object",
@@ -134,7 +166,11 @@
                     "type": "string",
                     "description": "Steps to follow to meet this prerequisite."
                   }
-                }
+                },
+                "required": [
+                  "title",
+                  "description"
+                ]
               }
             }
           }
@@ -155,7 +191,10 @@
                   "type": "string",
                   "description": "The name of the section in the configuration file. Only for data collectors whose configuration is in netdata.conf (e.g. proc.plugin modules)."
                 }
-              }
+              },
+              "required": [
+                "name"
+              ]
             },
             "options": {
               "type": "object",
@@ -197,10 +236,21 @@
                         "type": "boolean",
                         "description": "Indicates whether this option is required or not. The option is required if the collector does not work, if it is not set."
                       }
-                    }
+                    },
+                    "required": [
+                      "name",
+                      "description",
+                      "default_value",
+                      "required"
+                    ]
                   }
                 }
-              }
+              },
+              "required": [
+                "description",
+                "folding",
+                "list"
+              ]
             },
             "examples": {
               "type": "object",
@@ -227,14 +277,32 @@
                         "type": "string",
                         "description": "Example configuration."
                       }
-                    }
+                    },
+                    "required": [
+                      "folding",
+                      "name",
+                      "description",
+                      "config"
+                    ]
                   }
                 }
-              }
+              },
+              "required": [
+                "list"
+              ]
             }
-          }
+          },
+          "required": [
+            "file",
+            "options",
+            "examples"
+          ]
         }
-      }
+      },
+      "required": [
+        "prerequisites",
+        "configuration"
+      ]
     },
     "troubleshooting": {
       "type": "object",
@@ -259,11 +327,21 @@
                     "description": "Explanation of the problem and its solution."
                   }
                 }
-              }
+              },
+              "required": [
+                "name",
+                "description"
+              ]
             }
-          }
+          },
+          "required": [
+            "list"
+          ]
         }
-      }
+      },
+      "required": [
+        "problems"
+      ]
     },
     "related_resources": {
       "type": "object",
@@ -287,12 +365,22 @@
                     "type": "string",
                     "description": "Related integration module name."
                   }
-                }
+                },
+                "required": [
+                  "plugin_name",
+                  "module_name"
+                ]
               }
             }
-          }
+          },
+          "required": [
+            "list"
+          ]
         }
-      }
+      },
+      "required": [
+        "integrations"
+      ]
     },
     "info_provided_to_referring_integrations": {
       "type": "object",
@@ -302,7 +390,10 @@
           "type": "string",
           "description": "TODO"
         }
-      }
+      },
+      "required": [
+        "description"
+      ]
     },
     "alerts": {
       "type": "array",
@@ -331,7 +422,13 @@
             "type": "string",
             "description": "Alert's 'os' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-os)."
           }
-        }
+        },
+        "required": [
+          "name",
+          "link",
+          "metric",
+          "info"
+        ]
       }
     },
     "metrics": {
@@ -381,7 +478,11 @@
                       "type": "string",
                       "description": "Label description."
                     }
-                  }
+                  },
+                  "required": [
+                    "name",
+                    "description"
+                  ]
                 }
               },
               "metrics": {
@@ -424,18 +525,55 @@
                             "type": "string",
                             "description": "Dimension name."
                           }
-                        }
+                        },
+                        "required": [
+                          "name"
+                        ]
                       }
                     }
-                  }
+                  },
+                  "required": [
+                    "name",
+                    "availability",
+                    "description",
+                    "unit",
+                    "chart_type",
+                    "dimensions"
+                  ]
                 }
               }
-            }
+            },
+            "required": [
+              "name",
+              "description",
+              "labels",
+              "metrics"
+            ]
           }
         }
-      }
+      },
+      "required": [
+        "folding",
+        "description",
+        "availability",
+        "scopes"
+      ]
     }
   },
+  "required": [
+    "plugin_name",
+    "module_name",
+    "monitored_instance",
+    "alternative_monitored_instances",
+    "keywords",
+    "overview",
+    "setup",
+    "troubleshooting",
+    "related_resources",
+    "info_provided_to_referring_integrations",
+    "alerts",
+    "metrics"
+  ],
   "$defs": {
     "_monitored_instance": {
       "type": "object",
@@ -449,7 +587,11 @@
           "description": "Link to the monitored instance official website if any.",
           "type": "string"
         }
-      }
+      },
+      "required": [
+        "name",
+        "link"
+      ]
     },
     "_folding": {
       "type": "object",
@@ -463,7 +605,11 @@
           "description": "Determines if this content should be folded",
           "type": "boolean"
         }
-      }
+      },
+      "required": [
+        "title",
+        "enabled"
+      ]
     }
   }
 }

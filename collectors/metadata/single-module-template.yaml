@@ -32,6 +32,7 @@ setup:
         description: ""
   configuration:
     file:
+      name: ""
       description: ""
     options:
       description: ""
@@ -46,7 +47,7 @@ setup:
     examples:
       list:
         - name: ""
-          folding: 
+          folding:
             enabled: true
             title: ""
           description: ""
