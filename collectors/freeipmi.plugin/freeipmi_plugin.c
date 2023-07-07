@@ -1051,10 +1051,6 @@ struct sensors_global_stats {
         IPMI_COLLECTOR_STATUS status;
         usec_t last_iteration_ut;
         size_t collected;
-        size_t states_nominal;
-        size_t states_warning;
-        size_t states_critical;
-        size_t states_unknown;
         usec_t now;
         usec_t freq_ut;
         int priority;
@@ -1139,10 +1135,6 @@ int netdata_ipmi_collect_data(struct ipmi_monitoring_ipmi_config *ipmi_config, I
 
     if(type & IPMI_COLLECT_TYPE_SENSORS) {
         stats->sensors.collected = 0;
-        stats->sensors.states_critical = 0;
-        stats->sensors.states_warning = 0;
-        stats->sensors.states_nominal = 0;
-        stats->sensors.states_unknown = 0;
         stats->sensors.now = now_monotonic_usec();
 
         if (_ipmimonitoring_sensors(ipmi_config, stats) < 0) return -1;
@@ -1454,30 +1446,6 @@ static size_t send_sensor_metrics_to_netdata(struct sensors_global_stats *stats)
             }
     dfe_done(sn);
 
-    if(total_sensors_sent) {
-        if (!sensors_states_chart_generated) {
-            sensors_states_chart_generated = 1;
-            printf("CHART ipmi.sensors_states '' 'IPMI Sensors State' 'sensors' 'states' ipmi.sensors_states line %d %d\n",
-                   stats->sensors.priority + 1, update_every);
-
-            printf("DIMENSION nominal '' absolute 1 1\n");
-            printf("DIMENSION critical '' absolute 1 1\n");
-            printf("DIMENSION warning '' absolute 1 1\n");
-            printf("DIMENSION unknown '' absolute 1 1\n");
-        }
-
-        printf(
-                "BEGIN ipmi.sensors_states\n"
-                "SET nominal = %zu\n"
-                "SET warning = %zu\n"
-                "SET critical = %zu\n"
-                "SET unknown = %zu\n"
-                "END\n",
-                stats->sensors.states_nominal, stats->sensors.states_warning,
-                stats->sensors.states_critical, stats->sensors.states_unknown
-        );
-    }
-
     return total_sensors_sent;
 }
 
@@ -1676,25 +1644,6 @@ static void netdata_get_sensor(
                         sensor_name, record_id, sensor_number, sensor_type, sensor_state, sensor_units, sensor_reading_type);
 
             sn->do_metric = false;
-            break;
-    }
-
-    switch(sensor_state) {
-        case IPMI_MONITORING_STATE_NOMINAL:
-            stats->sensors.states_nominal++;
-            break;
-
-        case IPMI_MONITORING_STATE_WARNING:
-            stats->sensors.states_warning++;
-            break;
-
-        case IPMI_MONITORING_STATE_CRITICAL:
-            stats->sensors.states_critical++;
-            break;
-
-        default:
-        case IPMI_MONITORING_STATE_UNKNOWN:
-            stats->sensors.states_unknown++;
             break;
     }
 }
