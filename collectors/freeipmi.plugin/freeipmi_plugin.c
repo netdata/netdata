@@ -1151,7 +1151,8 @@ int netdata_ipmi_detect_speed_secs(struct ipmi_monitoring_ipmi_config *ipmi_conf
     usec_t total = 0;
 
     for(i = 0 ; i < checks ; i++) {
-        if(stats->debug) fprintf(stderr, "freeipmi.plugin: checking data collection speed iteration %d of %d\n", i+1, checks);
+        if(stats->debug) fprintf(stderr, "%s: checking data collection speed iteration %d of %d\n",
+                                 program_name, i+1, checks);
 
         // measure the time a data collection needs
         usec_t start = now_realtime_usec();
@@ -1163,7 +1164,8 @@ int netdata_ipmi_detect_speed_secs(struct ipmi_monitoring_ipmi_config *ipmi_conf
 
         successful++;
 
-        if(stats->debug) fprintf(stderr, "freeipmi.plugin: data collection speed was %llu usec\n", end - start);
+        if(stats->debug) fprintf(stderr, "%s: data collection speed was %llu usec\n",
+                                 program_name, end - start);
 
         // add it to our total
         total += end - start;
@@ -1245,7 +1247,8 @@ static const char *sensor_component(struct sensor *sn) {
 static size_t send_sensor_metrics_to_netdata(struct sensors_global_stats *stats) {
     if(stats->sensors.status != ICS_RUNNING) {
         if(stats->debug)
-            fprintf(stderr, "freeipmi.plugin: %s() sensors state is not RUNNING\n", __FUNCTION__ );
+            fprintf(stderr, "%s: %s() sensors state is not RUNNING\n",
+                    program_name, __FUNCTION__ );
         return 0;
     }
 
@@ -1257,8 +1260,8 @@ static size_t send_sensor_metrics_to_netdata(struct sensors_global_stats *stats)
     dfe_start_read(stats->sensors.dict, sn) {
                 if(!is_sensor_updated(sn, stats->updates.now, stats->sensors.freq_ut)) {
                     if (stats->debug)
-                        fprintf(stderr, "freeipmi.plugin: %s() sensor '%s' is not UPDATED (last updated %llu, now %llu, freq %llu\n",
-                                __FUNCTION__, sn->sensor_name, sn->last_collected_ut, stats->updates.now, stats->sensors.freq_ut);
+                        fprintf(stderr, "%s: %s() sensor '%s' is not UPDATED (last updated %llu, now %llu, freq %llu\n",
+                                program_name, __FUNCTION__, sn->sensor_name, sn->last_collected_ut, stats->updates.now, stats->sensors.freq_ut);
                     continue;
                 }
 
@@ -1491,7 +1494,7 @@ static void excluded_record_ids_parse(const char *s, bool debug) {
     }
 
     if(debug) {
-        fprintf(stderr, "freeipmi.plugin: excluded record ids:");
+        fprintf(stderr, "%s: excluded record ids:", program_name);
         size_t i;
         for(i = 0; i < excluded_record_ids_length; i++) {
             fprintf(stderr, " %d", excluded_record_ids[i]);
@@ -1515,18 +1518,14 @@ static void excluded_status_record_ids_parse(const char *s, bool debug) {
             s = e;
 
             if(n != 0) {
-                excluded_status_record_ids = realloc(excluded_status_record_ids, (excluded_status_record_ids_length + 1) * sizeof(int));
-                if(!excluded_status_record_ids) {
-                    fprintf(stderr, "freeipmi.plugin: failed to allocate memory. Exiting.");
-                    exit(1);
-                }
+                excluded_status_record_ids = reallocz(excluded_status_record_ids, (excluded_status_record_ids_length + 1) * sizeof(int));
                 excluded_status_record_ids[excluded_status_record_ids_length++] = (int)n;
             }
         }
     }
 
     if(debug) {
-        fprintf(stderr, "freeipmi.plugin: excluded status record ids:");
+        fprintf(stderr, "%s: excluded status record ids:", program_name);
         size_t i;
         for(i = 0; i < excluded_status_record_ids_length; i++) {
             fprintf(stderr, " %d", excluded_status_record_ids[i]);
@@ -1669,13 +1668,13 @@ struct ipmi_collection_thread {
 void *netdata_ipmi_collection_thread(void *ptr) {
     struct ipmi_collection_thread *t = ptr;
 
-    if(t->debug) fprintf(stderr, "freeipmi.plugin: calling _init_ipmi_config() for %s\n",
-                      collect_type_to_string(t->type));
+    if(t->debug) fprintf(stderr, "%s: calling _init_ipmi_config() for %s\n",
+                      program_name, collect_type_to_string(t->type));
 
     _init_ipmi_config(&t->ipmi_config);
 
-    if(t->debug) fprintf(stderr, "freeipmi.plugin: detecting IPMI minimum update frequency for %s...\n",
-                      collect_type_to_string(t->type));
+    if(t->debug) fprintf(stderr, "%s: detecting IPMI minimum update frequency for %s...\n",
+                      program_name, collect_type_to_string(t->type));
 
     int freq_s = netdata_ipmi_detect_speed_secs(&t->ipmi_config, t->type, &t->stats);
     if(!freq_s) {
@@ -1703,10 +1702,13 @@ void *netdata_ipmi_collection_thread(void *ptr) {
 
     freq_s = t->freq_s = MAX(t->freq_s, freq_s);
 
-    if(t->debug) fprintf(stderr, "freeipmi.plugin: IPMI minimum update frequency of %s was calculated to %d seconds.\n",
-                      collect_type_to_string(t->type), t->freq_s);
+    if(t->debug) {
+        fprintf(stderr, "%s: IPMI minimum update frequency of %s was calculated to %d seconds.\n",
+                program_name, collect_type_to_string(t->type), t->freq_s);
 
-    if(t->debug) fprintf(stderr, "freeipmi.plugin: starting data collection of %s\n", collect_type_to_string(t->type));
+        fprintf(stderr, "%s: starting data collection of %s\n",
+                program_name, collect_type_to_string(t->type));
+    }
 
     size_t iteration = 0, failures = 0;
     usec_t step = t->freq_s * USEC_PER_SEC;
@@ -1716,8 +1718,8 @@ void *netdata_ipmi_collection_thread(void *ptr) {
     for(iteration = 0; 1 ; iteration++) {
         heartbeat_next(&hb, step);
 
-        if(t->debug) fprintf(stderr, "freeipmi.plugin: calling netdata_ipmi_collect_data() for %s\n",
-                          collect_type_to_string(t->type));
+        if(t->debug) fprintf(stderr, "%s: calling netdata_ipmi_collect_data() for %s\n",
+                          program_name, collect_type_to_string(t->type));
 
         struct sensors_global_stats tmp_stats = t->stats;
 
@@ -1737,8 +1739,8 @@ void *netdata_ipmi_collection_thread(void *ptr) {
             failures = 0;
 
         if(failures > 10) {
-            collector_error("freeipmi.plugin: failed to collect %s data for %zu consecutive times, having made %zu iterations.",
-                  collect_type_to_string(t->type), failures, iteration);
+            collector_error("%s() failed to collect %s data for %zu consecutive times, having made %zu iterations.",
+                  __FUNCTION__, collect_type_to_string(t->type), failures, iteration);
 
             if(t->type & IPMI_COLLECT_TYPE_SENSORS) {
                 t->stats.sensors.status = ICS_FAILED;
@@ -1797,7 +1799,7 @@ int main (int argc, char **argv) {
             }
         }
         else if(strcmp("version", argv[i]) == 0 || strcmp("-version", argv[i]) == 0 || strcmp("--version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0 || strcmp("-V", argv[i]) == 0) {
-            printf("freeipmi.plugin %s\n", VERSION);
+            printf("%s %s\n", program_name, VERSION);
             exit(0);
         }
         else if(strcmp("debug", argv[i]) == 0) {
@@ -1815,8 +1817,8 @@ int main (int argc, char **argv) {
         else if(strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {
             fprintf(stderr,
                     "\n"
-                    " netdata freeipmi.plugin %s\n"
-                    " Copyright (C) 2016-2017 Costa Tsaousis <costa@tsaousis.gr>\n"
+                    " netdata %s %s\n"
+                    " Copyright (C) 2023 Netdata Inc.\n"
                     " Released under GNU General Public License v3 or later.\n"
                     " All rights reserved.\n"
                     "\n"
@@ -1873,7 +1875,7 @@ int main (int argc, char **argv) {
                     " For more information:\n"
                     " https://github.com/netdata/netdata/tree/master/collectors/freeipmi.plugin\n"
                     "\n"
-                    , VERSION
+                    , program_name, VERSION
                     , update_every
                     , netdata_do_sel?"enabled":"disabled"
                     , sdr_cache_directory?sdr_cache_directory:"system default"
@@ -1886,7 +1888,7 @@ int main (int argc, char **argv) {
             char *s = argv[i];
             // mask it be hidden from the process tree
             while(*s) *s++ = 'x';
-            if(debug) fprintf(stderr, "freeipmi.plugin: hostname set to '%s'\n", hostname);
+            if(debug) fprintf(stderr, "%s: hostname set to '%s'\n", program_name, hostname);
             continue;
         }
         else if(i < argc && strcmp("username", argv[i]) == 0) {
@@ -1894,7 +1896,7 @@ int main (int argc, char **argv) {
             char *s = argv[i];
             // mask it be hidden from the process tree
             while(*s) *s++ = 'x';
-            if(debug) fprintf(stderr, "freeipmi.plugin: username set to '%s'\n", username);
+            if(debug) fprintf(stderr, "%s: username set to '%s'\n", program_name, username);
             continue;
         }
         else if(i < argc && strcmp("password", argv[i]) == 0) {
@@ -1902,34 +1904,38 @@ int main (int argc, char **argv) {
             char *s = argv[i];
             // mask it be hidden from the process tree
             while(*s) *s++ = 'x';
-            if(debug) fprintf(stderr, "freeipmi.plugin: password set to '%s'\n", password);
+            if(debug) fprintf(stderr, "%s: password set to '%s'\n", program_name, password);
             continue;
         }
         else if(strcmp("driver-type", argv[i]) == 0) {
             if (hostname) {
                 protocol_version=parse_outofband_driver_type(argv[++i]);
-                if(debug) fprintf(stderr, "freeipmi.plugin: outband protocol version set to '%d'\n", protocol_version);
+                if(debug) fprintf(stderr, "%s: outband protocol version set to '%d'\n",
+                                  program_name, protocol_version);
             }
             else {
                 driver_type=parse_inband_driver_type(argv[++i]);
-                if(debug) fprintf(stderr, "freeipmi.plugin: inband driver type set to '%d'\n", driver_type);
+                if(debug) fprintf(stderr, "%s: inband driver type set to '%d'\n",
+                                  program_name, driver_type);
             }
             continue;
         } else if (i < argc && strcmp("noauthcodecheck", argv[i]) == 0) {
             if (!hostname || host_is_local(hostname)) {
                 if (debug)
-                    fprintf(stderr, "freeipmi.plugin: noauthcodecheck workaround flag is ignored for inband configuration\n");
+                    fprintf(stderr, "%s: noauthcodecheck workaround flag is ignored for inband configuration\n",
+                            program_name);
 
             }
             else if (protocol_version < 0 || protocol_version == IPMI_MONITORING_PROTOCOL_VERSION_1_5) {
                 workaround_flags |= IPMI_MONITORING_WORKAROUND_FLAGS_PROTOCOL_VERSION_1_5_NO_AUTH_CODE_CHECK;
 
                 if (debug)
-                    fprintf(stderr, "freeipmi.plugin: noauthcodecheck workaround flag enabled\n");
+                    fprintf(stderr, "%s: noauthcodecheck workaround flag enabled\n", program_name);
             }
             else {
                 if (debug)
-                    fprintf(stderr, "freeipmi.plugin: noauthcodecheck workaround flag is ignored for protocol version 2.0\n");
+                    fprintf(stderr, "%s: noauthcodecheck workaround flag is ignored for protocol version 2.0\n",
+                            program_name);
             }
             continue;
         }
@@ -1937,13 +1943,13 @@ int main (int argc, char **argv) {
             sdr_cache_directory = argv[++i];
 
             if(debug)
-                fprintf(stderr, "freeipmi.plugin: SDR cache directory set to '%s'\n", sdr_cache_directory);
+                fprintf(stderr, "%s: SDR cache directory set to '%s'\n", program_name, sdr_cache_directory);
 
             continue;
         }
         else if(i < argc && strcmp("sensor-config-file", argv[i]) == 0) {
             sensor_config_file = argv[++i];
-            if(debug) fprintf(stderr, "freeipmi.plugin: sensor config file set to '%s'\n", sensor_config_file);
+            if(debug) fprintf(stderr, "%s: sensor config file set to '%s'\n", program_name, sensor_config_file);
             continue;
         }
         else if(i < argc && strcmp("ignore", argv[i]) == 0) {
@@ -1955,13 +1961,14 @@ int main (int argc, char **argv) {
             continue;
         }
 
-        collector_error("freeipmi.plugin: ignoring parameter '%s'", argv[i]);
+        collector_error("%s(): ignoring parameter '%s'", __FUNCTION__, argv[i]);
     }
 
     errno = 0;
 
     if(freq_s < update_every)
-        collector_error("update frequency %d seconds is too small for IPMI. Using %d.", freq_s, update_every);
+        collector_error("%s(): update frequency %d seconds is too small for IPMI. Using %d.",
+                        __FUNCTION__, freq_s, update_every);
 
     freq_s = update_every = MAX(freq_s, update_every);
     update_every_sel = MAX(update_every, update_every_sel);
@@ -1970,7 +1977,7 @@ int main (int argc, char **argv) {
     // initialize IPMI
 
     if(debug) {
-        fprintf(stderr, "freeipmi.plugin: calling ipmi_monitoring_init()\n");
+        fprintf(stderr, "%s: calling ipmi_monitoring_init()\n", program_name);
         ipmimonitoring_init_flags|=IPMI_MONITORING_FLAGS_DEBUG|IPMI_MONITORING_FLAGS_DEBUG_IPMI_PACKETS;
     }
 
@@ -2021,7 +2028,7 @@ int main (int argc, char **argv) {
     // ------------------------------------------------------------------------
     // the main loop
 
-    if(debug) fprintf(stderr, "freeipmi.plugin: starting data collection\n");
+    if(debug) fprintf(stderr, "%s: starting data collection\n", program_name);
 
     time_t started_t = now_monotonic_sec();
 
@@ -2048,6 +2055,9 @@ int main (int argc, char **argv) {
             case ICS_RUNNING:
                 step = update_every * USEC_PER_SEC;
                 if(stats.sensors.last_iteration_ut < now_monotonic_usec() - IPMI_RESTART_IF_SENSORS_DONT_ITERATE_EVERY_SECONDS * USEC_PER_SEC) {
+                    collector_error("%s(): sensors have not be collected for %zu seconds. Exiting to restart.",
+                                    __FUNCTION__, (size_t)((now_monotonic_usec() - stats.sensors.last_iteration_ut) / USEC_PER_SEC));
+
                     fprintf(stdout, "EXIT\n");
                     fflush(stdout);
                     exit(0);
@@ -2058,12 +2068,14 @@ int main (int argc, char **argv) {
                 continue;
 
             case ICS_INIT_FAILED:
+                collector_error("%s(): sensors failed to initialize. Calling DISABLE.", __FUNCTION__);
                 fprintf(stdout, "DISABLE\n");
                 fflush(stdout);
                 exit(0);
                 break;
 
             case ICS_FAILED:
+                collector_error("%s(): sensors fails repeatedly to collect metrics. Exiting to restart.", __FUNCTION__);
                 fprintf(stdout, "EXIT\n");
                 fflush(stdout);
                 exit(0);
@@ -2077,12 +2089,13 @@ int main (int argc, char **argv) {
 
                 case ICS_INIT_FAILED:
                 case ICS_FAILED:
+                    collector_error("%s(): SEL fails to collect events. Disabling SEL collection.", __FUNCTION__);
                     netdata_do_sel = false;
                     break;
             }
         }
 
-        if(debug) fprintf(stderr, "freeipmi.plugin: calling send_sensor_metrics_to_netdata()\n");
+        if(debug) fprintf(stderr, "%s: calling send_sensor_metrics_to_netdata()\n", program_name);
 
         stats.updates.now = now_monotonic_usec();
         send_sensor_metrics_to_netdata(&stats);
@@ -2091,7 +2104,8 @@ int main (int argc, char **argv) {
             send_sel_metrics_to_netdata(&stats);
 
         if(debug)
-            fprintf(stderr, "freeipmi.plugin: iteration %zu, dt %llu usec, sensors ever collected %zu, sensors last collected %zu \n"
+            fprintf(stderr, "%s: iteration %zu, dt %llu usec, sensors ever collected %zu, sensors last collected %zu \n"
+                    , program_name
                     , iteration
                     , dt
                     , dictionary_entries(stats.sensors.dict)
@@ -2102,7 +2116,8 @@ int main (int argc, char **argv) {
             global_chart_created = true;
 
             fprintf(stdout,
-                    "CHART netdata.freeipmi_availability_status '' 'Plugin availability status' 'status' plugins netdata.plugin_availability_status line 146000 %d\n"
+                    "CHART netdata.freeipmi_availability_status '' 'Plugin availability status' 'status' "
+                    "plugins netdata.plugin_availability_status line 146000 %d\n"
                     "DIMENSION available '' absolute 1 1\n",
                     update_every);
         }
@@ -2113,6 +2128,7 @@ int main (int argc, char **argv) {
 
         // restart check (14400 seconds)
         if (now_monotonic_sec() - started_t > IPMI_RESTART_EVERY_SECONDS) {
+            collector_error("%s(): reached my lifetime expectancy. Exiting to restart.", __FUNCTION__);
             fprintf(stdout, "EXIT\n");
             fflush(stdout);
             exit(0);
