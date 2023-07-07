@@ -60,8 +60,8 @@ char *driver_device = NULL;     /* not used if probing */
 int protocol_version = -1; //IPMI_MONITORING_PROTOCOL_VERSION_1_5; /* or -1 for default */
 char *username = "foousername";
 char *password = "foopassword";
-unsigned char *ipmi_k_g = NULL;
-unsigned int ipmi_k_g_len = 0;
+unsigned char *k_g = NULL;
+unsigned int k_g_len = 0;
 int privilege_level = -1; // IPMI_MONITORING_PRIVILEGE_LEVEL_USER; /* or -1 for default */
 int authentication_type = -1; // IPMI_MONITORING_AUTHENTICATION_TYPE_MD5; /* or -1 for default */
 int cipher_suite_id = 0;        /* or -1 for default */
@@ -137,8 +137,8 @@ _init_ipmi_config (struct ipmi_monitoring_ipmi_config *ipmi_config)
     ipmi_config->protocol_version = protocol_version;
     ipmi_config->username = username;
     ipmi_config->password = password;
-    ipmi_config->k_g = ipmi_k_g;
-    ipmi_config->k_g_len = ipmi_k_g_len;
+    ipmi_config->k_g = k_g;
+    ipmi_config->k_g_len = k_g_len;
     ipmi_config->privilege_level = privilege_level;
     ipmi_config->authentication_type = authentication_type;
     ipmi_config->cipher_suite_id = cipher_suite_id;
@@ -257,15 +257,8 @@ _get_sensor_type_string (int sensor_type)
 static int debug = 0;
 
 static int netdata_update_every = 5; // this is the minimum update frequency
-static int netdata_priority = 90000;
-static int netdata_do_sel = 1;
-
-static size_t netdata_sensors_updated = 0;
-static size_t netdata_sensors_collected = 0;
-static size_t netdata_sel_events = 0;
-static size_t netdata_sensors_states_nominal = 0;
-static size_t netdata_sensors_states_warning = 0;
-static size_t netdata_sensors_states_critical = 0;
+static int netdata_priority_ipmi  = 90000;
+static int netdata_priority_state = 99000;
 
 struct sensor {
     int record_id;
@@ -282,274 +275,338 @@ struct sensor {
         double double_value;
     } sensor_reading;
 
-    int sent;
-    int ignore;
-    int exposed;
-    int updated;
-    struct sensor *next;
-} *sensors_root = NULL;
+    int multiplier;
+    bool ignore;
+    bool chart_sent;
+    usec_t last_collected_ut;
+};
 
-static void netdata_mark_as_not_updated() {
-    struct sensor *sn;
-    for(sn = sensors_root; sn ;sn = sn->next)
-        sn->updated = sn->sent = 0;
+static inline bool is_sensor_updated(struct sensor *sn, usec_t now, usec_t freq) {
+    if(sn->ignore)
+        return false;
 
-    netdata_sensors_updated = 0;
-    netdata_sensors_collected = 0;
-    netdata_sel_events = 0;
-
-    netdata_sensors_states_nominal = 0;
-    netdata_sensors_states_warning = 0;
-    netdata_sensors_states_critical = 0;
+    return (now - sn->last_collected_ut > freq * 2) ? true : false;
 }
 
-static void send_chart_to_netdata_for_units(int units) {
-    struct sensor *sn, *sn_stored;
-    int dupfound, multiplier;
+static DICTIONARY *sensors_dict = NULL;
 
-    switch(units) {
-        case IPMI_MONITORING_SENSOR_UNITS_CELSIUS:
-            printf("CHART ipmi.temperatures_c '' 'System Celsius Temperatures read by IPMI' 'Celsius' 'temperatures' 'ipmi.temperatures_c' 'line' %d %d\n"
-                   , netdata_priority + 10
-                   , netdata_update_every
-            );
-            break;
+#define SENSORS_DICT_KEY_SIZE 2048
 
-        case IPMI_MONITORING_SENSOR_UNITS_FAHRENHEIT:
-            printf("CHART ipmi.temperatures_f '' 'System Fahrenheit Temperatures read by IPMI' 'Fahrenheit' 'temperatures' 'ipmi.temperatures_f' 'line' %d %d\n"
-                   , netdata_priority + 11
-                   , netdata_update_every
-            );
-            break;
+typedef enum __attribute__((packed)) {
+    ICS_INIT,
+    ICS_INIT_FAILED,
+    ICS_RUNNING,
+    ICS_FAILED,
+} IPMI_COLLECTOR_STATUS;
 
-        case IPMI_MONITORING_SENSOR_UNITS_VOLTS:
-            printf("CHART ipmi.volts '' 'System Voltages read by IPMI' 'Volts' 'voltages' 'ipmi.voltages' 'line' %d %d\n"
-                   , netdata_priority + 12
-                   , netdata_update_every
-            );
-            break;
+struct sensors_global_stats {
+    struct {
+        IPMI_COLLECTOR_STATUS status;
+        usec_t last_iteration_ut;
+        size_t updated;
+        size_t collected;
+        size_t states_nominal;
+        size_t states_warning;
+        size_t states_critical;
+        usec_t now;
+        usec_t freq;
+    } sensors;
 
-        case IPMI_MONITORING_SENSOR_UNITS_AMPS:
-            printf("CHART ipmi.amps '' 'System Current read by IPMI' 'Amps' 'current' 'ipmi.amps' 'line' %d %d\n"
-                   , netdata_priority + 13
-                   , netdata_update_every
-            );
-            break;
+    struct {
+        IPMI_COLLECTOR_STATUS status;
+        usec_t last_iteration_ut;
+        size_t events;
+        usec_t now;
+        usec_t freq;
+    } sel;
 
-        case IPMI_MONITORING_SENSOR_UNITS_RPM:
-            printf("CHART ipmi.rpm '' 'System Fans read by IPMI' 'RPM' 'fans' 'ipmi.rpm' 'line' %d %d\n"
-                   , netdata_priority + 14
-                   , netdata_update_every
-            );
-            break;
+    struct {
+        usec_t now;
+    } updates;
+};
 
-        case IPMI_MONITORING_SENSOR_UNITS_WATTS:
-            printf("CHART ipmi.watts '' 'System Power read by IPMI' 'Watts' 'power' 'ipmi.watts' 'line' %d %d\n"
-                   , netdata_priority + 5
-                   , netdata_update_every
-            );
-            break;
+struct {
+    const char *search;
+    SIMPLE_PATTERN *pattern;
+    const char *label;
+} sensors_component_patterns[] = {
 
-        case IPMI_MONITORING_SENSOR_UNITS_PERCENT:
-            printf("CHART ipmi.percent '' 'System Metrics read by IPMI' '%%' 'other' 'ipmi.percent' 'line' %d %d\n"
-                   , netdata_priority + 15
-                   , netdata_update_every
-            );
-            break;
+        // The order is important!
+        // They are evaluated top to bottom
+        // The first the matches is used
 
-        default:
-            for(sn = sensors_root; sn; sn = sn->next)
-                if(sn->sensor_units == units)
-                    sn->ignore = 1;
-            return;
-    }
-
-    for(sn = sensors_root; sn; sn = sn->next) {
-        dupfound = 0;
-        if(sn->sensor_units == units && sn->updated && !sn->ignore) {
-            sn->exposed = 1;
-            multiplier = 1;
-
-            switch(sn->sensor_reading_type) {
-                case IPMI_MONITORING_SENSOR_READING_TYPE_DOUBLE:
-                    multiplier = 1000;
-                    // fallthrough
-                case IPMI_MONITORING_SENSOR_READING_TYPE_UNSIGNED_INTEGER8_BOOL:
-                case IPMI_MONITORING_SENSOR_READING_TYPE_UNSIGNED_INTEGER32:
-                    for (sn_stored = sensors_root; sn_stored; sn_stored = sn_stored->next) {
-                        if (sn_stored == sn) continue;
-                        // If the name is a duplicate, append the sensor number
-                        if ( !strcmp(sn_stored->sensor_name, sn->sensor_name) ) {
-                            dupfound = 1;
-                            printf("DIMENSION i%d_n%d_r%d '%s i%d' absolute 1 %d\n"
-                                   , sn->sensor_number
-                                   , sn->record_id
-                                   , sn->sensor_reading_type
-                                   , sn->sensor_name
-                                   , sn->sensor_number
-                                   , multiplier
-                            );
-                            break;
-                        }
-                    }
-                    // No duplicate name was found, display it just with Name
-                    if (!dupfound) {
-                        // display without ID
-                        printf("DIMENSION i%d_n%d_r%d '%s' absolute 1 %d\n"
-                               , sn->sensor_number
-                               , sn->record_id
-                               , sn->sensor_reading_type
-                               , sn->sensor_name
-                               , multiplier
-                        );
-                    }
-                    break;
-
-                default:
-                    sn->ignore = 1;
-                    break;
-            }
+        {
+                .search = "*DIMM*",
+                .label = "Memory Module",
+        },
+        {
+                .search = "*CPU*|SOC_*|*VDD*",
+                .label = "Processor",
+        },
+        {
+                .search = "M2_*",
+                .label = "Storage",
+        },
+        {
+                .search = "MB_*",
+                .label = "Motherboard",
+        },
+        {
+                .search = "Watchdog|SEL|SYS_*",
+                .label = "System",
+        },
+        {
+                .search = "PS*|P_*",
+                .label = "Power Supply",
+        },
+        {
+                .search = "VR_P*",
+                .label = "Processor",
+        },
+        {
+                .search = NULL,
+                .label = NULL,
         }
+};
+
+static const char *sensor_component(struct sensor *sn) {
+    for(int i = 0; sensors_component_patterns[i].search ;i++) {
+        if(!sensors_component_patterns[i].pattern)
+            sensors_component_patterns[i].pattern = simple_pattern_create(sensors_component_patterns[i].search, "|", SIMPLE_PATTERN_EXACT, true);
+
+        if(simple_pattern_matches(sensors_component_patterns[i].pattern, sn->sensor_name))
+            return sensors_component_patterns[i].label;
     }
+
+    return "Other";
 }
 
-static void send_metrics_to_netdata_for_units(int units) {
+static size_t send_sensor_metrics_to_netdata(struct sensors_global_stats *stats) {
+    if(stats->sensors.status != ICS_RUNNING)
+        return 0;
+
+    static int sensors_states_chart_generated = 0;
+    size_t total_sensors_sent = 0;
     struct sensor *sn;
-
-    switch(units) {
-        case IPMI_MONITORING_SENSOR_UNITS_CELSIUS:
-            printf("BEGIN ipmi.temperatures_c\n");
-            break;
-
-        case IPMI_MONITORING_SENSOR_UNITS_FAHRENHEIT:
-            printf("BEGIN ipmi.temperatures_f\n");
-            break;
-
-        case IPMI_MONITORING_SENSOR_UNITS_VOLTS:
-            printf("BEGIN ipmi.volts\n");
-            break;
-
-        case IPMI_MONITORING_SENSOR_UNITS_AMPS:
-            printf("BEGIN ipmi.amps\n");
-            break;
-
-        case IPMI_MONITORING_SENSOR_UNITS_RPM:
-            printf("BEGIN ipmi.rpm\n");
-            break;
-
-        case IPMI_MONITORING_SENSOR_UNITS_WATTS:
-            printf("BEGIN ipmi.watts\n");
-            break;
-
-        case IPMI_MONITORING_SENSOR_UNITS_PERCENT:
-            printf("BEGIN ipmi.percent\n");
-            break;
-
-        default:
-            for(sn = sensors_root; sn; sn = sn->next)
-                if(sn->sensor_units == units)
-                    sn->ignore = 1;
-            return;
-    }
-
-    for(sn = sensors_root; sn; sn = sn->next) {
-        if(sn->sensor_units == units && sn->updated && !sn->sent && !sn->ignore) {
-            netdata_sensors_updated++;
-
-            sn->sent = 1;
-
-            switch(sn->sensor_reading_type) {
-                case IPMI_MONITORING_SENSOR_READING_TYPE_UNSIGNED_INTEGER8_BOOL:
-                    printf("SET i%d_n%d_r%d = %u\n"
-                           , sn->sensor_number
-                           , sn->record_id
-                           , sn->sensor_reading_type
-                           , sn->sensor_reading.bool_value
-                    );
-                    break;
-
-                case IPMI_MONITORING_SENSOR_READING_TYPE_UNSIGNED_INTEGER32:
-                    printf("SET i%d_n%d_r%d = %u\n"
-                           , sn->sensor_number
-                           , sn->record_id
-                           , sn->sensor_reading_type
-                           , sn->sensor_reading.uint32_value
-                    );
-                    break;
-
-                case IPMI_MONITORING_SENSOR_READING_TYPE_DOUBLE:
-                    printf("SET i%d_n%d_r%d = %lld\n"
-                           , sn->sensor_number
-                           , sn->record_id
-                           , sn->sensor_reading_type
-                           , (long long int)(sn->sensor_reading.double_value * 1000)
-                    );
-                    break;
-
-                default:
-                    sn->ignore = 1;
-                    break;
-            }
-        }
-    }
-
-    printf("END\n");
-}
-
-static void send_metrics_to_netdata() {
-    static int sel_chart_generated = 0, sensors_states_chart_generated = 0;
-    struct sensor *sn;
-
-    if(netdata_do_sel && !sel_chart_generated) {
-        sel_chart_generated = 1;
-        printf("CHART ipmi.events '' 'IPMI Events' 'events' 'events' ipmi.sel area %d %d\n"
-               , netdata_priority + 2
-               , netdata_update_every
-        );
-        printf("DIMENSION events '' absolute 1 1\n");
-    }
-
-    if(!sensors_states_chart_generated) {
-        sensors_states_chart_generated = 1;
-        printf("CHART ipmi.sensors_states '' 'IPMI Sensors State' 'sensors' 'states' ipmi.sensors_states line %d %d\n"
-               , netdata_priority + 1
-               , netdata_update_every
-        );
-        printf("DIMENSION nominal '' absolute 1 1\n");
-        printf("DIMENSION critical '' absolute 1 1\n");
-        printf("DIMENSION warning '' absolute 1 1\n");
-    }
 
     // generate the CHART/DIMENSION lines, if we have to
-    for(sn = sensors_root; sn; sn = sn->next)
-        if(sn->updated && !sn->exposed && !sn->ignore)
-            send_chart_to_netdata_for_units(sn->sensor_units);
+    dfe_start_read(sensors_dict, sn) {
+        if(!is_sensor_updated(sn, stats->updates.now, stats->sensors.freq))
+            continue;
 
-    if(netdata_do_sel) {
+        const char *context;
+        const char *title;
+        const char *units;
+        const char *family;
+        const char *chart_type;
+        const char *dimension;
+        int priority;
+        switch(sn->sensor_units) {
+            case IPMI_MONITORING_SENSOR_UNITS_CELSIUS:
+                dimension = "temperature";
+                context = "ipmi.sensor_temperature_c";
+                title = "IPMI Sensor Temperature Celsius";
+                units = "Celsius";
+                family = "temperatures";
+                chart_type = "line";
+                priority = netdata_priority_ipmi + 10;
+                break;
+
+            case IPMI_MONITORING_SENSOR_UNITS_FAHRENHEIT:
+                dimension = "temperature";
+                context = "ipmi.sensor_temperature_f";
+                title = "IPMI Sensor Temperature Fahrenheit";
+                units = "Fahrenheit";
+                family = "temperatures";
+                chart_type = "line";
+                priority = netdata_priority_ipmi + 11;
+                break;
+
+            case IPMI_MONITORING_SENSOR_UNITS_VOLTS:
+                dimension = "voltage";
+                context = "ipmi.sensor_voltage";
+                title = "IPMI Sensor Voltage";
+                units = "Volts";
+                family = "voltages";
+                chart_type = "line";
+                priority = netdata_priority_ipmi + 12;
+                break;
+
+            case IPMI_MONITORING_SENSOR_UNITS_AMPS:
+                dimension = "ampere";
+                context = "ipmi.sensor_ampere";
+                title = "IPMI Sensor Current";
+                units = "Amps";
+                family = "current";
+                chart_type = "line";
+                priority = netdata_priority_ipmi + 13;
+                break;
+
+            case IPMI_MONITORING_SENSOR_UNITS_RPM:
+                dimension = "rotations";
+                context = "ipmi.fan_speed";
+                title = "IPMI Sensor Fans Speed";
+                units = "RPM";
+                family = "fans";
+                chart_type = "line";
+                priority = netdata_priority_ipmi + 14;
+                break;
+
+            case IPMI_MONITORING_SENSOR_UNITS_WATTS:
+                dimension = "power";
+                context = "ipmi.sensor_power";
+                title = "IPMI Sensor Power";
+                units = "Watts";
+                family = "power";
+                chart_type = "line";
+                priority = netdata_priority_ipmi + 5;
+                break;
+
+            case IPMI_MONITORING_SENSOR_UNITS_PERCENT:
+                dimension = "percentage";
+                context = "ipmi.sensor_percent";
+                title = "IPMI Sensor Reading Percentage";
+                units = "%%";
+                family = "other";
+                chart_type = "line";
+                priority = netdata_priority_ipmi + 15;
+                break;
+
+            default:
+                sn->ignore = true;
+                continue;
+        }
+
+        switch(sn->sensor_reading_type) {
+            case IPMI_MONITORING_SENSOR_READING_TYPE_DOUBLE:
+                sn->multiplier = 1000;
+                break;
+
+            case IPMI_MONITORING_SENSOR_READING_TYPE_UNSIGNED_INTEGER8_BOOL:
+            case IPMI_MONITORING_SENSOR_READING_TYPE_UNSIGNED_INTEGER32:
+                sn->multiplier = 1;
+                break;
+
+            default:
+                sn->ignore = true;
+                continue;
+        }
+
+        if(!sn->chart_sent) {
+            sn->chart_sent = true;
+            const char *component = sensor_component(sn);
+
+            printf("CHART '%s_%s' '' '%s' '%s' '%s' '%s' '%s' %d %d\n",
+                   context, sn_dfe.name, title, units, family, context, chart_type, priority, netdata_update_every);
+
+            printf("CLABEL 'sensor' '%s' 1\n", sn->sensor_name);
+            printf("CLABEL 'component' '%s' 1\n", component);
+            printf("CLABEL_COMMIT\n");
+
+            printf("DIMENSION '%s' '' absolute 1 %d\n"
+                    , dimension
+                    , sn->multiplier
+            );
+
+            printf("CHART 'ipmi.sensor_state_%s' '' 'IPMI Sensor State' 'state' 'states' 'ipmi.sensor_state' 'line' %d %d\n",
+                   sn_dfe.name, netdata_priority_state, netdata_update_every);
+
+            printf("CLABEL 'sensor' '%s' 1\n", sn->sensor_name);
+            printf("CLABEL 'component' '%s' 1\n", component);
+            printf("CLABEL_COMMIT\n");
+
+            printf("DIMENSION 'nominal' '' absolute 1 1\n");
+            printf("DIMENSION 'warning' '' absolute 1 1\n");
+            printf("DIMENSION 'critical' '' absolute 1 1\n");
+            printf("DIMENSION 'unknown' '' absolute 1 1\n");
+        }
+
+        printf("BEGIN '%s_%s'\n", context, sn_dfe.name);
+
+        switch(sn->sensor_reading_type) {
+            case IPMI_MONITORING_SENSOR_READING_TYPE_UNSIGNED_INTEGER8_BOOL:
+                printf("SET '%s' = %u\n"
+                        , dimension
+                        , sn->sensor_reading.bool_value
+                );
+                break;
+
+            case IPMI_MONITORING_SENSOR_READING_TYPE_UNSIGNED_INTEGER32:
+                printf("SET '%s' = %u\n"
+                        , dimension
+                        , sn->sensor_reading.uint32_value
+                );
+                break;
+
+            case IPMI_MONITORING_SENSOR_READING_TYPE_DOUBLE:
+                printf("SET '%s' = %lld\n"
+                        , dimension
+                        , (long long int)(sn->sensor_reading.double_value * sn->multiplier)
+                );
+                break;
+
+            default:
+                sn->ignore = true;
+                break;
+        }
+
+        printf("END\n");
+        total_sensors_sent++;
+
+        printf("BEGIN 'ipmi.sensor_state_%s'\n", sn_dfe.name);
+        printf("SET 'nominal' = %lld\n", sn->sensor_state == IPMI_MONITORING_STATE_NOMINAL ? 1LL : 0LL);
+        printf("SET 'warning' = %lld\n", sn->sensor_state == IPMI_MONITORING_STATE_WARNING ? 1LL : 0LL);
+        printf("SET 'critical' = %lld\n", sn->sensor_state == IPMI_MONITORING_STATE_CRITICAL ? 1LL : 0LL);
+        printf("SET 'unknown' = %lld\n", sn->sensor_state == IPMI_MONITORING_STATE_UNKNOWN ? 1LL : 0LL);
+        printf("END\n");
+    }
+    dfe_done(sn);
+
+    if(total_sensors_sent) {
+        if (!sensors_states_chart_generated) {
+            sensors_states_chart_generated = 1;
+            printf("CHART ipmi.sensors_states '' 'IPMI Sensors State' 'sensors' 'states' ipmi.sensors_states line %d %d\n",
+                   netdata_priority_ipmi + 1, netdata_update_every);
+
+            printf("DIMENSION nominal '' absolute 1 1\n");
+            printf("DIMENSION critical '' absolute 1 1\n");
+            printf("DIMENSION warning '' absolute 1 1\n");
+        }
+
+        printf(
+                "BEGIN ipmi.sensors_states\n"
+                "SET nominal = %zu\n"
+                "SET warning = %zu\n"
+                "SET critical = %zu\n"
+                "END\n", stats->sensors.states_nominal, stats->sensors.states_warning, stats->sensors.states_critical
+        );
+    }
+
+    return total_sensors_sent;
+}
+
+static size_t send_sel_metrics_to_netdata(struct sensors_global_stats *stats) {
+    static int sel_chart_generated = 0;
+
+    if(stats->sel.status == ICS_RUNNING) {
+        if(!sel_chart_generated) {
+            sel_chart_generated = 1;
+            printf("CHART ipmi.events '' 'IPMI Events' 'events' 'events' ipmi.sel area %d %d\n"
+                    , netdata_priority_ipmi + 2
+                    , netdata_update_every
+            );
+            printf("DIMENSION events '' absolute 1 1\n");
+        }
+
         printf(
                 "BEGIN ipmi.events\n"
                 "SET events = %zu\n"
                 "END\n"
-                , netdata_sel_events
+                , stats->sel.events
         );
     }
 
-    printf(
-           "BEGIN ipmi.sensors_states\n"
-           "SET nominal = %zu\n"
-           "SET warning = %zu\n"
-           "SET critical = %zu\n"
-           "END\n"
-           , netdata_sensors_states_nominal
-           , netdata_sensors_states_warning
-           , netdata_sensors_states_critical
-    );
-
-    // send metrics to netdata
-    for(sn = sensors_root; sn; sn = sn->next)
-        if(sn->updated && sn->exposed && !sn->sent && !sn->ignore)
-            send_metrics_to_netdata_for_units(sn->sensor_units);
-
+    return stats->sel.events;
 }
 
 static int *excluded_record_ids = NULL;
@@ -654,18 +711,14 @@ static void netdata_get_sensor(
         , int sensor_reading_type
         , char *sensor_name
         , void *sensor_reading
+        , struct sensors_global_stats *stats
 ) {
-    // find the sensor record
-    struct sensor *sn;
-    for(sn = sensors_root; sn ;sn = sn->next)
-        if(     sn->record_id           == record_id &&
-                sn->sensor_number       == sensor_number &&
-                sn->sensor_reading_type == sensor_reading_type &&
-                sn->sensor_units        == sensor_units &&
-                !strcmp(sn->sensor_name, sensor_name)
-                )
-            break;
+    char key[SENSORS_DICT_KEY_SIZE + 1];
+    snprintfz(key, SENSORS_DICT_KEY_SIZE, "%d.%d.%d.%d.%s",
+              record_id, sensor_number, sensor_reading_type, sensor_units, sensor_name);
 
+    // find the sensor record
+    struct sensor *sn = dictionary_get(sensors_dict, key);
     if(!sn) {
         // not found, create it
         // check if it is excluded
@@ -676,24 +729,17 @@ static void netdata_get_sensor(
 
         if(debug) fprintf(stderr, "Allocating new sensor data record for sensor '%s', id %d, number %d, type %d, state %d, units %d, reading_type %d\n", sensor_name, record_id, sensor_number, sensor_type, sensor_state, sensor_units, sensor_reading_type);
 
-        sn = calloc(1, sizeof(struct sensor));
-        if(!sn) {
-            fatal("cannot allocate %zu bytes of memory.", sizeof(struct sensor));
-        }
+        struct sensor t = {
+                .record_id = record_id,
+                .sensor_number = sensor_number,
+                .sensor_type = sensor_type,
+                .sensor_state = sensor_state,
+                .sensor_units = sensor_units,
+                .sensor_reading_type = sensor_reading_type,
+                .sensor_name = strdupz(sensor_name),
+        };
 
-        sn->record_id = record_id;
-        sn->sensor_number = sensor_number;
-        sn->sensor_type = sensor_type;
-        sn->sensor_state = sensor_state;
-        sn->sensor_units = sensor_units;
-        sn->sensor_reading_type = sensor_reading_type;
-        sn->sensor_name = strdup(sensor_name);
-        if(!sn->sensor_name) {
-            fatal("cannot allocate %zu bytes of memory.", strlen(sensor_name));
-        }
-
-        sn->next = sensors_root;
-        sensors_root = sn;
+        sn = dictionary_set(sensors_dict, key, &t, sizeof(t));
     }
     else {
         if(debug) fprintf(stderr, "Reusing sensor record for sensor '%s', id %d, number %d, type %d, state %d, units %d, reading_type %d\n", sensor_name, record_id, sensor_number, sensor_type, sensor_state, sensor_units, sensor_reading_type);
@@ -702,25 +748,25 @@ static void netdata_get_sensor(
     switch(sensor_reading_type) {
         case IPMI_MONITORING_SENSOR_READING_TYPE_UNSIGNED_INTEGER8_BOOL:
             sn->sensor_reading.bool_value = *((uint8_t *)sensor_reading);
-            sn->updated = 1;
-            netdata_sensors_collected++;
+            sn->last_collected_ut = stats->sensors.now;
+            stats->sensors.collected++;
             break;
 
         case IPMI_MONITORING_SENSOR_READING_TYPE_UNSIGNED_INTEGER32:
             sn->sensor_reading.uint32_value = *((uint32_t *)sensor_reading);
-            sn->updated = 1;
-            netdata_sensors_collected++;
+            sn->last_collected_ut = stats->sensors.now;
+            stats->sensors.collected++;
             break;
 
         case IPMI_MONITORING_SENSOR_READING_TYPE_DOUBLE:
             sn->sensor_reading.double_value = *((double *)sensor_reading);
-            sn->updated = 1;
-            netdata_sensors_collected++;
+            sn->last_collected_ut = stats->sensors.now;
+            stats->sensors.collected++;
             break;
 
         default:
             if(debug) fprintf(stderr, "Unknown reading type - Ignoring sensor record for sensor '%s', id %d, number %d, type %d, state %d, units %d, reading_type %d\n", sensor_name, record_id, sensor_number, sensor_type, sensor_state, sensor_units, sensor_reading_type);
-            sn->ignore = 1;
+            sn->ignore = true;
             break;
     }
 
@@ -732,15 +778,15 @@ static void netdata_get_sensor(
 
     switch(sensor_state) {
         case IPMI_MONITORING_STATE_NOMINAL:
-            netdata_sensors_states_nominal++;
+            stats->sensors.states_nominal++;
             break;
 
         case IPMI_MONITORING_STATE_WARNING:
-            netdata_sensors_states_warning++;
+            stats->sensors.states_warning++;
             break;
 
         case IPMI_MONITORING_STATE_CRITICAL:
-            netdata_sensors_states_critical++;
+            stats->sensors.states_critical++;
             break;
 
         default:
@@ -752,12 +798,13 @@ static void netdata_get_sel(
           int record_id
         , int record_type_class
         , int sel_state
+        , struct sensors_global_stats *stats
 ) {
     (void)record_id;
     (void)record_type_class;
     (void)sel_state;
 
-    netdata_sel_events++;
+    stats->sel.events++;
 }
 
 
@@ -766,7 +813,7 @@ static void netdata_get_sel(
 
 
 static int
-_ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
+_ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config, struct sensors_global_stats *stats)
 {
     ipmi_monitoring_ctx_t ctx = NULL;
     unsigned int sensor_reading_flags = 0;
@@ -1010,6 +1057,7 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
                 , sensor_reading_type
                 , sensor_name
                 , sensor_reading
+                , stats
         );
 
 #ifdef NETDATA_COMMENTED
@@ -1120,7 +1168,7 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
 
 
 static int
-_ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
+_ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config, struct sensors_global_stats *stats)
 {
     ipmi_monitoring_ctx_t ctx = NULL;
     unsigned int sel_flags = 0;
@@ -1310,6 +1358,7 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
                   record_id
                 , record_type_class
                 , sel_state
+                , stats
         );
 
 #ifdef NETDATA_COMMENTED
@@ -1500,20 +1549,47 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
 // ----------------------------------------------------------------------------
 // MAIN PROGRAM FOR NETDATA PLUGIN
 
-int ipmi_collect_data(struct ipmi_monitoring_ipmi_config *ipmi_config) {
+typedef enum __attribute__((packed)) {
+    IPMI_COLLECT_TYPE_SENSORS = (1 << 0),
+    IPMI_COLLECT_TYPE_SEL     = (1 << 1),
+} IPMI_COLLECTION_TYPE;
+
+const char *collect_type_to_string(IPMI_COLLECTION_TYPE type) {
+    if(type & (IPMI_COLLECT_TYPE_SENSORS|IPMI_COLLECT_TYPE_SEL))
+        return "sensors,sel";
+    if(type & IPMI_COLLECT_TYPE_SEL)
+        return "sel";
+    if(type & IPMI_COLLECT_TYPE_SENSORS)
+        return "sensors";
+
+    return "unknown";
+}
+
+int netdata_ipmi_collect_data(struct ipmi_monitoring_ipmi_config *ipmi_config, IPMI_COLLECTION_TYPE type, struct sensors_global_stats *stats) {
     errno = 0;
 
-    if (_ipmimonitoring_sensors(ipmi_config) < 0) return -1;
+    if(type & IPMI_COLLECT_TYPE_SENSORS) {
+        stats->sensors.updated = 0;
+        stats->sensors.collected = 0;
+        stats->sensors.states_critical = 0;
+        stats->sensors.states_warning = 0;
+        stats->sensors.states_nominal = 0;
+        stats->sensors.now = now_monotonic_usec();
 
-    if(netdata_do_sel) {
-        if(_ipmimonitoring_sel(ipmi_config) < 0) return -2;
+        if (_ipmimonitoring_sensors(ipmi_config, stats) < 0) return -1;
+    }
+
+    if(type & IPMI_COLLECT_TYPE_SEL) {
+        stats->sel.events = 0;
+        stats->sel.now = now_monotonic_usec();
+        if(_ipmimonitoring_sel(ipmi_config, stats) < 0) return -2;
     }
 
     return 0;
 }
 
-int ipmi_detect_speed_secs(struct ipmi_monitoring_ipmi_config *ipmi_config) {
-    int i, checks = 10;
+int netdata_ipmi_detect_speed_secs(struct ipmi_monitoring_ipmi_config *ipmi_config, IPMI_COLLECTION_TYPE type, struct sensors_global_stats *stats) {
+    int i, checks = 10, successful = 0;
     unsigned long long total = 0;
 
     for(i = 0 ; i < checks ; i++) {
@@ -1521,8 +1597,10 @@ int ipmi_detect_speed_secs(struct ipmi_monitoring_ipmi_config *ipmi_config) {
 
         // measure the time a data collection needs
         unsigned long long start = now_realtime_usec();
-        if(ipmi_collect_data(ipmi_config) < 0)
-            fatal("freeipmi.plugin: data collection failed.");
+        if(netdata_ipmi_collect_data(ipmi_config, type, stats) < 0)
+            continue;
+
+        successful++;
 
         unsigned long long end = now_realtime_usec();
 
@@ -1535,6 +1613,9 @@ int ipmi_detect_speed_secs(struct ipmi_monitoring_ipmi_config *ipmi_config) {
         // to avoid flooding the IPMI processor with requests
         sleep_usec(end - start);
     }
+
+    if(!successful)
+        return 0;
 
     // so, we assume it needed 2x the time
     // we find the average in microseconds
@@ -1594,7 +1675,110 @@ int host_is_local(const char *host)
     return (0);
 }
 
+struct ipmi_collection_thread {
+    struct ipmi_monitoring_ipmi_config ipmi_config;
+    int freq;
+    IPMI_COLLECTION_TYPE type;
+    SPINLOCK spinlock;
+    struct sensors_global_stats stats;
+};
+
+void *netdata_ipmi_collection_thread(void *ptr) {
+    struct ipmi_collection_thread *t = ptr;
+
+    if(debug) fprintf(stderr, "freeipmi.plugin: calling _init_ipmi_config() for %s\n",
+                      collect_type_to_string(t->type));
+
+    _init_ipmi_config(&t->ipmi_config);
+
+    if(debug) fprintf(stderr, "freeipmi.plugin: detecting IPMI minimum update frequency for %s...\n",
+                      collect_type_to_string(t->type));
+
+    t->freq = netdata_ipmi_detect_speed_secs(&t->ipmi_config, t->type, &t->stats);
+    if(!t->freq) {
+        if(t->type & IPMI_COLLECT_TYPE_SENSORS) {
+            t->stats.sensors.status = ICS_INIT_FAILED;
+            t->stats.sensors.last_iteration_ut = 0;
+        }
+
+        if(t->type & IPMI_COLLECT_TYPE_SEL) {
+            t->stats.sel.status = ICS_INIT_FAILED;
+            t->stats.sel.last_iteration_ut = 0;
+        }
+
+        return ptr;
+    }
+    else {
+        if(t->type & IPMI_COLLECT_TYPE_SENSORS) {
+            t->stats.sensors.status = ICS_RUNNING;
+        }
+
+        if(t->type & IPMI_COLLECT_TYPE_SEL) {
+            t->stats.sel.status = ICS_RUNNING;
+        }
+    }
+
+    if(debug) fprintf(stderr, "freeipmi.plugin: IPMI minimum update frequency of %s was calculated to %d seconds.\n",
+                      collect_type_to_string(t->type), t->freq);
+
+    if(debug) fprintf(stderr, "freeipmi.plugin: starting data collection of %s\n", collect_type_to_string(t->type));
+
+    size_t iteration = 0, failures = 0;
+    usec_t step = t->freq * USEC_PER_SEC;
+
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    for(iteration = 0; 1 ; iteration++) {
+        heartbeat_next(&hb, step);
+
+        if(debug) fprintf(stderr, "freeipmi.plugin: calling netdata_ipmi_collect_data() for %s\n",
+                          collect_type_to_string(t->type));
+
+        struct sensors_global_stats tmp_stats = t->stats;
+
+        if(t->type & IPMI_COLLECT_TYPE_SENSORS) {
+            tmp_stats.sensors.last_iteration_ut = now_monotonic_usec();
+            tmp_stats.sensors.freq = t->freq * USEC_PER_SEC;
+        }
+
+        if(t->type & IPMI_COLLECT_TYPE_SEL) {
+            tmp_stats.sel.last_iteration_ut = now_monotonic_usec();
+            tmp_stats.sel.freq = t->freq * USEC_PER_SEC;
+        }
+
+        if(netdata_ipmi_collect_data(&t->ipmi_config, t->type, &tmp_stats) != 0)
+            failures++;
+        else
+            failures = 0;
+
+        if(failures > 10) {
+            collector_error("freeipmi.plugin: failed to collect %s data for %zu consecutive times, having made %zu iterations.",
+                  collect_type_to_string(t->type), failures, iteration);
+
+            if(t->type & IPMI_COLLECT_TYPE_SENSORS) {
+                t->stats.sensors.status = ICS_FAILED;
+                t->stats.sensors.last_iteration_ut = 0;
+            }
+
+            if(t->type & IPMI_COLLECT_TYPE_SEL) {
+                t->stats.sel.status = ICS_FAILED;
+                t->stats.sel.last_iteration_ut = 0;
+            }
+
+            return ptr;
+        }
+
+        spinlock_lock(&t->spinlock);
+        t->stats = tmp_stats;
+        spinlock_unlock(&t->spinlock);
+    }
+
+    return ptr;
+}
+
 int main (int argc, char **argv) {
+    int netdata_do_sel = 1;
+
     stderror = stderr;
     clocks_init();
 
@@ -1794,12 +1978,6 @@ int main (int argc, char **argv) {
     // ------------------------------------------------------------------------
     // initialize IPMI
 
-    struct ipmi_monitoring_ipmi_config ipmi_config;
-
-    if(debug) fprintf(stderr, "freeipmi.plugin: calling _init_ipmi_config()\n");
-
-    _init_ipmi_config(&ipmi_config);
-
     if(debug) {
         fprintf(stderr, "freeipmi.plugin: calling ipmi_monitoring_init()\n");
         ipmimonitoring_init_flags|=IPMI_MONITORING_FLAGS_DEBUG|IPMI_MONITORING_FLAGS_DEBUG_IPMI_PACKETS;
@@ -1808,15 +1986,37 @@ int main (int argc, char **argv) {
     if(ipmi_monitoring_init(ipmimonitoring_init_flags, &errnum) < 0)
         fatal("ipmi_monitoring_init: %s", ipmi_monitoring_ctx_strerror(errnum));
 
-    if(debug) fprintf(stderr, "freeipmi.plugin: detecting IPMI minimum update frequency...\n");
-    freq = ipmi_detect_speed_secs(&ipmi_config);
-    if(debug) fprintf(stderr, "freeipmi.plugin: IPMI minimum update frequency was calculated to %d seconds.\n", freq);
+    // ------------------------------------------------------------------------
+    // create the data collection threads
 
-    if(freq > netdata_update_every) {
-        collector_info("enforcing minimum data collection frequency, calculated to %d seconds.", freq);
-        netdata_update_every = freq;
-    }
+    sensors_dict = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
 
+    struct ipmi_collection_thread sensors_data = {
+            .type = IPMI_COLLECT_TYPE_SENSORS,
+            .stats = {
+                    .sensors = {
+                            .status = ICS_INIT,
+                            .last_iteration_ut = now_monotonic_usec(),
+                            .freq = netdata_update_every * USEC_PER_SEC,
+                    },
+            },
+    }, sel_data = {
+            .type = IPMI_COLLECT_TYPE_SEL,
+            .stats = {
+                    .sel = {
+                            .status = ICS_INIT,
+                            .last_iteration_ut = now_monotonic_usec(),
+                            .freq = netdata_update_every * USEC_PER_SEC,
+                    },
+            },
+    };
+
+    netdata_thread_t sensors_thread = 0, sel_thread = 0;
+
+    netdata_thread_create(&sensors_thread, "IPMI[sensors]", NETDATA_THREAD_OPTION_DONT_LOG, netdata_ipmi_collection_thread, &sensors_data);
+
+    if(netdata_do_sel)
+        netdata_thread_create(&sel_thread, "IPMI[sel]", NETDATA_THREAD_OPTION_DONT_LOG, netdata_ipmi_collection_thread, &sel_data);
 
     // ------------------------------------------------------------------------
     // the main loop
@@ -1826,45 +2026,90 @@ int main (int argc, char **argv) {
     time_t started_t = now_monotonic_sec();
 
     size_t iteration = 0;
-    usec_t step = netdata_update_every * USEC_PER_SEC;
+    usec_t step = 100 * USEC_PER_MS;
+    bool global_chart_created = false;
 
     heartbeat_t hb;
     heartbeat_init(&hb);
     for(iteration = 0; 1 ; iteration++) {
         usec_t dt = heartbeat_next(&hb, step);
 
-        if (iteration) {
-            if (iteration == 1) {
-                fprintf(
-                    stdout,
-                    "CHART netdata.freeipmi_availability_status '' 'Plugin availability status' 'status' plugins netdata.plugin_availability_status line 146000 %d\n"
-                    "DIMENSION available '' absolute 1 1\n",
-                    netdata_update_every);
-            }
-            fprintf(
-                stdout,
-                "BEGIN netdata.freeipmi_availability_status\n"
-                "SET available = 1\n"
-                "END\n");
+        struct sensors_global_stats stats = { 0 };
+
+        spinlock_lock(&sensors_data.spinlock);
+        stats.sensors = sensors_data.stats.sensors;
+        spinlock_unlock(&sensors_data.spinlock);
+
+        spinlock_lock(&sel_data.spinlock);
+        stats.sel = sel_data.stats.sel;
+        spinlock_unlock(&sel_data.spinlock);
+
+        switch(stats.sensors.status) {
+            case ICS_RUNNING:
+                step = netdata_update_every * USEC_PER_SEC;
+                if(stats.sensors.last_iteration_ut < now_monotonic_usec() - 10 * 60 * USEC_PER_SEC) {
+                    fprintf(stdout, "EXIT\n");
+                    fflush(stdout);
+                    exit(0);
+                }
+                break;
+
+            case ICS_INIT:
+                continue;
+
+            case ICS_INIT_FAILED:
+                fprintf(stdout, "DISABLE\n");
+                fflush(stdout);
+                exit(0);
+                break;
+
+            case ICS_FAILED:
+                fprintf(stdout, "EXIT\n");
+                fflush(stdout);
+                exit(0);
         }
 
-        if(debug && iteration)
+        if(netdata_do_sel) {
+            switch (stats.sensors.status) {
+                case ICS_RUNNING:
+                case ICS_INIT:
+                    break;
+
+                case ICS_INIT_FAILED:
+                case ICS_FAILED:
+                    netdata_do_sel = 0;
+                    break;
+            }
+        }
+
+        if(debug) fprintf(stderr, "freeipmi.plugin: calling send_sensor_metrics_to_netdata()\n");
+
+        stats.updates.now = now_monotonic_usec();
+        send_sensor_metrics_to_netdata(&stats);
+
+        if(netdata_do_sel)
+            send_sel_metrics_to_netdata(&stats);
+
+        if(debug)
             fprintf(stderr, "freeipmi.plugin: iteration %zu, dt %llu usec, sensors collected %zu, sensors sent to netdata %zu \n"
                     , iteration
                     , dt
-                    , netdata_sensors_collected
-                    , netdata_sensors_updated
+                    , stats.sensors.collected
+                    , stats.sensors.updated
             );
 
-        netdata_mark_as_not_updated();
+        if (!global_chart_created) {
+            global_chart_created = true;
 
-        if(debug) fprintf(stderr, "freeipmi.plugin: calling ipmi_collect_data()\n");
-        if(ipmi_collect_data(&ipmi_config) < 0)
-            fatal("data collection failed.");
-
-        if(debug) fprintf(stderr, "freeipmi.plugin: calling send_metrics_to_netdata()\n");
-        send_metrics_to_netdata();
-        fflush(stdout);
+            fprintf(stdout,
+                    "CHART netdata.freeipmi_availability_status '' 'Plugin availability status' 'status' plugins netdata.plugin_availability_status line 146000 %d\n"
+                    "DIMENSION available '' absolute 1 1\n",
+                    netdata_update_every);
+        }
+        fprintf(stdout,
+                "BEGIN netdata.freeipmi_availability_status\n"
+                "SET available = 1\n"
+                "END\n");
 
         // restart check (14400 seconds)
         if (now_monotonic_sec() - started_t > 14400) {
@@ -1872,6 +2117,7 @@ int main (int argc, char **argv) {
             fflush(stdout);
             exit(0);
         }
+
+        fflush(stdout);
     }
 }
-
