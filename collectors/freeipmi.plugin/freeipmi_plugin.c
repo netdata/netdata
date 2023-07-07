@@ -285,7 +285,7 @@ static inline bool is_sensor_updated(struct sensor *sn, usec_t now, usec_t freq)
     if(sn->ignore)
         return false;
 
-    return (now - sn->last_collected_ut > freq * 2) ? true : false;
+    return (now - sn->last_collected_ut < freq * 2) ? true : false;
 }
 
 static DICTIONARY *sensors_dict = NULL;
