@@ -1608,7 +1608,7 @@ static void netdata_get_sensor(
     }
 
     if(!sensor_name || !*sensor_name)
-        sensor_name = "UNKNOWN";
+        return;
 
     char key[SENSORS_DICT_KEY_SIZE + 1];
     snprintfz(key, SENSORS_DICT_KEY_SIZE, "i%d_n%d_t%d_u%d_%s",
