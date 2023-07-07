@@ -1092,6 +1092,10 @@ struct {
                 .label = "Memory Module",
         },
         {
+                .search = "FAN*|*_FAN*",
+                .label = "Fan",
+        },
+        {
                 .search = "*CPU*|SOC_*|*VDD*",
                 .label = "Processor",
         },
