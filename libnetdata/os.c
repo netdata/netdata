@@ -75,7 +75,7 @@ long get_system_cpus_with_cache(bool cache, bool for_netdata) {
     if(processors[index] < 1)
         processors[index] = 1;
 
-    debug(D_SYSTEM, "System has %ld processors.", processors[index]);
+    netdata_log_debug(D_SYSTEM, "System has %ld processors.", processors[index]);
     return processors[index];
 
 #endif /* __APPLE__, __FreeBSD__ */

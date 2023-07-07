@@ -14,7 +14,7 @@
 void free_silencers(SILENCER *t) {
     if (!t) return;
     if (t->next) free_silencers(t->next);
-    debug(D_HEALTH, "HEALTH command API: Freeing silencer %s:%s:%s:%s:%s", t->alarms,
+    netdata_log_debug(D_HEALTH, "HEALTH command API: Freeing silencer %s:%s:%s:%s:%s", t->alarms,
           t->charts, t->contexts, t->hosts, t->families);
     simple_pattern_free(t->alarms_pattern);
     simple_pattern_free(t->charts_pattern);
@@ -133,7 +133,7 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
         buffer_strcat(wb, HEALTH_CMDAPI_MSG_AUTHERROR);
         ret = HTTP_RESP_FORBIDDEN;
     } else {
-        debug(D_HEALTH, "HEALTH command API: Comparing secret '%s' to '%s'", w->auth_bearer_token, api_secret);
+        netdata_log_debug(D_HEALTH, "HEALTH command API: Comparing secret '%s' to '%s'", w->auth_bearer_token, api_secret);
         if (strcmp(w->auth_bearer_token, api_secret)) {
             buffer_strcat(wb, HEALTH_CMDAPI_MSG_AUTHERROR);
             ret = HTTP_RESP_FORBIDDEN;
@@ -146,7 +146,7 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                 if (!key || !*key) continue;
                 if (!value || !*value) continue;
 
-                debug(D_WEB_CLIENT, "%llu: API v1 health query param '%s' with value '%s'", w->id, key, value);
+                netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 health query param '%s' with value '%s'", w->id, key, value);
 
                 // name and value are now the parameters
                 if (!strcmp(key, "cmd")) {

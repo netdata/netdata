@@ -4,7 +4,7 @@
 #include "registry_internals.h"
 
 int registry_db_should_be_saved(void) {
-    debug(D_REGISTRY, "log entries %llu, max %llu", registry.log_count, registry.save_registry_every_entries);
+    netdata_log_debug(D_REGISTRY, "log entries %llu, max %llu", registry.log_count, registry.save_registry_every_entries);
     return registry.log_count > registry.save_registry_every_entries;
 }
 
@@ -12,7 +12,7 @@ int registry_db_should_be_saved(void) {
 // INTERNAL FUNCTIONS FOR SAVING REGISTRY OBJECTS
 
 static int registry_machine_save_url(REGISTRY_MACHINE_URL *mu, FILE *fp) {
-    debug(D_REGISTRY, "REGISTRY: registry_machine_save_url('%s')", string2str(mu->url));
+    netdata_log_debug(D_REGISTRY, "REGISTRY: registry_machine_save_url('%s')", string2str(mu->url));
 
     int ret = fprintf(fp, "V\t%08x\t%08x\t%08x\t%02x\t%s\n",
             mu->first_t,
@@ -32,7 +32,7 @@ static int registry_machine_save(const DICTIONARY_ITEM *item __maybe_unused, voi
     REGISTRY_MACHINE *m = entry;
     FILE *fp = file;
 
-    debug(D_REGISTRY, "REGISTRY: registry_machine_save('%s')", m->guid);
+    netdata_log_debug(D_REGISTRY, "REGISTRY: registry_machine_save('%s')", m->guid);
 
     int ret = fprintf(fp, "M\t%08x\t%08x\t%08x\t%s\n",
             m->first_t,
@@ -57,7 +57,7 @@ static int registry_machine_save(const DICTIONARY_ITEM *item __maybe_unused, voi
 }
 
 static inline int registry_person_save_url(REGISTRY_PERSON_URL *pu, FILE *fp) {
-    debug(D_REGISTRY, "REGISTRY: registry_person_save_url('%s')", string2str(pu->url));
+    netdata_log_debug(D_REGISTRY, "REGISTRY: registry_person_save_url('%s')", string2str(pu->url));
 
     int ret = fprintf(fp, "U\t%08x\t%08x\t%08x\t%02x\t%s\t%s\t%s\n",
             pu->first_t,
@@ -78,7 +78,7 @@ static inline int registry_person_save(const DICTIONARY_ITEM *item __maybe_unuse
     REGISTRY_PERSON *p = entry;
     FILE *fp = file;
 
-    debug(D_REGISTRY, "REGISTRY: registry_person_save('%s')", p->guid);
+    netdata_log_debug(D_REGISTRY, "REGISTRY: registry_person_save('%s')", p->guid);
 
     int ret = fprintf(fp, "P\t%08x\t%08x\t%08x\t%s\n",
             p->first_t,
@@ -120,7 +120,7 @@ int registry_db_save(void) {
     snprintfz(old_filename, FILENAME_MAX, "%s.old", registry.db_filename);
     snprintfz(tmp_filename, FILENAME_MAX, "%s.tmp", registry.db_filename);
 
-    debug(D_REGISTRY, "REGISTRY: Creating file '%s'", tmp_filename);
+    netdata_log_debug(D_REGISTRY, "REGISTRY: Creating file '%s'", tmp_filename);
     FILE *fp = fopen(tmp_filename, "w");
     if(!fp) {
         netdata_log_error("REGISTRY: Cannot create file: %s", tmp_filename);
@@ -130,7 +130,7 @@ int registry_db_save(void) {
 
     // dictionary_walkthrough_read() has its own locking, so this is safe to do
 
-    debug(D_REGISTRY, "REGISTRY: saving all machines");
+    netdata_log_debug(D_REGISTRY, "REGISTRY: saving all machines");
     int bytes1 = dictionary_walkthrough_read(registry.machines, registry_machine_save, fp);
     if(bytes1 < 0) {
         netdata_log_error("REGISTRY: Cannot save registry machines - return value %d", bytes1);
@@ -138,9 +138,9 @@ int registry_db_save(void) {
         error_log_limit_reset();
         return bytes1;
     }
-    debug(D_REGISTRY, "REGISTRY: saving machines took %d bytes", bytes1);
+    netdata_log_debug(D_REGISTRY, "REGISTRY: saving machines took %d bytes", bytes1);
 
-    debug(D_REGISTRY, "Saving all persons");
+    netdata_log_debug(D_REGISTRY, "Saving all persons");
     int bytes2 = dictionary_walkthrough_read(registry.persons, registry_person_save, fp);
     if(bytes2 < 0) {
         netdata_log_error("REGISTRY: Cannot save registry persons - return value %d", bytes2);
@@ -148,7 +148,7 @@ int registry_db_save(void) {
         error_log_limit_reset();
         return bytes2;
     }
-    debug(D_REGISTRY, "REGISTRY: saving persons took %d bytes", bytes2);
+    netdata_log_debug(D_REGISTRY, "REGISTRY: saving persons took %d bytes", bytes2);
 
     // save the totals
     fprintf(fp, "T\t%016llx\t%016llx\t%016llx\t%016llx\t%016llx\t%016llx\n",
@@ -165,34 +165,34 @@ int registry_db_save(void) {
     errno = 0;
 
     // remove the .old db
-    debug(D_REGISTRY, "REGISTRY: Removing old db '%s'", old_filename);
+    netdata_log_debug(D_REGISTRY, "REGISTRY: Removing old db '%s'", old_filename);
     if(unlink(old_filename) == -1 && errno != ENOENT)
         netdata_log_error("REGISTRY: cannot remove old registry file '%s'", old_filename);
 
     // rename the db to .old
-    debug(D_REGISTRY, "REGISTRY: Link current db '%s' to .old: '%s'", registry.db_filename, old_filename);
+    netdata_log_debug(D_REGISTRY, "REGISTRY: Link current db '%s' to .old: '%s'", registry.db_filename, old_filename);
     if(link(registry.db_filename, old_filename) == -1 && errno != ENOENT)
         netdata_log_error("REGISTRY: cannot move file '%s' to '%s'. Saving registry DB failed!", registry.db_filename, old_filename);
 
     else {
         // remove the database (it is saved in .old)
-        debug(D_REGISTRY, "REGISTRY: removing db '%s'", registry.db_filename);
+        netdata_log_debug(D_REGISTRY, "REGISTRY: removing db '%s'", registry.db_filename);
         if (unlink(registry.db_filename) == -1 && errno != ENOENT)
             netdata_log_error("REGISTRY: cannot remove old registry file '%s'", registry.db_filename);
 
         // move the .tmp to make it active
-        debug(D_REGISTRY, "REGISTRY: linking tmp db '%s' to active db '%s'", tmp_filename, registry.db_filename);
+        netdata_log_debug(D_REGISTRY, "REGISTRY: linking tmp db '%s' to active db '%s'", tmp_filename, registry.db_filename);
         if (link(tmp_filename, registry.db_filename) == -1) {
             netdata_log_error("REGISTRY: cannot move file '%s' to '%s'. Saving registry DB failed!", tmp_filename,
                     registry.db_filename);
 
             // move the .old back
-            debug(D_REGISTRY, "REGISTRY: linking old db '%s' to active db '%s'", old_filename, registry.db_filename);
+            netdata_log_debug(D_REGISTRY, "REGISTRY: linking old db '%s' to active db '%s'", old_filename, registry.db_filename);
             if(link(old_filename, registry.db_filename) == -1)
                 netdata_log_error("REGISTRY: cannot move file '%s' to '%s'. Recovering the old registry DB failed!", old_filename, registry.db_filename);
         }
         else {
-            debug(D_REGISTRY, "REGISTRY: removing tmp db '%s'", tmp_filename);
+            netdata_log_debug(D_REGISTRY, "REGISTRY: removing tmp db '%s'", tmp_filename);
             if(unlink(tmp_filename) == -1)
                 netdata_log_error("REGISTRY: cannot remove tmp registry file '%s'", tmp_filename);
 
@@ -219,7 +219,7 @@ size_t registry_db_load(void) {
     STRING *u = NULL;
     size_t line = 0;
 
-    debug(D_REGISTRY, "REGISTRY: loading active db from: '%s'", registry.db_filename);
+    netdata_log_debug(D_REGISTRY, "REGISTRY: loading active db from: '%s'", registry.db_filename);
     FILE *fp = fopen(registry.db_filename, "r");
     if(!fp) {
         netdata_log_error("REGISTRY: cannot open registry file: '%s'", registry.db_filename);
@@ -232,7 +232,7 @@ size_t registry_db_load(void) {
     while((s = fgets_trim_len(buf, 4096, fp, &len))) {
         line++;
 
-        debug(D_REGISTRY, "REGISTRY: read line %zu to length %zu: %s", line, len, s);
+        netdata_log_debug(D_REGISTRY, "REGISTRY: read line %zu to length %zu: %s", line, len, s);
         switch(*s) {
             case 'U': // person URL
                 if(unlikely(!p)) {
@@ -284,7 +284,7 @@ size_t registry_db_load(void) {
                 pu->last_t = (uint32_t)strtoul(&s[11], NULL, 16);
                 pu->usages = (uint32_t)strtoul(&s[20], NULL, 16);
                 pu->flags = (uint8_t)strtoul(&s[29], NULL, 16);
-                debug(D_REGISTRY, "REGISTRY: loaded person URL '%s' with name '%s' of machine '%s', first: %u, last: %u, usages: %u, flags: %02x",
+                netdata_log_debug(D_REGISTRY, "REGISTRY: loaded person URL '%s' with name '%s' of machine '%s', first: %u, last: %u, usages: %u, flags: %02x",
                       string2str(u), string2str(pu->machine_name), m->guid, pu->first_t, pu->last_t, pu->usages, pu->flags);
 
                 string_freez(u);
@@ -302,7 +302,7 @@ size_t registry_db_load(void) {
                 p = registry_person_allocate(&s[29], (time_t)strtoul(&s[2], NULL, 16));
                 p->last_t = (uint32_t)strtoul(&s[11], NULL, 16);
                 p->usages = (uint32_t)strtoul(&s[20], NULL, 16);
-                debug(D_REGISTRY, "REGISTRY: loaded person '%s', first: %u, last: %u, usages: %u", p->guid, p->first_t, p->last_t, p->usages);
+                netdata_log_debug(D_REGISTRY, "REGISTRY: loaded person '%s', first: %u, last: %u, usages: %u", p->guid, p->first_t, p->last_t, p->usages);
                 break;
 
             case 'V': // machine URL
@@ -336,7 +336,7 @@ size_t registry_db_load(void) {
                 mu->last_t = (uint32_t)strtoul(&s[11], NULL, 16);
                 mu->usages = (uint32_t)strtoul(&s[20], NULL, 16);
                 mu->flags = (uint8_t)strtoul(&s[29], NULL, 16);
-                debug(D_REGISTRY, "Registry loaded machine URL '%s', machine '%s', first: %u, last: %u, usages: %u, flags: %02x",
+                netdata_log_debug(D_REGISTRY, "Registry loaded machine URL '%s', machine '%s', first: %u, last: %u, usages: %u, flags: %02x",
                       string2str(u), m->guid, mu->first_t, mu->last_t, mu->usages, mu->flags);
 
                 string_freez(u);
@@ -354,7 +354,7 @@ size_t registry_db_load(void) {
                 m = registry_machine_allocate(&s[29], (time_t)strtoul(&s[2], NULL, 16));
                 m->last_t = (uint32_t)strtoul(&s[11], NULL, 16);
                 m->usages = (uint32_t)strtoul(&s[20], NULL, 16);
-                debug(D_REGISTRY, "REGISTRY: loaded machine '%s', first: %u, last: %u, usages: %u", m->guid, m->first_t, m->last_t, m->usages);
+                netdata_log_debug(D_REGISTRY, "REGISTRY: loaded machine '%s', first: %u, last: %u, usages: %u", m->guid, m->first_t, m->last_t, m->usages);
                 break;
 
             case 'T': // totals

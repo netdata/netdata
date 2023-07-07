@@ -133,7 +133,7 @@ size_t netdata_threads_init(void) {
     if(i != 0)
         fatal("pthread_attr_getstacksize() failed with code %d.", i);
     else
-        debug(D_OPTIONS, "initial pthread stack size is %zu bytes", stacksize);
+        netdata_log_debug(D_OPTIONS, "initial pthread stack size is %zu bytes", stacksize);
 
     return stacksize;
 }

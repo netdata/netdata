@@ -587,14 +587,14 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
 
     if(outFileName && *outFileName) {
         buffer_sprintf(w->response.header, "Content-Disposition: attachment; filename=\"%s\"\r\n", outFileName);
-        debug(D_WEB_CLIENT, "%llu: generating outfilename header: '%s'", w->id, outFileName);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: generating outfilename header: '%s'", w->id, outFileName);
     }
 
     if(format == DATASOURCE_DATATABLE_JSONP) {
         if(responseHandler == NULL)
             responseHandler = "google.visualization.Query.setResponse";
 
-        debug(D_WEB_CLIENT_ACCESS, "%llu: GOOGLE JSON/JSONP: version = '%s', reqId = '%s', sig = '%s', out = '%s', responseHandler = '%s', outFileName = '%s'",
+        netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: GOOGLE JSON/JSONP: version = '%s', reqId = '%s', sig = '%s', out = '%s', responseHandler = '%s', outFileName = '%s'",
               w->id, google_version, google_reqId, google_sig, google_out, responseHandler, outFileName
         );
 

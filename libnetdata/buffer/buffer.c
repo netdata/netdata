@@ -107,7 +107,7 @@ void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args)
     do {
         need += space_remaining * 2;
 
-        debug(D_WEB_BUFFER, "web_buffer_sprintf(): increasing web_buffer at position %zu, size = %zu, by %zu bytes (wrote = %zu)\n", wb->len, wb->size, need, wrote);
+        netdata_log_debug(D_WEB_BUFFER, "web_buffer_sprintf(): increasing web_buffer at position %zu, size = %zu, by %zu bytes (wrote = %zu)\n", wb->len, wb->size, need, wrote);
         buffer_need_bytes(wb, need);
 
         space_remaining = wb->size - wb->len - 1;
@@ -131,7 +131,7 @@ void buffer_sprintf(BUFFER *wb, const char *fmt, ...)
     do {
         need += space_remaining * 2;
 
-        debug(D_WEB_BUFFER, "web_buffer_sprintf(): increasing web_buffer at position %zu, size = %zu, by %zu bytes (wrote = %zu)\n", wb->len, wb->size, need, wrote);
+        netdata_log_debug(D_WEB_BUFFER, "web_buffer_sprintf(): increasing web_buffer at position %zu, size = %zu, by %zu bytes (wrote = %zu)\n", wb->len, wb->size, need, wrote);
         buffer_need_bytes(wb, need);
 
         space_remaining = wb->size - wb->len - 1;
@@ -246,7 +246,7 @@ BUFFER *buffer_create(size_t size, size_t *statistics)
 {
     BUFFER *b;
 
-    debug(D_WEB_BUFFER, "Creating new web buffer of size %zu.", size);
+    netdata_log_debug(D_WEB_BUFFER, "Creating new web buffer of size %zu.", size);
 
     b = callocz(1, sizeof(BUFFER));
     b->buffer = mallocz(size + sizeof(BUFFER_OVERFLOW_EOF) + 2);
@@ -268,7 +268,7 @@ void buffer_free(BUFFER *b) {
 
     buffer_overflow_check(b);
 
-    debug(D_WEB_BUFFER, "Freeing web buffer of size %zu.", b->size);
+    netdata_log_debug(D_WEB_BUFFER, "Freeing web buffer of size %zu.", b->size);
 
     if(b->statistics)
         __atomic_sub_fetch(b->statistics, b->size + sizeof(BUFFER) + sizeof(BUFFER_OVERFLOW_EOF) + 2, __ATOMIC_RELAXED);
@@ -290,7 +290,7 @@ void buffer_increase(BUFFER *b, size_t free_size_required) {
     size_t optimal = (b->size > 5*1024*1024) ? b->size / 2 : b->size;
     if(optimal > wanted) wanted = optimal;
 
-    debug(D_WEB_BUFFER, "Increasing data buffer from size %zu to %zu.", b->size, b->size + wanted);
+    netdata_log_debug(D_WEB_BUFFER, "Increasing data buffer from size %zu to %zu.", b->size, b->size + wanted);
 
     b->buffer = reallocz(b->buffer, b->size + wanted + sizeof(BUFFER_OVERFLOW_EOF) + 2);
     b->size += wanted;

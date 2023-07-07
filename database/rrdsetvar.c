@@ -222,7 +222,7 @@ void rrdsetvar_add_and_leave_released(RRDSET *st, const char *name, RRDVAR_TYPE 
 }
 
 void rrdsetvar_rename_all(RRDSET *st) {
-    debug(D_VARIABLES, "RRDSETVAR rename for chart id '%s' name '%s'", rrdset_id(st), rrdset_name(st));
+    netdata_log_debug(D_VARIABLES, "RRDSETVAR rename for chart id '%s' name '%s'", rrdset_id(st), rrdset_name(st));
 
     RRDSETVAR *rs;
     dfe_start_write(st->rrdsetvar_root_index, rs) {

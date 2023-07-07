@@ -41,7 +41,7 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN
             rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_SEND);
         } else {
             rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_IGNORE);
-            debug(
+            netdata_log_debug(
                 D_EXPORTING,
                 "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.",
                 rrdset_id(st),
@@ -51,7 +51,7 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN
     }
 
     if (unlikely(!rrdset_is_available_for_exporting_and_alarms(st))) {
-        debug(
+        netdata_log_debug(
             D_EXPORTING,
             "EXPORTING: not sending chart '%s' of host '%s', because it is not available for exporting.",
             rrdset_id(st),
@@ -62,7 +62,7 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN
     if (unlikely(
             st->rrd_memory_mode == RRD_MEMORY_MODE_NONE &&
             !(EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED))) {
-        debug(
+        netdata_log_debug(
             D_EXPORTING,
             "EXPORTING: not sending chart '%s' of host '%s' because its memory mode is '%s' and the exporting connector requires database access.",
             rrdset_id(st),

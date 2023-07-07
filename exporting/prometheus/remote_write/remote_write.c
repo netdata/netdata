@@ -244,7 +244,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
             // we need as-collected / raw data
 
             if (unlikely(rd->collector.last_collected_time.tv_sec < instance->after)) {
-                debug(
+                netdata_log_debug(
                     D_EXPORTING,
                     "EXPORTING: not sending dimension '%s' of chart '%s' from host '%s', "
                     "its last data collection (%lu) is not within our timeframe (%lu to %lu)",

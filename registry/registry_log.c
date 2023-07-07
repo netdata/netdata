@@ -70,7 +70,7 @@ ssize_t registry_log_load(void) {
     // otherwise we will append to it the values we read
     registry_log_close();
 
-    debug(D_REGISTRY, "Registry: loading active db from: %s", registry.log_filename);
+    netdata_log_debug(D_REGISTRY, "Registry: loading active db from: %s", registry.log_filename);
     FILE *fp = fopen(registry.log_filename, "r");
     if(!fp)
         netdata_log_error("Registry: cannot open registry file: %s", registry.log_filename);

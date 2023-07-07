@@ -1065,7 +1065,7 @@ static size_t hashtable_destroy_unsafe(DICTIONARY *dict) {
                           JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
     }
 
-    debug(D_DICTIONARY, "Dictionary: hash table freed %lu bytes", ret);
+    netdata_log_debug(D_DICTIONARY, "Dictionary: hash table freed %lu bytes", ret);
 
     dict->index.JudyHSArray = NULL;
     return (size_t)ret;
@@ -1376,7 +1376,7 @@ static void dict_item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *
     if(unlikely(is_view_dictionary(dict)))
         fatal("DICTIONARY: %s() should never be called on views.", __FUNCTION__ );
 
-    debug(D_DICTIONARY, "Dictionary entry with name '%s' found. Changing its value.", item_get_name(item));
+    netdata_log_debug(D_DICTIONARY, "Dictionary entry with name '%s' found. Changing its value.", item_get_name(item));
 
     DICTIONARY_VALUE_RESETS_PLUS1(dict);
 
@@ -1388,12 +1388,12 @@ static void dict_item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *
     dictionary_execute_delete_callback(dict, item);
 
     if(likely(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE)) {
-        debug(D_DICTIONARY, "Dictionary: linking value to '%s'", item_get_name(item));
+        netdata_log_debug(D_DICTIONARY, "Dictionary: linking value to '%s'", item_get_name(item));
         item->shared->value = value;
         item->shared->value_len = value_len;
     }
     else {
-        debug(D_DICTIONARY, "Dictionary: cloning value to '%s'", item_get_name(item));
+        netdata_log_debug(D_DICTIONARY, "Dictionary: cloning value to '%s'", item_get_name(item));
 
         void *old_value = item->shared->value;
         void *new_value = NULL;
@@ -1405,7 +1405,7 @@ static void dict_item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *
         item->shared->value = new_value;
         item->shared->value_len = value_len;
 
-        debug(D_DICTIONARY, "Dictionary: freeing old value of '%s'", item_get_name(item));
+        netdata_log_debug(D_DICTIONARY, "Dictionary: freeing old value of '%s'", item_get_name(item));
         dict_item_value_freez(dict, old_value);
     }
 
@@ -1413,7 +1413,7 @@ static void dict_item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *
 }
 
 static size_t dict_item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item) {
-    debug(D_DICTIONARY, "Destroying name value entry for name '%s'.", item_get_name(item));
+    netdata_log_debug(D_DICTIONARY, "Destroying name value entry for name '%s'.", item_get_name(item));
 
     if(!item_flag_check(item, ITEM_FLAG_DELETED))
         DICTIONARY_ENTRIES_MINUS1(dict);
@@ -1428,7 +1428,7 @@ static size_t dict_item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item)
         dictionary_execute_delete_callback(dict, item);
 
         if(unlikely(!(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE))) {
-            debug(D_DICTIONARY, "Dictionary freeing value of '%s'", item_get_name(item));
+            netdata_log_debug(D_DICTIONARY, "Dictionary freeing value of '%s'", item_get_name(item));
             dict_item_value_freez(dict, item->shared->value);
             item->shared->value = NULL;
         }
@@ -1554,7 +1554,7 @@ static bool dict_item_del(DICTIONARY *dict, const char *name, ssize_t name_len) 
     if(name_len == -1)
         name_len = (ssize_t)strlen(name) + 1; // we need the terminating null too
 
-    debug(D_DICTIONARY, "DEL dictionary entry with name '%s'.", name);
+    netdata_log_debug(D_DICTIONARY, "DEL dictionary entry with name '%s'.", name);
 
     // Unfortunately, the JudyHSDel() does not return the value of the
     // item that was deleted, so we have to find it before we delete it,
@@ -1605,7 +1605,7 @@ static DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONARY *dic
     if(name_len == -1)
         name_len = (ssize_t)strlen(name) + 1; // we need the terminating null too
 
-    debug(D_DICTIONARY, "SET dictionary entry with name '%s'.", name);
+    netdata_log_debug(D_DICTIONARY, "SET dictionary entry with name '%s'.", name);
 
     // DISCUSSION:
     // Is it better to gain a read-lock and do a hashtable_get_unsafe()
@@ -1724,7 +1724,7 @@ static DICTIONARY_ITEM *dict_item_find_and_acquire(DICTIONARY *dict, const char 
     if(name_len == -1)
         name_len = (ssize_t)strlen(name) + 1; // we need the terminating null too
 
-    debug(D_DICTIONARY, "GET dictionary entry with name '%s'.", name);
+    netdata_log_debug(D_DICTIONARY, "GET dictionary entry with name '%s'.", name);
 
     dictionary_index_lock_rdlock(dict);
 

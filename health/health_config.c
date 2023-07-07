@@ -308,7 +308,7 @@ static inline int health_parse_db_lookup(
         RRDR_TIME_GROUPING *group_method, int *after, int *before, int *every,
         RRDCALC_OPTIONS *options, STRING **dimensions, STRING **foreachdim
 ) {
-    debug(D_HEALTH, "Health configuration parsing database lookup %zu@%s: %s", line, filename, string);
+    netdata_log_debug(D_HEALTH, "Health configuration parsing database lookup %zu@%s: %s", line, filename, string);
 
     if(*dimensions) string_freez(*dimensions);
     if(*foreachdim) string_freez(*foreachdim);
@@ -507,7 +507,7 @@ int sql_store_hashes = 1;
 static int health_readfile(const char *filename, void *data) {
     RRDHOST *host = (RRDHOST *)data;
 
-    debug(D_HEALTH, "Health configuration reading file '%s'", filename);
+    netdata_log_debug(D_HEALTH, "Health configuration reading file '%s'", filename);
 
     static uint32_t
             hash_alarm = 0,
@@ -738,10 +738,10 @@ static int health_readfile(const char *filename, void *data) {
 
             if(!simple_pattern_matches_string(os_pattern, host->os)) {
                 if(rc)
-                    debug(D_HEALTH, "HEALTH on '%s' ignoring alarm '%s' defined at %zu@%s: host O/S does not match '%s'", rrdhost_hostname(host), rrdcalc_name(rc), line, filename, os_match);
+                    netdata_log_debug(D_HEALTH, "HEALTH on '%s' ignoring alarm '%s' defined at %zu@%s: host O/S does not match '%s'", rrdhost_hostname(host), rrdcalc_name(rc), line, filename, os_match);
 
                 if(rt)
-                    debug(D_HEALTH, "HEALTH on '%s' ignoring template '%s' defined at %zu@%s: host O/S does not match '%s'", rrdhost_hostname(host), rrdcalctemplate_name(rt), line, filename, os_match);
+                    netdata_log_debug(D_HEALTH, "HEALTH on '%s' ignoring template '%s' defined at %zu@%s: host O/S does not match '%s'", rrdhost_hostname(host), rrdcalctemplate_name(rt), line, filename, os_match);
 
                 ignore_this = 1;
             }
@@ -755,10 +755,10 @@ static int health_readfile(const char *filename, void *data) {
 
             if(!simple_pattern_matches_string(host_pattern, host->hostname)) {
                 if(rc)
-                    debug(D_HEALTH, "HEALTH on '%s' ignoring alarm '%s' defined at %zu@%s: hostname does not match '%s'", rrdhost_hostname(host), rrdcalc_name(rc), line, filename, host_match);
+                    netdata_log_debug(D_HEALTH, "HEALTH on '%s' ignoring alarm '%s' defined at %zu@%s: hostname does not match '%s'", rrdhost_hostname(host), rrdcalc_name(rc), line, filename, host_match);
 
                 if(rt)
-                    debug(D_HEALTH, "HEALTH on '%s' ignoring template '%s' defined at %zu@%s: hostname does not match '%s'", rrdhost_hostname(host), rrdcalctemplate_name(rt), line, filename, host_match);
+                    netdata_log_debug(D_HEALTH, "HEALTH on '%s' ignoring template '%s' defined at %zu@%s: hostname does not match '%s'", rrdhost_hostname(host), rrdcalctemplate_name(rt), line, filename, host_match);
 
                 ignore_this = 1;
             }
@@ -1328,7 +1328,7 @@ void sql_refresh_hashes(void)
 void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath) {
     if(unlikely((!host->health.health_enabled) && !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)) ||
         !service_running(SERVICE_HEALTH)) {
-        debug(D_HEALTH, "CONFIG health is not enabled for host '%s'", rrdhost_hostname(host));
+        netdata_log_debug(D_HEALTH, "CONFIG health is not enabled for host '%s'", rrdhost_hostname(host));
         return;
     }
 

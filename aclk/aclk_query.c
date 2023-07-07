@@ -286,10 +286,10 @@ static void aclk_query_process_msg(struct aclk_query_thread *query_thr, aclk_que
 
     worker_is_busy(query->type);
     if (query->type == HTTP_API_V2) {
-        debug(D_ACLK, "Processing Queued Message of type: \"http_api_request_v2\"");
+        netdata_log_debug(D_ACLK, "Processing Queued Message of type: \"http_api_request_v2\"");
         http_api_v2(query_thr, query);
     } else {
-        debug(D_ACLK, "Processing Queued Message of type: \"%s\"", query->data.bin_payload.msg_name);
+        netdata_log_debug(D_ACLK, "Processing Queued Message of type: \"%s\"", query->data.bin_payload.msg_name);
         send_bin_msg(query_thr, query);
     }
 

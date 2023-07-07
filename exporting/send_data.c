@@ -40,12 +40,11 @@ int exporting_discard_response(BUFFER *buffer, struct instance *instance) {
     }
     *d = '\0';
 
-    debug(
-        D_EXPORTING,
-        "EXPORTING: received %zu bytes from %s connector instance. Ignoring them. Sample: '%s'",
-        buffer_strlen(buffer),
-        instance->config.name,
-        sample);
+    netdata_log_debug(D_EXPORTING,
+                      "EXPORTING: received %zu bytes from %s connector instance. Ignoring them. Sample: '%s'",
+                      buffer_strlen(buffer),
+                      instance->config.name,
+                      sample);
 #else
     UNUSED(instance);
 #endif /* NETDATA_INTERNAL_CHECKS */

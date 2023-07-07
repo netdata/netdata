@@ -80,7 +80,7 @@ static inline void rrdhost_init() {
 }
 
 RRDHOST_ACQUIRED *rrdhost_find_and_acquire(const char *machine_guid) {
-    debug(D_RRD_CALLS, "rrdhost_find_and_acquire() host %s", machine_guid);
+    netdata_log_debug(D_RRD_CALLS, "rrdhost_find_and_acquire() host %s", machine_guid);
 
     return (RRDHOST_ACQUIRED *)dictionary_get_and_acquire_item(rrdhost_root_index, machine_guid);
 }
@@ -303,7 +303,7 @@ static RRDHOST *rrdhost_create(
         int is_localhost,
         bool archived
 ) {
-    debug(D_RRDHOST, "Host '%s': adding with guid '%s'", hostname, guid);
+    netdata_log_debug(D_RRDHOST, "Host '%s': adding with guid '%s'", hostname, guid);
 
     if(memory_mode == RRD_MEMORY_MODE_DBENGINE && !dbengine_enabled) {
         netdata_log_error("memory mode 'dbengine' is not enabled, but host '%s' is configured for it. Falling back to 'alloc'",
@@ -724,7 +724,7 @@ RRDHOST *rrdhost_find_or_create(
         , struct rrdhost_system_info *system_info
         , bool archived
 ) {
-    debug(D_RRDHOST, "Searching for host '%s' with guid '%s'", hostname, guid);
+    netdata_log_debug(D_RRDHOST, "Searching for host '%s' with guid '%s'", hostname, guid);
 
     RRDHOST *host = rrdhost_find_by_guid(guid);
     if (unlikely(host && host->rrd_memory_mode != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) {
@@ -1033,7 +1033,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
     if(!unittest)
         metadata_sync_init();
 
-    debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
+    netdata_log_debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
     localhost = rrdhost_create(
             hostname
             , registry_get_this_machine_hostname()
@@ -1455,7 +1455,7 @@ static void rrdhost_load_kubernetes_labels(void) {
         return;
     }
 
-    debug(D_RRDHOST, "Attempting to fetch external labels via %s", label_script);
+    netdata_log_debug(D_RRDHOST, "Attempting to fetch external labels via %s", label_script);
 
     pid_t pid;
     FILE *fp_child_input;

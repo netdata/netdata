@@ -55,7 +55,7 @@ static STRING *rrdset_fix_name(RRDHOST *host, const char *chart_full_id, const c
     strncpyz(new_name, sanitized_name, CONFIG_MAX_VALUE);
 
     if(rrdset_index_find_name(host, new_name)) {
-        debug(D_RRD_CALLS, "RRDSET: chart name '%s' on host '%s' already exists.", new_name, rrdhost_hostname(host));
+        netdata_log_debug(D_RRD_CALLS, "RRDSET: chart name '%s' on host '%s' already exists.", new_name, rrdhost_hostname(host));
         if(!strcmp(chart_full_id, full_name) && (!current_name || !*current_name)) {
             unsigned i = 1;
 
@@ -450,7 +450,7 @@ static RRDSET *rrdset_index_find(RRDHOST *host, const char *id) {
 // RRDSET - find charts
 
 inline RRDSET *rrdset_find(RRDHOST *host, const char *id) {
-    debug(D_RRD_CALLS, "rrdset_find() for chart '%s' in host '%s'", id, rrdhost_hostname(host));
+    netdata_log_debug(D_RRD_CALLS, "rrdset_find() for chart '%s' in host '%s'", id, rrdhost_hostname(host));
     RRDSET *st = rrdset_index_find(host, id);
 
     if(st)
@@ -460,7 +460,7 @@ inline RRDSET *rrdset_find(RRDHOST *host, const char *id) {
 }
 
 inline RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id) {
-    debug(D_RRD_CALLS, "rrdset_find_bytype() for chart '%s.%s' in host '%s'", type, id, rrdhost_hostname(host));
+    netdata_log_debug(D_RRD_CALLS, "rrdset_find_bytype() for chart '%s.%s' in host '%s'", type, id, rrdhost_hostname(host));
 
     char buf[RRD_ID_LENGTH_MAX + 1];
     strncpyz(buf, type, RRD_ID_LENGTH_MAX - 1);
@@ -472,13 +472,13 @@ inline RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *i
 }
 
 inline RRDSET *rrdset_find_byname(RRDHOST *host, const char *name) {
-    debug(D_RRD_CALLS, "rrdset_find_byname() for chart '%s' in host '%s'", name, rrdhost_hostname(host));
+    netdata_log_debug(D_RRD_CALLS, "rrdset_find_byname() for chart '%s' in host '%s'", name, rrdhost_hostname(host));
     RRDSET *st = rrdset_index_find_name(host, name);
     return(st);
 }
 
 RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id) {
-    debug(D_RRD_CALLS, "rrdset_find_and_acquire() for host %s, chart %s", rrdhost_hostname(host), id);
+    netdata_log_debug(D_RRD_CALLS, "rrdset_find_and_acquire() for host %s, chart %s", rrdhost_hostname(host), id);
 
     return (RRDSET_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdset_root_index, id);
 }
@@ -522,7 +522,7 @@ int rrdset_reset_name(RRDSET *st, const char *name) {
 
     RRDHOST *host = st->rrdhost;
 
-    debug(D_RRD_CALLS, "rrdset_reset_name() old: '%s', new: '%s'", rrdset_name(st), name);
+    netdata_log_debug(D_RRD_CALLS, "rrdset_reset_name() old: '%s', new: '%s'", rrdset_name(st), name);
 
     STRING *name_string = rrdset_fix_name(host, rrdset_id(st), rrdset_parts_type(st), string2str(st->name), name);
     if(!name_string) return 0;
@@ -745,7 +745,7 @@ inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
 // RRDSET - reset a chart
 
 void rrdset_reset(RRDSET *st) {
-    debug(D_RRD_CALLS, "rrdset_reset() %s", rrdset_name(st));
+    netdata_log_debug(D_RRD_CALLS, "rrdset_reset() %s", rrdset_name(st));
 
     st->last_collected_time.tv_sec = 0;
     st->last_collected_time.tv_usec = 0;
@@ -933,7 +933,7 @@ RRDSET *rrdset_create_custom(
     // ------------------------------------------------------------------------
     // allocate it
 
-    debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
+    netdata_log_debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
     struct rrdset_constructor tmp = {
         .host = host,
@@ -1056,7 +1056,7 @@ void rrdset_timed_next(RRDSET *st, struct timeval now, usec_t duration_since_las
 #endif
     }
 
-    debug(D_RRD_CALLS, "rrdset_timed_next() for chart %s with duration since last update %llu usec", rrdset_name(st), duration_since_last_update);
+    netdata_log_debug(D_RRD_CALLS, "rrdset_timed_next() for chart %s with duration since last update %llu usec", rrdset_name(st), duration_since_last_update);
     rrdset_debug(st, "NEXT: %llu microseconds", duration_since_last_update);
 
     internal_error(discarded && discarded != duration_since_last_update,
@@ -1514,7 +1514,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
     if (pending_rrdset_next)
         rrdset_timed_next(st, now, 0ULL);
 
-    debug(D_RRD_CALLS, "rrdset_done() for chart '%s'", rrdset_name(st));
+    netdata_log_debug(D_RRD_CALLS, "rrdset_done() for chart '%s'", rrdset_name(st));
 
     RRDDIM *rd;
 
@@ -1666,7 +1666,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
             // if the new is smaller than the old (an overflow, or reset), set the old equal to the new
             // to reset the calculation (it will give zero as the calculation for this second)
             if(unlikely(rd->algorithm == RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL && rd->collector.last_collected_value > rd->collector.collected_value)) {
-                debug(D_RRD_STATS, "'%s' / '%s': RESET or OVERFLOW. Last collected value = " COLLECTED_NUMBER_FORMAT ", current = " COLLECTED_NUMBER_FORMAT
+                netdata_log_debug(D_RRD_STATS, "'%s' / '%s': RESET or OVERFLOW. Last collected value = " COLLECTED_NUMBER_FORMAT ", current = " COLLECTED_NUMBER_FORMAT
                 , rrdset_id(st)
                 , rrddim_name(rd)
                 , rd->collector.last_collected_value
@@ -1770,7 +1770,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
                 // It is imperative to set the comparison to uint64_t since type collected_number is signed and
                 // produces wrong results as far as incremental counters are concerned.
                 if(unlikely((uint64_t)rd->collector.last_collected_value > (uint64_t)rd->collector.collected_value)) {
-                    debug(D_RRD_STATS, "'%s' / '%s': RESET or OVERFLOW. Last collected value = " COLLECTED_NUMBER_FORMAT ", current = " COLLECTED_NUMBER_FORMAT
+                    netdata_log_debug(D_RRD_STATS, "'%s' / '%s': RESET or OVERFLOW. Last collected value = " COLLECTED_NUMBER_FORMAT ", current = " COLLECTED_NUMBER_FORMAT
                           , rrdset_id(st)
                           , rrddim_name(rd)
                           , rd->collector.last_collected_value
