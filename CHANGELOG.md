@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- local-listeners: use host prefix in read\_cmdline [\#15320](https://github.com/netdata/netdata/pull/15320) ([ilyam8](https://github.com/ilyam8))
+- local-listener using libnetdata [\#15319](https://github.com/netdata/netdata/pull/15319) ([ktsaou](https://github.com/ktsaou))
+- avoid memory allocations for alert transitions facets processing [\#15318](https://github.com/netdata/netdata/pull/15318) ([ktsaou](https://github.com/ktsaou))
+- add add summary linking to alert instances \(ati\) when options=summary,values is requested [\#15317](https://github.com/netdata/netdata/pull/15317) ([ktsaou](https://github.com/ktsaou))
+- fix alerts transitions sorting [\#15315](https://github.com/netdata/netdata/pull/15315) ([ktsaou](https://github.com/ktsaou))
+- stale vitual hosts [\#15313](https://github.com/netdata/netdata/pull/15313) ([ktsaou](https://github.com/ktsaou))
+- bump go.d.plugin to v0.54.0 [\#15312](https://github.com/netdata/netdata/pull/15312) ([ilyam8](https://github.com/ilyam8))
 - health: respect overriding nc binary for IRC notifications [\#15310](https://github.com/netdata/netdata/pull/15310) ([ilyam8](https://github.com/ilyam8))
 - hide not available for viewers charts when exporting in shell format [\#15309](https://github.com/netdata/netdata/pull/15309) ([ilyam8](https://github.com/ilyam8))
 - move collectors meta to metadata/ [\#15308](https://github.com/netdata/netdata/pull/15308) ([ilyam8](https://github.com/ilyam8))
@@ -17,6 +24,7 @@
 - s/info/netdata\_log\_info/ [\#15299](https://github.com/netdata/netdata/pull/15299) ([vkalintiris](https://github.com/vkalintiris))
 - Fix wording issue in Docker README [\#15298](https://github.com/netdata/netdata/pull/15298) ([Ancairon](https://github.com/Ancairon))
 - Update metrics-streaming-and-replication.md [\#15297](https://github.com/netdata/netdata/pull/15297) ([Ancairon](https://github.com/Ancairon))
+- Rename generic `error` function [\#15296](https://github.com/netdata/netdata/pull/15296) ([thiagoftsm](https://github.com/thiagoftsm))
 - Code reorg and cleanup - enrichment of /api/v2 [\#15294](https://github.com/netdata/netdata/pull/15294) ([ktsaou](https://github.com/ktsaou))
 - Optimizations part 3 [\#15293](https://github.com/netdata/netdata/pull/15293) ([ktsaou](https://github.com/ktsaou))
 - docs: update stream.conf "health enabled by default" description [\#15291](https://github.com/netdata/netdata/pull/15291) ([ilyam8](https://github.com/ilyam8))
@@ -75,7 +83,9 @@
 - Use a single health log table [\#15157](https://github.com/netdata/netdata/pull/15157) ([MrZammler](https://github.com/MrZammler))
 - Add configuration file for netdata-updater.sh. [\#15149](https://github.com/netdata/netdata/pull/15149) ([Ferroin](https://github.com/Ferroin))
 - Redirect to index.html when a file is not found by web server [\#15143](https://github.com/netdata/netdata/pull/15143) ([MrZammler](https://github.com/MrZammler))
+- fix\(alerting\): removing some of criticals [\#15124](https://github.com/netdata/netdata/pull/15124) ([M4itee](https://github.com/M4itee))
 - Add hardening options to CFLAGS by default if they are available. [\#15087](https://github.com/netdata/netdata/pull/15087) ([Ferroin](https://github.com/Ferroin))
+- Additional CO-RE code \(eBPF.plugin\) [\#15078](https://github.com/netdata/netdata/pull/15078) ([thiagoftsm](https://github.com/thiagoftsm))
 - Consistently start the agent as root and rely on it to drop privileges properly. [\#14890](https://github.com/netdata/netdata/pull/14890) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
@@ -392,12 +402,6 @@
 - add note on readme on how to easily see all ml related blog posts [\#14675](https://github.com/netdata/netdata/pull/14675) ([andrewm4894](https://github.com/andrewm4894))
 - Guard for null host when sending node instances [\#14673](https://github.com/netdata/netdata/pull/14673) ([MrZammler](https://github.com/MrZammler))
 - reviewed role description to be according to app [\#14672](https://github.com/netdata/netdata/pull/14672) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- If a child is not streaming, send to the cloud last known version instead of unknown [\#14671](https://github.com/netdata/netdata/pull/14671) ([MrZammler](https://github.com/MrZammler))
-- /api/v2/X improvements part 3 [\#14665](https://github.com/netdata/netdata/pull/14665) ([ktsaou](https://github.com/ktsaou))
-- add FAQ information provided by Finance [\#14664](https://github.com/netdata/netdata/pull/14664) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Handle conffiles for DEB packages explicitly instead of automatically. [\#14662](https://github.com/netdata/netdata/pull/14662) ([Ferroin](https://github.com/Ferroin))
-- Fix cloud node stale status when a virtual host is created [\#14660](https://github.com/netdata/netdata/pull/14660) ([stelfrag](https://github.com/stelfrag))
-- Refactor ML code. [\#14659](https://github.com/netdata/netdata/pull/14659) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
