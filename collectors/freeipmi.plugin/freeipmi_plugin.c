@@ -382,8 +382,11 @@ static const char *sensor_component(struct sensor *sn) {
 }
 
 static size_t send_sensor_metrics_to_netdata(struct sensors_global_stats *stats) {
-    if(stats->sensors.status != ICS_RUNNING)
+    if(stats->sensors.status != ICS_RUNNING) {
+        if(debug)
+            fprintf(stderr, "freeipmi.plugin: %s() sensors state is not RUNNING", __FUNCTION__ );
         return 0;
+    }
 
     static int sensors_states_chart_generated = 0;
     size_t total_sensors_sent = 0;
@@ -391,8 +394,11 @@ static size_t send_sensor_metrics_to_netdata(struct sensors_global_stats *stats)
 
     // generate the CHART/DIMENSION lines, if we have to
     dfe_start_read(sensors_dict, sn) {
-        if(!is_sensor_updated(sn, stats->updates.now, stats->sensors.freq))
+        if(!is_sensor_updated(sn, stats->updates.now, stats->sensors.freq)) {
+            if (debug)
+                fprintf(stderr, "freeipmi.plugin: %s() sensor '%s' is not UPDATED", __FUNCTION__, sn->sensor_name);
             continue;
+        }
 
         const char *context;
         const char *title;
@@ -625,10 +631,8 @@ static void excluded_record_ids_parse(const char *s) {
 
             if(n != 0) {
                 excluded_record_ids = realloc(excluded_record_ids, (excluded_record_ids_length + 1) * sizeof(int));
-                if(!excluded_record_ids) {
-                    fprintf(stderr, "freeipmi.plugin: failed to allocate memory. Exiting.");
-                    exit(1);
-                }
+                if(!excluded_record_ids)
+                    fatal("freeipmi.plugin: failed to allocate memory.");
                 excluded_record_ids[excluded_record_ids_length++] = (int)n;
             }
         }
