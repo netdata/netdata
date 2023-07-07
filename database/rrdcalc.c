@@ -62,7 +62,7 @@ inline const char *rrdcalc_status2string(RRDCALC_STATUS status) {
 }
 
 uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, uuid_t *config_hash_id) {
-    netdata_rwlock_rdlock(&host->health_log.spinlock);
+    rw_spinlock_read_lock(&host->health_log.spinlock);
 
     // re-use old IDs, by looking them up in the alarm log
     ALARM_ENTRY *ae = NULL;
@@ -89,7 +89,7 @@ uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint3
         }
     }
 
-    netdata_rwlock_unlock(&host->health_log.spinlock);
+    rw_spinlock_read_unlock(&host->health_log.spinlock);
     return alarm_id;
 }
 
