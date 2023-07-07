@@ -1555,7 +1555,7 @@ typedef enum __attribute__((packed)) {
 } IPMI_COLLECTION_TYPE;
 
 const char *collect_type_to_string(IPMI_COLLECTION_TYPE type) {
-    if(type & (IPMI_COLLECT_TYPE_SENSORS|IPMI_COLLECT_TYPE_SEL))
+    if((type & (IPMI_COLLECT_TYPE_SENSORS|IPMI_COLLECT_TYPE_SEL)) == (IPMI_COLLECT_TYPE_SENSORS|IPMI_COLLECT_TYPE_SEL))
         return "sensors,sel";
     if(type & IPMI_COLLECT_TYPE_SEL)
         return "sel";
