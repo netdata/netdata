@@ -20,6 +20,13 @@
         "$ref": "#/$defs/_monitored_instance"
       }
     },
+    "keywords": {
+      "type":"array",
+      "description": "An array of terms related to the integration.",
+      "items": {
+          "type":"string"
+      }
+    },
     "overview": {
       "type": "object",
       "properties": {
