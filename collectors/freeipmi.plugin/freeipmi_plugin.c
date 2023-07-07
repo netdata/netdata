@@ -1140,6 +1140,7 @@ int netdata_ipmi_collect_data(struct ipmi_monitoring_ipmi_config *ipmi_config, I
         stats->sensors.states_critical = 0;
         stats->sensors.states_warning = 0;
         stats->sensors.states_nominal = 0;
+        stats->sensors.states_unknown = 0;
         stats->sensors.now = now_monotonic_usec();
 
         if (_ipmimonitoring_sensors(ipmi_config, stats) < 0) return -1;
