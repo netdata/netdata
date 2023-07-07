@@ -1014,8 +1014,6 @@ typedef enum __attribute__((packed)) {
 } IPMI_COLLECTION_TYPE;
 
 struct sensor {
-    int record_id;
-    int sensor_number;
     int sensor_type;
     int sensor_state;
     int sensor_units;
@@ -1031,7 +1029,6 @@ struct sensor {
     int multiplier;
     bool do_metric;
     bool do_state;
-    bool ignore;
     bool metric_chart_sent;
     bool state_chart_sent;
     usec_t last_collected_ut;
@@ -1602,8 +1599,6 @@ static void netdata_get_sensor(
                     sensor_name, record_id, sensor_number, sensor_type, sensor_state, sensor_units, sensor_reading_type);
 
         struct sensor t = {
-                .record_id = record_id,
-                .sensor_number = sensor_number,
                 .sensor_type = sensor_type,
                 .sensor_state = sensor_state,
                 .sensor_units = sensor_units,
