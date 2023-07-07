@@ -615,7 +615,7 @@ static void query_target_summary_alerts_v2(BUFFER *wb, QUERY_TARGET *qt, const c
         QUERY_INSTANCE *qi = query_instance(qt, c);
         RRDSET *st = rrdinstance_acquired_rrdset(qi->ria);
         if (st) {
-            netdata_rwlock_rdlock(&st->alerts.rwlock);
+            rw_spinlock_read_lock(&st->alerts.spinlock);
             if (st->alerts.base) {
                 for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
                     z = dictionary_set(dict, string2str(rc->name), NULL, sizeof(*z));
@@ -642,7 +642,7 @@ static void query_target_summary_alerts_v2(BUFFER *wb, QUERY_TARGET *qt, const c
                     }
                 }
             }
-            netdata_rwlock_unlock(&st->alerts.rwlock);
+            rw_spinlock_read_unlock(&st->alerts.spinlock);
         }
     }
     dfe_start_read(dict, z)
@@ -931,7 +931,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb) {
 static void rrdset_rrdcalc_entries_v2(BUFFER *wb, RRDINSTANCE_ACQUIRED *ria) {
     RRDSET *st = rrdinstance_acquired_rrdset(ria);
     if(st) {
-        netdata_rwlock_rdlock(&st->alerts.rwlock);
+        rw_spinlock_read_lock(&st->alerts.spinlock);
         if(st->alerts.base) {
             buffer_json_member_add_object(wb, "alerts");
             for(RRDCALC *rc = st->alerts.base; rc ;rc = rc->next) {
@@ -946,7 +946,7 @@ static void rrdset_rrdcalc_entries_v2(BUFFER *wb, RRDINSTANCE_ACQUIRED *ria) {
             }
             buffer_json_object_close(wb);
         }
-        netdata_rwlock_unlock(&st->alerts.rwlock);
+        rw_spinlock_read_unlock(&st->alerts.spinlock);
     }
 }
 

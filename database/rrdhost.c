@@ -1260,7 +1260,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     string_freez(host->health.health_default_recipient);
     string_freez(host->registry_hostname);
     simple_pattern_free(host->rrdpush_send_charts_matching);
-    netdata_rwlock_destroy(&host->health_log.alarm_log_rwlock);
     freez(host->node_id);
 
     rrdfamily_index_destroy(host);

@@ -405,7 +405,7 @@ static FTS_MATCH rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_jso
 
         if(ri->rrdset) {
             RRDSET *st = ri->rrdset;
-            netdata_rwlock_rdlock(&st->alerts.rwlock);
+            rw_spinlock_read_lock(&st->alerts.spinlock);
             for (RRDCALC *rcl = st->alerts.base; rcl; rcl = rcl->next) {
                 if(unlikely(full_text_search_string(&ctl->q.fts, q, rcl->name))) {
                     matched = FTS_MATCHED_ALERT;
@@ -417,7 +417,7 @@ static FTS_MATCH rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_jso
                     break;
                 }
             }
-            netdata_rwlock_unlock(&st->alerts.rwlock);
+            rw_spinlock_read_unlock(&st->alerts.spinlock);
         }
     }
     dfe_done(ri);
@@ -430,7 +430,7 @@ static bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRD
     dfe_start_read(rc->rrdinstances, ri) {
         if(ri->rrdset) {
             RRDSET *st = ri->rrdset;
-            netdata_rwlock_rdlock(&st->alerts.rwlock);
+            rw_spinlock_read_lock(&st->alerts.spinlock);
             for (RRDCALC *rcl = st->alerts.base; rcl; rcl = rcl->next) {
                 if(ctl->alerts.alert_name_pattern && !simple_pattern_matches_string(ctl->alerts.alert_name_pattern, rcl->name))
                     continue;
@@ -488,7 +488,7 @@ static bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRD
                     dictionary_set(ctl->alerts.alert_instances, key, &z, sizeof(z));
                 }
             }
-            netdata_rwlock_unlock(&st->alerts.rwlock);
+            rw_spinlock_read_unlock(&st->alerts.spinlock);
         }
     }
     dfe_done(ri);
