@@ -257,11 +257,8 @@ bool netdata_random_session_id_generate(void) {
         if (write(fd, guid, UUID_STR_LEN - 1) != UUID_STR_LEN - 1) {
             netdata_log_error("Cannot write the random session id file '%s'.", filename);
             ret = false;
-        }
-
-        ssize_t rc = write(fd, "\n", 1);
-        (void)rc;
-
+        } else
+            (void) write(fd, "\n", 1);
         close(fd);
     }
 
