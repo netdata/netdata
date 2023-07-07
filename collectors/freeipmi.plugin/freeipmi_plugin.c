@@ -1249,7 +1249,6 @@ static size_t send_sensor_metrics_to_netdata(struct sensors_global_stats *stats)
         return 0;
     }
 
-    static int sensors_states_chart_generated = 0;
     size_t total_sensors_sent = 0;
     int update_every = (int)(stats->sensors.freq_ut / USEC_PER_SEC);
     struct sensor *sn;
