@@ -1052,11 +1052,11 @@ struct sensors_global_stats {
     struct {
         IPMI_COLLECTOR_STATUS status;
         usec_t last_iteration_ut;
-        size_t updated;
         size_t collected;
         size_t states_nominal;
         size_t states_warning;
         size_t states_critical;
+        size_t states_unknown;
         usec_t now;
         usec_t freq_ut;
         int priority;
@@ -1136,7 +1136,6 @@ int netdata_ipmi_collect_data(struct ipmi_monitoring_ipmi_config *ipmi_config, I
     errno = 0;
 
     if(type & IPMI_COLLECT_TYPE_SENSORS) {
-        stats->sensors.updated = 0;
         stats->sensors.collected = 0;
         stats->sensors.states_critical = 0;
         stats->sensors.states_warning = 0;
@@ -1458,6 +1457,7 @@ static size_t send_sensor_metrics_to_netdata(struct sensors_global_stats *stats)
             printf("DIMENSION nominal '' absolute 1 1\n");
             printf("DIMENSION critical '' absolute 1 1\n");
             printf("DIMENSION warning '' absolute 1 1\n");
+            printf("DIMENSION unknown '' absolute 1 1\n");
         }
 
         printf(
@@ -1465,7 +1465,10 @@ static size_t send_sensor_metrics_to_netdata(struct sensors_global_stats *stats)
                 "SET nominal = %zu\n"
                 "SET warning = %zu\n"
                 "SET critical = %zu\n"
-                "END\n", stats->sensors.states_nominal, stats->sensors.states_warning, stats->sensors.states_critical
+                "SET unknown = %zu\n"
+                "END\n",
+                stats->sensors.states_nominal, stats->sensors.states_warning,
+                stats->sensors.states_critical, stats->sensors.states_unknown
         );
     }
 
@@ -1596,6 +1599,13 @@ static void netdata_get_sensor(
         , void *sensor_reading
         , struct sensors_global_stats *stats
 ) {
+    // check if it is excluded
+    if(excluded_status_record_ids_check(record_id)) {
+        if(stats->debug)
+            fprintf(stderr, "Sensor '%s' is excluded for status check, by excluded_status_record_ids_check()\n", sensor_name);
+        return;
+    }
+
     if(!sensor_name || !*sensor_name)
         sensor_name = "UNKNOWN";
 
@@ -1625,6 +1635,8 @@ static void netdata_get_sensor(
                 .sensor_units = sensor_units,
                 .sensor_reading_type = sensor_reading_type,
                 .sensor_name = strdupz(sensor_name ? sensor_name : ""),
+                .do_state = true,
+                .do_metric = true,
         };
 
         sn = dictionary_set(stats->sensors.dict, key, &t, sizeof(t));
@@ -1635,29 +1647,20 @@ static void netdata_get_sensor(
                     sensor_name, record_id, sensor_number, sensor_type, sensor_state, sensor_units, sensor_reading_type);
     }
 
+    stats->sensors.collected++;
+    sn->last_collected_ut = stats->sensors.now;
+
     switch(sensor_reading_type) {
         case IPMI_MONITORING_SENSOR_READING_TYPE_UNSIGNED_INTEGER8_BOOL:
             sn->sensor_reading.bool_value = *((uint8_t *)sensor_reading);
-            sn->last_collected_ut = stats->sensors.now;
-            stats->sensors.collected++;
-            sn->do_metric = true;
-            sn->do_state = true;
             break;
 
         case IPMI_MONITORING_SENSOR_READING_TYPE_UNSIGNED_INTEGER32:
             sn->sensor_reading.uint32_value = *((uint32_t *)sensor_reading);
-            sn->last_collected_ut = stats->sensors.now;
-            stats->sensors.collected++;
-            sn->do_metric = true;
-            sn->do_state = true;
             break;
 
         case IPMI_MONITORING_SENSOR_READING_TYPE_DOUBLE:
             sn->sensor_reading.double_value = *((double *)sensor_reading);
-            sn->last_collected_ut = stats->sensors.now;
-            stats->sensors.collected++;
-            sn->do_metric = true;
-            sn->do_state = true;
             break;
 
         default:
@@ -1667,18 +1670,7 @@ static void netdata_get_sensor(
                         sensor_name, record_id, sensor_number, sensor_type, sensor_state, sensor_units, sensor_reading_type);
 
             sn->do_metric = false;
-            sn->do_state = true;
             break;
-    }
-
-    // check if it is excluded
-    if(excluded_status_record_ids_check(record_id)) {
-        if(stats->debug)
-            fprintf(stderr, "Sensor '%s' is excluded for status check, by excluded_status_record_ids_check()\n", sensor_name);
-
-        sn->do_state = false;
-        sn->do_metric = false;
-        return;
     }
 
     switch(sensor_state) {
@@ -1695,6 +1687,8 @@ static void netdata_get_sensor(
             break;
 
         default:
+        case IPMI_MONITORING_STATE_UNKNOWN:
+            stats->sensors.states_unknown++;
             break;
     }
 }
@@ -2148,11 +2142,11 @@ int main (int argc, char **argv) {
             send_sel_metrics_to_netdata(&stats);
 
         if(debug)
-            fprintf(stderr, "freeipmi.plugin: iteration %zu, dt %llu usec, sensors collected %zu, sensors sent to netdata %zu \n"
+            fprintf(stderr, "freeipmi.plugin: iteration %zu, dt %llu usec, sensors ever collected %zu, sensors last collected %zu \n"
                     , iteration
                     , dt
+                    , dictionary_entries(stats.sensors.dict)
                     , stats.sensors.collected
-                    , stats.sensors.updated
             );
 
         if (!global_chart_created) {
