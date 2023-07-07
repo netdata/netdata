@@ -565,6 +565,7 @@
     "module_name",
     "monitored_instance",
     "alternative_monitored_instances",
+    "keywords",
     "overview",
     "setup",
     "troubleshooting",
