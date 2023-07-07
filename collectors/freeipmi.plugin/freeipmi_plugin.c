@@ -718,8 +718,11 @@ static void netdata_get_sensor(
         , void *sensor_reading
         , struct sensors_global_stats *stats
 ) {
+    if(!sensor_name || !*sensor_name)
+        return;
+
     char key[SENSORS_DICT_KEY_SIZE + 1];
-    snprintfz(key, SENSORS_DICT_KEY_SIZE, "%d.%d.%d.%d.%s",
+    snprintfz(key, SENSORS_DICT_KEY_SIZE, "i%d_n%d_t%d_u%d_%s",
               record_id, sensor_number, sensor_reading_type, sensor_units, sensor_name);
 
     // find the sensor record
