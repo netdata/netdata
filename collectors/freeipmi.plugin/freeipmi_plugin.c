@@ -161,7 +161,6 @@ _init_ipmi_config (struct ipmi_monitoring_ipmi_config *ipmi_config)
     ipmi_config->workaround_flags = workaround_flags;
 }
 
-#ifdef NETDATA_COMMENTED
 static const char *
 _get_sensor_type_string (int sensor_type)
 {
@@ -261,7 +260,6 @@ _get_sensor_type_string (int sensor_type)
 
     return ("Unrecognized");
 }
-#endif // NETDATA_COMMENTED
 
 static int
 _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config, struct sensors_global_stats *stats)
@@ -1100,7 +1098,7 @@ struct {
                 .label = "Processor",
         },
         {
-                .search = "M2_*",
+                .search = "M2_*|*SSD*|*HSC*",
                 .label = "Storage",
         },
         {
@@ -1380,6 +1378,7 @@ static size_t send_sensor_metrics_to_netdata(struct sensors_global_stats *stats)
 
                 total_sensors_sent++;
                 const char *component = sensor_component(sn);
+                const char *type = _get_sensor_type_string (sn->sensor_type);
 
                 if(sn->do_metric) {
                     if (!sn->metric_chart_sent) {
@@ -1390,6 +1389,7 @@ static size_t send_sensor_metrics_to_netdata(struct sensors_global_stats *stats)
                                update_every);
 
                         printf("CLABEL 'sensor' '%s' 1\n", sn->sensor_name);
+                        printf("CLABEL 'type' '%s' 1\n", type);
                         printf("CLABEL 'component' '%s' 1\n", component);
                         printf("CLABEL_COMMIT\n");
 
@@ -1434,6 +1434,7 @@ static size_t send_sensor_metrics_to_netdata(struct sensors_global_stats *stats)
                                sn_dfe.name, priority, update_every);
 
                         printf("CLABEL 'sensor' '%s' 1\n", sn->sensor_name);
+                        printf("CLABEL 'type' '%s' 1\n", type);
                         printf("CLABEL 'component' '%s' 1\n", component);
                         printf("CLABEL_COMMIT\n");
 
