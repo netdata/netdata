@@ -1658,8 +1658,12 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
             buffer_json_member_add_uuid(wb, "config_hash_id", &t->config_hash_id);
             buffer_json_member_add_string(wb, "machine_guid", t->machine_guid);
 
-            if(host && host->node_id)
-                buffer_json_member_add_uuid(wb, "node_id", host->node_id);
+            if(host) {
+                buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
+
+                if(host->node_id)
+                    buffer_json_member_add_uuid(wb, "node_id", host->node_id);
+            }
 
             buffer_json_member_add_string(wb, "alert", *t->alert_name ? t->alert_name : NULL);
             buffer_json_member_add_string(wb, "instance", *t->chart ? t->chart : NULL);
@@ -1733,14 +1737,23 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
     buffer_json_member_add_object(wb, "stats");
     {
         buffer_json_member_add_uint64(wb, "items", data.stats.items);
-        buffer_json_member_add_uint64(wb, "first", data.stats.first);
-        buffer_json_member_add_uint64(wb, "prepend", data.stats.prepend);
-        buffer_json_member_add_uint64(wb, "append", data.stats.append);
-        buffer_json_member_add_uint64(wb, "backwards", data.stats.backwards);
-        buffer_json_member_add_uint64(wb, "forwards", data.stats.forwards);
-        buffer_json_member_add_uint64(wb, "shifts", data.stats.shifts);
-        buffer_json_member_add_uint64(wb, "skips_before", data.stats.skips_before);
-        buffer_json_member_add_uint64(wb, "skips_after", data.stats.skips_after);
+        buffer_json_member_add_uint64(wb, "items_before", data.stats.skips_before);
+        buffer_json_member_add_uint64(wb, "items_after", data.stats.skips_after + data.stats.shifts);
+
+        if(debug) {
+            buffer_json_member_add_object(wb, "operations");
+            {
+                buffer_json_member_add_uint64(wb, "first", data.stats.first);
+                buffer_json_member_add_uint64(wb, "prepend", data.stats.prepend);
+                buffer_json_member_add_uint64(wb, "append", data.stats.append);
+                buffer_json_member_add_uint64(wb, "backwards", data.stats.backwards);
+                buffer_json_member_add_uint64(wb, "forwards", data.stats.forwards);
+                buffer_json_member_add_uint64(wb, "shifts", data.stats.shifts);
+                buffer_json_member_add_uint64(wb, "skips_before", data.stats.skips_before);
+                buffer_json_member_add_uint64(wb, "skips_after", data.stats.skips_after);
+            }
+            buffer_json_object_close(wb);
+        }
     }
     buffer_json_object_close(wb);
 }
