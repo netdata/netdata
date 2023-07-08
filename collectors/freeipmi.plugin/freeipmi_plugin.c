@@ -1913,7 +1913,7 @@ int main (int argc, char **argv) {
 
     if(debug) {
         fprintf(stderr, "%s: calling ipmi_monitoring_init()\n", program_name);
-        //ipmimonitoring_init_flags|=IPMI_MONITORING_FLAGS_DEBUG|IPMI_MONITORING_FLAGS_DEBUG_IPMI_PACKETS;
+        ipmimonitoring_init_flags |= IPMI_MONITORING_FLAGS_DEBUG|IPMI_MONITORING_FLAGS_DEBUG_IPMI_PACKETS;
     }
 
     if(ipmi_monitoring_init(ipmimonitoring_init_flags, &errnum) < 0)
