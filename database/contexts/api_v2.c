@@ -1740,32 +1740,41 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
     }
 
     buffer_json_member_add_object(wb, "items");
-    buffer_json_member_add_uint64(wb, "evaluated", data.items_evaluated);
-    buffer_json_member_add_uint64(wb, "matched", data.items_matched);
-    buffer_json_member_add_uint64(wb, "returned", data.items_to_return);
-    buffer_json_member_add_uint64(wb, "max_to_return", data.max_items_to_return);
-    buffer_json_member_add_uint64(wb, "before", data.operations.skips_before);
-    buffer_json_member_add_uint64(wb, "after", data.operations.skips_after + data.operations.shifts);
+    {
+        // all the items in the window, under the scope_nodes, ignoring the facets (filters)
+        buffer_json_member_add_uint64(wb, "evaluated", data.items_evaluated);
+
+        // all the items matching the query (if you didn't put anchor_gi and last, these are all the items you would get back)
+        buffer_json_member_add_uint64(wb, "matched", data.items_matched);
+
+        // the items included in this response
+        buffer_json_member_add_uint64(wb, "returned", data.items_to_return);
+
+        // same as last=X parameter
+        buffer_json_member_add_uint64(wb, "max_to_return", data.max_items_to_return);
+
+        // items before the first returned, this should be 0 if anchor_gi is not set
+        buffer_json_member_add_uint64(wb, "before", data.operations.skips_before);
+
+        // items after the last returned, when this is zero there aren't any items after the current list
+        buffer_json_member_add_uint64(wb, "after", data.operations.skips_after + data.operations.shifts);
+    }
     buffer_json_object_close(wb); // items
 
-    buffer_json_member_add_object(wb, "stats");
-    {
-        if(debug) {
-            buffer_json_member_add_object(wb, "operations");
-            {
-                buffer_json_member_add_uint64(wb, "first", data.operations.first);
-                buffer_json_member_add_uint64(wb, "prepend", data.operations.prepend);
-                buffer_json_member_add_uint64(wb, "append", data.operations.append);
-                buffer_json_member_add_uint64(wb, "backwards", data.operations.backwards);
-                buffer_json_member_add_uint64(wb, "forwards", data.operations.forwards);
-                buffer_json_member_add_uint64(wb, "shifts", data.operations.shifts);
-                buffer_json_member_add_uint64(wb, "skips_before", data.operations.skips_before);
-                buffer_json_member_add_uint64(wb, "skips_after", data.operations.skips_after);
-            }
-            buffer_json_object_close(wb);
+    if(debug) {
+        buffer_json_member_add_object(wb, "stats");
+        {
+            buffer_json_member_add_uint64(wb, "first", data.operations.first);
+            buffer_json_member_add_uint64(wb, "prepend", data.operations.prepend);
+            buffer_json_member_add_uint64(wb, "append", data.operations.append);
+            buffer_json_member_add_uint64(wb, "backwards", data.operations.backwards);
+            buffer_json_member_add_uint64(wb, "forwards", data.operations.forwards);
+            buffer_json_member_add_uint64(wb, "shifts", data.operations.shifts);
+            buffer_json_member_add_uint64(wb, "skips_before", data.operations.skips_before);
+            buffer_json_member_add_uint64(wb, "skips_after", data.operations.skips_after);
         }
+        buffer_json_object_close(wb);
     }
-    buffer_json_object_close(wb);
 }
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_MODE mode) {
