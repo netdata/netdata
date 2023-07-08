@@ -275,7 +275,7 @@ _get_sensor_type_string (int sensor_type)
 }
 
 #define ipmi_sensor_read_int(var, func, ctx) do {               \
-    if(( (var) = func(ctx) < 0 )) {                             \
+    if(( var = func(ctx) < 0 )) {                               \
         collector_error("%s(): call to " #func " failed: %s",   \
             __FUNCTION__, ipmi_monitoring_ctx_errormsg(ctx));   \
         goto cleanup;                                           \
@@ -284,7 +284,7 @@ _get_sensor_type_string (int sensor_type)
 } while(0)
 
 #define ipmi_sensor_read_str(var, func, ctx) do {               \
-    if(!( (var) = func(ctx) )) {                                \
+    if(!( var = func(ctx) )) {                                  \
         collector_error("%s(): call to " #func " failed: %s",   \
             __FUNCTION__, ipmi_monitoring_ctx_errormsg(ctx));   \
         goto cleanup;                                           \
@@ -293,7 +293,7 @@ _get_sensor_type_string (int sensor_type)
 } while(0)
 
 #define ipmi_sensor_read_no_check(var, func, ctx) do {          \
-    (var) = func(ctx);                                          \
+    var = func(ctx);                                            \
     timing_step(TIMING_STEP_FREEIPMI_READ_ ## var);             \
 } while(0)
 
@@ -433,6 +433,11 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config, struct
         // whatever we read for the sensor, it is ok
         ipmi_sensor_read_no_check(sensor_reading, ipmi_monitoring_sensor_read_sensor_reading, ctx);
         ipmi_sensor_read_int(event_reading_type_code, ipmi_monitoring_sensor_read_event_reading_type_code, ctx);
+
+//        if(!record_id && !sensor_number && !sensor_type && !sensor_state && !sensor_units && !sensor_reading_type &&
+//            !sensor_reading && (!sensor_name || !*sensor_name))
+//            // a dummy - nothing is here
+//            continue;
 
         netdata_get_sensor(
                 record_id
@@ -1420,8 +1425,8 @@ static void netdata_get_sensor(
         // recurring collection
 
         if(state->debug)
-            fprintf(stderr, "Reusing sensor record for sensor '%s', id %d, number %d, type %d, state %d, units %d, reading_type %d\n",
-                    sensor_name, record_id, sensor_number, sensor_type, sensor_state, sensor_units, sensor_reading_type);
+            fprintf(stderr, "%s: reusing sensor record for sensor '%s', id %d, number %d, type %d, state %d, units %d, reading_type %d\n",
+                    program_name, sensor_name, record_id, sensor_number, sensor_type, sensor_state, sensor_units, sensor_reading_type);
 
         struct sensor *sn = dictionary_acquired_item_value(item);
 
@@ -1650,7 +1655,6 @@ void *netdata_ipmi_collection_thread(void *ptr) {
                     program_name, collect_type_to_string(t->type));
 
         struct netdata_ipmi_state tmp_state = t->state;
-        tmp_state.debug = true;
 
         if(t->type & IPMI_COLLECT_TYPE_SENSORS) {
             tmp_state.sensors.last_iteration_ut = now_monotonic_usec();
