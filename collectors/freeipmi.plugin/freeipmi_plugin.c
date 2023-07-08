@@ -275,7 +275,8 @@ _get_sensor_type_string (int sensor_type)
 }
 
 #define ipmi_sensor_read_int(var, func, ctx) do {               \
-    if(( var = func(ctx) < 0 )) {                               \
+    (var) = func(ctx);                                          \
+    if( (var) < 0) {                                            \
         collector_error("%s(): call to " #func " failed: %s",   \
             __FUNCTION__, ipmi_monitoring_ctx_errormsg(ctx));   \
         goto cleanup;                                           \
@@ -284,7 +285,8 @@ _get_sensor_type_string (int sensor_type)
 } while(0)
 
 #define ipmi_sensor_read_str(var, func, ctx) do {               \
-    if(!( var = func(ctx) )) {                                  \
+    (var) = func(ctx);                                          \
+    if(!(var)) {                                                \
         collector_error("%s(): call to " #func " failed: %s",   \
             __FUNCTION__, ipmi_monitoring_ctx_errormsg(ctx));   \
         goto cleanup;                                           \
@@ -293,7 +295,7 @@ _get_sensor_type_string (int sensor_type)
 } while(0)
 
 #define ipmi_sensor_read_no_check(var, func, ctx) do {          \
-    var = func(ctx);                                            \
+    (var) = func(ctx);                                          \
     timing_step(TIMING_STEP_FREEIPMI_READ_ ## var);             \
 } while(0)
 
@@ -434,10 +436,10 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config, struct
         ipmi_sensor_read_no_check(sensor_reading, ipmi_monitoring_sensor_read_sensor_reading, ctx);
         ipmi_sensor_read_int(event_reading_type_code, ipmi_monitoring_sensor_read_event_reading_type_code, ctx);
 
-//        if(!record_id && !sensor_number && !sensor_type && !sensor_state && !sensor_units && !sensor_reading_type &&
-//            !sensor_reading && (!sensor_name || !*sensor_name))
-//            // a dummy - nothing is here
-//            continue;
+        if(!record_id && !sensor_number && !sensor_type && !sensor_state && !sensor_units && !sensor_reading_type &&
+            !sensor_reading && (!sensor_name || !*sensor_name))
+            // a dummy - nothing is here
+            continue;
 
         netdata_get_sensor(
                 record_id
