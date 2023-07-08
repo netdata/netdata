@@ -40,7 +40,7 @@
 #define IPMI_SENSORS_DASHBOARD_PRIORITY 90000       // the priority of the sensors charts on the dashboard
 #define IPMI_SEL_DASHBOARD_PRIORITY 99000           // the priority of the SEL events chart on the dashboard
 #define IPMI_SENSORS_MIN_UPDATE_EVERY 5             // the minimum data collection frequency for sensors
-#define IPMI_SEL_MIN_UPDATE_EVERY 5                 // the minimum data collection frequency for SEL events
+#define IPMI_SEL_MIN_UPDATE_EVERY 30                // the minimum data collection frequency for SEL events
 #define IPMI_ENABLE_SEL_BY_DEFAULT true             // true/false, to enable/disable SEL by default
 #define IPMI_RESTART_EVERY_SECONDS 14400            // restart the plugin every this many seconds
                                                     // this is to prevent possible bugs/leaks in ipmi libraries
