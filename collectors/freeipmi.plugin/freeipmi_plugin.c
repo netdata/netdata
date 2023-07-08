@@ -1051,8 +1051,9 @@ int netdata_ipmi_detect_speed_secs(struct ipmi_monitoring_ipmi_config *ipmi_conf
     usec_t total = 0;
 
     for(i = 0 ; i < checks ; i++) {
-        if(state->debug) fprintf(stderr, "%s: checking data collection speed iteration %d of %d\n",
-                                 program_name, i+1, checks);
+        if(state->debug)
+            fprintf(stderr, "%s: checking %s data collection speed iteration %d of %d\n",
+                    program_name, collect_type_to_string(type), i+1, checks);
 
         // measure the time a data collection needs
         usec_t start = now_realtime_usec();
@@ -1064,8 +1065,9 @@ int netdata_ipmi_detect_speed_secs(struct ipmi_monitoring_ipmi_config *ipmi_conf
 
         successful++;
 
-        if(state->debug) fprintf(stderr, "%s: data collection speed was %llu usec\n",
-                                 program_name, end - start);
+        if(state->debug)
+            fprintf(stderr, "%s: %s data collection speed was %llu usec\n",
+                    program_name, collect_type_to_string(type), end - start);
 
         // add it to our total
         total += end - start;
@@ -1643,10 +1645,12 @@ void *netdata_ipmi_collection_thread(void *ptr) {
     for(iteration = 0; 1 ; iteration++) {
         heartbeat_next(&hb, step);
 
-        if(t->debug) fprintf(stderr, "%s: calling netdata_ipmi_collect_data() for %s\n",
-                          program_name, collect_type_to_string(t->type));
+        if(t->debug)
+            fprintf(stderr, "%s: calling netdata_ipmi_collect_data() for %s\n",
+                    program_name, collect_type_to_string(t->type));
 
         struct netdata_ipmi_state tmp_state = t->state;
+        tmp_state.debug = true;
 
         if(t->type & IPMI_COLLECT_TYPE_SENSORS) {
             tmp_state.sensors.last_iteration_ut = now_monotonic_usec();
@@ -1728,7 +1732,7 @@ int main (int argc, char **argv) {
             exit(0);
         }
         else if(strcmp("debug", argv[i]) == 0) {
-            debug = 1;
+            debug = true;
             continue;
         }
         else if(strcmp("sel", argv[i]) == 0) {
@@ -1903,7 +1907,7 @@ int main (int argc, char **argv) {
 
     if(debug) {
         fprintf(stderr, "%s: calling ipmi_monitoring_init()\n", program_name);
-        ipmimonitoring_init_flags|=IPMI_MONITORING_FLAGS_DEBUG|IPMI_MONITORING_FLAGS_DEBUG_IPMI_PACKETS;
+        //ipmimonitoring_init_flags|=IPMI_MONITORING_FLAGS_DEBUG|IPMI_MONITORING_FLAGS_DEBUG_IPMI_PACKETS;
     }
 
     if(ipmi_monitoring_init(ipmimonitoring_init_flags, &errnum) < 0)
