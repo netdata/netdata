@@ -946,6 +946,15 @@ typedef enum {
     TIMING_STEP_FREEIPMI_READ_sensor_reading_type,
     TIMING_STEP_FREEIPMI_READ_sensor_reading,
     TIMING_STEP_FREEIPMI_READ_event_reading_type_code,
+    TIMING_STEP_FREEIPMI_READ_record_type,
+    TIMING_STEP_FREEIPMI_READ_record_type_class,
+    TIMING_STEP_FREEIPMI_READ_sel_state,
+    TIMING_STEP_FREEIPMI_READ_event_direction,
+    TIMING_STEP_FREEIPMI_READ_event_type_code,
+    TIMING_STEP_FREEIPMI_READ_event_offset_type,
+    TIMING_STEP_FREEIPMI_READ_event_offset,
+    TIMING_STEP_FREEIPMI_READ_event_offset_string,
+    TIMING_STEP_FREEIPMI_READ_manufacturer_id,
 
     // terminator
     TIMING_STEP_MAX,
