@@ -18,7 +18,7 @@
 // ----------------------------------------------------------------------------
 // BEGIN NETDATA CODE
 
-#define NETDATA_TIMING_REPORT 1
+// #define NETDATA_TIMING_REPORT 1
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
@@ -30,12 +30,12 @@ static void netdata_get_sensor(
         , int sensor_type
         , int sensor_state
         , int sensor_units
-        , int sensor_bitmask_type
-        , int sensor_bitmask
-        , int event_reading_type_code
         , int sensor_reading_type
         , char *sensor_name
         , void *sensor_reading
+        , int event_reading_type_code
+        , int sensor_bitmask_type
+        , int sensor_bitmask
         , char **sensor_bitmask_strings
         , struct netdata_ipmi_state *state
 );
@@ -440,12 +440,12 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config, struct
                 , sensor_type
                 , sensor_state
                 , sensor_units
+                , sensor_reading_type
+                , sensor_name
+                , sensor_reading
+                , event_reading_type_code
                 , sensor_bitmask_type
                 , sensor_bitmask
-                , event_reading_type_code
-                , sensor_reading_type
-                , sensor_name && *sensor_name ? sensor_name : "UNNAMED"
-                , sensor_reading
                 , sensor_bitmask_strings
                 , state
         );
@@ -488,7 +488,7 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config, struct
     }
 
     rv = 0;
-    
+
 cleanup:
     if (ctx)
         ipmi_monitoring_ctx_destroy (ctx);
@@ -1217,7 +1217,7 @@ static size_t send_sensor_metrics_to_netdata(struct netdata_ipmi_state *state) {
         }
 
         if(sn->do_state) {
-            if(!is_sensor_updated(sn->last_collected_metric_ut, state->updates.now_ut, state->sensors.freq_ut)) {
+            if(!is_sensor_updated(sn->last_collected_state_ut, state->updates.now_ut, state->sensors.freq_ut)) {
                 if (state->debug)
                     fprintf(stderr, "%s: %s() sensor '%s' state is not UPDATED (last updated %llu, now %llu, freq %llu\n",
                             program_name, __FUNCTION__, sn->sensor_name, sn->last_collected_state_ut, state->updates.now_ut, state->sensors.freq_ut);
@@ -1370,27 +1370,20 @@ static int excluded_status_record_ids_check(int record_id) {
 static void sensor_set_value(struct sensor *sn, void *sensor_reading, struct netdata_ipmi_state *state) {
     switch(sn->sensor_reading_type) {
         case IPMI_MONITORING_SENSOR_READING_TYPE_UNSIGNED_INTEGER8_BOOL:
-            if(!sensor_reading) return;
             sn->sensor_reading.bool_value = *((uint8_t *)sensor_reading);
-            sn->last_collected_metric_ut = state->sensors.now_ut;
             break;
 
         case IPMI_MONITORING_SENSOR_READING_TYPE_UNSIGNED_INTEGER32:
-            if(!sensor_reading) return;
             sn->sensor_reading.uint32_value = *((uint32_t *)sensor_reading);
-            sn->last_collected_metric_ut = state->sensors.now_ut;
             break;
 
         case IPMI_MONITORING_SENSOR_READING_TYPE_DOUBLE:
-            if(!sensor_reading) return;
             sn->sensor_reading.double_value = *((double *)sensor_reading);
-            sn->last_collected_metric_ut = state->sensors.now_ut;
             break;
 
         default:
         case IPMI_MONITORING_SENSOR_READING_TYPE_UNKNOWN:
             sn->do_metric = false;
-            sn->last_collected_metric_ut = state->sensors.now_ut;
             break;
     }
 }
@@ -1401,13 +1394,13 @@ static void netdata_get_sensor(
         , int sensor_type
         , int sensor_state
         , int sensor_units
-        , int sensor_bitmask_type
-        , int sensor_bitmask
-        , int event_reading_type_code
         , int sensor_reading_type
         , char *sensor_name
         , void *sensor_reading
-        , char **sensor_bitmask_strings
+        , int event_reading_type_code __maybe_unused
+        , int sensor_bitmask_type __maybe_unused
+        , int sensor_bitmask __maybe_unused
+        , char **sensor_bitmask_strings __maybe_unused
         , struct netdata_ipmi_state *state
 ) {
     if(!sensor_name || !*sensor_name)
@@ -1429,7 +1422,12 @@ static void netdata_get_sensor(
                     sensor_name, record_id, sensor_number, sensor_type, sensor_state, sensor_units, sensor_reading_type);
 
         struct sensor *sn = dictionary_acquired_item_value(item);
-        sensor_set_value(sn, sensor_reading, state);
+
+        if(sensor_reading) {
+            sensor_set_value(sn, sensor_reading, state);
+            sn->last_collected_metric_ut = state->sensors.now_ut;
+        }
+
         sn->last_collected_state_ut = state->sensors.now_ut;
 
         dictionary_acquired_item_release(state->sensors.dict, item);
@@ -1446,14 +1444,13 @@ static void netdata_get_sensor(
     bool excluded_state = excluded_status_record_ids_check(record_id);
 
     if(excluded_metric) {
-        if(state->debug) fprintf(stderr, "Sensor '%s' is excluded by excluded_record_ids_check()\n", sensor_name);
-        return;
+        if(state->debug)
+            fprintf(stderr, "Sensor '%s' is excluded by excluded_record_ids_check()\n", sensor_name);
     }
 
     if(excluded_state) {
         if(state->debug)
             fprintf(stderr, "Sensor '%s' is excluded for status check, by excluded_status_record_ids_check()\n", sensor_name);
-        return;
     }
 
     struct sensor t = {
@@ -1560,7 +1557,10 @@ static void netdata_get_sensor(
             break;
     }
 
-    sensor_set_value(&t, sensor_reading, state);
+    if(sensor_reading) {
+        sensor_set_value(&t, sensor_reading, state);
+        t.last_collected_metric_ut = state->sensors.now_ut;
+    }
     t.last_collected_state_ut = state->sensors.now_ut;
 
     dictionary_set(state->sensors.dict, key, &t, sizeof(t));
