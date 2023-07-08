@@ -969,6 +969,16 @@ struct netdata_ipmi_state {
     } updates;
 };
 
+#define COMPONENT_MEMORY_MODULE     "Memory Module"
+#define COMPONENT_MEMORY            "Memory"
+#define COMPONENT_PROCESSOR         "Processor"
+#define COMPONENT_IPU               "Image Processor"
+#define COMPONENT_STORAGE           "Storage"
+#define COMPONENT_MOTHERBOARD       "Motherboard"
+#define COMPONENT_POWER_SUPPLY      "Power Supply"
+#define COMPONENT_SYSTEM            "System"
+#define COMPONENT_PERIPHERAL        "Peripheral"
+
 struct {
     const char *search;
     SIMPLE_PATTERN *pattern;
@@ -980,41 +990,61 @@ struct {
         // The first the matches is used
 
         {
-                .search = "*DIMM*",
-                .label = "Memory Module",
+                .search = "*DIMM*|*_DIM*|*VTT*|*VDDQ*|*ECC*|*MEM*CRC*",
+                .label = COMPONENT_MEMORY_MODULE,
         },
-//        {
-//                .search = "FAN*|*_FAN*",
-//                .label = "Fan",
-//        },
         {
-                .search = "*CPU*|SOC_*|*VDD*",
-                .label = "Processor",
+                .search = "*CPU*|SOC_*|*VDDCR*|P*_VDD*|*_DTS|*VCORE*",
+                .label = COMPONENT_PROCESSOR,
         },
         {
                 .search = "IPU*",
-                .label = "Image Processor",
+                .label = COMPONENT_IPU,
         },
         {
-                .search = "M2_*|*SSD*|*HSC*",
-                .label = "Storage",
+                .search = "M2_*|*SSD*|*HSC*|*HDD*|*NVME*",
+                .label = COMPONENT_STORAGE,
         },
         {
-                .search = "MB_*",
-                .label = "Motherboard",
+                .search = "MB_*|*PCH*|*VBAT*",
+                .label = COMPONENT_MOTHERBOARD,
         },
         {
-                .search = "Watchdog|SEL|SYS_*",
-                .label = "System",
+                .search = "Watchdog|SEL|SYS_*|*CHASSIS*",
+                .label = COMPONENT_SYSTEM,
         },
         {
-                .search = "PS*|P_*",
-                .label = "Power Supply",
+                .search = "PS*|P_*|*PSU*",
+                .label = COMPONENT_POWER_SUPPLY,
+        },
+
+        // fallback components
+        {
+                .search = "VR_P*|*VRMP*",
+                .label = COMPONENT_PROCESSOR,
         },
         {
-                .search = "VR_P*",
-                .label = "Processor",
+                .search = "*VSB*|*PS*",
+                .label = COMPONENT_POWER_SUPPLY,
         },
+        {
+                .search = "*MEM*|*MEM*RAID*",
+                .label = COMPONENT_MEMORY,
+        },
+        {
+                .search = "*RAID*",         // there is also "Memory RAID", so keep this after memory
+                .label = COMPONENT_STORAGE,
+        },
+        {
+                .search = "*PERIPHERAL*|*USB*",
+                .label = COMPONENT_PERIPHERAL,
+        },
+        {
+                .search = "*FAN*|*12V*|*VCC*|*PCI*|*CHIPSET*",
+                .label = COMPONENT_SYSTEM,
+        },
+
+        // terminator
         {
                 .search = NULL,
                 .label = NULL,
