@@ -1180,9 +1180,9 @@ static size_t send_sensor_metrics_to_netdata(struct netdata_ipmi_state *state) {
                 if (unlikely(!sn->metric_chart_sent)) {
                     sn->metric_chart_sent = true;
 
-                    printf("CHART '%s_%s' '' '%s' '%s' '%s' '%s' '%s' %d %d\n",
+                    printf("CHART '%s_%s' '' '%s' '%s' '%s' '%s' '%s' %d %d '' '%s' '%s'\n",
                            sn->context, sn_dfe.name, sn->title, sn->units, sn->family, sn->context,
-                           sn->chart_type, sn->priority + 1, update_every);
+                           sn->chart_type, sn->priority + 1, update_every, program_name, "sensors");
 
                     printf("CLABEL 'sensor' '%s' 1\n", sn->sensor_name);
                     printf("CLABEL 'type' '%s' 1\n", sn->type);
@@ -1233,8 +1233,8 @@ static size_t send_sensor_metrics_to_netdata(struct netdata_ipmi_state *state) {
                 if (unlikely(!sn->state_chart_sent)) {
                     sn->state_chart_sent = true;
 
-                    printf("CHART 'ipmi.sensor_state_%s' '' 'IPMI Sensor State' 'state' 'states' 'ipmi.sensor_state' 'line' %d %d\n",
-                           sn_dfe.name, sn->priority, update_every);
+                    printf("CHART 'ipmi.sensor_state_%s' '' 'IPMI Sensor State' 'state' 'states' 'ipmi.sensor_state' 'line' %d %d '' '%s' '%s'\n",
+                           sn_dfe.name, sn->priority, update_every, program_name, "sensors");
 
                     printf("CLABEL 'sensor' '%s' 1\n", sn->sensor_name);
                     printf("CLABEL 'type' '%s' 1\n", sn->type);
@@ -1271,9 +1271,11 @@ static size_t send_sel_metrics_to_netdata(struct netdata_ipmi_state *state) {
     if(likely(state->sel.status == ICS_RUNNING)) {
         if(unlikely(!sel_chart_generated)) {
             sel_chart_generated = true;
-            printf("CHART ipmi.events '' 'IPMI Events' 'events' 'events' ipmi.sel area %d %d\n"
+            printf("CHART ipmi.events '' 'IPMI Events' 'events' 'events' ipmi.sel area %d %d '' '%s' '%s'\n"
                     , state->sel.priority + 2
                     , (int)(state->sel.freq_ut / USEC_PER_SEC)
+                    , program_name
+                    , "sel"
             );
             printf("DIMENSION events '' absolute 1 1\n");
         }
@@ -2059,9 +2061,9 @@ int main (int argc, char **argv) {
 
             fprintf(stdout,
                     "CHART netdata.freeipmi_availability_status '' 'Plugin availability status' 'status' "
-                    "plugins netdata.plugin_availability_status line 146000 %d\n"
+                    "plugins netdata.plugin_availability_status line 146000 %d '' '%s' '%s'\n"
                     "DIMENSION available '' absolute 1 1\n",
-                    update_every);
+                    update_every, program_name, "");
         }
 
         fprintf(stdout,
