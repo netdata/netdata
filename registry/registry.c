@@ -84,6 +84,7 @@ struct registry_json_walk_person_urls_callback {
     int count;
 };
 
+#define ASTERISKS_STR "***"
 static STRING *asterisks = NULL;
 
 // callback for rendering PERSON_URLs
@@ -110,19 +111,18 @@ static int registry_json_person_url_callback(void *entry, void *data) {
 
 // callback for rendering MACHINE_URLs
 static int registry_json_machine_url_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data) {
-    if(unlikely(!asterisks))
-        asterisks = string_strdupz("***");
-
     REGISTRY_MACHINE_URL *mu = (REGISTRY_MACHINE_URL *)entry;
+
     struct registry_json_walk_person_urls_callback *c = (struct registry_json_walk_person_urls_callback *)data;
     struct web_client *w = c->w;
     REGISTRY_MACHINE *m = c->m;
 
-    if (mu->url == asterisks) return 0;
+    const char *url = dictionary_acquired_item_name(item);
+    if (!strcmp(url, ASTERISKS_STR)) return 0;
 
     buffer_json_add_array_item_array(w->response.data);
     buffer_json_add_array_item_string(w->response.data, m->guid);
-    buffer_json_add_array_item_string(w->response.data, string2str(mu->url));
+    buffer_json_add_array_item_string(w->response.data, url);
     buffer_json_add_array_item_uint64(w->response.data, mu->last_t * (uint64_t) 1000);
     buffer_json_add_array_item_uint64(w->response.data, mu->usages);
     buffer_json_array_close(w->response.data);

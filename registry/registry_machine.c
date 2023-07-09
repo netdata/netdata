@@ -11,22 +11,21 @@ REGISTRY_MACHINE *registry_machine_find(const char *machine_guid) {
     return dictionary_get(registry.machines, machine_guid);
 }
 
-REGISTRY_MACHINE_URL *registry_machine_url_allocate(REGISTRY_MACHINE *m, STRING *u, time_t when) {
-    debug(D_REGISTRY, "registry_machine_url_allocate('%s', '%s'): allocating %zu bytes", m->guid, string2str(u), sizeof(REGISTRY_MACHINE_URL));
+REGISTRY_MACHINE_URL *registry_machine_url_allocate(REGISTRY_MACHINE *m, STRING *url, time_t when) {
+    debug(D_REGISTRY, "registry_machine_url_allocate('%s', '%s'): allocating %zu bytes", m->guid, string2str(url), sizeof(REGISTRY_MACHINE_URL));
 
     REGISTRY_MACHINE_URL *mu = mallocz(sizeof(REGISTRY_MACHINE_URL));
 
     mu->first_t = mu->last_t = (uint32_t)when;
     mu->usages = 1;
-    mu->url = string_dup(u);
     mu->flags = REGISTRY_URL_FLAGS_DEFAULT;
 
     registry.machines_urls_memory += sizeof(REGISTRY_MACHINE_URL);
 
-    debug(D_REGISTRY, "registry_machine_url_allocate('%s', '%s'): indexing URL in machine", m->guid, string2str(u));
+    debug(D_REGISTRY, "registry_machine_url_allocate('%s', '%s'): indexing URL in machine", m->guid, string2str(url));
 
     registry.machines_urls_memory -= dictionary_stats_for_registry(m->machine_urls);
-    dictionary_set(m->machine_urls, string2str(u), mu, sizeof(REGISTRY_MACHINE_URL));
+    dictionary_set(m->machine_urls, string2str(url), mu, sizeof(REGISTRY_MACHINE_URL));
     registry.machines_urls_memory += dictionary_stats_for_registry(m->machine_urls);
 
     return mu;
@@ -80,17 +79,17 @@ REGISTRY_MACHINE *registry_machine_get(const char *machine_guid, time_t when) {
 // ----------------------------------------------------------------------------
 // LINKING OF OBJECTS
 
-REGISTRY_MACHINE_URL *registry_machine_link_to_url(REGISTRY_MACHINE *m, STRING *u, time_t when) {
-    debug(D_REGISTRY, "registry_machine_link_to_url('%s', '%s'): searching for URL in machine", m->guid, string2str(u));
+REGISTRY_MACHINE_URL *registry_machine_link_to_url(REGISTRY_MACHINE *m, STRING *url, time_t when) {
+    debug(D_REGISTRY, "registry_machine_link_to_url('%s', '%s'): searching for URL in machine", m->guid, string2str(url));
 
-    REGISTRY_MACHINE_URL *mu = dictionary_get(m->machine_urls, string2str(u));
+    REGISTRY_MACHINE_URL *mu = dictionary_get(m->machine_urls, string2str(url));
     if(!mu) {
-        debug(D_REGISTRY, "registry_machine_link_to_url('%s', '%s'): not found", m->guid, string2str(u));
-        mu = registry_machine_url_allocate(m, u, when);
+        debug(D_REGISTRY, "registry_machine_link_to_url('%s', '%s'): not found", m->guid, string2str(url));
+        mu = registry_machine_url_allocate(m, url, when);
         registry.machines_urls_count++;
     }
     else {
-        debug(D_REGISTRY, "registry_machine_link_to_url('%s', '%s'): found", m->guid, string2str(u));
+        debug(D_REGISTRY, "registry_machine_link_to_url('%s', '%s'): found", m->guid, string2str(url));
         mu->usages++;
         if(likely(mu->last_t < (uint32_t)when)) mu->last_t = (uint32_t)when;
     }
@@ -99,7 +98,7 @@ REGISTRY_MACHINE_URL *registry_machine_link_to_url(REGISTRY_MACHINE *m, STRING *
     if(likely(m->last_t < (uint32_t)when)) m->last_t = (uint32_t)when;
 
     if(mu->flags & REGISTRY_URL_FLAGS_EXPIRED) {
-        debug(D_REGISTRY, "registry_machine_link_to_url('%s', '%s'): accessing an expired URL.", m->guid, string2str(u));
+        debug(D_REGISTRY, "registry_machine_link_to_url('%s', '%s'): accessing an expired URL.", m->guid, string2str(url));
         mu->flags &= ~REGISTRY_URL_FLAGS_EXPIRED;
     }
 

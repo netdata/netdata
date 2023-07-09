@@ -12,17 +12,18 @@ int registry_db_should_be_saved(void) {
 // INTERNAL FUNCTIONS FOR SAVING REGISTRY OBJECTS
 
 static int registry_machine_save_url(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *file) {
+    const char *url = dictionary_acquired_item_name(item);
     REGISTRY_MACHINE_URL *mu = entry;
     FILE *fp = file;
 
-    debug(D_REGISTRY, "Registry: registry_machine_save_url('%s')", string2str(mu->url));
+    debug(D_REGISTRY, "Registry: registry_machine_save_url('%s')", url);
 
     int ret = fprintf(fp, "V\t%08x\t%08x\t%08x\t%02x\t%s\n",
             mu->first_t,
             mu->last_t,
             mu->usages,
             mu->flags,
-            string2str(mu->url)
+            url
     );
 
     // error handling is done at registry_db_save()

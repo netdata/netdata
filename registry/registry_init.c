@@ -98,9 +98,6 @@ static int machine_urls_delete_callback(const DICTIONARY_ITEM *item __maybe_unus
 
     REGISTRY_MACHINE_URL *mu = (REGISTRY_MACHINE_URL *)entry;
 
-    debug(D_REGISTRY, "Registry: unlinking url '%s' from machine", string2str(mu->url));
-    string_freez(mu->url);
-
     debug(D_REGISTRY, "Registry: freeing machine url");
     freez(mu);
 
