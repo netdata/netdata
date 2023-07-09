@@ -53,7 +53,7 @@ static struct string_partition {
 #ifdef NETDATA_INTERNAL_CHECKS
 #define string_internal_stats_add(partition, var, val) __atomic_add_fetch(&string_base[partition].var, val, __ATOMIC_RELAXED)
 #else
-#define string_internal_stats_add(var, val) do {;} while(0)
+#define string_internal_stats_add(partition, var, val) do {;} while(0)
 #endif
 
 #define string_stats_atomic_increment(partition, var) __atomic_add_fetch(&string_base[partition].var, 1, __ATOMIC_RELAXED)
