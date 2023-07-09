@@ -68,7 +68,6 @@ int registry_init(void) {
     registry.persons_memory = 0;
     registry.machines_memory = 0;
     registry.persons_urls_memory = 0;
-    registry.machines_urls_memory = 0;
 
     // initialize locks
     netdata_mutex_init(&registry.lock);
@@ -76,6 +75,9 @@ int registry_init(void) {
     // create dictionaries
     registry.persons = dictionary_create(REGISTRY_DICTIONARY_OPTIONS);
     registry.machines = dictionary_create(REGISTRY_DICTIONARY_OPTIONS);
+
+    registry.machine_urls_aral = aral_create("registry_machine_urls", sizeof(REGISTRY_MACHINE_URL),
+                                             1, 65536, NULL, NULL, NULL, false, true);
 
     // load the registry database
     if(registry.enabled) {

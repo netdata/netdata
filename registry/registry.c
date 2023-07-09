@@ -439,6 +439,8 @@ void registry_statistics(void) {
     rrddim_set(stm, "persons",       (collected_number)registry.persons_memory + dictionary_stats_for_registry(registry.persons));
     rrddim_set(stm, "machines",      (collected_number)registry.machines_memory + dictionary_stats_for_registry(registry.machines));
     rrddim_set(stm, "persons_urls",  (collected_number)registry.persons_urls_memory);
-    rrddim_set(stm, "machines_urls", (collected_number)registry.machines_urls_memory);
+
+    struct aral_statistics *aral_stats = aral_statistics(registry.machine_urls_aral);
+    rrddim_set(stm, "machines_urls", (collected_number)(aral_stats->structures.allocated_bytes + aral_stats->malloc.allocated_bytes));
     rrdset_done(stm);
 }

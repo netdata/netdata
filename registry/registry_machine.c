@@ -24,21 +24,18 @@ REGISTRY_MACHINE_URL *registry_machine_url_find(REGISTRY_MACHINE *m, STRING *url
 void registry_machine_url_unlink_from_machine_and_free(REGISTRY_MACHINE *m, REGISTRY_MACHINE_URL *mu) {
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(m->machine_urls, mu, prev, next);
     string_freez(mu->url);
-    freez(mu);
-    registry.machines_urls_memory -= sizeof(REGISTRY_MACHINE_URL);
+    aral_freez(registry.machine_urls_aral, mu);
 }
 
 REGISTRY_MACHINE_URL *registry_machine_url_allocate(REGISTRY_MACHINE *m, STRING *u, time_t when) {
     debug(D_REGISTRY, "registry_machine_url_allocate('%s', '%s'): allocating %zu bytes", m->guid, string2str(u), sizeof(REGISTRY_MACHINE_URL));
 
-    REGISTRY_MACHINE_URL *mu = mallocz(sizeof(REGISTRY_MACHINE_URL));
+    REGISTRY_MACHINE_URL *mu = aral_mallocz(registry.machine_urls_aral);
 
     mu->first_t = mu->last_t = (uint32_t)when;
     mu->usages = 1;
     mu->url = string_dup(u);
     mu->flags = REGISTRY_URL_FLAGS_DEFAULT;
-
-    registry.machines_urls_memory += sizeof(REGISTRY_MACHINE_URL);
 
     debug(D_REGISTRY, "registry_machine_url_allocate('%s', '%s'): indexing URL in machine", m->guid, string2str(u));
 
