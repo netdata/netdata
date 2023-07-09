@@ -64,23 +64,28 @@ int registry_init(void) {
     registry.persons_urls_count = 0;
     registry.machines_urls_count = 0;
 
-    // initialize memory counters
-    registry.persons_memory = 0;
-    registry.machines_memory = 0;
-    registry.persons_urls_memory = 0;
-
     // initialize locks
     netdata_mutex_init(&registry.lock);
 
-    // create dictionaries
-    registry.persons = dictionary_create(REGISTRY_DICTIONARY_OPTIONS);
-    registry.machines = dictionary_create(REGISTRY_DICTIONARY_OPTIONS);
-
-    registry.machine_urls_aral = aral_create("registry_machine_urls", sizeof(REGISTRY_MACHINE_URL),
-                                             1, 65536, NULL, NULL, NULL, false, true);
-
     // load the registry database
     if(registry.enabled) {
+        // create dictionaries
+        registry.persons = dictionary_create(REGISTRY_DICTIONARY_OPTIONS);
+        registry.machines = dictionary_create(REGISTRY_DICTIONARY_OPTIONS);
+
+        // initialize the allocators
+        registry.persons_aral = aral_create("registry_persons", sizeof(REGISTRY_PERSON),
+                                            1, 65536, NULL, NULL, NULL, false, true);
+
+        registry.machines_aral = aral_create("registry_machines", sizeof(REGISTRY_MACHINE),
+                                             1, 65536, NULL, NULL, NULL, false, true);
+
+        registry.person_urls_aral = aral_create("registry_person_urls", sizeof(REGISTRY_PERSON_URL),
+                                                1, 65536, NULL, NULL, NULL, false, true);
+
+        registry.machine_urls_aral = aral_create("registry_machine_urls", sizeof(REGISTRY_MACHINE_URL),
+                                                 1, 65536, NULL, NULL, NULL, false, true);
+
         registry_log_open();
         registry_db_load();
         registry_log_load();
@@ -130,8 +135,19 @@ void registry_free(void) {
     debug(D_REGISTRY, "Registry: destroying persons dictionary");
     dictionary_walkthrough_read(registry.persons, registry_person_del_callback, NULL);
     dictionary_destroy(registry.persons);
+    registry.persons = NULL;
 
     debug(D_REGISTRY, "Registry: destroying machines dictionary");
     dictionary_walkthrough_read(registry.machines, machine_delete_callback, NULL);
     dictionary_destroy(registry.machines);
+    registry.machines = NULL;
+
+    aral_destroy(registry.persons_aral);
+    aral_destroy(registry.machines_aral);
+    aral_destroy(registry.person_urls_aral);
+    aral_destroy(registry.machine_urls_aral);
+    registry.persons_aral = NULL;
+    registry.machines_aral = NULL;
+    registry.person_urls_aral = NULL;
+    registry.machine_urls_aral = NULL;
 }

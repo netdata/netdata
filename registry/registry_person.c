@@ -57,11 +57,11 @@ REGISTRY_PERSON_URL *registry_person_url_allocate(REGISTRY_PERSON *p, REGISTRY_M
     if(name_len > registry.max_name_length)
         name_len = registry.max_name_length;
 
-    REGISTRY_PERSON_URL *pu = mallocz(sizeof(REGISTRY_PERSON_URL) + name_len);
+    REGISTRY_PERSON_URL *pu = aral_mallocz(registry.person_urls_aral);
 
     // a simple strcpy() should do the job,
     // but I prefer to be safe, since the caller specified name_len
-    strncpyz(pu->machine_name, name, name_len);
+    pu->machine_name = string_strdupz(name);
 
     pu->machine = m;
     pu->first_t = pu->last_t = (uint32_t)when;
@@ -70,14 +70,13 @@ REGISTRY_PERSON_URL *registry_person_url_allocate(REGISTRY_PERSON *p, REGISTRY_M
     pu->flags = REGISTRY_URL_FLAGS_DEFAULT;
     m->links++;
 
-    registry.persons_urls_memory += sizeof(REGISTRY_PERSON_URL) + name_len;
-
     debug(D_REGISTRY, "registry_person_url_allocate('%s', '%s', '%s'): indexing URL in person", p->guid, m->guid, string2str(url));
     REGISTRY_PERSON_URL *tpu = registry_person_url_index_add(p, pu);
     if(tpu != pu) {
         netdata_log_error("Registry: Attempted to add duplicate person url '%s' with name '%s' to person '%s'", string2str(url), name, p->guid);
+        string_freez(pu->machine_name);
         string_freez(pu->url);
-        freez(pu);
+        aral_freez(registry.person_urls_aral, pu);
         pu = tpu;
     }
 
@@ -89,10 +88,10 @@ void registry_person_url_free(REGISTRY_PERSON *p, REGISTRY_PERSON_URL *pu) {
 
     REGISTRY_PERSON_URL *tpu = registry_person_url_index_del(p, pu);
     if(tpu) {
+        string_freez(tpu->machine_name);
         string_freez(tpu->url);
         tpu->machine->links--;
-        registry.persons_urls_memory -= sizeof(REGISTRY_PERSON_URL) + strlen(tpu->machine_name);
-        freez(tpu);
+        aral_freez(registry.person_urls_aral, tpu);
     }
 }
 
@@ -107,7 +106,7 @@ REGISTRY_PERSON_URL *registry_person_url_reallocate(REGISTRY_PERSON *p, REGISTRY
             .usages = pu->usages,
             .flags = pu->flags,
             .machine = pu->machine,
-            .machine_name = ""
+            .machine_name = NULL
     };
 
     // remove the existing one from the index
@@ -136,7 +135,7 @@ REGISTRY_PERSON *registry_person_find(const char *person_guid) {
 REGISTRY_PERSON *registry_person_allocate(const char *person_guid, time_t when) {
     debug(D_REGISTRY, "Registry: registry_person_allocate('%s'): allocating new person, sizeof(PERSON)=%zu", (person_guid)?person_guid:"", sizeof(REGISTRY_PERSON));
 
-    REGISTRY_PERSON *p = mallocz(sizeof(REGISTRY_PERSON));
+    REGISTRY_PERSON *p = aral_mallocz(registry.persons_aral);
     if(!person_guid) {
         for(;;) {
             uuid_t uuid;
@@ -160,8 +159,6 @@ REGISTRY_PERSON *registry_person_allocate(const char *person_guid, time_t when) 
 
     p->first_t = p->last_t = (uint32_t)when;
     p->usages = 0;
-
-    registry.persons_memory += sizeof(REGISTRY_PERSON);
 
     registry.persons_count++;
     dictionary_set(registry.persons, p->guid, p, sizeof(REGISTRY_PERSON));
@@ -228,7 +225,7 @@ REGISTRY_PERSON_URL *registry_person_link_to_url(REGISTRY_PERSON *p, REGISTRY_MA
             pu->machine = m;
         }
 
-        if(strcmp(pu->machine_name, name) != 0) {
+        if(strcmp(string2str(pu->machine_name), name) != 0) {
             // the name of the PERSON_URL has changed !
             pu = registry_person_url_reallocate(p, m, url, name, name_len, when, pu);
         }

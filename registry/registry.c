@@ -102,7 +102,7 @@ static int registry_json_person_url_callback(void *entry, void *data) {
     buffer_json_add_array_item_string(w->response.data, string2str(pu->url));
     buffer_json_add_array_item_uint64(w->response.data, pu->last_t * (uint64_t) 1000);
     buffer_json_add_array_item_uint64(w->response.data, pu->usages);
-    buffer_json_add_array_item_string(w->response.data, pu->machine_name);
+    buffer_json_add_array_item_string(w->response.data, string2str(pu->machine_name));
     buffer_json_array_close(w->response.data);
 
     return 1;
@@ -436,11 +436,17 @@ void registry_statistics(void) {
         rrddim_add(stm, "machines_urls",  NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    rrddim_set(stm, "persons",       (collected_number)registry.persons_memory + dictionary_stats_for_registry(registry.persons));
-    rrddim_set(stm, "machines",      (collected_number)registry.machines_memory + dictionary_stats_for_registry(registry.machines));
-    rrddim_set(stm, "persons_urls",  (collected_number)registry.persons_urls_memory);
+    struct aral_statistics *p_aral_stats = aral_statistics(registry.persons_aral);
+    rrddim_set(stm, "persons",       (collected_number)p_aral_stats->structures.allocated_bytes + (collected_number)p_aral_stats->malloc.allocated_bytes);
 
-    struct aral_statistics *aral_stats = aral_statistics(registry.machine_urls_aral);
-    rrddim_set(stm, "machines_urls", (collected_number)(aral_stats->structures.allocated_bytes + aral_stats->malloc.allocated_bytes));
+    struct aral_statistics *m_aral_stats = aral_statistics(registry.machines_aral);
+    rrddim_set(stm, "machines",      (collected_number)m_aral_stats->structures.allocated_bytes + (collected_number)m_aral_stats->malloc.allocated_bytes);
+
+    struct aral_statistics *pu_aral_stats = aral_statistics(registry.person_urls_aral);
+    rrddim_set(stm, "persons_urls",  (collected_number)pu_aral_stats->structures.allocated_bytes + (collected_number)pu_aral_stats->malloc.allocated_bytes);
+
+    struct aral_statistics *mu_aral_stats = aral_statistics(registry.machine_urls_aral);
+    rrddim_set(stm, "machines_urls", (collected_number)mu_aral_stats->structures.allocated_bytes + (collected_number)mu_aral_stats->malloc.allocated_bytes);
+
     rrdset_done(stm);
 }

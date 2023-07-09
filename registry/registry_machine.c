@@ -47,7 +47,7 @@ REGISTRY_MACHINE_URL *registry_machine_url_allocate(REGISTRY_MACHINE *m, STRING 
 REGISTRY_MACHINE *registry_machine_allocate(const char *machine_guid, time_t when) {
     debug(D_REGISTRY, "Registry: registry_machine_allocate('%s'): creating new machine, sizeof(MACHINE)=%zu", machine_guid, sizeof(REGISTRY_MACHINE));
 
-    REGISTRY_MACHINE *m = mallocz(sizeof(REGISTRY_MACHINE));
+    REGISTRY_MACHINE *m = aral_mallocz(registry.machines_aral);
 
     strncpyz(m->guid, machine_guid, GUID_LEN);
 
@@ -56,7 +56,6 @@ REGISTRY_MACHINE *registry_machine_allocate(const char *machine_guid, time_t whe
     m->first_t = m->last_t = (uint32_t)when;
     m->usages = 0;
 
-    registry.machines_memory += sizeof(REGISTRY_MACHINE);
     registry.machines_count++;
 
     dictionary_set(registry.machines, m->guid, m, sizeof(REGISTRY_MACHINE));

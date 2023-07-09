@@ -68,7 +68,7 @@ static inline int registry_person_save_url(void *entry, void *file) {
             pu->usages,
             pu->flags,
             pu->machine->guid,
-            pu->machine_name,
+            string2str(pu->machine_name),
             string2str(pu->url)
     );
 
@@ -311,7 +311,8 @@ size_t registry_db_load(void) {
                 pu->last_t = (uint32_t)strtoul(&s[11], NULL, 16);
                 pu->usages = (uint32_t)strtoul(&s[20], NULL, 16);
                 pu->flags = (uint8_t)strtoul(&s[29], NULL, 16);
-                debug(D_REGISTRY, "Registry loaded person URL '%s' with name '%s' of machine '%s', first: %u, last: %u, usages: %u, flags: %02x", string2str(u), pu->machine_name, m->guid, pu->first_t, pu->last_t, pu->usages, pu->flags);
+                debug(D_REGISTRY, "Registry loaded person URL '%s' with name '%s' of machine '%s', first: %u, last: %u, usages: %u, flags: %02x",
+                      string2str(u), string2str(pu->machine_name), m->guid, pu->first_t, pu->last_t, pu->usages, pu->flags);
                 break;
 
             case 'V': // machine URL

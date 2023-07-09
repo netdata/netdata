@@ -24,12 +24,6 @@ struct registry {
     unsigned long long machines_urls_count;
     unsigned long long log_count;
 
-    // memory counters / statistics
-    unsigned long long persons_memory;
-    unsigned long long machines_memory;
-    unsigned long long persons_urls_memory;
-    unsigned long long machines_urls_memory;
-
     // configuration
     unsigned long long save_registry_every_entries;
     char *registry_domain;
@@ -55,9 +49,12 @@ struct registry {
     // the database
     DICTIONARY *persons;    // dictionary of REGISTRY_PERSON *,  with key the REGISTRY_PERSON.guid
     DICTIONARY *machines;   // dictionary of REGISTRY_MACHINE *, with key the REGISTRY_MACHINE.guid
-    ARAL *machine_urls_aral;
 
-    avl_tree_type registry_urls_root_index;
+    ARAL *persons_aral;
+    ARAL *machines_aral;
+
+    ARAL *person_urls_aral;
+    ARAL *machine_urls_aral;
 
     netdata_mutex_t lock;
 };

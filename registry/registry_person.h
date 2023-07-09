@@ -21,8 +21,7 @@ struct registry_person_url {
     uint32_t last_t;            // the last time we saw this
     uint32_t usages;            // how many times this has been accessed
 
-    char machine_name[1];       // the name of the machine, as known by the user
-    // dynamically allocated to fit properly
+    STRING *machine_name;
 };
 typedef struct registry_person_url REGISTRY_PERSON_URL;
 
