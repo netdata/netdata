@@ -174,7 +174,9 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w) {
 // ----------------------------------------------------------------------------
 //public ACCESS request
 
-#define REGISTRY_VERIFY_COOKIES_GUID "give-me-back-this-cookie-now--please"
+// this is generated using this:
+// uuidgen -n @dns -N registry.my-netdata.io -m
+#define REGISTRY_VERIFY_COOKIES_GUID "d6008554-b2dd-3b1e-8b5c-69bc7553b271"
 
 // the main method for registering an access
 int registry_request_access_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url, char *name, time_t when) {
@@ -189,6 +191,7 @@ int registry_request_access_json(RRDHOST *host, struct web_client *w, char *pers
         registry_set_cookie(w, REGISTRY_VERIFY_COOKIES_GUID);
         w->response.data->content_type = CT_APPLICATION_JSON;
         registry_json_header(host, w, "access", REGISTRY_STATUS_REDIRECT);
+        buffer_json_member_add_string(w->response.data, "person_guid", REGISTRY_VERIFY_COOKIES_GUID);
         buffer_json_member_add_string(w->response.data, "registry", registry.registry_to_announce);
         registry_json_footer(w);
         return HTTP_RESP_OK;

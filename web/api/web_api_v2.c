@@ -38,10 +38,7 @@ static void bearer_get_token(uuid_t *uuid) {
 
 #define HTTP_REQUEST_AUTHORIZATION_BEARER "\r\nAuthorization: Bearer "
 
-bool api_check_bearer_token(struct web_client *w) {
-    if(!netdata_authorized_bearers)
-        return false;
-
+bool extract_bearer_token_from_request(struct web_client *w, char *dst, size_t dst_len) {
     const char *req = buffer_tostring(w->response.data);
     size_t req_len = buffer_strlen(w->response.data);
     const char *bearer = strstr(req, HTTP_REQUEST_AUTHORIZATION_BEARER);
@@ -49,15 +46,28 @@ bool api_check_bearer_token(struct web_client *w) {
     if(!bearer)
         return false;
 
+    while(isspace(*bearer))
+        bearer++;
+
     const char *token_start = bearer + sizeof(HTTP_REQUEST_AUTHORIZATION_BEARER) - 1;
     const char *token_end = token_start + UUID_STR_LEN - 1 + 2;
     if (token_end < req + req_len)
         return false;
 
-    char token[UUID_STR_LEN];
-    strncpyz(token, token_start, UUID_STR_LEN - 1);
+    strncpyz(dst, token_start, dst_len - 1);
     uuid_t uuid;
-    if (uuid_parse(token, uuid) != 0)
+    if (uuid_parse(dst, uuid) != 0)
+        return false;
+
+    return true;
+}
+
+bool api_check_bearer_token(struct web_client *w) {
+    if(!netdata_authorized_bearers)
+        return false;
+
+    char token[UUID_STR_LEN];
+    if(!extract_bearer_token_from_request(w, token, sizeof(token)))
         return false;
 
     struct bearer_token *z = dictionary_get(netdata_authorized_bearers, token);
