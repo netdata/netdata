@@ -8,9 +8,10 @@ typedef int32_t REFCOUNT;
 // ----------------------------------------------------------------------------
 // STRING implementation - dedup all STRING
 
-#define STRING_PARTITIONS (64) // CHANGING THIS NEEDS MATCHING SHIFTS BELOW
-#define string_partition(string) ((uint8_t)((string)->str[0]) >> 2)
-#define string_partition_str(str) ((uint8_t)((str)[0]) >> 2)
+#define STRING_PARTITION_SHIFTS (1)
+#define STRING_PARTITIONS (256 >> STRING_PARTITION_SHIFTS)
+#define string_partition_str(str) ((uint8_t)((str)[0]) >> STRING_PARTITION_SHIFTS)
+#define string_partition(string) (string_partition_str((string)->str))
 
 struct netdata_string {
     uint32_t length;    // the string length including the terminating '\0'
