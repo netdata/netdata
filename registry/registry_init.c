@@ -74,17 +74,40 @@ int registry_init(void) {
         registry.machines = dictionary_create(REGISTRY_DICTIONARY_OPTIONS);
 
         // initialize the allocators
+
+        bool use_mmap = true;
+
+        size_t initial_page_elements = 1;
+        size_t max_page_size = 1024 * 1024;
+
+        if(use_mmap) {
+            initial_page_elements = 8192;
+            max_page_size = 512 * 1024 * 1024;
+        }
+
         registry.persons_aral = aral_create("registry_persons", sizeof(REGISTRY_PERSON),
-                                            1, 65536, NULL, NULL, NULL, false, true);
+                                            initial_page_elements, max_page_size, NULL,
+                                            "registry_persons",
+                                            &netdata_configured_cache_dir,
+                                            use_mmap, true);
 
         registry.machines_aral = aral_create("registry_machines", sizeof(REGISTRY_MACHINE),
-                                             1, 65536, NULL, NULL, NULL, false, true);
+                                             initial_page_elements, max_page_size, NULL,
+                                             "registry_machines",
+                                             &netdata_configured_cache_dir,
+                                             use_mmap, true);
 
         registry.person_urls_aral = aral_create("registry_person_urls", sizeof(REGISTRY_PERSON_URL),
-                                                1, 65536, NULL, NULL, NULL, false, true);
+                                                initial_page_elements, max_page_size, NULL,
+                                                "registry_person_urls",
+                                                &netdata_configured_cache_dir,
+                                                use_mmap, true);
 
         registry.machine_urls_aral = aral_create("registry_machine_urls", sizeof(REGISTRY_MACHINE_URL),
-                                                 1, 65536, NULL, NULL, NULL, false, true);
+                                                 initial_page_elements, max_page_size, NULL,
+                                                 "registry_machine_urls",
+                                                 &netdata_configured_cache_dir,
+                                                 use_mmap, true);
 
         registry_log_open();
         registry_db_load();

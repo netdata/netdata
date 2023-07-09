@@ -369,10 +369,6 @@ size_t dictionary_referenced_items(DICTIONARY *dict) {
     return referenced_items;
 }
 
-long int dictionary_stats_for_registry(DICTIONARY *dict) {
-    if(unlikely(!dict)) return 0;
-    return (dict->stats->memory.index + dict->stats->memory.dict);
-}
 void dictionary_version_increment(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->version, 1, __ATOMIC_RELAXED);
 }
