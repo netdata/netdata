@@ -28,7 +28,7 @@ long get_system_cpus_with_cache(bool cache, bool for_netdata) {
     bool error = false;
 
     if (unlikely(GETSYSCTL_BY_NAME(HW_CPU_NAME, tmp_processors)))
-        netdata_log_error = true;
+        error = true;
     else
         processors[index] = tmp_processors;
 
