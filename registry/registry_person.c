@@ -7,45 +7,42 @@
 // PERSON_URL INDEX
 
 int person_url_compare(void *a, void *b) {
-    register uint32_t hash1 = ((REGISTRY_PERSON_URL *)a)->url->hash;
-    register uint32_t hash2 = ((REGISTRY_PERSON_URL *)b)->url->hash;
+    register STRING *hash1 = ((REGISTRY_PERSON_URL *)a)->url;
+    register STRING *hash2 = ((REGISTRY_PERSON_URL *)b)->url;
 
     if(hash1 < hash2) return -1;
     else if(hash1 > hash2) return 1;
-    else return strcmp(((REGISTRY_PERSON_URL *)a)->url->url, ((REGISTRY_PERSON_URL *)b)->url->url);
+    else return 0;
 }
 
-inline REGISTRY_PERSON_URL *registry_person_url_index_find(REGISTRY_PERSON *p, const char *url) {
-    debug(D_REGISTRY, "Registry: registry_person_url_index_find('%s', '%s')", p->guid, url);
+inline REGISTRY_PERSON_URL *registry_person_url_index_find(REGISTRY_PERSON *p, STRING *url) {
+    debug(D_REGISTRY, "Registry: registry_person_url_index_find('%s', '%s')", p->guid, string2str(url));
 
-    char buf[sizeof(REGISTRY_URL) + strlen(url)];
-
-    REGISTRY_URL *u = (REGISTRY_URL *)&buf;
-    strcpy(u->url, url);
-    u->hash = simple_hash(u->url);
-
-    REGISTRY_PERSON_URL tpu = { .url = u };
+    REGISTRY_PERSON_URL tpu = {
+            .url = url,
+    };
 
     REGISTRY_PERSON_URL *pu = (REGISTRY_PERSON_URL *)avl_search(&p->person_urls, (void *)&tpu);
+
     return pu;
 }
 
 inline REGISTRY_PERSON_URL *registry_person_url_index_add(REGISTRY_PERSON *p, REGISTRY_PERSON_URL *pu) {
-    debug(D_REGISTRY, "Registry: registry_person_url_index_add('%s', '%s')", p->guid, pu->url->url);
+    debug(D_REGISTRY, "Registry: registry_person_url_index_add('%s', '%s')", p->guid, string2str(pu->url));
     REGISTRY_PERSON_URL *tpu = (REGISTRY_PERSON_URL *)avl_insert(&(p->person_urls), (avl_t *)(pu));
     if(tpu != pu)
-        netdata_log_error("Registry: registry_person_url_index_add('%s', '%s') already exists as '%s'", p->guid, pu->url->url, tpu->url->url);
+        netdata_log_error("Registry: registry_person_url_index_add('%s', '%s') already exists as '%s'", p->guid, string2str(pu->url), string2str(tpu->url));
 
     return tpu;
 }
 
 inline REGISTRY_PERSON_URL *registry_person_url_index_del(REGISTRY_PERSON *p, REGISTRY_PERSON_URL *pu) {
-    debug(D_REGISTRY, "Registry: registry_person_url_index_del('%s', '%s')", p->guid, pu->url->url);
+    debug(D_REGISTRY, "Registry: registry_person_url_index_del('%s', '%s')", p->guid, string2str(pu->url));
     REGISTRY_PERSON_URL *tpu = (REGISTRY_PERSON_URL *)avl_remove(&(p->person_urls), (avl_t *)(pu));
     if(!tpu)
-        netdata_log_error("Registry: registry_person_url_index_del('%s', '%s') deleted nothing", p->guid, pu->url->url);
+        netdata_log_error("Registry: registry_person_url_index_del('%s', '%s') deleted nothing", p->guid, string2str(pu->url));
     else if(tpu != pu)
-        netdata_log_error("Registry: registry_person_url_index_del('%s', '%s') deleted wrong URL '%s'", p->guid, pu->url->url, tpu->url->url);
+        netdata_log_error("Registry: registry_person_url_index_del('%s', '%s') deleted wrong URL '%s'", p->guid, string2str(pu->url), string2str(tpu->url));
 
     return tpu;
 }
@@ -53,47 +50,46 @@ inline REGISTRY_PERSON_URL *registry_person_url_index_del(REGISTRY_PERSON *p, RE
 // ----------------------------------------------------------------------------
 // PERSON_URL
 
-REGISTRY_PERSON_URL *registry_person_url_allocate(REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY_URL *u, char *name, size_t namelen, time_t when) {
-    debug(D_REGISTRY, "registry_person_url_allocate('%s', '%s', '%s'): allocating %zu bytes", p->guid, m->guid, u->url, sizeof(REGISTRY_PERSON_URL) + namelen);
+REGISTRY_PERSON_URL *registry_person_url_allocate(REGISTRY_PERSON *p, REGISTRY_MACHINE *m, STRING *url, char *name, size_t name_len, time_t when) {
+    debug(D_REGISTRY, "registry_person_url_allocate('%s', '%s', '%s'): allocating %zu bytes", p->guid, m->guid, string2str(url), sizeof(REGISTRY_PERSON_URL) + name_len);
 
     // protection from too big names
-    if(namelen > registry.max_name_length)
-        namelen = registry.max_name_length;
+    if(name_len > registry.max_name_length)
+        name_len = registry.max_name_length;
 
-    REGISTRY_PERSON_URL *pu = mallocz(sizeof(REGISTRY_PERSON_URL) + namelen);
+    REGISTRY_PERSON_URL *pu = mallocz(sizeof(REGISTRY_PERSON_URL) + name_len);
 
-    // a simple strcpy() should do the job
-    // but I prefer to be safe, since the caller specified urllen
-    strncpyz(pu->machine_name, name, namelen);
+    // a simple strcpy() should do the job,
+    // but I prefer to be safe, since the caller specified name_len
+    strncpyz(pu->machine_name, name, name_len);
 
     pu->machine = m;
     pu->first_t = pu->last_t = (uint32_t)when;
     pu->usages = 1;
-    pu->url = u;
+    pu->url = string_dup(url);
     pu->flags = REGISTRY_URL_FLAGS_DEFAULT;
     m->links++;
 
-    registry.persons_urls_memory += sizeof(REGISTRY_PERSON_URL) + namelen;
+    registry.persons_urls_memory += sizeof(REGISTRY_PERSON_URL) + name_len;
 
-    debug(D_REGISTRY, "registry_person_url_allocate('%s', '%s', '%s'): indexing URL in person", p->guid, m->guid, u->url);
+    debug(D_REGISTRY, "registry_person_url_allocate('%s', '%s', '%s'): indexing URL in person", p->guid, m->guid, string2str(url));
     REGISTRY_PERSON_URL *tpu = registry_person_url_index_add(p, pu);
     if(tpu != pu) {
-        netdata_log_error("Registry: Attempted to add duplicate person url '%s' with name '%s' to person '%s'", u->url, name, p->guid);
+        netdata_log_error("Registry: Attempted to add duplicate person url '%s' with name '%s' to person '%s'", string2str(url), name, p->guid);
+        string_freez(pu->url);
         freez(pu);
         pu = tpu;
     }
-    else
-        registry_url_link(u);
 
     return pu;
 }
 
 void registry_person_url_free(REGISTRY_PERSON *p, REGISTRY_PERSON_URL *pu) {
-    debug(D_REGISTRY, "registry_person_url_free('%s', '%s')", p->guid, pu->url->url);
+    debug(D_REGISTRY, "registry_person_url_free('%s', '%s')", p->guid, string2str(pu->url));
 
     REGISTRY_PERSON_URL *tpu = registry_person_url_index_del(p, pu);
     if(tpu) {
-        registry_url_unlink(tpu->url);
+        string_freez(tpu->url);
         tpu->machine->links--;
         registry.persons_urls_memory -= sizeof(REGISTRY_PERSON_URL) + strlen(tpu->machine_name);
         freez(tpu);
@@ -101,8 +97,8 @@ void registry_person_url_free(REGISTRY_PERSON *p, REGISTRY_PERSON_URL *pu) {
 }
 
 // this function is needed to change the name of a PERSON_URL
-REGISTRY_PERSON_URL *registry_person_url_reallocate(REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY_URL *u, char *name, size_t namelen, time_t when, REGISTRY_PERSON_URL *pu) {
-    debug(D_REGISTRY, "registry_person_url_reallocate('%s', '%s', '%s'): allocating %zu bytes", p->guid, m->guid, u->url, sizeof(REGISTRY_PERSON_URL) + namelen);
+REGISTRY_PERSON_URL *registry_person_url_reallocate(REGISTRY_PERSON *p, REGISTRY_MACHINE *m, STRING *url, char *name, size_t name_len, time_t when, REGISTRY_PERSON_URL *pu) {
+    debug(D_REGISTRY, "registry_person_url_reallocate('%s', '%s', '%s'): allocating %zu bytes", p->guid, m->guid, string2str(url), sizeof(REGISTRY_PERSON_URL) + name_len);
 
     // keep a backup
     REGISTRY_PERSON_URL pu2 = {
@@ -119,7 +115,7 @@ REGISTRY_PERSON_URL *registry_person_url_reallocate(REGISTRY_PERSON *p, REGISTRY
     pu = &pu2;
 
     // allocate a new one
-    REGISTRY_PERSON_URL *tpu = registry_person_url_allocate(p, m, u, name, namelen, when);
+    REGISTRY_PERSON_URL *tpu = registry_person_url_allocate(p, m, url, name, name_len, when);
     tpu->first_t = pu->first_t;
     tpu->last_t = pu->last_t;
     tpu->usages = pu->usages;
@@ -202,30 +198,30 @@ REGISTRY_PERSON *registry_person_get(const char *person_guid, time_t when) {
 // ----------------------------------------------------------------------------
 // LINKING OF OBJECTS
 
-REGISTRY_PERSON_URL *registry_person_link_to_url(REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY_URL *u, char *name, size_t namelen, time_t when) {
-    debug(D_REGISTRY, "registry_person_link_to_url('%s', '%s', '%s'): searching for URL in person", p->guid, m->guid, u->url);
+REGISTRY_PERSON_URL *registry_person_link_to_url(REGISTRY_PERSON *p, REGISTRY_MACHINE *m, STRING *url, char *name, size_t name_len, time_t when) {
+    debug(D_REGISTRY, "registry_person_link_to_url('%s', '%s', '%s'): searching for URL in person", p->guid, m->guid, string2str(url));
 
-    REGISTRY_PERSON_URL *pu = registry_person_url_index_find(p, u->url);
+    REGISTRY_PERSON_URL *pu = registry_person_url_index_find(p, url);
     if(!pu) {
-        debug(D_REGISTRY, "registry_person_link_to_url('%s', '%s', '%s'): not found", p->guid, m->guid, u->url);
-        pu = registry_person_url_allocate(p, m, u, name, namelen, when);
+        debug(D_REGISTRY, "registry_person_link_to_url('%s', '%s', '%s'): not found", p->guid, m->guid, string2str(url));
+        pu = registry_person_url_allocate(p, m, url, name, name_len, when);
         registry.persons_urls_count++;
     }
     else {
-        debug(D_REGISTRY, "registry_person_link_to_url('%s', '%s', '%s'): found", p->guid, m->guid, u->url);
+        debug(D_REGISTRY, "registry_person_link_to_url('%s', '%s', '%s'): found", p->guid, m->guid, string2str(url));
         pu->usages++;
         if(likely(pu->last_t < (uint32_t)when)) pu->last_t = (uint32_t)when;
 
         if(pu->machine != m) {
-            REGISTRY_MACHINE_URL *mu = dictionary_get(pu->machine->machine_urls, u->url);
+            REGISTRY_MACHINE_URL *mu = dictionary_get(pu->machine->machine_urls, string2str(url));
             if(mu) {
                 debug(D_REGISTRY, "registry_person_link_to_url('%s', '%s', '%s'): URL switched machines (old was '%s') - expiring it from previous machine.",
-                     p->guid, m->guid, u->url, pu->machine->guid);
+                      p->guid, m->guid, string2str(url), pu->machine->guid);
                 mu->flags |= REGISTRY_URL_FLAGS_EXPIRED;
             }
             else {
                 debug(D_REGISTRY, "registry_person_link_to_url('%s', '%s', '%s'): URL switched machines (old was '%s') - but the URL is not linked to the old machine.",
-                     p->guid, m->guid, u->url, pu->machine->guid);
+                      p->guid, m->guid, string2str(url), pu->machine->guid);
             }
 
             pu->machine->links--;
@@ -234,7 +230,7 @@ REGISTRY_PERSON_URL *registry_person_link_to_url(REGISTRY_PERSON *p, REGISTRY_MA
 
         if(strcmp(pu->machine_name, name) != 0) {
             // the name of the PERSON_URL has changed !
-            pu = registry_person_url_reallocate(p, m, u, name, namelen, when, pu);
+            pu = registry_person_url_reallocate(p, m, url, name, name_len, when, pu);
         }
     }
 
@@ -242,7 +238,7 @@ REGISTRY_PERSON_URL *registry_person_link_to_url(REGISTRY_PERSON *p, REGISTRY_MA
     if(likely(p->last_t < (uint32_t)when)) p->last_t = (uint32_t)when;
 
     if(pu->flags & REGISTRY_URL_FLAGS_EXPIRED) {
-        debug(D_REGISTRY, "registry_person_link_to_url('%s', '%s', '%s'): accessing an expired URL. Re-enabling URL.", p->guid, m->guid, u->url);
+        debug(D_REGISTRY, "registry_person_link_to_url('%s', '%s', '%s'): accessing an expired URL. Re-enabling URL.", p->guid, m->guid, string2str(url));
         pu->flags &= ~REGISTRY_URL_FLAGS_EXPIRED;
     }
 

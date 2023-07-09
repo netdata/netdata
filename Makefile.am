@@ -661,8 +661,6 @@ REGISTRY_PLUGIN_FILES = \
     registry/registry_machine.h \
     registry/registry_person.c \
     registry/registry_person.h \
-    registry/registry_url.c \
-    registry/registry_url.h \
     $(NULL)
 
 STATSD_PLUGIN_FILES = \

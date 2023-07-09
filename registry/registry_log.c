@@ -3,7 +3,7 @@
 #include "daemon/common.h"
 #include "registry_internals.h"
 
-void registry_log(char action, REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY_URL *u, char *name) {
+void registry_log(char action, REGISTRY_PERSON *p, REGISTRY_MACHINE *m, STRING *u, const char *name) {
     if(likely(registry.log_fp)) {
         if(unlikely(fprintf(registry.log_fp, "%c\t%08x\t%s\t%s\t%s\t%s\n",
                 action,
@@ -11,7 +11,7 @@ void registry_log(char action, REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY
                 p->guid,
                 m->guid,
                 name,
-                u->url) < 0))
+                string2str(u)) < 0))
             netdata_log_error("Registry: failed to save log. Registry data may be lost in case of abnormal restart.");
 
         // we increase the counter even on failures
@@ -94,7 +94,7 @@ ssize_t registry_log_load(void) {
                     s[1] = s[10] = s[47] = s[84] = '\0';
 
                     // get the variables
-                    time_t when = strtoul(&s[2], NULL, 16);
+                    time_t when = (time_t)strtoul(&s[2], NULL, 16);
                     char *person_guid = &s[11];
                     char *machine_guid = &s[48];
                     char *name = &s[85];

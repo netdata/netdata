@@ -15,14 +15,14 @@ static int registry_machine_save_url(const DICTIONARY_ITEM *item __maybe_unused,
     REGISTRY_MACHINE_URL *mu = entry;
     FILE *fp = file;
 
-    debug(D_REGISTRY, "Registry: registry_machine_save_url('%s')", mu->url->url);
+    debug(D_REGISTRY, "Registry: registry_machine_save_url('%s')", string2str(mu->url));
 
     int ret = fprintf(fp, "V\t%08x\t%08x\t%08x\t%02x\t%s\n",
             mu->first_t,
             mu->last_t,
             mu->usages,
             mu->flags,
-            mu->url->url
+            string2str(mu->url)
     );
 
     // error handling is done at registry_db_save()
@@ -59,7 +59,7 @@ static inline int registry_person_save_url(void *entry, void *file) {
     REGISTRY_PERSON_URL *pu = entry;
     FILE *fp = file;
 
-    debug(D_REGISTRY, "Registry: registry_person_save_url('%s')", pu->url->url);
+    debug(D_REGISTRY, "Registry: registry_person_save_url('%s')", string2str(pu->url));
 
     int ret = fprintf(fp, "U\t%08x\t%08x\t%08x\t%02x\t%s\t%s\t%s\n",
             pu->first_t,
@@ -68,7 +68,7 @@ static inline int registry_person_save_url(void *entry, void *file) {
             pu->flags,
             pu->machine->guid,
             pu->machine_name,
-            pu->url->url
+            string2str(pu->url)
     );
 
     // error handling is done at registry_db_save()
@@ -215,7 +215,7 @@ size_t registry_db_load(void) {
     char *s, buf[4096 + 1];
     REGISTRY_PERSON *p = NULL;
     REGISTRY_MACHINE *m = NULL;
-    REGISTRY_URL *u = NULL;
+    STRING *u = NULL;
     size_t line = 0;
 
     debug(D_REGISTRY, "Registry: loading active db from: '%s'", registry.db_filename);
@@ -254,7 +254,7 @@ size_t registry_db_load(void) {
                 }
 
                 s[1] = s[10] = s[19] = s[28] = '\0';
-                p = registry_person_allocate(&s[29], strtoul(&s[2], NULL, 16));
+                p = registry_person_allocate(&s[29], (time_t)strtoul(&s[2], NULL, 16));
                 p->last_t = (uint32_t)strtoul(&s[11], NULL, 16);
                 p->usages = (uint32_t)strtoul(&s[20], NULL, 16);
                 debug(D_REGISTRY, "Registry loaded person '%s', first: %u, last: %u, usages: %u", p->guid, p->first_t, p->last_t, p->usages);
@@ -269,7 +269,7 @@ size_t registry_db_load(void) {
                 }
 
                 s[1] = s[10] = s[19] = s[28] = '\0';
-                m = registry_machine_allocate(&s[29], strtoul(&s[2], NULL, 16));
+                m = registry_machine_allocate(&s[29], (time_t)strtoul(&s[2], NULL, 16));
                 m->last_t = (uint32_t)strtoul(&s[11], NULL, 16);
                 m->usages = (uint32_t)strtoul(&s[20], NULL, 16);
                 debug(D_REGISTRY, "Registry loaded machine '%s', first: %u, last: %u, usages: %u", m->guid, m->first_t, m->last_t, m->usages);
@@ -299,9 +299,9 @@ size_t registry_db_load(void) {
                 *url++ = '\0';
 
                 // u = registry_url_allocate_nolock(url, strlen(url));
-                u = registry_url_get(url, strlen(url));
+                u = string_strdupz(url);
 
-                time_t first_t = strtoul(&s[2], NULL, 16);
+                time_t first_t = (time_t)strtoul(&s[2], NULL, 16);
 
                 m = registry_machine_find(&s[32]);
                 if(!m) m = registry_machine_allocate(&s[32], first_t);
@@ -310,7 +310,7 @@ size_t registry_db_load(void) {
                 pu->last_t = (uint32_t)strtoul(&s[11], NULL, 16);
                 pu->usages = (uint32_t)strtoul(&s[20], NULL, 16);
                 pu->flags = (uint8_t)strtoul(&s[29], NULL, 16);
-                debug(D_REGISTRY, "Registry loaded person URL '%s' with name '%s' of machine '%s', first: %u, last: %u, usages: %u, flags: %02x", u->url, pu->machine_name, m->guid, pu->first_t, pu->last_t, pu->usages, pu->flags);
+                debug(D_REGISTRY, "Registry loaded person URL '%s' with name '%s' of machine '%s', first: %u, last: %u, usages: %u, flags: %02x", string2str(u), pu->machine_name, m->guid, pu->first_t, pu->last_t, pu->usages, pu->flags);
                 break;
 
             case 'V': // machine URL
@@ -327,13 +327,14 @@ size_t registry_db_load(void) {
 
                 s[1] = s[10] = s[19] = s[28] = s[31] = '\0';
                 // u = registry_url_allocate_nolock(&s[32], strlen(&s[32]));
-                u = registry_url_get(&s[32], strlen(&s[32]));
+                u = string_strdupz(&s[32]);
 
-                REGISTRY_MACHINE_URL *mu = registry_machine_url_allocate(m, u, strtoul(&s[2], NULL, 16));
+                REGISTRY_MACHINE_URL *mu = registry_machine_url_allocate(m, u, (time_t)strtoul(&s[2], NULL, 16));
                 mu->last_t = (uint32_t)strtoul(&s[11], NULL, 16);
                 mu->usages = (uint32_t)strtoul(&s[20], NULL, 16);
                 mu->flags = (uint8_t)strtoul(&s[29], NULL, 16);
-                debug(D_REGISTRY, "Registry loaded machine URL '%s', machine '%s', first: %u, last: %u, usages: %u, flags: %02x", u->url, m->guid, mu->first_t, mu->last_t, mu->usages, mu->flags);
+                debug(D_REGISTRY, "Registry loaded machine URL '%s', machine '%s', first: %u, last: %u, usages: %u, flags: %02x",
+                      string2str(u), m->guid, mu->first_t, mu->last_t, mu->usages, mu->flags);
                 break;
 
             default:

@@ -23,19 +23,19 @@ static inline void registry_unlock(void) {
 // COOKIES
 
 static void registry_set_cookie(struct web_client *w, const char *guid) {
-    char edate[100];
+    char e_date[100];
     time_t et = now_realtime_sec() + registry.persons_expiration;
-    struct tm etmbuf, *etm = gmtime_r(&et, &etmbuf);
-    strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", etm);
+    struct tm e_tm_buf, *etm = gmtime_r(&et, &e_tm_buf);
+    strftime(e_date, sizeof(e_date), "%a, %d %b %Y %H:%M:%S %Z", etm);
 
-    buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s\r\n", guid, edate);
+    buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s\r\n", guid, e_date);
     if(registry.enable_cookies_samesite_secure)
-        buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; SameSite=None; Secure\r\n", guid, edate);
+        buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; SameSite=None; Secure\r\n", guid, e_date);
 
     if(registry.registry_domain && *registry.registry_domain) {
-        buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; Domain=%s\r\n", guid, edate, registry.registry_domain);
+        buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; Domain=%s\r\n", guid, e_date, registry.registry_domain);
         if(registry.enable_cookies_samesite_secure)
-            buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; Domain=%s; SameSite=None; Secure\r\n", guid, edate, registry.registry_domain);
+            buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; Domain=%s; SameSite=None; Secure\r\n", guid, e_date, registry.registry_domain);
     }
 
     w->response.has_cookies = true;
@@ -84,17 +84,22 @@ struct registry_json_walk_person_urls_callback {
     int count;
 };
 
+static STRING *asterisks = NULL;
+
 // callback for rendering PERSON_URLs
 static int registry_json_person_url_callback(void *entry, void *data) {
+    if(unlikely(!asterisks))
+        asterisks = string_strdupz("***");
+
     REGISTRY_PERSON_URL *pu = (REGISTRY_PERSON_URL *)entry;
     struct registry_json_walk_person_urls_callback *c = (struct registry_json_walk_person_urls_callback *)data;
     struct web_client *w = c->w;
 
-    if (!strcmp(pu->url->url,"***")) return 0;
+    if (pu->url == asterisks) return 0;
 
     buffer_json_add_array_item_array(w->response.data);
     buffer_json_add_array_item_string(w->response.data, pu->machine->guid);
-    buffer_json_add_array_item_string(w->response.data, pu->url->url);
+    buffer_json_add_array_item_string(w->response.data, string2str(pu->url));
     buffer_json_add_array_item_uint64(w->response.data, pu->last_t * (uint64_t) 1000);
     buffer_json_add_array_item_uint64(w->response.data, pu->usages);
     buffer_json_add_array_item_string(w->response.data, pu->machine_name);
@@ -105,16 +110,19 @@ static int registry_json_person_url_callback(void *entry, void *data) {
 
 // callback for rendering MACHINE_URLs
 static int registry_json_machine_url_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data) {
+    if(unlikely(!asterisks))
+        asterisks = string_strdupz("***");
+
     REGISTRY_MACHINE_URL *mu = (REGISTRY_MACHINE_URL *)entry;
     struct registry_json_walk_person_urls_callback *c = (struct registry_json_walk_person_urls_callback *)data;
     struct web_client *w = c->w;
     REGISTRY_MACHINE *m = c->m;
 
-    if (!strcmp(mu->url->url,"***")) return 0;
+    if (mu->url == asterisks) return 0;
 
     buffer_json_add_array_item_array(w->response.data);
     buffer_json_add_array_item_string(w->response.data, m->guid);
-    buffer_json_add_array_item_string(w->response.data, mu->url->url);
+    buffer_json_add_array_item_string(w->response.data, string2str(mu->url));
     buffer_json_add_array_item_uint64(w->response.data, mu->last_t * (uint64_t) 1000);
     buffer_json_add_array_item_uint64(w->response.data, mu->usages);
     buffer_json_array_close(w->response.data);
@@ -279,12 +287,9 @@ int registry_request_search_json(RRDHOST *host, struct web_client *w, char *pers
 // SWITCH REQUEST
 
 // the main method for switching user identity
-int registry_request_switch_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url, char *new_person_guid, time_t when) {
+int registry_request_switch_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url __maybe_unused, char *new_person_guid, time_t when __maybe_unused) {
     if(!registry.enabled)
         return registry_json_disabled(host, w, "switch");
-
-    (void)url;
-    (void)when;
 
     registry_lock();
 

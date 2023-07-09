@@ -10,7 +10,7 @@
 
 // For each MACHINE-URL pair we keep this
 struct registry_machine_url {
-    REGISTRY_URL *url;          // de-duplicated URL
+    STRING *url;                // de-duplicated URL
 
     uint8_t flags;
 
@@ -35,9 +35,9 @@ struct registry_machine {
 typedef struct registry_machine REGISTRY_MACHINE;
 
 REGISTRY_MACHINE *registry_machine_find(const char *machine_guid);
-REGISTRY_MACHINE_URL *registry_machine_url_allocate(REGISTRY_MACHINE *m, REGISTRY_URL *u, time_t when);
+REGISTRY_MACHINE_URL *registry_machine_url_allocate(REGISTRY_MACHINE *m, STRING *u, time_t when);
 REGISTRY_MACHINE *registry_machine_allocate(const char *machine_guid, time_t when);
 REGISTRY_MACHINE *registry_machine_get(const char *machine_guid, time_t when);
-REGISTRY_MACHINE_URL *registry_machine_link_to_url(REGISTRY_MACHINE *m, REGISTRY_URL *u, time_t when);
+REGISTRY_MACHINE_URL *registry_machine_link_to_url(REGISTRY_MACHINE *m, STRING *u, time_t when);
 
 #endif //NETDATA_REGISTRY_MACHINE_H

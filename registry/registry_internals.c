@@ -121,7 +121,10 @@ REGISTRY_PERSON_URL *registry_verify_request(char *person_guid, char *machine_gu
     }
     if(pp) *pp = p;
 
-    REGISTRY_PERSON_URL *pu = registry_person_url_index_find(p, url);
+    STRING *u = string_strdupz(url);
+    REGISTRY_PERSON_URL *pu = registry_person_url_index_find(p, u);
+    string_freez(u);
+
     if(!pu) {
         netdata_log_info("Registry Request Verification: URL not found for person, person: '%s', machine '%s', url '%s'", person_guid, machine_guid, url);
         return NULL;
@@ -153,7 +156,7 @@ REGISTRY_PERSON *registry_request_access(char *person_guid, char *machine_guid, 
 
     REGISTRY_PERSON *p = registry_person_get(person_guid, when);
 
-    REGISTRY_URL *u = registry_url_get(url, urllen);
+    STRING *u = string_strdupz(url);
     registry_person_link_to_url(p, m, u, name, namelen, when);
     registry_machine_link_to_url(m, u, when);
 
@@ -184,14 +187,17 @@ REGISTRY_PERSON *registry_request_delete(char *person_guid, char *machine_guid, 
     }
     */
 
-    REGISTRY_PERSON_URL *dpu = registry_person_url_index_find(p, delete_url);
+    STRING *d_url = string_strdupz(delete_url);
+    REGISTRY_PERSON_URL *dpu = registry_person_url_index_find(p, d_url);
+    string_freez(d_url);
+
     if(!dpu) {
         netdata_log_info("Registry Delete Request: URL not found for person: '%s', machine '%s', url '%s', delete url '%s'", p->guid
-             , m->guid, pu->url->url, delete_url);
+             , m->guid, string2str(pu->url), delete_url);
         return NULL;
     }
 
-    registry_log('D', p, m, pu->url, dpu->url->url);
+    registry_log('D', p, m, pu->url, string2str(dpu->url));
     registry_person_unlink_from_url(p, dpu);
 
     return p;
@@ -230,7 +236,7 @@ REGISTRY_MACHINE *registry_request_machine(char *person_guid, char *machine_guid
 
     // make sure the machine GUID is valid
     if(regenerate_guid(request_machine, mbuf) == -1) {
-        netdata_log_info("Registry Machine URLs request: invalid machine GUID, person: '%s', machine '%s', url '%s', request machine '%s'", p->guid, m->guid, pu->url->url, request_machine);
+        netdata_log_info("Registry Machine URLs request: invalid machine GUID, person: '%s', machine '%s', url '%s', request machine '%s'", p->guid, m->guid, string2str(pu->url), request_machine);
         return NULL;
     }
     request_machine = mbuf;
@@ -238,7 +244,7 @@ REGISTRY_MACHINE *registry_request_machine(char *person_guid, char *machine_guid
     // make sure the machine exists
     m = registry_machine_find(request_machine);
     if(!m) {
-        netdata_log_info("Registry Machine URLs request: machine not found, person: '%s', machine '%s', url '%s', request machine '%s'", p->guid, machine_guid, pu->url->url, request_machine);
+        netdata_log_info("Registry Machine URLs request: machine not found, person: '%s', machine '%s', url '%s', request machine '%s'", p->guid, machine_guid, string2str(pu->url), request_machine);
         return NULL;
     }
 

@@ -16,7 +16,7 @@ int registry_init(void) {
         registry.enabled = 0;
     }
 
-    // pathnames
+    // path names
     snprintfz(filename, FILENAME_MAX, "%s/registry", netdata_configured_varlib_dir);
     registry.pathname = config_get(CONFIG_SECTION_DIRECTORIES, "registry", filename);
     if(mkdir(registry.pathname, 0770) == -1 && errno != EEXIST)
@@ -78,7 +78,6 @@ int registry_init(void) {
     // create dictionaries
     registry.persons = dictionary_create(REGISTRY_DICTIONARY_OPTIONS);
     registry.machines = dictionary_create(REGISTRY_DICTIONARY_OPTIONS);
-    avl_init(&registry.registry_urls_root_index, registry_url_compare);
 
     // load the registry database
     if(registry.enabled) {
@@ -99,8 +98,8 @@ static int machine_urls_delete_callback(const DICTIONARY_ITEM *item __maybe_unus
 
     REGISTRY_MACHINE_URL *mu = (REGISTRY_MACHINE_URL *)entry;
 
-    debug(D_REGISTRY, "Registry: unlinking url '%s' from machine", mu->url->url);
-    registry_url_unlink(mu->url);
+    debug(D_REGISTRY, "Registry: unlinking url '%s' from machine", string2str(mu->url));
+    string_freez(mu->url);
 
     debug(D_REGISTRY, "Registry: freeing machine url");
     freez(mu);

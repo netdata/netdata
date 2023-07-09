@@ -50,7 +50,6 @@ struct registry {
     char *db_filename;
     char *log_filename;
     char *machine_guid_filename;
-    char *session_key_filename;
 
     // open files
     FILE *log_fp;
@@ -64,7 +63,6 @@ struct registry {
     netdata_mutex_t lock;
 };
 
-#include "registry_url.h"
 #include "registry_machine.h"
 #include "registry_person.h"
 #include "registry.h"
@@ -77,7 +75,7 @@ REGISTRY_PERSON *registry_request_delete(char *person_guid, char *machine_guid, 
 REGISTRY_MACHINE *registry_request_machine(char *person_guid, char *machine_guid, char *url, char *request_machine, time_t when);
 
 // REGISTRY LOG (in registry_log.c)
-void registry_log(char action, REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY_URL *u, char *name);
+void registry_log(char action, REGISTRY_PERSON *p, REGISTRY_MACHINE *m, STRING *u, const char *name);
 int registry_log_open(void);
 void registry_log_close(void);
 void registry_log_recreate(void);

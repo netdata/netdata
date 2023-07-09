@@ -12,7 +12,7 @@
 struct registry_person_url {
     avl_t avl;                  // binary tree node
 
-    REGISTRY_URL *url;          // de-duplicated URL
+    STRING *url;                // de-duplicated URL
     REGISTRY_MACHINE *machine;  // link the MACHINE of this URL
 
     uint8_t flags;
@@ -42,12 +42,12 @@ struct registry_person {
 typedef struct registry_person REGISTRY_PERSON;
 
 // PERSON_URL
-REGISTRY_PERSON_URL *registry_person_url_index_find(REGISTRY_PERSON *p, const char *url);
+REGISTRY_PERSON_URL *registry_person_url_index_find(REGISTRY_PERSON *p, STRING *url);
 REGISTRY_PERSON_URL *registry_person_url_index_add(REGISTRY_PERSON *p, REGISTRY_PERSON_URL *pu) NEVERNULL WARNUNUSED;
 REGISTRY_PERSON_URL *registry_person_url_index_del(REGISTRY_PERSON *p, REGISTRY_PERSON_URL *pu) WARNUNUSED;
 
-REGISTRY_PERSON_URL *registry_person_url_allocate(REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY_URL *u, char *name, size_t namelen, time_t when);
-REGISTRY_PERSON_URL *registry_person_url_reallocate(REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY_URL *u, char *name, size_t namelen, time_t when, REGISTRY_PERSON_URL *pu);
+REGISTRY_PERSON_URL *registry_person_url_allocate(REGISTRY_PERSON *p, REGISTRY_MACHINE *m, STRING *url, char *name, size_t name_len, time_t when);
+REGISTRY_PERSON_URL *registry_person_url_reallocate(REGISTRY_PERSON *p, REGISTRY_MACHINE *m, STRING *url, char *name, size_t name_len, time_t when, REGISTRY_PERSON_URL *pu);
 
 // PERSON
 REGISTRY_PERSON *registry_person_find(const char *person_guid);
@@ -55,7 +55,7 @@ REGISTRY_PERSON *registry_person_allocate(const char *person_guid, time_t when);
 REGISTRY_PERSON *registry_person_get(const char *person_guid, time_t when);
 
 // LINKING PERSON -> PERSON_URL
-REGISTRY_PERSON_URL *registry_person_link_to_url(REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY_URL *u, char *name, size_t namelen, time_t when);
+REGISTRY_PERSON_URL *registry_person_link_to_url(REGISTRY_PERSON *p, REGISTRY_MACHINE *m, STRING *url, char *name, size_t name_len, time_t when);
 void registry_person_unlink_from_url(REGISTRY_PERSON *p, REGISTRY_PERSON_URL *pu);
 
 #endif //NETDATA_REGISTRY_PERSON_H
