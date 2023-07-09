@@ -77,22 +77,6 @@ static void netdata_update_ipmi_sel_events_count(struct netdata_ipmi_state *stat
 #include <unistd.h>
 #include <sys/time.h>
 
-// inband drivers
-#define IPMI_PARSE_DEVICE_KCS_STR       "kcs"
-#define IPMI_PARSE_DEVICE_SSIF_STR      "ssif"
-#define IPMI_PARSE_DEVICE_OPENIPMI_STR  "openipmi"
-#define IPMI_PARSE_DEVICE_OPENIPMI_STR2 "open"
-#define IPMI_PARSE_DEVICE_SUNBMC_STR    "sunbmc"
-#define IPMI_PARSE_DEVICE_SUNBMC_STR2   "bmc"
-
-// outband drivers
-#define IPMI_PARSE_DEVICE_LAN_STR       "lan"
-#define IPMI_PARSE_DEVICE_LAN_2_0_STR   "lan_2_0"
-#define IPMI_PARSE_DEVICE_LAN_2_0_STR2  "lan20"
-#define IPMI_PARSE_DEVICE_LAN_2_0_STR3  "lan_20"
-#define IPMI_PARSE_DEVICE_LAN_2_0_STR4  "lan2_0"
-#define IPMI_PARSE_DEVICE_LAN_2_0_STR5  "lanplus"
-
 #include <ipmi_monitoring.h>
 #include <ipmi_monitoring_bitmasks.h>
 #include <ipmi_monitoring_offsets.h>
@@ -548,6 +532,86 @@ cleanup:
 }
 
 // ----------------------------------------------------------------------------
+// copied from freeipmi codebase commit 8dea6dec4012d0899901e595f2c868a05e1cefed
+// added netdata_ in-front to not overwrite library functions
+
+// FROM: common/miscutil/network.c
+static int netdata_host_is_localhost (const char *host) {
+    /* Ordered by my assumption of most popular */
+    if (!strcasecmp (host, "localhost")
+        || !strcmp (host, "127.0.0.1")
+        || !strcasecmp (host, "ipv6-localhost")
+        || !strcmp (host, "::1")
+        || !strcasecmp (host, "ip6-localhost")
+        || !strcmp (host, "0:0:0:0:0:0:0:1"))
+        return (1);
+
+    return (0);
+}
+
+// FROM: common/parsecommon/parse-common.h
+#define IPMI_PARSE_DEVICE_LAN_STR       "lan"
+#define IPMI_PARSE_DEVICE_LAN_2_0_STR   "lan_2_0"
+#define IPMI_PARSE_DEVICE_LAN_2_0_STR2  "lan20"
+#define IPMI_PARSE_DEVICE_LAN_2_0_STR3  "lan_20"
+#define IPMI_PARSE_DEVICE_LAN_2_0_STR4  "lan2_0"
+#define IPMI_PARSE_DEVICE_LAN_2_0_STR5  "lanplus"
+#define IPMI_PARSE_DEVICE_KCS_STR       "kcs"
+#define IPMI_PARSE_DEVICE_SSIF_STR      "ssif"
+#define IPMI_PARSE_DEVICE_OPENIPMI_STR  "openipmi"
+#define IPMI_PARSE_DEVICE_OPENIPMI_STR2 "open"
+#define IPMI_PARSE_DEVICE_SUNBMC_STR    "sunbmc"
+#define IPMI_PARSE_DEVICE_SUNBMC_STR2   "bmc"
+#define IPMI_PARSE_DEVICE_INTELDCMI_STR "inteldcmi"
+
+// FROM: common/parsecommon/parse-common.c
+// changed the return values to match ipmi_monitoring.h
+static int netdata_parse_outofband_driver_type (const char *str) {
+    if (strcasecmp (str, IPMI_PARSE_DEVICE_LAN_STR) == 0)
+        return (IPMI_MONITORING_PROTOCOL_VERSION_1_5);
+
+        /* support "lanplus" for those that might be used to ipmitool.
+         * support typo variants to ease.
+         */
+    else if (strcasecmp (str, IPMI_PARSE_DEVICE_LAN_2_0_STR) == 0
+             || strcasecmp (str, IPMI_PARSE_DEVICE_LAN_2_0_STR2) == 0
+             || strcasecmp (str, IPMI_PARSE_DEVICE_LAN_2_0_STR3) == 0
+             || strcasecmp (str, IPMI_PARSE_DEVICE_LAN_2_0_STR4) == 0
+             || strcasecmp (str, IPMI_PARSE_DEVICE_LAN_2_0_STR5) == 0)
+        return (IPMI_MONITORING_PROTOCOL_VERSION_2_0);
+
+    return (-1);
+}
+
+// FROM: common/parsecommon/parse-common.c
+// changed the return values to match ipmi_monitoring.h
+static int netdata_parse_inband_driver_type (const char *str) {
+    if (strcasecmp (str, IPMI_PARSE_DEVICE_KCS_STR) == 0)
+        return (IPMI_MONITORING_DRIVER_TYPE_KCS);
+    else if (strcasecmp (str, IPMI_PARSE_DEVICE_SSIF_STR) == 0)
+        return (IPMI_MONITORING_DRIVER_TYPE_SSIF);
+        /* support "open" for those that might be used to
+         * ipmitool.
+         */
+    else if (strcasecmp (str, IPMI_PARSE_DEVICE_OPENIPMI_STR) == 0
+             || strcasecmp (str, IPMI_PARSE_DEVICE_OPENIPMI_STR2) == 0)
+        return (IPMI_MONITORING_DRIVER_TYPE_OPENIPMI);
+        /* support "bmc" for those that might be used to
+         * ipmitool.
+         */
+    else if (strcasecmp (str, IPMI_PARSE_DEVICE_SUNBMC_STR) == 0
+             || strcasecmp (str, IPMI_PARSE_DEVICE_SUNBMC_STR2) == 0)
+        return (IPMI_MONITORING_DRIVER_TYPE_SUNBMC);
+
+#ifdef IPMI_MONITORING_DRIVER_TYPE_INTELDCMI
+    else if (strcasecmp (str, IPMI_PARSE_DEVICE_INTELDCMI_STR) == 0)
+        return (IPMI_MONITORING_DRIVER_TYPE_INTELDCMI);
+#endif // IPMI_MONITORING_DRIVER_TYPE_INTELDCMI
+
+    return (-1);
+}
+
+// ----------------------------------------------------------------------------
 // BEGIN NETDATA CODE
 
 typedef enum __attribute__((packed)) {
@@ -725,11 +789,11 @@ struct {
         // The first the matches is used
 
         {
-                .search = "*DIMM*|*_DIM*|*VTT*|*VDDQ*|*ECC*|*MEM*CRC*",
+                .search = "*DIMM*|*_DIM*|*VTT*|*VDDQ*|*ECC*|*MEM*CRC*|*MEM*BD*",
                 .label = NETDATA_SENSOR_COMPONENT_MEMORY_MODULE,
         },
         {
-                .search = "*CPU*|SOC_*|*VDDCR*|P*_VDD*|*_DTS|*VCORE*",
+                .search = "*CPU*|SOC_*|*VDDCR*|P*_VDD*|*_DTS|*VCORE*|*PROC*",
                 .label = NETDATA_SENSOR_COMPONENT_PROCESSOR,
         },
         {
@@ -741,7 +805,7 @@ struct {
                 .label = NETDATA_SENSOR_COMPONENT_STORAGE,
         },
         {
-                .search = "MB_*|*PCH*|*VBAT*",
+                .search = "MB_*|*PCH*|*VBAT*|*I/O*BD*|*IO*BD*",
                 .label = NETDATA_SENSOR_COMPONENT_MOTHERBOARD,
         },
         {
@@ -749,7 +813,7 @@ struct {
                 .label = NETDATA_SENSOR_COMPONENT_SYSTEM,
         },
         {
-                .search = "PS*|P_*|*PSU*",
+                .search = "PS*|P_*|*PSU*|*PWR*|*TERMV*|*D2D*",
                 .label = NETDATA_SENSOR_COMPONENT_POWER_SUPPLY,
         },
 
@@ -775,7 +839,7 @@ struct {
                 .label = NETDATA_SENSOR_COMPONENT_PERIPHERAL,
         },
         {
-                .search = "*FAN*|*12V*|*VCC*|*PCI*|*CHIPSET*",
+                .search = "*FAN*|*12V*|*VCC*|*PCI*|*CHIPSET*|*AMP*|*BD*",
                 .label = NETDATA_SENSOR_COMPONENT_SYSTEM,
         },
 
@@ -1342,53 +1406,6 @@ static size_t send_ipmi_sel_metrics_to_netdata(struct netdata_ipmi_state *state)
 // ----------------------------------------------------------------------------
 // main, command line arguments parsing
 
-int parse_inband_driver_type (const char *str) {
-    fatal_assert(str);
-
-    if (strcasecmp (str, IPMI_PARSE_DEVICE_KCS_STR) == 0)
-        return (IPMI_MONITORING_DRIVER_TYPE_KCS);
-
-    else if (strcasecmp (str, IPMI_PARSE_DEVICE_SSIF_STR) == 0)
-        return (IPMI_MONITORING_DRIVER_TYPE_SSIF);
-
-    else if (strcasecmp (str, IPMI_PARSE_DEVICE_OPENIPMI_STR) == 0
-             || strcasecmp (str, IPMI_PARSE_DEVICE_OPENIPMI_STR2) == 0)
-        // support "open" for those that might be used to ipmitool.
-        return (IPMI_MONITORING_DRIVER_TYPE_OPENIPMI);
-
-    else if (strcasecmp (str, IPMI_PARSE_DEVICE_SUNBMC_STR) == 0
-             || strcasecmp (str, IPMI_PARSE_DEVICE_SUNBMC_STR2) == 0)
-        // support "bmc" for those that might be used to ipmitool.
-        return (IPMI_MONITORING_DRIVER_TYPE_SUNBMC);
-
-    return (-1);
-}
-
-int parse_outofband_driver_type (const char *str) {
-    fatal_assert(str);
-
-    if (strcasecmp (str, IPMI_PARSE_DEVICE_LAN_STR) == 0)
-        return (IPMI_MONITORING_PROTOCOL_VERSION_1_5);
-
-    else if (strcasecmp (str, IPMI_PARSE_DEVICE_LAN_2_0_STR) == 0
-             || strcasecmp (str, IPMI_PARSE_DEVICE_LAN_2_0_STR2) == 0
-             || strcasecmp (str, IPMI_PARSE_DEVICE_LAN_2_0_STR3) == 0
-             || strcasecmp (str, IPMI_PARSE_DEVICE_LAN_2_0_STR4) == 0
-             || strcasecmp (str, IPMI_PARSE_DEVICE_LAN_2_0_STR5) == 0)
-        // support "lanplus" for those that might be used to ipmitool.
-        // support typo variants to ease.
-        return (IPMI_MONITORING_PROTOCOL_VERSION_2_0);
-
-    return (-1);
-}
-
-int host_is_local(const char *host) {
-    if (host && (!strcmp(host, "localhost") || !strcmp(host, "127.0.0.1") || !strcmp(host, "::1")))
-        return (1);
-
-    return (0);
-}
-
 int main (int argc, char **argv) {
     bool netdata_do_sel = IPMI_ENABLE_SEL_BY_DEFAULT;
 
@@ -1620,18 +1637,18 @@ int main (int argc, char **argv) {
         }
         else if(strcmp("driver-type", argv[i]) == 0) {
             if (hostname) {
-                protocol_version = parse_outofband_driver_type(argv[++i]);
+                protocol_version = netdata_parse_outofband_driver_type(argv[++i]);
                 if(debug) fprintf(stderr, "%s: outband protocol version set to '%d'\n",
                                   program_name, protocol_version);
             }
             else {
-                driver_type = parse_inband_driver_type(argv[++i]);
+                driver_type = netdata_parse_inband_driver_type(argv[++i]);
                 if(debug) fprintf(stderr, "%s: inband driver type set to '%d'\n",
                                   program_name, driver_type);
             }
             continue;
         } else if (i < argc && (strcmp("noauthcodecheck", argv[i]) == 0 || strcmp("no-auth-code-check", argv[i]) == 0)) {
-            if (!hostname || host_is_local(hostname)) {
+            if (!hostname || netdata_host_is_localhost(hostname)) {
                 if (debug)
                     fprintf(stderr, "%s: noauthcodecheck workaround flag is ignored for inband configuration\n",
                             program_name);
