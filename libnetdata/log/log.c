@@ -1143,7 +1143,7 @@ netdata_log_level_t log_severity_string_to_severity_level(char *level)
     else if (!strcmp(level, NETDATA_LOG_LEVEL_ERROR_STR))
         return NETDATA_LOG_LEVEL_ERROR;
 
-    error("The value `%s` is not a known value. Netdata will run with default `info`.", level);
+    netdata_log_error("The value `%s` is not a known value. Netdata will run with default `info`.", level);
 
     return NETDATA_LOG_LEVEL_INFO;
 }
