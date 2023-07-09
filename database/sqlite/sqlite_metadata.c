@@ -950,7 +950,7 @@ static void cleanup_finished_threads(struct host_context_load_thread *hclt, size
            || (wait && __atomic_load_n(&(hclt[index].busy), __ATOMIC_ACQUIRE))) {
            int rc = uv_thread_join(&(hclt[index].thread));
            if (rc)
-                error("Failed to join thread, rc = %d",rc);
+               netdata_log_error("Failed to join thread, rc = %d",rc);
            __atomic_store_n(&(hclt[index].busy), false, __ATOMIC_RELEASE);
            __atomic_store_n(&(hclt[index].finished), false, __ATOMIC_RELEASE);
        }
@@ -1244,21 +1244,21 @@ static void metadata_event_loop(void *arg)
     loop = wc->loop = mallocz(sizeof(uv_loop_t));
     ret = uv_loop_init(loop);
     if (ret) {
-        error("uv_loop_init(): %s", uv_strerror(ret));
+        netdata_log_error("uv_loop_init(): %s", uv_strerror(ret));
         goto error_after_loop_init;
     }
     loop->data = wc;
 
     ret = uv_async_init(wc->loop, &wc->async, async_cb);
     if (ret) {
-        error("uv_async_init(): %s", uv_strerror(ret));
+        netdata_log_error("uv_async_init(): %s", uv_strerror(ret));
         goto error_after_async_init;
     }
     wc->async.data = wc;
 
     ret = uv_timer_init(loop, &wc->timer_req);
     if (ret) {
-        error("uv_timer_init(): %s", uv_strerror(ret));
+        netdata_log_error("uv_timer_init(): %s", uv_strerror(ret));
         goto error_after_timer_init;
     }
     wc->timer_req.data = wc;

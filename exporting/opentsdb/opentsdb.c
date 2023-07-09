@@ -46,7 +46,7 @@ int init_opentsdb_telnet_instance(struct instance *instance)
 
     instance->buffer = (void *)buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
     if (!instance->buffer) {
-        error("EXPORTING: cannot create buffer for opentsdb telnet exporting connector instance %s", instance->config.name);
+        netdata_log_error("EXPORTING: cannot create buffer for opentsdb telnet exporting connector instance %s", instance->config.name);
         return 1;
     }
 
@@ -102,7 +102,7 @@ int init_opentsdb_http_instance(struct instance *instance)
 
     instance->buffer = (void *)buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
     if (!instance->buffer) {
-        error("EXPORTING: cannot create buffer for opentsdb HTTP exporting connector instance %s", instance->config.name);
+        netdata_log_error("EXPORTING: cannot create buffer for opentsdb HTTP exporting connector instance %s", instance->config.name);
         return 1;
     }
 

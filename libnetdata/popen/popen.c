@@ -55,7 +55,7 @@ static void netdata_popen_tracking_del_pid(pid_t pid) {
         freez(mp);
     }
     else
-        error("POPEN: Cannot find pid %d.", pid);
+        netdata_log_error("POPEN: Cannot find pid %d.", pid);
 
     netdata_popen_tracking_unlock();
 }
@@ -156,33 +156,33 @@ static int popene_internal(volatile pid_t *pidptr, char **env, uint8_t flags, FI
     unsigned int fds_to_exclude_from_closing = OPEN_FD_EXCLUDE_STDERR;
 
     if(posix_spawn_file_actions_init(&fa)) {
-        error("POPEN: posix_spawn_file_actions_init() failed.");
+        netdata_log_error("POPEN: posix_spawn_file_actions_init() failed.");
         ret = -1;
         goto set_return_values_and_return;
     }
 
     if(fpp_child_stdin) {
         if (pipe(pipefd_stdin) == -1) {
-            error("POPEN: stdin pipe() failed");
+            netdata_log_error("POPEN: stdin pipe() failed");
             ret = -1;
             goto cleanup_and_return;
         }
 
         if ((fp_child_stdin = fdopen(pipefd_stdin[PIPE_WRITE], "w")) == NULL) {
-            error("POPEN: fdopen() stdin failed");
+            netdata_log_error("POPEN: fdopen() stdin failed");
             ret = -1;
             goto cleanup_and_return;
         }
 
         if(posix_spawn_file_actions_adddup2(&fa, pipefd_stdin[PIPE_READ], STDIN_FILENO)) {
-            error("POPEN: posix_spawn_file_actions_adddup2() on stdin failed.");
+            netdata_log_error("POPEN: posix_spawn_file_actions_adddup2() on stdin failed.");
             ret = -1;
             goto cleanup_and_return;
         }
     }
     else {
         if (posix_spawn_file_actions_addopen(&fa, STDIN_FILENO, "/dev/null", O_RDONLY, 0)) {
-            error("POPEN: posix_spawn_file_actions_addopen() on stdin to /dev/null failed.");
+            netdata_log_error("POPEN: posix_spawn_file_actions_addopen() on stdin to /dev/null failed.");
             // this is not a fatal error
             fds_to_exclude_from_closing |= OPEN_FD_EXCLUDE_STDIN;
         }
@@ -190,26 +190,26 @@ static int popene_internal(volatile pid_t *pidptr, char **env, uint8_t flags, FI
 
     if (fpp_child_stdout) {
         if (pipe(pipefd_stdout) == -1) {
-            error("POPEN: stdout pipe() failed");
+            netdata_log_error("POPEN: stdout pipe() failed");
             ret = -1;
             goto cleanup_and_return;
         }
 
         if ((fp_child_stdout = fdopen(pipefd_stdout[PIPE_READ], "r")) == NULL) {
-            error("POPEN: fdopen() stdout failed");
+            netdata_log_error("POPEN: fdopen() stdout failed");
             ret = -1;
             goto cleanup_and_return;
         }
 
         if(posix_spawn_file_actions_adddup2(&fa, pipefd_stdout[PIPE_WRITE], STDOUT_FILENO)) {
-            error("POPEN: posix_spawn_file_actions_adddup2() on stdout failed.");
+            netdata_log_error("POPEN: posix_spawn_file_actions_adddup2() on stdout failed.");
             ret = -1;
             goto cleanup_and_return;
         }
     }
     else {
         if (posix_spawn_file_actions_addopen(&fa, STDOUT_FILENO, "/dev/null", O_WRONLY, 0)) {
-            error("POPEN: posix_spawn_file_actions_addopen() on stdout to /dev/null failed.");
+            netdata_log_error("POPEN: posix_spawn_file_actions_addopen() on stdout to /dev/null failed.");
             // this is not a fatal error
             fds_to_exclude_from_closing |= OPEN_FD_EXCLUDE_STDOUT;
         }
@@ -223,20 +223,20 @@ static int popene_internal(volatile pid_t *pidptr, char **env, uint8_t flags, FI
     attr_rc = posix_spawnattr_init(&attr);
     if(attr_rc) {
         // failed
-        error("POPEN: posix_spawnattr_init() failed.");
+        netdata_log_error("POPEN: posix_spawnattr_init() failed.");
     }
     else {
         // success
         // reset all signals in the child
 
         if (posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF))
-            error("POPEN: posix_spawnattr_setflags() failed.");
+            netdata_log_error("POPEN: posix_spawnattr_setflags() failed.");
 
         sigset_t mask;
         sigemptyset(&mask);
 
         if (posix_spawnattr_setsigmask(&attr, &mask))
-            error("POPEN: posix_spawnattr_setsigmask() failed.");
+            netdata_log_error("POPEN: posix_spawnattr_setsigmask() failed.");
     }
 
     // Take the lock while we fork to ensure we don't race with SIGCHLD
@@ -251,7 +251,7 @@ static int popene_internal(volatile pid_t *pidptr, char **env, uint8_t flags, FI
     else {
         // failure
         netdata_popen_tracking_unlock();
-        error("POPEN: failed to spawn command: \"%s\" from parent pid %d.", command_to_be_logged, getpid());
+        netdata_log_error("POPEN: failed to spawn command: \"%s\" from parent pid %d.", command_to_be_logged, getpid());
         ret = -1;
         goto cleanup_and_return;
     }
@@ -263,11 +263,11 @@ cleanup_and_return:
     if(!attr_rc) {
         // posix_spawnattr_init() succeeded
         if (posix_spawnattr_destroy(&attr))
-            error("POPEN: posix_spawnattr_destroy() failed");
+            netdata_log_error("POPEN: posix_spawnattr_destroy() failed");
     }
 
     if (posix_spawn_file_actions_destroy(&fa))
-        error("POPEN: posix_spawn_file_actions_destroy() failed");
+        netdata_log_error("POPEN: posix_spawn_file_actions_destroy() failed");
 
     // the child end - close it
     if(pipefd_stdin[PIPE_READ] != -1)
@@ -401,7 +401,7 @@ int netdata_pclose(FILE *fp_child_input, FILE *fp_child_output, pid_t pid) {
         switch (info.si_code) {
             case CLD_EXITED:
                 if(info.si_status)
-                    error("child pid %d exited with code %d.", info.si_pid, info.si_status);
+                    netdata_log_error("child pid %d exited with code %d.", info.si_pid, info.si_status);
                 return(info.si_status);
 
             case CLD_KILLED:
@@ -414,33 +414,33 @@ int netdata_pclose(FILE *fp_child_input, FILE *fp_child_output, pid_t pid) {
                     return(0);
                 }
                 else {
-                    error("child pid %d killed by signal %d.", info.si_pid, info.si_status);
+                    netdata_log_error("child pid %d killed by signal %d.", info.si_pid, info.si_status);
                     return(-1);
                 }
 
             case CLD_DUMPED:
-                error("child pid %d core dumped by signal %d.", info.si_pid, info.si_status);
+                netdata_log_error("child pid %d core dumped by signal %d.", info.si_pid, info.si_status);
                 return(-2);
 
             case CLD_STOPPED:
-                error("child pid %d stopped by signal %d.", info.si_pid, info.si_status);
+                netdata_log_error("child pid %d stopped by signal %d.", info.si_pid, info.si_status);
                 return(0);
 
             case CLD_TRAPPED:
-                error("child pid %d trapped by signal %d.", info.si_pid, info.si_status);
+                netdata_log_error("child pid %d trapped by signal %d.", info.si_pid, info.si_status);
                 return(-4);
 
             case CLD_CONTINUED:
-                error("child pid %d continued by signal %d.", info.si_pid, info.si_status);
+                netdata_log_error("child pid %d continued by signal %d.", info.si_pid, info.si_status);
                 return(0);
 
             default:
-                error("child pid %d gave us a SIGCHLD with code %d and status %d.", info.si_pid, info.si_code, info.si_status);
+                netdata_log_error("child pid %d gave us a SIGCHLD with code %d and status %d.", info.si_pid, info.si_code, info.si_status);
                 return(-5);
         }
     }
     else
-        error("Cannot waitid() for pid %d", pid);
+        netdata_log_error("Cannot waitid() for pid %d", pid);
     
     return 0;
 }

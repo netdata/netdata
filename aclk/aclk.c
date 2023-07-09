@@ -72,7 +72,7 @@ static void aclk_ssl_keylog_cb(const SSL *ssl, const char *line)
     if (!ssl_log_file)
         ssl_log_file = fopen(ssl_log_filename, "a");
     if (!ssl_log_file) {
-        error("Couldn't open ssl_log file (%s) for append.", ssl_log_filename);
+        netdata_log_error("Couldn't open ssl_log file (%s) for append.", ssl_log_filename);
         return;
     }
     fputs(line, ssl_log_file);
@@ -107,14 +107,14 @@ static int load_private_key()
     long bytes_read;
     char *private_key = read_by_filename(filename, &bytes_read);
     if (!private_key) {
-        error("Claimed agent cannot establish ACLK - unable to load private key '%s' failed.", filename);
+        netdata_log_error("Claimed agent cannot establish ACLK - unable to load private key '%s' failed.", filename);
         return 1;
     }
     debug(D_ACLK, "Claimed agent loaded private key len=%ld bytes", bytes_read);
 
     BIO *key_bio = BIO_new_mem_buf(private_key, -1);
     if (key_bio==NULL) {
-        error("Claimed agent cannot establish ACLK - failed to create BIO for key");
+        netdata_log_error("Claimed agent cannot establish ACLK - failed to create BIO for key");
         goto biofailed;
     }
 
@@ -125,13 +125,13 @@ static int load_private_key()
                                               NULL, NULL);
 
     if (!aclk_dctx) {
-        error("Loading private key (from claiming) failed - no OpenSSL Decoders found");
+        netdata_log_error("Loading private key (from claiming) failed - no OpenSSL Decoders found");
         goto biofailed;
     }
 
     // this is necesseary to avoid RSA key with wrong size
     if (!OSSL_DECODER_from_bio(aclk_dctx, key_bio)) {
-        error("Decoding private key (from claiming) failed - invalid format.");
+        netdata_log_error("Decoding private key (from claiming) failed - invalid format.");
         goto biofailed;
     }
 #else
@@ -145,7 +145,7 @@ static int load_private_key()
     }
     char err[512];
     ERR_error_string_n(ERR_get_error(), err, sizeof(err));
-    error("Claimed agent cannot establish ACLK - cannot create private key: %s", err);
+    netdata_log_error("Claimed agent cannot establish ACLK - cannot create private key: %s", err);
 
 biofailed:
     freez(private_key);
@@ -204,7 +204,7 @@ static int wait_till_agent_claim_ready()
         // We trap the impossible NULL here to keep the linter happy without using a fatal() in the code.
         char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
         if (cloud_base_url == NULL) {
-            error("Do not move the cloud base url out of post_conf_load!!");
+            netdata_log_error("Do not move the cloud base url out of post_conf_load!!");
             return 1;
         }
 
@@ -212,7 +212,7 @@ static int wait_till_agent_claim_ready()
         // TODO make it without malloc/free
         memset(&url, 0, sizeof(url_t));
         if (url_parse(cloud_base_url, &url)) {
-            error("Agent is claimed but the URL in configuration key \"cloud base url\" is invalid, please fix");
+            netdata_log_error("Agent is claimed but the URL in configuration key \"cloud base url\" is invalid, please fix");
             url_t_destroy(&url);
             sleep(5);
             continue;
@@ -243,7 +243,7 @@ void aclk_mqtt_wss_log_cb(mqtt_wss_log_type_t log_type, const char* str)
             debug(D_ACLK, "%s", str);
             return;
         default:
-            error("Unknown log type from mqtt_wss");
+            netdata_log_error("Unknown log type from mqtt_wss");
     }
 }
 
@@ -255,7 +255,7 @@ static void msg_callback(const char *topic, const void *msg, size_t msglen, int 
     debug(D_ACLK, "Got Message From Broker Topic \"%s\" QOS %d", topic, qos);
 
     if (aclk_shared_state.mqtt_shutdown_msg_id > 0) {
-        error("Link is shutting down. Ignoring incoming message.");
+        netdata_log_error("Link is shutting down. Ignoring incoming message.");
         return;
     }
 
@@ -277,7 +277,7 @@ static void msg_callback(const char *topic, const void *msg, size_t msglen, int 
     snprintf(filename, FN_MAX_LEN, ACLK_LOG_CONVERSATION_DIR "/%010d-rx-%s.bin", ACLK_GET_CONV_LOG_NEXT(), msgtype);
     logfd = open(filename, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR );
     if(logfd < 0)
-        error("Error opening ACLK Conversation logfile \"%s\" for RX message.", filename);
+        netdata_log_error("Error opening ACLK Conversation logfile \"%s\" for RX message.", filename);
     write(logfd, msg, msglen);
     close(logfd);
 #endif
@@ -308,7 +308,7 @@ static int read_query_thread_count()
     threads = MAX(threads, 2);
     threads = config_get_number(CONFIG_SECTION_CLOUD, "query thread count", threads);
     if(threads < 1) {
-        error("You need at least one query thread. Overriding configured setting of \"%d\"", threads);
+        netdata_log_error("You need at least one query thread. Overriding configured setting of \"%d\"", threads);
         threads = 1;
         config_set_number(CONFIG_SECTION_CLOUD, "query thread count", threads);
     }
@@ -365,13 +365,13 @@ static inline void mqtt_connected_actions(mqtt_wss_client client)
     char *topic = (char*)aclk_get_topic(ACLK_TOPICID_COMMAND);
 
     if (!topic)
-        error("Unable to fetch topic for COMMAND (to subscribe)");
+        netdata_log_error("Unable to fetch topic for COMMAND (to subscribe)");
     else
         mqtt_wss_subscribe(client, topic, 1);
 
     topic = (char*)aclk_get_topic(ACLK_TOPICID_CMD_NG_V1);
     if (!topic)
-        error("Unable to fetch topic for protobuf COMMAND (to subscribe)");
+        netdata_log_error("Unable to fetch topic for protobuf COMMAND (to subscribe)");
     else
         mqtt_wss_subscribe(client, topic, 1);
 
@@ -399,7 +399,7 @@ void aclk_graceful_disconnect(mqtt_wss_client client)
     time_t t = now_monotonic_sec();
     while (!mqtt_wss_service(client, 100)) {
         if (now_monotonic_sec() - t >= 2) {
-            error("Wasn't able to gracefully shutdown ACLK in time!");
+            netdata_log_error("Wasn't able to gracefully shutdown ACLK in time!");
             break;
         }
         if (aclk_shared_state.mqtt_shutdown_msg_rcvd) {
@@ -786,7 +786,7 @@ void *aclk_main(void *ptr)
     ACLK_PROXY_TYPE proxy_type;
     aclk_get_proxy(&proxy_type);
     if (proxy_type == PROXY_TYPE_SOCKS5) {
-        error("SOCKS5 proxy is not supported by ACLK-NG yet.");
+        netdata_log_error("SOCKS5 proxy is not supported by ACLK-NG yet.");
         static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
         return NULL;
     }
@@ -811,7 +811,7 @@ void *aclk_main(void *ptr)
         goto exit;
 
     if (!(mqttwss_client = mqtt_wss_new("mqtt_wss", aclk_mqtt_wss_log_cb, msg_callback, puback_callback))) {
-        error("Couldn't initialize MQTT_WSS network library");
+        netdata_log_error("Couldn't initialize MQTT_WSS network library");
         goto exit;
     }
 
@@ -906,7 +906,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd)
         ret = get_node_id(&host->host_uuid, &node_id);
         if (ret > 0) {
             // this means we were not able to check if node_id already present
-            error("Unable to check for node_id. Ignoring the host state update.");
+            netdata_log_error("Unable to check for node_id. Ignoring the host state update.");
             return;
         }
         if (ret < 0) {

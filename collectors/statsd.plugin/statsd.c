@@ -571,7 +571,7 @@ static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
     if(!is_metric_useful_for_collection(m)) return;
 
     if(unlikely(!value || !*value)) {
-        error("STATSD: metric of type set, with empty value is ignored.");
+        netdata_log_error("STATSD: metric of type set, with empty value is ignored.");
         return;
     }
 
@@ -606,7 +606,7 @@ static inline void statsd_process_dictionary(STATSD_METRIC *m, const char *value
     if(!is_metric_useful_for_collection(m)) return;
 
     if(unlikely(!value || !*value)) {
-        error("STATSD: metric of type set, with empty value is ignored.");
+        netdata_log_error("STATSD: metric of type set, with empty value is ignored.");
         return;
     }
 
@@ -720,7 +720,7 @@ static void statsd_process_metric(const char *name, const char *value, const cha
     }
     else {
         statsd.unknown_types++;
-        error("STATSD: metric '%s' with value '%s' is sent with unknown metric type '%s'", name, value?value:"", type);
+        netdata_log_error("STATSD: metric '%s' with value '%s' is sent with unknown metric type '%s'", name, value?value:"", type);
     }
 
     if(m && tags && *tags) {
@@ -892,14 +892,14 @@ static void statsd_del_callback(POLLINFO *pi) {
         if(t->type == STATSD_SOCKET_DATA_TYPE_TCP) {
             if(t->len != 0) {
                 statsd.socket_errors++;
-                error("STATSD: client is probably sending unterminated metrics. Closed socket left with '%s'. Trying to process it.", t->buffer);
+                netdata_log_error("STATSD: client is probably sending unterminated metrics. Closed socket left with '%s'. Trying to process it.", t->buffer);
                 statsd_process(t->buffer, t->len, 0);
             }
             statsd.tcp_socket_disconnects++;
             statsd.tcp_socket_connected--;
         }
         else
-            error("STATSD: internal error: received socket data type is %d, but expected %d", (int)t->type, (int)STATSD_SOCKET_DATA_TYPE_TCP);
+            netdata_log_error("STATSD: internal error: received socket data type is %d, but expected %d", (int)t->type, (int)STATSD_SOCKET_DATA_TYPE_TCP);
 
         freez(t);
     }
@@ -920,7 +920,7 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
         case SOCK_STREAM: {
             struct statsd_tcp *d = (struct statsd_tcp *)pi->data;
             if(unlikely(!d)) {
-                error("STATSD: internal error: expected TCP data pointer is NULL");
+                netdata_log_error("STATSD: internal error: expected TCP data pointer is NULL");
                 statsd.socket_errors++;
                 retval = -1;
                 goto cleanup;
@@ -928,7 +928,7 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
 
 #ifdef NETDATA_INTERNAL_CHECKS
             if(unlikely(d->type != STATSD_SOCKET_DATA_TYPE_TCP)) {
-                error("STATSD: internal error: socket data type should be %d, but it is %d", (int)STATSD_SOCKET_DATA_TYPE_TCP, (int)d->type);
+                netdata_log_error("STATSD: internal error: socket data type should be %d, but it is %d", (int)STATSD_SOCKET_DATA_TYPE_TCP, (int)d->type);
                 statsd.socket_errors++;
                 retval = -1;
                 goto cleanup;
@@ -942,7 +942,7 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
                 if (rc < 0) {
                     // read failed
                     if (errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR) {
-                        error("STATSD: recv() on TCP socket %d failed.", fd);
+                        netdata_log_error("STATSD: recv() on TCP socket %d failed.", fd);
                         statsd.socket_errors++;
                         ret = -1;
                     }
@@ -976,7 +976,7 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
         case SOCK_DGRAM: {
             struct statsd_udp *d = (struct statsd_udp *)pi->data;
             if(unlikely(!d)) {
-                error("STATSD: internal error: expected UDP data pointer is NULL");
+                netdata_log_error("STATSD: internal error: expected UDP data pointer is NULL");
                 statsd.socket_errors++;
                 retval = -1;
                 goto cleanup;
@@ -984,7 +984,7 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
 
 #ifdef NETDATA_INTERNAL_CHECKS
             if(unlikely(d->type != STATSD_SOCKET_DATA_TYPE_UDP)) {
-                error("STATSD: internal error: socket data should be %d, but it is %d", (int)d->type, (int)STATSD_SOCKET_DATA_TYPE_UDP);
+                netdata_log_error("STATSD: internal error: socket data should be %d, but it is %d", (int)d->type, (int)STATSD_SOCKET_DATA_TYPE_UDP);
                 statsd.socket_errors++;
                 retval = -1;
                 goto cleanup;
@@ -998,7 +998,7 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
                 if (rc < 0) {
                     // read failed
                     if (errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR) {
-                        error("STATSD: recvmmsg() on UDP socket %d failed.", fd);
+                        netdata_log_error("STATSD: recvmmsg() on UDP socket %d failed.", fd);
                         statsd.socket_errors++;
                         retval = -1;
                         goto cleanup;
@@ -1024,7 +1024,7 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
                 if (rc < 0) {
                     // read failed
                     if (errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR) {
-                        error("STATSD: recv() on UDP socket %d failed.", fd);
+                        netdata_log_error("STATSD: recv() on UDP socket %d failed.", fd);
                         statsd.socket_errors++;
                         retval = -1;
                         goto cleanup;
@@ -1043,7 +1043,7 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
         }
 
         default: {
-            error("STATSD: internal error: unknown socktype %d on socket %d", pi->socktype, fd);
+            netdata_log_error("STATSD: internal error: unknown socktype %d on socket %d", pi->socktype, fd);
             statsd.socket_errors++;
             retval = -1;
             goto cleanup;
@@ -1061,7 +1061,7 @@ static int statsd_snd_callback(POLLINFO *pi, short int *events) {
     (void)events;
 
     worker_is_busy(WORKER_JOB_TYPE_SND_DATA);
-    error("STATSD: snd_callback() called, but we never requested to send data to statsd clients.");
+    netdata_log_error("STATSD: snd_callback() called, but we never requested to send data to statsd clients.");
     worker_is_idle();
 
     return -1;
@@ -1169,7 +1169,7 @@ static STATSD_APP_CHART_DIM_VALUE_TYPE string2valuetype(const char *type, size_t
     else if(!strcmp(type, "stddev")) return STATSD_APP_CHART_DIM_VALUE_TYPE_STDDEV;
     else if(!strcmp(type, "percentile")) return STATSD_APP_CHART_DIM_VALUE_TYPE_PERCENTILE;
 
-    error("STATSD: invalid type '%s' at line %zu of file '%s'. Using 'last'.", type, line, filename);
+    netdata_log_error("STATSD: invalid type '%s' at line %zu of file '%s'. Using 'last'.", type, line, filename);
     return STATSD_APP_CHART_DIM_VALUE_TYPE_LAST;
 }
 
@@ -1244,7 +1244,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
 
     FILE *fp = fopen(filename, "r");
     if(!fp) {
-        error("STATSD: cannot open file '%s'.", filename);
+        netdata_log_error("STATSD: cannot open file '%s'.", filename);
         freez(buffer);
         return -1;
     }
@@ -1281,7 +1281,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                 freez(tmp);
             }
             else
-                error("STATSD: ignoring line %zu of file '%s', include filename is empty", line, filename);
+                netdata_log_error("STATSD: ignoring line %zu of file '%s', include filename is empty", line, filename);
 
             continue;
         }
@@ -1348,20 +1348,20 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                 }
             }
             else
-                error("STATSD: ignoring line %zu ('%s') of file '%s', [app] is not defined.", line, s, filename);
+                netdata_log_error("STATSD: ignoring line %zu ('%s') of file '%s', [app] is not defined.", line, s, filename);
 
             continue;
         }
 
         if(!app) {
-            error("STATSD: ignoring line %zu ('%s') of file '%s', it is outside all sections.", line, s, filename);
+            netdata_log_error("STATSD: ignoring line %zu ('%s') of file '%s', it is outside all sections.", line, s, filename);
             continue;
         }
 
         char *name = s;
         char *value = strchr(s, '=');
         if(!value) {
-            error("STATSD: ignoring line %zu ('%s') of file '%s', there is no = in it.", line, s, filename);
+            netdata_log_error("STATSD: ignoring line %zu ('%s') of file '%s', there is no = in it.", line, s, filename);
             continue;
         }
         *value = '\0';
@@ -1371,7 +1371,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
         value = trim(value);
 
         if(!name || *name == '#') {
-            error("STATSD: ignoring line %zu of file '%s', name is empty.", line, filename);
+            netdata_log_error("STATSD: ignoring line %zu of file '%s', name is empty.", line, filename);
             continue;
         }
         if(!value) {
@@ -1418,7 +1418,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                     app->rrd_history_entries = 5;
             }
             else {
-                error("STATSD: ignoring line %zu ('%s') of file '%s'. Unknown keyword for the [app] section.", line, name, filename);
+                netdata_log_error("STATSD: ignoring line %zu ('%s') of file '%s'. Unknown keyword for the [app] section.", line, name, filename);
                 continue;
             }
         }
@@ -1512,7 +1512,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                     dim->metric_pattern = simple_pattern_create(dim->metric, NULL, SIMPLE_PATTERN_EXACT, true);
             }
             else {
-                error("STATSD: ignoring line %zu ('%s') of file '%s'. Unknown keyword for the [%s] section.", line, name, filename, chart->id);
+                netdata_log_error("STATSD: ignoring line %zu ('%s') of file '%s'. Unknown keyword for the [%s] section.", line, name, filename, chart->id);
                 continue;
             }
         }
@@ -2049,7 +2049,7 @@ static inline void link_metric_to_app_dimension(STATSD_APP *app, STATSD_METRIC *
     }
     else {
         if (dim->value_type != STATSD_APP_CHART_DIM_VALUE_TYPE_LAST)
-            error("STATSD: unsupported value type for dimension '%s' of chart '%s' of app '%s' on metric '%s'", dim->name, chart->id, app->name, m->name);
+            netdata_log_error("STATSD: unsupported value type for dimension '%s' of chart '%s' of app '%s' on metric '%s'", dim->name, chart->id, app->name, m->name);
 
         dim->value_ptr = &m->last;
         dim->algorithm = statsd_algorithm_for_metric(m);

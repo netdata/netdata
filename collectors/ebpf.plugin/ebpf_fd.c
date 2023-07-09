@@ -326,7 +326,7 @@ static inline int ebpf_fd_load_and_attach(struct fd_bpf *obj, ebpf_module_t *em)
     netdata_ebpf_program_loaded_t test = mt[NETDATA_FD_SYSCALL_OPEN].mode;
 
     if (ebpf_fd_set_target_values()) {
-        error("%s file descriptor.", NETDATA_EBPF_DEFAULT_FNT_NOT_FOUND);
+        netdata_log_error("%s file descriptor.", NETDATA_EBPF_DEFAULT_FNT_NOT_FOUND);
         return -1;
     }
 
@@ -1125,7 +1125,7 @@ static int ebpf_fd_load_bpf(ebpf_module_t *em)
 #endif
 
     if (ret)
-        error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
+        netdata_log_error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
 
     return ret;
 }

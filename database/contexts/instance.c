@@ -407,13 +407,13 @@ inline void rrdinstance_from_rrdset(RRDSET *st) {
 #define rrdset_get_rrdinstance(st) rrdset_get_rrdinstance_with_trace(st, __FUNCTION__);
 static inline RRDINSTANCE *rrdset_get_rrdinstance_with_trace(RRDSET *st, const char *function) {
     if(unlikely(!st->rrdinstance)) {
-        error("RRDINSTANCE: RRDSET '%s' is not linked to an RRDINSTANCE at %s()", rrdset_id(st), function);
+        netdata_log_error("RRDINSTANCE: RRDSET '%s' is not linked to an RRDINSTANCE at %s()", rrdset_id(st), function);
         return NULL;
     }
 
     RRDINSTANCE *ri = rrdinstance_acquired_value(st->rrdinstance);
     if(unlikely(!ri)) {
-        error("RRDINSTANCE: RRDSET '%s' lost its link to an RRDINSTANCE at %s()", rrdset_id(st), function);
+        netdata_log_error("RRDINSTANCE: RRDSET '%s' lost its link to an RRDINSTANCE at %s()", rrdset_id(st), function);
         return NULL;
     }
 

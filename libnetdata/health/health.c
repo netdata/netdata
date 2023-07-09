@@ -73,7 +73,7 @@ SILENCER *health_silencers_addparam(SILENCER *silencer, char *key, char *value) 
                 ) {
             silencer = create_silencer();
             if(!silencer) {
-                error("Cannot add a new silencer to Netdata");
+                netdata_log_error("Cannot add a new silencer to Netdata");
                 return NULL;
             }
         }

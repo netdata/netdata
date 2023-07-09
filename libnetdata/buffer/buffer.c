@@ -367,8 +367,8 @@ static int buffer_expect(BUFFER *wb, const char *expected) {
     const char *generated = buffer_tostring(wb);
 
     if(strcmp(generated, expected) != 0) {
-        error("BUFFER: mismatch.\nGenerated:\n%s\nExpected:\n%s\n",
-              generated, expected);
+        netdata_log_error("BUFFER: mismatch.\nGenerated:\n%s\nExpected:\n%s\n",
+                          generated, expected);
         return 1;
     }
 
@@ -385,8 +385,8 @@ static int buffer_uint64_roundtrip(BUFFER *wb, NUMBER_ENCODING encoding, uint64_
 
     uint64_t v = str2ull_encoded(buffer_tostring(wb));
     if(v != value) {
-        error("BUFFER: string '%s' does resolves to %llu, expected %llu",
-              buffer_tostring(wb), (unsigned long long)v, (unsigned long long)value);
+        netdata_log_error("BUFFER: string '%s' does resolves to %llu, expected %llu",
+                          buffer_tostring(wb), (unsigned long long)v, (unsigned long long)value);
         errors++;
     }
     buffer_flush(wb);
@@ -403,8 +403,8 @@ static int buffer_int64_roundtrip(BUFFER *wb, NUMBER_ENCODING encoding, int64_t 
 
     int64_t v = str2ll_encoded(buffer_tostring(wb));
     if(v != value) {
-        error("BUFFER: string '%s' does resolves to %lld, expected %lld",
-              buffer_tostring(wb), (long long)v, (long long)value);
+        netdata_log_error("BUFFER: string '%s' does resolves to %lld, expected %lld",
+                          buffer_tostring(wb), (long long)v, (long long)value);
         errors++;
     }
     buffer_flush(wb);
@@ -421,8 +421,8 @@ static int buffer_double_roundtrip(BUFFER *wb, NUMBER_ENCODING encoding, NETDATA
 
     NETDATA_DOUBLE v = str2ndd_encoded(buffer_tostring(wb), NULL);
     if(v != value) {
-        error("BUFFER: string '%s' does resolves to %.12f, expected %.12f",
-              buffer_tostring(wb), v, value);
+        netdata_log_error("BUFFER: string '%s' does resolves to %.12f, expected %.12f",
+                          buffer_tostring(wb), v, value);
         errors++;
     }
     buffer_flush(wb);

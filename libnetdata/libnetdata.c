@@ -370,7 +370,7 @@ static struct malloc_header *malloc_get_header(void *ptr, const char *caller, co
     struct malloc_header *t = (struct malloc_header *)ret;
 
     if(t->signature.magic != 0x0BADCAFE) {
-        error("pointer %p is not our pointer (called %s() from %zu@%s, %s()).", ptr, caller, line, file, function);
+        netdata_log_error("pointer %p is not our pointer (called %s() from %zu@%s, %s()).", ptr, caller, line, file, function);
         return NULL;
     }
 
@@ -1050,13 +1050,16 @@ static int memory_file_open(const char *filename, size_t size) {
         if (lseek(fd, size, SEEK_SET) == (off_t) size) {
             if (write(fd, "", 1) == 1) {
                 if (ftruncate(fd, size))
-                    error("Cannot truncate file '%s' to size %zu. Will use the larger file.", filename, size);
+                    netdata_log_error("Cannot truncate file '%s' to size %zu. Will use the larger file.", filename, size);
             }
-            else error("Cannot write to file '%s' at position %zu.", filename, size);
+            else
+                netdata_log_error("Cannot write to file '%s' at position %zu.", filename, size);
         }
-        else error("Cannot seek file '%s' to size %zu.", filename, size);
+        else
+            netdata_log_error("Cannot seek file '%s' to size %zu.", filename, size);
     }
-    else error("Cannot create/open file '%s'.", filename);
+    else
+        netdata_log_error("Cannot create/open file '%s'.", filename);
 
     return fd;
 }
@@ -1065,7 +1068,8 @@ inline int madvise_sequential(void *mem, size_t len) {
     static int logger = 1;
     int ret = madvise(mem, len, MADV_SEQUENTIAL);
 
-    if (ret != 0 && logger-- > 0) error("madvise(MADV_SEQUENTIAL) failed.");
+    if (ret != 0 && logger-- > 0)
+        netdata_log_error("madvise(MADV_SEQUENTIAL) failed.");
     return ret;
 }
 
@@ -1073,7 +1077,8 @@ inline int madvise_random(void *mem, size_t len) {
     static int logger = 1;
     int ret = madvise(mem, len, MADV_RANDOM);
 
-    if (ret != 0 && logger-- > 0) error("madvise(MADV_RANDOM) failed.");
+    if (ret != 0 && logger-- > 0)
+        netdata_log_error("madvise(MADV_RANDOM) failed.");
     return ret;
 }
 
@@ -1081,7 +1086,8 @@ inline int madvise_dontfork(void *mem, size_t len) {
     static int logger = 1;
     int ret = madvise(mem, len, MADV_DONTFORK);
 
-    if (ret != 0 && logger-- > 0) error("madvise(MADV_DONTFORK) failed.");
+    if (ret != 0 && logger-- > 0)
+        netdata_log_error("madvise(MADV_DONTFORK) failed.");
     return ret;
 }
 
@@ -1089,7 +1095,8 @@ inline int madvise_willneed(void *mem, size_t len) {
     static int logger = 1;
     int ret = madvise(mem, len, MADV_WILLNEED);
 
-    if (ret != 0 && logger-- > 0) error("madvise(MADV_WILLNEED) failed.");
+    if (ret != 0 && logger-- > 0)
+        netdata_log_error("madvise(MADV_WILLNEED) failed.");
     return ret;
 }
 
@@ -1097,7 +1104,8 @@ inline int madvise_dontneed(void *mem, size_t len) {
     static int logger = 1;
     int ret = madvise(mem, len, MADV_DONTNEED);
 
-    if (ret != 0 && logger-- > 0) error("madvise(MADV_DONTNEED) failed.");
+    if (ret != 0 && logger-- > 0)
+        netdata_log_error("madvise(MADV_DONTNEED) failed.");
     return ret;
 }
 
@@ -1106,7 +1114,8 @@ inline int madvise_dontdump(void *mem __maybe_unused, size_t len __maybe_unused)
     static int logger = 1;
     int ret = madvise(mem, len, MADV_DONTDUMP);
 
-    if (ret != 0 && logger-- > 0) error("madvise(MADV_DONTDUMP) failed.");
+    if (ret != 0 && logger-- > 0)
+        netdata_log_error("madvise(MADV_DONTDUMP) failed.");
     return ret;
 #else
     return 0;
@@ -1118,7 +1127,8 @@ inline int madvise_mergeable(void *mem __maybe_unused, size_t len __maybe_unused
     static int logger = 1;
     int ret = madvise(mem, len, MADV_MERGEABLE);
 
-    if (ret != 0 && logger-- > 0) error("madvise(MADV_MERGEABLE) failed.");
+    if (ret != 0 && logger-- > 0)
+        netdata_log_error("madvise(MADV_MERGEABLE) failed.");
     return ret;
 #else
     return 0;
@@ -1215,12 +1225,12 @@ int memory_file_save(const char *filename, void *mem, size_t size) {
 
     int fd = open(tmpfilename, O_RDWR | O_CREAT | O_NOATIME, 0664);
     if (fd < 0) {
-        error("Cannot create/open file '%s'.", filename);
+        netdata_log_error("Cannot create/open file '%s'.", filename);
         return -1;
     }
 
     if (write(fd, mem, size) != (ssize_t) size) {
-        error("Cannot write to file '%s' %ld bytes.", filename, (long) size);
+        netdata_log_error("Cannot write to file '%s' %ld bytes.", filename, (long) size);
         close(fd);
         return -1;
     }
@@ -1228,7 +1238,7 @@ int memory_file_save(const char *filename, void *mem, size_t size) {
     close(fd);
 
     if (rename(tmpfilename, filename)) {
-        error("Cannot rename '%s' to '%s'", tmpfilename, filename);
+        netdata_log_error("Cannot rename '%s' to '%s'", tmpfilename, filename);
         return -1;
     }
 
@@ -1298,7 +1308,7 @@ unsigned long end_tsc(void) {
 int recursively_delete_dir(const char *path, const char *reason) {
     DIR *dir = opendir(path);
     if(!dir) {
-        error("Cannot read %s directory to be deleted '%s'", reason?reason:"", path);
+        netdata_log_error("Cannot read %s directory to be deleted '%s'", reason?reason:"", path);
         return -1;
     }
 
@@ -1323,14 +1333,14 @@ int recursively_delete_dir(const char *path, const char *reason) {
 
         netdata_log_info("Deleting %s file '%s'", reason?reason:"", fullpath);
         if(unlikely(unlink(fullpath) == -1))
-            error("Cannot delete %s file '%s'", reason?reason:"", fullpath);
+            netdata_log_error("Cannot delete %s file '%s'", reason?reason:"", fullpath);
         else
             ret++;
     }
 
     netdata_log_info("Deleting empty directory '%s'", path);
     if(unlikely(rmdir(path) == -1))
-        error("Cannot delete empty directory '%s'", path);
+        netdata_log_error("Cannot delete empty directory '%s'", path);
     else
         ret++;
 
@@ -1404,7 +1414,7 @@ int verify_netdata_host_prefix() {
     return 0;
 
 failed:
-    error("Ignoring host prefix '%s': path '%s' %s", netdata_configured_host_prefix, path, reason);
+    netdata_log_error("Ignoring host prefix '%s': path '%s' %s", netdata_configured_host_prefix, path, reason);
     netdata_configured_host_prefix = "";
     return -1;
 }
@@ -1512,7 +1522,7 @@ int path_is_file(const char *path, const char *subpath) {
 
 void recursive_config_double_dir_load(const char *user_path, const char *stock_path, const char *subpath, int (*callback)(const char *filename, void *data), void *data, size_t depth) {
     if(depth > 3) {
-        error("CONFIG: Max directory depth reached while reading user path '%s', stock path '%s', subpath '%s'", user_path, stock_path, subpath);
+        netdata_log_error("CONFIG: Max directory depth reached while reading user path '%s', stock path '%s', subpath '%s'", user_path, stock_path, subpath);
         return;
     }
 
@@ -1523,7 +1533,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
 
     DIR *dir = opendir(udir);
     if (!dir) {
-        error("CONFIG cannot open user-config directory '%s'.", udir);
+        netdata_log_error("CONFIG cannot open user-config directory '%s'.", udir);
     }
     else {
         struct dirent *de = NULL;
@@ -1565,7 +1575,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
 
     dir = opendir(sdir);
     if (!dir) {
-        error("CONFIG cannot open stock config directory '%s'.", sdir);
+        netdata_log_error("CONFIG cannot open stock config directory '%s'.", sdir);
     }
     else {
         if (strcmp(udir, sdir)) {
@@ -1741,7 +1751,7 @@ bool run_command_and_copy_output_to_stdout(const char *command, int max_line_len
             fprintf(stdout, "%s", buffer);
     }
     else {
-        error("Failed to execute command '%s'.", command);
+        netdata_log_error("Failed to execute command '%s'.", command);
         return false;
     }
 
@@ -1759,7 +1769,7 @@ void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds){
             if(!(excluded_fds & OPEN_FD_EXCLUDE_STDERR)) (void)close(STDERR_FILENO);
 #if defined(HAVE_CLOSE_RANGE)
             if(close_range(STDERR_FILENO + 1, ~0U, 0) == 0) return;
-            error("close_range() failed, will try to close fds one by one");
+            netdata_log_error("close_range() failed, will try to close fds one by one");
 #endif
             break;
         case OPEN_FD_ACTION_FD_CLOEXEC:
@@ -1768,7 +1778,7 @@ void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds){
             if(!(excluded_fds & OPEN_FD_EXCLUDE_STDERR)) (void)fcntl(STDERR_FILENO, F_SETFD, FD_CLOEXEC);
 #if defined(HAVE_CLOSE_RANGE) && defined(CLOSE_RANGE_CLOEXEC) // Linux >= 5.11, FreeBSD >= 13.1
             if(close_range(STDERR_FILENO + 1, ~0U, CLOSE_RANGE_CLOEXEC) == 0) return;
-            error("close_range() failed, will try to mark fds for closing one by one");
+            netdata_log_error("close_range() failed, will try to mark fds for closing one by one");
 #endif
             break;
         default:

@@ -56,7 +56,7 @@ inline const char *rrdcalc_status2string(RRDCALC_STATUS status) {
             return "CRITICAL";
 
         default:
-            error("Unknown alarm status %d", status);
+            netdata_log_error("Unknown alarm status %d", status);
             return "UNKNOWN";
     }
 }
@@ -217,7 +217,7 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
     netdata_rwlock_unlock(&st->alerts.rwlock);
 
     if(rc->update_every < rc->rrdset->update_every) {
-        error("Health alarm '%s.%s' has update every %d, less than chart update every %d. Setting alarm update frequency to %d.", rrdset_id(rc->rrdset), rrdcalc_name(rc), rc->update_every, rc->rrdset->update_every, rc->rrdset->update_every);
+        netdata_log_error("Health alarm '%s.%s' has update every %d, less than chart update every %d. Setting alarm update frequency to %d.", rrdset_id(rc->rrdset), rrdcalc_name(rc), rc->update_every, rc->rrdset->update_every, rc->rrdset->update_every);
         rc->update_every = rc->rrdset->update_every;
     }
 
@@ -318,7 +318,7 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
 
     if(!st) {
         debug(D_HEALTH, "Requested to unlink RRDCALC '%s.%s' which is not linked to any RRDSET", rrdcalc_chart_name(rc), rrdcalc_name(rc));
-        error("Requested to unlink RRDCALC '%s.%s' which is not linked to any RRDSET", rrdcalc_chart_name(rc), rrdcalc_name(rc));
+        netdata_log_error("Requested to unlink RRDCALC '%s.%s' which is not linked to any RRDSET", rrdcalc_chart_name(rc), rrdcalc_name(rc));
         return;
     }
 
@@ -512,17 +512,17 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
         if(rt->calculation) {
             rc->calculation = expression_parse(rt->calculation->source, NULL, NULL);
             if(!rc->calculation)
-                error("Health alarm '%s.%s': failed to parse calculation expression '%s'", rrdset_id(st), rrdcalctemplate_name(rt), rt->calculation->source);
+                netdata_log_error("Health alarm '%s.%s': failed to parse calculation expression '%s'", rrdset_id(st), rrdcalctemplate_name(rt), rt->calculation->source);
         }
         if(rt->warning) {
             rc->warning = expression_parse(rt->warning->source, NULL, NULL);
             if(!rc->warning)
-                error("Health alarm '%s.%s': failed to re-parse warning expression '%s'", rrdset_id(st), rrdcalctemplate_name(rt), rt->warning->source);
+                netdata_log_error("Health alarm '%s.%s': failed to re-parse warning expression '%s'", rrdset_id(st), rrdcalctemplate_name(rt), rt->warning->source);
         }
         if(rt->critical) {
             rc->critical = expression_parse(rt->critical->source, NULL, NULL);
             if(!rc->critical)
-                error("Health alarm '%s.%s': failed to re-parse critical expression '%s'", rrdset_id(st), rrdcalctemplate_name(rt), rt->critical->source);
+                netdata_log_error("Health alarm '%s.%s': failed to re-parse critical expression '%s'", rrdset_id(st), rrdcalctemplate_name(rt), rt->critical->source);
         }
     }
     else if(ctr->from_config) {
@@ -703,23 +703,23 @@ void rrdcalc_add_from_rrdcalctemplate(RRDHOST *host, RRDCALCTEMPLATE *rt, RRDSET
 
     dictionary_set_advanced(host->rrdcalc_root_index, key, (ssize_t)(key_len + 1), NULL, sizeof(RRDCALC), &tmp);
     if(tmp.react_action != RRDCALC_REACT_NEW && tmp.existing_from_template == false)
-        error("RRDCALC: from template '%s' on chart '%s' with key '%s', failed to be added to host '%s'. It is manually configured.",
+        netdata_log_error("RRDCALC: from template '%s' on chart '%s' with key '%s', failed to be added to host '%s'. It is manually configured.",
               string2str(rt->name), rrdset_id(st), key, rrdhost_hostname(host));
 }
 
 int rrdcalc_add_from_config(RRDHOST *host, RRDCALC *rc) {
     if(!rc->chart) {
-        error("Health configuration for alarm '%s' does not have a chart", rrdcalc_name(rc));
+        netdata_log_error("Health configuration for alarm '%s' does not have a chart", rrdcalc_name(rc));
         return 0;
     }
 
     if(!rc->update_every) {
-        error("Health configuration for alarm '%s.%s' has no frequency (parameter 'every'). Ignoring it.", rrdcalc_chart_name(rc), rrdcalc_name(rc));
+        netdata_log_error("Health configuration for alarm '%s.%s' has no frequency (parameter 'every'). Ignoring it.", rrdcalc_chart_name(rc), rrdcalc_name(rc));
         return 0;
     }
 
     if(!RRDCALC_HAS_DB_LOOKUP(rc) && !rc->calculation && !rc->warning && !rc->critical) {
-        error("Health configuration for alarm '%s.%s' is useless (no db lookup, no calculation, no warning and no critical expressions)", rrdcalc_chart_name(rc), rrdcalc_name(rc));
+        netdata_log_error("Health configuration for alarm '%s.%s' is useless (no db lookup, no calculation, no warning and no critical expressions)", rrdcalc_chart_name(rc), rrdcalc_name(rc));
         return 0;
     }
 
@@ -750,7 +750,7 @@ int rrdcalc_add_from_config(RRDHOST *host, RRDCALC *rc) {
         rrdset_foreach_done(st);
     }
     else {
-        error(
+        netdata_log_error(
             "RRDCALC: from config '%s' on chart '%s' failed to be added to host '%s'. It already exists.",
             string2str(rc->name),
             string2str(rc->chart),
@@ -811,7 +811,7 @@ void rrdcalc_unlink_all_rrdset_alerts(RRDSET *st) {
     netdata_rwlock_wrlock(&st->alerts.rwlock);
     while((rc = st->alerts.base)) {
         if(last == rc) {
-            error("RRDCALC: malformed list of alerts linked to chart - cannot cleanup - giving up.");
+            netdata_log_error("RRDCALC: malformed list of alerts linked to chart - cannot cleanup - giving up.");
             break;
         }
         last = rc;

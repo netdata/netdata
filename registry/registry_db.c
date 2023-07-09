@@ -122,7 +122,7 @@ int registry_db_save(void) {
     debug(D_REGISTRY, "Registry: Creating file '%s'", tmp_filename);
     FILE *fp = fopen(tmp_filename, "w");
     if(!fp) {
-        error("Registry: Cannot create file: %s", tmp_filename);
+        netdata_log_error("Registry: Cannot create file: %s", tmp_filename);
         error_log_limit_reset();
         return -1;
     }
@@ -132,7 +132,7 @@ int registry_db_save(void) {
     debug(D_REGISTRY, "Saving all machines");
     int bytes1 = dictionary_walkthrough_read(registry.machines, registry_machine_save, fp);
     if(bytes1 < 0) {
-        error("Registry: Cannot save registry machines - return value %d", bytes1);
+        netdata_log_error("Registry: Cannot save registry machines - return value %d", bytes1);
         fclose(fp);
         error_log_limit_reset();
         return bytes1;
@@ -142,7 +142,7 @@ int registry_db_save(void) {
     debug(D_REGISTRY, "Saving all persons");
     int bytes2 = dictionary_walkthrough_read(registry.persons, registry_person_save, fp);
     if(bytes2 < 0) {
-        error("Registry: Cannot save registry persons - return value %d", bytes2);
+        netdata_log_error("Registry: Cannot save registry persons - return value %d", bytes2);
         fclose(fp);
         error_log_limit_reset();
         return bytes2;
@@ -166,34 +166,34 @@ int registry_db_save(void) {
     // remove the .old db
     debug(D_REGISTRY, "Registry: Removing old db '%s'", old_filename);
     if(unlink(old_filename) == -1 && errno != ENOENT)
-        error("Registry: cannot remove old registry file '%s'", old_filename);
+        netdata_log_error("Registry: cannot remove old registry file '%s'", old_filename);
 
     // rename the db to .old
     debug(D_REGISTRY, "Registry: Link current db '%s' to .old: '%s'", registry.db_filename, old_filename);
     if(link(registry.db_filename, old_filename) == -1 && errno != ENOENT)
-        error("Registry: cannot move file '%s' to '%s'. Saving registry DB failed!", registry.db_filename, old_filename);
+        netdata_log_error("Registry: cannot move file '%s' to '%s'. Saving registry DB failed!", registry.db_filename, old_filename);
 
     else {
         // remove the database (it is saved in .old)
         debug(D_REGISTRY, "Registry: removing db '%s'", registry.db_filename);
         if (unlink(registry.db_filename) == -1 && errno != ENOENT)
-            error("Registry: cannot remove old registry file '%s'", registry.db_filename);
+            netdata_log_error("Registry: cannot remove old registry file '%s'", registry.db_filename);
 
         // move the .tmp to make it active
         debug(D_REGISTRY, "Registry: linking tmp db '%s' to active db '%s'", tmp_filename, registry.db_filename);
         if (link(tmp_filename, registry.db_filename) == -1) {
-            error("Registry: cannot move file '%s' to '%s'. Saving registry DB failed!", tmp_filename,
+            netdata_log_error("Registry: cannot move file '%s' to '%s'. Saving registry DB failed!", tmp_filename,
                     registry.db_filename);
 
             // move the .old back
             debug(D_REGISTRY, "Registry: linking old db '%s' to active db '%s'", old_filename, registry.db_filename);
             if(link(old_filename, registry.db_filename) == -1)
-                error("Registry: cannot move file '%s' to '%s'. Recovering the old registry DB failed!", old_filename, registry.db_filename);
+                netdata_log_error("Registry: cannot move file '%s' to '%s'. Recovering the old registry DB failed!", old_filename, registry.db_filename);
         }
         else {
             debug(D_REGISTRY, "Registry: removing tmp db '%s'", tmp_filename);
             if(unlink(tmp_filename) == -1)
-                error("Registry: cannot remove tmp registry file '%s'", tmp_filename);
+                netdata_log_error("Registry: cannot remove tmp registry file '%s'", tmp_filename);
 
             // it has been moved successfully
             // discard the current registry log
@@ -221,7 +221,7 @@ size_t registry_db_load(void) {
     debug(D_REGISTRY, "Registry: loading active db from: '%s'", registry.db_filename);
     FILE *fp = fopen(registry.db_filename, "r");
     if(!fp) {
-        error("Registry: cannot open registry file: '%s'", registry.db_filename);
+        netdata_log_error("Registry: cannot open registry file: '%s'", registry.db_filename);
         return 0;
     }
 
@@ -234,7 +234,7 @@ size_t registry_db_load(void) {
         switch(*s) {
             case 'T': // totals
                 if(unlikely(len != 103 || s[1] != '\t' || s[18] != '\t' || s[35] != '\t' || s[52] != '\t' || s[69] != '\t' || s[86] != '\t' || s[103] != '\0')) {
-                    error("Registry totals line %zu is wrong (len = %zu).", line, len);
+                    netdata_log_error("Registry totals line %zu is wrong (len = %zu).", line, len);
                     continue;
                 }
                 registry.persons_count = strtoull(&s[2], NULL, 16);
@@ -249,7 +249,7 @@ size_t registry_db_load(void) {
                 m = NULL;
                 // verify it is valid
                 if(unlikely(len != 65 || s[1] != '\t' || s[10] != '\t' || s[19] != '\t' || s[28] != '\t' || s[65] != '\0')) {
-                    error("Registry person line %zu is wrong (len = %zu).", line, len);
+                    netdata_log_error("Registry person line %zu is wrong (len = %zu).", line, len);
                     continue;
                 }
 
@@ -264,7 +264,7 @@ size_t registry_db_load(void) {
                 p = NULL;
                 // verify it is valid
                 if(unlikely(len != 65 || s[1] != '\t' || s[10] != '\t' || s[19] != '\t' || s[28] != '\t' || s[65] != '\0')) {
-                    error("Registry person line %zu is wrong (len = %zu).", line, len);
+                    netdata_log_error("Registry person line %zu is wrong (len = %zu).", line, len);
                     continue;
                 }
 
@@ -277,13 +277,13 @@ size_t registry_db_load(void) {
 
             case 'U': // person URL
                 if(unlikely(!p)) {
-                    error("Registry: ignoring line %zu, no person loaded: %s", line, s);
+                    netdata_log_error("Registry: ignoring line %zu, no person loaded: %s", line, s);
                     continue;
                 }
 
                 // verify it is valid
                 if(len < 69 || s[1] != '\t' || s[10] != '\t' || s[19] != '\t' || s[28] != '\t' || s[31] != '\t' || s[68] != '\t') {
-                    error("Registry person URL line %zu is wrong (len = %zu).", line, len);
+                    netdata_log_error("Registry person URL line %zu is wrong (len = %zu).", line, len);
                     continue;
                 }
 
@@ -293,7 +293,7 @@ size_t registry_db_load(void) {
                 char *url = &s[69];
                 while(*url && *url != '\t') url++;
                 if(!*url) {
-                    error("Registry person URL line %zu does not have a url.", line);
+                    netdata_log_error("Registry person URL line %zu does not have a url.", line);
                     continue;
                 }
                 *url++ = '\0';
@@ -315,13 +315,13 @@ size_t registry_db_load(void) {
 
             case 'V': // machine URL
                 if(unlikely(!m)) {
-                    error("Registry: ignoring line %zu, no machine loaded: %s", line, s);
+                    netdata_log_error("Registry: ignoring line %zu, no machine loaded: %s", line, s);
                     continue;
                 }
 
                 // verify it is valid
                 if(len < 32 || s[1] != '\t' || s[10] != '\t' || s[19] != '\t' || s[28] != '\t' || s[31] != '\t') {
-                    error("Registry person URL line %zu is wrong (len = %zu).", line, len);
+                    netdata_log_error("Registry person URL line %zu is wrong (len = %zu).", line, len);
                     continue;
                 }
 
@@ -337,7 +337,7 @@ size_t registry_db_load(void) {
                 break;
 
             default:
-                error("Registry: ignoring line %zu of filename '%s': %s.", line, registry.db_filename, s);
+                netdata_log_error("Registry: ignoring line %zu of filename '%s': %s.", line, registry.db_filename, s);
                 break;
         }
     }

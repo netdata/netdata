@@ -386,7 +386,7 @@ int format_batch_prometheus_remote_write(struct instance *instance)
     size_t data_size = get_write_request_size(connector_specific_data->write_request);
 
     if (unlikely(!data_size)) {
-        error("EXPORTING: write request size is out of range");
+        netdata_log_error("EXPORTING: write request size is out of range");
         return 1;
     }
 
@@ -394,7 +394,7 @@ int format_batch_prometheus_remote_write(struct instance *instance)
 
     buffer_need_bytes(buffer, data_size);
     if (unlikely(pack_and_clear_write_request(connector_specific_data->write_request, buffer->buffer, &data_size))) {
-        error("EXPORTING: cannot pack write request");
+        netdata_log_error("EXPORTING: cannot pack write request");
         return 1;
     }
     buffer->len = data_size;

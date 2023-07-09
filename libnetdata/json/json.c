@@ -22,13 +22,13 @@ int json_tokens = JSON_TOKENS;
 #ifdef ENABLE_JSONC
 json_object *json_tokenise(char *js) {
     if(!js) {
-        error("JSON: json string is empty.");
+        netdata_log_error("JSON: json string is empty.");
         return NULL;
     }
 
     json_object *token = json_tokener_parse(js);
     if(!token) {
-        error("JSON: Invalid json string.");
+        netdata_log_error("JSON: Invalid json string.");
         return NULL;
     }
 
@@ -39,7 +39,7 @@ jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
 {
     int n = json_tokens;
     if(!js || !len) {
-        error("JSON: json string is empty.");
+        netdata_log_error("JSON: json string is empty.");
         return NULL;
     }
 
@@ -62,12 +62,12 @@ jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
     }
 
     if (ret == JSMN_ERROR_INVAL) {
-        error("JSON: Invalid json string.");
+        netdata_log_error("JSON: Invalid json string.");
         freez(tokens);
         return NULL;
     }
     else if (ret == JSMN_ERROR_PART) {
-        error("JSON: Truncated JSON string.");
+        netdata_log_error("JSON: Truncated JSON string.");
         freez(tokens);
         return NULL;
     }

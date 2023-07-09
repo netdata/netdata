@@ -251,8 +251,10 @@ static cmd_status_t cmd_read_config_execute(char *args, char **message)
     char *value = appconfig_get(tmp_config, temp + offset + 1, temp + offset2 + 1, NULL);
     if (value == NULL)
     {
-        error("Cannot execute read-config conf_file=%s section=%s / key=%s because no value set", conf_file,
-              temp + offset + 1, temp + offset2 + 1);
+        netdata_log_error("Cannot execute read-config conf_file=%s section=%s / key=%s because no value set",
+                          conf_file,
+                          temp + offset + 1,
+                          temp + offset2 + 1);
         freez(temp);
         return CMD_STATUS_FAILURE;
     }
@@ -449,7 +451,7 @@ static void send_command_reply(struct command_context *cmd_ctx, cmd_status_t sta
     write_buf.len = reply_string_size;
     ret = uv_write(&cmd_ctx->write_req, (uv_stream_t *)client, &write_buf, 1, pipe_write_cb);
     if (ret) {
-        error("uv_write(): %s", uv_strerror(ret));
+        netdata_log_error("uv_write(): %s", uv_strerror(ret));
     }
 }
 
@@ -535,7 +537,7 @@ static void pipe_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf
         netdata_log_info("EOF found in command pipe.");
         parse_commands(cmd_ctx);
     } else if (nread < 0) {
-        error("%s: %s", __func__, uv_strerror(nread));
+        netdata_log_error("%s: %s", __func__, uv_strerror(nread));
     }
 
     if (nread < 0) { /* stop stream due to EOF or error */
@@ -579,13 +581,13 @@ static void connection_cb(uv_stream_t *server, int status)
     client = (uv_pipe_t *)cmd_ctx;
     ret = uv_pipe_init(server->loop, client, 1);
     if (ret) {
-        error("uv_pipe_init(): %s", uv_strerror(ret));
+        netdata_log_error("uv_pipe_init(): %s", uv_strerror(ret));
         freez(cmd_ctx);
         return;
     }
     ret = uv_accept(server, (uv_stream_t *)client);
     if (ret) {
-        error("uv_accept(): %s", uv_strerror(ret));
+        netdata_log_error("uv_accept(): %s", uv_strerror(ret));
         uv_close((uv_handle_t *)client, pipe_close_cb);
         return;
     }
@@ -598,7 +600,7 @@ static void connection_cb(uv_stream_t *server, int status)
 
     ret = uv_read_start((uv_stream_t*)client, alloc_cb, pipe_read_cb);
     if (ret) {
-        error("uv_read_start(): %s", uv_strerror(ret));
+        netdata_log_error("uv_read_start(): %s", uv_strerror(ret));
         uv_close((uv_handle_t *)client, pipe_close_cb);
         --clients;
         netdata_log_info("Command Clients = %u\n", clients);
@@ -620,7 +622,7 @@ static void command_thread(void *arg)
     loop = mallocz(sizeof(uv_loop_t));
     ret = uv_loop_init(loop);
     if (ret) {
-        error("uv_loop_init(): %s", uv_strerror(ret));
+        netdata_log_error("uv_loop_init(): %s", uv_strerror(ret));
         command_thread_error = ret;
         goto error_after_loop_init;
     }
@@ -628,7 +630,7 @@ static void command_thread(void *arg)
 
     ret = uv_async_init(loop, &async, async_cb);
     if (ret) {
-        error("uv_async_init(): %s", uv_strerror(ret));
+        netdata_log_error("uv_async_init(): %s", uv_strerror(ret));
         command_thread_error = ret;
         goto error_after_async_init;
     }
@@ -636,7 +638,7 @@ static void command_thread(void *arg)
 
     ret = uv_pipe_init(loop, &server_pipe, 0);
     if (ret) {
-        error("uv_pipe_init(): %s", uv_strerror(ret));
+        netdata_log_error("uv_pipe_init(): %s", uv_strerror(ret));
         command_thread_error = ret;
         goto error_after_pipe_init;
     }
@@ -647,7 +649,7 @@ static void command_thread(void *arg)
     uv_fs_req_cleanup(&req);
     ret = uv_pipe_bind(&server_pipe, pipename);
     if (ret) {
-        error("uv_pipe_bind(): %s", uv_strerror(ret));
+        netdata_log_error("uv_pipe_bind(): %s", uv_strerror(ret));
         command_thread_error = ret;
         goto error_after_pipe_bind;
     }
@@ -659,7 +661,7 @@ static void command_thread(void *arg)
         ret = uv_listen((uv_stream_t *)&server_pipe, 1, connection_cb);
     }
     if (ret) {
-        error("uv_listen(): %s", uv_strerror(ret));
+        netdata_log_error("uv_listen(): %s", uv_strerror(ret));
         command_thread_error = ret;
         goto error_after_uv_listen;
     }
@@ -723,7 +725,7 @@ void commands_init(void)
     completion_init(&completion);
     error = uv_thread_create(&thread, command_thread, NULL);
     if (error) {
-        error("uv_thread_create(): %s", uv_strerror(error));
+        netdata_log_error("uv_thread_create(): %s", uv_strerror(error));
         goto after_error;
     }
     /* wait for worker thread to initialize */
@@ -734,7 +736,7 @@ void commands_init(void)
     if (command_thread_error) {
         error = uv_thread_join(&thread);
         if (error) {
-            error("uv_thread_create(): %s", uv_strerror(error));
+            netdata_log_error("uv_thread_create(): %s", uv_strerror(error));
         }
         goto after_error;
     }
@@ -743,7 +745,7 @@ void commands_init(void)
     return;
 
 after_error:
-    error("Failed to initialize command server. The netdata cli tool will be unable to send commands.");
+    netdata_log_error("Failed to initialize command server. The netdata cli tool will be unable to send commands.");
 }
 
 void commands_exit(void)

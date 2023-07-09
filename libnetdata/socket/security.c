@@ -429,7 +429,7 @@ void netdata_ssl_initialize_openssl() {
 #else
 
     if (OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG, NULL) != 1) {
-        error("SSL library cannot be initialized.");
+        netdata_log_error("SSL library cannot be initialized.");
     }
 
 #endif
@@ -516,7 +516,7 @@ static SSL_CTX * netdata_ssl_create_server_ctx(unsigned long mode) {
 #if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
 	ctx = SSL_CTX_new(SSLv23_server_method());
     if (!ctx) {
-		error("Cannot create a new SSL context, netdata won't encrypt communication");
+		netdata_log_error("Cannot create a new SSL context, netdata won't encrypt communication");
         return NULL;
     }
 
@@ -524,7 +524,7 @@ static SSL_CTX * netdata_ssl_create_server_ctx(unsigned long mode) {
 #else
     ctx = SSL_CTX_new(TLS_server_method());
     if (!ctx) {
-		error("Cannot create a new SSL context, netdata won't encrypt communication");
+        netdata_log_error("Cannot create a new SSL context, netdata won't encrypt communication");
         return NULL;
     }
 
@@ -539,7 +539,7 @@ static SSL_CTX * netdata_ssl_create_server_ctx(unsigned long mode) {
 
     if(tls_ciphers  && strcmp(tls_ciphers, "none") != 0) {
         if (!SSL_CTX_set_cipher_list(ctx, tls_ciphers)) {
-            error("SSL error. cannot set the cipher list");
+            netdata_log_error("SSL error. cannot set the cipher list");
         }
     }
 #endif
@@ -548,7 +548,7 @@ static SSL_CTX * netdata_ssl_create_server_ctx(unsigned long mode) {
 
     if (!SSL_CTX_check_private_key(ctx)) {
         ERR_error_string_n(ERR_get_error(),lerror,sizeof(lerror));
-		error("SSL cannot check the private key: %s",lerror);
+        netdata_log_error("SSL cannot check the private key: %s",lerror);
         SSL_CTX_free(ctx);
         return NULL;
     }
@@ -680,7 +680,7 @@ int security_test_certificate(SSL *ssl) {
     {
         char error[512];
         ERR_error_string_n(ERR_get_error(), error, sizeof(error));
-        error("SSL RFC4158 check:  We have a invalid certificate, the tests result with %ld and message %s", status, error);
+        netdata_log_error("SSL RFC4158 check:  We have a invalid certificate, the tests result with %ld and message %s", status, error);
         ret = -1;
     } else {
         ret = 0;

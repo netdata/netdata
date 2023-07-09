@@ -270,7 +270,7 @@ static inline int is_machine_guid_blacklisted(const char *guid) {
     if(!strcmp(guid, "8a795b0c-2311-11e6-8563-000c295076a6")
        || !strcmp(guid, "4aed1458-1c3e-11e6-a53f-000c290fc8f5")
             ) {
-        error("Blacklisted machine GUID '%s' found.", guid);
+        netdata_log_error("Blacklisted machine GUID '%s' found.", guid);
         return 1;
     }
 
@@ -292,11 +292,11 @@ char *registry_get_this_machine_guid(void) {
     if(fd != -1) {
         char buf[GUID_LEN + 1];
         if(read(fd, buf, GUID_LEN) != GUID_LEN)
-            error("Failed to read machine GUID from '%s'", registry.machine_guid_filename);
+            netdata_log_error("Failed to read machine GUID from '%s'", registry.machine_guid_filename);
         else {
             buf[GUID_LEN] = '\0';
             if(regenerate_guid(buf, guid) == -1) {
-                error("Failed to validate machine GUID '%s' from '%s'. Ignoring it - this might mean this netdata will appear as duplicate in the registry.",
+                netdata_log_error("Failed to validate machine GUID '%s' from '%s'. Ignoring it - this might mean this netdata will appear as duplicate in the registry.",
                         buf, registry.machine_guid_filename);
 
                 guid[0] = '\0';

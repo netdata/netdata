@@ -477,7 +477,7 @@ void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *m
     snprintfz(filename, FILENAME_MAX, "/proc/self/fdinfo/%d", map->map_fd);
     procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
     if(unlikely(!ff)) {
-        error("Cannot open %s", filename);
+        netdata_log_error("Cannot open %s", filename);
         return;
     }
 
@@ -613,7 +613,7 @@ void ebpf_update_map_size(struct bpf_map *map, ebpf_local_maps_t *lmap, ebpf_mod
 void ebpf_update_map_type(struct bpf_map *map, ebpf_local_maps_t *w)
 {
     if (bpf_map__set_type(map, w->map_type)) {
-        error("Cannot modify map type for %s", w->name);
+        netdata_log_error("Cannot modify map type for %s", w->name);
     }
 }
 
@@ -794,7 +794,7 @@ void ebpf_update_controller(int fd, ebpf_module_t *em)
     for (key = NETDATA_CONTROLLER_APPS_ENABLED; key < end; key++) {
         int ret = bpf_map_update_elem(fd, &key, &values[key], 0);
         if (ret)
-            error("Add key(%u) for controller table failed.", key);
+            netdata_log_error("Add key(%u) for controller table failed.", key);
     }
 }
 
@@ -867,7 +867,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
     ebpf_update_legacy_map(*obj, em);
 
     if (bpf_object__load(*obj)) {
-        error("ERROR: loading BPF object file failed %s\n", lpath);
+        netdata_log_error("ERROR: loading BPF object file failed %s\n", lpath);
         bpf_object__close(*obj);
         return NULL;
     }
@@ -891,7 +891,7 @@ char *ebpf_find_symbol(char *search)
     snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, NETDATA_KALLSYMS);
     procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
     if(unlikely(!ff)) {
-        error("Cannot open %s%s", netdata_configured_host_prefix, NETDATA_KALLSYMS);
+        netdata_log_error("Cannot open %s%s", netdata_configured_host_prefix, NETDATA_KALLSYMS);
         return ret;
     }
 
@@ -1295,7 +1295,7 @@ void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file, int kver, int i
     if (!ebpf_load_config(em->cfg, filename)) {
         ebpf_mount_config_name(filename, FILENAME_MAX, ebpf_stock_config_dir, em->config_file);
         if (!ebpf_load_config(em->cfg, filename)) {
-            error("Cannot load the ebpf configuration file %s", em->config_file);
+            netdata_log_error("Cannot load the ebpf configuration file %s", em->config_file);
             return;
         }
         // If user defined data globally, we will have here EBPF_LOADED_FROM_USER, we need to consider this, to avoid
@@ -1512,7 +1512,7 @@ int ebpf_is_tracepoint_enabled(char *subsys, char *eventname)
 static int ebpf_change_tracing_values(char *subsys, char *eventname, char *value)
 {
     if (strcmp("0", value) && strcmp("1", value)) {
-        error("Invalid value given to either enable or disable a tracepoint.");
+        netdata_log_error("Invalid value given to either enable or disable a tracepoint.");
         return -1;
     }
 

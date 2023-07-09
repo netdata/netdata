@@ -952,7 +952,7 @@ static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *it
             if (having_index_lock) {
                 // delete it from the hashtable
                 if(hashtable_delete_unsafe(dict, item_get_name(item), item->key_len, item) == 0)
-                    error("DICTIONARY: INTERNAL ERROR VIEW: tried to delete item with name '%s', name_len %u that is not in the index", item_get_name(item), (KEY_LEN_TYPE)(item->key_len - 1));
+                    netdata_log_error("DICTIONARY: INTERNAL ERROR VIEW: tried to delete item with name '%s', name_len %u that is not in the index", item_get_name(item), (KEY_LEN_TYPE)(item->key_len - 1));
                 else
                     pointer_del(dict, item);
 
@@ -1065,8 +1065,8 @@ static size_t hashtable_destroy_unsafe(DICTIONARY *dict) {
     JError_t J_Error;
     Word_t ret = JudyHSFreeArray(&dict->index.JudyHSArray, &J_Error);
     if(unlikely(ret == (Word_t) JERR)) {
-        error("DICTIONARY: Cannot destroy JudyHS, JU_ERRNO_* == %u, ID == %d",
-              JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+        netdata_log_error("DICTIONARY: Cannot destroy JudyHS, JU_ERRNO_* == %u, ID == %d",
+                          JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
     }
 
     debug(D_DICTIONARY, "Dictionary: hash table freed %lu bytes", ret);
@@ -1079,8 +1079,8 @@ static inline void **hashtable_insert_unsafe(DICTIONARY *dict, const char *name,
     JError_t J_Error;
     Pvoid_t *Rc = JudyHSIns(&dict->index.JudyHSArray, (void *)name, name_len, &J_Error);
     if (unlikely(Rc == PJERR)) {
-        error("DICTIONARY: Cannot insert entry with name '%s' to JudyHS, JU_ERRNO_* == %u, ID == %d",
-              name, JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+        netdata_log_error("DICTIONARY: Cannot insert entry with name '%s' to JudyHS, JU_ERRNO_* == %u, ID == %d",
+                          name, JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
     }
 
     // if *Rc == 0, new item added to the array
@@ -1100,8 +1100,9 @@ static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, si
     JError_t J_Error;
     int ret = JudyHSDel(&dict->index.JudyHSArray, (void *)name, name_len, &J_Error);
     if(unlikely(ret == JERR)) {
-        error("DICTIONARY: Cannot delete entry with name '%s' from JudyHS, JU_ERRNO_* == %u, ID == %d", name,
-              JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+        netdata_log_error("DICTIONARY: Cannot delete entry with name '%s' from JudyHS, JU_ERRNO_* == %u, ID == %d",
+                          name,
+                          JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
         return 0;
     }
 
@@ -1573,7 +1574,9 @@ static bool dict_item_del(DICTIONARY *dict, const char *name, ssize_t name_len) 
     }
     else {
         if(hashtable_delete_unsafe(dict, name, name_len, item) == 0)
-            error("DICTIONARY: INTERNAL ERROR: tried to delete item with name '%s', name_len %zd that is not in the index", name, name_len - 1);
+            netdata_log_error("DICTIONARY: INTERNAL ERROR: tried to delete item with name '%s', name_len %zd that is not in the index",
+                              name,
+                              name_len - 1);
         else
             pointer_del(dict, item);
 
@@ -1668,7 +1671,7 @@ static DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONARY *dic
                 // view dictionary
                 // the item is already there and can be used
                 if(item->shared != master_item->shared)
-                    error("DICTIONARY: changing the master item on a view is not supported. The previous item will remain. To change the key of an item in a view, delete it and add it again.");
+                    netdata_log_error("DICTIONARY: changing the master item on a view is not supported. The previous item will remain. To change the key of an item in a view, delete it and add it again.");
             }
             else {
                 // master dictionary
@@ -2555,8 +2558,8 @@ void thread_cache_destroy(void) {
     JError_t J_Error;
     Word_t ret = JudyHSFreeArray(&thread_cache_judy_array, &J_Error);
     if(unlikely(ret == (Word_t) JERR)) {
-        error("THREAD_CACHE: Cannot destroy JudyHS, JU_ERRNO_* == %u, ID == %d",
-              JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+        netdata_log_error("THREAD_CACHE: Cannot destroy JudyHS, JU_ERRNO_* == %u, ID == %d",
+                          JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
     }
 
     internal_error(true, "THREAD_CACHE: hash table freed %lu bytes", ret);

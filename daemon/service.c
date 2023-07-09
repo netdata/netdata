@@ -42,7 +42,7 @@ static void svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
     if(cache_filename) {
         netdata_log_info("Deleting dimension file '%s'.", cache_filename);
         if (unlikely(unlink(cache_filename) == -1))
-            error("Cannot delete dimension file '%s'", cache_filename);
+            netdata_log_error("Cannot delete dimension file '%s'", cache_filename);
     }
 
     if (rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {

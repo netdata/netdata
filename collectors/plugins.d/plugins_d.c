@@ -94,7 +94,7 @@ static void pluginsd_worker_thread_handle_success(struct plugind *cd) {
     }
 
     if (cd->serial_failures > SERIAL_FAILURES_THRESHOLD) {
-        error("PLUGINSD: 'host:'%s', '%s' (pid %d) does not generate useful output, "
+        netdata_log_error("PLUGINSD: 'host:'%s', '%s' (pid %d) does not generate useful output, "
               "although it reports success (exits with 0)."
               "We have tried to collect something %zu times - unsuccessfully. Disabling it.",
               rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid, cd->serial_failures);
@@ -112,14 +112,14 @@ static void pluginsd_worker_thread_handle_error(struct plugind *cd, int worker_r
     }
 
     if (!cd->successful_collections) {
-        error("PLUGINSD: 'host:%s', '%s' (pid %d) exited with error code %d and haven't collected any data. Disabling it.",
+        netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) exited with error code %d and haven't collected any data. Disabling it.",
               rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid, worker_ret_code);
         plugin_set_disabled(cd);
         return;
     }
 
     if (cd->serial_failures <= SERIAL_FAILURES_THRESHOLD) {
-        error("PLUGINSD: 'host:%s', '%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times). %s",
+        netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times). %s",
               rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid, worker_ret_code, cd->successful_collections,
               plugin_is_enabled(cd) ? "Waiting a bit before starting it again." : "Will not start it again - it is disabled.");
         sleep((unsigned int)(cd->update_every * 10));
@@ -127,7 +127,7 @@ static void pluginsd_worker_thread_handle_error(struct plugind *cd, int worker_r
     }
 
     if (cd->serial_failures > SERIAL_FAILURES_THRESHOLD) {
-        error("PLUGINSD: 'host:%s', '%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times)."
+        netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times)."
               "We tried to restart it %zu times, but it failed to generate data. Disabling it.",
               rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid, worker_ret_code,
               cd->successful_collections, cd->serial_failures);
@@ -153,7 +153,7 @@ static void *pluginsd_worker_thread(void *arg) {
         FILE *fp_child_output = netdata_popen(cd->cmd, &cd->unsafe.pid, &fp_child_input);
 
         if (unlikely(!fp_child_input || !fp_child_output)) {
-            error("PLUGINSD: 'host:%s', cannot popen(\"%s\", \"r\").", rrdhost_hostname(cd->host), cd->cmd);
+            netdata_log_error("PLUGINSD: 'host:%s', cannot popen(\"%s\", \"r\").", rrdhost_hostname(cd->host), cd->cmd);
             break;
         }
 
@@ -235,7 +235,7 @@ void *pluginsd_main(void *ptr)
             if (unlikely(!dir)) {
                 if (directory_errors[idx] != errno) {
                     directory_errors[idx] = errno;
-                    error("cannot open plugins directory '%s'", directory_name);
+                    netdata_log_error("cannot open plugins directory '%s'", directory_name);
                 }
                 continue;
             }

@@ -148,7 +148,7 @@ int rrdpush_init() {
 #endif
 
     if(default_rrdpush_enabled && (!default_rrdpush_destination || !*default_rrdpush_destination || !default_rrdpush_api_key || !*default_rrdpush_api_key)) {
-        error("STREAM [send]: cannot enable sending thread - information is missing.");
+        netdata_log_error("STREAM [send]: cannot enable sending thread - information is missing.");
         default_rrdpush_enabled = 0;
     }
 
@@ -479,7 +479,7 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
 
         if(unlikely(!(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS))) {
             rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS);
-            error("STREAM %s [send]: not ready - collected metrics are not sent to parent.", rrdhost_hostname(host));
+            netdata_log_error("STREAM %s [send]: not ready - collected metrics are not sent to parent.", rrdhost_hostname(host));
         }
 
         return (RRDSET_STREAM_BUFFER) { .wb = NULL, };
@@ -727,7 +727,7 @@ static void rrdpush_sender_thread_spawn(RRDHOST *host) {
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM_SENDER "[%s]", rrdhost_hostname(host));
 
         if(netdata_thread_create(&host->rrdpush_sender_thread, tag, NETDATA_THREAD_OPTION_DEFAULT, rrdpush_sender_thread, (void *) host->sender))
-            error("STREAM %s [send]: failed to create new thread for client.", rrdhost_hostname(host));
+            netdata_log_error("STREAM %s [send]: failed to create new thread for client.", rrdhost_hostname(host));
         else
             rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
     }
@@ -1075,7 +1075,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
 #endif
                 rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
 
-            error("STREAM '%s' [receive from [%s]:%s]: "
+            netdata_log_error("STREAM '%s' [receive from [%s]:%s]: "
                   "failed to reply."
                   , rpt->hostname
                   , rpt->client_ip, rpt->client_port

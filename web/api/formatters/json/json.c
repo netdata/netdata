@@ -159,7 +159,8 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
         if(dates == JSON_DATES_JS) {
             // generate the local date time
             struct tm tmbuf, *tm = localtime_r(&now, &tmbuf);
-            if(!tm) { error("localtime_r() failed."); continue; }
+            if(!tm) {
+                netdata_log_error("localtime_r() failed."); continue; }
 
             if(likely(i != start)) buffer_fast_strcat(wb, ",\n", 2);
             buffer_fast_strcat(wb, pre_date, pre_date_len);

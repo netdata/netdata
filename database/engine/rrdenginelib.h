@@ -53,7 +53,7 @@ static inline void modify_bit(unsigned *x, unsigned pos, uint8_t val)
         *x |= 1U << pos;
         break;
     default:
-        error("modify_bit() called with invalid argument.");
+        netdata_log_error("modify_bit() called with invalid argument.");
         break;
     }
 }

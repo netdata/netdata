@@ -185,7 +185,7 @@ static void topic_generate_final(struct aclk_topic *t) {
 
     rrdhost_aclk_state_lock(localhost);
     if (unlikely(!localhost->aclk_state.claimed_id)) {
-        error("This should never be called if agent not claimed");
+        netdata_log_error("This should never be called if agent not claimed");
         rrdhost_aclk_state_unlock(localhost);
         return;
     }
@@ -214,7 +214,7 @@ static int topic_cache_add_topic(struct json_object *json, struct aclk_topic *to
     while (!json_object_iter_equal(&it, &itEnd)) {
         if (!strcmp(json_object_iter_peek_name(&it), JSON_TOPIC_KEY_NAME)) {
             if (json_object_get_type(json_object_iter_peek_value(&it)) != json_type_string) {
-                error("topic dictionary key \"" JSON_TOPIC_KEY_NAME "\" is expected to be json_type_string");
+                netdata_log_error("topic dictionary key \"" JSON_TOPIC_KEY_NAME "\" is expected to be json_type_string");
                 return 1;
             }
             topic->topic_id = topic_name_to_id(json_object_get_string(json_object_iter_peek_value(&it)));
@@ -226,7 +226,7 @@ static int topic_cache_add_topic(struct json_object *json, struct aclk_topic *to
         }
         if (!strcmp(json_object_iter_peek_name(&it), JSON_TOPIC_KEY_TOPIC)) {
             if (json_object_get_type(json_object_iter_peek_value(&it)) != json_type_string) {
-                error("topic dictionary key \"" JSON_TOPIC_KEY_TOPIC "\" is expected to be json_type_string");
+                netdata_log_error("topic dictionary key \"" JSON_TOPIC_KEY_TOPIC "\" is expected to be json_type_string");
                 return 1;
             }
             topic->topic_recvd = strdupz(json_object_get_string(json_object_iter_peek_value(&it)));
@@ -234,12 +234,12 @@ static int topic_cache_add_topic(struct json_object *json, struct aclk_topic *to
             continue;
         }
 
-        error("topic dictionary has Unknown/Unexpected key \"%s\" in topic description. Ignoring!", json_object_iter_peek_name(&it));
+        netdata_log_error("topic dictionary has Unknown/Unexpected key \"%s\" in topic description. Ignoring!", json_object_iter_peek_name(&it));
         json_object_iter_next(&it);
     }
 
     if (!topic->topic_recvd) {
-        error("topic dictionary Missig compulsory key %s", JSON_TOPIC_KEY_TOPIC);
+        netdata_log_error("topic dictionary Missig compulsory key %s", JSON_TOPIC_KEY_TOPIC);
         return 1;
     }
 
@@ -255,7 +255,7 @@ int aclk_generate_topic_cache(struct json_object *json)
 
     size_t array_size = json_object_array_length(json);
     if (!array_size) {
-        error("Empty topic list!");
+        netdata_log_error("Empty topic list!");
         return 1;
     }
 
@@ -267,19 +267,19 @@ int aclk_generate_topic_cache(struct json_object *json)
     for (size_t i = 0; i < array_size; i++) {
         obj = json_object_array_get_idx(json, i);
         if (json_object_get_type(obj) != json_type_object) {
-            error("expected json_type_object");
+            netdata_log_error("expected json_type_object");
             return 1;
         }
         aclk_topic_cache[i] = callocz(1, sizeof(struct aclk_topic));
         if (topic_cache_add_topic(obj, aclk_topic_cache[i])) {
-            error("failed to parse topic @idx=%d", (int)i);
+            netdata_log_error("failed to parse topic @idx=%d", (int)i);
             return 1;
         }
     }
 
     for (int i = 0; compulsory_topics[i] != ACLK_TOPICID_UNKNOWN; i++) {
         if (!aclk_get_topic(compulsory_topics[i])) {
-            error("missing compulsory topic \"%s\" in password response from cloud", topic_id_to_name(compulsory_topics[i]));
+            netdata_log_error("missing compulsory topic \"%s\" in password response from cloud", topic_id_to_name(compulsory_topics[i]));
             return 1;
         }
     }
@@ -295,7 +295,7 @@ int aclk_generate_topic_cache(struct json_object *json)
 const char *aclk_get_topic(enum aclk_topics topic)
 {
     if (!aclk_topic_cache) {
-        error("Topic cache not initialized");
+        netdata_log_error("Topic cache not initialized");
         return NULL;
     }
 
@@ -303,7 +303,7 @@ const char *aclk_get_topic(enum aclk_topics topic)
         if (aclk_topic_cache[i]->topic_id == topic)
             return aclk_topic_cache[i]->topic;
     }
-    error("Unknown topic");
+    netdata_log_error("Unknown topic");
     return NULL;
 }
 
@@ -315,7 +315,7 @@ const char *aclk_get_topic(enum aclk_topics topic)
 const char *aclk_topic_cache_iterate(aclk_topic_cache_iter_t *iter)
 {
     if (!aclk_topic_cache) {
-        error("Topic cache not initialized when %s was called.", __FUNCTION__);
+        netdata_log_error("Topic cache not initialized when %s was called.", __FUNCTION__);
         return NULL;
     }
 
