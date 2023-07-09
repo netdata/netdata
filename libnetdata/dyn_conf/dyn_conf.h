@@ -17,6 +17,8 @@ struct dyncfg_config {
 
 typedef struct dyncfg_config dyncfg_config_t;
 
+struct configurable_plugin;
+
 struct module
 {
     pthread_mutex_t lock;
@@ -27,7 +29,11 @@ struct module
     dyncfg_config_t config;
     dyncfg_config_t default_config;
 
-    int (*set_config_cb)(json_object *cfg);
+    struct configurable_plugin *plugin;
+
+    DICTIONARY *jobs;
+
+    int (*set_config_cb)(dyncfg_config_t *cfg);
 };
 
 struct configurable_plugin {
@@ -39,7 +45,7 @@ struct configurable_plugin {
     dyncfg_config_t config;
     dyncfg_config_t default_config;
 
-    int (*set_config_cb)(json_object *cfg);
+    int (*set_config_cb)(dyncfg_config_t *cfg);
 };
 
 //int has_module

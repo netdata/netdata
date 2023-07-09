@@ -376,11 +376,11 @@ static int netdata_dyncfg(h2o_handler_t *self, h2o_req_t *req)
         return 0;
     }
 
-    struct uni_http_response resp = dyn_conf_process_http_request(method, plugin_name, module_name, job_id, NULL, 0); //TODOTODO
+    struct uni_http_response resp = dyn_conf_process_http_request(method, plugin_name, module_name, job_id, req->entity.base, req->entity.len);
 
     req->res.status = resp.status;
     req->res.reason = resp.content;
-    h2o_send_inline(req, resp.content, strlen(resp.content));
+    h2o_send_inline(req, resp.content, resp.content_length);
 
     if (resp.content_free)
         free(resp.content);
@@ -389,14 +389,8 @@ static int netdata_dyncfg(h2o_handler_t *self, h2o_req_t *req)
     return 0;
 }
 
-// TODO this is hardcoded for now, as virtual module during development
-// as demo, in future this callback should exist within the module/plugin itself
-json_object *http_check_config = NULL;
-
 int set_current_config_http_check(json_object *cfg)
 {
-    json_object_put(http_check_config);
-    http_check_config = cfg;
     return 0;
 }
 
@@ -409,6 +403,18 @@ struct configurable_plugin plugin = {
 
 const char *default_config = "{\n\t\"info\": \"I'am http_check and this is my current configuration\",\n\t\"update_every\": 5\n}";
 const char *module1_default_config = "{\n\t\"info\": \"I'am module1 and this is my current configuration\",\n\t\"update_every\": 5\n}";
+const char *job_module_default_config = "{\n\t\"info\": \"I'am module1 and this is my current configuration\",\n\t\"update_every\": 5\n}";
+
+struct module job_module = {
+    .default_config = {
+        .data = job_module_default_config,
+        .data_size = strlen(job_module_default_config) + 1,
+    },
+    .name = "job_module",
+    .type = ARRAY,
+    
+
+}
 
 #define POLL_INTERVAL 100
 

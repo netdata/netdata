@@ -145,12 +145,14 @@ dyncfg_config_t load_config(const char *plugin_name, const char *module_name, co
 
     dyncfg_config_t config;
     long bytes;
-    config.data = read_by_filename(filename, &bytes);
+    config.data = read_by_filename(buffer_tostring(filename), &bytes);
 
     if (config.data == NULL)
         error_report("DYNCFG load_config: failed to load config from %s", buffer_tostring(filename));
 
     config.data_size = bytes;
+
+    buffer_free(filename);
 
     return config;
 }
@@ -168,10 +170,43 @@ static const char *set_plugin_config(struct configurable_plugin *plugin, dyncfg_
     }
 
     pthread_mutex_lock(&plugin->lock);
-    plugin->config = cfg;
+    plugin->config.data_size = cfg.data_size;
+    plugin->config.data = mallocz(cfg.data_size);
+    memcpy(plugin->config.data, cfg.data, cfg.data_size);
     pthread_mutex_unlock(&plugin->lock);
 
-//    module->set_config_cb(cfg_copy);
+    if (plugin->set_config_cb != NULL && plugin->set_config_cb(&plugin->config)) {
+        error_report("DYNCFG module \"%s\" set_config_cb failed", plugin->name);
+        return "set_config_cb failed";
+    }
+
+    return NULL;
+}
+
+static const char *set_module_config(struct module *mod, dyncfg_config_t cfg)
+{
+    struct configurable_plugin *plugin = mod->plugin;
+
+    if (store_config(plugin->name, mod->name, NULL, cfg)) {
+        error_report("DYNCFG could not store config for module \"%s\"", mod->name);
+        return "could not store config on disk";
+    }
+
+    if (plugin->set_config_cb == NULL) {
+        error_report("DYNCFG module \"%s\" has no set_module_config_cb", plugin->name);
+        return "module has no set_config_cb callback";
+    }
+
+    pthread_mutex_lock(&plugin->lock);
+    mod->config.data_size = cfg.data_size;
+    mod->config.data = mallocz(cfg.data_size);
+    memcpy(mod->config.data, cfg.data, cfg.data_size);
+    pthread_mutex_unlock(&plugin->lock);
+
+    if (plugin->set_config_cb != NULL && plugin->set_config_cb(&mod)) {
+        error_report("DYNCFG module \"%s\" set_module_config_cb failed", plugin->name);
+        return "set_module_config_cb failed";
+    }
 
     return NULL;
 }
@@ -214,6 +249,11 @@ int register_module(struct configurable_plugin *plugin, struct module *module)
     }
 
     pthread_mutex_init(&module->lock, NULL);
+
+    module->plugin = plugin;
+
+    if (module->type == ARRAY)
+        module->jobs = dictionary_create(DICT_OPTION_VALUE_LINK_DONT_CLONE);
 
     module->config = load_config(plugin->name, module->name, NULL);
     if (module->config.data == NULL) {
@@ -273,12 +313,20 @@ struct uni_http_response dyn_conf_process_http_request(int method, const char *p
             resp.content_length = plug->config.data_size;
             return resp;
         } else if (method == HTTP_METHOD_PUT) {
+            if (post_payload == NULL) {
+                resp.content = "no payload";
+                resp.content_length = strlen(resp.content);
+                resp.status = HTTP_RESP_BAD_REQUEST;
+                return resp;
+            }
             dyncfg_config_t cont = {
                 .data = post_payload,
                 .data_size = post_payload_size
             };
             set_plugin_config(plug, cont);
             resp.status = HTTP_RESP_OK;
+            resp.content = "OK";
+            resp.content_length = strlen(resp.content);
             return resp;
         }
         resp.content = "method not allowed";
@@ -309,6 +357,46 @@ struct uni_http_response dyn_conf_process_http_request(int method, const char *p
         resp.content_length = strlen(resp.content);
         return resp;
     }
+    struct module *mod = get_module_by_name(plug, module);
+    if (mod == NULL) {
+        resp.content = "module not found";
+        resp.content_length = strlen(resp.content);
+        resp.status = HTTP_RESP_NOT_FOUND;
+        return resp;
+    }
+    if (job_id == NULL) {
+        if (method == HTTP_METHOD_GET) {
+            resp.content = mallocz(mod->config.data_size);
+            memcpy(resp.content, mod->config.data, mod->config.data_size);
+            resp.status = HTTP_RESP_OK;
+//          resp.content_type = CT_APPLICATION_JSON;
+            resp.content_free = free;
+            resp.content_length = mod->config.data_size;
+            return resp;
+        } else if (method == HTTP_METHOD_PUT) {
+            if (post_payload == NULL) {
+                resp.content = "no payload";
+                resp.content_length = strlen(resp.content);
+                resp.status = HTTP_RESP_BAD_REQUEST;
+                return resp;
+            }
+            dyncfg_config_t cont = {
+                .data = post_payload,
+                .data_size = post_payload_size
+            };
+            set_module_config(mod, cont);
+            resp.status = HTTP_RESP_OK;
+            resp.content = "OK";
+            resp.content_length = strlen(resp.content);
+            return resp;
+        }
+        resp.content = "method not allowed";
+        resp.content_length = strlen(resp.content);
+        resp.status = HTTP_RESP_METHOD_NOT_ALLOWED;
+        return resp;
+    }
+
+
 
     return resp;
 }
