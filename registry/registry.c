@@ -109,12 +109,10 @@ static int registry_json_person_url_callback(void *entry, void *data) {
 }
 
 // callback for rendering MACHINE_URLs
-static int registry_json_machine_url_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data) {
+static int registry_json_machine_url_callback(REGISTRY_MACHINE_URL *mu, struct registry_json_walk_person_urls_callback *c) {
     if(unlikely(!asterisks))
         asterisks = string_strdupz("***");
 
-    REGISTRY_MACHINE_URL *mu = (REGISTRY_MACHINE_URL *)entry;
-    struct registry_json_walk_person_urls_callback *c = (struct registry_json_walk_person_urls_callback *)data;
     struct web_client *w = c->w;
     REGISTRY_MACHINE *m = c->m;
 
@@ -275,7 +273,10 @@ int registry_request_search_json(RRDHOST *host, struct web_client *w, char *pers
 
     buffer_json_member_add_array(w->response.data, "urls");
     struct registry_json_walk_person_urls_callback c = { NULL, m, w, 0 };
-    dictionary_walkthrough_read(m->machine_urls, registry_json_machine_url_callback, &c);
+
+    for(REGISTRY_MACHINE_URL *mu = m->machine_urls; mu ; mu = mu->next)
+        registry_json_machine_url_callback(mu, &c);
+
     buffer_json_array_close(w->response.data);
 
     registry_json_footer(w);

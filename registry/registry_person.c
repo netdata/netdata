@@ -213,7 +213,7 @@ REGISTRY_PERSON_URL *registry_person_link_to_url(REGISTRY_PERSON *p, REGISTRY_MA
         if(likely(pu->last_t < (uint32_t)when)) pu->last_t = (uint32_t)when;
 
         if(pu->machine != m) {
-            REGISTRY_MACHINE_URL *mu = dictionary_get(pu->machine->machine_urls, string2str(url));
+            REGISTRY_MACHINE_URL *mu = registry_machine_url_find(pu->machine, url);
             if(mu) {
                 debug(D_REGISTRY, "registry_person_link_to_url('%s', '%s', '%s'): URL switched machines (old was '%s') - expiring it from previous machine.",
                       p->guid, m->guid, string2str(url), pu->machine->guid);

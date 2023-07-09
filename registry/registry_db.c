@@ -11,10 +11,7 @@ int registry_db_should_be_saved(void) {
 // ----------------------------------------------------------------------------
 // INTERNAL FUNCTIONS FOR SAVING REGISTRY OBJECTS
 
-static int registry_machine_save_url(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *file) {
-    REGISTRY_MACHINE_URL *mu = entry;
-    FILE *fp = file;
-
+static int registry_machine_save_url(REGISTRY_MACHINE_URL *mu, FILE *fp) {
     debug(D_REGISTRY, "Registry: registry_machine_save_url('%s')", string2str(mu->url));
 
     int ret = fprintf(fp, "V\t%08x\t%08x\t%08x\t%02x\t%s\n",
@@ -45,9 +42,13 @@ static int registry_machine_save(const DICTIONARY_ITEM *item __maybe_unused, voi
     );
 
     if(ret >= 0) {
-        int ret2 = dictionary_walkthrough_read(m->machine_urls, registry_machine_save_url, fp);
-        if(ret2 < 0) return ret2;
-        ret += ret2;
+        for(REGISTRY_MACHINE_URL *mu = m->machine_urls; mu ; mu = mu->next) {
+            int rc = registry_machine_save_url(mu, fp);
+            if(rc < 0)
+                return rc;
+
+            ret += rc;
+        }
     }
 
     // error handling is done at registry_db_save()

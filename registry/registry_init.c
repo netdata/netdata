@@ -90,30 +90,21 @@ int registry_init(void) {
     return 0;
 }
 
-static int machine_urls_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data) {
-    REGISTRY_MACHINE *m = (REGISTRY_MACHINE *)data;
-    (void)m;
-
-    REGISTRY_MACHINE_URL *mu = (REGISTRY_MACHINE_URL *)entry;
-
-    debug(D_REGISTRY, "Registry: unlinking url '%s' from machine", string2str(mu->url));
-    string_freez(mu->url);
-
-    debug(D_REGISTRY, "Registry: freeing machine url");
-    freez(mu);
-
-    return 1;
-}
-
 static int machine_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data __maybe_unused) {
     REGISTRY_MACHINE *m = (REGISTRY_MACHINE *)entry;
-    int ret = dictionary_walkthrough_read(m->machine_urls, machine_urls_delete_callback, m);
 
-    dictionary_destroy(m->machine_urls);
+    int count = 0;
+
+    while(m->machine_urls) {
+        registry_machine_url_unlink_from_machine_and_free(m, m->machine_urls);
+        count++;
+    }
+
     freez(m);
 
-    return ret + 1;
+    return count + 1;
 }
+
 static int registry_person_del_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *d __maybe_unused) {
     REGISTRY_PERSON *p = (REGISTRY_PERSON *)entry;
 
