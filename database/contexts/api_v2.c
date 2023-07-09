@@ -69,14 +69,17 @@ struct alert_transitions_callback_data {
         DICTIONARY *dict;
     } facets[ATF_TOTAL_ENTRIES];
 
-    uint32_t limit;
-    uint32_t items;
+    uint32_t max_items_to_return;
+    uint32_t items_to_return;
+
+    uint32_t items_evaluated;
+    uint32_t items_matched;
+
 
     struct sql_alert_transition_fixed_size *base; // double linked list - last item is base->prev
     struct sql_alert_transition_fixed_size *last_added; // the last item added, not the last of the list
 
     struct {
-        size_t items;
         size_t first;
         size_t skips_before;
         size_t skips_after;
@@ -85,7 +88,7 @@ struct alert_transitions_callback_data {
         size_t prepend;
         size_t append;
         size_t shifts;
-    } stats;
+    } operations;
 
     uint32_t configs_added;
 };
@@ -1452,76 +1455,78 @@ static void contexts_v2_alert_transition_free(struct sql_alert_transition_fixed_
 }
 
 static inline void contexts_v2_alert_transition_keep(struct alert_transitions_callback_data *d, struct sql_alert_transition_data *t, const char *machine_guid) {
+    d->items_matched++;
+
     if(unlikely(t->global_id <= d->ctl->request->alerts.global_id_anchor)) {
         // this is in our past, we are not interested
-        d->stats.skips_before++;
+        d->operations.skips_before++;
         return;
     }
 
     if(unlikely(!d->base)) {
         d->last_added = contexts_v2_alert_transition_dup(t, machine_guid, NULL);
         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(d->base, d->last_added, prev, next);
-        d->items++;
-        d->stats.first++;
+        d->items_to_return++;
+        d->operations.first++;
         return;
     }
 
     struct sql_alert_transition_fixed_size *last = d->last_added;
     while(last->prev != d->base->prev && t->global_id > last->prev->global_id) {
         last = last->prev;
-        d->stats.backwards++;
+        d->operations.backwards++;
     }
 
     while(last->next && t->global_id < last->next->global_id) {
         last = last->next;
-        d->stats.forwards++;
+        d->operations.forwards++;
     }
 
-    if(d->items >= d->limit) {
+    if(d->items_to_return >= d->max_items_to_return) {
         if(last == d->base->prev && t->global_id < last->global_id) {
-            d->stats.skips_after++;
+            d->operations.skips_after++;
             return;
         }
     }
 
-    d->items++;
+    d->items_to_return++;
 
     if(t->global_id > last->global_id) {
-        if(d->items > d->limit) {
-            d->items--;
-            d->stats.shifts++;
+        if(d->items_to_return > d->max_items_to_return) {
+            d->items_to_return--;
+            d->operations.shifts++;
             d->last_added = d->base->prev;
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(d->base, d->last_added, prev, next);
             d->last_added = contexts_v2_alert_transition_dup(t, machine_guid, d->last_added);
         }
         DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(d->base, d->last_added, prev, next);
-        d->stats.prepend++;
+        d->operations.prepend++;
     }
     else {
         d->last_added = contexts_v2_alert_transition_dup(t, machine_guid, NULL);
         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(d->base, d->last_added, prev, next);
-        d->stats.append++;
+        d->operations.append++;
     }
 
-    while(d->items > d->limit) {
+    while(d->items_to_return > d->max_items_to_return) {
         // we have to remove something
 
         struct sql_alert_transition_fixed_size *tmp = d->base->prev;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(d->base, tmp, prev, next);
-        d->items--;
+        d->items_to_return--;
 
         if(unlikely(d->last_added == tmp))
             d->last_added = d->base;
 
         contexts_v2_alert_transition_free(tmp);
 
-        d->stats.shifts++;
+        d->operations.shifts++;
     }
 }
 
 static void contexts_v2_alert_transition_callback(struct sql_alert_transition_data *t, void *data) {
     struct alert_transitions_callback_data *d = data;
-    d->stats.items++;
+    d->items_evaluated++;
 
     char machine_guid[UUID_STR_LEN] = "";
     uuid_unparse_lower(*t->host_id, machine_guid);
@@ -1591,8 +1596,8 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
             .ctl = ctl,
             .debug = debug,
             .only_one_config = true,
-            .limit = ctl->request->alerts.last,
-            .items = 0,
+            .max_items_to_return = ctl->request->alerts.last,
+            .items_to_return = 0,
             .base = NULL,
     };
 
@@ -1658,8 +1663,12 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
             buffer_json_member_add_uuid(wb, "config_hash_id", &t->config_hash_id);
             buffer_json_member_add_string(wb, "machine_guid", t->machine_guid);
 
-            if(host && host->node_id)
-                buffer_json_member_add_uuid(wb, "node_id", host->node_id);
+            if(host) {
+                buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
+
+                if(host->node_id)
+                    buffer_json_member_add_uuid(wb, "node_id", host->node_id);
+            }
 
             buffer_json_member_add_string(wb, "alert", *t->alert_name ? t->alert_name : NULL);
             buffer_json_member_add_string(wb, "instance", *t->chart ? t->chart : NULL);
@@ -1730,19 +1739,42 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
         simple_pattern_free(data.facets[i].pattern);
     }
 
-    buffer_json_member_add_object(wb, "stats");
+    buffer_json_member_add_object(wb, "items");
     {
-        buffer_json_member_add_uint64(wb, "items", data.stats.items);
-        buffer_json_member_add_uint64(wb, "first", data.stats.first);
-        buffer_json_member_add_uint64(wb, "prepend", data.stats.prepend);
-        buffer_json_member_add_uint64(wb, "append", data.stats.append);
-        buffer_json_member_add_uint64(wb, "backwards", data.stats.backwards);
-        buffer_json_member_add_uint64(wb, "forwards", data.stats.forwards);
-        buffer_json_member_add_uint64(wb, "shifts", data.stats.shifts);
-        buffer_json_member_add_uint64(wb, "skips_before", data.stats.skips_before);
-        buffer_json_member_add_uint64(wb, "skips_after", data.stats.skips_after);
+        // all the items in the window, under the scope_nodes, ignoring the facets (filters)
+        buffer_json_member_add_uint64(wb, "evaluated", data.items_evaluated);
+
+        // all the items matching the query (if you didn't put anchor_gi and last, these are all the items you would get back)
+        buffer_json_member_add_uint64(wb, "matched", data.items_matched);
+
+        // the items included in this response
+        buffer_json_member_add_uint64(wb, "returned", data.items_to_return);
+
+        // same as last=X parameter
+        buffer_json_member_add_uint64(wb, "max_to_return", data.max_items_to_return);
+
+        // items before the first returned, this should be 0 if anchor_gi is not set
+        buffer_json_member_add_uint64(wb, "before", data.operations.skips_before);
+
+        // items after the last returned, when this is zero there aren't any items after the current list
+        buffer_json_member_add_uint64(wb, "after", data.operations.skips_after + data.operations.shifts);
     }
-    buffer_json_object_close(wb);
+    buffer_json_object_close(wb); // items
+
+    if(debug) {
+        buffer_json_member_add_object(wb, "stats");
+        {
+            buffer_json_member_add_uint64(wb, "first", data.operations.first);
+            buffer_json_member_add_uint64(wb, "prepend", data.operations.prepend);
+            buffer_json_member_add_uint64(wb, "append", data.operations.append);
+            buffer_json_member_add_uint64(wb, "backwards", data.operations.backwards);
+            buffer_json_member_add_uint64(wb, "forwards", data.operations.forwards);
+            buffer_json_member_add_uint64(wb, "shifts", data.operations.shifts);
+            buffer_json_member_add_uint64(wb, "skips_before", data.operations.skips_before);
+            buffer_json_member_add_uint64(wb, "skips_after", data.operations.skips_after);
+        }
+        buffer_json_object_close(wb);
+    }
 }
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_MODE mode) {
