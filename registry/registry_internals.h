@@ -20,7 +20,7 @@ struct registry {
     unsigned long long persons_count;
     unsigned long long machines_count;
     unsigned long long usages_count;
-    unsigned long long urls_count;
+    //unsigned long long urls_count;
     unsigned long long persons_urls_count;
     unsigned long long machines_urls_count;
     unsigned long long log_count;

@@ -401,14 +401,12 @@ void registry_statistics(void) {
 
         rrddim_add(stc, "persons",        NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(stc, "machines",       NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
-        rrddim_add(stc, "urls",           NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(stc, "persons_urls",   NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(stc, "machines_urls",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set(stc, "persons",       (collected_number)registry.persons_count);
     rrddim_set(stc, "machines",      (collected_number)registry.machines_count);
-    rrddim_set(stc, "urls",          (collected_number)registry.urls_count);
     rrddim_set(stc, "persons_urls",  (collected_number)registry.persons_urls_count);
     rrddim_set(stc, "machines_urls", (collected_number)registry.machines_urls_count);
     rrdset_done(stc);
@@ -433,14 +431,12 @@ void registry_statistics(void) {
 
         rrddim_add(stm, "persons",        NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(stm, "machines",       NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
-        rrddim_add(stm, "urls",           NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(stm, "persons_urls",   NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(stm, "machines_urls",  NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set(stm, "persons",       (collected_number)registry.persons_memory + dictionary_stats_for_registry(registry.persons));
     rrddim_set(stm, "machines",      (collected_number)registry.machines_memory + dictionary_stats_for_registry(registry.machines));
-    rrddim_set(stm, "urls",          (collected_number)registry.urls_memory);
     rrddim_set(stm, "persons_urls",  (collected_number)registry.persons_urls_memory);
     rrddim_set(stm, "machines_urls", (collected_number)registry.machines_urls_memory);
     rrdset_done(stm);

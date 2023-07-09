@@ -155,7 +155,7 @@ int registry_db_save(void) {
             registry.persons_count,
             registry.machines_count,
             registry.usages_count + 1, // this is required - it is lost on db rotation
-            registry.urls_count,
+            0LLU, //registry.urls_count,
             registry.persons_urls_count,
             registry.machines_urls_count
     );
@@ -241,7 +241,7 @@ size_t registry_db_load(void) {
                 registry.persons_count = strtoull(&s[2], NULL, 16);
                 registry.machines_count = strtoull(&s[19], NULL, 16);
                 registry.usages_count = strtoull(&s[36], NULL, 16);
-                registry.urls_count = strtoull(&s[53], NULL, 16);
+                // registry.urls_count = strtoull(&s[53], NULL, 16);
                 registry.persons_urls_count = strtoull(&s[70], NULL, 16);
                 registry.machines_urls_count = strtoull(&s[87], NULL, 16);
                 break;

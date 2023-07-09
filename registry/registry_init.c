@@ -61,14 +61,12 @@ int registry_init(void) {
     registry.persons_count = 0;
     registry.machines_count = 0;
     registry.usages_count = 0;
-    registry.urls_count = 0;
     registry.persons_urls_count = 0;
     registry.machines_urls_count = 0;
 
     // initialize memory counters
     registry.persons_memory = 0;
     registry.machines_memory = 0;
-    registry.urls_memory = 0;
     registry.persons_urls_memory = 0;
     registry.machines_urls_memory = 0;
 
