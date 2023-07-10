@@ -27,6 +27,7 @@
 #include "flb_plugin.h"
 #include "rrd_api/rrd_api.h"
 #include "rrd_api/rrd_api_stats.h"
+#include "functions.h"
 
 #if defined(LOGS_MANAGEMENT_STRESS_TEST) && LOGS_MANAGEMENT_STRESS_TEST == 1
 #include "query_test.h"
@@ -1096,6 +1097,9 @@ static void logs_management_init(uv_loop_t *main_loop,
 
 static void logsmanagement_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+
+    rrd_collector_finished();
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     collector_info("cleaning up...");
@@ -1124,6 +1128,8 @@ static void logsmanagement_main_cleanup(void *ptr) {
  * @todo Any cleanup required on program exit? 
  */
 void *logsmanagement_main(void *ptr) {
+    rrd_collector_started();
+
     netdata_thread_cleanup_push(logsmanagement_main_cleanup, ptr);
 
     Flb_socket_config_t *forward_in_config = NULL;
@@ -1208,6 +1214,10 @@ void *logsmanagement_main(void *ptr) {
     static uv_thread_t run_stress_test_queries_thread_id;
     uv_thread_create(&run_stress_test_queries_thread_id, run_stress_test_queries_thread, NULL);
 #endif  // LOGS_MANAGEMENT_STRESS_TEST
+
+    rrd_collector_add_function( localhost, NULL, "logsmanagement", 10, 
+                                FUNCTION_LOGSMANAGEMENT_HELP_SHORT, true, 
+                                logsmanagement_function_execute_cb, NULL);
 
     collector_info("logsmanagement_main() setup completed successfully");
 

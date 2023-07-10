@@ -951,20 +951,22 @@ LOGSMANAGEMENT_FILES = \
     logsmanagement/circular_buffer.h \
     logsmanagement/compression.c \
     logsmanagement/compression.h \
-    logsmanagement/logsmanagement_conf.h \
     logsmanagement/db_api.c \
     logsmanagement/db_api.h \
     logsmanagement/file_info.h \
+    logsmanagement/flb_plugin.c \
+    logsmanagement/flb_plugin.h \
+    logsmanagement/functions.c \
+    logsmanagement/functions.h \
     logsmanagement/helper.h \
+    logsmanagement/logsmanagement_conf.h \
     logsmanagement/logsmanagement.c \
     logsmanagement/parser.c \
     logsmanagement/parser.h \
-    logsmanagement/query.c \
-    logsmanagement/query.h \
     logsmanagement/query_test.c \
     logsmanagement/query_test.h \
-    logsmanagement/flb_plugin.c \
-    logsmanagement/flb_plugin.h \
+    logsmanagement/query.c \
+    logsmanagement/query.h \
     $(NULL)
 endif
 

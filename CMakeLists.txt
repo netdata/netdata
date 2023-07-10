@@ -1051,18 +1051,6 @@ ELSE()
 ENDIF()
 
 set(LOGSMANAGEMENT_FILES
-        // collectors/logsmanagement.plugin/plugin_logsmanagement_docker_ev.c
-        // collectors/logsmanagement.plugin/plugin_logsmanagement_docker_ev.h
-        // collectors/logsmanagement.plugin/plugin_logsmanagement_generic.c
-        // collectors/logsmanagement.plugin/plugin_logsmanagement_generic.h
-        // collectors/logsmanagement.plugin/plugin_logsmanagement_kernel.c
-        // collectors/logsmanagement.plugin/plugin_logsmanagement_kernel.h
-        // collectors/logsmanagement.plugin/plugin_logsmanagement_systemd.c
-        // collectors/logsmanagement.plugin/plugin_logsmanagement_systemd.h
-        // collectors/logsmanagement.plugin/plugin_logsmanagement_web_log.c
-        // collectors/logsmanagement.plugin/plugin_logsmanagement_web_log.h
-        // collectors/logsmanagement.plugin/plugin_logsmanagement.c
-        // collectors/logsmanagement.plugin/plugin_logsmanagement.h
         logsmanagement/rrd_api/rrd_api_docker_ev.c
         logsmanagement/rrd_api/rrd_api_docker_ev.h
         logsmanagement/rrd_api/rrd_api_generic.c
@@ -1076,24 +1064,28 @@ set(LOGSMANAGEMENT_FILES
         logsmanagement/rrd_api/rrd_api_web_log.c
         logsmanagement/rrd_api/rrd_api_web_log.h
         logsmanagement/rrd_api/rrd_api.h
+        logsmanagement/unit_test/unit_test.c
+        logsmanagement/unit_test/unit_test.h
         logsmanagement/circular_buffer.c
         logsmanagement/circular_buffer.h
         logsmanagement/compression.c
         logsmanagement/compression.h
-        logsmanagement/logsmanagement_conf.h
         logsmanagement/db_api.c
         logsmanagement/db_api.h
         logsmanagement/file_info.h
-        logsmanagement/helper.h
-        logsmanagement/logsmanagement.c
-        logsmanagement/query.c
-        logsmanagement/query.h
-        logsmanagement/query_test.c
-        logsmanagement/query_test.h
         logsmanagement/flb_plugin.c
         logsmanagement/flb_plugin.h
-        logsmanagement/unit_test/unit_test.c
-        logsmanagement/unit_test/unit_test.h
+        logsmanagement/functions.c
+        logsmanagement/functions.h
+        logsmanagement/helper.h
+        logsmanagement/logsmanagement_conf.h
+        logsmanagement/logsmanagement.c
+        logsmanagement/parser.c
+        logsmanagement/parser.h
+        logsmanagement/query_test.c
+        logsmanagement/query_test.h
+        logsmanagement/query.c
+        logsmanagement/query.h
         )
 
 set(NETDATA_FILES
