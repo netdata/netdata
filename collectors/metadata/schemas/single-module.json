@@ -265,12 +265,12 @@
                   "items": {
                     "type": "object",
                     "properties": {
-                      "folding": {
-                        "$ref": "#/$defs/_folding"
-                      },
                       "name": {
                         "type": "string",
                         "description": "Example name."
+                      },
+                      "folding": {
+                        "$ref": "#/$defs/_folding"
                       },
                       "description": {
                         "type": "string",
