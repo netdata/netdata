@@ -1775,6 +1775,8 @@ int main (int argc, char **argv) {
     for(iteration = 0; 1 ; iteration++) {
         usec_t dt = heartbeat_next(&hb, step);
 
+        fprintf(stdout, "\n"); // keepalive to avoid parser read timeout (2 minutes) during ipmi_detect_speed_secs()
+
         struct netdata_ipmi_state state = {0 };
 
         spinlock_lock(&sensors_data.spinlock);
