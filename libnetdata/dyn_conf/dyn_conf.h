@@ -20,12 +20,33 @@ typedef struct dyncfg_config dyncfg_config_t;
 struct configurable_plugin;
 struct module;
 
+enum job_state {
+    JOB_STATE_UNKNOWN = 0, // State used until plugin reports first status
+    JOB_STATE_STOPPED,
+    JOB_STATE_RUNNING,
+    JOB_STATE_ERROR
+};
+
+enum set_config_result {
+    SET_CONFIG_ACCEPTED = 0,
+    SET_CONFIG_REJECTED,
+    SET_CONFIG_DEFFER
+};
+
+typedef enum set_config_result (*set_config_cb_t)(void *usr_ctx, dyncfg_config_t *cfg);
+
 struct job
 {
     char *name;
     dyncfg_config_t config;
 
+    enum job_state state;
+    usec_t last_state_update;
+
     struct module *module;
+
+    set_config_cb_t set_config_cb;
+    void *set_config_cb_usr_ctx;
 };
 
 struct module
@@ -42,7 +63,8 @@ struct module
 
     DICTIONARY *jobs;
 
-    int (*set_config_cb)(dyncfg_config_t *cfg);
+    set_config_cb_t set_config_cb;
+    void *set_config_cb_usr_ctx;
 };
 
 struct configurable_plugin {
@@ -54,7 +76,8 @@ struct configurable_plugin {
     dyncfg_config_t config;
     dyncfg_config_t default_config;
 
-    int (*set_config_cb)(dyncfg_config_t *cfg);
+    set_config_cb_t set_config_cb;
+    void *set_config_cb_usr_ctx;
 };
 
 //int has_module

@@ -76,15 +76,37 @@ json_object *get_list_of_modules_json(struct configurable_plugin *plugin)
     return obj;
 }
 
+const char *job_state2str(enum job_state state)
+{
+    switch (state) {
+        case JOB_STATE_UNKNOWN:
+            return "unknown";
+        case JOB_STATE_STOPPED:
+            return "stopped";
+        case JOB_STATE_RUNNING:
+            return "running";
+        case JOB_STATE_ERROR:
+            return "error";
+        default:
+            return "unknown";
+    }
+}
+
 static int _get_list_of_jobs_json_cb(const DICTIONARY_ITEM *item, void *entry, void *data)
 {
     UNUSED(item);
     json_object *obj = (json_object *)data;
     struct job *job = (struct job *)entry;
 
+    json_object *json_job = json_object_new_object();
     json_object *json_item = json_object_new_string(job->name);
+    json_object_object_add(json_job, "name", json_item);
+    json_item = json_object_new_string(job_state2str(job->state));
+    json_object_object_add(json_job, "state", json_item);
+    json_item = json_object_new_uint64(job->last_state_update);
+    json_object_object_add(json_job, "last_state_update", json_item);
 
-    json_object_array_add(obj, json_item);
+    json_object_array_add(obj, json_job);
 
     return 0;
 }
@@ -220,7 +242,7 @@ static const char *set_plugin_config(struct configurable_plugin *plugin, dyncfg_
     memcpy(plugin->config.data, cfg.data, cfg.data_size);
     pthread_mutex_unlock(&plugin->lock);
 
-    if (plugin->set_config_cb != NULL && plugin->set_config_cb(&plugin->config)) {
+    if (plugin->set_config_cb != NULL && plugin->set_config_cb(plugin->set_config_cb_usr_ctx, &plugin->config)) {
         error_report("DYNCFG module \"%s\" set_config_cb failed", plugin->name);
         return "set_config_cb failed";
     }
@@ -237,10 +259,10 @@ static const char *set_module_config(struct module *mod, dyncfg_config_t cfg)
         return "could not store config on disk";
     }
 
-    if (plugin->set_config_cb == NULL) {
+/*    if (mod->set_config_cb == NULL) {
         error_report("DYNCFG module \"%s\" has no set_module_config_cb", plugin->name);
         return "module has no set_config_cb callback";
-    }
+    } */
 
     pthread_mutex_lock(&plugin->lock);
     mod->config.data_size = cfg.data_size;
@@ -248,7 +270,7 @@ static const char *set_module_config(struct module *mod, dyncfg_config_t cfg)
     memcpy(mod->config.data, cfg.data, cfg.data_size);
     pthread_mutex_unlock(&plugin->lock);
 
-    if (plugin->set_config_cb != NULL && plugin->set_config_cb(&mod->config)) {
+    if (mod->set_config_cb != NULL && mod->set_config_cb(mod->set_config_cb_usr_ctx, &mod->config)) {
         error_report("DYNCFG module \"%s\" set_module_config_cb failed", plugin->name);
         return "set_module_config_cb failed";
     }
@@ -263,7 +285,7 @@ static void set_job_config(struct job *job, dyncfg_config_t cfg)
     if (store_config(plugin->name, job->module->name, job->name, cfg)) {
         error_report("DYNCFG could not store config for module \"%s\"", job->module->name);
         return;
-    }
+    }`
 
     pthread_mutex_lock(&plugin->lock);
     job->config.data_size = cfg.data_size;
@@ -272,9 +294,17 @@ static void set_job_config(struct job *job, dyncfg_config_t cfg)
     pthread_mutex_unlock(&plugin->lock);
 }
 
+struct job *job_new()
+{
+    struct job *job = callocz(1, sizeof(struct job));
+    job->state = JOB_STATE_UNKNOWN;
+    job->last_state_update = now_realtime_usec();
+    return job;
+}
+
 struct job *add_job(struct module *mod, const char *job_id, dyncfg_config_t cfg)
 {
-    struct job *job = mallocz(sizeof(struct job));
+    struct job *job = job_new();
     job->name = strdupz(job_id);
     job->module = mod;
 
@@ -362,7 +392,7 @@ int register_module(struct configurable_plugin *plugin, struct module *module)
                     continue;
                 ent->d_name[len - strlen(DYN_CONF_CFG_EXT)] = '\0';
 
-                struct job *job = mallocz(sizeof(struct job));
+                struct job *job = job_new();
                 job->name = strdupz(ent->d_name);
                 job->module = module;
                 job->config = load_config(plugin->name, module->name, job->name);
