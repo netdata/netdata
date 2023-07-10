@@ -173,7 +173,10 @@
                 ]
               }
             }
-          }
+          },
+          "required": [
+            "list"
+          ]
         },
         "configuration": {
           "description": "Information on how to configure the collector and available configuration options.",
@@ -262,12 +265,12 @@
                   "items": {
                     "type": "object",
                     "properties": {
-                      "folding": {
-                        "$ref": "#/$defs/_folding"
-                      },
                       "name": {
                         "type": "string",
                         "description": "Example name."
+                      },
+                      "folding": {
+                        "$ref": "#/$defs/_folding"
                       },
                       "description": {
                         "type": "string",
