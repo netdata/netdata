@@ -3,6 +3,49 @@
 #include "daemon/common.h"
 #include "registry_internals.h"
 
+void registry_db_stats(void) {
+    size_t persons = 0;
+    size_t persons_urls = 0;
+    size_t max_urls_per_person = 0;
+
+    REGISTRY_PERSON *p;
+    dfe_start_read(registry.persons, p) {
+        persons++;
+        size_t urls = 0;
+        for(REGISTRY_PERSON_URL *pu = p->person_urls ; pu ;pu = pu->next)
+            urls++;
+
+        if(urls > max_urls_per_person)
+            max_urls_per_person = urls;
+
+        persons_urls += urls;
+    }
+    dfe_done(p);
+
+    size_t machines = 0;
+    size_t machines_urls = 0;
+    size_t max_urls_per_machine = 0;
+
+    REGISTRY_MACHINE *m;
+    dfe_start_read(registry.machines, m) {
+                machines++;
+                size_t urls = 0;
+                for(REGISTRY_MACHINE_URL *mu = m->machine_urls ; mu ;mu = mu->next)
+                    urls++;
+
+                if(urls > max_urls_per_machine)
+                    max_urls_per_machine = urls;
+
+                machines_urls += urls;
+            }
+    dfe_done(m);
+
+    netdata_log_info("REGISTRY: persons %zu, person_urls %zu, max_urls_per_person %zu, "
+                     "machines %zu, machine_urls %zu, max_urls_per_machine %zu",
+                     persons, persons_urls, max_urls_per_person,
+                     machines, machines_urls, max_urls_per_machine);
+}
+
 int registry_init(void) {
     char filename[FILENAME_MAX + 1];
 
@@ -123,6 +166,9 @@ int registry_init(void) {
         if(unlikely(registry_db_should_be_saved()))
             registry_db_save();
 
+//        registry_db_stats();
+//        exit(0);
+
         netdata_thread_enable_cancelability();
     }
 
@@ -149,8 +195,8 @@ static int registry_person_del_callback(const DICTIONARY_ITEM *item __maybe_unus
 
     debug(D_REGISTRY, "Registry: registry_person_del('%s'): deleting person", p->guid);
 
-    while(p->person_urls.root)
-        registry_person_unlink_from_url(p, (REGISTRY_PERSON_URL *)p->person_urls.root);
+    while(p->person_urls)
+        registry_person_unlink_from_url(p, (REGISTRY_PERSON_URL *)p->person_urls);
 
     //debug(D_REGISTRY, "Registry: deleting person '%s' from persons registry", p->guid);
     //dictionary_del(registry.persons, p->guid);

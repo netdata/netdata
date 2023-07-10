@@ -8,6 +8,10 @@
 #define REGISTRY_STATUS_FAILED "failed"
 #define REGISTRY_STATUS_DISABLED "disabled"
 
+bool registry_is_valid_url(const char *url) {
+    return url && (*url == 'h' || *url == '*');
+}
+
 // ----------------------------------------------------------------------------
 // REGISTRY concurrency locking
 
@@ -87,12 +91,10 @@ struct registry_json_walk_person_urls_callback {
 static STRING *asterisks = NULL;
 
 // callback for rendering PERSON_URLs
-static int registry_json_person_url_callback(void *entry, void *data) {
+static int registry_json_person_url_callback(REGISTRY_PERSON_URL *pu, struct registry_json_walk_person_urls_callback *c) {
     if(unlikely(!asterisks))
         asterisks = string_strdupz("***");
 
-    REGISTRY_PERSON_URL *pu = (REGISTRY_PERSON_URL *)entry;
-    struct registry_json_walk_person_urls_callback *c = (struct registry_json_walk_person_urls_callback *)data;
     struct web_client *w = c->w;
 
     if (pu->url == asterisks) return 0;
@@ -136,9 +138,7 @@ struct registry_person_url_callback_verify_machine_exists_data {
     int count;
 };
 
-static inline int registry_person_url_callback_verify_machine_exists(void *entry, void *data) {
-    struct registry_person_url_callback_verify_machine_exists_data *d = (struct registry_person_url_callback_verify_machine_exists_data *)data;
-    REGISTRY_PERSON_URL *pu = (REGISTRY_PERSON_URL *)entry;
+static inline int registry_person_url_callback_verify_machine_exists(REGISTRY_PERSON_URL *pu, struct registry_person_url_callback_verify_machine_exists_data *d) {
     REGISTRY_MACHINE *m = d->m;
 
     if(pu->machine == m)
@@ -194,6 +194,12 @@ int registry_request_access_json(RRDHOST *host, struct web_client *w, char *pers
     if(unlikely(!registry.enabled))
         return registry_json_disabled(host, w, "access");
 
+    if(!registry_is_valid_url(url)) {
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "Invalid URL given in the request");
+        return HTTP_RESP_BAD_REQUEST;
+    }
+
     // ------------------------------------------------------------------------
     // verify the browser supports cookies or the bearer
 
@@ -232,7 +238,8 @@ int registry_request_access_json(RRDHOST *host, struct web_client *w, char *pers
     buffer_json_member_add_array(w->response.data, "urls");
 
     struct registry_json_walk_person_urls_callback c = { p, NULL, w, 0 };
-    avl_traverse(&p->person_urls, registry_json_person_url_callback, &c);
+    for(REGISTRY_PERSON_URL *pu = p->person_urls; pu ;pu = pu->next)
+        registry_json_person_url_callback(pu, &c);
     buffer_json_array_close(w->response.data); // urls
 
     registry_json_footer(w);
@@ -247,6 +254,12 @@ int registry_request_access_json(RRDHOST *host, struct web_client *w, char *pers
 int registry_request_delete_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when) {
     if(!registry.enabled)
         return registry_json_disabled(host, w, "delete");
+
+    if(!registry_is_valid_url(url)) {
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "Invalid URL given in the request");
+        return HTTP_RESP_BAD_REQUEST;
+    }
 
     registry_lock();
 
@@ -272,6 +285,12 @@ int registry_request_delete_json(RRDHOST *host, struct web_client *w, char *pers
 int registry_request_search_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url, char *request_machine, time_t when) {
     if(!registry.enabled)
         return registry_json_disabled(host, w, "search");
+
+    if(!registry_is_valid_url(url)) {
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "Invalid URL given in the request");
+        return HTTP_RESP_BAD_REQUEST;
+    }
 
     registry_lock();
 
@@ -306,6 +325,12 @@ int registry_request_switch_json(RRDHOST *host, struct web_client *w, char *pers
     if(!registry.enabled)
         return registry_json_disabled(host, w, "switch");
 
+    if(!registry_is_valid_url(url)) {
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "Invalid URL given in the request");
+        return HTTP_RESP_BAD_REQUEST;
+    }
+
     registry_lock();
 
     REGISTRY_PERSON *op = registry_person_find(person_guid);
@@ -335,7 +360,9 @@ int registry_request_switch_json(RRDHOST *host, struct web_client *w, char *pers
     struct registry_person_url_callback_verify_machine_exists_data data = { m, 0 };
 
     // verify the old person has access to this machine
-    avl_traverse(&op->person_urls, registry_person_url_callback_verify_machine_exists, &data);
+    for(REGISTRY_PERSON_URL *pu = op->person_urls; pu ;pu = pu->next)
+        registry_person_url_callback_verify_machine_exists(pu, &data);
+
     if(!data.count) {
         registry_json_header(host, w, "switch", REGISTRY_STATUS_FAILED);
         registry_json_footer(w);
@@ -345,7 +372,9 @@ int registry_request_switch_json(RRDHOST *host, struct web_client *w, char *pers
 
     // verify the new person has access to this machine
     data.count = 0;
-    avl_traverse(&np->person_urls, registry_person_url_callback_verify_machine_exists, &data);
+    for(REGISTRY_PERSON_URL *pu = np->person_urls; pu ;pu = pu->next)
+        registry_person_url_callback_verify_machine_exists(pu, &data);
+
     if(!data.count) {
         registry_json_header(host, w, "switch", REGISTRY_STATUS_FAILED);
         registry_json_footer(w);

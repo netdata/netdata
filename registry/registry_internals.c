@@ -256,7 +256,8 @@ REGISTRY_MACHINE *registry_request_machine(char *person_guid, char *machine_guid
     struct machine_request_callback_data rdata = { m, NULL };
 
     // request a walk through on the dictionary
-    avl_traverse(&p->person_urls, machine_request_callback, &rdata);
+    for(pu = p->person_urls; pu ;pu = pu->next)
+        machine_request_callback(pu, &rdata);
 
     if(rdata.result)
         return m;
