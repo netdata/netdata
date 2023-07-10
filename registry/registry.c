@@ -167,12 +167,23 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w) {
     buffer_json_member_add_string(w->response.data, "cloud_base_url", registry.cloud_base_url);
     buffer_json_member_add_boolean(w->response.data, "anonymous_statistics", netdata_anonymous_statistics_enabled);
 
+    buffer_json_member_add_array(w->response.data, "nodes");
+    RRDHOST *h;
+    dfe_start_read(rrdhost_root_index, h) {
+        buffer_json_add_array_item_object(w->response.data);
+        buffer_json_member_add_string(w->response.data, "machine_guid", h->machine_guid);
+        buffer_json_member_add_string(w->response.data, "hostname", rrdhost_registry_hostname(h));
+        buffer_json_object_close(w->response.data);
+    }
+    dfe_done(h);
+    buffer_json_array_close(w->response.data);
+
     registry_json_footer(w);
     return HTTP_RESP_OK;
 }
 
 // ----------------------------------------------------------------------------
-//public ACCESS request
+// public ACCESS request
 
 // this is generated using this:
 // uuidgen -n @dns -N registry.my-netdata.io -m
@@ -184,7 +195,7 @@ int registry_request_access_json(RRDHOST *host, struct web_client *w, char *pers
         return registry_json_disabled(host, w, "access");
 
     // ------------------------------------------------------------------------
-    // verify the browser supports cookies
+    // verify the browser supports cookies or the bearer
 
     if(registry.verify_cookies_redirects > 0 && !person_guid[0]) {
         buffer_flush(w->response.data);
