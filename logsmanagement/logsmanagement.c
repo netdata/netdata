@@ -838,9 +838,13 @@ static void logs_management_init(uv_loop_t *main_loop,
         }
         case FLB_KMSG: {
             p_file_info->parser_metrics->kernel = callocz(1, sizeof(Kernel_metrics_t));
-            p_file_info->parser_metrics->kernel->subsystem = dictionary_create(DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
+            p_file_info->parser_metrics->kernel->subsystem = dictionary_create( DICT_OPTION_SINGLE_THREADED | 
+                                                                                DICT_OPTION_NAME_LINK_DONT_CLONE | 
+                                                                                DICT_OPTION_DONT_OVERWRITE_VALUE);
             dictionary_register_conflict_callback(p_file_info->parser_metrics->kernel->subsystem, metrics_dict_conflict_cb, NULL);
-            p_file_info->parser_metrics->kernel->device = dictionary_create(DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
+            p_file_info->parser_metrics->kernel->device = dictionary_create(DICT_OPTION_SINGLE_THREADED | 
+                                                                            DICT_OPTION_NAME_LINK_DONT_CLONE | 
+                                                                            DICT_OPTION_DONT_OVERWRITE_VALUE);
             dictionary_register_conflict_callback(p_file_info->parser_metrics->kernel->device, metrics_dict_conflict_cb, NULL);
             break;
         }

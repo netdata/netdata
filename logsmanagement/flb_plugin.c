@@ -297,10 +297,6 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
 
     /* FLB_KMSG case */
     static int skip_kmsg_log_buffering = 1;
-    const char  subsys_str[] = " SUBSYSTEM=",
-                device_str[] = " DEVICE=";
-    const size_t subsys_str_len = sizeof(subsys_str) - 1,
-                 device_str_len = sizeof(device_str) - 1;
     int kmsg_sever = -1; // -1 equals invalid
     /* FLB_KMSG case end */
 
@@ -715,6 +711,11 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
         // see https://www.kernel.org/doc/Documentation/ABI/testing/dev-kmsg
         if((c = memchr(message, '\n', message_size))){
 
+            const char  subsys_str[] = "SUBSYSTEM=",
+                        device_str[] = "DEVICE=";
+            const size_t subsys_str_len = sizeof(subsys_str) - 1,
+                         device_str_len = sizeof(device_str) - 1;
+
             size_t bytes_remain = message_size - (c - message);
 
             /* Extract machine-readable info for charts, such as subsystem and device. */
@@ -723,29 +724,34 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                 while(--bytes_remain && c[++sz] != '\n');
                 if(bytes_remain) --sz;
                 *(c++) = '\\';
-                *c = 'n';
+                *(c++) = 'n'; 
+                sz--;
 
-                // DICTIONARY *dict = NULL;
-                // char *str = NULL;
-                // size_t str_len = 0;
-                // if(!strncmp(c, subsys_str, subsys_str_len)){
-                //     dict = p_file_info->parser_metrics->kernel->subsystem;
-                //     str = &c[subsys_str_len];
-                //     str_len = (sz - subsys_str_len);
-                // }
-                // else if (!strncmp(c, device_str, device_str_len)){
-                //     dict = p_file_info->parser_metrics->kernel->device;
-                //     str = &c[device_str_len];
-                //     str_len = (sz - device_str_len);
-                // }
+                debug(D_LOGS_MANAG, "msg:%.*s", (int) sz, c);
 
-                // if(likely(str)){
-                //     char * const key = mallocz(str_len + 1);
-                //     memcpy(key, str, str_len);
-                //     key[str_len] = '\0';
-                //     Kernel_metrics_dict_item_t item = {.dim = NULL, .num = 1};
-                //     dictionary_set_advanced(dict, key, str_len, &item, sizeof(item), NULL);
-                // }
+                DICTIONARY *dict = NULL;
+                char *str = NULL;
+                size_t str_len = 0;
+                if(!strncmp(c, subsys_str, subsys_str_len)){
+                    dict = p_file_info->parser_metrics->kernel->subsystem;
+                    str = &c[subsys_str_len];
+                    str_len = (sz - subsys_str_len);
+                    debug(D_LOGS_MANAG, "subsys_str:%.*s", (int) str_len, str);
+                }
+                else if (!strncmp(c, device_str, device_str_len)){
+                    dict = p_file_info->parser_metrics->kernel->device;
+                    str = &c[device_str_len];
+                    str_len = (sz - device_str_len);
+                    debug(D_LOGS_MANAG, "device_str:%.*s", (int) str_len, str);
+                }
+
+                if(likely(str)){
+                    char * const key = mallocz(str_len + 1);
+                    memcpy(key, str, str_len);
+                    key[str_len] = '\0';
+                    Kernel_metrics_dict_item_t item = {.dim = NULL, .num = 1};
+                    dictionary_set_advanced(dict, key, str_len, &item, sizeof(item), NULL);
+                }
                 c = &c[sz];
             }
         }
