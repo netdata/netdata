@@ -3,7 +3,8 @@
 ## Table of Contents
 
 - [Summary](#summary)  
-    - [Types of available collectors](#collector-types)  
+    - [Types of available collectors](#collector-types)
+- [Getting Started](#getting-started)  
 - [Package Requirements](#package-requirements)
     - [Systemd](#requirements-systemd)
 - [General Configuration](#general-configuration)
@@ -28,7 +29,7 @@
 
 </a>
 
-The Netdata logs management engine enables collection, processing, storage, streaming and querying of logs through the Netdata agent. The following pipeline depicts a high-level overview of the different stages that the logs have to pass through for this to be achieved:
+The Netdata logs management engine enables collection, processing, storage, streaming and querying of logs through the Netdata agent. The following pipeline depicts a high-level overview of the different stages that collected logs propagate through for this to be achieved:
 
 ![Logs management pipeline](https://github.com/netdata/netdata/assets/5953192/dd73382c-af4b-4840-a3fe-1ba5069304e8 "Logs management pipeline")
 
@@ -36,10 +37,10 @@ The [Fluent Bit](https://github.com/fluent/fluent-bit) project has been used as 
 
 A bespoke circular buffering implementation has been used to maximize performance and optimize memory utilization. More technical details about how it works can be found [here](https://github.com/netdata/netdata/pull/13291#buffering).
 
-To configure Netdata's logs management engine properly, please make sure you are aware of the following points:
+To configure Netdata's logs management engine properly, please make sure you are aware of the following points first:
 
-* One collection cycle (at max) occurs per `update every` interval (in seconds) and any log records collected in a collection cycle are grouped and compressed together. As a result, a longer `update every` interval will reduce memory and disk space requirements.
-* When collected logs contain parsable timestamps, these will be used to display metrics from parsed logs at the correct time in each chart, even if collection of said logs takes place *much* later than the time they were produced. How much later? Up to a configurable value of `update timeout` seconds. This mechanism ensures correct  parsing and querying of delayed logs that contain parsable timestamps (such as streamed inputs or buffered logs sources that write logs in batches), but the respective charts may lag behind some seconds up to that timeout. If no parsable timestamp is found, the collection timestamp will be used instead.
+* One collection cycle (at max) occurs per `update every` interval (in seconds - minimum 1 sec) and any log records collected in a collection cycle are grouped together (for compression and performance purposes). As a result of this, a longer `update every` interval will reduce memory and disk space requirements.
+* When collected logs contain parsable timestamps, these will be used to display metrics from parsed logs at the correct time in each chart, even if collection of said logs takes place *much* later than the time they were produced. How much later? Up to a configurable value of `update timeout` seconds. This mechanism ensures correct  parsing and querying of delayed logs that contain parsable timestamps (such as streamed inputs or buffered logs sources that write logs in batches), but the respective charts may lag behind some seconds up to that timeout. If no parsable timestamp is found, the collection timestamp will be used instead (or the collector can be forced to always use the collection timestamp by setting `use log timestamp = no`).
 
 <a name="collector-types"/>
 
@@ -57,6 +58,24 @@ The following log collectors are supported at the moment. The table will be upda
 | generic (tail)	| `flb_generic` 		| Collection of new logs from files by "tailing" them.|
 | syslog socket   	| `flb_syslog`  		| Collection of RFC-3164 syslog logs by creating listening sockets.|
 | serial        	| `flb_serial`  		| Collection of logs from a serial interface.|
+
+<a name="getting-started"/>
+
+## Getting Started
+
+</a>
+
+Since version `XXXXX`, Netdata is distributed with built-in logs management functionality, but it is disabled by default and must be explicitly enabled at runtime by setting the respective configuration option in `netdata.conf` to `yes` and restarting the agent:
+```
+[logs management]
+	enabled = yes
+```
+
+There are some pre-configured log sources that Netdata will attempt to automatically discover and monitor that can be edited using `./edit-config logsmanagement.conf` in Netdata's configuration directory.
+
+To get familiar with the Logs Management functionality, the user is advised to read at least the [Summary](#summary) and the [General Configuration](#general-configuration) sections and also any [Collector-specific Configuration](#collector-configuration) subsections, according to each of their use cases.
+
+For any issues, please refer to [Troubleshooting](#troubleshooting) or open a new support ticket on [Github](https://github.com/netdata/netdata/issues) or one of Netdata's support channels.
 
 <a name="package-requirements"/>
 
@@ -83,10 +102,12 @@ Debian and derivatives:
 ```
 apt install libsystemd-dev
 ```
+
 Red Hat Enterprise Linux and derivatives:
 ```
 yum install systemd-devel
 ```
+
 openSUSE:
 ```
 zypper install systemd-devel
@@ -98,7 +119,7 @@ zypper install systemd-devel
 
 </a>
 
-There are some fundamental configuration options that are common to all collector types. These options can be set globally in the `[logs management]` section of `netdata.conf` or customized per collector using `edit-config logsmanagement.conf`:
+There are some fundamental configuration options that are common to all collector types. These options can be set globally in the `[logs management]` section of `netdata.conf` or customized per collector using `./edit-config logsmanagement.conf`:
 
 |  Configuration Option | Default 		| Description  |
 |      :------------:  	| :------------:  | ------------ |
@@ -227,7 +248,7 @@ This collector will collect logs through a serial interface. See also documentat
 </a>
 
 In addition to the predefined charts, each log source supports the option to extract 
-user-defined metrics, by matching log records to POSIX Extended Regular Expressions. 
+user-defined metrics, by matching log records to [POSIX Extended Regular Expressions](https://en.wikibooks.org/wiki/Regular_Expressions/POSIX-Extended_Regular_Expressions). 
 This can be very useful particularly for `FLB_GENERIC` type log sources, where
 there is no parsing at all by default.
 
