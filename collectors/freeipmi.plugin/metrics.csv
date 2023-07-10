@@ -1,10 +1,10 @@
 metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-ipmi.sel,,events,events,"IPMI Events",area,,freeipmi.plugin,
-ipmi.sensors_states,,"nominal, critical, warning",sensors,"IPMI Sensors State",line,,freeipmi.plugin,
-ipmi.temperatures_c,,a dimension per sensor,Celsius,"System Celsius Temperatures read by IPMI",line,,freeipmi.plugin,
-ipmi.temperatures_f,,a dimension per sensor,Fahrenheit,"System Celsius Temperatures read by IPMI",line,,freeipmi.plugin,
-ipmi.voltages,,a dimension per sensor,Volts,"System Voltages read by IPMI",line,,freeipmi.plugin,
-ipmi.amps,,a dimension per sensor,Amps,"System Current read by IPMI",line,,freeipmi.plugin,
-ipmi.rpm,,a dimension per sensor,RPM,"System Fans read by IPMI",line,,freeipmi.plugin,
-ipmi.watts,,a dimension per sensor,Watts,"System Power read by IPMI",line,,freeipmi.plugin,
-ipmi.percent,,a dimension per sensor,%,"System Metrics read by IPMI",line,,freeipmi.plugin,
+ipmi.sel,,events,events,"IPMI Events",area,,freeipmi.plugin,sel
+ipmi.sensor_state,sensor,"nominal, critical, warning, unknown",state,"IPMI Sensors State",line,,freeipmi.plugin,
+ipmi.sensor_temperature_c,sensor,temperature,Celsius,"IPMI Sensor Temperature Celsius",line,,freeipmi.plugin,sensors
+ipmi.sensor_temperature_f,sensor,temperature,Fahrenheit,"IPMI Sensor Temperature Fahrenheit",line,,freeipmi.plugin,sensors
+ipmi.sensor_voltage,sensor,voltage,Volts,"IPMI Sensor Voltage",line,,freeipmi.plugin,sensors
+ipmi.sensor_ampere,sensor,ampere,Amps,"IPMI Sensor Current",line,,freeipmi.plugin,sensors
+ipmi.sensor_fan_speed,sensor,rotations,RPM,"IPMI Sensor Fans Speed",line,,freeipmi.plugin,sensors
+ipmi.sensor_power,sensor,power,Watts,"IPMI Sensor Power",line,,freeipmi.plugin,sensors
+ipmi.sensor_reading_percent,sensor,percentage,%,"IPMI Sensor Reading Percentage",line,,freeipmi.plugin,sensors
