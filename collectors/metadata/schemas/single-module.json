@@ -173,7 +173,10 @@
                 ]
               }
             }
-          }
+          },
+          "required": [
+            "list"
+          ]
         },
         "configuration": {
           "description": "Information on how to configure the collector and available configuration options.",
