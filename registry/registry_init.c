@@ -3,6 +3,63 @@
 #include "daemon/common.h"
 #include "registry_internals.h"
 
+void registry_db_stats(void) {
+    size_t persons = 0;
+    size_t persons_urls = 0;
+    size_t max_urls_per_person = 0;
+
+    REGISTRY_PERSON *p;
+    dfe_start_read(registry.persons, p) {
+        persons++;
+        size_t urls = 0;
+        for(REGISTRY_PERSON_URL *pu = p->person_urls ; pu ;pu = pu->next)
+            urls++;
+
+        if(urls > max_urls_per_person)
+            max_urls_per_person = urls;
+
+        persons_urls += urls;
+    }
+    dfe_done(p);
+
+    size_t machines = 0;
+    size_t machines_urls = 0;
+    size_t max_urls_per_machine = 0;
+
+    REGISTRY_MACHINE *m;
+    dfe_start_read(registry.machines, m) {
+                machines++;
+                size_t urls = 0;
+                for(REGISTRY_MACHINE_URL *mu = m->machine_urls ; mu ;mu = mu->next)
+                    urls++;
+
+                if(urls > max_urls_per_machine)
+                    max_urls_per_machine = urls;
+
+                machines_urls += urls;
+            }
+    dfe_done(m);
+
+    netdata_log_info("REGISTRY: persons %zu, person_urls %zu, max_urls_per_person %zu, "
+                     "machines %zu, machine_urls %zu, max_urls_per_machine %zu",
+                     persons, persons_urls, max_urls_per_person,
+                     machines, machines_urls, max_urls_per_machine);
+}
+
+void registry_generate_curl_urls(void) {
+    FILE *fp = fopen("/tmp/registry.curl", "w+");
+
+    REGISTRY_PERSON *p;
+    dfe_start_read(registry.persons, p) {
+        for(REGISTRY_PERSON_URL *pu = p->person_urls ; pu ;pu = pu->next) {
+            fprintf(fp, "do_curl '%s' '%s' '%s'\n", p->guid, pu->machine->guid, string2str(pu->url));
+        }
+    }
+    dfe_done(p);
+
+    fclose(fp);
+}
+
 int registry_init(void) {
     char filename[FILENAME_MAX + 1];
 
@@ -16,7 +73,7 @@ int registry_init(void) {
         registry.enabled = 0;
     }
 
-    // pathnames
+    // path names
     snprintfz(filename, FILENAME_MAX, "%s/registry", netdata_configured_varlib_dir);
     registry.pathname = config_get(CONFIG_SECTION_DIRECTORIES, "registry", filename);
     if(mkdir(registry.pathname, 0770) == -1 && errno != EEXIST)
@@ -57,73 +114,104 @@ int registry_init(void) {
         config_set_number(CONFIG_SECTION_REGISTRY, "max URL name length", (long long)registry.max_name_length);
     }
 
+    bool use_mmap = config_get_boolean(CONFIG_SECTION_REGISTRY, "use mmap", false);
+
     // initialize entries counters
     registry.persons_count = 0;
     registry.machines_count = 0;
     registry.usages_count = 0;
-    registry.urls_count = 0;
     registry.persons_urls_count = 0;
     registry.machines_urls_count = 0;
-
-    // initialize memory counters
-    registry.persons_memory = 0;
-    registry.machines_memory = 0;
-    registry.urls_memory = 0;
-    registry.persons_urls_memory = 0;
-    registry.machines_urls_memory = 0;
 
     // initialize locks
     netdata_mutex_init(&registry.lock);
 
-    // create dictionaries
-    registry.persons = dictionary_create(REGISTRY_DICTIONARY_OPTIONS);
-    registry.machines = dictionary_create(REGISTRY_DICTIONARY_OPTIONS);
-    avl_init(&registry.registry_urls_root_index, registry_url_compare);
-
     // load the registry database
     if(registry.enabled) {
+        // create dictionaries
+        registry.persons = dictionary_create(REGISTRY_DICTIONARY_OPTIONS);
+        registry.machines = dictionary_create(REGISTRY_DICTIONARY_OPTIONS);
+
+        // initialize the allocators
+
+        size_t min_page_size = 4 * 1024;
+        size_t max_page_size = 1024 * 1024;
+
+        if(use_mmap) {
+            min_page_size = 100 * 1024 * 1024;
+            max_page_size = 512 * 1024 * 1024;
+        }
+
+        registry.persons_aral = aral_create("registry_persons", sizeof(REGISTRY_PERSON),
+                                            min_page_size / sizeof(REGISTRY_PERSON), max_page_size,
+                                            &registry.aral_stats,
+                                            "registry_persons",
+                                            &netdata_configured_cache_dir,
+                                            use_mmap, true);
+
+        registry.machines_aral = aral_create("registry_machines", sizeof(REGISTRY_MACHINE),
+                                             min_page_size / sizeof(REGISTRY_MACHINE), max_page_size,
+                                             &registry.aral_stats,
+                                             "registry_machines",
+                                             &netdata_configured_cache_dir,
+                                             use_mmap, true);
+
+        registry.person_urls_aral = aral_create("registry_person_urls", sizeof(REGISTRY_PERSON_URL),
+                                                min_page_size / sizeof(REGISTRY_PERSON_URL), max_page_size,
+                                                &registry.aral_stats,
+                                                "registry_person_urls",
+                                                &netdata_configured_cache_dir,
+                                                use_mmap, true);
+
+        registry.machine_urls_aral = aral_create("registry_machine_urls", sizeof(REGISTRY_MACHINE_URL),
+                                                 min_page_size / sizeof(REGISTRY_MACHINE_URL), max_page_size,
+                                                 &registry.aral_stats,
+                                                 "registry_machine_urls",
+                                                 &netdata_configured_cache_dir,
+                                                 use_mmap, true);
+
+        // disable cancelability to avoid enable/disable per item in the dictionary locks
+        netdata_thread_disable_cancelability();
+
         registry_log_open();
         registry_db_load();
         registry_log_load();
 
         if(unlikely(registry_db_should_be_saved()))
             registry_db_save();
+
+//        registry_db_stats();
+//        registry_generate_curl_urls();
+//        exit(0);
+
+        netdata_thread_enable_cancelability();
     }
 
     return 0;
 }
 
-static int machine_urls_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data) {
-    REGISTRY_MACHINE *m = (REGISTRY_MACHINE *)data;
-    (void)m;
-
-    REGISTRY_MACHINE_URL *mu = (REGISTRY_MACHINE_URL *)entry;
-
-    debug(D_REGISTRY, "Registry: unlinking url '%s' from machine", mu->url->url);
-    registry_url_unlink(mu->url);
-
-    debug(D_REGISTRY, "Registry: freeing machine url");
-    freez(mu);
-
-    return 1;
-}
-
 static int machine_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data __maybe_unused) {
     REGISTRY_MACHINE *m = (REGISTRY_MACHINE *)entry;
-    int ret = dictionary_walkthrough_read(m->machine_urls, machine_urls_delete_callback, m);
 
-    dictionary_destroy(m->machine_urls);
+    int count = 0;
+
+    while(m->machine_urls) {
+        registry_machine_url_unlink_from_machine_and_free(m, m->machine_urls);
+        count++;
+    }
+
     freez(m);
 
-    return ret + 1;
+    return count + 1;
 }
+
 static int registry_person_del_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *d __maybe_unused) {
     REGISTRY_PERSON *p = (REGISTRY_PERSON *)entry;
 
     debug(D_REGISTRY, "Registry: registry_person_del('%s'): deleting person", p->guid);
 
-    while(p->person_urls.root)
-        registry_person_unlink_from_url(p, (REGISTRY_PERSON_URL *)p->person_urls.root);
+    while(p->person_urls)
+        registry_person_unlink_from_url(p, (REGISTRY_PERSON_URL *)p->person_urls);
 
     //debug(D_REGISTRY, "Registry: deleting person '%s' from persons registry", p->guid);
     //dictionary_del(registry.persons, p->guid);
@@ -140,8 +228,19 @@ void registry_free(void) {
     debug(D_REGISTRY, "Registry: destroying persons dictionary");
     dictionary_walkthrough_read(registry.persons, registry_person_del_callback, NULL);
     dictionary_destroy(registry.persons);
+    registry.persons = NULL;
 
     debug(D_REGISTRY, "Registry: destroying machines dictionary");
     dictionary_walkthrough_read(registry.machines, machine_delete_callback, NULL);
     dictionary_destroy(registry.machines);
+    registry.machines = NULL;
+
+    aral_destroy(registry.persons_aral);
+    aral_destroy(registry.machines_aral);
+    aral_destroy(registry.person_urls_aral);
+    aral_destroy(registry.machine_urls_aral);
+    registry.persons_aral = NULL;
+    registry.machines_aral = NULL;
+    registry.person_urls_aral = NULL;
+    registry.machine_urls_aral = NULL;
 }

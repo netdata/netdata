@@ -8,6 +8,10 @@
 #define REGISTRY_STATUS_FAILED "failed"
 #define REGISTRY_STATUS_DISABLED "disabled"
 
+bool registry_is_valid_url(const char *url) {
+    return url && (*url == 'h' || *url == '*');
+}
+
 // ----------------------------------------------------------------------------
 // REGISTRY concurrency locking
 
@@ -23,19 +27,19 @@ static inline void registry_unlock(void) {
 // COOKIES
 
 static void registry_set_cookie(struct web_client *w, const char *guid) {
-    char edate[100];
+    char e_date[100];
     time_t et = now_realtime_sec() + registry.persons_expiration;
-    struct tm etmbuf, *etm = gmtime_r(&et, &etmbuf);
-    strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", etm);
+    struct tm e_tm_buf, *etm = gmtime_r(&et, &e_tm_buf);
+    strftime(e_date, sizeof(e_date), "%a, %d %b %Y %H:%M:%S %Z", etm);
 
-    buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s\r\n", guid, edate);
+    buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s\r\n", guid, e_date);
     if(registry.enable_cookies_samesite_secure)
-        buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; SameSite=None; Secure\r\n", guid, edate);
+        buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; SameSite=None; Secure\r\n", guid, e_date);
 
     if(registry.registry_domain && *registry.registry_domain) {
-        buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; Domain=%s\r\n", guid, edate, registry.registry_domain);
+        buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; Domain=%s\r\n", guid, e_date, registry.registry_domain);
         if(registry.enable_cookies_samesite_secure)
-            buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; Domain=%s; SameSite=None; Secure\r\n", guid, edate, registry.registry_domain);
+            buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; Domain=%s; SameSite=None; Secure\r\n", guid, e_date, registry.registry_domain);
     }
 
     w->response.has_cookies = true;
@@ -84,37 +88,41 @@ struct registry_json_walk_person_urls_callback {
     int count;
 };
 
+static STRING *asterisks = NULL;
+
 // callback for rendering PERSON_URLs
-static int registry_json_person_url_callback(void *entry, void *data) {
-    REGISTRY_PERSON_URL *pu = (REGISTRY_PERSON_URL *)entry;
-    struct registry_json_walk_person_urls_callback *c = (struct registry_json_walk_person_urls_callback *)data;
+static int registry_json_person_url_callback(REGISTRY_PERSON_URL *pu, struct registry_json_walk_person_urls_callback *c) {
+    if(unlikely(!asterisks))
+        asterisks = string_strdupz("***");
+
     struct web_client *w = c->w;
 
-    if (!strcmp(pu->url->url,"***")) return 0;
+    if (pu->url == asterisks) return 0;
 
     buffer_json_add_array_item_array(w->response.data);
     buffer_json_add_array_item_string(w->response.data, pu->machine->guid);
-    buffer_json_add_array_item_string(w->response.data, pu->url->url);
+    buffer_json_add_array_item_string(w->response.data, string2str(pu->url));
     buffer_json_add_array_item_uint64(w->response.data, pu->last_t * (uint64_t) 1000);
     buffer_json_add_array_item_uint64(w->response.data, pu->usages);
-    buffer_json_add_array_item_string(w->response.data, pu->machine_name);
+    buffer_json_add_array_item_string(w->response.data, string2str(pu->machine_name));
     buffer_json_array_close(w->response.data);
 
     return 1;
 }
 
 // callback for rendering MACHINE_URLs
-static int registry_json_machine_url_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data) {
-    REGISTRY_MACHINE_URL *mu = (REGISTRY_MACHINE_URL *)entry;
-    struct registry_json_walk_person_urls_callback *c = (struct registry_json_walk_person_urls_callback *)data;
+static int registry_json_machine_url_callback(REGISTRY_MACHINE_URL *mu, struct registry_json_walk_person_urls_callback *c) {
+    if(unlikely(!asterisks))
+        asterisks = string_strdupz("***");
+
     struct web_client *w = c->w;
     REGISTRY_MACHINE *m = c->m;
 
-    if (!strcmp(mu->url->url,"***")) return 0;
+    if (mu->url == asterisks) return 0;
 
     buffer_json_add_array_item_array(w->response.data);
     buffer_json_add_array_item_string(w->response.data, m->guid);
-    buffer_json_add_array_item_string(w->response.data, mu->url->url);
+    buffer_json_add_array_item_string(w->response.data, string2str(mu->url));
     buffer_json_add_array_item_uint64(w->response.data, mu->last_t * (uint64_t) 1000);
     buffer_json_add_array_item_uint64(w->response.data, mu->usages);
     buffer_json_array_close(w->response.data);
@@ -130,9 +138,7 @@ struct registry_person_url_callback_verify_machine_exists_data {
     int count;
 };
 
-static inline int registry_person_url_callback_verify_machine_exists(void *entry, void *data) {
-    struct registry_person_url_callback_verify_machine_exists_data *d = (struct registry_person_url_callback_verify_machine_exists_data *)data;
-    REGISTRY_PERSON_URL *pu = (REGISTRY_PERSON_URL *)entry;
+static inline int registry_person_url_callback_verify_machine_exists(REGISTRY_PERSON_URL *pu, struct registry_person_url_callback_verify_machine_exists_data *d) {
     REGISTRY_MACHINE *m = d->m;
 
     if(pu->machine == m)
@@ -161,34 +167,54 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w) {
     buffer_json_member_add_string(w->response.data, "cloud_base_url", registry.cloud_base_url);
     buffer_json_member_add_boolean(w->response.data, "anonymous_statistics", netdata_anonymous_statistics_enabled);
 
+    buffer_json_member_add_array(w->response.data, "nodes");
+    RRDHOST *h;
+    dfe_start_read(rrdhost_root_index, h) {
+        buffer_json_add_array_item_object(w->response.data);
+        buffer_json_member_add_string(w->response.data, "machine_guid", h->machine_guid);
+        buffer_json_member_add_string(w->response.data, "hostname", rrdhost_registry_hostname(h));
+        buffer_json_object_close(w->response.data);
+    }
+    dfe_done(h);
+    buffer_json_array_close(w->response.data);
+
     registry_json_footer(w);
     return HTTP_RESP_OK;
 }
 
 // ----------------------------------------------------------------------------
-//public ACCESS request
-
-#define REGISTRY_VERIFY_COOKIES_GUID "give-me-back-this-cookie-now--please"
+// public ACCESS request
 
 // the main method for registering an access
 int registry_request_access_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url, char *name, time_t when) {
     if(unlikely(!registry.enabled))
         return registry_json_disabled(host, w, "access");
 
+    if(!registry_is_valid_url(url)) {
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "Invalid URL given in the request");
+        return HTTP_RESP_BAD_REQUEST;
+    }
+
     // ------------------------------------------------------------------------
-    // verify the browser supports cookies
+    // verify the browser supports cookies or the bearer
 
     if(registry.verify_cookies_redirects > 0 && !person_guid[0]) {
+        registry_request_access(REGISTRY_VERIFY_COOKIES_GUID, machine_guid, url, name, when);
+
         buffer_flush(w->response.data);
         registry_set_cookie(w, REGISTRY_VERIFY_COOKIES_GUID);
         w->response.data->content_type = CT_APPLICATION_JSON;
         registry_json_header(host, w, "access", REGISTRY_STATUS_REDIRECT);
+        buffer_json_member_add_string(w->response.data, "person_guid", REGISTRY_VERIFY_COOKIES_GUID);
         buffer_json_member_add_string(w->response.data, "registry", registry.registry_to_announce);
         registry_json_footer(w);
         return HTTP_RESP_OK;
     }
 
-    if(unlikely(person_guid[0] && !strcmp(person_guid, REGISTRY_VERIFY_COOKIES_GUID)))
+    if(unlikely(person_guid[0] && is_dummy_person(person_guid)))
+        // it passed the check - they gave us a different person_guid
+        // empty the dummy one, so that we will generate a new person_guid
         person_guid[0] = '\0';
 
     // ------------------------------------------------------------------------
@@ -212,7 +238,8 @@ int registry_request_access_json(RRDHOST *host, struct web_client *w, char *pers
     buffer_json_member_add_array(w->response.data, "urls");
 
     struct registry_json_walk_person_urls_callback c = { p, NULL, w, 0 };
-    avl_traverse(&p->person_urls, registry_json_person_url_callback, &c);
+    for(REGISTRY_PERSON_URL *pu = p->person_urls; pu ;pu = pu->next)
+        registry_json_person_url_callback(pu, &c);
     buffer_json_array_close(w->response.data); // urls
 
     registry_json_footer(w);
@@ -227,6 +254,12 @@ int registry_request_access_json(RRDHOST *host, struct web_client *w, char *pers
 int registry_request_delete_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when) {
     if(!registry.enabled)
         return registry_json_disabled(host, w, "delete");
+
+    if(!registry_is_valid_url(url)) {
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "Invalid URL given in the request");
+        return HTTP_RESP_BAD_REQUEST;
+    }
 
     registry_lock();
 
@@ -253,6 +286,12 @@ int registry_request_search_json(RRDHOST *host, struct web_client *w, char *pers
     if(!registry.enabled)
         return registry_json_disabled(host, w, "search");
 
+    if(!registry_is_valid_url(url)) {
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "Invalid URL given in the request");
+        return HTTP_RESP_BAD_REQUEST;
+    }
+
     registry_lock();
 
     REGISTRY_MACHINE *m = registry_request_machine(person_guid, machine_guid, url, request_machine, when);
@@ -267,7 +306,10 @@ int registry_request_search_json(RRDHOST *host, struct web_client *w, char *pers
 
     buffer_json_member_add_array(w->response.data, "urls");
     struct registry_json_walk_person_urls_callback c = { NULL, m, w, 0 };
-    dictionary_walkthrough_read(m->machine_urls, registry_json_machine_url_callback, &c);
+
+    for(REGISTRY_MACHINE_URL *mu = m->machine_urls; mu ; mu = mu->next)
+        registry_json_machine_url_callback(mu, &c);
+
     buffer_json_array_close(w->response.data);
 
     registry_json_footer(w);
@@ -279,12 +321,15 @@ int registry_request_search_json(RRDHOST *host, struct web_client *w, char *pers
 // SWITCH REQUEST
 
 // the main method for switching user identity
-int registry_request_switch_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url, char *new_person_guid, time_t when) {
+int registry_request_switch_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url __maybe_unused, char *new_person_guid, time_t when __maybe_unused) {
     if(!registry.enabled)
         return registry_json_disabled(host, w, "switch");
 
-    (void)url;
-    (void)when;
+    if(!registry_is_valid_url(url)) {
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "Invalid URL given in the request");
+        return HTTP_RESP_BAD_REQUEST;
+    }
 
     registry_lock();
 
@@ -315,7 +360,9 @@ int registry_request_switch_json(RRDHOST *host, struct web_client *w, char *pers
     struct registry_person_url_callback_verify_machine_exists_data data = { m, 0 };
 
     // verify the old person has access to this machine
-    avl_traverse(&op->person_urls, registry_person_url_callback_verify_machine_exists, &data);
+    for(REGISTRY_PERSON_URL *pu = op->person_urls; pu ;pu = pu->next)
+        registry_person_url_callback_verify_machine_exists(pu, &data);
+
     if(!data.count) {
         registry_json_header(host, w, "switch", REGISTRY_STATUS_FAILED);
         registry_json_footer(w);
@@ -325,7 +372,9 @@ int registry_request_switch_json(RRDHOST *host, struct web_client *w, char *pers
 
     // verify the new person has access to this machine
     data.count = 0;
-    avl_traverse(&np->person_urls, registry_person_url_callback_verify_machine_exists, &data);
+    for(REGISTRY_PERSON_URL *pu = np->person_urls; pu ;pu = pu->next)
+        registry_person_url_callback_verify_machine_exists(pu, &data);
+
     if(!data.count) {
         registry_json_header(host, w, "switch", REGISTRY_STATUS_FAILED);
         registry_json_footer(w);
@@ -396,14 +445,12 @@ void registry_statistics(void) {
 
         rrddim_add(stc, "persons",        NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(stc, "machines",       NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
-        rrddim_add(stc, "urls",           NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(stc, "persons_urls",   NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(stc, "machines_urls",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set(stc, "persons",       (collected_number)registry.persons_count);
     rrddim_set(stc, "machines",      (collected_number)registry.machines_count);
-    rrddim_set(stc, "urls",          (collected_number)registry.urls_count);
     rrddim_set(stc, "persons_urls",  (collected_number)registry.persons_urls_count);
     rrddim_set(stc, "machines_urls", (collected_number)registry.machines_urls_count);
     rrdset_done(stc);
@@ -428,15 +475,21 @@ void registry_statistics(void) {
 
         rrddim_add(stm, "persons",        NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(stm, "machines",       NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
-        rrddim_add(stm, "urls",           NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(stm, "persons_urls",   NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(stm, "machines_urls",  NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    rrddim_set(stm, "persons",       (collected_number)registry.persons_memory + dictionary_stats_for_registry(registry.persons));
-    rrddim_set(stm, "machines",      (collected_number)registry.machines_memory + dictionary_stats_for_registry(registry.machines));
-    rrddim_set(stm, "urls",          (collected_number)registry.urls_memory);
-    rrddim_set(stm, "persons_urls",  (collected_number)registry.persons_urls_memory);
-    rrddim_set(stm, "machines_urls", (collected_number)registry.machines_urls_memory);
+    struct aral_statistics *p_aral_stats = aral_statistics(registry.persons_aral);
+    rrddim_set(stm, "persons",       (collected_number)p_aral_stats->structures.allocated_bytes + (collected_number)p_aral_stats->malloc.allocated_bytes);
+
+    struct aral_statistics *m_aral_stats = aral_statistics(registry.machines_aral);
+    rrddim_set(stm, "machines",      (collected_number)m_aral_stats->structures.allocated_bytes + (collected_number)m_aral_stats->malloc.allocated_bytes);
+
+    struct aral_statistics *pu_aral_stats = aral_statistics(registry.person_urls_aral);
+    rrddim_set(stm, "persons_urls",  (collected_number)pu_aral_stats->structures.allocated_bytes + (collected_number)pu_aral_stats->malloc.allocated_bytes);
+
+    struct aral_statistics *mu_aral_stats = aral_statistics(registry.machine_urls_aral);
+    rrddim_set(stm, "machines_urls", (collected_number)mu_aral_stats->structures.allocated_bytes + (collected_number)mu_aral_stats->malloc.allocated_bytes);
+
     rrdset_done(stm);
 }

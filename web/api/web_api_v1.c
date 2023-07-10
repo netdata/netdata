@@ -927,16 +927,17 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
 */
     }
 
-    char person_guid[GUID_LEN + 1] = "";
-
     debug(D_WEB_CLIENT, "%llu: API v1 registry with URL '%s'", w->id, url);
 
     // TODO
     // The browser may send multiple cookies with our id
 
+    char person_guid[UUID_STR_LEN] = "";
     char *cookie = strstr(w->response.data->buffer, NETDATA_REGISTRY_COOKIE_NAME "=");
     if(cookie)
-        strncpyz(person_guid, &cookie[sizeof(NETDATA_REGISTRY_COOKIE_NAME)], 36);
+        strncpyz(person_guid, &cookie[sizeof(NETDATA_REGISTRY_COOKIE_NAME)], UUID_STR_LEN - 1);
+    else if(!extract_bearer_token_from_request(w, person_guid, sizeof(person_guid)))
+        person_guid[0] = '\0';
 
     char action = '\0';
     char *machine_guid = NULL,
@@ -1516,12 +1517,6 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
 }
 #endif
 
-#ifdef NETDATA_DEV_MODE
-#define ACL_DEV_OPEN_ACCESS WEB_CLIENT_ACL_DASHBOARD
-#else
-#define ACL_DEV_OPEN_ACCESS 0
-#endif
-
 static struct web_api_command api_commands_v1[] = {
         { "info",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_info                       },
         { "data",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_data                       },
@@ -1531,7 +1526,7 @@ static struct web_api_command api_commands_v1[] = {
         { "contexts",        0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_contexts                   },
 
         // registry checks the ACL by itself, so we allow everything
-        { "registry",        0, WEB_CLIENT_ACL_NOCHECK,                         web_client_api_request_v1_registry                   },
+        { "registry",        0, WEB_CLIENT_ACL_NOCHECK,               web_client_api_request_v1_registry                   },
 
         // badges can be fetched with both dashboard and badge permissions
         { "badge.svg",       0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC | WEB_CLIENT_ACL_BADGE, web_client_api_request_v1_badge },
@@ -1545,16 +1540,16 @@ static struct web_api_command api_commands_v1[] = {
 
 #if defined(ENABLE_ML)
         { "ml_info",         0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_ml_info            },
-        { "ml_models",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_models          },
+        // { "ml_models",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_models          },
 #endif
 
-        { "manage/health",       0, WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_ACLK,      web_client_api_request_v1_mgmt_health           },
+        {"manage/health", 0, WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_ACLK | WEB_CLIENT_ACL_BEARER_REQUIRED, web_client_api_request_v1_mgmt_health           },
         { "aclk",                0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_aclk_state            },
         { "metric_correlations", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_metric_correlations   },
         { "weights",             0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_weights               },
 
-        { "function",            0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_function },
-        { "functions",            0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_functions },
+        {"function", 0, WEB_CLIENT_ACL_ACLK | WEB_CLIENT_ACL_BEARER_REQUIRED | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_function },
+        {"functions", 0, WEB_CLIENT_ACL_ACLK | WEB_CLIENT_ACL_BEARER_REQUIRED | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_functions },
 
         { "dbengine_stats",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_dbengine_stats },
 

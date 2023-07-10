@@ -80,7 +80,7 @@ static inline char *registry_fix_url(char *url, size_t *len) {
 // HELPERS
 
 // verify the person, the machine and the URL exist in our DB
-REGISTRY_PERSON_URL *registry_verify_request(char *person_guid, char *machine_guid, char *url, REGISTRY_PERSON **pp, REGISTRY_MACHINE **mm) {
+REGISTRY_PERSON_URL *registry_verify_request(const char *person_guid, char *machine_guid, char *url, REGISTRY_PERSON **pp, REGISTRY_MACHINE **mm) {
     char pbuf[GUID_LEN + 1], mbuf[GUID_LEN + 1];
 
     if(!person_guid || !*person_guid || !machine_guid || !*machine_guid || !url || !*url) {
@@ -121,7 +121,10 @@ REGISTRY_PERSON_URL *registry_verify_request(char *person_guid, char *machine_gu
     }
     if(pp) *pp = p;
 
-    REGISTRY_PERSON_URL *pu = registry_person_url_index_find(p, url);
+    STRING *u = string_strdupz(url);
+    REGISTRY_PERSON_URL *pu = registry_person_url_index_find(p, u);
+    string_freez(u);
+
     if(!pu) {
         netdata_log_info("Registry Request Verification: URL not found for person, person: '%s', machine '%s', url '%s'", person_guid, machine_guid, url);
         return NULL;
@@ -138,23 +141,28 @@ REGISTRY_PERSON_URL *registry_verify_request(char *person_guid, char *machine_gu
 // ----------------------------------------------------------------------------
 // REGISTRY REQUESTS
 
-REGISTRY_PERSON *registry_request_access(char *person_guid, char *machine_guid, char *url, char *name, time_t when) {
+REGISTRY_PERSON *registry_request_access(const char *person_guid, char *machine_guid, char *url, char *name, time_t when) {
     debug(D_REGISTRY, "registry_request_access('%s', '%s', '%s'): NEW REQUEST", (person_guid)?person_guid:"", machine_guid, url);
 
-    REGISTRY_MACHINE *m = registry_machine_get(machine_guid, when);
+    bool is_dummy = is_dummy_person(person_guid);
+
+    REGISTRY_MACHINE *m = registry_machine_find_or_create(machine_guid, when, is_dummy);
     if(!m) return NULL;
 
+    REGISTRY_PERSON *p = registry_person_find_or_create(person_guid, when, is_dummy);
+
     // make sure the name is valid
-    size_t namelen;
-    name = registry_fix_machine_name(name, &namelen);
+    size_t name_len;
+    name = registry_fix_machine_name(name, &name_len);
 
-    size_t urllen;
-    url = registry_fix_url(url, &urllen);
+    size_t url_len;
+    url = registry_fix_url(url, &url_len);
 
-    REGISTRY_PERSON *p = registry_person_get(person_guid, when);
+    STRING *u = string_strdupz(url);
 
-    REGISTRY_URL *u = registry_url_get(url, urllen);
-    registry_person_link_to_url(p, m, u, name, namelen, when);
+    if(!is_dummy)
+        registry_person_link_to_url(p, m, u, name, name_len, when);
+
     registry_machine_link_to_url(m, u, when);
 
     registry_log('A', p, m, u, name);
@@ -164,7 +172,7 @@ REGISTRY_PERSON *registry_request_access(char *person_guid, char *machine_guid, 
     return p;
 }
 
-REGISTRY_PERSON *registry_request_delete(char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when) {
+REGISTRY_PERSON *registry_request_delete(const char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when) {
     (void) when;
 
     REGISTRY_PERSON *p = NULL;
@@ -184,14 +192,17 @@ REGISTRY_PERSON *registry_request_delete(char *person_guid, char *machine_guid, 
     }
     */
 
-    REGISTRY_PERSON_URL *dpu = registry_person_url_index_find(p, delete_url);
+    STRING *d_url = string_strdupz(delete_url);
+    REGISTRY_PERSON_URL *dpu = registry_person_url_index_find(p, d_url);
+    string_freez(d_url);
+
     if(!dpu) {
         netdata_log_info("Registry Delete Request: URL not found for person: '%s', machine '%s', url '%s', delete url '%s'", p->guid
-             , m->guid, pu->url->url, delete_url);
+             , m->guid, string2str(pu->url), delete_url);
         return NULL;
     }
 
-    registry_log('D', p, m, pu->url, dpu->url->url);
+    registry_log('D', p, m, pu->url, string2str(dpu->url));
     registry_person_unlink_from_url(p, dpu);
 
     return p;
@@ -218,7 +229,7 @@ static int machine_request_callback(void *entry, void *data) {
     return 0; // continue
 }
 
-REGISTRY_MACHINE *registry_request_machine(char *person_guid, char *machine_guid, char *url, char *request_machine, time_t when) {
+REGISTRY_MACHINE *registry_request_machine(const char *person_guid, char *machine_guid, char *url, char *request_machine, time_t when) {
     (void)when;
 
     char mbuf[GUID_LEN + 1];
@@ -230,7 +241,7 @@ REGISTRY_MACHINE *registry_request_machine(char *person_guid, char *machine_guid
 
     // make sure the machine GUID is valid
     if(regenerate_guid(request_machine, mbuf) == -1) {
-        netdata_log_info("Registry Machine URLs request: invalid machine GUID, person: '%s', machine '%s', url '%s', request machine '%s'", p->guid, m->guid, pu->url->url, request_machine);
+        netdata_log_info("Registry Machine URLs request: invalid machine GUID, person: '%s', machine '%s', url '%s', request machine '%s'", p->guid, m->guid, string2str(pu->url), request_machine);
         return NULL;
     }
     request_machine = mbuf;
@@ -238,7 +249,7 @@ REGISTRY_MACHINE *registry_request_machine(char *person_guid, char *machine_guid
     // make sure the machine exists
     m = registry_machine_find(request_machine);
     if(!m) {
-        netdata_log_info("Registry Machine URLs request: machine not found, person: '%s', machine '%s', url '%s', request machine '%s'", p->guid, machine_guid, pu->url->url, request_machine);
+        netdata_log_info("Registry Machine URLs request: machine not found, person: '%s', machine '%s', url '%s', request machine '%s'", p->guid, machine_guid, string2str(pu->url), request_machine);
         return NULL;
     }
 
@@ -250,7 +261,8 @@ REGISTRY_MACHINE *registry_request_machine(char *person_guid, char *machine_guid
     struct machine_request_callback_data rdata = { m, NULL };
 
     // request a walk through on the dictionary
-    avl_traverse(&p->person_urls, machine_request_callback, &rdata);
+    for(pu = p->person_urls; pu ;pu = pu->next)
+        machine_request_callback(pu, &rdata);
 
     if(rdata.result)
         return m;

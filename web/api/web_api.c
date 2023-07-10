@@ -2,6 +2,35 @@
 
 #include "web_api.h"
 
+bool netdata_is_protected_by_bearer = false; // this is controlled by cloud, at the point the agent logs in - this should also be saved to /var/lib/netdata
+DICTIONARY *netdata_authorized_bearers = NULL;
+
+static bool web_client_check_acl_and_bearer(struct web_client *w, WEB_CLIENT_ACL endpoint_acl) {
+    if(endpoint_acl == WEB_CLIENT_ACL_NOCHECK)
+        // the endpoint is totally public
+        return true;
+
+    bool acl_allows = w->acl & endpoint_acl;
+    if(!acl_allows)
+        // the channel we received the request from (w->acl) is not compatible with the endpoint
+        return false;
+
+    if(!netdata_is_protected_by_bearer && !(endpoint_acl & WEB_CLIENT_ACL_BEARER_REQUIRED))
+        // bearer protection is not enabled and is not required by the endpoint
+        return true;
+
+    if(!(endpoint_acl & (WEB_CLIENT_ACL_BEARER_REQUIRED|WEB_CLIENT_ACL_BEARER_OPTIONAL)))
+        // endpoint does not require a bearer
+        return true;
+
+    if((w->acl & (WEB_CLIENT_ACL_ACLK|WEB_CLIENT_ACL_WEBRTC)) || api_check_bearer_token(w))
+        // the request is coming from ACLK or WEBRTC (authorized already),
+        // or we have a valid bearer on the request
+        return true;
+
+    return false;
+}
+
 int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_path_endpoint, struct web_api_command *api_commands) {
     if(unlikely(!url_path_endpoint || !*url_path_endpoint)) {
         buffer_flush(w->response.data);
@@ -13,7 +42,7 @@ int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_pat
 
     for(int i = 0; api_commands[i].command ; i++) {
         if(unlikely(hash == api_commands[i].hash && !strcmp(url_path_endpoint, api_commands[i].command))) {
-            if(unlikely(api_commands[i].acl != WEB_CLIENT_ACL_NOCHECK) && !(w->acl & api_commands[i].acl))
+            if(unlikely(!web_client_check_acl_and_bearer(w, api_commands[i].acl)))
                 return web_client_permission_denied(w);
 
             char *query_string = (char *)buffer_tostring(w->url_query_string_decoded);

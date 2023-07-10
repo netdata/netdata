@@ -11,18 +11,15 @@ int registry_db_should_be_saved(void) {
 // ----------------------------------------------------------------------------
 // INTERNAL FUNCTIONS FOR SAVING REGISTRY OBJECTS
 
-static int registry_machine_save_url(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *file) {
-    REGISTRY_MACHINE_URL *mu = entry;
-    FILE *fp = file;
-
-    debug(D_REGISTRY, "Registry: registry_machine_save_url('%s')", mu->url->url);
+static int registry_machine_save_url(REGISTRY_MACHINE_URL *mu, FILE *fp) {
+    debug(D_REGISTRY, "REGISTRY: registry_machine_save_url('%s')", string2str(mu->url));
 
     int ret = fprintf(fp, "V\t%08x\t%08x\t%08x\t%02x\t%s\n",
             mu->first_t,
             mu->last_t,
             mu->usages,
             mu->flags,
-            mu->url->url
+            string2str(mu->url)
     );
 
     // error handling is done at registry_db_save()
@@ -35,7 +32,7 @@ static int registry_machine_save(const DICTIONARY_ITEM *item __maybe_unused, voi
     REGISTRY_MACHINE *m = entry;
     FILE *fp = file;
 
-    debug(D_REGISTRY, "Registry: registry_machine_save('%s')", m->guid);
+    debug(D_REGISTRY, "REGISTRY: registry_machine_save('%s')", m->guid);
 
     int ret = fprintf(fp, "M\t%08x\t%08x\t%08x\t%s\n",
             m->first_t,
@@ -45,9 +42,13 @@ static int registry_machine_save(const DICTIONARY_ITEM *item __maybe_unused, voi
     );
 
     if(ret >= 0) {
-        int ret2 = dictionary_walkthrough_read(m->machine_urls, registry_machine_save_url, fp);
-        if(ret2 < 0) return ret2;
-        ret += ret2;
+        for(REGISTRY_MACHINE_URL *mu = m->machine_urls; mu ; mu = mu->next) {
+            int rc = registry_machine_save_url(mu, fp);
+            if(rc < 0)
+                return rc;
+
+            ret += rc;
+        }
     }
 
     // error handling is done at registry_db_save()
@@ -55,11 +56,8 @@ static int registry_machine_save(const DICTIONARY_ITEM *item __maybe_unused, voi
     return ret;
 }
 
-static inline int registry_person_save_url(void *entry, void *file) {
-    REGISTRY_PERSON_URL *pu = entry;
-    FILE *fp = file;
-
-    debug(D_REGISTRY, "Registry: registry_person_save_url('%s')", pu->url->url);
+static inline int registry_person_save_url(REGISTRY_PERSON_URL *pu, FILE *fp) {
+    debug(D_REGISTRY, "REGISTRY: registry_person_save_url('%s')", string2str(pu->url));
 
     int ret = fprintf(fp, "U\t%08x\t%08x\t%08x\t%02x\t%s\t%s\t%s\n",
             pu->first_t,
@@ -67,8 +65,8 @@ static inline int registry_person_save_url(void *entry, void *file) {
             pu->usages,
             pu->flags,
             pu->machine->guid,
-            pu->machine_name,
-            pu->url->url
+            string2str(pu->machine_name),
+            string2str(pu->url)
     );
 
     // error handling is done at registry_db_save()
@@ -80,7 +78,7 @@ static inline int registry_person_save(const DICTIONARY_ITEM *item __maybe_unuse
     REGISTRY_PERSON *p = entry;
     FILE *fp = file;
 
-    debug(D_REGISTRY, "Registry: registry_person_save('%s')", p->guid);
+    debug(D_REGISTRY, "REGISTRY: registry_person_save('%s')", p->guid);
 
     int ret = fprintf(fp, "P\t%08x\t%08x\t%08x\t%s\n",
             p->first_t,
@@ -90,10 +88,13 @@ static inline int registry_person_save(const DICTIONARY_ITEM *item __maybe_unuse
     );
 
     if(ret >= 0) {
-        //int ret2 = dictionary_walkthrough_read(p->person_urls, registry_person_save_url, fp);
-        int ret2 = avl_traverse(&p->person_urls, registry_person_save_url, fp);
-        if (ret2 < 0) return ret2;
-        ret += ret2;
+        for(REGISTRY_PERSON_URL *pu = p->person_urls; pu ;pu = pu->next) {
+            int rc = registry_person_save_url(pu, fp);
+            if(rc < 0)
+                return rc;
+            else
+                ret += rc;
+        }
     }
 
     // error handling is done at registry_db_save()
@@ -119,42 +120,42 @@ int registry_db_save(void) {
     snprintfz(old_filename, FILENAME_MAX, "%s.old", registry.db_filename);
     snprintfz(tmp_filename, FILENAME_MAX, "%s.tmp", registry.db_filename);
 
-    debug(D_REGISTRY, "Registry: Creating file '%s'", tmp_filename);
+    debug(D_REGISTRY, "REGISTRY: Creating file '%s'", tmp_filename);
     FILE *fp = fopen(tmp_filename, "w");
     if(!fp) {
-        netdata_log_error("Registry: Cannot create file: %s", tmp_filename);
+        netdata_log_error("REGISTRY: Cannot create file: %s", tmp_filename);
         error_log_limit_reset();
         return -1;
     }
 
     // dictionary_walkthrough_read() has its own locking, so this is safe to do
 
-    debug(D_REGISTRY, "Saving all machines");
+    debug(D_REGISTRY, "REGISTRY: saving all machines");
     int bytes1 = dictionary_walkthrough_read(registry.machines, registry_machine_save, fp);
     if(bytes1 < 0) {
-        netdata_log_error("Registry: Cannot save registry machines - return value %d", bytes1);
+        netdata_log_error("REGISTRY: Cannot save registry machines - return value %d", bytes1);
         fclose(fp);
         error_log_limit_reset();
         return bytes1;
     }
-    debug(D_REGISTRY, "Registry: saving machines took %d bytes", bytes1);
+    debug(D_REGISTRY, "REGISTRY: saving machines took %d bytes", bytes1);
 
     debug(D_REGISTRY, "Saving all persons");
     int bytes2 = dictionary_walkthrough_read(registry.persons, registry_person_save, fp);
     if(bytes2 < 0) {
-        netdata_log_error("Registry: Cannot save registry persons - return value %d", bytes2);
+        netdata_log_error("REGISTRY: Cannot save registry persons - return value %d", bytes2);
         fclose(fp);
         error_log_limit_reset();
         return bytes2;
     }
-    debug(D_REGISTRY, "Registry: saving persons took %d bytes", bytes2);
+    debug(D_REGISTRY, "REGISTRY: saving persons took %d bytes", bytes2);
 
     // save the totals
     fprintf(fp, "T\t%016llx\t%016llx\t%016llx\t%016llx\t%016llx\t%016llx\n",
             registry.persons_count,
             registry.machines_count,
             registry.usages_count + 1, // this is required - it is lost on db rotation
-            registry.urls_count,
+            0LLU, //registry.urls_count,
             registry.persons_urls_count,
             registry.machines_urls_count
     );
@@ -164,36 +165,36 @@ int registry_db_save(void) {
     errno = 0;
 
     // remove the .old db
-    debug(D_REGISTRY, "Registry: Removing old db '%s'", old_filename);
+    debug(D_REGISTRY, "REGISTRY: Removing old db '%s'", old_filename);
     if(unlink(old_filename) == -1 && errno != ENOENT)
-        netdata_log_error("Registry: cannot remove old registry file '%s'", old_filename);
+        netdata_log_error("REGISTRY: cannot remove old registry file '%s'", old_filename);
 
     // rename the db to .old
-    debug(D_REGISTRY, "Registry: Link current db '%s' to .old: '%s'", registry.db_filename, old_filename);
+    debug(D_REGISTRY, "REGISTRY: Link current db '%s' to .old: '%s'", registry.db_filename, old_filename);
     if(link(registry.db_filename, old_filename) == -1 && errno != ENOENT)
-        netdata_log_error("Registry: cannot move file '%s' to '%s'. Saving registry DB failed!", registry.db_filename, old_filename);
+        netdata_log_error("REGISTRY: cannot move file '%s' to '%s'. Saving registry DB failed!", registry.db_filename, old_filename);
 
     else {
         // remove the database (it is saved in .old)
-        debug(D_REGISTRY, "Registry: removing db '%s'", registry.db_filename);
+        debug(D_REGISTRY, "REGISTRY: removing db '%s'", registry.db_filename);
         if (unlink(registry.db_filename) == -1 && errno != ENOENT)
-            netdata_log_error("Registry: cannot remove old registry file '%s'", registry.db_filename);
+            netdata_log_error("REGISTRY: cannot remove old registry file '%s'", registry.db_filename);
 
         // move the .tmp to make it active
-        debug(D_REGISTRY, "Registry: linking tmp db '%s' to active db '%s'", tmp_filename, registry.db_filename);
+        debug(D_REGISTRY, "REGISTRY: linking tmp db '%s' to active db '%s'", tmp_filename, registry.db_filename);
         if (link(tmp_filename, registry.db_filename) == -1) {
-            netdata_log_error("Registry: cannot move file '%s' to '%s'. Saving registry DB failed!", tmp_filename,
+            netdata_log_error("REGISTRY: cannot move file '%s' to '%s'. Saving registry DB failed!", tmp_filename,
                     registry.db_filename);
 
             // move the .old back
-            debug(D_REGISTRY, "Registry: linking old db '%s' to active db '%s'", old_filename, registry.db_filename);
+            debug(D_REGISTRY, "REGISTRY: linking old db '%s' to active db '%s'", old_filename, registry.db_filename);
             if(link(old_filename, registry.db_filename) == -1)
-                netdata_log_error("Registry: cannot move file '%s' to '%s'. Recovering the old registry DB failed!", old_filename, registry.db_filename);
+                netdata_log_error("REGISTRY: cannot move file '%s' to '%s'. Recovering the old registry DB failed!", old_filename, registry.db_filename);
         }
         else {
-            debug(D_REGISTRY, "Registry: removing tmp db '%s'", tmp_filename);
+            debug(D_REGISTRY, "REGISTRY: removing tmp db '%s'", tmp_filename);
             if(unlink(tmp_filename) == -1)
-                netdata_log_error("Registry: cannot remove tmp registry file '%s'", tmp_filename);
+                netdata_log_error("REGISTRY: cannot remove tmp registry file '%s'", tmp_filename);
 
             // it has been moved successfully
             // discard the current registry log
@@ -215,75 +216,33 @@ size_t registry_db_load(void) {
     char *s, buf[4096 + 1];
     REGISTRY_PERSON *p = NULL;
     REGISTRY_MACHINE *m = NULL;
-    REGISTRY_URL *u = NULL;
+    STRING *u = NULL;
     size_t line = 0;
 
-    debug(D_REGISTRY, "Registry: loading active db from: '%s'", registry.db_filename);
+    debug(D_REGISTRY, "REGISTRY: loading active db from: '%s'", registry.db_filename);
     FILE *fp = fopen(registry.db_filename, "r");
     if(!fp) {
-        netdata_log_error("Registry: cannot open registry file: '%s'", registry.db_filename);
+        netdata_log_error("REGISTRY: cannot open registry file: '%s'", registry.db_filename);
         return 0;
     }
 
+    REGISTRY_MACHINE_URL *mu;
     size_t len = 0;
     buf[4096] = '\0';
     while((s = fgets_trim_len(buf, 4096, fp, &len))) {
         line++;
 
-        debug(D_REGISTRY, "Registry: read line %zu to length %zu: %s", line, len, s);
+        debug(D_REGISTRY, "REGISTRY: read line %zu to length %zu: %s", line, len, s);
         switch(*s) {
-            case 'T': // totals
-                if(unlikely(len != 103 || s[1] != '\t' || s[18] != '\t' || s[35] != '\t' || s[52] != '\t' || s[69] != '\t' || s[86] != '\t' || s[103] != '\0')) {
-                    netdata_log_error("Registry totals line %zu is wrong (len = %zu).", line, len);
-                    continue;
-                }
-                registry.persons_count = strtoull(&s[2], NULL, 16);
-                registry.machines_count = strtoull(&s[19], NULL, 16);
-                registry.usages_count = strtoull(&s[36], NULL, 16);
-                registry.urls_count = strtoull(&s[53], NULL, 16);
-                registry.persons_urls_count = strtoull(&s[70], NULL, 16);
-                registry.machines_urls_count = strtoull(&s[87], NULL, 16);
-                break;
-
-            case 'P': // person
-                m = NULL;
-                // verify it is valid
-                if(unlikely(len != 65 || s[1] != '\t' || s[10] != '\t' || s[19] != '\t' || s[28] != '\t' || s[65] != '\0')) {
-                    netdata_log_error("Registry person line %zu is wrong (len = %zu).", line, len);
-                    continue;
-                }
-
-                s[1] = s[10] = s[19] = s[28] = '\0';
-                p = registry_person_allocate(&s[29], strtoul(&s[2], NULL, 16));
-                p->last_t = (uint32_t)strtoul(&s[11], NULL, 16);
-                p->usages = (uint32_t)strtoul(&s[20], NULL, 16);
-                debug(D_REGISTRY, "Registry loaded person '%s', first: %u, last: %u, usages: %u", p->guid, p->first_t, p->last_t, p->usages);
-                break;
-
-            case 'M': // machine
-                p = NULL;
-                // verify it is valid
-                if(unlikely(len != 65 || s[1] != '\t' || s[10] != '\t' || s[19] != '\t' || s[28] != '\t' || s[65] != '\0')) {
-                    netdata_log_error("Registry person line %zu is wrong (len = %zu).", line, len);
-                    continue;
-                }
-
-                s[1] = s[10] = s[19] = s[28] = '\0';
-                m = registry_machine_allocate(&s[29], strtoul(&s[2], NULL, 16));
-                m->last_t = (uint32_t)strtoul(&s[11], NULL, 16);
-                m->usages = (uint32_t)strtoul(&s[20], NULL, 16);
-                debug(D_REGISTRY, "Registry loaded machine '%s', first: %u, last: %u, usages: %u", m->guid, m->first_t, m->last_t, m->usages);
-                break;
-
             case 'U': // person URL
                 if(unlikely(!p)) {
-                    netdata_log_error("Registry: ignoring line %zu, no person loaded: %s", line, s);
+                    netdata_log_error("REGISTRY: ignoring line %zu, no person loaded: %s", line, s);
                     continue;
                 }
 
                 // verify it is valid
                 if(len < 69 || s[1] != '\t' || s[10] != '\t' || s[19] != '\t' || s[28] != '\t' || s[31] != '\t' || s[68] != '\t') {
-                    netdata_log_error("Registry person URL line %zu is wrong (len = %zu).", line, len);
+                    netdata_log_error("REGISTRY: person URL line %zu is wrong (len = %zu).", line, len);
                     continue;
                 }
 
@@ -293,51 +252,125 @@ size_t registry_db_load(void) {
                 char *url = &s[69];
                 while(*url && *url != '\t') url++;
                 if(!*url) {
-                    netdata_log_error("Registry person URL line %zu does not have a url.", line);
+                    netdata_log_error("REGISTRY: person URL line %zu does not have a url.", line);
                     continue;
                 }
                 *url++ = '\0';
 
-                // u = registry_url_allocate_nolock(url, strlen(url));
-                u = registry_url_get(url, strlen(url));
+                if(*url != 'h' && *url != '*') {
+                    netdata_log_error("REGISTRY: person URL line %zu does not have a valid url: %s", line, url);
+                    continue;
+                }
 
-                time_t first_t = strtoul(&s[2], NULL, 16);
+                u = string_strdupz(url);
+
+                time_t first_t = (time_t)strtoul(&s[2], NULL, 16);
 
                 m = registry_machine_find(&s[32]);
                 if(!m) m = registry_machine_allocate(&s[32], first_t);
 
-                REGISTRY_PERSON_URL *pu = registry_person_url_allocate(p, m, u, &s[69], strlen(&s[69]), first_t);
+                mu = registry_machine_url_find(m, u);
+                if(!mu) {
+                    netdata_log_error("REGISTRY: person URL line %zu was not linked to the machine it refers to", line);
+                    mu = registry_machine_url_allocate(m, u, first_t);
+                }
+
+                REGISTRY_PERSON_URL *pu = registry_person_url_index_find(p, u);
+                if(!pu)
+                    pu = registry_person_url_allocate(p, m, u, &s[69], strlen(&s[69]), first_t);
+                else
+                    netdata_log_error("REGISTRY: person URL line %zu is duplicate, reusing the old one.", line);
+
                 pu->last_t = (uint32_t)strtoul(&s[11], NULL, 16);
                 pu->usages = (uint32_t)strtoul(&s[20], NULL, 16);
                 pu->flags = (uint8_t)strtoul(&s[29], NULL, 16);
-                debug(D_REGISTRY, "Registry loaded person URL '%s' with name '%s' of machine '%s', first: %u, last: %u, usages: %u, flags: %02x", u->url, pu->machine_name, m->guid, pu->first_t, pu->last_t, pu->usages, pu->flags);
+                debug(D_REGISTRY, "REGISTRY: loaded person URL '%s' with name '%s' of machine '%s', first: %u, last: %u, usages: %u, flags: %02x",
+                      string2str(u), string2str(pu->machine_name), m->guid, pu->first_t, pu->last_t, pu->usages, pu->flags);
+
+                string_freez(u);
+                break;
+
+            case 'P': // person
+                m = NULL;
+                // verify it is valid
+                if(unlikely(len != 65 || s[1] != '\t' || s[10] != '\t' || s[19] != '\t' || s[28] != '\t' || s[65] != '\0')) {
+                    netdata_log_error("REGISTRY: person line %zu is wrong (len = %zu).", line, len);
+                    continue;
+                }
+
+                s[1] = s[10] = s[19] = s[28] = '\0';
+                p = registry_person_allocate(&s[29], (time_t)strtoul(&s[2], NULL, 16));
+                p->last_t = (uint32_t)strtoul(&s[11], NULL, 16);
+                p->usages = (uint32_t)strtoul(&s[20], NULL, 16);
+                debug(D_REGISTRY, "REGISTRY: loaded person '%s', first: %u, last: %u, usages: %u", p->guid, p->first_t, p->last_t, p->usages);
                 break;
 
             case 'V': // machine URL
                 if(unlikely(!m)) {
-                    netdata_log_error("Registry: ignoring line %zu, no machine loaded: %s", line, s);
+                    netdata_log_error("REGISTRY: ignoring line %zu, no machine loaded: %s", line, s);
                     continue;
                 }
 
                 // verify it is valid
                 if(len < 32 || s[1] != '\t' || s[10] != '\t' || s[19] != '\t' || s[28] != '\t' || s[31] != '\t') {
-                    netdata_log_error("Registry person URL line %zu is wrong (len = %zu).", line, len);
+                    netdata_log_error("REGISTRY: person URL line %zu is wrong (len = %zu).", line, len);
                     continue;
                 }
 
                 s[1] = s[10] = s[19] = s[28] = s[31] = '\0';
-                // u = registry_url_allocate_nolock(&s[32], strlen(&s[32]));
-                u = registry_url_get(&s[32], strlen(&s[32]));
 
-                REGISTRY_MACHINE_URL *mu = registry_machine_url_allocate(m, u, strtoul(&s[2], NULL, 16));
+                url = &s[32];
+                if(*url != 'h' && *url != '*') {
+                    netdata_log_error("REGISTRY: machine URL line %zu does not have a valid url: %s", line, url);
+                    continue;
+                }
+
+                u = string_strdupz(url);
+
+                mu = registry_machine_url_find(m, u);
+                if(!mu)
+                    mu = registry_machine_url_allocate(m, u, (time_t)strtoul(&s[2], NULL, 16));
+                else
+                    netdata_log_error("REGISTRY: machine URL line %zu is duplicate, reusing the old one.", line);
+
                 mu->last_t = (uint32_t)strtoul(&s[11], NULL, 16);
                 mu->usages = (uint32_t)strtoul(&s[20], NULL, 16);
                 mu->flags = (uint8_t)strtoul(&s[29], NULL, 16);
-                debug(D_REGISTRY, "Registry loaded machine URL '%s', machine '%s', first: %u, last: %u, usages: %u, flags: %02x", u->url, m->guid, mu->first_t, mu->last_t, mu->usages, mu->flags);
+                debug(D_REGISTRY, "Registry loaded machine URL '%s', machine '%s', first: %u, last: %u, usages: %u, flags: %02x",
+                      string2str(u), m->guid, mu->first_t, mu->last_t, mu->usages, mu->flags);
+
+                string_freez(u);
+                break;
+
+            case 'M': // machine
+                p = NULL;
+                // verify it is valid
+                if(unlikely(len != 65 || s[1] != '\t' || s[10] != '\t' || s[19] != '\t' || s[28] != '\t' || s[65] != '\0')) {
+                    netdata_log_error("REGISTRY: person line %zu is wrong (len = %zu).", line, len);
+                    continue;
+                }
+
+                s[1] = s[10] = s[19] = s[28] = '\0';
+                m = registry_machine_allocate(&s[29], (time_t)strtoul(&s[2], NULL, 16));
+                m->last_t = (uint32_t)strtoul(&s[11], NULL, 16);
+                m->usages = (uint32_t)strtoul(&s[20], NULL, 16);
+                debug(D_REGISTRY, "REGISTRY: loaded machine '%s', first: %u, last: %u, usages: %u", m->guid, m->first_t, m->last_t, m->usages);
+                break;
+
+            case 'T': // totals
+                if(unlikely(len != 103 || s[1] != '\t' || s[18] != '\t' || s[35] != '\t' || s[52] != '\t' || s[69] != '\t' || s[86] != '\t' || s[103] != '\0')) {
+                    netdata_log_error("REGISTRY: totals line %zu is wrong (len = %zu).", line, len);
+                    continue;
+                }
+                registry.persons_count = strtoull(&s[2], NULL, 16);
+                registry.machines_count = strtoull(&s[19], NULL, 16);
+                registry.usages_count = strtoull(&s[36], NULL, 16);
+                registry.persons_urls_count = strtoull(&s[70], NULL, 16);
+                registry.machines_urls_count = strtoull(&s[87], NULL, 16);
                 break;
 
             default:
-                netdata_log_error("Registry: ignoring line %zu of filename '%s': %s.", line, registry.db_filename, s);
+                netdata_log_error("REGISTRY: ignoring line %zu of filename '%s': %s.", line, registry.db_filename, s);
                 break;
         }
     }
