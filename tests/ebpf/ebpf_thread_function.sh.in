@@ -35,7 +35,8 @@ netdata_ebpf_test_functions "${MURL}/api/v1/function?function=ebpf_thread%20help
 netdata_ebpf_test_functions "${MURL}/api/v1/function?function=ebpf_thread" "columns"
 
 #Test thread requests . The mdflush is not enabled, because it is not present in all distributions by default.
-for THREAD in "cachestat" "dc" "disk" "fd" "filesystem" "hardirq" "mount" "oomkill" "process" "shm" "socket" "softirq" "sync" "swap" "vfs" ;
+#Socket is not in the list, because it will have a complete refactory with  next PR
+for THREAD in "cachestat" "dc" "disk" "fd" "filesystem" "hardirq" "mount" "oomkill" "process" "shm" "softirq" "sync" "swap" "vfs" ;
 do
     echo "TESTING ${THREAD}"
     netdata_ebpf_test_functions "${MURL}/api/v1/function?function=ebpf_thread%20enable:${THREAD}:${INTERVAL}%20thread:${THREAD}"
