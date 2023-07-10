@@ -226,6 +226,7 @@ size_t registry_db_load(void) {
         return 0;
     }
 
+    REGISTRY_MACHINE_URL *mu;
     size_t len = 0;
     buf[4096] = '\0';
     while((s = fgets_trim_len(buf, 4096, fp, &len))) {
@@ -233,49 +234,6 @@ size_t registry_db_load(void) {
 
         debug(D_REGISTRY, "REGISTRY: read line %zu to length %zu: %s", line, len, s);
         switch(*s) {
-            case 'T': // totals
-                if(unlikely(len != 103 || s[1] != '\t' || s[18] != '\t' || s[35] != '\t' || s[52] != '\t' || s[69] != '\t' || s[86] != '\t' || s[103] != '\0')) {
-                    netdata_log_error("REGISTRY: totals line %zu is wrong (len = %zu).", line, len);
-                    continue;
-                }
-                registry.persons_count = strtoull(&s[2], NULL, 16);
-                registry.machines_count = strtoull(&s[19], NULL, 16);
-                registry.usages_count = strtoull(&s[36], NULL, 16);
-                // registry.urls_count = strtoull(&s[53], NULL, 16);
-                registry.persons_urls_count = strtoull(&s[70], NULL, 16);
-                registry.machines_urls_count = strtoull(&s[87], NULL, 16);
-                break;
-
-            case 'P': // person
-                m = NULL;
-                // verify it is valid
-                if(unlikely(len != 65 || s[1] != '\t' || s[10] != '\t' || s[19] != '\t' || s[28] != '\t' || s[65] != '\0')) {
-                    netdata_log_error("REGISTRY: person line %zu is wrong (len = %zu).", line, len);
-                    continue;
-                }
-
-                s[1] = s[10] = s[19] = s[28] = '\0';
-                p = registry_person_allocate(&s[29], (time_t)strtoul(&s[2], NULL, 16));
-                p->last_t = (uint32_t)strtoul(&s[11], NULL, 16);
-                p->usages = (uint32_t)strtoul(&s[20], NULL, 16);
-                debug(D_REGISTRY, "REGISTRY: loaded person '%s', first: %u, last: %u, usages: %u", p->guid, p->first_t, p->last_t, p->usages);
-                break;
-
-            case 'M': // machine
-                p = NULL;
-                // verify it is valid
-                if(unlikely(len != 65 || s[1] != '\t' || s[10] != '\t' || s[19] != '\t' || s[28] != '\t' || s[65] != '\0')) {
-                    netdata_log_error("REGISTRY: person line %zu is wrong (len = %zu).", line, len);
-                    continue;
-                }
-
-                s[1] = s[10] = s[19] = s[28] = '\0';
-                m = registry_machine_allocate(&s[29], (time_t)strtoul(&s[2], NULL, 16));
-                m->last_t = (uint32_t)strtoul(&s[11], NULL, 16);
-                m->usages = (uint32_t)strtoul(&s[20], NULL, 16);
-                debug(D_REGISTRY, "REGISTRY: loaded machine '%s', first: %u, last: %u, usages: %u", m->guid, m->first_t, m->last_t, m->usages);
-                break;
-
             case 'U': // person URL
                 if(unlikely(!p)) {
                     netdata_log_error("REGISTRY: ignoring line %zu, no person loaded: %s", line, s);
@@ -311,6 +269,12 @@ size_t registry_db_load(void) {
                 m = registry_machine_find(&s[32]);
                 if(!m) m = registry_machine_allocate(&s[32], first_t);
 
+                mu = registry_machine_url_find(m, u);
+                if(!mu) {
+                    netdata_log_error("REGISTRY: person URL line %zu was not linked to the machine it refers to", line);
+                    mu = registry_machine_url_allocate(m, u, first_t);
+                }
+
                 REGISTRY_PERSON_URL *pu = registry_person_url_index_find(p, u);
                 if(!pu)
                     pu = registry_person_url_allocate(p, m, u, &s[69], strlen(&s[69]), first_t);
@@ -324,6 +288,21 @@ size_t registry_db_load(void) {
                       string2str(u), string2str(pu->machine_name), m->guid, pu->first_t, pu->last_t, pu->usages, pu->flags);
 
                 string_freez(u);
+                break;
+
+            case 'P': // person
+                m = NULL;
+                // verify it is valid
+                if(unlikely(len != 65 || s[1] != '\t' || s[10] != '\t' || s[19] != '\t' || s[28] != '\t' || s[65] != '\0')) {
+                    netdata_log_error("REGISTRY: person line %zu is wrong (len = %zu).", line, len);
+                    continue;
+                }
+
+                s[1] = s[10] = s[19] = s[28] = '\0';
+                p = registry_person_allocate(&s[29], (time_t)strtoul(&s[2], NULL, 16));
+                p->last_t = (uint32_t)strtoul(&s[11], NULL, 16);
+                p->usages = (uint32_t)strtoul(&s[20], NULL, 16);
+                debug(D_REGISTRY, "REGISTRY: loaded person '%s', first: %u, last: %u, usages: %u", p->guid, p->first_t, p->last_t, p->usages);
                 break;
 
             case 'V': // machine URL
@@ -348,7 +327,7 @@ size_t registry_db_load(void) {
 
                 u = string_strdupz(url);
 
-                REGISTRY_MACHINE_URL *mu = registry_machine_url_find(m, u);
+                mu = registry_machine_url_find(m, u);
                 if(!mu)
                     mu = registry_machine_url_allocate(m, u, (time_t)strtoul(&s[2], NULL, 16));
                 else
@@ -361,6 +340,33 @@ size_t registry_db_load(void) {
                       string2str(u), m->guid, mu->first_t, mu->last_t, mu->usages, mu->flags);
 
                 string_freez(u);
+                break;
+
+            case 'M': // machine
+                p = NULL;
+                // verify it is valid
+                if(unlikely(len != 65 || s[1] != '\t' || s[10] != '\t' || s[19] != '\t' || s[28] != '\t' || s[65] != '\0')) {
+                    netdata_log_error("REGISTRY: person line %zu is wrong (len = %zu).", line, len);
+                    continue;
+                }
+
+                s[1] = s[10] = s[19] = s[28] = '\0';
+                m = registry_machine_allocate(&s[29], (time_t)strtoul(&s[2], NULL, 16));
+                m->last_t = (uint32_t)strtoul(&s[11], NULL, 16);
+                m->usages = (uint32_t)strtoul(&s[20], NULL, 16);
+                debug(D_REGISTRY, "REGISTRY: loaded machine '%s', first: %u, last: %u, usages: %u", m->guid, m->first_t, m->last_t, m->usages);
+                break;
+
+            case 'T': // totals
+                if(unlikely(len != 103 || s[1] != '\t' || s[18] != '\t' || s[35] != '\t' || s[52] != '\t' || s[69] != '\t' || s[86] != '\t' || s[103] != '\0')) {
+                    netdata_log_error("REGISTRY: totals line %zu is wrong (len = %zu).", line, len);
+                    continue;
+                }
+                registry.persons_count = strtoull(&s[2], NULL, 16);
+                registry.machines_count = strtoull(&s[19], NULL, 16);
+                registry.usages_count = strtoull(&s[36], NULL, 16);
+                registry.persons_urls_count = strtoull(&s[70], NULL, 16);
+                registry.machines_urls_count = strtoull(&s[87], NULL, 16);
                 break;
 
             default:
