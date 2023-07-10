@@ -8,7 +8,7 @@ typedef int32_t REFCOUNT;
 // ----------------------------------------------------------------------------
 // STRING implementation - dedup all STRING
 
-#define STRING_PARTITION_SHIFTS (1)
+#define STRING_PARTITION_SHIFTS (0)
 #define STRING_PARTITIONS (256 >> STRING_PARTITION_SHIFTS)
 #define string_partition_str(str) ((uint8_t)((str)[0]) >> STRING_PARTITION_SHIFTS)
 #define string_partition(string) (string_partition_str((string)->str))
@@ -146,7 +146,7 @@ static inline STRING *string_index_search(const char *str, size_t length) {
     rw_spinlock_read_lock(&string_base[partition].spinlock);
 
     Pvoid_t *Rc;
-    Rc = JudyHSGet(string_base[partition].JudyHSArray, (void *)str, length);
+    Rc = JudyHSGet(string_base[partition].JudyHSArray, (void *)str, length - 1);
     if(likely(Rc)) {
         // found in the hash table
         string = *Rc;
@@ -188,7 +188,7 @@ static inline STRING *string_index_insert(const char *str, size_t length) {
     STRING **ptr;
     {
         JError_t J_Error;
-        Pvoid_t *Rc = JudyHSIns(&string_base[partition].JudyHSArray, (void *)str, length, &J_Error);
+        Pvoid_t *Rc = JudyHSIns(&string_base[partition].JudyHSArray, (void *)str, length - 1, &J_Error);
         if (unlikely(Rc == PJERR)) {
             fatal(
                 "STRING: Cannot insert entry with name '%s' to JudyHS, JU_ERRNO_* == %u, ID == %d",
@@ -248,7 +248,7 @@ static inline void string_index_delete(STRING *string) {
 
     if (likely(string_base[partition].JudyHSArray)) {
         JError_t J_Error;
-        int ret = JudyHSDel(&string_base[partition].JudyHSArray, (void *)string->str, string->length, &J_Error);
+        int ret = JudyHSDel(&string_base[partition].JudyHSArray, (void *)string->str, string->length - 1, &J_Error);
         if (unlikely(ret == JERR)) {
             netdata_log_error(
                 "STRING: Cannot delete entry with name '%s' from JudyHS, JU_ERRNO_* == %u, ID == %d",
