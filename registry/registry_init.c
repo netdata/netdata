@@ -113,12 +113,17 @@ int registry_init(void) {
                                                  &netdata_configured_cache_dir,
                                                  use_mmap, true);
 
+        // disable cancelability to avoid enable/disable per item in the dictionary locks
+        netdata_thread_disable_cancelability();
+
         registry_log_open();
         registry_db_load();
         registry_log_load();
 
         if(unlikely(registry_db_should_be_saved()))
             registry_db_save();
+
+        netdata_thread_enable_cancelability();
     }
 
     return 0;
