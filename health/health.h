@@ -35,6 +35,10 @@ void health_entry_flags_to_json_array(BUFFER *wb, const char *key, HEALTH_ENTRY_
 #define HEALTH_LOG_DEFAULT_HISTORY 432000
 #endif
 
+#ifndef HEALTH_LOG_MINIMUM_HISTORY
+#define HEALTH_LOG_MINIMUM_HISTORY 86400
+#endif
+
 #define HEALTH_SILENCERS_MAX_FILE_LEN 10000
 
 extern char *silencers_filename;

@@ -808,16 +808,19 @@ static void initialize_health(RRDHOST *host)
     else
         host->health_log.max = (unsigned int)n;
 
-    //default health log history is 5 days and not less than a day
-    if (host->health_log.health_log_history < 86400) {
-        uint32_t m = config_get_number(CONFIG_SECTION_HEALTH, "health log history", HEALTH_LOG_DEFAULT_HISTORY);
-        if (m < 86400) {
-            log_health("Host '%s': health configuration has invalid health log history %u. Using default %d", rrdhost_hostname(host), m, HEALTH_LOG_DEFAULT_HISTORY);
-            config_set_number(CONFIG_SECTION_HEALTH, "health log history", HEALTH_LOG_DEFAULT_HISTORY);
-            host->health_log.health_log_history = HEALTH_LOG_DEFAULT_HISTORY;
-        } else
-            host->health_log.health_log_history = m;
+    uint32_t m = config_get_number(CONFIG_SECTION_HEALTH, "health log history", HEALTH_LOG_DEFAULT_HISTORY);
+    if (m < HEALTH_LOG_MINIMUM_HISTORY) {
+        log_health("Host '%s': health configuration has invalid health log history %u. Using minimum %d", rrdhost_hostname(host), m, HEALTH_LOG_MINIMUM_HISTORY);
+        config_set_number(CONFIG_SECTION_HEALTH, "health log history", HEALTH_LOG_MINIMUM_HISTORY);
+        m = HEALTH_LOG_MINIMUM_HISTORY;
     }
+
+    //default health log history is 5 days and not less than a day
+    if (host->health_log.health_log_history) {
+        if (host->health_log.health_log_history < HEALTH_LOG_MINIMUM_HISTORY)
+            host->health_log.health_log_history = HEALTH_LOG_MINIMUM_HISTORY;
+    } else
+        host->health_log.health_log_history = m;
 
     log_health("[%s]: Health log history is set to %u seconds (%u days)", rrdhost_hostname(host), host->health_log.health_log_history, host->health_log.health_log_history / 86400);
 
