@@ -100,7 +100,7 @@ int registry_init(void) {
         config_set_number(CONFIG_SECTION_REGISTRY, "max URL name length", (long long)registry.max_name_length);
     }
 
-    bool use_mmap = config_get_boolean(CONFIG_SECTION_REGISTRY, "use mmap", true);
+    bool use_mmap = config_get_boolean(CONFIG_SECTION_REGISTRY, "use mmap", false);
 
     // initialize entries counters
     registry.persons_count = 0;
