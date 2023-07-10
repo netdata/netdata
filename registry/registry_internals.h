@@ -15,6 +15,7 @@
 
 struct registry {
     int enabled;
+    netdata_mutex_t lock;
 
     // entries counters / statistics
     unsigned long long persons_count;
@@ -56,7 +57,7 @@ struct registry {
     ARAL *person_urls_aral;
     ARAL *machine_urls_aral;
 
-    netdata_mutex_t lock;
+    struct aral_statistics aral_stats;
 };
 
 #include "registry_machine.h"

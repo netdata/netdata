@@ -10,17 +10,17 @@
 
 // for each PERSON-URL pair we keep this
 struct registry_person_url {
-    avl_t avl;                  // binary tree node
-
-    STRING *url;                // de-duplicated URL
-    REGISTRY_MACHINE *machine;  // link the MACHINE of this URL
+    avl_t_packed avl;           // binary tree node
 
     uint8_t flags;
 
-    uint32_t first_t;           // the first time we saw this
-    uint32_t last_t;            // the last time we saw this
     uint32_t usages;            // how many times this has been accessed
 
+    uint32_t first_t;           // the first time we saw this
+    uint32_t last_t;            // the last time we saw this
+
+    STRING *url;                // de-duplicated URL
+    REGISTRY_MACHINE *machine;  // link the MACHINE of this URL
     STRING *machine_name;
 };
 typedef struct registry_person_url REGISTRY_PERSON_URL;
@@ -34,9 +34,6 @@ struct registry_person {
     uint32_t first_t;           // the first time we saw this
     uint32_t last_t;            // the last time we saw this
     uint32_t usages;            // how many times this has been accessed
-
-    //uint32_t flags;
-    //char *email;
 };
 typedef struct registry_person REGISTRY_PERSON;
 

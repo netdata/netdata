@@ -57,6 +57,8 @@ int registry_init(void) {
         config_set_number(CONFIG_SECTION_REGISTRY, "max URL name length", (long long)registry.max_name_length);
     }
 
+    bool use_mmap = config_get_boolean(CONFIG_SECTION_REGISTRY, "use mmap", true);
+
     // initialize entries counters
     registry.persons_count = 0;
     registry.machines_count = 0;
@@ -75,36 +77,38 @@ int registry_init(void) {
 
         // initialize the allocators
 
-        bool use_mmap = true;
-
-        size_t initial_page_elements = 1;
+        size_t min_page_size = 4 * 1024;
         size_t max_page_size = 1024 * 1024;
 
         if(use_mmap) {
-            initial_page_elements = 8192;
+            min_page_size = 100 * 1024 * 1024;
             max_page_size = 512 * 1024 * 1024;
         }
 
         registry.persons_aral = aral_create("registry_persons", sizeof(REGISTRY_PERSON),
-                                            initial_page_elements, max_page_size, NULL,
+                                            min_page_size / sizeof(REGISTRY_PERSON), max_page_size,
+                                            &registry.aral_stats,
                                             "registry_persons",
                                             &netdata_configured_cache_dir,
                                             use_mmap, true);
 
         registry.machines_aral = aral_create("registry_machines", sizeof(REGISTRY_MACHINE),
-                                             initial_page_elements, max_page_size, NULL,
+                                             min_page_size / sizeof(REGISTRY_MACHINE), max_page_size,
+                                             &registry.aral_stats,
                                              "registry_machines",
                                              &netdata_configured_cache_dir,
                                              use_mmap, true);
 
         registry.person_urls_aral = aral_create("registry_person_urls", sizeof(REGISTRY_PERSON_URL),
-                                                initial_page_elements, max_page_size, NULL,
+                                                min_page_size / sizeof(REGISTRY_PERSON_URL), max_page_size,
+                                                &registry.aral_stats,
                                                 "registry_person_urls",
                                                 &netdata_configured_cache_dir,
                                                 use_mmap, true);
 
         registry.machine_urls_aral = aral_create("registry_machine_urls", sizeof(REGISTRY_MACHINE_URL),
-                                                 initial_page_elements, max_page_size, NULL,
+                                                 min_page_size / sizeof(REGISTRY_MACHINE_URL), max_page_size,
+                                                 &registry.aral_stats,
                                                  "registry_machine_urls",
                                                  &netdata_configured_cache_dir,
                                                  use_mmap, true);
