@@ -94,14 +94,14 @@ inline void health_alarm_log_add_entry(
     __atomic_add_fetch(&host->health_transitions, 1, __ATOMIC_RELAXED);
 
     // link it
-    netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_write_lock(&host->health_log.spinlock);
     ae->next = host->health_log.alarms;
     host->health_log.alarms = ae;
     host->health_log.count++;
-    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_write_unlock(&host->health_log.spinlock);
 
     // match previous alarms
-    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_read_lock(&host->health_log.spinlock);
     ALARM_ENTRY *t;
     for(t = host->health_log.alarms ; t ; t = t->next) {
         if(t != ae && t->alarm_id == ae->alarm_id) {
@@ -121,7 +121,7 @@ inline void health_alarm_log_add_entry(
             break;
         }
     }
-    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_read_unlock(&host->health_log.spinlock);
 
     health_alarm_log_save(host, ae);
 }
@@ -145,7 +145,7 @@ inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
 }
 
 inline void health_alarm_log_free(RRDHOST *host) {
-    netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_write_lock(&host->health_log.spinlock);
 
     ALARM_ENTRY *ae;
     while((ae = host->health_log.alarms)) {
@@ -153,5 +153,5 @@ inline void health_alarm_log_free(RRDHOST *host) {
         health_alarm_log_free_one_nochecks_nounlink(ae);
     }
 
-    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_write_unlock(&host->health_log.spinlock);
 }

@@ -454,11 +454,11 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
     sqlite3_stmt *res = NULL;
     int rc;
 
-    netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_write_lock(&host->health_log.spinlock);
 
     buffer_sprintf(sql, "delete from aclk_alert_%s; ", uuid_str);
     if (unlikely(db_execute(db_meta, buffer_tostring(sql)))) {
-        netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+        rw_spinlock_write_unlock(&host->health_log.spinlock);
         buffer_free(sql);
         return;
     }
@@ -472,7 +472,7 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement when trying to queue existing alerts.");
-        netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+        rw_spinlock_write_unlock(&host->health_log.spinlock);
         buffer_free(sql);
         return;
     }
@@ -481,7 +481,7 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host_id for when trying to queue existing alerts.");
         sqlite3_finalize(res);
-        netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+        rw_spinlock_write_unlock(&host->health_log.spinlock);
         buffer_free(sql);
         return;
     }
@@ -495,7 +495,7 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement to queue existing alerts, rc = %d", rc);
 
-    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_write_unlock(&host->health_log.spinlock);
 
     buffer_free(sql);
     rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
@@ -888,7 +888,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
     char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
-    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_read_lock(&host->health_log.spinlock);
 
     ALARM_ENTRY *ae = host->health_log.alarms;
 
@@ -973,7 +973,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
             aclk_send_alarm_snapshot(snapshot_proto);
     }
 
-    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_read_unlock(&host->health_log.spinlock);
     wc->alerts_snapshot_uuid = NULL;
 
     freez(claim_id);

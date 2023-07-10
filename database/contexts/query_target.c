@@ -579,7 +579,7 @@ static void query_target_eval_instance_rrdcalc(QUERY_TARGET_LOCALS *qtl __maybe_
                                                QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi) {
     RRDSET *st = rrdinstance_acquired_rrdset(qi->ria);
     if (st) {
-        netdata_rwlock_rdlock(&st->alerts.rwlock);
+        rw_spinlock_read_lock(&st->alerts.spinlock);
         for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
             switch(rc->status) {
                 case RRDCALC_STATUS_CLEAR:
@@ -610,7 +610,7 @@ static void query_target_eval_instance_rrdcalc(QUERY_TARGET_LOCALS *qtl __maybe_
                     break;
             }
         }
-        netdata_rwlock_unlock(&st->alerts.rwlock);
+        rw_spinlock_read_unlock(&st->alerts.spinlock);
     }
 }
 
@@ -624,7 +624,7 @@ static bool query_target_match_alert_pattern(RRDINSTANCE_ACQUIRED *ria, SIMPLE_P
 
     BUFFER *wb = NULL;
     bool matched = false;
-    netdata_rwlock_rdlock(&st->alerts.rwlock);
+    rw_spinlock_read_lock(&st->alerts.spinlock);
     if (st->alerts.base) {
         for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
             SIMPLE_PATTERN_RESULT ret = simple_pattern_matches_string_extract(pattern, rc->name, NULL, 0);
@@ -655,7 +655,7 @@ static bool query_target_match_alert_pattern(RRDINSTANCE_ACQUIRED *ria, SIMPLE_P
                 break;
         }
     }
-    netdata_rwlock_unlock(&st->alerts.rwlock);
+    rw_spinlock_read_unlock(&st->alerts.spinlock);
 
     buffer_free(wb);
     return matched;

@@ -886,7 +886,7 @@ struct rrdset {
     const RRDFAMILY_ACQUIRED *rrdfamily;            // pointer to RRDFAMILY dictionary item, this chart belongs to
 
     struct {
-        netdata_rwlock_t rwlock;                    // protection for RRDCALC *base
+        RW_SPINLOCK spinlock;                       // protection for RRDCALC *base
         RRDCALC *base;                              // double linked list of RRDCALC related to this RRDSET
     } alerts;
 
@@ -1106,7 +1106,7 @@ typedef struct alarm_log {
     unsigned int count;
     unsigned int max;
     ALARM_ENTRY *alarms;
-    netdata_rwlock_t alarm_log_rwlock;
+    RW_SPINLOCK spinlock;
 } ALARM_LOG;
 
 typedef struct health {

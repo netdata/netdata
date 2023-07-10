@@ -62,7 +62,7 @@ inline const char *rrdcalc_status2string(RRDCALC_STATUS status) {
 }
 
 uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, uuid_t *config_hash_id) {
-    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_read_lock(&host->health_log.spinlock);
 
     // re-use old IDs, by looking them up in the alarm log
     ALARM_ENTRY *ae = NULL;
@@ -89,7 +89,7 @@ uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint3
         }
     }
 
-    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_read_unlock(&host->health_log.spinlock);
     return alarm_id;
 }
 
@@ -212,9 +212,9 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
     rc->last_status_change = now_realtime_sec();
     rc->rrdset = st;
 
-    netdata_rwlock_wrlock(&st->alerts.rwlock);
+    rw_spinlock_write_lock(&st->alerts.spinlock);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(st->alerts.base, rc, prev, next);
-    netdata_rwlock_unlock(&st->alerts.rwlock);
+    rw_spinlock_write_unlock(&st->alerts.spinlock);
 
     if(rc->update_every < rc->rrdset->update_every) {
         netdata_log_error("Health alarm '%s.%s' has update every %d, less than chart update every %d. Setting alarm update frequency to %d.", rrdset_id(rc->rrdset), rrdcalc_name(rc), rc->update_every, rc->rrdset->update_every, rc->rrdset->update_every);
@@ -362,12 +362,12 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
     // unlink it
 
     if(!having_ll_wrlock)
-        netdata_rwlock_wrlock(&st->alerts.rwlock);
+        rw_spinlock_write_lock(&st->alerts.spinlock);
 
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(st->alerts.base, rc, prev, next);
 
     if(!having_ll_wrlock)
-        netdata_rwlock_unlock(&st->alerts.rwlock);
+        rw_spinlock_write_unlock(&st->alerts.spinlock);
 
     rc->rrdset = NULL;
 
@@ -808,7 +808,7 @@ void rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts() {
 
 void rrdcalc_unlink_all_rrdset_alerts(RRDSET *st) {
     RRDCALC *rc, *last = NULL;
-    netdata_rwlock_wrlock(&st->alerts.rwlock);
+    rw_spinlock_write_lock(&st->alerts.spinlock);
     while((rc = st->alerts.base)) {
         if(last == rc) {
             netdata_log_error("RRDCALC: malformed list of alerts linked to chart - cannot cleanup - giving up.");
@@ -827,7 +827,7 @@ void rrdcalc_unlink_all_rrdset_alerts(RRDSET *st) {
         }
 
     }
-    netdata_rwlock_unlock(&st->alerts.rwlock);
+    rw_spinlock_write_unlock(&st->alerts.spinlock);
 }
 
 void rrdcalc_delete_all(RRDHOST *host) {

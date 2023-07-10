@@ -143,7 +143,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
                 | RRDSET_FLAG_SENDER_REPLICATION_FINISHED
                 ;
 
-    netdata_rwlock_init(&st->alerts.rwlock);
+    rw_spinlock_init(&st->alerts.spinlock);
 
     if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
         if(!rrdset_memory_load_or_create_map_save(st, st->rrd_memory_mode)) {
@@ -262,8 +262,6 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     // ------------------------------------------------------------------------
     // free it
-
-    netdata_rwlock_destroy(&st->alerts.rwlock);
 
     string_freez(st->id);
     string_freez(st->name);

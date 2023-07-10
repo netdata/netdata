@@ -346,13 +346,13 @@ static void health_reload_host(RRDHOST *host) {
     rrdcalctemplate_delete_all(host);
 
     // invalidate all previous entries in the alarm log
-    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_read_lock(&host->health_log.spinlock);
     ALARM_ENTRY *t;
     for(t = host->health_log.alarms ; t ; t = t->next) {
         if(t->new_status != RRDCALC_STATUS_REMOVED)
             t->flags |= HEALTH_ENTRY_FLAG_UPDATED;
     }
-    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_read_unlock(&host->health_log.spinlock);
 
     // reset all thresholds to all charts
     RRDSET *st;
@@ -632,7 +632,7 @@ static inline void health_alarm_log_process(RRDHOST *host) {
     uint32_t first_waiting = (host->health_log.alarms)?host->health_log.alarms->unique_id:0;
     time_t now = now_realtime_sec();
 
-    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_read_lock(&host->health_log.spinlock);
 
     ALARM_ENTRY *ae;
     for(ae = host->health_log.alarms; ae && ae->unique_id >= host->health_last_processed_id; ae = ae->next) {
@@ -648,13 +648,13 @@ static inline void health_alarm_log_process(RRDHOST *host) {
         }
     }
 
-    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_read_unlock(&host->health_log.spinlock);
 
     // remember this for the next iteration
     host->health_last_processed_id = first_waiting;
 
     //delete those that are updated, no in progress execution, and is not repeating
-    netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_write_lock(&host->health_log.spinlock);
 
     ALARM_ENTRY *prev = NULL, *next = NULL;
     for(ae = host->health_log.alarms; ae ; ae = next) {
@@ -686,7 +686,7 @@ static inline void health_alarm_log_process(RRDHOST *host) {
             prev = ae;
     }
 
-    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_write_unlock(&host->health_log.spinlock);
 }
 
 static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) {
@@ -815,7 +815,7 @@ static void initialize_health(RRDHOST *host)
     conf_enabled_alarms = simple_pattern_create(config_get(CONFIG_SECTION_HEALTH, "enabled alarms", "*"), NULL,
                                                 SIMPLE_PATTERN_EXACT, true);
 
-    netdata_rwlock_init(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_init(&host->health_log.spinlock);
 
     char filename[FILENAME_MAX + 1];
 

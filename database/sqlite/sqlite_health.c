@@ -789,7 +789,7 @@ void sql_health_alarm_log_load(RRDHOST *host) {
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
 
-    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_read_lock(&host->health_log.spinlock);
 
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         ALARM_ENTRY *ae = NULL;
@@ -947,7 +947,7 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         loaded++;
     }
 
-    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_read_unlock(&host->health_log.spinlock);
 
     dictionary_destroy(all_rrdcalcs);
     all_rrdcalcs = NULL;

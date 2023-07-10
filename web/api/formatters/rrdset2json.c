@@ -120,7 +120,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         buffer_strcat(wb, ",\n\t\t\t\"alarms\": {\n");
         size_t alarms = 0;
         RRDCALC *rc;
-        netdata_rwlock_rdlock(&st->alerts.rwlock);
+        rw_spinlock_read_lock(&st->alerts.spinlock);
         DOUBLE_LINKED_LIST_FOREACH_FORWARD(st->alerts.base, rc, prev, next) {
             buffer_sprintf(
                 wb,
@@ -136,7 +136,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
 
             alarms++;
         }
-        netdata_rwlock_unlock(&st->alerts.rwlock);
+        rw_spinlock_read_unlock(&st->alerts.spinlock);
         buffer_sprintf(wb,
                        "\n\t\t\t}"
         );
