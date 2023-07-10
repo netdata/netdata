@@ -285,7 +285,7 @@ static void set_job_config(struct job *job, dyncfg_config_t cfg)
     if (store_config(plugin->name, job->module->name, job->name, cfg)) {
         error_report("DYNCFG could not store config for module \"%s\"", job->module->name);
         return;
-    }`
+    }
 
     pthread_mutex_lock(&plugin->lock);
     job->config.data_size = cfg.data_size;
