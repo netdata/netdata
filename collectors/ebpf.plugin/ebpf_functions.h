@@ -10,7 +10,7 @@
 // function list
 #define EBPF_FUNCTION_THREAD "ebpf_thread"
 
-#define EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION "Detailed information on the currently running threads."
+#define EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION "Detailed information about eBPF threads."
 #define EBPF_PLUGIN_THREAD_FUNCTION_ERROR_THREAD_NOT_FOUND "ebpf.plugin does not have thread named "
 
 #define EBPF_PLUGIN_FUNCTIONS(NAME, DESC) do { \
