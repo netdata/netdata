@@ -80,7 +80,7 @@ static inline char *registry_fix_url(char *url, size_t *len) {
 // HELPERS
 
 // verify the person, the machine and the URL exist in our DB
-REGISTRY_PERSON_URL *registry_verify_request(char *person_guid, char *machine_guid, char *url, REGISTRY_PERSON **pp, REGISTRY_MACHINE **mm) {
+REGISTRY_PERSON_URL *registry_verify_request(const char *person_guid, char *machine_guid, char *url, REGISTRY_PERSON **pp, REGISTRY_MACHINE **mm) {
     char pbuf[GUID_LEN + 1], mbuf[GUID_LEN + 1];
 
     if(!person_guid || !*person_guid || !machine_guid || !*machine_guid || !url || !*url) {
@@ -141,23 +141,28 @@ REGISTRY_PERSON_URL *registry_verify_request(char *person_guid, char *machine_gu
 // ----------------------------------------------------------------------------
 // REGISTRY REQUESTS
 
-REGISTRY_PERSON *registry_request_access(char *person_guid, char *machine_guid, char *url, char *name, time_t when) {
+REGISTRY_PERSON *registry_request_access(const char *person_guid, char *machine_guid, char *url, char *name, time_t when) {
     debug(D_REGISTRY, "registry_request_access('%s', '%s', '%s'): NEW REQUEST", (person_guid)?person_guid:"", machine_guid, url);
 
-    REGISTRY_MACHINE *m = registry_machine_get(machine_guid, when);
+    bool is_dummy = is_dummy_person(person_guid);
+
+    REGISTRY_MACHINE *m = registry_machine_find_or_create(machine_guid, when, is_dummy);
     if(!m) return NULL;
 
+    REGISTRY_PERSON *p = registry_person_find_or_create(person_guid, when, is_dummy);
+
     // make sure the name is valid
-    size_t namelen;
-    name = registry_fix_machine_name(name, &namelen);
+    size_t name_len;
+    name = registry_fix_machine_name(name, &name_len);
 
-    size_t urllen;
-    url = registry_fix_url(url, &urllen);
-
-    REGISTRY_PERSON *p = registry_person_get(person_guid, when);
+    size_t url_len;
+    url = registry_fix_url(url, &url_len);
 
     STRING *u = string_strdupz(url);
-    registry_person_link_to_url(p, m, u, name, namelen, when);
+
+    if(!is_dummy)
+        registry_person_link_to_url(p, m, u, name, name_len, when);
+
     registry_machine_link_to_url(m, u, when);
 
     registry_log('A', p, m, u, name);
@@ -167,7 +172,7 @@ REGISTRY_PERSON *registry_request_access(char *person_guid, char *machine_guid, 
     return p;
 }
 
-REGISTRY_PERSON *registry_request_delete(char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when) {
+REGISTRY_PERSON *registry_request_delete(const char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when) {
     (void) when;
 
     REGISTRY_PERSON *p = NULL;
@@ -224,7 +229,7 @@ static int machine_request_callback(void *entry, void *data) {
     return 0; // continue
 }
 
-REGISTRY_MACHINE *registry_request_machine(char *person_guid, char *machine_guid, char *url, char *request_machine, time_t when) {
+REGISTRY_MACHINE *registry_request_machine(const char *person_guid, char *machine_guid, char *url, char *request_machine, time_t when) {
     (void)when;
 
     char mbuf[GUID_LEN + 1];

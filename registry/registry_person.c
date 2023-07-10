@@ -150,23 +150,29 @@ REGISTRY_PERSON *registry_person_allocate(const char *person_guid, time_t when) 
 // 2. if it is valid, find it
 // 3. if it is not valid, create a new one
 // 4. return it
-REGISTRY_PERSON *registry_person_get(const char *person_guid, time_t when) {
-    debug(D_REGISTRY, "Registry: registry_person_get('%s'): creating dictionary of urls", person_guid);
+REGISTRY_PERSON *registry_person_find_or_create(const char *person_guid, time_t when, bool is_dummy) {
+    debug(D_REGISTRY, "Registry: registry_person_find_or_create('%s'): creating dictionary of urls", person_guid);
 
+    char buf[GUID_LEN + 1];
     REGISTRY_PERSON *p = NULL;
 
     if(person_guid && *person_guid) {
-        char buf[GUID_LEN + 1];
         // validate it is a GUID
-        if(unlikely(regenerate_guid(person_guid, buf) == -1))
+        if(unlikely(regenerate_guid(person_guid, buf) == -1)) {
             netdata_log_info("Registry: person guid '%s' is not a valid guid. Ignoring it.", person_guid);
+            person_guid = NULL;
+        }
         else {
             person_guid = buf;
             p = registry_person_find(person_guid);
+            if(!p && !is_dummy)
+                person_guid = NULL;
         }
     }
+    else
+        person_guid = NULL;
 
-    if(!p) p = registry_person_allocate(NULL, when);
+    if(!p) p = registry_person_allocate(person_guid, when);
 
     return p;
 }

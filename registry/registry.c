@@ -185,10 +185,6 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w) {
 // ----------------------------------------------------------------------------
 // public ACCESS request
 
-// this is generated using this:
-// uuidgen -n @dns -N registry.my-netdata.io -m
-#define REGISTRY_VERIFY_COOKIES_GUID "d6008554-b2dd-3b1e-8b5c-69bc7553b271"
-
 // the main method for registering an access
 int registry_request_access_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url, char *name, time_t when) {
     if(unlikely(!registry.enabled))
@@ -204,6 +200,8 @@ int registry_request_access_json(RRDHOST *host, struct web_client *w, char *pers
     // verify the browser supports cookies or the bearer
 
     if(registry.verify_cookies_redirects > 0 && !person_guid[0]) {
+        registry_request_access(REGISTRY_VERIFY_COOKIES_GUID, machine_guid, url, name, when);
+
         buffer_flush(w->response.data);
         registry_set_cookie(w, REGISTRY_VERIFY_COOKIES_GUID);
         w->response.data->content_type = CT_APPLICATION_JSON;
@@ -214,7 +212,9 @@ int registry_request_access_json(RRDHOST *host, struct web_client *w, char *pers
         return HTTP_RESP_OK;
     }
 
-    if(unlikely(person_guid[0] && !strcmp(person_guid, REGISTRY_VERIFY_COOKIES_GUID)))
+    if(unlikely(person_guid[0] && is_dummy_person(person_guid)))
+        // it passed the check - they gave us a different person_guid
+        // empty the dummy one, so that we will generate a new person_guid
         person_guid[0] = '\0';
 
     // ------------------------------------------------------------------------

@@ -48,7 +48,7 @@ REGISTRY_PERSON_URL *registry_person_url_reallocate(REGISTRY_PERSON *p, REGISTRY
 // PERSON
 REGISTRY_PERSON *registry_person_find(const char *person_guid);
 REGISTRY_PERSON *registry_person_allocate(const char *person_guid, time_t when);
-REGISTRY_PERSON *registry_person_get(const char *person_guid, time_t when);
+REGISTRY_PERSON *registry_person_find_or_create(const char *person_guid, time_t when, bool is_dummy);
 
 // LINKING PERSON -> PERSON_URL
 REGISTRY_PERSON_URL *registry_person_link_to_url(REGISTRY_PERSON *p, REGISTRY_MACHINE *m, STRING *url, char *machine_name, size_t machine_name_len, time_t when);

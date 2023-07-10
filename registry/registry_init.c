@@ -46,6 +46,20 @@ void registry_db_stats(void) {
                      machines, machines_urls, max_urls_per_machine);
 }
 
+void registry_generate_curl_urls(void) {
+    FILE *fp = fopen("/tmp/registry.curl", "w+");
+
+    REGISTRY_PERSON *p;
+    dfe_start_read(registry.persons, p) {
+        for(REGISTRY_PERSON_URL *pu = p->person_urls ; pu ;pu = pu->next) {
+            fprintf(fp, "do_curl '%s' '%s' '%s'\n", p->guid, pu->machine->guid, string2str(pu->url));
+        }
+    }
+    dfe_done(p);
+
+    fclose(fp);
+}
+
 int registry_init(void) {
     char filename[FILENAME_MAX + 1];
 
@@ -167,6 +181,7 @@ int registry_init(void) {
             registry_db_save();
 
 //        registry_db_stats();
+//        registry_generate_curl_urls();
 //        exit(0);
 
         netdata_thread_enable_cancelability();

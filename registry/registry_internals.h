@@ -10,6 +10,9 @@
 
 #define REGISTRY_DICTIONARY_OPTIONS (DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_SINGLE_THREADED)
 
+#define REGISTRY_VERIFY_COOKIES_GUID "11111111-2222-3333-4444-555555555555"
+#define is_dummy_person(person_guid) (strcmp(person_guid, REGISTRY_VERIFY_COOKIES_GUID) == 0)
+
 // ----------------------------------------------------------------------------
 // COMMON structures
 
@@ -67,9 +70,9 @@ struct registry {
 extern struct registry registry;
 
 // REGISTRY LOW-LEVEL REQUESTS (in registry-internals.c)
-REGISTRY_PERSON *registry_request_access(char *person_guid, char *machine_guid, char *url, char *name, time_t when);
-REGISTRY_PERSON *registry_request_delete(char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when);
-REGISTRY_MACHINE *registry_request_machine(char *person_guid, char *machine_guid, char *url, char *request_machine, time_t when);
+REGISTRY_PERSON *registry_request_access(const char *person_guid, char *machine_guid, char *url, char *name, time_t when);
+REGISTRY_PERSON *registry_request_delete(const char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when);
+REGISTRY_MACHINE *registry_request_machine(const char *person_guid, char *machine_guid, char *url, char *request_machine, time_t when);
 
 // REGISTRY LOG (in registry_log.c)
 void registry_log(char action, REGISTRY_PERSON *p, REGISTRY_MACHINE *m, STRING *u, const char *name);

@@ -39,7 +39,7 @@ typedef struct registry_machine REGISTRY_MACHINE;
 REGISTRY_MACHINE *registry_machine_find(const char *machine_guid);
 REGISTRY_MACHINE_URL *registry_machine_url_allocate(REGISTRY_MACHINE *m, STRING *u, time_t when);
 REGISTRY_MACHINE *registry_machine_allocate(const char *machine_guid, time_t when);
-REGISTRY_MACHINE *registry_machine_get(const char *machine_guid, time_t when);
+REGISTRY_MACHINE *registry_machine_find_or_create(const char *machine_guid, time_t when, bool is_dummy);
 REGISTRY_MACHINE_URL *registry_machine_link_to_url(REGISTRY_MACHINE *m, STRING *url, time_t when);
 
 REGISTRY_MACHINE_URL *registry_machine_url_find(REGISTRY_MACHINE *m, STRING *url);
