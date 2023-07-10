@@ -41,17 +41,18 @@ static void bearer_get_token(uuid_t *uuid) {
 bool extract_bearer_token_from_request(struct web_client *w, char *dst, size_t dst_len) {
     const char *req = buffer_tostring(w->response.data);
     size_t req_len = buffer_strlen(w->response.data);
-    const char *bearer = strstr(req, HTTP_REQUEST_AUTHORIZATION_BEARER);
+    const char *bearer = strcasestr(req, HTTP_REQUEST_AUTHORIZATION_BEARER);
 
     if(!bearer)
         return false;
 
-    while(isspace(*bearer))
-        bearer++;
-
     const char *token_start = bearer + sizeof(HTTP_REQUEST_AUTHORIZATION_BEARER) - 1;
+
+    while(isspace(*token_start))
+        token_start++;
+
     const char *token_end = token_start + UUID_STR_LEN - 1 + 2;
-    if (token_end < req + req_len)
+    if (token_end > req + req_len)
         return false;
 
     strncpyz(dst, token_start, dst_len - 1);
