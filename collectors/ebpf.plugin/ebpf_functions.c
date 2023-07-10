@@ -153,7 +153,6 @@ static void ebpf_function_thread_manipulation(const char *transaction,
                     period = EBPF_DEFAULT_LIFETIME;
 
                 st->thread = mallocz(sizeof(netdata_thread_t));
-                lem->thread_id = i;
                 lem->enabled = NETDATA_THREAD_EBPF_FUNCTION_RUNNING;
                 lem->lifetime = period;
 

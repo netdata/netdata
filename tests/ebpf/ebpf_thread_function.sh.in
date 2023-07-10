@@ -1,6 +1,7 @@
 #!/bin/bash
 
 netdata_ebpf_test_functions() {
+    echo "QUERYING: ${1}"
     curl -k -o /tmp/ebpf_netdata_test_functions.txt "${1}"
     TEST=$?
     if [ $TEST -ne 0 ]; then
