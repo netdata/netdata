@@ -37,6 +37,7 @@ ebpf_module_t *ebpf_functions_select_module(const char *thread_name) {
  * @param transaction  the transaction id that Netdata sent for this function execution
 */
 static void ebpf_function_thread_manipulation_help(const char *transaction) {
+    pthread_mutex_lock(&lock);
     pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600);
     fprintf(stdout, "%s",
             "ebpf.plugin / thread\n"
@@ -59,6 +60,8 @@ static void ebpf_function_thread_manipulation_help(const char *transaction) {
             "Process thread is not controlled by functions until we finish the creation of functions per thread..\n"
             );
     pluginsd_function_result_end_to_stdout();
+    fflush(stdout);
+    pthread_mutex_unlock(&lock);
 }
 
 
