@@ -1,0 +1,254 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+netdata.aclk_cloud_req,,"received, malformed",req/s,Requests received from cloud,stacked,,netdata,stats
+netdata.aclk_cloud_req_http_type,,"other, info, data, alarms, alarm_log, chart, charts, function, functions",req/s,Requests received from cloud via HTTP by their type,stacked,,netdata,stats
+netdata.aclk_mqtt_tx_perc,,used,%,"Actively used percentage of MQTT Tx Buffer,",line,,netdata,stats
+netdata.aclk_mqtt_tx_queue,,"usable, reclaimable, used, free, size",B,State of transmit MQTT queue.,line,,netdata,stats
+netdata.aclk_mqtt_wss_time,,"keep-alive, socket_read_ssl, socket_write_ssl, process_websocket, process_mqtt",us,"Time spent handling MQTT, WSS, SSL and network communication.",stacked,,netdata,stats
+netdata.aclk_openssl_bytes,,"sent, received",B/s,Received and Sent bytes.,stacked,,netdata,stats
+netdata.aclk_processed_query_type,,"unknown, http_api_request_v2, register_node, node_state_update, chart_and_dim_update, chart_config_updated, reset_chart_messages, update_retention_info, update_node_info, alarm_checkpoint, provide_alarm_config, alarm_snapshot, update_node_collectors, generic_binary_proto_message",cmd/s,Query thread commands processed by their type,stacked,,netdata,stats
+netdata.aclk_protobuf_rx_types,,"cmd, CreateNodeInstanceResult, SendNodeInstances, StreamChartsAndDimensions, ChartsAndDimensionsAck, UpdateChartConfigs, StartAlarmStreaming, SendAlarmCheckpoint, SendAlarmConfiguration, SendAlarmSnapshot, DisconnectReq, ContextsCheckpoint, StopStreamingContexts, CancelPendingRequest",msg/s,Received new cloud architecture messages by their type.,stacked,,netdata,stats
+netdata.aclk_query_per_second,,"added, dispatched",queries/s,ACLK Queries per second,area,,netdata,stats
+netdata.aclk_query_threads,,"Query 0, Query 1, Query 2, Query 3, Query 4, Query 5",req/s,Queries Processed Per Thread,stacked,,netdata,stats
+netdata.aclk_query_time,,"avg, max, total",us,Time it took to process cloud requested DB queries,line,,netdata,stats
+netdata.aclk_status,,online,connected,ACLK/Cloud connection status,line,,netdata,stats
+netdata.apps_children_fix,,"cutime, cstime, cgtime, cminflt, cmajflt",percentage,Apps Plugin Exited Children Normalization Ratios,line,,apps.plugin,
+netdata.apps_cpu,,"user, system",milliseconds/s,Apps Plugin CPU,stacked,,apps.plugin,
+netdata.apps_fix,,"utime, stime, gtime, minflt, majflt",percentage,Apps Plugin Normalization Ratios,line,,apps.plugin,
+netdata.apps_sizes,,"calls, files, filenames, inode_changes, link_changes, pids, fds, targets, new_pids",files/s,Apps Plugin Files,line,,apps.plugin,
+netdata.clients,,clients,connected clients,Netdata Web Clients,line,,netdata,stats
+netdata.compression_ratio,,savings,percentage,Netdata API Responses Compression Savings Ratio,line,,netdata,stats
+netdata.db_points_read,,"/api/v1/data, /api/v1/weights, /api/v1/badge, health, ml, exporters, backfill, replication",points/s,Netdata DB Points Query Read,stacked,,netdata,stats
+netdata.db_points_results,,"/api/v1/data, /api/v1/weights, /api/v1/badge, health, ml, replication",points/s,Netdata Points in Query Results,stacked,,netdata,stats
+netdata.db_points_stored,,"tier0, tier1, tier2",points/s,Netdata DB Points Stored,stacked,,netdata,stats
+netdata.dbengine_buffers,,"pgc, mrg, opcodes, query handles, descriptors, wal, workers, pdc, pd, extent io, extent buffers, epdl, deol",bytes,Netdata DB Buffers,stacked,,netdata,stats
+netdata.dbengine_cache_hit_ratio,,"overall, main cache, extent cache, extent merge",%,Netdata Queries Cache Hit Ratio,line,,netdata,stats
+netdata.dbengine_compression_ratio,,savings,percentage,Netdata DB engine data extents' compression savings ratio,line,,netdata,stats
+netdata.dbengine_events,,"journal v2 mapped, journal v2 unmapped, datafile creation, datafile deletion, datafile deletion spin, journal v2 indexing, retention",events/s,Netdata Database Events,line,,netdata,stats
+netdata.dbengine_extent_cache_events,,"evictions aggressive, evictions critical, flushes critical",events/s,Netdata extent Cache Events,area,,netdata,stats
+netdata.dbengine_extent_cache_hit_ratio,,"closest, exact",%,Netdata extent Cache Hit Ratio,line,,netdata,stats
+netdata.dbengine_extent_cache_memory,,"free, hot, dirty, clean, index, evicting, flushing",bytes,Netdata extent Cache Memory,stacked,,netdata,stats
+netdata.dbengine_extent_cache_memory_changes,,"new clean, evictions, new hot",bytes/s,Netdata extent Cache Memory Changes,area,,netdata,stats
+netdata.dbengine_extent_cache_memory_migrations,,"dirty to clean, hot to dirty",bytes/s,Netdata extent Cache Memory Migrations,area,,netdata,stats
+netdata.dbengine_extent_cache_operations,,"search closest, search exact, add hot, add clean, evictions, flushes, acquires, releases, del acquires",ops/s,Netdata extent Cache Operations,line,,netdata,stats
+netdata.dbengine_extent_cache_pages,,"clean, hot, dirty, referenced",pages,Netdata extent Cache Pages,line,,netdata,stats
+netdata.dbengine_extent_cache_workers,,"searchers, adders, evictors, flushers, hot2dirty, jv2 flushers",workers,Netdata extent Cache Workers,line,,netdata,stats
+netdata.dbengine_extent_target_memory,,"current, wanted, referenced, hot max, dirty max, hot, dirty",bytes,Netdata extent Target Cache Memory,line,,netdata,stats
+netdata.dbengine_extent_waste_events,,"evictions skipped, flushes cancelled, acquire spins, release spins, insert spins, delete spins, evict spins, flush spins",events/s,Netdata extent Waste Events,line,,netdata,stats
+netdata.dbengine_global_errors,,"io_errors, fs_errors, pg_cache_over_half_dirty_events",errors/s,Netdata DB engine errors,line,,netdata,stats
+netdata.dbengine_global_file_descriptors,,"current, max",descriptors,Netdata DB engine File Descriptors,line,,netdata,stats
+netdata.dbengine_io_operations,,"reads, writes",operations/s,Netdata DB engine I/O operations,line,,netdata,stats
+netdata.dbengine_io_throughput,,"reads, writes",MiB/s,Netdata DB engine I/O throughput,line,,netdata,stats
+netdata.dbengine_main_cache_events,,"evictions aggressive, evictions critical, flushes critical",events/s,Netdata main Cache Events,area,,netdata,stats
+netdata.dbengine_main_cache_hit_ratio,,"closest, exact",%,Netdata main Cache Hit Ratio,line,,netdata,stats
+netdata.dbengine_main_cache_memory,,"free, hot, dirty, clean, index, evicting, flushing",bytes,Netdata main Cache Memory,stacked,,netdata,stats
+netdata.dbengine_main_cache_memory_changes,,"new clean, evictions, new hot",bytes/s,Netdata main Cache Memory Changes,area,,netdata,stats
+netdata.dbengine_main_cache_memory_migrations,,"dirty to clean, hot to dirty",bytes/s,Netdata main Cache Memory Migrations,area,,netdata,stats
+netdata.dbengine_main_cache_operations,,"search closest, search exact, add hot, add clean, evictions, flushes, acquires, releases, del acquires",ops/s,Netdata main Cache Operations,line,,netdata,stats
+netdata.dbengine_main_cache_pages,,"clean, hot, dirty, referenced",pages,Netdata main Cache Pages,line,,netdata,stats
+netdata.dbengine_main_cache_workers,,"searchers, adders, evictors, flushers, hot2dirty, jv2 flushers",workers,Netdata main Cache Workers,line,,netdata,stats
+netdata.dbengine_main_target_memory,,"current, wanted, referenced, hot max, dirty max, hot, dirty",bytes,Netdata main Target Cache Memory,line,,netdata,stats
+netdata.dbengine_main_waste_events,,"evictions skipped, flushes cancelled, acquire spins, release spins, insert spins, delete spins, evict spins, flush spins",events/s,Netdata main Waste Events,line,,netdata,stats
+netdata.dbengine_memory,,"main cache, open cache, extent cache, metrics registry, buffers",bytes,Netdata DB Memory,stacked,,netdata,stats
+netdata.dbengine_metrics,,"all, acquired, collected, with retention, without retention, multi-collected",metrics,Netdata Metrics in Metrics Registry,line,,netdata,stats
+netdata.dbengine_metrics_registry_operations,,"add, delete, search",metrics,Netdata Metrics Registry Operations,line,,netdata,stats
+netdata.dbengine_metrics_registry_references,,references,references,Netdata Metrics Registry References,line,,netdata,stats
+netdata.dbengine_open_cache_events,,"evictions aggressive, evictions critical, flushes critical",events/s,Netdata open Cache Events,area,,netdata,stats
+netdata.dbengine_open_cache_hit_ratio,,"closest, exact",%,Netdata open Cache Hit Ratio,line,,netdata,stats
+netdata.dbengine_open_cache_memory,,"free, hot, dirty, clean, index, evicting, flushing",bytes,Netdata open Cache Memory,stacked,,netdata,stats
+netdata.dbengine_open_cache_memory_changes,,"new clean, evictions, new hot",bytes/s,Netdata open Cache Memory Changes,area,,netdata,stats
+netdata.dbengine_open_cache_memory_migrations,,"dirty to clean, hot to dirty",bytes/s,Netdata open Cache Memory Migrations,area,,netdata,stats
+netdata.dbengine_open_cache_operations,,"search closest, search exact, add hot, add clean, evictions, flushes, acquires, releases, del acquires",ops/s,Netdata open Cache Operations,line,,netdata,stats
+netdata.dbengine_open_cache_pages,,"clean, hot, dirty, referenced",pages,Netdata open Cache Pages,line,,netdata,stats
+netdata.dbengine_open_cache_workers,,"searchers, adders, evictors, flushers, hot2dirty, jv2 flushers",workers,Netdata open Cache Workers,line,,netdata,stats
+netdata.dbengine_open_target_memory,,"current, wanted, referenced, hot max, dirty max, hot, dirty",bytes,Netdata open Target Cache Memory,line,,netdata,stats
+netdata.dbengine_open_waste_events,,"evictions skipped, flushes cancelled, acquire spins, release spins, insert spins, delete spins, evict spins, flush spins",events/s,Netdata open Waste Events,line,,netdata,stats
+netdata.dbengine_prep_timings,,"routing, main cache, open cache, journal v2, pass4",usec/s,Netdata Query Preparation Timings,stacked,,netdata,stats
+netdata.dbengine_queries,,"total, open cache, journal v2, planned with gaps, executed with gaps",queries/s,Netdata Queries,line,,netdata,stats
+netdata.dbengine_queries_running,,queries,queries,Netdata Queries Running,line,,netdata,stats
+netdata.dbengine_query_next_page,,"pass4, failed slow, failed fast, loaded slow, loaded fast",pages/s,Netdata Query Next Page,stacked,,netdata,stats
+netdata.dbengine_query_next_page_issues,,"zero timestamp, invalid size, past time, overlapping, update every fixed, entries fixed",pages/s,Netdata Query Next Page Issues,stacked,,netdata,stats
+netdata.dbengine_query_pages_data_source,,"main cache, disk, extent cache",pages/s,Netdata Query Pages to Data Source,stacked,,netdata,stats
+netdata.dbengine_query_pages_disk_load,,"ok compressed, fail invalid page, ok uncompressed, fail cant mmap, fail unavailable, fail unroutable, fail not found, fail invalid extent, extent merged, cancelled",pages/s,Netdata Query Pages Loaded from Disk,line,,netdata,stats
+netdata.dbengine_query_pages_metadata_source,,"cache hit, journal v2 scan, open journal",pages/s,Netdata Query Pages Metadata Source,stacked,,netdata,stats
+netdata.dbengine_query_timings,,"init, prep wait, next page disk fast, next page disk slow, next page preload fast, next page preload slow",usec/s,Netdata Query Timings,stacked,,netdata,stats
+netdata.dictionaries.category.callbacks,category,"inserts, deletes, conflicts, reacts",callbacks/s,Dictionary Callbacks,line,category,netdata,stats
+netdata.dictionaries.category.dictionaries,category,"active, deleted",dictionaries,Dictionaries,line,category,netdata,stats
+netdata.dictionaries.category.items,category,"active, deleted, referenced",items,Dictionary Items,line,category,netdata,stats
+netdata.dictionaries.category.memory,category,"index, data, structures",bytes,Dictionary Memory,stacked,category,netdata,stats
+netdata.dictionaries.category.ops,category,"creations, destructions, flushes, traversals, walkthroughs, garbage_collections, searches, inserts, resets, deletes",ops/s,Dictionary Operations,line,category,netdata,stats
+netdata.dictionaries.category.spins,category,"use, search, insert, delete",count,Dictionary Spins,line,category,netdata,stats
+netdata.ebpf_hash_tables_count,,hash_table,hash tables,Number of hash tables loaded.,line,,ebpf.plugin,process
+netdata.ebpf_hash_tables_per_core,,"per_core, unique",threads,How threads are loading hash/array tables.,line,,ebpf.plugin,process
+netdata.ebpf_kernel_memory,,memory_locked,bytes,Memory allocated for hash tables.,line,,ebpf.plugin,process
+netdata.ebpf_load_methods,,"legacy, co-re",methods,Load info.,line,,ebpf.plugin,process
+netdata.ebpf_threads,,"total, running",threads,Threads info.,line,,ebpf.plugin,process
+netdata.go_plugin_execution_time,,time,ms,Execution time,line,,go.d,logind
+netdata.heartbeat,,"min, max, average",microseconds,System clock jitter,area,,netdata,stats
+netdata.machine_learning_status,,"enabled, disabled-sp",dimensions,Machine learning status,line,,ml.plugin,training
+netdata.memory,,"db, collectors, hosts, rrdset rrddim, contexts, health, functions, labels, strings, streaming, replication, buffers, workers, aral, judy, other",bytes,Netdata Memory,stacked,,netdata,stats
+netdata.memory_buffers,,"queries, collection, aclk, api, functions, sqlite, exporters, health, streaming, streaming cbuf, replication, web, aral, judy",bytes,Netdata Memory Buffers,stacked,,netdata,stats
+netdata.metric_types,,"constant, variable",dimensions,Dimensions by metric type,line,,ml.plugin,training
+netdata.ml_models_consulted,,num_models_consulted,models,KMeans models used for prediction,area,,ml.plugin,detection
+netdata.net,,"in, out",kilobits/s,Netdata Network Traffic,area,,netdata,stats
+netdata.private_charts,,charts,charts,Private metric charts created by the netdata statsd server,area,,statsd.plugin,stats
+netdata.queries,,"/api/v1/data, /api/v1/weights, /api/v1/badge, health, ml, exporters, backfill, replication",queries/s,Netdata DB Queries,stacked,,netdata,stats
+netdata.queue_stats,,"queue_size, popped_items",items,Training queue stats,line,,ml.plugin,training
+netdata.requests,,requests,requests/s,Netdata Web Requests,line,,netdata,stats
+netdata.response_time,,"average, max",milliseconds/request,Netdata API Response Time,line,,netdata,stats
+netdata.server_cpu,,"user, system",milliseconds/s,Netdata CPU usage,stacked,,netdata,stats
+netdata.sqlite3_context_cache,,"cache_hit, cache_miss, cache_spill, cache_write",ops/s,Netdata SQLite3 context cache,line,,netdata,stats
+netdata.sqlite3_metatada_cache,,"cache_hit, cache_miss, cache_spill, cache_write",ops/s,Netdata SQLite3 metadata cache,line,,netdata,stats
+netdata.sqlite3_queries,,queries,queries/s,Netdata SQLite3 Queries,line,,netdata,stats
+netdata.sqlite3_queries_by_status,,"ok, failed, busy, locked",queries/s,Netdata SQLite3 Queries by status,line,,netdata,stats
+netdata.sqlite3_rows,,ok,rows/s,Netdata SQLite3 Rows,line,,netdata,stats
+netdata.statsd_bytes,,"tcp, udp",kilobits/s,Bytes read by the netdata statsd server,stacked,,statsd.plugin,stats
+netdata.statsd_events,,"gauges, counters, timers, meters, histograms, sets, dictionaries, unknown, errors",events/s,Events processed by the netdata statsd server,stacked,,statsd.plugin,stats
+netdata.statsd_metrics,,"gauges, counters, timers, meters, histograms, sets, dictionaries",metrics,Metrics in the netdata statsd database,stacked,,statsd.plugin,stats
+netdata.statsd_packets,,"tcp, udp",packets/s,Network packets processed by the netdata statsd server,stacked,,statsd.plugin,stats
+netdata.statsd_reads,,"tcp, udp",reads/s,Read operations made by the netdata statsd server,stacked,,statsd.plugin,stats
+netdata.statsd_useful_metrics,,"gauges, counters, timers, meters, histograms, sets, dictionaries",metrics,Useful metrics in the netdata statsd database,stacked,,statsd.plugin,stats
+netdata.strings_entries,,"entries, references",entries,Strings entries,area,,netdata,stats
+netdata.strings_memory,,memory,bytes,Strings memory,area,,netdata,stats
+netdata.strings_ops,,"inserts, deletes, searches, duplications, releases",ops/s,Strings operations,line,,netdata,stats
+netdata.tcp_connected,,connected,sockets,statsd server TCP connected sockets,line,,statsd.plugin,stats
+netdata.tcp_connects,,"connects, disconnects",events,statsd server TCP connects and disconnects,line,,statsd.plugin,stats
+netdata.training_results,,"ok, invalid-queries, not-enough-values, null-acquired-dimensions, chart-under-replication",events,Training results,line,,ml.plugin,training
+netdata.training_status,,"untrained, pending-without-model, trained, pending-with-model, silenced",dimensions,Training status of dimensions,line,,ml.plugin,training
+netdata.training_time_stats,,"allotted, consumed, remaining",milliseconds,Training time stats,line,,ml.plugin,training
+netdata.uptime,,uptime,seconds,Netdata uptime,line,,netdata,stats
+netdata.workers.aclkquery.cpu,,"min, max, average",%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.aclkquery.jobs_started_by_type,,"http_api_request_v2, register_node, node_state_update, chart_and_dim_update, chart_config_updated, reset_chart_messages, update_retention_info, update_node_info, alarm_checkpoint, provide_alarm_config, alarm_snapshot, update_node_collectors, generic_binary_proto_message",jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.aclkquery.threads,,"free, busy",threads,Netdata Workers Threads,stacked,,netdata,stats
+netdata.workers.aclkquery.time,,"min, max, average",%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.aclkquery.time_by_type,,"http_api_request_v2, register_node, node_state_update, chart_and_dim_update, chart_config_updated, reset_chart_messages, update_retention_info, update_node_info, alarm_checkpoint, provide_alarm_config, alarm_snapshot, update_node_collectors, generic_binary_proto_message",ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.aclksync.cpu,,average,%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.aclksync.jobs_started_by_type,,"noop, cleanup, node delete, node state, alert push, alert conf push, alert snapshot, alert checkpoint, alerts check, timer",jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.aclksync.time,,average,%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.aclksync.time_by_type,,"noop, cleanup, node delete, node state, alert push, alert conf push, alert snapshot, alert checkpoint, alerts check, timer",ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.cgroups.cpu,,average,%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.cgroups.jobs_started_by_type,,"lock, read, chart",jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.cgroups.time,,average,%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.cgroups.time_by_type,,"lock, read, chart",ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.cgroupsdisc.cpu,,average,%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.cgroupsdisc.jobs_started_by_type,,"init, find, process, rename, network, new, update, cleanup, copy, share, lock",jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.cgroupsdisc.time,,average,%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.cgroupsdisc.time_by_type,,"init, find, process, rename, network, new, update, cleanup, copy, share, lock",ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.cpu_total,,"stats, health, mltrain, mldetect, streamsnd, dbengine, libuv, web, aclksync, metasync, pluginsd, statsd, statsdflush, proc, netdev, cgroups, cgroupsdisc, diskspace, tc, timex, idlejitter, rrdcontext, replication, service, aclkquery, streamrcv",%,Netdata Workers CPU Utilization,stacked,,netdata,stats
+netdata.workers.dbengine.cpu,,average,%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.dbengine.jobs_started_by_type,,"noop, query, extent write, extent read, flushed to open, db rotate, journal index, flush init, evict init, ctx shutdown, ctx quiesce, get opcode, query cb, extent write cb, extent read cb, flushed to open cb, db rotate cb, journal index cb, flush init cb, evict init cb, ctx shutdown cb, ctx quiesce cb, timer, transaction buffer flush cb",jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.dbengine.time,,average,%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.dbengine.time_by_type,,"noop, query, extent write, extent read, flushed to open, db rotate, journal index, flush init, evict init, ctx shutdown, ctx quiesce, get opcode, query cb, extent write cb, extent read cb, flushed to open cb, db rotate cb, journal index cb, flush init cb, evict init cb, ctx shutdown cb, ctx quiesce cb, timer, transaction buffer flush cb",ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.dbengine.value.opcodes_waiting,,"min, max, average",opcodes,Netdata Workers dbengine value of opcodes waiting,line,,netdata,stats
+netdata.workers.dbengine.value.works_dispatched,,"min, max, average",works,Netdata Workers dbengine value of works dispatched,line,,netdata,stats
+netdata.workers.dbengine.value.works_executing,,"min, max, average",works,Netdata Workers dbengine value of works executing,line,,netdata,stats
+netdata.workers.diskspace.cpu,,average,%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.diskspace.jobs_started_by_type,,"mountinfo, mountpoint, cleanup",jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.diskspace.time,,average,%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.diskspace.time_by_type,,"mountinfo, mountpoint, cleanup",ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.health.cpu,,average,%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.health.jobs_started_by_type,,"rrd lock, host lock, db lookup, calc eval, warning eval, critical eval, alarm log entry, alarm log process, rrdset init, rrddim init",jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.health.time,,average,%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.health.time_by_type,,"rrd lock, host lock, db lookup, calc eval, warning eval, critical eval, alarm log entry, alarm log process, rrdset init, rrddim init",ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.idlejitter.cpu,,average,%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.idlejitter.jobs_started_by_type,,measurements,jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.idlejitter.time,,average,%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.idlejitter.time_by_type,,measurements,ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.libuv.cpu,,"min, max, average",%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.libuv.jobs_started_by_type,,"worker init, query, extent cache, extent mmap, extent decompression, page lookup, page populate, page allocate, flush main, extent write, flushed to open, jv2 index wait, jv2 indexing, datafile delete wait, datafile deletion, find rotated metrics, find remaining retention, update retention, evict main, dbengine buffers cleanup, dbengine quiesce, dbengine shutdown, metadata load host context, metadata store host, metadata cleanup, schedule command",jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.libuv.threads,,"free, busy",threads,Netdata Workers Threads,stacked,,netdata,stats
+netdata.workers.libuv.time,,"min, max, average",%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.libuv.time_by_type,,"worker init, query, extent cache, extent mmap, extent decompression, page lookup, page populate, page allocate, flush main, extent write, flushed to open, jv2 index wait, jv2 indexing, datafile delete wait, datafile deletion, find rotated metrics, find remaining retention, update retention, evict main, dbengine buffers cleanup, dbengine quiesce, dbengine shutdown, metadata load host context, metadata store host, metadata cleanup, schedule command",ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.metasync.cpu,,average,%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.metasync.jobs_started_by_type,,"noop, timer, delete dimension, add claim id, add host info, maintenance, ml load models",jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.metasync.time,,average,%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.metasync.time_by_type,,"noop, timer, delete dimension, add claim id, add host info, maintenance, ml load models",ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.mldetect.cpu,,average,%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.mldetect.jobs_started_by_type,,"collect stats, dim chart, host chart, training stats",jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.mldetect.time,,average,%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.mldetect.time_by_type,,"collect stats, dim chart, host chart, training stats",ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.mltrain.cpu,,"min, max, average",%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.mltrain.jobs_started_by_type,,"pop queue, acquire, query, kmeans, update models, release, update host, flush models",jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.mltrain.threads,,"free, busy",threads,Netdata Workers Threads,stacked,,netdata,stats
+netdata.workers.mltrain.time,,"min, max, average",%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.mltrain.time_by_type,,"pop queue, acquire, query, kmeans, update models, release, update host, flush models",ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.netdev.cpu,,average,%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.netdev.jobs_started_by_type,,netdev,jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.netdev.time,,average,%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.netdev.time_by_type,,netdev,ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.pluginsd.cpu,,"min, max, average",%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.pluginsd.jobs_started_by_type,,"FLUSH, DISABLE, HOST_DEFINE, HOST_DEFINE_END, HOST_LABEL, HOST, EXIT, CHART, DIMENSION, VARIABLE, LABEL, OVERWRITE, CLABEL_COMMIT, CLABEL, FUNCTION, FUNCTION_RESULT_BEGIN, BEGIN, SET, END",jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.pluginsd.threads,,"free, busy",threads,Netdata Workers Threads,stacked,,netdata,stats
+netdata.workers.pluginsd.time,,"min, max, average",%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.pluginsd.time_by_type,,"FLUSH, DISABLE, HOST_DEFINE, HOST_DEFINE_END, HOST_LABEL, HOST, EXIT, CHART, DIMENSION, VARIABLE, LABEL, OVERWRITE, CLABEL_COMMIT, CLABEL, FUNCTION, FUNCTION_RESULT_BEGIN, BEGIN, SET, END",ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.proc.cpu,,average,%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.proc.jobs_started_by_type,,"stat, uptime, loadavg, entropy, pressure, interrupts, softirqs, vmstat, meminfo, ksm, zram, ecc, numa, pagetypeinfo, netwireless, sockstat, sockstat6, netstat, sctp, softnet, ipvs, infiniband, conntrack, synproxy, diskstats, mdstat, nfsd, nfs, zfs_arcstats, zfs_pool_state, btrfs, ipc, power_supply",jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.proc.time,,average,%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.proc.time_by_type,,"stat, uptime, loadavg, entropy, pressure, interrupts, softirqs, vmstat, meminfo, ksm, zram, ecc, numa, pagetypeinfo, netwireless, sockstat, sockstat6, netstat, sctp, softnet, ipvs, infiniband, conntrack, synproxy, diskstats, mdstat, nfsd, nfs, zfs_arcstats, zfs_pool_state, btrfs, ipc, power_supply",ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.replication.cpu,,"min, max, average",%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.replication.jobs_started_by_type,,"find next, querying, dict delete, find chart, prepare query, check consistency, commit, cleanup, wait, statistics",jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.replication.rate.added_requests,,"min, max, average",requests/s,Netdata Workers replication rate of added requests,line,,netdata,stats
+netdata.workers.replication.rate.finished_requests,,"min, max, average",requests/s,Netdata Workers replication rate of finished requests,line,,netdata,stats
+netdata.workers.replication.rate.sender_resets,,"min, max, average",resets/s,Netdata Workers replication rate of sender resets,line,,netdata,stats
+netdata.workers.replication.threads,,"free, busy",threads,Netdata Workers Threads,stacked,,netdata,stats
+netdata.workers.replication.time,,"min, max, average",%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.replication.time_by_type,,"find next, querying, dict delete, find chart, prepare query, check consistency, commit, cleanup, wait, statistics",ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.replication.value.completion,,"min, max, average",%,Netdata Workers replication value of completion,line,,netdata,stats
+netdata.workers.replication.value.no_room_requests,,"min, max, average",requests,Netdata Workers replication value of no room requests,line,,netdata,stats
+netdata.workers.replication.value.pending_requests,,"min, max, average",requests,Netdata Workers replication value of pending requests,line,,netdata,stats
+netdata.workers.replication.value.senders_full,,"min, max, average",senders,Netdata Workers replication value of senders full,line,,netdata,stats
+netdata.workers.rrdcontext.cpu,,average,%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.rrdcontext.jobs_started_by_type,,"hosts, dedup checks, sent contexts, deduplicated contexts, metrics retention, queued contexts, cleanups, deletes, check metrics, check instances, check contexts",jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.rrdcontext.time,,average,%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.rrdcontext.time_by_type,,"hosts, dedup checks, sent contexts, deduplicated contexts, metrics retention, queued contexts, cleanups, deletes, check metrics, check instances, check contexts",ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.rrdcontext.value.hub_queue_size,,"min, max, average",contexts,Netdata Workers rrdcontext value of hub queue size,line,,netdata,stats
+netdata.workers.rrdcontext.value.post_processing_queue_size,,"min, max, average",contexts,Netdata Workers rrdcontext value of post processing queue size,line,,netdata,stats
+netdata.workers.service.cpu,,average,%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.service.jobs_started_by_type,,"child chart obsoletion check, cleanup obsolete charts, archive chart, archive chart dimensions, archive dimension, cleanup orphan hosts, cleanup obsolete charts on all hosts, free host, save host charts, delete host charts, free chart, save chart, delete chart, free dimension, main cache evictions, main cache flushes, open cache evictions, open cache flushes",jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.service.time,,average,%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.service.time_by_type,,"child chart obsoletion check, cleanup obsolete charts, archive chart, archive chart dimensions, archive dimension, cleanup orphan hosts, cleanup obsolete charts on all hosts, free host, save host charts, delete host charts, free chart, save chart, delete chart, free dimension, main cache evictions, main cache flushes, open cache evictions, open cache flushes",ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.stats.cpu,,"min, max, average",%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.stats.jobs_started_by_type,,"global, registry, workers, dbengine, strings, dictionaries, malloc_trace, sqlite3",jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.stats.threads,,"free, busy",threads,Netdata Workers Threads,stacked,,netdata,stats
+netdata.workers.stats.time,,"min, max, average",%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.stats.time_by_type,,"global, registry, workers, dbengine, strings, dictionaries, malloc_trace, sqlite3",ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.statsd.cpu,,average,%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.statsd.jobs_started_by_type,,"tcp connect, tcp disconnect, receive, send",jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.statsd.time,,average,%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.statsd.time_by_type,,"tcp connect, tcp disconnect, receive, send",ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.statsdflush.cpu,,average,%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.statsdflush.jobs_started_by_type,,"gauges, counters, meters, timers, histograms, sets, dictionaries, statistics",jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.statsdflush.time,,average,%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.statsdflush.time_by_type,,"gauges, counters, meters, timers, histograms, sets, dictionaries, statistics",ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.streamrcv.cpu,,"average, min, max",%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.streamrcv.jobs_started_by_type,,"CHART, DIMENSION, VARIABLE, LABEL, OVERWRITE, CLABEL_COMMIT, CLABEL, FUNCTION, FUNCTION_RESULT_BEGIN, BEGIN, SET, END, CHART_DEFINITION_END, RBEGIN, RSET, RDSTATE, RSSTATE, REND, BEGIN2, SET2, END2, CLAIMED_ID",jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.streamrcv.rate.received_bytes,,"min, max, average",bytes/s,Netdata Workers streamrcv rate of received bytes,line,,netdata,stats
+netdata.workers.streamrcv.rate.uncompressed_bytes,,"min, max, average",bytes/s,Netdata Workers streamrcv rate of uncompressed bytes,line,,netdata,stats
+netdata.workers.streamrcv.threads,,"free, busy",threads,Netdata Workers Threads,stacked,,netdata,stats
+netdata.workers.streamrcv.time,,"average, min, max",%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.streamrcv.time_by_type,,"CHART, DIMENSION, VARIABLE, LABEL, OVERWRITE, CLABEL_COMMIT, CLABEL, FUNCTION, FUNCTION_RESULT_BEGIN, BEGIN, SET, END, CHART_DEFINITION_END, RBEGIN, RSET, RDSTATE, RSSTATE, REND, BEGIN2, SET2, END2, CLAIMED_ID",ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.streamrcv.value.replication_completion,,"min, max, average",%,Netdata Workers streamrcv value of replication completion,line,,netdata,stats
+netdata.workers.streamsnd.cpu,,"average, min, max",%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.streamsnd.jobs_started_by_type,,"connect, pipe read, receive, execute, send, disconnect bad handshake, disconnect overflow, disconnect timeout, disconnect poll error, disconnect socket error, disconnect ssl error, disconnect parent closed, disconnect receive error, disconnect send error, disconnect no compression, replay request, function",jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.streamsnd.rate.bytes_received,,"min, max, average",bytes/s,Netdata Workers streamsnd rate of bytes received,line,,netdata,stats
+netdata.workers.streamsnd.rate.bytes_sent,,"min, max, average",bytes/s,Netdata Workers streamsnd rate of bytes sent,line,,netdata,stats
+netdata.workers.streamsnd.threads,,"free, busy",threads,Netdata Workers Threads,stacked,,netdata,stats
+netdata.workers.streamsnd.time,,"average, min, max",%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.streamsnd.time_by_type,,"connect, pipe read, receive, execute, send, disconnect bad handshake, disconnect overflow, disconnect timeout, disconnect poll error, disconnect socket error, disconnect ssl error, disconnect parent closed, disconnect receive error, disconnect send error, disconnect no compression, replay request, function",ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.streamsnd.value.replication_dict_entries,,"min, max, average",entries,Netdata Workers streamsnd value of replication dict entries,line,,netdata,stats
+netdata.workers.streamsnd.value.used_buffer_ratio,,"min, max, average",%,Netdata Workers streamsnd value of used buffer ratio,line,,netdata,stats
+netdata.workers.tc.cpu,,average,%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.tc.jobs_started_by_type,,"class, begin, end, sent, lended, tokens, devicename, devicegroup, classname, worktime",jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.tc.time,,average,%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.tc.time_by_type,,"class, begin, end, sent, lended, tokens, devicename, devicegroup, classname, worktime",ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.tc.value.number_of_classes,,"min, max, average",classes,Netdata Workers tc value of number of classes,line,,netdata,stats
+netdata.workers.tc.value.number_of_devices,,"min, max, average",devices,Netdata Workers tc value of number of devices,line,,netdata,stats
+netdata.workers.tc.value.tc_script_execution_time,,"min, max, average",milliseconds/run,Netdata Workers tc value of tc script execution time,line,,netdata,stats
+netdata.workers.timex.cpu,,average,%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.timex.jobs_started_by_type,,clock check,jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.timex.time,,average,%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.timex.time_by_type,,clock check,ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
+netdata.workers.web.cpu,,"min, max, average",%,Netdata Workers CPU Utilization,area,,netdata,stats
+netdata.workers.web.jobs_started_by_type,,"connect, disconnect, file start, file end, file read, file write, receive, send, process",jobs,Netdata Workers Jobs Started by Type,stacked,,netdata,stats
+netdata.workers.web.threads,,"free, busy",threads,Netdata Workers Threads,stacked,,netdata,stats
+netdata.workers.web.time,,"min, max, average",%,Netdata Workers Busy Time,area,,netdata,stats
+netdata.workers.web.time_by_type,,"connect, disconnect, file start, file end, file read, file write, receive, send, process",ms,Netdata Workers Busy Time by Type,stacked,,netdata,stats
