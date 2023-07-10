@@ -18,6 +18,15 @@ struct dyncfg_config {
 typedef struct dyncfg_config dyncfg_config_t;
 
 struct configurable_plugin;
+struct module;
+
+struct job
+{
+    char *name;
+    dyncfg_config_t config;
+
+    struct module *module;
+};
 
 struct module
 {

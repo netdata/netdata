@@ -403,18 +403,16 @@ struct configurable_plugin plugin = {
 
 const char *default_config = "{\n\t\"info\": \"I'am http_check and this is my current configuration\",\n\t\"update_every\": 5\n}";
 const char *module1_default_config = "{\n\t\"info\": \"I'am module1 and this is my current configuration\",\n\t\"update_every\": 5\n}";
-const char *job_module_default_config = "{\n\t\"info\": \"I'am module1 and this is my current configuration\",\n\t\"update_every\": 5\n}";
+#define JOB_MODULE_DEFAULT_CONFIG "{\n\t\"info\": \"I'am module1 and this is my current configuration\",\n\t\"update_every\": 5\n}"
 
 struct module job_module = {
     .default_config = {
-        .data = job_module_default_config,
-        .data_size = strlen(job_module_default_config) + 1,
+        .data = JOB_MODULE_DEFAULT_CONFIG,
+        .data_size = strlen(JOB_MODULE_DEFAULT_CONFIG)
     },
     .name = "job_module",
     .type = ARRAY,
-    
-
-}
+};
 
 #define POLL_INTERVAL 100
 
@@ -439,6 +437,8 @@ void *httpd_main(void *ptr) {
 
     struct configurable_plugin *plg = get_plugin_by_name("http_check");
     register_module(plg, m);
+
+    register_module(plg, &job_module);
 
     h2o_pathconf_t *pathconf;
     h2o_hostconf_t *hostconf;
