@@ -426,7 +426,8 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                             parse_web_log_line( (Web_log_parser_config_t *) p_file_info->parser_config->gen_config, 
                                                 message, message_size, &line_parsed);
 
-                            timestamp = line_parsed.timestamp * MSEC_PER_SEC; // convert to msec from sec
+                            if(likely(p_file_info->use_log_timestamp))
+                                timestamp = line_parsed.timestamp * MSEC_PER_SEC; // convert to msec from sec
                         }
 
                         new_tmp_text_size = message_size + 1; // +1 for '\n'
@@ -449,16 +450,15 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                         else skip_kmsg_log_buffering = 0;
                     }
                     /* NOTE/WARNING: kmsg timestamps will be **wrong** if system 
-                     *               has gone into hibernation since boot. Need
-                     *               to add config option to use now_realtime_msec()
-                     *               if the user desires to use collection time.
-                     */
-                    if(!strncmp(p->key.via.str.ptr, "sec", (size_t) p->key.via.str.size)){
-                        // timestamp += (now_realtime_sec() - now_boottime_sec() + p->val.via.i64) * MSEC_PER_SEC;
-                        timestamp += now_realtime_msec();
+                     *               has gone into hibernation since boot and 
+                     *               "p_file_info->use_log_timestamp" is set. */
+                    if( p_file_info->use_log_timestamp && 
+                        !strncmp(p->key.via.str.ptr, "sec", (size_t) p->key.via.str.size)){
+                        timestamp += (now_realtime_sec() - now_boottime_sec() + p->val.via.i64) * MSEC_PER_SEC;
                     }
-                    else if(!strncmp(p->key.via.str.ptr, "usec", (size_t) p->key.via.str.size)){
-                        // timestamp += p->val.via.i64 / USEC_PER_MS;
+                    else if(p_file_info->use_log_timestamp && 
+                            !strncmp(p->key.via.str.ptr, "usec", (size_t) p->key.via.str.size)){
+                        timestamp += p->val.via.i64 / USEC_PER_MS;
                     }
                     else if(!strncmp(p->key.via.str.ptr, LOG_REC_KEY, (size_t) p->key.via.str.size)){
                         message = (char *) p->val.via.str.ptr;
@@ -467,7 +467,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                         m_assert(message, "message is NULL");
                         m_assert(message_size, "message_size is 0");
 
-                        // new_tmp_text_size += message_size + 1; // +1 for '\n'
+                        new_tmp_text_size += message_size + 1; // +1 for '\n'
                     }
                     else if(!strncmp(p->key.via.str.ptr, "priority", (size_t) p->key.via.str.size)){
                         kmsg_sever = (int) p->val.via.u64;
@@ -479,7 +479,8 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                 /* FLB_SYSTEMD or FLB_SYSLOG case */
                 if( p_file_info->log_type == FLB_SYSTEMD || 
                     p_file_info->log_type == FLB_SYSLOG){
-                    if(!strncmp(p->key.via.str.ptr, "_SOURCE_REALTIME_TIMESTAMP", (size_t) p->key.via.str.size)){
+                    if( p_file_info->use_log_timestamp && 
+                        !strncmp(p->key.via.str.ptr, "_SOURCE_REALTIME_TIMESTAMP", (size_t) p->key.via.str.size)){
                         strncpy(timestamp_str, p->val.via.str.ptr, (size_t) p->val.via.str.size);
                         timestamp_str[p->val.via.str.size] = '\0';
 
@@ -566,7 +567,8 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
 
                         m_assert(docker_ev_timeNano, "docker_ev_timeNano is 0");
 
-                        timestamp = docker_ev_timeNano / NSEC_PER_MSEC;
+                        if(likely(p_file_info->use_log_timestamp))
+                            timestamp = docker_ev_timeNano / NSEC_PER_MSEC;
                     }
                     else if(!strncmp(p->key.via.str.ptr, "Type", (size_t) p->key.via.str.size)){
                         docker_ev_type = (char *) p->val.via.str.ptr;
@@ -727,8 +729,6 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                 *(c++) = 'n'; 
                 sz--;
 
-                debug(D_LOGS_MANAG, "msg:%.*s", (int) sz, c);
-
                 DICTIONARY *dict = NULL;
                 char *str = NULL;
                 size_t str_len = 0;
@@ -736,13 +736,11 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                     dict = p_file_info->parser_metrics->kernel->subsystem;
                     str = &c[subsys_str_len];
                     str_len = (sz - subsys_str_len);
-                    debug(D_LOGS_MANAG, "subsys_str:%.*s", (int) str_len, str);
                 }
                 else if (!strncmp(c, device_str, device_str_len)){
                     dict = p_file_info->parser_metrics->kernel->device;
                     str = &c[device_str_len];
                     str_len = (sz - device_str_len);
-                    debug(D_LOGS_MANAG, "device_str:%.*s", (int) str_len, str);
                 }
 
                 if(likely(str)){
@@ -756,10 +754,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
             }
         }
 
-        new_tmp_text_size += message_size + 1; // +1 for '\n'
-
         if(likely(kmsg_sever >= 0)) p_file_info->parser_metrics->kernel->sever[kmsg_sever]++;
-
 
         // TODO: Fix: Metrics will still be collected if circ_buff_prepare_write() returns 0.
         if(unlikely(!circ_buff_prepare_write(buff, new_tmp_text_size))) goto skip_collect_and_drop_logs;

@@ -67,7 +67,7 @@ The following log collectors are supported at the moment. The table will be upda
 Netdata logs management introduces minimal additional package dependencies and those are actually [Fluent Bit dependencies](https://docs.fluentbit.io/manual/installation/requirements). The only extra build-time dependencies are:
 - `flex` 
 - `bison` 
-- `musl-fts-dev` (Alpine Linux only)
+- `musl-fts-dev` ([Alpine Linux](https://www.alpinelinux.org/about) only)
 
 However, there may be some exceptions to this rule as more collectors are added to the logs management engine, so if a specific collector is disabled due to missing dependencies, please refer to this section or check [Troubleshooting](#troubleshooting).
 
@@ -105,6 +105,7 @@ There are some fundamental configuration options that are common to all collecto
 | `enabled` | `no` 		| Whether this log source will be monitored or not.
 | `update every` 		| Equivalent value in `[logs management]` section of `netdata.conf` (or Netdata global value, if higher). | How often metrics in charts will be updated every (in seconds).
 | `update timeout` 		| Equivalent value in `[logs management]` section of `netdata.conf` (or Netdata global value, if higher). | Maximum timeout charts may be delayed by while waiting for new logs.
+| `use log timestamp` 	| Equivalent value in `[logs management]` section of `netdata.conf` (`auto` by default). | If set to `auto`, log timestamps (when available) will be used for precise metrics aggregation. Otherwise (if set to `no`), collection timestamps will be used instead (which may result in lagged metrics under heavy system load, but it will reduce CPU usage).
 | `log type` 			| `flb_generic`	| Type of this log collector, see [relevant table](#collector-types) for a complete list of supported collectors.
 | `circular buffer max size` | Equivalent value in `[logs management]` section of `netdata.conf`. | Maximum RAM that can be used to buffer collected logs until they are saved to the disk database.
 | `circular buffer drop logs if full` | Equivalent value in `[logs management]` section of `netdata.conf` (`no` by default). | If there are new logs pending to be collected and the circular buffer is full, enabling this setting will allow old buffered logs to be dropped in favor of new ones. If disabled, collection of new logs will be blocked until there is free space again in the buffer (no logs will be lost in this case, but logs will not be ingested in real-time).
@@ -136,9 +137,16 @@ Also, the `log path` configuration option must be defined per log source in `log
 
 </a>
 
-TODO
+This collector will collect logs from the kernel message log buffer. See also documentation of [Fluent Bit kmsg input plugin](https://docs.fluentbit.io/manual/pipeline/inputs/kernel-logs).
 
-NOTE / WARNING: `kmsg` timestamps will be wrong if system has been suspended and resumed.
+> **Warning**
+> If `use log timestamp` is set to `auto` and the system has been in suspend and resumed since the last boot, timestamps of new `kmsg` logs will be incorrect and log collection will not work. This is a know limitation when reading the kernel log buffer records and it is recommended to use `use log timestamp = no` in this scenario.
+
+|  Configuration Option | Description  |
+|      :------------:  	| ------------ |
+| `severity chart` | Enable chart showing Syslog Severity values of collected logs. Severity values are in the range of 0 to 7 inclusive.|
+| `subsystem chart` | Enable chart showing which subsystems generated the logs.|
+| `device chart` | Enable chart showing which devices generated the logs.|
 
 <a name="collector-configuration-systemd"/>
 

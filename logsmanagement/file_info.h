@@ -97,6 +97,7 @@ struct File_info {
     int compression_accel;                          /**< LZ4 compression acceleration factor for collected logs, see also: https://github.com/lz4/lz4/blob/90d68e37093d815e7ea06b0ee3c168cccffc84b8/lib/lz4.h#L195 **/
     int update_every;                               /**< Interval (in sec) of how often to collect and update charts **/
     int update_timeout;                             /**< Timeout to update charts after, since last update */
+    int use_log_timestamp;                          /**< Use log timestamps instead of collection timestamps, if available **/
     struct Chart_meta *chart_meta;
 
     /* Struct members related to disk database */
@@ -150,6 +151,7 @@ extern int g_logs_manag_update_every;               /**< Variable defining globa
 typedef struct {
     int update_every;
     int update_timeout;
+    int use_log_timestamp;
     int circ_buff_max_size_in_mib;
     int circ_buff_drop_logs;
     int compression_acceleration;

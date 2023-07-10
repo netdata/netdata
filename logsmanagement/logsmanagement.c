@@ -48,7 +48,6 @@ static struct config log_management_config = {
 
 struct File_infos_arr *p_file_infos_arr = NULL;
 
-// volatile sig_atomic_t p_file_infos_arr_ready = 0;
 
 static struct Chart_meta chart_types[] = {
     {.type = FLB_GENERIC,   .init = generic_chart_init,   .update = generic_chart_update},
@@ -63,6 +62,7 @@ static struct Chart_meta chart_types[] = {
 g_logs_manag_config_t g_logs_manag_config = {
     .update_every = 1,
     .update_timeout = UPDATE_TIMEOUT_DEFAULT,
+    .use_log_timestamp = CONFIG_BOOLEAN_AUTO,
     .circ_buff_max_size_in_mib = CIRCULAR_BUFF_DEFAULT_MAX_SIZE / (1 MiB),
     .circ_buff_drop_logs = CIRCULAR_BUFF_DEFAULT_DROP_LOGS,
     .compression_acceleration = COMPRESSION_ACCELERATION_DEFAULT,
@@ -221,6 +221,11 @@ static int logs_manag_config_load(Flb_socket_config_t **forward_in_config_p){
         g_logs_manag_config.update_timeout = g_logs_manag_config.update_every;
     collector_info("CONFIG: global logs management update_timeout: %d", g_logs_manag_config.update_timeout);
 
+    g_logs_manag_config.use_log_timestamp = config_get_boolean_ondemand(CONFIG_SECTION_LOGS_MANAGEMENT, 
+                                                                        "use log timestamp", 
+                                                                        g_logs_manag_config.use_log_timestamp);
+    collector_info("CONFIG: global logs management use_log_timestamp: %d", g_logs_manag_config.use_log_timestamp);
+
     g_logs_manag_config.circ_buff_max_size_in_mib = config_get_number(  CONFIG_SECTION_LOGS_MANAGEMENT, 
                                                                         "circular buffer max size MiB", 
                                                                         g_logs_manag_config.circ_buff_max_size_in_mib);
@@ -286,7 +291,7 @@ static int logs_manag_config_load(Flb_socket_config_t **forward_in_config_p){
                     g_logs_manag_config.enable_collected_logs_rate);
 
     *forward_in_config_p = (Flb_socket_config_t *) callocz(1, sizeof(Flb_socket_config_t));
-    const int fwd_enable = config_get_boolean(CONFIG_SECTION_LOGS_MANAGEMENT, "forward in enable", 0);
+    const int fwd_enable = config_get_boolean(CONFIG_SECTION_LOGS_MANAGEMENT, "forward in enable", CONFIG_BOOLEAN_NO);
     
     (*forward_in_config_p)->unix_path = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, "forward in unix path", FLB_FORWARD_UNIX_PATH_DEFAULT);
     collector_info("forward in unix path = %s", (*forward_in_config_p)->unix_path);
@@ -314,7 +319,7 @@ static int logs_manag_config_load(Flb_socket_config_t **forward_in_config_p){
                                                 "fluent bit log level", flb_srvc_config.log_level);
 
 
-    if(!fwd_enable) flb_socket_config_destroy((*forward_in_config_p));
+    // if(!fwd_enable) flb_socket_config_destroy((*forward_in_config_p));
 
     return rc;
 }
@@ -378,7 +383,7 @@ static void logs_management_init(uv_loop_t *main_loop,
     /* -------------------------------------------------------------------------
      * Check if this log source is enabled.
      * ------------------------------------------------------------------------- */
-    if(appconfig_get_boolean(&log_management_config, config_section->name, "enabled", 0)){
+    if(appconfig_get_boolean(&log_management_config, config_section->name, "enabled", CONFIG_BOOLEAN_NO)){
         collector_info("[%s]: enabled = yes", p_file_info->chart_name);
     } else {
         collector_info("[%s]: enabled = no", p_file_info->chart_name);
@@ -557,6 +562,16 @@ static void logs_management_init(uv_loop_t *main_loop,
 
 
     /* -------------------------------------------------------------------------
+     * Read "use log timestamp" configuration.
+     * ------------------------------------------------------------------------- */
+    p_file_info->use_log_timestamp = appconfig_get_boolean_ondemand(&log_management_config, config_section->name, 
+                                                                    "use log timestamp", 
+                                                                    g_logs_manag_config.use_log_timestamp);
+    collector_info("[%s]: use log timestamp = %s", p_file_info->chart_name, 
+                                                    p_file_info->use_log_timestamp ? "auto or yes" : "no");
+
+
+    /* -------------------------------------------------------------------------
      * Read compression acceleration configuration.
      * ------------------------------------------------------------------------- */
     p_file_info->compression_accel = appconfig_get_number(  &log_management_config, config_section->name, 
@@ -664,76 +679,76 @@ static void logs_management_init(uv_loop_t *main_loop,
         /* Check whether metrics verification during parsing is required */
         Web_log_parser_config_t *wblp_config = (Web_log_parser_config_t *) p_file_info->parser_config->gen_config;
         wblp_config->verify_parsed_logs = appconfig_get_boolean( &log_management_config, config_section->name, 
-                                                                    "verify parsed logs", 0);
+                                                                    "verify parsed logs", CONFIG_BOOLEAN_NO);
         collector_info("[%s]: verify parsed logs = %d", p_file_info->chart_name, wblp_config->verify_parsed_logs);
         
         for(int j = 0; j < wblp_config->num_fields; j++){
             if((wblp_config->fields[j] == VHOST_WITH_PORT || wblp_config->fields[j] == VHOST) 
-                && appconfig_get_boolean(&log_management_config, config_section->name, "vhosts chart", 0)){ 
+                && appconfig_get_boolean(&log_management_config, config_section->name, "vhosts chart", CONFIG_BOOLEAN_NO)){ 
                 p_file_info->parser_config->chart_config |= CHART_VHOST;
             }
             if((wblp_config->fields[j] == VHOST_WITH_PORT || wblp_config->fields[j] == PORT) 
-                && appconfig_get_boolean(&log_management_config, config_section->name, "ports chart", 0)){ 
+                && appconfig_get_boolean(&log_management_config, config_section->name, "ports chart", CONFIG_BOOLEAN_NO)){ 
                 p_file_info->parser_config->chart_config |= CHART_PORT;
             }
             if((wblp_config->fields[j] == REQ_CLIENT) 
-                && appconfig_get_boolean(&log_management_config, config_section->name, "IP versions chart", 0)){ 
+                && appconfig_get_boolean(&log_management_config, config_section->name, "IP versions chart", CONFIG_BOOLEAN_NO)){ 
                 p_file_info->parser_config->chart_config |= CHART_IP_VERSION;
             }
             if((wblp_config->fields[j] == REQ_CLIENT) 
-                && appconfig_get_boolean(&log_management_config, config_section->name, "unique client IPs - current poll chart", 0)){ 
+                && appconfig_get_boolean(&log_management_config, config_section->name, "unique client IPs - current poll chart", CONFIG_BOOLEAN_NO)){ 
                 p_file_info->parser_config->chart_config |= CHART_REQ_CLIENT_CURRENT;
             }
             if((wblp_config->fields[j] == REQ_CLIENT) 
-                && appconfig_get_boolean(&log_management_config, config_section->name, "unique client IPs - all-time chart", 0)){ 
+                && appconfig_get_boolean(&log_management_config, config_section->name, "unique client IPs - all-time chart", CONFIG_BOOLEAN_NO)){ 
                 p_file_info->parser_config->chart_config |= CHART_REQ_CLIENT_ALL_TIME;
             }
             if((wblp_config->fields[j] == REQ || wblp_config->fields[j] == REQ_METHOD) 
-                && appconfig_get_boolean(&log_management_config, config_section->name, "http request methods chart", 0)){ 
+                && appconfig_get_boolean(&log_management_config, config_section->name, "http request methods chart", CONFIG_BOOLEAN_NO)){ 
                 p_file_info->parser_config->chart_config |= CHART_REQ_METHODS;
             }
             if((wblp_config->fields[j] == REQ || wblp_config->fields[j] == REQ_PROTO) 
-                && appconfig_get_boolean(&log_management_config, config_section->name, "http protocol versions chart", 0)){ 
+                && appconfig_get_boolean(&log_management_config, config_section->name, "http protocol versions chart", CONFIG_BOOLEAN_NO)){ 
                 p_file_info->parser_config->chart_config |= CHART_REQ_PROTO;
             }
             if((wblp_config->fields[j] == REQ_SIZE || wblp_config->fields[j] == RESP_SIZE) 
-                && appconfig_get_boolean(&log_management_config, config_section->name, "bandwidth chart", 0)){ 
+                && appconfig_get_boolean(&log_management_config, config_section->name, "bandwidth chart", CONFIG_BOOLEAN_NO)){ 
                 p_file_info->parser_config->chart_config |= CHART_BANDWIDTH;
             }
             if((wblp_config->fields[j] == REQ_PROC_TIME) 
-                && appconfig_get_boolean(&log_management_config, config_section->name, "timings chart", 0)){ 
+                && appconfig_get_boolean(&log_management_config, config_section->name, "timings chart", CONFIG_BOOLEAN_NO)){ 
                 p_file_info->parser_config->chart_config |= CHART_REQ_PROC_TIME;
             }
             if((wblp_config->fields[j] == RESP_CODE) 
-                && appconfig_get_boolean(&log_management_config, config_section->name, "response code families chart", 0)){ 
+                && appconfig_get_boolean(&log_management_config, config_section->name, "response code families chart", CONFIG_BOOLEAN_NO)){ 
                 p_file_info->parser_config->chart_config |= CHART_RESP_CODE_FAMILY;
             }
             if((wblp_config->fields[j] == RESP_CODE) 
-                && appconfig_get_boolean(&log_management_config, config_section->name, "response codes chart", 0)){ 
+                && appconfig_get_boolean(&log_management_config, config_section->name, "response codes chart", CONFIG_BOOLEAN_NO)){ 
                 p_file_info->parser_config->chart_config |= CHART_RESP_CODE;
             }
             if((wblp_config->fields[j] == RESP_CODE) 
-                && appconfig_get_boolean(&log_management_config, config_section->name, "response code types chart", 0)){ 
+                && appconfig_get_boolean(&log_management_config, config_section->name, "response code types chart", CONFIG_BOOLEAN_NO)){ 
                 p_file_info->parser_config->chart_config |= CHART_RESP_CODE_TYPE;
             }
             if((wblp_config->fields[j] == SSL_PROTO) 
-                && appconfig_get_boolean(&log_management_config, config_section->name, "SSL protocols chart", 0)){ 
+                && appconfig_get_boolean(&log_management_config, config_section->name, "SSL protocols chart", CONFIG_BOOLEAN_NO)){ 
                 p_file_info->parser_config->chart_config |= CHART_SSL_PROTO;
             }
             if((wblp_config->fields[j] == SSL_CIPHER_SUITE) 
-                && appconfig_get_boolean(&log_management_config, config_section->name, "SSL chipher suites chart", 0)){ 
+                && appconfig_get_boolean(&log_management_config, config_section->name, "SSL chipher suites chart", CONFIG_BOOLEAN_NO)){ 
                 p_file_info->parser_config->chart_config |= CHART_SSL_CIPHER;
             }
         }
     }
     else if(p_file_info->log_type == FLB_KMSG){
-        if(appconfig_get_boolean(&log_management_config, config_section->name, "severity chart", 0)) {
+        if(appconfig_get_boolean(&log_management_config, config_section->name, "severity chart", CONFIG_BOOLEAN_NO)) {
             p_file_info->parser_config->chart_config |= CHART_SYSLOG_SEVER;
         }
-        if(appconfig_get_boolean(&log_management_config, config_section->name, "subsystem chart", 0)) {
+        if(appconfig_get_boolean(&log_management_config, config_section->name, "subsystem chart", CONFIG_BOOLEAN_NO)) {
             p_file_info->parser_config->chart_config |= CHART_KMSG_SUBSYSTEM;
         }
-        if(appconfig_get_boolean(&log_management_config, config_section->name, "device chart", 0)) {
+        if(appconfig_get_boolean(&log_management_config, config_section->name, "device chart", CONFIG_BOOLEAN_NO)) {
             p_file_info->parser_config->chart_config |= CHART_KMSG_DEVICE;
         }
     }
@@ -800,18 +815,18 @@ static void logs_management_init(uv_loop_t *main_loop,
 
             p_file_info->parser_config->gen_config = syslog_config;
         }
-        if(appconfig_get_boolean(&log_management_config, config_section->name, "priority value chart", 0)) {
+        if(appconfig_get_boolean(&log_management_config, config_section->name, "priority value chart", CONFIG_BOOLEAN_NO)) {
             p_file_info->parser_config->chart_config |= CHART_SYSLOG_PRIOR;
         }
-        if(appconfig_get_boolean(&log_management_config, config_section->name, "severity chart", 0)) {
+        if(appconfig_get_boolean(&log_management_config, config_section->name, "severity chart", CONFIG_BOOLEAN_NO)) {
             p_file_info->parser_config->chart_config |= CHART_SYSLOG_SEVER;
         }
-        if(appconfig_get_boolean(&log_management_config, config_section->name, "facility chart", 0)) {
+        if(appconfig_get_boolean(&log_management_config, config_section->name, "facility chart", CONFIG_BOOLEAN_NO)) {
             p_file_info->parser_config->chart_config |= CHART_SYSLOG_FACIL;
         }
     }
     else if(p_file_info->log_type == FLB_DOCKER_EV){
-        if(appconfig_get_boolean(&log_management_config, config_section->name, "event type chart", 0)) {
+        if(appconfig_get_boolean(&log_management_config, config_section->name, "event type chart", CONFIG_BOOLEAN_NO)) {
             p_file_info->parser_config->chart_config |= CHART_DOCKER_EV_TYPE;
         }
     }
@@ -922,7 +937,7 @@ static void logs_management_init(uv_loop_t *main_loop,
         char *cus_ignore_case_k = mallocz(snprintf(NULL, 0, "custom %d ignore case", MAX_CUS_CHARTS_PER_SOURCE) + 1);
         sprintf(cus_ignore_case_k, "custom %d ignore case", cus_off);
         int cus_ignore_case_v = appconfig_get_boolean(  &log_management_config, 
-                                                        config_section->name, cus_ignore_case_k, 1);
+                                                        config_section->name, cus_ignore_case_k, CONFIG_BOOLEAN_YES);
         debug(D_LOGS_MANAG, "cus case: (%s:%s)", cus_ignore_case_k, cus_ignore_case_v ? "yes" : "no");
         freez(cus_ignore_case_k); 
 
@@ -1193,8 +1208,6 @@ void *logsmanagement_main(void *ptr) {
     static uv_thread_t run_stress_test_queries_thread_id;
     uv_thread_create(&run_stress_test_queries_thread_id, run_stress_test_queries_thread, NULL);
 #endif  // LOGS_MANAGEMENT_STRESS_TEST
-
-    // p_file_infos_arr_ready = 1; // All good, inform other threads of ready state
 
     collector_info("logsmanagement_main() setup completed successfully");
 
