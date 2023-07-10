@@ -163,6 +163,15 @@ void registry_update_cloud_base_url() {
 int registry_request_hello_json(RRDHOST *host, struct web_client *w) {
     registry_json_header(host, w, "hello", REGISTRY_STATUS_OK);
 
+    if(host->node_id)
+        buffer_json_member_add_uuid(w->response.data, "node_id", host->node_id);
+
+    char *claim_id = get_agent_claimid();
+    if(claim_id) {
+        buffer_json_member_add_string(w->response.data, "claim_id", claim_id);
+        freez(claim_id);
+    }
+
     buffer_json_member_add_string(w->response.data, "registry", registry.registry_to_announce);
     buffer_json_member_add_string(w->response.data, "cloud_base_url", registry.cloud_base_url);
     buffer_json_member_add_boolean(w->response.data, "anonymous_statistics", netdata_anonymous_statistics_enabled);
@@ -172,6 +181,10 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w) {
     dfe_start_read(rrdhost_root_index, h) {
         buffer_json_add_array_item_object(w->response.data);
         buffer_json_member_add_string(w->response.data, "machine_guid", h->machine_guid);
+
+        if(h->node_id)
+            buffer_json_member_add_uuid(w->response.data, "node_id", h->node_id);
+
         buffer_json_member_add_string(w->response.data, "hostname", rrdhost_registry_hostname(h));
         buffer_json_object_close(w->response.data);
     }

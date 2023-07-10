@@ -4,7 +4,7 @@
 
 #include "ml/ml.h"
 
-#define HTTP_API_V2_VERSION 5
+#define HTTP_API_V2_VERSION 6
 
 const struct capability *aclk_get_agent_capas()
 {

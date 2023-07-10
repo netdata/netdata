@@ -199,6 +199,7 @@ struct web_client {
 };
 
 int web_client_permission_denied(struct web_client *w);
+int web_client_bearer_required(struct web_client *w);
 
 ssize_t web_client_send(struct web_client *w);
 ssize_t web_client_receive(struct web_client *w);

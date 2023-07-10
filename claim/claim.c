@@ -458,6 +458,7 @@ int api_v2_claim(struct web_client *w, char *url) {
     if(can_be_claimed)
         buffer_json_member_add_string(wb, "key_filename", netdata_random_session_id_get_filename());
 
+    buffer_json_agents_v2(wb, NULL, now_s, false, false);
     buffer_json_finalize(wb);
 
     return HTTP_RESP_OK;

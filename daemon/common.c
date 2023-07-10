@@ -182,8 +182,14 @@ CLOUD_STATUS buffer_json_cloud_status(BUFFER *wb, time_t now_s) {
             buffer_json_member_add_time_t(wb, "next_in", next_connect - now_s);
         }
 
-        if (status != CLOUD_STATUS_DISABLED && cloud_base_url())
+        if (cloud_base_url())
             buffer_json_member_add_string(wb, "url", cloud_base_url());
+
+        char *claim_id = get_agent_claimid();
+        if(claim_id) {
+            buffer_json_member_add_string(wb, "claim_id", claim_id);
+            freez(claim_id);
+        }
     }
     buffer_json_object_close(wb); // cloud
 

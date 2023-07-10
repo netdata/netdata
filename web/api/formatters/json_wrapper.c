@@ -1570,7 +1570,7 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
     }
     buffer_json_object_close(wb); // view
 
-    buffer_json_agents_array_v2(wb, &r->internal.qt->timings, 0, false);
+    buffer_json_agents_v2(wb, &r->internal.qt->timings, 0, false, true);
     buffer_json_cloud_timings(wb, "timings", &r->internal.qt->timings);
     buffer_json_finalize(wb);
 }
