@@ -956,17 +956,24 @@ void buffer_json_query_timings(BUFFER *wb, const char *key, struct query_timings
 
 void build_info_to_json_object(BUFFER *b);
 
-void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time_t now_s, bool info) {
+void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now_s, bool info, bool array) {
     if(!now_s)
         now_s = now_realtime_sec();
 
-    buffer_json_member_add_array(wb, "agents");
-    buffer_json_add_array_item_object(wb);
+    if(array) {
+        buffer_json_member_add_array(wb, "agents");
+        buffer_json_add_array_item_object(wb);
+    }
+    else
+        buffer_json_member_add_object(wb, "agent");
+
     buffer_json_member_add_string(wb, "mg", localhost->machine_guid);
     buffer_json_member_add_uuid(wb, "nd", localhost->node_id);
     buffer_json_member_add_string(wb, "nm", rrdhost_hostname(localhost));
     buffer_json_member_add_time_t(wb, "now", now_s);
-    buffer_json_member_add_uint64(wb, "ai", 0);
+
+    if(array)
+        buffer_json_member_add_uint64(wb, "ai", 0);
 
     if(info) {
         buffer_json_member_add_object(wb, "application");
@@ -1022,7 +1029,9 @@ void buffer_json_agents_array_v2(BUFFER *wb, struct query_timings *timings, time
         buffer_json_query_timings(wb, "timings", timings);
 
     buffer_json_object_close(wb);
-    buffer_json_array_close(wb);
+
+    if(array)
+        buffer_json_array_close(wb);
 }
 
 void buffer_json_cloud_timings(BUFFER *wb, const char *key, struct query_timings *timings) {
@@ -2050,7 +2059,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
             version_hashes_api_v2(wb, &ctl.versions);
 
         if (mode & CONTEXTS_V2_AGENTS)
-            buffer_json_agents_array_v2(wb, &ctl.timings, ctl.now, mode & (CONTEXTS_V2_AGENTS_INFO));
+            buffer_json_agents_v2(wb, &ctl.timings, ctl.now, mode & (CONTEXTS_V2_AGENTS_INFO), true);
     }
 
     buffer_json_cloud_timings(wb, "timings", &ctl.timings);

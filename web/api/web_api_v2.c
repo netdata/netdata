@@ -8,6 +8,24 @@ struct bearer_token {
     time_t expires_s;
 };
 
+static void bearer_token_cleanup(void) {
+    static time_t attempts = 0;
+
+    if(++attempts % 1000 != 0)
+        return;
+
+    time_t now_s = now_monotonic_sec();
+
+    struct bearer_token *z;
+    dfe_start_read(netdata_authorized_bearers, z) {
+        if(z->expires_s < now_s)
+            dictionary_del(netdata_authorized_bearers, z_dfe.name);
+    }
+    dfe_done(z);
+
+    dictionary_garbage_collect(netdata_authorized_bearers);
+}
+
 static void bearer_get_token(uuid_t *uuid) {
     static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
     static bool initialized = false;
@@ -34,6 +52,8 @@ static void bearer_get_token(uuid_t *uuid) {
         z->created_s = now_monotonic_sec();
         z->expires_s = z->created_s + 86400;
     }
+
+    bearer_token_cleanup();
 }
 
 #define HTTP_REQUEST_AUTHORIZATION_BEARER "\r\nAuthorization: Bearer "
@@ -75,7 +95,36 @@ bool api_check_bearer_token(struct web_client *w) {
     return z && z->expires_s > now_monotonic_sec();
 }
 
+static bool verify_agent_uuids(const char *machine_guid, const char *node_id, const char *claim_id) {
+    if(!machine_guid || !node_id || !claim_id)
+        return false;
+
+    if(strcmp(machine_guid, localhost->machine_guid) != 0)
+        return false;
+
+    char *agent_claim_id = get_agent_claimid();
+    if(!agent_claim_id || strcmp(claim_id, agent_claim_id) != 0)
+        return false;
+    freez(agent_claim_id);
+
+    if(!localhost->node_id)
+        return false;
+
+    char buf[UUID_STR_LEN];
+    uuid_unparse_lower(*localhost->node_id, buf);
+
+    if(strcmp(node_id, buf) != 0)
+        return false;
+
+    return true;
+}
+
 int api_v2_bearer_protection(RRDHOST *host __maybe_unused, struct web_client *w __maybe_unused, char *url) {
+    char *machine_guid = NULL;
+    char *claim_id = NULL;
+    char *node_id = NULL;
+    bool protection = netdata_is_protected_by_bearer;
+
     while (url) {
         char *value = strsep_skip_consecutive_separators(&url, "&");
         if (!value || !*value) continue;
@@ -86,11 +135,25 @@ int api_v2_bearer_protection(RRDHOST *host __maybe_unused, struct web_client *w 
 
         if(!strcmp(name, "bearer_protection")) {
             if(!strcmp(value, "on") || !strcmp(value, "true") || !strcmp(value, "yes"))
-                netdata_is_protected_by_bearer = true;
+                protection = true;
             else
-                netdata_is_protected_by_bearer = false;
+                protection = false;
         }
+        else if(!strcmp(name, "machine_guid"))
+            machine_guid = value;
+        else if(!strcmp(name, "claim_id"))
+            claim_id = value;
+        else if(!strcmp(name, "node_id"))
+            node_id = value;
     }
+
+    if(!verify_agent_uuids(machine_guid, node_id, claim_id)) {
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "The request is missing or not matching local UUIDs");
+        return HTTP_RESP_BAD_REQUEST;
+    }
+
+    netdata_is_protected_by_bearer = protection;
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
@@ -102,6 +165,32 @@ int api_v2_bearer_protection(RRDHOST *host __maybe_unused, struct web_client *w 
 }
 
 int api_v2_bearer_token(RRDHOST *host __maybe_unused, struct web_client *w __maybe_unused, char *url __maybe_unused) {
+    char *machine_guid = NULL;
+    char *claim_id = NULL;
+    char *node_id = NULL;
+
+    while(url) {
+        char *value = strsep_skip_consecutive_separators(&url, "&");
+        if (!value || !*value) continue;
+
+        char *name = strsep_skip_consecutive_separators(&value, "=");
+        if (!name || !*name) continue;
+        if (!value || !*value) continue;
+
+        if(!strcmp(name, "machine_guid"))
+            machine_guid = value;
+        else if(!strcmp(name, "claim_id"))
+            claim_id = value;
+        else if(!strcmp(name, "node_id"))
+            node_id = value;
+    }
+
+    if(!verify_agent_uuids(machine_guid, node_id, claim_id)) {
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "The request is missing or not matching local UUIDs");
+        return HTTP_RESP_BAD_REQUEST;
+    }
+
     uuid_t uuid;
     bearer_get_token(&uuid);
 
