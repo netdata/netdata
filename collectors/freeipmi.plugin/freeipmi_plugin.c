@@ -1023,7 +1023,7 @@ static void netdata_update_ipmi_sensor_reading(
 
         case IPMI_MONITORING_SENSOR_UNITS_RPM:
             t.dimension = "rotations";
-            t.context = "ipmi.fan_speed";
+            t.context = "ipmi.sensor_fan_speed";
             t.title = "IPMI Sensor Fans Speed";
             t.units = "RPM";
             t.family = "fans";
@@ -1043,7 +1043,7 @@ static void netdata_update_ipmi_sensor_reading(
 
         case IPMI_MONITORING_SENSOR_UNITS_PERCENT:
             t.dimension = "percentage";
-            t.context = "ipmi.sensor_percent";
+            t.context = "ipmi.sensor_reading_percent";
             t.title = "IPMI Sensor Reading Percentage";
             t.units = "%%";
             t.family = "other";
