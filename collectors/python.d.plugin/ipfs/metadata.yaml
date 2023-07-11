@@ -1,0 +1,42 @@
+module_name: ipfs
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: ipfs.bandwidth
+          description: IPFS Bandwidth
+          unit: "kilobits/s"
+          chart_type: line
+          dimensions:
+            - name: in
+            - name: out
+        - name: ipfs.peers
+          description: IPFS Peers
+          unit: "peers"
+          chart_type: line
+          dimensions:
+            - name: peers
+        - name: ipfs.repo_size
+          description: IPFS Repo Size
+          unit: "GiB"
+          chart_type: area
+          dimensions:
+            - name: avail
+            - name: size
+        - name: ipfs.repo_objects
+          description: IPFS Repo Objects
+          unit: "objects"
+          chart_type: line
+          dimensions:
+            - name: objects
+            - name: pinned
+            - name: recursive_pins

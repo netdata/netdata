@@ -1,0 +1,33 @@
+module_name: timex.plugin
+plugin_name: timex.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: system.clock_sync_state
+          description: System Clock Synchronization State
+          unit: "state"
+          chart_type: line
+          dimensions:
+            - name: state
+        - name: system.clock_status
+          description: System Clock Status
+          unit: "status"
+          chart_type: line
+          dimensions:
+            - name: unsync
+            - name: clockerr
+        - name: system.clock_sync_offset
+          description: Computed Time Offset Between Local System and Reference Clock
+          unit: "milliseconds"
+          chart_type: line
+          dimensions:
+            - name: offset

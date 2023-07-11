@@ -1,0 +1,41 @@
+module_name: puppet
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: puppet.jvm
+          description: JVM Heap
+          unit: "MiB"
+          chart_type: area
+          dimensions:
+            - name: committed
+            - name: used
+        - name: puppet.jvm
+          description: JVM Non-Heap
+          unit: "MiB"
+          chart_type: area
+          dimensions:
+            - name: committed
+            - name: used
+        - name: puppet.cpu
+          description: CPU usage
+          unit: "percentage"
+          chart_type: stacked
+          dimensions:
+            - name: execution
+            - name: GC
+        - name: puppet.fdopen
+          description: File Descriptors
+          unit: "descriptors"
+          chart_type: line
+          dimensions:
+            - name: used

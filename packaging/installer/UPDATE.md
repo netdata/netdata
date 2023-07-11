@@ -28,7 +28,7 @@ The exact update method to use depends on the install type:
 Starting with netdata v1.33.0, you can use Netdata itself to determine the installation type by running:
 
 ```bash
-netdata -W buildinfo | grep 'Install type:'
+netdata -W buildinfo | grep -E 'Installation Type|Install type:'
 ```
 
 If you are using an older version of Netdata, or the above command produces no output, you can run our one-line

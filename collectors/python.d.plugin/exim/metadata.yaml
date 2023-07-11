@@ -1,0 +1,20 @@
+module_name: exim
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: exim.qemails
+          description: Exim Queue Emails
+          unit: "emails"
+          chart_type: line
+          dimensions:
+            - name: emails

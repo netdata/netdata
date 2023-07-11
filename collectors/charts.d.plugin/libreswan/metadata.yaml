@@ -1,0 +1,27 @@
+module_name: libreswan
+plugin_name: charts.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: IPSEC tunnel
+      description: ""
+      labels: []
+      metrics:
+        - name: libreswan.net
+          description: LibreSWAN Tunnel ${name} Traffic
+          unit: "kilobits/s"
+          chart_type: area
+          dimensions:
+            - name: in
+            - name: out
+        - name: libreswan.uptime
+          description: LibreSWAN Tunnel ${name} Uptime
+          unit: "seconds"
+          chart_type: line
+          dimensions:
+            - name: uptime

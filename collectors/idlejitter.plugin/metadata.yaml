@@ -1,0 +1,22 @@
+module_name: idlejitter.plugin
+plugin_name: idlejitter.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: system.idlejitter
+          description: CPU Idle Jitter
+          unit: "microseconds lost/s"
+          chart_type: line
+          dimensions:
+            - name: min
+            - name: max
+            - name: average

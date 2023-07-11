@@ -1,0 +1,36 @@
+module_name: spigotmc
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: spigotmc.tps
+          description: Spigot Ticks Per Second
+          unit: "ticks"
+          chart_type: line
+          dimensions:
+            - name: 1 Minute Average
+            - name: 5 Minute Average
+            - name: 15 Minute Average
+        - name: spigotmc.users
+          description: Minecraft Users
+          unit: "users"
+          chart_type: area
+          dimensions:
+            - name: Users
+        - name: spigotmc.mem
+          description: Minecraft Memory Usage
+          unit: "MiB"
+          chart_type: line
+          dimensions:
+            - name: used
+            - name: allocated
+            - name: max

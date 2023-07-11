@@ -1,0 +1,57 @@
+module_name: go_expvar
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: expvar.memstats.heap
+          description: 'memory: size of heap memory structures'
+          unit: "KiB"
+          chart_type: line
+          dimensions:
+            - name: alloc
+            - name: inuse
+        - name: expvar.memstats.stack
+          description: 'memory: size of stack memory structures'
+          unit: "KiB"
+          chart_type: line
+          dimensions:
+            - name: inuse
+        - name: expvar.memstats.mspan
+          description: 'memory: size of mspan memory structures'
+          unit: "KiB"
+          chart_type: line
+          dimensions:
+            - name: inuse
+        - name: expvar.memstats.mcache
+          description: 'memory: size of mcache memory structures'
+          unit: "KiB"
+          chart_type: line
+          dimensions:
+            - name: inuse
+        - name: expvar.memstats.live_objects
+          description: 'memory: number of live objects'
+          unit: "objects"
+          chart_type: line
+          dimensions:
+            - name: live
+        - name: expvar.memstats.sys
+          description: 'memory: size of reserved virtual address space'
+          unit: "KiB"
+          chart_type: line
+          dimensions:
+            - name: sys
+        - name: expvar.memstats.gc_pauses
+          description: 'memory: average duration of GC pauses'
+          unit: "ns"
+          chart_type: line
+          dimensions:
+            - name: avg

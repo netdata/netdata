@@ -1,0 +1,66 @@
+module_name: cups.plugin
+plugin_name: cups.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: cups.dests_state
+          description: Destinations by state
+          unit: "dests"
+          chart_type: stacked
+          dimensions:
+            - name: idle
+            - name: printing
+            - name: stopped
+        - name: cups.dests_option
+          description: Destinations by option
+          unit: "dests"
+          chart_type: line
+          dimensions:
+            - name: total
+            - name: acceptingjobs
+            - name: shared
+        - name: cups.job_num
+          description: Active jobs
+          unit: "jobs"
+          chart_type: stacked
+          dimensions:
+            - name: pending
+            - name: held
+            - name: processing
+        - name: cups.job_size
+          description: Active jobs size
+          unit: "KB"
+          chart_type: stacked
+          dimensions:
+            - name: pending
+            - name: held
+            - name: processing
+    - name: destination
+      description: ""
+      labels: []
+      metrics:
+        - name: cups.destination_job_num
+          description: Active jobs of {destination}
+          unit: "jobs"
+          chart_type: stacked
+          dimensions:
+            - name: pending
+            - name: held
+            - name: processing
+        - name: cups.destination_job_size
+          description: Active jobs size of {destination}
+          unit: "KB"
+          chart_type: stacked
+          dimensions:
+            - name: pending
+            - name: held
+            - name: processing

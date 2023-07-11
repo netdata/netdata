@@ -1,0 +1,26 @@
+module_name: alarms
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: alarms.status
+          description: Alarms ({status mapping})
+          unit: "status"
+          chart_type: line
+          dimensions:
+            - name: a dimension per alarm
+        - name: alarms.status
+          description: Alarm Values
+          unit: "value"
+          chart_type: line
+          dimensions:
+            - name: a dimension per alarm

@@ -1,0 +1,64 @@
+module_name: openldap
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: openldap.total_connections
+          description: Total Connections
+          unit: "connections/s"
+          chart_type: line
+          dimensions:
+            - name: connections
+        - name: openldap.traffic_stats
+          description: Traffic
+          unit: "KiB/s"
+          chart_type: line
+          dimensions:
+            - name: sent
+        - name: openldap.operations_status
+          description: Operations Status
+          unit: "ops/s"
+          chart_type: line
+          dimensions:
+            - name: completed
+            - name: initiated
+        - name: openldap.referrals
+          description: Referrals
+          unit: "referrals/s"
+          chart_type: line
+          dimensions:
+            - name: sent
+        - name: openldap.entries
+          description: Entries
+          unit: "entries/s"
+          chart_type: line
+          dimensions:
+            - name: sent
+        - name: openldap.ldap_operations
+          description: Operations
+          unit: "ops/s"
+          chart_type: line
+          dimensions:
+            - name: bind
+            - name: search
+            - name: unbind
+            - name: add
+            - name: delete
+            - name: modify
+            - name: compare
+        - name: openldap.waiters
+          description: Waiters
+          unit: "waiters/s"
+          chart_type: line
+          dimensions:
+            - name: write
+            - name: read

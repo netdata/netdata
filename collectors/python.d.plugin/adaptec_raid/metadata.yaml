@@ -1,0 +1,43 @@
+module_name: adaptec_raid
+plugin_name: python.d.plugin
+alerts:
+  - name: adaptec_raid_ld_status
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/adaptec_raid.conf
+    metric: adaptec_raid.ld_status
+    info: logical device status is failed or degraded
+    os: "linux"
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: adaptec_raid.ld_status
+          description: 'Status of logical devices (1: Failed or Degraded)'
+          unit: "bool"
+          chart_type: line
+          dimensions:
+            - name: a dimension per logical device
+        - name: adaptec_raid.pd_state
+          description: 'State of physical devices (1: not Online)'
+          unit: "bool"
+          chart_type: line
+          dimensions:
+            - name: a dimension per physical device
+        - name: adaptec_raid.smart_warnings
+          description: S.M.A.R.T warnings
+          unit: "count"
+          chart_type: line
+          dimensions:
+            - name: a dimension per physical device
+        - name: adaptec_raid.temperature
+          description: Temperature
+          unit: "celsius"
+          chart_type: line
+          dimensions:
+            - name: a dimension per physical device
