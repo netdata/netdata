@@ -143,7 +143,7 @@ static void rrdcalctemplate_insert_callback(const DICTIONARY_ITEM *item __maybe_
     bool *added = added_bool;
     *added = true;
 
-    debug(D_HEALTH, "Health configuration adding template '%s'"
+    netdata_log_debug(D_HEALTH, "Health configuration adding template '%s'"
                     ": context '%s'"
                     ", exec '%s'"
                     ", recipient '%s'"

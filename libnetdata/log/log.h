@@ -109,11 +109,11 @@ typedef struct error_with_limit {
 #define error_limit_static_thread_var(var, log_every_secs, sleep_usecs) static __thread ERROR_LIMIT var = { .last_logged = 0, .count = 0, .log_every = (log_every_secs), .sleep_ut = (sleep_usecs) }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-#define debug(type, args...) do { if(unlikely(debug_flags & type)) debug_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
+#define netdata_log_debug(type, args...) do { if(unlikely(debug_flags & type)) debug_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #define internal_error(condition, args...) do { if(unlikely(condition)) error_int(0, "IERR", __FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #define internal_fatal(condition, args...) do { if(unlikely(condition)) fatal_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #else
-#define debug(type, args...) debug_dummy()
+#define netdata_log_debug(type, args...) debug_dummy()
 #define internal_error(args...) debug_dummy()
 #define internal_fatal(args...) debug_dummy()
 #endif

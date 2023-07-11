@@ -180,7 +180,7 @@ int aclk_handle_cloud_cmd_message(char *payload)
         return 1;
     }
 
-    debug(D_ACLK, "ACLK incoming 'cmd' message (%s)", payload);
+    netdata_log_debug(D_ACLK, "ACLK incoming 'cmd' message (%s)", payload);
 
     int rc = json_parse(payload, &cloud_to_agent, cloud_to_agent_parse);
 
@@ -250,7 +250,7 @@ int create_node_instance_result(const char *msg, size_t msg_len)
         return 1;
     }
 
-    debug(D_ACLK, "CreateNodeInstanceResult: guid:%s nodeid:%s", res.machine_guid, res.node_id);
+    netdata_log_debug(D_ACLK, "CreateNodeInstanceResult: guid:%s nodeid:%s", res.machine_guid, res.node_id);
 
     uuid_t host_id, node_id;
     if (uuid_parse(res.machine_guid, host_id)) {
@@ -529,7 +529,7 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
         ACLK_STATS_UNLOCK;
     }
     new_cloud_rx_msg_t *msg_descriptor = find_rx_handler_by_hash(simple_hash(message_type));
-    debug(D_ACLK, "Got message named '%s' from cloud", message_type);
+    netdata_log_debug(D_ACLK, "Got message named '%s' from cloud", message_type);
     if (unlikely(!msg_descriptor)) {
         netdata_log_error("Do not know how to handle message of type '%s'. Ignoring", message_type);
         if (aclk_stats_enabled) {

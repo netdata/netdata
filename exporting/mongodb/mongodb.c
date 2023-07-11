@@ -329,7 +329,7 @@ void mongodb_connector_worker(void *instance_p)
             data_size += insert[i]->len;
         }
 
-        debug(
+        netdata_log_debug(
             D_EXPORTING,
             "EXPORTING: mongodb_insert(): destination = %s, database = %s, collection = %s, data size = %zu",
             instance->config.destination,

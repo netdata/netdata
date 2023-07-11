@@ -135,29 +135,29 @@ int __netdata_mutex_unlock(netdata_mutex_t *mutex) {
 
 int netdata_mutex_init_debug(const char *file __maybe_unused, const char *function __maybe_unused,
                              const unsigned long line __maybe_unused, netdata_mutex_t *mutex) {
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_init(%p) from %lu@%s, %s()", mutex, line, file, function);
+    netdata_log_debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_init(%p) from %lu@%s, %s()", mutex, line, file, function);
 
     int ret = __netdata_mutex_init(mutex);
 
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_init(%p) = %d, from %lu@%s, %s()", mutex, ret, line, file, function);
+   netdata_log_debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_init(%p) = %d, from %lu@%s, %s()", mutex, ret, line, file, function);
 
     return ret;
 }
 
 int netdata_mutex_destroy_debug(const char *file __maybe_unused, const char *function __maybe_unused,
                              const unsigned long line __maybe_unused, netdata_mutex_t *mutex) {
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_destroy(%p) from %lu@%s, %s()", mutex, line, file, function);
+    netdata_log_debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_destroy(%p) from %lu@%s, %s()", mutex, line, file, function);
 
     int ret = __netdata_mutex_destroy(mutex);
 
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_destroy(%p) = %d, from %lu@%s, %s()", mutex, ret, line, file, function);
+    netdata_log_debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_destroy(%p) = %d, from %lu@%s, %s()", mutex, ret, line, file, function);
 
     return ret;
 }
 
 int netdata_mutex_lock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
                              const unsigned long line __maybe_unused, netdata_mutex_t *mutex) {
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_lock(%p) from %lu@%s, %s()", mutex, line, file, function);
+    netdata_log_debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_lock(%p) from %lu@%s, %s()", mutex, line, file, function);
 
     usec_t start_s = now_monotonic_high_precision_usec();
     int ret = __netdata_mutex_lock(mutex);
@@ -167,14 +167,14 @@ int netdata_mutex_lock_debug(const char *file __maybe_unused, const char *functi
     (void)start_s;
     (void)end_s;
 
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_lock(%p) = %d in %llu usec, from %lu@%s, %s()", mutex, ret, end_s - start_s, line, file, function);
+    netdata_log_debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_lock(%p) = %d in %llu usec, from %lu@%s, %s()", mutex, ret, end_s - start_s, line, file, function);
 
     return ret;
 }
 
 int netdata_mutex_trylock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
                                 const unsigned long line __maybe_unused, netdata_mutex_t *mutex) {
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_trylock(%p) from %lu@%s, %s()", mutex, line, file, function);
+    netdata_log_debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_trylock(%p) from %lu@%s, %s()", mutex, line, file, function);
 
     usec_t start_s = now_monotonic_high_precision_usec();
     int ret = __netdata_mutex_trylock(mutex);
@@ -184,14 +184,14 @@ int netdata_mutex_trylock_debug(const char *file __maybe_unused, const char *fun
     (void)start_s;
     (void)end_s;
 
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_trylock(%p) = %d in %llu usec, from %lu@%s, %s()", mutex, ret, end_s - start_s, line, file, function);
+    netdata_log_debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_trylock(%p) = %d in %llu usec, from %lu@%s, %s()", mutex, ret, end_s - start_s, line, file, function);
 
     return ret;
 }
 
 int netdata_mutex_unlock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
                                const unsigned long line __maybe_unused, netdata_mutex_t *mutex) {
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_unlock(%p) from %lu@%s, %s()", mutex, line, file, function);
+    netdata_log_debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_unlock(%p) from %lu@%s, %s()", mutex, line, file, function);
 
     usec_t start_s = now_monotonic_high_precision_usec();
     int ret = __netdata_mutex_unlock(mutex);
@@ -201,7 +201,7 @@ int netdata_mutex_unlock_debug(const char *file __maybe_unused, const char *func
     (void)start_s;
     (void)end_s;
 
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_unlock(%p) = %d in %llu usec, from %lu@%s, %s()", mutex, ret, end_s - start_s, line, file, function);
+    netdata_log_debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_unlock(%p) = %d in %llu usec, from %lu@%s, %s()", mutex, ret, end_s - start_s, line, file, function);
 
     return ret;
 }

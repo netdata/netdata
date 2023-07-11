@@ -203,7 +203,7 @@ static inline void rrdpush_sender_add_host_variable_to_buffer(BUFFER *wb, const 
             , rrdvar2number(rva)
     );
 
-    debug(D_STREAM, "RRDVAR pushed HOST VARIABLE %s = " NETDATA_DOUBLE_FORMAT, rrdvar_name(rva), rrdvar2number(rva));
+    netdata_log_debug(D_STREAM, "RRDVAR pushed HOST VARIABLE %s = " NETDATA_DOUBLE_FORMAT, rrdvar_name(rva), rrdvar2number(rva));
 }
 
 void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQUIRED *rva) {
@@ -242,7 +242,7 @@ static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
         sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
         sender_thread_buffer_free();
 
-        debug(D_STREAM, "RRDVAR sent %d VARIABLES", ret);
+        netdata_log_debug(D_STREAM, "RRDVAR sent %d VARIABLES", ret);
     }
 }
 
@@ -752,7 +752,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
         netdata_log_error("STREAM %s [send to %s]: cannot enlarge the socket buffer.", rrdhost_hostname(host), s->connected_to);
 
     http[bytes] = '\0';
-    debug(D_STREAM, "Response to sender from far end: %s", http);
+    netdata_log_debug(D_STREAM, "Response to sender from far end: %s", http);
     if(!rrdpush_sender_validate_response(host, s, http, bytes))
         return false;
 
@@ -765,7 +765,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
 
     log_sender_capabilities(s);
 
-    debug(D_STREAM, "STREAM: Connected on fd %d...", s->rrdpush_sender_socket);
+    netdata_log_debug(D_STREAM, "STREAM: Connected on fd %d...", s->rrdpush_sender_socket);
 
     return true;
 }
@@ -824,7 +824,7 @@ static ssize_t attempt_to_send(struct sender_state *s) {
     sender_lock(s);
     char *chunk;
     size_t outstanding = cbuffer_next_unsafe(s->buffer, &chunk);
-    debug(D_STREAM, "STREAM: Sending data. Buffer r=%zu w=%zu s=%zu, next chunk=%zu", cb->read, cb->write, cb->size, outstanding);
+    netdata_log_debug(D_STREAM, "STREAM: Sending data. Buffer r=%zu w=%zu s=%zu, next chunk=%zu", cb->read, cb->write, cb->size, outstanding);
 
 #ifdef ENABLE_HTTPS
     if(SSL_connection(&s->ssl))
@@ -839,18 +839,18 @@ static ssize_t attempt_to_send(struct sender_state *s) {
         cbuffer_remove_unsafe(s->buffer, ret);
         s->sent_bytes_on_this_connection += ret;
         s->sent_bytes += ret;
-        debug(D_STREAM, "STREAM %s [send to %s]: Sent %zd bytes", rrdhost_hostname(s->host), s->connected_to, ret);
+        netdata_log_debug(D_STREAM, "STREAM %s [send to %s]: Sent %zd bytes", rrdhost_hostname(s->host), s->connected_to, ret);
     }
     else if (ret == -1 && (errno == EAGAIN || errno == EINTR || errno == EWOULDBLOCK))
-        debug(D_STREAM, "STREAM %s [send to %s]: unavailable after polling POLLOUT", rrdhost_hostname(s->host), s->connected_to);
+        netdata_log_debug(D_STREAM, "STREAM %s [send to %s]: unavailable after polling POLLOUT", rrdhost_hostname(s->host), s->connected_to);
     else if (ret == -1) {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR);
-        debug(D_STREAM, "STREAM: Send failed - closing socket...");
+        netdata_log_debug(D_STREAM, "STREAM: Send failed - closing socket...");
         netdata_log_error("STREAM %s [send to %s]: failed to send metrics - closing connection - we have sent %zu bytes on this connection.",  rrdhost_hostname(s->host), s->connected_to, s->sent_bytes_on_this_connection);
         rrdpush_sender_thread_close_socket(s->host);
     }
     else
-        debug(D_STREAM, "STREAM: send() returned 0 -> no error but no transmission");
+        netdata_log_debug(D_STREAM, "STREAM: send() returned 0 -> no error but no transmission");
 
     replication_recalculate_buffer_used_ratio_unsafe(s);
     sender_unlock(s);
@@ -1388,7 +1388,7 @@ void *rrdpush_sender_thread(void *ptr) {
 
         int poll_rc = poll(fds, 2, 1000);
 
-        debug(D_STREAM, "STREAM: poll() finished collector=%d socket=%d (current chunk %zu bytes)...",
+        netdata_log_debug(D_STREAM, "STREAM: poll() finished collector=%d socket=%d (current chunk %zu bytes)...",
               fds[Collector].revents, fds[Socket].revents, outstanding);
 
         if(unlikely(rrdhost_sender_should_exit(s)))
@@ -1403,7 +1403,7 @@ void *rrdpush_sender_thread(void *ptr) {
         // Spurious wake-ups without error - loop again
         if (poll_rc == 0 || ((poll_rc == -1) && (errno == EAGAIN || errno == EINTR))) {
             netdata_thread_testcancel();
-            debug(D_STREAM, "Spurious wakeup");
+            netdata_log_debug(D_STREAM, "Spurious wakeup");
             now_s = now_monotonic_sec();
             continue;
         }
@@ -1430,7 +1430,7 @@ void *rrdpush_sender_thread(void *ptr) {
         // If the collector woke us up then empty the pipe to remove the signal
         if (fds[Collector].revents & (POLLIN|POLLPRI)) {
             worker_is_busy(WORKER_SENDER_JOB_PIPE_READ);
-            debug(D_STREAM, "STREAM: Data added to send buffer (current buffer chunk %zu bytes)...", outstanding);
+            netdata_log_debug(D_STREAM, "STREAM: Data added to send buffer (current buffer chunk %zu bytes)...", outstanding);
 
             if (read(fds[Collector].fd, thread_data->pipe_buffer, pipe_buffer_size) == -1)
                 netdata_log_error("STREAM %s [send to %s]: cannot read from internal pipe.", rrdhost_hostname(s->host), s->connected_to);

@@ -245,7 +245,7 @@ void *pluginsd_main(void *ptr)
                 if (unlikely(!service_running(SERVICE_COLLECTORS)))
                     break;
 
-                debug(D_PLUGINSD, "examining file '%s'", file->d_name);
+                netdata_log_debug(D_PLUGINSD, "examining file '%s'", file->d_name);
 
                 if (unlikely(strcmp(file->d_name, ".") == 0 || strcmp(file->d_name, "..") == 0))
                     continue;
@@ -254,7 +254,7 @@ void *pluginsd_main(void *ptr)
                 if (unlikely(len <= (int)PLUGINSD_FILE_SUFFIX_LEN))
                     continue;
                 if (unlikely(strcmp(PLUGINSD_FILE_SUFFIX, &file->d_name[len - (int)PLUGINSD_FILE_SUFFIX_LEN]) != 0)) {
-                    debug(D_PLUGINSD, "file '%s' does not end in '%s'", file->d_name, PLUGINSD_FILE_SUFFIX);
+                    netdata_log_debug(D_PLUGINSD, "file '%s' does not end in '%s'", file->d_name, PLUGINSD_FILE_SUFFIX);
                     continue;
                 }
 
@@ -263,7 +263,7 @@ void *pluginsd_main(void *ptr)
                 int enabled = config_get_boolean(CONFIG_SECTION_PLUGINS, pluginname, automatic_run);
 
                 if (unlikely(!enabled)) {
-                    debug(D_PLUGINSD, "plugin '%s' is not enabled", file->d_name);
+                    netdata_log_debug(D_PLUGINSD, "plugin '%s' is not enabled", file->d_name);
                     continue;
                 }
 
@@ -274,7 +274,7 @@ void *pluginsd_main(void *ptr)
                         break;
 
                 if (likely(cd && plugin_is_running(cd))) {
-                    debug(D_PLUGINSD, "plugin '%s' is already running", cd->filename);
+                    netdata_log_debug(D_PLUGINSD, "plugin '%s' is already running", cd->filename);
                     continue;
                 }
 

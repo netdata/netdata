@@ -41,11 +41,11 @@ static struct web_client *web_client_create_on_fd(POLLINFO *pi) {
 
     int flag = 1;
     if(unlikely(web_client_check_tcp(w) && setsockopt(w->ifd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0))
-        debug(D_WEB_CLIENT, "%llu: failed to enable TCP_NODELAY on socket fd %d.", w->id, w->ifd);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: failed to enable TCP_NODELAY on socket fd %d.", w->id, w->ifd);
 
     flag = 1;
     if(unlikely(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0))
-        debug(D_WEB_CLIENT, "%llu: failed to enable SO_KEEPALIVE on socket fd %d.", w->id, w->ifd);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: failed to enable SO_KEEPALIVE on socket fd %d.", w->id, w->ifd);
 
     web_client_update_acl_matches(w);
     web_client_enable_wait_receive(w);
@@ -101,7 +101,7 @@ static void *web_server_file_add_callback(POLLINFO *pi, short int *events, void 
 
     worker_private->files_read++;
 
-    debug(D_WEB_CLIENT, "%llu: ADDED FILE READ ON FD %d", w->id, pi->fd);
+    netdata_log_debug(D_WEB_CLIENT, "%llu: ADDED FILE READ ON FD %d", w->id, pi->fd);
     *events = POLLIN;
     pi->data = w;
 
@@ -111,14 +111,14 @@ static void *web_server_file_add_callback(POLLINFO *pi, short int *events, void 
 
 static void web_server_file_del_callback(POLLINFO *pi) {
     struct web_client *w = (struct web_client *)pi->data;
-    debug(D_WEB_CLIENT, "%llu: RELEASE FILE READ ON FD %d", w->id, pi->fd);
+    netdata_log_debug(D_WEB_CLIENT, "%llu: RELEASE FILE READ ON FD %d", w->id, pi->fd);
 
     worker_is_busy(WORKER_JOB_DEL_FILE);
 
     w->pollinfo_filecopy_slot = 0;
 
     if(unlikely(!w->pollinfo_slot)) {
-        debug(D_WEB_CLIENT, "%llu: CROSS WEB CLIENT CLEANUP (iFD %d, oFD %d)", w->id, pi->fd, w->ofd);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: CROSS WEB CLIENT CLEANUP (iFD %d, oFD %d)", w->id, pi->fd, w->ofd);
         web_server_log_connection(w, "DISCONNECTED");
         web_client_request_done(w);
         web_client_release_to_cache(w);
@@ -137,18 +137,18 @@ static int web_server_file_read_callback(POLLINFO *pi, short int *events) {
     // if there is no POLLINFO linked to this, it means the client disconnected
     // stop the file reading too
     if(unlikely(!w->pollinfo_slot)) {
-        debug(D_WEB_CLIENT, "%llu: PREVENTED ATTEMPT TO READ FILE ON FD %d, ON CLOSED WEB CLIENT", w->id, pi->fd);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: PREVENTED ATTEMPT TO READ FILE ON FD %d, ON CLOSED WEB CLIENT", w->id, pi->fd);
         retval = -1;
         goto cleanup;
     }
 
     if(unlikely(w->mode != WEB_CLIENT_MODE_FILECOPY || w->ifd == w->ofd)) {
-        debug(D_WEB_CLIENT, "%llu: PREVENTED ATTEMPT TO READ FILE ON FD %d, ON NON-FILECOPY WEB CLIENT", w->id, pi->fd);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: PREVENTED ATTEMPT TO READ FILE ON FD %d, ON NON-FILECOPY WEB CLIENT", w->id, pi->fd);
         retval = -1;
         goto cleanup;
     }
 
-    debug(D_WEB_CLIENT, "%llu: READING FILE ON FD %d", w->id, pi->fd);
+    netdata_log_debug(D_WEB_CLIENT, "%llu: READING FILE ON FD %d", w->id, pi->fd);
 
     worker_private->file_reads++;
     ssize_t ret = unlikely(web_client_read_file(w));
@@ -157,12 +157,12 @@ static int web_server_file_read_callback(POLLINFO *pi, short int *events) {
         POLLJOB *p = pi->p;                                        // our POLLJOB
         POLLINFO *wpi = pollinfo_from_slot(p, w->pollinfo_slot);  // POLLINFO of the client socket
 
-        debug(D_WEB_CLIENT, "%llu: SIGNALING W TO SEND (iFD %d, oFD %d)", w->id, pi->fd, wpi->fd);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: SIGNALING W TO SEND (iFD %d, oFD %d)", w->id, pi->fd, wpi->fd);
         p->fds[wpi->slot].events |= POLLOUT;
     }
 
     if(unlikely(ret <= 0 || w->ifd == w->ofd)) {
-        debug(D_WEB_CLIENT, "%llu: DONE READING FILE ON FD %d", w->id, pi->fd);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: DONE READING FILE ON FD %d", w->id, pi->fd);
         retval = -1;
         goto cleanup;
     }
@@ -201,7 +201,7 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
 
     *events = POLLIN;
 
-    debug(D_WEB_CLIENT_ACCESS, "LISTENER on %d: new connection.", pi->fd);
+    netdata_log_debug(D_WEB_CLIENT_ACCESS, "LISTENER on %d: new connection.", pi->fd);
     struct web_client *w = web_client_create_on_fd(pi);
 
     if (!strncmp(pi->client_port, "UNIX", 4)) {
@@ -240,7 +240,7 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
     }
 #endif
 
-    debug(D_WEB_CLIENT, "%llu: ADDED CLIENT FD %d", w->id, pi->fd);
+    netdata_log_debug(D_WEB_CLIENT, "%llu: ADDED CLIENT FD %d", w->id, pi->fd);
 
 cleanup:
     worker_is_idle();
@@ -260,13 +260,13 @@ static void web_server_del_callback(POLLINFO *pi) {
         POLLINFO *fpi = pollinfo_from_slot(pi->p, w->pollinfo_filecopy_slot);  // POLLINFO of the client socket
         (void)fpi;
 
-        debug(D_WEB_CLIENT, "%llu: THE CLIENT WILL BE FRED BY READING FILE JOB ON FD %d", w->id, fpi->fd);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: THE CLIENT WILL BE FRED BY READING FILE JOB ON FD %d", w->id, fpi->fd);
     }
     else {
         if(web_client_flag_check(w, WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET))
             pi->flags |= POLLINFO_FLAG_DONT_CLOSE;
 
-        debug(D_WEB_CLIENT, "%llu: CLOSING CLIENT FD %d", w->id, pi->fd);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: CLOSING CLIENT FD %d", w->id, pi->fd);
         web_server_log_connection(w, "DISCONNECTED");
         web_client_request_done(w);
         web_client_release_to_cache(w);
@@ -289,7 +289,7 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
     bytes = web_client_receive(w);
 
     if (likely(bytes > 0)) {
-        debug(D_WEB_CLIENT, "%llu: processing received data on fd %d.", w->id, fd);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: processing received data on fd %d.", w->id, fd);
         worker_is_idle();
         worker_is_busy(WORKER_JOB_PROCESS);
         web_client_process_request(w);
@@ -300,11 +300,11 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
 
         else if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
             if(w->pollinfo_filecopy_slot == 0) {
-                debug(D_WEB_CLIENT, "%llu: FILECOPY DETECTED ON FD %d", w->id, pi->fd);
+                netdata_log_debug(D_WEB_CLIENT, "%llu: FILECOPY DETECTED ON FD %d", w->id, pi->fd);
 
                 if (unlikely(w->ifd != -1 && w->ifd != w->ofd && w->ifd != fd)) {
                     // add a new socket to poll_events, with the same
-                    debug(D_WEB_CLIENT, "%llu: CREATING FILECOPY SLOT ON FD %d", w->id, pi->fd);
+                    netdata_log_debug(D_WEB_CLIENT, "%llu: CREATING FILECOPY SLOT ON FD %d", w->id, pi->fd);
 
                     POLLINFO *fpi = poll_add_fd(
                                                 pi->p
@@ -366,7 +366,7 @@ static int web_server_snd_callback(POLLINFO *pi, short int *events) {
     struct web_client *w = (struct web_client *)pi->data;
     int fd = pi->fd;
 
-    debug(D_WEB_CLIENT, "%llu: sending data on fd %d.", w->id, fd);
+    netdata_log_debug(D_WEB_CLIENT, "%llu: sending data on fd %d.", w->id, fd);
 
     int ret = web_client_send(w);
 

@@ -216,7 +216,7 @@ char *strdup_client_description(int family, const char *protocol, const char *ip
 int create_listen_socket_unix(const char *path, int listen_backlog) {
     int sock;
 
-    debug(D_LISTENER, "LISTENER: UNIX creating new listening socket on path '%s'", path);
+    netdata_log_debug(D_LISTENER, "LISTENER: UNIX creating new listening socket on path '%s'", path);
 
     sock = socket(AF_UNIX, SOCK_STREAM, 0);
     if(sock < 0) {
@@ -253,14 +253,14 @@ int create_listen_socket_unix(const char *path, int listen_backlog) {
         return -1;
     }
 
-    debug(D_LISTENER, "LISTENER: Listening on UNIX path '%s'", path);
+    netdata_log_debug(D_LISTENER, "LISTENER: Listening on UNIX path '%s'", path);
     return sock;
 }
 
 int create_listen_socket4(int socktype, const char *ip, uint16_t port, int listen_backlog) {
     int sock;
 
-    debug(D_LISTENER, "LISTENER: IPv4 creating new listening socket on ip '%s' port %d, socktype %d", ip, port, socktype);
+    netdata_log_debug(D_LISTENER, "LISTENER: IPv4 creating new listening socket on ip '%s' port %d, socktype %d", ip, port, socktype);
 
     sock = socket(AF_INET, socktype, 0);
     if(sock < 0) {
@@ -297,7 +297,7 @@ int create_listen_socket4(int socktype, const char *ip, uint16_t port, int liste
         return -1;
     }
 
-    debug(D_LISTENER, "LISTENER: Listening on IPv4 ip '%s' port %d, socktype %d", ip, port, socktype);
+    netdata_log_debug(D_LISTENER, "LISTENER: Listening on IPv4 ip '%s' port %d, socktype %d", ip, port, socktype);
     return sock;
 }
 
@@ -305,7 +305,7 @@ int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip, int p
     int sock;
     int ipv6only = 1;
 
-    debug(D_LISTENER, "LISTENER: IPv6 creating new listening socket on ip '%s' port %d, socktype %d", ip, port, socktype);
+    netdata_log_debug(D_LISTENER, "LISTENER: IPv6 creating new listening socket on ip '%s' port %d, socktype %d", ip, port, socktype);
 
     sock = socket(AF_INET6, socktype, 0);
     if (sock < 0) {
@@ -349,7 +349,7 @@ int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip, int p
         return -1;
     }
 
-    debug(D_LISTENER, "LISTENER: Listening on IPv6 ip '%s' port %d, socktype %d", ip, port, socktype);
+    netdata_log_debug(D_LISTENER, "LISTENER: Listening on IPv6 ip '%s' port %d, socktype %d", ip, port, socktype);
     return sock;
 }
 
@@ -603,7 +603,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
             }
 
             default:
-                debug(D_LISTENER, "LISTENER: Unknown socket family %d", family);
+                netdata_log_debug(D_LISTENER, "LISTENER: Unknown socket family %d", family);
                 break;
         }
 
@@ -635,7 +635,7 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
     }
     else sockets->default_port = (uint16_t)new_port;
 
-    debug(D_OPTIONS, "LISTENER: Default listen port set to %d.", sockets->default_port);
+    netdata_log_debug(D_OPTIONS, "LISTENER: Default listen port set to %d.", sockets->default_port);
 
     char *s = appconfig_get(sockets->config, sockets->config_section, "bind to", sockets->default_bind_to);
     while(*s) {
@@ -697,7 +697,7 @@ static inline int connect_to_unix(const char *path, struct timeval *timeout) {
         return -1;
     }
 
-    debug(D_CONNECT_TO, "Connected to UNIX socket on path '%s'.", path);
+    netdata_log_debug(D_CONNECT_TO, "Connected to UNIX socket on path '%s'.", path);
 
     return fd;
 }
@@ -748,7 +748,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
                     sizeof(servBfr),
                     NI_NUMERICHOST | NI_NUMERICSERV);
 
-        debug(D_CONNECT_TO, "Address info: host = '%s', service = '%s', ai_flags = 0x%02X, ai_family = %d (PF_INET = %d, PF_INET6 = %d), ai_socktype = %d (SOCK_STREAM = %d, SOCK_DGRAM = %d), ai_protocol = %d (IPPROTO_TCP = %d, IPPROTO_UDP = %d), ai_addrlen = %lu (sockaddr_in = %lu, sockaddr_in6 = %lu)",
+        netdata_log_debug(D_CONNECT_TO, "Address info: host = '%s', service = '%s', ai_flags = 0x%02X, ai_family = %d (PF_INET = %d, PF_INET6 = %d), ai_socktype = %d (SOCK_STREAM = %d, SOCK_DGRAM = %d), ai_protocol = %d (IPPROTO_TCP = %d, IPPROTO_UDP = %d), ai_addrlen = %lu (sockaddr_in = %lu, sockaddr_in6 = %lu)",
               hostBfr,
               servBfr,
               (unsigned int)ai->ai_flags,
@@ -770,7 +770,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
                 struct sockaddr_in *pSadrIn = (struct sockaddr_in *)ai->ai_addr;
                 (void)pSadrIn;
 
-                debug(D_CONNECT_TO, "ai_addr = sin_family: %d (AF_INET = %d, AF_INET6 = %d), sin_addr: '%s', sin_port: '%s'",
+                netdata_log_debug(D_CONNECT_TO, "ai_addr = sin_family: %d (AF_INET = %d, AF_INET6 = %d), sin_addr: '%s', sin_port: '%s'",
                       pSadrIn->sin_family,
                       AF_INET,
                       AF_INET6,
@@ -783,7 +783,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
                 struct sockaddr_in6 *pSadrIn6 = (struct sockaddr_in6 *) ai->ai_addr;
                 (void)pSadrIn6;
 
-                debug(D_CONNECT_TO,"ai_addr = sin6_family: %d (AF_INET = %d, AF_INET6 = %d), sin6_addr: '%s', sin6_port: '%s', sin6_flowinfo: %u, sin6_scope_id: %u",
+                netdata_log_debug(D_CONNECT_TO,"ai_addr = sin6_family: %d (AF_INET = %d, AF_INET6 = %d), sin6_addr: '%s', sin6_port: '%s', sin6_flowinfo: %u, sin6_scope_id: %u",
                       pSadrIn6->sin6_family,
                       AF_INET,
                       AF_INET6,
@@ -795,7 +795,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
             }
 
             default: {
-                debug(D_CONNECT_TO, "Unknown protocol family %d.", ai->ai_family);
+                netdata_log_debug(D_CONNECT_TO, "Unknown protocol family %d.", ai->ai_family);
                 continue;
             }
         }
@@ -854,7 +854,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
             }
 
             if(fd != -1)
-                debug(D_CONNECT_TO, "Connected to '%s' on port '%s'.", hostBfr, servBfr);
+                netdata_log_debug(D_CONNECT_TO, "Connected to '%s' on port '%s'.", hostBfr, servBfr);
         }
     }
 
@@ -930,7 +930,7 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
         service = e;
     }
 
-    debug(D_CONNECT_TO, "Attempting connection to host = '%s', service = '%s', interface = '%s', protocol = %d (tcp = %d, udp = %d)", host, service, interface, protocol, IPPROTO_TCP, IPPROTO_UDP);
+    netdata_log_debug(D_CONNECT_TO, "Attempting connection to host = '%s', service = '%s', interface = '%s', protocol = %d (tcp = %d, udp = %d)", host, service, interface, protocol, IPPROTO_TCP, IPPROTO_UDP);
 
     if(!*host) {
         netdata_log_error("Definition '%s' does not specify a host.", definition);
@@ -1189,7 +1189,7 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
 int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsize, SIMPLE_PATTERN *access_list,
                        const char *patname, int allow_dns)
 {
-    debug(D_LISTENER,"checking %s... (allow_dns=%d)", patname, allow_dns);
+    netdata_log_debug(D_LISTENER,"checking %s... (allow_dns=%d)", patname, allow_dns);
     if (!access_list)
         return 1;
     if (simple_pattern_matches(access_list, client_ip))
@@ -1231,7 +1231,7 @@ int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsi
                     inet_ntop(AF_INET6, &((struct sockaddr_in6*)(scan->ai_addr))->sin6_addr, address, INET6_ADDRSTRLEN);
                     break;
             }
-            debug(D_LISTENER, "Incoming ip %s rev-resolved onto %s, validating against forward-resolution %s",
+            netdata_log_debug(D_LISTENER, "Incoming ip %s rev-resolved onto %s, validating against forward-resolution %s",
                   client_ip, client_host, address);
             if (!strcmp(client_ip, address)) {
                 validated = 1;
@@ -1248,7 +1248,7 @@ int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsi
             freeaddrinfo(addr_infos);
     }
     if (!simple_pattern_matches(access_list, client_host)) {
-        debug(D_LISTENER, "Incoming connection on '%s' (%s) does not match allowed pattern for %s",
+        netdata_log_debug(D_LISTENER, "Incoming connection on '%s' (%s) does not match allowed pattern for %s",
               client_ip, client_host, patname);
         return 0;
     }
@@ -1284,26 +1284,26 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
 
         switch (((struct sockaddr *)&sadr)->sa_family) {
             case AF_UNIX:
-                debug(D_LISTENER, "New UNIX domain web client from %s on socket %d.", client_ip, fd);
+                netdata_log_debug(D_LISTENER, "New UNIX domain web client from %s on socket %d.", client_ip, fd);
                 // set the port - certain versions of libc return garbage on unix sockets
                 strncpyz(client_port, "UNIX", portsize);
                 break;
 
             case AF_INET:
-                debug(D_LISTENER, "New IPv4 web client from %s port %s on socket %d.", client_ip, client_port, fd);
+                netdata_log_debug(D_LISTENER, "New IPv4 web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 break;
 
             case AF_INET6:
                 if (strncmp(client_ip, "::ffff:", 7) == 0) {
                     memmove(client_ip, &client_ip[7], strlen(&client_ip[7]) + 1);
-                    debug(D_LISTENER, "New IPv4 web client from %s port %s on socket %d.", client_ip, client_port, fd);
+                    netdata_log_debug(D_LISTENER, "New IPv4 web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 }
                 else
-                    debug(D_LISTENER, "New IPv6 web client from %s port %s on socket %d.", client_ip, client_port, fd);
+                    netdata_log_debug(D_LISTENER, "New IPv6 web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 break;
 
             default:
-                debug(D_LISTENER, "New UNKNOWN web client from %s port %s on socket %d.", client_ip, client_port, fd);
+                netdata_log_debug(D_LISTENER, "New UNKNOWN web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 break;
         }
         if (!connection_allowed(nfd, client_ip, client_host, hostsize, access_list, "connection", allow_dns)) {
@@ -1344,7 +1344,7 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
                              , int   (*snd_callback)(POLLINFO * /*pi*/, short int * /*events*/)
                              , void *data
 ) {
-    debug(D_POLLFD, "POLLFD: ADD: request to add fd %d, slots = %zu, used = %zu, min = %zu, max = %zu, next free = %zd", fd, p->slots, p->used, p->min, p->max, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
+    netdata_log_debug(D_POLLFD, "POLLFD: ADD: request to add fd %d, slots = %zu, used = %zu, min = %zu, max = %zu, next free = %zd", fd, p->slots, p->used, p->min, p->max, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
 
     if(unlikely(fd < 0)) return NULL;
 
@@ -1356,7 +1356,7 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
 
     if(unlikely(!p->first_free)) {
         size_t new_slots = p->slots + POLL_FDS_INCREASE_STEP;
-        debug(D_POLLFD, "POLLFD: ADD: increasing size (current = %zu, new = %zu, used = %zu, min = %zu, max = %zu)", p->slots, new_slots, p->used, p->min, p->max);
+        netdata_log_debug(D_POLLFD, "POLLFD: ADD: increasing size (current = %zu, new = %zu, used = %zu, min = %zu, max = %zu)", p->slots, new_slots, p->used, p->min, p->max);
 
         p->fds = reallocz(p->fds, sizeof(struct pollfd) * new_slots);
         p->inf = reallocz(p->inf, sizeof(POLLINFO) * new_slots);
@@ -1364,7 +1364,7 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
         // reset all the newly added slots
         ssize_t i;
         for(i = new_slots - 1; i >= (ssize_t)p->slots ; i--) {
-            debug(D_POLLFD, "POLLFD: ADD: resetting new slot %zd", i);
+            netdata_log_debug(D_POLLFD, "POLLFD: ADD: resetting new slot %zd", i);
             p->fds[i].fd = -1;
             p->fds[i].events = 0;
             p->fds[i].revents = 0;
@@ -1395,7 +1395,7 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
     POLLINFO *pi = p->first_free;
     p->first_free = p->first_free->next;
 
-    debug(D_POLLFD, "POLLFD: ADD: selected slot %zu, next free is %zd", pi->slot, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
+    netdata_log_debug(D_POLLFD, "POLLFD: ADD: selected slot %zu, next free is %zd", pi->slot, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
 
     struct pollfd *pf = &p->fds[pi->slot];
     pf->fd = fd;
@@ -1437,7 +1437,7 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
     }
     netdata_thread_enable_cancelability();
 
-    debug(D_POLLFD, "POLLFD: ADD: completed, slots = %zu, used = %zu, min = %zu, max = %zu, next free = %zd", p->slots, p->used, p->min, p->max, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
+    netdata_log_debug(D_POLLFD, "POLLFD: ADD: completed, slots = %zu, used = %zu, min = %zu, max = %zu, next free = %zd", p->slots, p->used, p->min, p->max, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
 
     return pi;
 }
@@ -1446,7 +1446,7 @@ inline void poll_close_fd(POLLINFO *pi) {
     POLLJOB *p = pi->p;
 
     struct pollfd *pf = &p->fds[pi->slot];
-    debug(D_POLLFD, "POLLFD: DEL: request to clear slot %zu (fd %d), old next free was %zd", pi->slot, pf->fd, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
+    netdata_log_debug(D_POLLFD, "POLLFD: DEL: request to clear slot %zu (fd %d), old next free was %zd", pi->slot, pf->fd, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
 
     if(unlikely(pf->fd == -1)) return;
 
@@ -1499,7 +1499,7 @@ inline void poll_close_fd(POLLINFO *pi) {
     }
     netdata_thread_enable_cancelability();
 
-    debug(D_POLLFD, "POLLFD: DEL: completed, slots = %zu, used = %zu, min = %zu, max = %zu, next free = %zd", p->slots, p->used, p->min, p->max, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
+    netdata_log_debug(D_POLLFD, "POLLFD: DEL: completed, slots = %zu, used = %zu, min = %zu, max = %zu, next free = %zd", p->slots, p->used, p->min, p->max, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
 }
 
 void *poll_default_add_callback(POLLINFO *pi, short int *events, void *data) {
@@ -1586,7 +1586,7 @@ static inline int poll_process_send(POLLJOB *p, POLLINFO *pi, struct pollfd *pf,
     pi->last_sent_t = now;
     pi->send_count++;
 
-    debug(D_POLLFD, "POLLFD: LISTENER: sending data to socket on slot %zu (fd %d)", pi->slot, pf->fd);
+    netdata_log_debug(D_POLLFD, "POLLFD: LISTENER: sending data to socket on slot %zu (fd %d)", pi->slot, pf->fd);
 
     pf->events = 0;
 
@@ -1607,7 +1607,7 @@ static inline int poll_process_tcp_read(POLLJOB *p, POLLINFO *pi, struct pollfd 
     pi->last_received_t = now;
     pi->recv_count++;
 
-    debug(D_POLLFD, "POLLFD: LISTENER: reading data from TCP client slot %zu (fd %d)", pi->slot, pf->fd);
+    netdata_log_debug(D_POLLFD, "POLLFD: LISTENER: reading data from TCP client slot %zu (fd %d)", pi->slot, pf->fd);
 
     pf->events = 0;
 
@@ -1628,7 +1628,7 @@ static inline int poll_process_udp_read(POLLINFO *pi, struct pollfd *pf, time_t 
     pi->last_received_t = now;
     pi->recv_count++;
 
-    debug(D_POLLFD, "POLLFD: LISTENER: reading data from UDP slot %zu (fd %d)", pi->slot, pf->fd);
+    netdata_log_debug(D_POLLFD, "POLLFD: LISTENER: reading data from UDP slot %zu (fd %d)", pi->slot, pf->fd);
 
     // TODO: access_list is not applied to UDP
     // but checking the access list on every UDP packet will destroy
@@ -1648,13 +1648,13 @@ static int poll_process_new_tcp_connection(POLLJOB *p, POLLINFO *pi, struct poll
     pi->last_received_t = now;
     pi->recv_count++;
 
-    debug(D_POLLFD, "POLLFD: LISTENER: accepting connections from slot %zu (fd %d)", pi->slot, pf->fd);
+    netdata_log_debug(D_POLLFD, "POLLFD: LISTENER: accepting connections from slot %zu (fd %d)", pi->slot, pf->fd);
 
     char client_ip[INET6_ADDRSTRLEN] = "";
     char client_port[NI_MAXSERV] = "";
     char client_host[NI_MAXHOST] = "";
 
-    debug(D_POLLFD, "POLLFD: LISTENER: calling accept4() slot %zu (fd %d)", pi->slot, pf->fd);
+    netdata_log_debug(D_POLLFD, "POLLFD: LISTENER: calling accept4() slot %zu (fd %d)", pi->slot, pf->fd);
 
     int nfd = accept_socket(
         pf->fd,SOCK_NONBLOCK,
@@ -1665,7 +1665,7 @@ static int poll_process_new_tcp_connection(POLLJOB *p, POLLINFO *pi, struct poll
     if (unlikely(nfd < 0)) {
         // accept failed
 
-        debug(D_POLLFD, "POLLFD: LISTENER: accept4() slot %zu (fd %d) failed.", pi->slot, pf->fd);
+        netdata_log_debug(D_POLLFD, "POLLFD: LISTENER: accept4() slot %zu (fd %d) failed.", pi->slot, pf->fd);
 
         if(unlikely(errno == EMFILE)) {
             error_limit_static_global_var(erl, 10, 1000);
@@ -1797,7 +1797,7 @@ void poll_events(LISTEN_SOCKETS *sockets
             now_usec = now_boottime_usec();
 
             if(unlikely(timer_usec && now_usec >= next_timer_usec)) {
-                debug(D_POLLFD, "Calling timer callback after %zu usec", (size_t)(now_usec - last_timer_usec));
+                netdata_log_debug(D_POLLFD, "Calling timer callback after %zu usec", (size_t)(now_usec - last_timer_usec));
                 last_timer_usec = now_usec;
                 p.tmr_callback(p.timer_data);
                 now_usec = now_boottime_usec();
@@ -1822,7 +1822,7 @@ void poll_events(LISTEN_SOCKETS *sockets
             }
         }
 
-        debug(D_POLLFD, "POLLFD: LISTENER: Waiting on %zu sockets for %zu ms...", p.max + 1, (size_t)timeout_ms);
+        netdata_log_debug(D_POLLFD, "POLLFD: LISTENER: Waiting on %zu sockets for %zu ms...", p.max + 1, (size_t)timeout_ms);
         retval = poll(p.fds, p.max + 1, timeout_ms);
         time_t now = now_boottime_sec();
 
@@ -1831,7 +1831,7 @@ void poll_events(LISTEN_SOCKETS *sockets
             break;
         }
         else if(unlikely(!retval)) {
-            debug(D_POLLFD, "POLLFD: LISTENER: poll() timeout.");
+            netdata_log_debug(D_POLLFD, "POLLFD: LISTENER: poll() timeout.");
         }
         else {
             POLLINFO *pi;
@@ -1987,5 +1987,5 @@ void poll_events(LISTEN_SOCKETS *sockets
     }
 
     netdata_thread_cleanup_pop(1);
-    debug(D_POLLFD, "POLLFD: LISTENER: cleanup completed");
+    netdata_log_debug(D_POLLFD, "POLLFD: LISTENER: cleanup completed");
 }

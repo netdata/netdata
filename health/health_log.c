@@ -37,7 +37,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     int delay,
     HEALTH_ENTRY_FLAGS flags
 ) {
-    debug(D_HEALTH, "Health adding alarm log entry with id: %u", host->health_log.next_log_id);
+    netdata_log_debug(D_HEALTH, "Health adding alarm log entry with id: %u", host->health_log.next_log_id);
 
     ALARM_ENTRY *ae = callocz(1, sizeof(ALARM_ENTRY));
     ae->name = string_dup(name);
@@ -89,7 +89,7 @@ inline void health_alarm_log_add_entry(
         RRDHOST *host,
         ALARM_ENTRY *ae
 ) {
-    debug(D_HEALTH, "Health adding alarm log entry with id: %u", ae->unique_id);
+    netdata_log_debug(D_HEALTH, "Health adding alarm log entry with id: %u", ae->unique_id);
 
     __atomic_add_fetch(&host->health_transitions, 1, __ATOMIC_RELAXED);
 

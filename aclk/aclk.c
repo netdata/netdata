@@ -110,7 +110,7 @@ static int load_private_key()
         netdata_log_error("Claimed agent cannot establish ACLK - unable to load private key '%s' failed.", filename);
         return 1;
     }
-    debug(D_ACLK, "Claimed agent loaded private key len=%ld bytes", bytes_read);
+    netdata_log_debug(D_ACLK, "Claimed agent loaded private key len=%ld bytes", bytes_read);
 
     BIO *key_bio = BIO_new_mem_buf(private_key, -1);
     if (key_bio==NULL) {
@@ -240,7 +240,7 @@ void aclk_mqtt_wss_log_cb(mqtt_wss_log_type_t log_type, const char* str)
             netdata_log_info("%s", str);
             return;
         case MQTT_WSS_LOG_DEBUG:
-            debug(D_ACLK, "%s", str);
+            netdata_log_debug(D_ACLK, "%s", str);
             return;
         default:
             netdata_log_error("Unknown log type from mqtt_wss");
@@ -252,7 +252,7 @@ static void msg_callback(const char *topic, const void *msg, size_t msglen, int 
     UNUSED(qos);
     aclk_rcvd_cloud_msgs++;
 
-    debug(D_ACLK, "Got Message From Broker Topic \"%s\" QOS %d", topic, qos);
+    netdata_log_debug(D_ACLK, "Got Message From Broker Topic \"%s\" QOS %d", topic, qos);
 
     if (aclk_shared_state.mqtt_shutdown_msg_id > 0) {
         netdata_log_error("Link is shutting down. Ignoring incoming message.");

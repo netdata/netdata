@@ -254,7 +254,7 @@ static void service_main_cleanup(void *ptr)
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    debug(D_SYSTEM, "Cleaning up...");
+    netdata_log_debug(D_SYSTEM, "Cleaning up...");
     worker_unregister();
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
@@ -290,7 +290,7 @@ void *service_main(void *ptr)
     heartbeat_init(&hb);
     usec_t step = USEC_PER_SEC * SERVICE_HEARTBEAT;
 
-    debug(D_SYSTEM, "Service thread starts");
+    netdata_log_debug(D_SYSTEM, "Service thread starts");
 
     while (service_running(SERVICE_MAINTENANCE)) {
         worker_is_idle();
