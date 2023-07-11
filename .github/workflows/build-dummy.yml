@@ -1,0 +1,141 @@
+---
+# Ci code for building release artifacts.
+#
+# This workflow exists so we can require these checks to pass, but skip
+# them on PRs that have nothing to do with the source code.
+name: Build
+on:
+  pull_request: # PR checks only validate the build and generate artifacts for testing.
+    paths-ignore: # This MUST be kept in-sync with the paths-ignore key for the build-dummy.yml workflow.
+      - '**.c'
+      - '**.cc'
+      - '**.h'
+      - '**.hh'
+      - '**.in'
+      - '!netdata.spec.in'
+      - 'configure.ac'
+      - 'netdata-installer.sh'
+      - '**/Makefile*'
+      - 'Makefile*'
+      - '.github/workflows/build.yml'
+      - '.github/scripts/build-static.sh'
+      - '.github/scripts/get-static-cache-key.sh'
+      - '.github/scripts/gen-matrix-build.py'
+      - '.github/scripts/run-updater-check.sh'
+      - 'build/**'
+      - 'packaging/makeself/**'
+      - 'packaging/installer/**'
+      - 'aclk/aclk-schemas/'
+      - 'ml/dlib/'
+      - 'mqtt_websockets'
+      - 'web/server/h2o/libh2o'
+      - '!**.md'
+concurrency: # This keeps multiple instances of the job from running concurrently for the same ref and event type.
+  group: build-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+jobs:
+  build-dist: # Build the distribution tarball and store it as an artifact.
+    name: Build Distribution Tarball
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'NOT REQUIRED'
+
+  build-static: # Build the static binary archives, and store them as artifacts.
+    name: Build Static
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch:
+          - x86_64
+          - armv7l
+          - aarch64
+          - ppc64le
+    steps:
+      - run: echo 'NOT REQUIRED'
+
+  matrix: # Generate the shared build matrix for our build tests.
+    name: Prepare Build Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v3
+      - name: Prepare tools
+        id: prepare
+        run: |
+          sudo apt-get update && sudo apt-get install -y python3-ruamel.yaml
+      - name: Read build matrix
+        id: set-matrix
+        run: |
+          matrix="$(.github/scripts/gen-matrix-build.py)"
+          echo "Generated matrix: ${matrix}"
+          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
+
+  prepare-test-images: # Prepare the test environments for our build checks. This also checks dependency handling code for each tested environment.
+    name: Prepare Test Environments
+    runs-on: ubuntu-latest
+    needs:
+      - matrix
+    env:
+      RETRY_DELAY: 300
+    strategy:
+      # Unlike the actual build tests, this completes _very_ fast (average of about 3 minutes for each job), so we
+      # just run everything in parallel instead lof limiting job concurrency.
+      fail-fast: false
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+    steps:
+      - run: echo 'NOT REQUIRED'
+
+  source-build: # Test various source build arrangements.
+    name: Test Source Build
+    runs-on: ubuntu-latest
+    needs:
+      - matrix
+      - prepare-test-images
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+    steps:
+      - run: echo 'NOT REQUIRED'
+
+  updater-check: # Test the generated dist archive using the updater code.
+    name: Test Generated Distfile and Updater Code
+    runs-on: ubuntu-latest
+    needs:
+      - build-dist
+      - matrix
+      - prepare-test-images
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+    steps:
+      - run: echo 'NOT REQUIRED'
+
+  prepare-upload: # Consolidate the artifacts for uploading or releasing.
+    name: Prepare Artifacts
+    runs-on: ubuntu-latest
+    needs:
+      - build-dist
+      - build-static
+    steps:
+      - run: echo 'NOT REQUIRED'
+
+  artifact-verification-dist: # Verify the regular installer works with the consolidated artifacts.
+    name: Test Consolidated Artifacts (Source)
+    runs-on: ubuntu-latest
+    needs:
+      - prepare-upload
+    steps:
+      - run: echo 'NOT REQUIRED'
+
+  artifact-verification-static: # Verify the static installer works with the consolidated artifacts.
+    name: Test Consolidated Artifacts (Static)
+    runs-on: ubuntu-latest
+    needs:
+      - prepare-upload
+    steps:
+      - run: echo 'NOT REQUIRED'

@@ -67,7 +67,7 @@ Metrics:
 
 ### sensor
 
-These metrics refer to the VPN user.
+These metrics refer to the sensor.
 
 Labels:
 

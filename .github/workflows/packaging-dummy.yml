@@ -1,0 +1,81 @@
+---
+# Handles building of binary packages for the agent.
+#
+# This workflow exists so that we can make these required checks but
+# still skip running them on PRs where they are not relevant.
+name: Packages
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - labeled
+      - synchronize
+    paths-ignore: # This MUST be kept in-sync with the paths key for the packaging.yml workflow.
+      - '**.c'
+      - '**.cc'
+      - '**.h'
+      - '**.hh'
+      - '**.in'
+      - 'netdata.spec.in'
+      - 'configure.ac'
+      - '**/Makefile*'
+      - 'Makefile*'
+      - '.github/workflows/packaging.yml'
+      - '.github/scripts/gen-matrix-packaging.py'
+      - '.github/scripts/pkg-test.sh'
+      - 'build/**'
+      - 'packaging/*.sh'
+      - 'packaging/*.checksums'
+      - 'packaging/*.version'
+      - 'contrib/debian/**'
+      - 'aclk/aclk-schemas/'
+      - 'ml/dlib/'
+      - 'mqtt_websockets'
+      - 'web/server/h2o/libh2o'
+      - '!**.md'
+env:
+  DISABLE_TELEMETRY: 1
+  REPO_PREFIX: netdata/netdata
+concurrency:
+  group: packages-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+jobs:
+  matrix:
+    name: Prepare Build Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v3
+      - name: Prepare tools
+        id: prepare
+        run: |
+          sudo apt-get update && sudo apt-get install -y python3-ruamel.yaml
+      - name: Read build matrix
+        id: set-matrix
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ] && \
+             [ "${{ !contains(github.event.pull_request.labels.*.name, 'run-ci/packaging') }}" = "true" ]; then
+            matrix="$(.github/scripts/gen-matrix-packaging.py 1)"
+          else
+            matrix="$(.github/scripts/gen-matrix-packaging.py 0)"
+          fi
+          echo "Generated matrix: ${matrix}"
+          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    env:
+      DOCKER_CLI_EXPERIMENTAL: enabled
+    needs:
+      - matrix
+    strategy:
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+      fail-fast: false
+      max-parallel: 8
+    steps:
+      - run: echo 'NOT REQUIRED'

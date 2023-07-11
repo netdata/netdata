@@ -10026,15 +10026,8 @@ NETDATA.registry = {
     },
 
     access: function (max_redirects, callback) {
-        let name = NETDATA.registry.MASKED_DATA;
-        let url = NETDATA.registry.MASKED_DATA;
-
-        if (!NETDATA.registry.isUsingGlobalRegistry()) {
-            // If the user is using a private registry keep sending identifiable
-            // data.
-            name = NETDATA.registry.hostname;
-            url = NETDATA.serverDefault;
-        }
+        let name = NETDATA.registry.hostname;
+        let url = NETDATA.serverDefault;
 
         console.log("ACCESS", name, url);
 
