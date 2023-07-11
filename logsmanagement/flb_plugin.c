@@ -251,6 +251,7 @@ static void flb_complete_buff_item(struct File_info *p_file_info){
                             NULL, &p_file_info->parser_cus_config[i]->regex, 0);
     }
 
+    /* Update charts */
     p_file_info->chart_meta->update(p_file_info);
 
     circ_buff_insert(buff);

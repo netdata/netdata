@@ -274,23 +274,6 @@ IDLEJITTER_PLUGIN_FILES = \
     collectors/idlejitter.plugin/plugin_idlejitter.c \
     $(NULL)
 
-# if ENABLE_LOGSMANAGEMENT
-# LOGSMANAGEMENT_PLUGIN_FILES = \
-#     collectors/logsmanagement.plugin/plugin_logsmanagement.c \
-#     collectors/logsmanagement.plugin/plugin_logsmanagement.h \
-#     collectors/logsmanagement.plugin/plugin_logsmanagement_docker_ev.c \
-#     collectors/logsmanagement.plugin/plugin_logsmanagement_docker_ev.h \
-#     collectors/logsmanagement.plugin/plugin_logsmanagement_systemd.c \
-#     collectors/logsmanagement.plugin/plugin_logsmanagement_systemd.h \
-#     collectors/logsmanagement.plugin/plugin_logsmanagement_kernel.c \
-#     collectors/logsmanagement.plugin/plugin_logsmanagement_kernel.h \
-#     collectors/logsmanagement.plugin/plugin_logsmanagement_web_log.c \
-#     collectors/logsmanagement.plugin/plugin_logsmanagement_web_log.h \
-#     collectors/logsmanagement.plugin/plugin_logsmanagement_generic.c \
-#     collectors/logsmanagement.plugin/plugin_logsmanagement_generic.h \
-#     $(NULL)
-# endif
-
 CGROUPS_PLUGIN_FILES = \
     collectors/cgroups.plugin/sys_fs_cgroup.c \
     collectors/cgroups.plugin/sys_fs_cgroup.h \
@@ -1131,7 +1114,6 @@ NETDATA_FILES = \
     $(HEALTH_PLUGIN_FILES) \
     $(ML_FILES) \
     $(IDLEJITTER_PLUGIN_FILES) \
-    # $(LOGSMANAGEMENT_PLUGIN_FILES) \
     $(PLUGINSD_PLUGIN_FILES) \
     $(REGISTRY_PLUGIN_FILES) \
     $(RRD_PLUGIN_FILES) \

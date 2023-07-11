@@ -144,8 +144,6 @@ struct File_infos_arr {
 
 extern struct File_infos_arr *p_file_infos_arr;     /**< Array that contains all p_file_info structs for all log sources **/
 
-extern volatile sig_atomic_t p_file_infos_arr_ready; /**< Variable to synchronise chart creation in logsmanagement.plugin, once the main logs management engine is ready **/
-
 extern int g_logs_manag_update_every;               /**< Variable defining global "update every" value for logs management **/
 
 typedef struct {

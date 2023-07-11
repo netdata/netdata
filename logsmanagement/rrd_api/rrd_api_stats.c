@@ -53,7 +53,7 @@ void stats_charts_init(void){
             stats_chart_data->rrd_type
             , "circular_buffers_mem_total_cached"
             , NULL
-            , "logsmanagement.plugin"
+            , "logsmanagement"
             , NULL
             , "Circular buffers total cached memory"
             , "bytes"
@@ -71,7 +71,7 @@ void stats_charts_init(void){
             stats_chart_data->rrd_type
             , "circular_buffers_num_of_items"
             , NULL
-            , "logsmanagement.plugin"
+            , "logsmanagement"
             , NULL
             , "Circular buffers number of items"
             , "items"
@@ -89,7 +89,7 @@ void stats_charts_init(void){
             stats_chart_data->rrd_type
             , "circular_buffers_mem_uncompressed_used"
             , NULL
-            , "logsmanagement.plugin"
+            , "logsmanagement"
             , NULL
             , "Circular buffers used memory for uncompressed logs"
             , "bytes"
@@ -107,7 +107,7 @@ void stats_charts_init(void){
             stats_chart_data->rrd_type
             , "circular_buffers_mem_compressed_used"
             , NULL
-            , "logsmanagement.plugin"
+            , "logsmanagement"
             , NULL
             , "Circular buffers used memory for compressed logs"
             , "bytes"
@@ -125,7 +125,7 @@ void stats_charts_init(void){
             stats_chart_data->rrd_type
             , "average_compression_ratio"
             , NULL
-            , "logsmanagement.plugin"
+            , "logsmanagement"
             , NULL
             , "Average compression ratio"
             , "uncompressed / compressed ratio"
@@ -143,7 +143,7 @@ void stats_charts_init(void){
             stats_chart_data->rrd_type
             , "database_disk_usage"
             , NULL
-            , "logsmanagement.plugin"
+            , "logsmanagement"
             , NULL
             , "Database disk usage"
             , "bytes"
@@ -161,7 +161,7 @@ void stats_charts_init(void){
             stats_chart_data->rrd_type
             , "database_timings"
             , NULL
-            , "logsmanagement.plugin"
+            , "logsmanagement"
             , NULL
             , "Database timings"
             , "ns"
@@ -229,8 +229,6 @@ void stats_charts_update(uv_timer_t *handle){
     
     for(int i = 0; i < p_file_infos_arr->count; i++){
         struct File_info *p_file_info = p_file_infos_arr->data[i];
-
-        // worker_is_busy(i);
         
         // Check if there is parser configuration to be used for chart generation
         if(!p_file_info->parser_config) continue; 
@@ -287,8 +285,6 @@ void stats_charts_update(uv_timer_t *handle){
                                 stats_chart_data->num_db_timings_rotate[i]);
 
     }
-
-    // worker_is_busy(p_file_infos_arr->count);
 
     // outside for loop as dimensions updated across different loop iterations, unlike chart_data_arr metrics.
     rrdset_done(stats_chart_data->st_circ_buff_mem_total); 
