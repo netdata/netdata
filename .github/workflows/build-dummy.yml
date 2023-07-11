@@ -37,8 +37,6 @@ jobs:
   build-dist: # Build the distribution tarball and store it as an artifact.
     name: Build Distribution Tarball
     runs-on: ubuntu-latest
-    outputs:
-      distfile: ${{ steps.build.outputs.distfile }}
     steps:
       - run: echo 'NOT REQUIRED'
 
@@ -74,27 +72,6 @@ jobs:
           matrix="$(.github/scripts/gen-matrix-build.py)"
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
-      - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_COLOR: 'danger'
-          SLACK_FOOTER: ''
-          SLACK_ICON_EMOJI: ':github-actions:'
-          SLACK_TITLE: 'Build matrix preparation failed:'
-          SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: |-
-              ${{ github.repository }}: Failed to prepare build matrix for build checks.
-              Checkout: ${{ steps.checkout.outcome }}
-              Prepare tools: ${{ steps.prepare.outcome }}
-              Read build matrix: ${{ steps.set-matrix.outcome }}
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
-        if: >-
-          ${{
-            failure()
-            && startsWith(github.ref, 'refs/heads/master')
-            && github.event_name != 'pull_request'
-            && github.repository == 'netdata/netdata'
-          }}
 
   prepare-test-images: # Prepare the test environments for our build checks. This also checks dependency handling code for each tested environment.
     name: Prepare Test Environments
