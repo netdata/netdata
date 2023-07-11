@@ -229,7 +229,7 @@ netdata.example.org {
 
 #### docker-compose.yml
 
-After setting Caddyfile run this with `docker-compose up -d` to have fully functioning Netdata setup behind HTTP reverse
+After setting Caddyfile run this with `docker-compose up -d` to have a fully functioning Netdata setup behind an HTTP reverse
 proxy.
 
 ```yaml
@@ -275,7 +275,7 @@ volumes:
 #### Restrict access with basic auth
 
 You can restrict access by
-following [official caddy guide](https://caddyserver.com/docs/caddyfile/directives/basicauth#basicauth) and adding lines
+following the [official caddy guide](https://caddyserver.com/docs/caddyfile/directives/basicauth#basicauth) and adding lines
 to Caddyfile.
 
 ### With Docker socket proxy
@@ -396,7 +396,7 @@ The official `netdata/netdata` Docker image provides the following named tags:
 |   `vX`   | just the major version (for example, `v1`).                                                                                                             |
 
 The tags for minor and major versions are updated whenever a release that matches this tag is published (for example,
-if `v1.40.1` were to be published, the `v1.40` tag will be updated to point to it instead version `v1.40.0`).
+if `v1.40.1` were to be published, the `v1.40` tag would be updated to instead point to version `v1.40.0`).
 
 ## Configure Agent containers
 
