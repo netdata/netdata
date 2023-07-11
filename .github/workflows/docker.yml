@@ -4,7 +4,29 @@ on:
   push:
     branches:
       - master
-  pull_request: null
+  pull_request:
+    paths: # This MUST be kept in-sync with the paths-ignore key for the docker-dummy.yml workflow.
+      - '**.c'
+      - '**.cc'
+      - '**.h'
+      - '**.hh'
+      - '**.in'
+      - '!netdata.spec.in'
+      - '.dockerignore'
+      - 'configure.ac'
+      - 'netdata-installer.sh'
+      - '**/Makefile*'
+      - 'Makefile*'
+      - '.github/workflows/docker.yml'
+      - '.github/scripts/docker-test.sh'
+      - 'build/**'
+      - 'packaging/docker/**'
+      - 'packaging/installer/**'
+      - 'aclk/aclk-schemas/'
+      - 'ml/dlib/'
+      - 'mqtt_websockets'
+      - 'web/server/h2o/libh2o'
+      - '!**.md'
   workflow_dispatch:
     inputs:
       version:
