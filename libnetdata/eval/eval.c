@@ -213,13 +213,6 @@ static inline NETDATA_DOUBLE eval_value(EVAL_EXPRESSION *exp, EVAL_VALUE *v, int
             break;
     }
 
-    if(likely(!*error)) {
-        if(unlikely(isnan(n)))
-            *error = EVAL_ERROR_VALUE_IS_NAN;
-        else if(unlikely(isinf(n)))
-            *error = EVAL_ERROR_VALUE_IS_INFINITE;
-    }
-
     return n;
 }
 
