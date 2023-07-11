@@ -899,7 +899,6 @@ void set_global_environment()
     analytics_set_data(&analytics_data.netdata_config_use_private_registry, "null");
     analytics_set_data(&analytics_data.netdata_config_oom_score, "null");
     analytics_set_data(&analytics_data.netdata_prebuilt_distro, "null");
-
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;
     analytics_data.json_hits = 0;
