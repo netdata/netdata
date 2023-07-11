@@ -518,7 +518,7 @@ static int netdata_get_ipmi_sel_events_count(struct ipmi_monitoring_ipmi_config 
         goto cleanup;
     }
 
-    netdata_update_ipmi_sel_events_count(state, sel_count >= 0 ? sel_count : 0);
+    netdata_update_ipmi_sel_events_count(state, sel_count);
 
     rv = 0;
 
@@ -972,7 +972,7 @@ static void netdata_update_ipmi_sensor_reading(
             .sensor_state = sensor_state,
             .sensor_units = sensor_units,
             .sensor_reading_type = sensor_reading_type,
-            .sensor_name = strdupz(sensor_name ? sensor_name : ""),
+            .sensor_name = strdupz(sensor_name),
             .component = netdata_sensor_name_to_component(sensor_name),
             .do_state = !excluded_state,
             .do_metric = !excluded_metric,
@@ -1245,7 +1245,7 @@ void *netdata_ipmi_collection_thread(void *ptr) {
                 t->state.sel.last_iteration_ut = 0;
             }
 
-            return ptr;
+            break;
         }
 
         spinlock_lock(&t->spinlock);

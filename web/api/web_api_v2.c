@@ -103,11 +103,11 @@ static bool verify_agent_uuids(const char *machine_guid, const char *node_id, co
         return false;
 
     char *agent_claim_id = get_agent_claimid();
-    if(!agent_claim_id || strcmp(claim_id, agent_claim_id) != 0)
-        return false;
+
+    bool not_verified = (!agent_claim_id || strcmp(claim_id, agent_claim_id) != 0);
     freez(agent_claim_id);
 
-    if(!localhost->node_id)
+    if(not_verified || !localhost->node_id)
         return false;
 
     char buf[UUID_STR_LEN];

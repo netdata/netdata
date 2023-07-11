@@ -48,6 +48,8 @@ void registry_db_stats(void) {
 
 void registry_generate_curl_urls(void) {
     FILE *fp = fopen("/tmp/registry.curl", "w+");
+    if (unlikely(!fp))
+        return;
 
     REGISTRY_PERSON *p;
     dfe_start_read(registry.persons, p) {
