@@ -396,7 +396,7 @@ The official `netdata/netdata` Docker image provides the following named tags:
 |   `vX`   | just the major version (for example, `v1`).                                                                                                             |
 
 The tags for minor and major versions are updated whenever a release that matches this tag is published (for example,
-if `v1.40.1` were to be published, the `v1.40` tag would be updated to instead point to version `v1.40.0`).
+if `v1.40.1` were to be published, the `v1.40` tag would be updated to it instead of pointing to `v1.40.0`).
 
 ## Configure Agent containers
 
