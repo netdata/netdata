@@ -110,6 +110,7 @@ unsigned int workaround_flags = 0;
 
 /* Set to an appropriate alternate if desired */
 char *sdr_cache_directory = "/tmp";
+char *sdr_cache_format = ".netdata-freeipmi-%H-on-%L.sdr";
 char *sensor_config_file = NULL;
 char *sel_config_file = NULL;
 
@@ -371,6 +372,12 @@ static int netdata_read_ipmi_sensors(struct ipmi_monitoring_ipmi_config *ipmi_co
             goto cleanup;
         }
     }
+    if (sdr_cache_format) {
+        if (ipmi_monitoring_ctx_sdr_cache_filenames(ctx, sdr_cache_format) < 0) {
+            collector_error("ipmi_monitoring_ctx_sdr_cache_filenames(): %s\n", ipmi_monitoring_ctx_errormsg (ctx));
+            goto cleanup;
+        }
+    }
 
     timing_step(TIMING_STEP_FREEIPMI_DSR_CACHE_DIR);
 
@@ -491,8 +498,13 @@ static int netdata_get_ipmi_sel_events_count(struct ipmi_monitoring_ipmi_config 
 
     if (sdr_cache_directory) {
         if (ipmi_monitoring_ctx_sdr_cache_directory (ctx, sdr_cache_directory) < 0) {
-            collector_error( "ipmi_monitoring_ctx_sdr_cache_directory(): %s",
-                             ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_ctx_sdr_cache_directory(): %s", ipmi_monitoring_ctx_errormsg (ctx));
+            goto cleanup;
+        }
+    }
+    if (sdr_cache_format) {
+        if (ipmi_monitoring_ctx_sdr_cache_filenames(ctx, sdr_cache_format) < 0) {
+            collector_error("ipmi_monitoring_ctx_sdr_cache_filenames(): %s\n", ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
     }
