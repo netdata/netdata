@@ -288,6 +288,7 @@ void variables_formatting(struct engine *engine, RRDHOST *host);
 void end_host_formatting(struct engine *engine, RRDHOST *host);
 void end_batch_formatting(struct engine *engine);
 int flush_host_labels(struct instance *instance, RRDHOST *host);
+int flush_chart_labels(struct instance *instance, RRDSET *set);
 int simple_connector_end_batch(struct instance *instance);
 
 int exporting_discard_response(BUFFER *buffer, struct instance *instance);

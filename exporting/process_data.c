@@ -382,6 +382,22 @@ int flush_host_labels(struct instance *instance, RRDHOST *host)
 }
 
 /**
+ * Flush a buffer with chart labels
+ *
+ * TODO: When all charts have their labels, we probably need to remove function flush_host_labels.
+ *
+ * @param instance an instance data structure.
+ * @param host a data collecting host.
+ * @return Always returns 0.
+ */
+int flush_chart_labels(struct instance *instance, RRDSET *set)
+{
+    (void)set;
+
+    return flush_host_labels(instance, NULL);
+}
+
+/**
  * End a batch for a simple connector
  *
  * @param instance an instance data structure.

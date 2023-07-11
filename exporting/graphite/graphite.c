@@ -36,9 +36,9 @@ int init_graphite_instance(struct instance *instance)
         instance->metric_formatting = format_dimension_stored_graphite_plaintext;
     instance->netdata_info_formatting = format_netdata_info_labels_graphite;
 
-    instance->end_chart_formatting = NULL;
+    instance->end_chart_formatting = flush_chart_labels;
     instance->variables_formatting = NULL;
-    instance->end_host_formatting = flush_host_labels;
+    instance->end_host_formatting = NULL;
     instance->end_batch_formatting = simple_connector_end_batch;
 
     if (instance->config.type == EXPORTING_CONNECTOR_TYPE_GRAPHITE_HTTP)
