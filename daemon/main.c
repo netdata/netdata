@@ -1178,14 +1178,14 @@ static void get_netdata_configured_variables() {
 
     // --------------------------------------------------------------------
 
-    rrdset_free_obsolete_time_s = config_get_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time_s);
+    rrdb.rrdset_free_obsolete_time_s = config_get_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdb.rrdset_free_obsolete_time_s);
     // Current chart locking and invalidation scheme doesn't prevent Netdata from segmentation faults if a short
     // cleanup delay is set. Extensive stress tests showed that 10 seconds is quite a safe delay. Look at
     // https://github.com/netdata/netdata/pull/11222#issuecomment-868367920 for more information.
-    if (rrdset_free_obsolete_time_s < 10) {
-        rrdset_free_obsolete_time_s = 10;
+    if (rrdb.rrdset_free_obsolete_time_s < 10) {
+        rrdb.rrdset_free_obsolete_time_s = 10;
         netdata_log_info("The \"cleanup obsolete charts after seconds\" option was set to 10 seconds.");
-        config_set_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time_s);
+        config_set_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdb.rrdset_free_obsolete_time_s);
     }
 
     rrdb.gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_DB, "gap when lost iterations above", rrdb.gap_when_lost_iterations_above);

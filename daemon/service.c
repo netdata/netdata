@@ -87,7 +87,7 @@ static bool svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_dimensio
     dfe_start_write(st->rrddim_root_index, rd) {
         if(unlikely(
                 all_dimensions ||
-                (rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && (rd->collector.last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now))
+                (rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && (rd->collector.last_collected_time.tv_sec + rrdb.rrdset_free_obsolete_time_s < now))
                     )) {
 
             if(dictionary_acquired_item_references(rd_dfe.item) == 1) {
@@ -146,9 +146,9 @@ static void svc_rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
             continue;
 
         if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)
-                     && st->last_accessed_time_s + rrdset_free_obsolete_time_s < now
-                     && st->last_updated.tv_sec + rrdset_free_obsolete_time_s < now
-                     && st->last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now
+                     && st->last_accessed_time_s + rrdb.rrdset_free_obsolete_time_s < now
+                     && st->last_updated.tv_sec + rrdb.rrdset_free_obsolete_time_s < now
+                     && st->last_collected_time.tv_sec + rrdb.rrdset_free_obsolete_time_s < now
                      )) {
             svc_rrdset_obsolete_to_archive(st);
         }
