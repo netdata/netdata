@@ -307,9 +307,9 @@ static int logs_manag_config_load(Flb_socket_config_t **forward_in_config_p){
     collector_info( "CONFIG: global logs management collected logs rate chart enable: %d", 
                     g_logs_manag_config.enable_collected_logs_rate);
 
-    *forward_in_config_p = (Flb_socket_config_t *) callocz(1, sizeof(Flb_socket_config_t));
     const int fwd_enable = config_get_boolean(CONFIG_SECTION_LOGS_MANAGEMENT, "forward in enable", CONFIG_BOOLEAN_NO);
     
+    *forward_in_config_p = (Flb_socket_config_t *) callocz(1, sizeof(Flb_socket_config_t));
     (*forward_in_config_p)->unix_path = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, "forward in unix path", FLB_FORWARD_UNIX_PATH_DEFAULT);
     collector_info("forward in unix path = %s", (*forward_in_config_p)->unix_path);
     (*forward_in_config_p)->unix_perm = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, "forward in unix perm", FLB_FORWARD_UNIX_PERM_DEFAULT);
@@ -319,6 +319,11 @@ static int logs_manag_config_load(Flb_socket_config_t **forward_in_config_p){
     collector_info("forward in listen = %s", (*forward_in_config_p)->listen);
     (*forward_in_config_p)->port = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, "forward in port", FLB_FORWARD_PORT_DEFAULT);
     collector_info("forward in port = %s", (*forward_in_config_p)->port);
+
+    if(!fwd_enable) {
+        freez(*forward_in_config_p);
+        *forward_in_config_p = NULL;
+    }
 
     snprintfz(temp_path, FILENAME_MAX, "%s/fluentbit.log", netdata_configured_log_dir);
     
@@ -335,8 +340,6 @@ static int logs_manag_config_load(Flb_socket_config_t **forward_in_config_p){
     flb_srvc_config.log_level = config_get(     CONFIG_SECTION_LOGS_MANAGEMENT, 
                                                 "fluent bit log level", flb_srvc_config.log_level);
 
-
-    // if(!fwd_enable) flb_socket_config_destroy((*forward_in_config_p));
 
     return rc;
 }
@@ -1141,7 +1144,6 @@ static void logsmanagement_main_cleanup(void *ptr) {
 
     // TODO: Clean up stats charts memory
 
-    flb_socket_config_destroy(thread_data->forward_in_config);
     flb_free_fwd_input_out_cb();
 
     uv_walk(thread_data->main_loop, on_walk_cleanup, NULL);
@@ -1197,10 +1199,8 @@ void *logsmanagement_main(void *ptr) {
         goto cleanup;
     }
 
-    if(flb_add_fwd_input(thread_data.forward_in_config)){
+    if(flb_add_fwd_input(thread_data.forward_in_config))
         collector_error("flb_add_fwd_input() failed - logs management forward input will be disabled");
-        flb_socket_config_destroy(thread_data.forward_in_config);
-    }
 
     /* Initialize logs management for each configuration section  */
     struct section *config_section = log_management_config.first_section;
@@ -1215,7 +1215,7 @@ void *logsmanagement_main(void *ptr) {
 
     stats_charts_init();
     uv_timer_t stats_charts_timer;
-    uv_timer_init(main_loop, &stats_charts_timer);
+    uv_timer_init(thread_data.main_loop, &stats_charts_timer);
 
     // TODO: stats_charts_update() is run as a timer callback, so not as precise as if heartbeat_next() was used.
     // Needs to be changed ideally.

@@ -60,18 +60,6 @@ typedef struct flb_socket_config {
     char *port;
 } Flb_socket_config_t;
 
-#define flb_socket_config_destroy(config){\
-    if(config){\
-        freez(config->mode);\
-        freez(config->unix_path);\
-        freez(config->unix_perm);\
-        freez(config->listen);\
-        freez(config->port);\
-        freez(config);\
-        config = NULL;\
-    }\
-}
-
 typedef struct syslog_parser_config {
     char *log_format;
     Flb_socket_config_t *socket_config;
