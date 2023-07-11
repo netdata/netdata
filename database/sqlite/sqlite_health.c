@@ -393,7 +393,7 @@ void sql_health_alarm_log_count(RRDHOST *host) {
 /* Health related SQL queries
    Cleans up the health_log_detail table on a non-claimed host
 */
-#define SQL_CLEANUP_HEALTH_LOG_DETAIL_NOT_CLAIMED "DELETE FROM health_log_detail WHERE health_log_id IN (SELECT health_log_id FROM health_log WHERE host_id = ?1) AND when_key + ?2 < unixepoch() AND updated_by_id <> 0 AND transition_id NOT IN (SELECT transition_id FROM health_log hl WHERE hl.last_transition_id = transition_id);"
+#define SQL_CLEANUP_HEALTH_LOG_DETAIL_NOT_CLAIMED "DELETE FROM health_log_detail WHERE health_log_id IN (SELECT health_log_id FROM health_log WHERE host_id = ?1) AND when_key + ?2 < unixepoch() AND updated_by_id <> 0 AND transition_id NOT IN (SELECT last_transition_id FROM health_log hl WHERE hl.host_id = ?3);"
 void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host) {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -424,6 +424,13 @@ void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host) {
     rc = sqlite3_bind_int64(res, 2, (sqlite3_int64)host->health_log.health_log_history);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind health log history for SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED.");
+        sqlite3_finalize(res);
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 3, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id for SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED.");
         sqlite3_finalize(res);
         return;
     }
