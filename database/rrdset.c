@@ -1441,7 +1441,7 @@ static inline size_t rrdset_done_interpolate(
                 continue;
             }
 
-            if(likely(rrddim_check_updated(rd) && rd->collector.counter > 1 && iterations < gap_when_lost_iterations_above)) {
+            if(likely(rrddim_check_updated(rd) && rd->collector.counter > 1 && iterations < rrdb.gap_when_lost_iterations_above)) {
                 uint32_t dim_storage_flags = storage_flags;
 
                 if (ml_dimension_is_anomalous(rd, current_time_s, new_value, true)) {

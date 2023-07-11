@@ -102,7 +102,6 @@ typedef enum __attribute__ ((__packed__)) {
 #define RRD_DEFAULT_HISTORY_ENTRIES 3600
 #define RRD_HISTORY_ENTRIES_MAX (86400*365)
 
-extern int gap_when_lost_iterations_above;
 extern time_t rrdset_free_obsolete_time_s;
 
 #if defined(ENV32BIT)
@@ -1287,6 +1286,8 @@ struct rrdb {
 
     int default_rrd_update_every;
     int default_rrd_history_entries;
+
+    int gap_when_lost_iterations_above;
 };
 
 extern struct rrdb rrdb;

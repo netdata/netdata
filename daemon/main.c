@@ -1188,12 +1188,12 @@ static void get_netdata_configured_variables() {
         config_set_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time_s);
     }
 
-    gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
-    if (gap_when_lost_iterations_above < 1) {
-        gap_when_lost_iterations_above = 1;
-        config_set_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
+    rrdb.gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_DB, "gap when lost iterations above", rrdb.gap_when_lost_iterations_above);
+    if (rrdb.gap_when_lost_iterations_above < 1) {
+        rrdb.gap_when_lost_iterations_above = 1;
+        config_set_number(CONFIG_SECTION_DB, "gap when lost iterations above", rrdb.gap_when_lost_iterations_above);
     }
-    gap_when_lost_iterations_above += 2;
+    rrdb.gap_when_lost_iterations_above += 2;
 
     // --------------------------------------------------------------------
     // get various system parameters

@@ -4,18 +4,6 @@
 #include "rrd.h"
 
 // ----------------------------------------------------------------------------
-// globals
-
-/*
-// if not zero it gives the time (in seconds) to remove un-updated dimensions
-// DO NOT ENABLE
-// if dimensions are removed, the chart generation will have to run again
-int rrd_delete_unupdated_dimensions = 0;
-*/
-
-int gap_when_lost_iterations_above = 1;
-
-// ----------------------------------------------------------------------------
 // RRD - algorithms types
 
 RRD_ALGORITHM rrd_algorithm_id(const char *name) {
@@ -138,4 +126,5 @@ struct rrdb rrdb = {
     },
     .default_rrd_update_every = UPDATE_EVERY_MIN,
     .default_rrd_history_entries = RRD_DEFAULT_HISTORY_ENTRIES,
+    .gap_when_lost_iterations_above = 1,
 };
