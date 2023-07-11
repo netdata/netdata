@@ -142,7 +142,7 @@ REGISTRY_PERSON_URL *registry_verify_request(const char *person_guid, char *mach
 // REGISTRY REQUESTS
 
 REGISTRY_PERSON *registry_request_access(const char *person_guid, char *machine_guid, char *url, char *name, time_t when) {
-    debug(D_REGISTRY, "registry_request_access('%s', '%s', '%s'): NEW REQUEST", (person_guid)?person_guid:"", machine_guid, url);
+    netdata_log_debug(D_REGISTRY, "registry_request_access('%s', '%s', '%s'): NEW REQUEST", (person_guid)?person_guid:"", machine_guid, url);
 
     bool is_dummy = is_dummy_person(person_guid);
 

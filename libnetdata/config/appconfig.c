@@ -164,7 +164,7 @@ static inline struct section *appconfig_section_find(struct config *root, const 
 }
 
 static inline struct section *appconfig_section_create(struct config *root, const char *section) {
-    debug(D_CONFIG, "Creating section '%s'.", section);
+    netdata_log_debug(D_CONFIG, "Creating section '%s'.", section);
 
     struct section *co = callocz(1, sizeof(struct section));
     co->name = strdupz(section);
@@ -194,7 +194,7 @@ void appconfig_section_destroy_non_loaded(struct config *root, const char *secti
     struct section *co;
     struct config_option *cv, *cv_next;
 
-    debug(D_CONFIG, "Destroying section '%s'.", section);
+    netdata_log_debug(D_CONFIG, "Destroying section '%s'.", section);
 
     co = appconfig_section_find(root, section);
     if(!co) {
@@ -259,7 +259,7 @@ void appconfig_section_destroy_non_loaded(struct config *root, const char *secti
 
 void appconfig_section_option_destroy_non_loaded(struct config *root, const char *section, const char *name)
 {
-    debug(D_CONFIG, "Destroying section option '%s -> %s'.", section, name);
+    netdata_log_debug(D_CONFIG, "Destroying section option '%s -> %s'.", section, name);
 
     struct section *co;
     co = appconfig_section_find(root, section);
@@ -310,7 +310,7 @@ void appconfig_section_option_destroy_non_loaded(struct config *root, const char
 // config name-value methods
 
 static inline struct config_option *appconfig_value_create(struct section *co, const char *name, const char *value) {
-    debug(D_CONFIG, "Creating config entry for name '%s', value '%s', in section '%s'.", name, value, co->name);
+    netdata_log_debug(D_CONFIG, "Creating config entry for name '%s', value '%s', in section '%s'.", name, value, co->name);
 
     struct config_option *cv = callocz(1, sizeof(struct config_option));
     cv->name = strdupz(name);
@@ -341,7 +341,7 @@ static inline struct config_option *appconfig_value_create(struct section *co, c
 int appconfig_exists(struct config *root, const char *section, const char *name) {
     struct config_option *cv;
 
-    debug(D_CONFIG, "request to get config in section '%s', name '%s'", section, name);
+    netdata_log_debug(D_CONFIG, "request to get config in section '%s', name '%s'", section, name);
 
     struct section *co = appconfig_section_find(root, section);
     if(!co) return 0;
@@ -356,7 +356,7 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
     struct config_option *cv_old, *cv_new;
     int ret = -1;
 
-    debug(D_CONFIG, "request to rename config in section '%s', old name '%s', to section '%s', new name '%s'", section_old, name_old, section_new, name_new);
+    netdata_log_debug(D_CONFIG, "request to rename config in section '%s', old name '%s', to section '%s', new name '%s'", section_old, name_old, section_new, name_new);
 
     struct section *co_old = appconfig_section_find(root, section_old);
     if(!co_old) return ret;
@@ -439,9 +439,9 @@ char *appconfig_get_by_section(struct section *co, const char *name, const char 
 char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value)
 {
     if (default_value == NULL)
-        debug(D_CONFIG, "request to get config in section '%s', name '%s' or fail", section, name);
+        netdata_log_debug(D_CONFIG, "request to get config in section '%s', name '%s' or fail", section, name);
     else
-        debug(D_CONFIG, "request to get config in section '%s', name '%s', default_value '%s'", section, name, default_value);
+        netdata_log_debug(D_CONFIG, "request to get config in section '%s', name '%s', default_value '%s'", section, name, default_value);
 
     struct section *co = appconfig_section_find(root, section);
     if (!co && !default_value)
@@ -532,7 +532,7 @@ const char *appconfig_set_default(struct config *root, const char *section, cons
 {
     struct config_option *cv;
 
-    debug(D_CONFIG, "request to set default config in section '%s', name '%s', value '%s'", section, name, value);
+    netdata_log_debug(D_CONFIG, "request to set default config in section '%s', name '%s', value '%s'", section, name, value);
 
     struct section *co = appconfig_section_find(root, section);
     if(!co) return appconfig_set(root, section, name, value);
@@ -559,7 +559,7 @@ const char *appconfig_set(struct config *root, const char *section, const char *
 {
     struct config_option *cv;
 
-    debug(D_CONFIG, "request to set config in section '%s', name '%s', value '%s'", section, name, value);
+    netdata_log_debug(D_CONFIG, "request to set config in section '%s', name '%s', value '%s'", section, name, value);
 
     struct section *co = appconfig_section_find(root, section);
     if(!co) co = appconfig_section_create(root, section);
@@ -649,7 +649,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
 
     if(!filename) filename = CONFIG_DIR "/" CONFIG_FILENAME;
 
-    debug(D_CONFIG, "CONFIG: opening config file '%s'", filename);
+    netdata_log_debug(D_CONFIG, "CONFIG: opening config file '%s'", filename);
 
     FILE *fp = fopen(filename, "r");
     if(!fp) {
@@ -669,7 +669,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
 
         s = trim(buffer);
         if(!s || *s == '#') {
-            debug(D_CONFIG, "CONFIG: ignoring line %d of file '%s', it is empty.", line, filename);
+            netdata_log_debug(D_CONFIG, "CONFIG: ignoring line %d of file '%s', it is empty.", line, filename);
             continue;
         }
 
@@ -778,12 +778,12 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
             }
         } else {
             if (((cv->flags & CONFIG_VALUE_USED) && overwrite_used) || !(cv->flags & CONFIG_VALUE_USED)) {
-                debug(
+                netdata_log_debug(
                     D_CONFIG, "CONFIG: line %d of file '%s', overwriting '%s/%s'.", line, filename, co->name, cv->name);
                 freez(cv->value);
                 cv->value = strdupz(value);
             } else
-                debug(
+                netdata_log_debug(
                     D_CONFIG,
                     "CONFIG: ignoring line %d of file '%s', '%s/%s' is already present and used.",
                     line,

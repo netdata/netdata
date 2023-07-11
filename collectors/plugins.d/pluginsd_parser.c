@@ -237,7 +237,7 @@ static inline PARSER_RC pluginsd_set(char **words, size_t num_words, PARSER *par
     if(!rd) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-        debug(D_PLUGINSD, "PLUGINSD: 'host:%s/chart:%s/dim:%s' SET is setting value to '%s'",
+        netdata_log_debug(D_PLUGINSD, "PLUGINSD: 'host:%s/chart:%s/dim:%s' SET is setting value to '%s'",
               rrdhost_hostname(host), rrdset_id(st), dimension, value && *value ? value : "UNSET");
 
     if (value && *value)
@@ -303,7 +303,7 @@ static inline PARSER_RC pluginsd_end(char **words, size_t num_words, PARSER *par
     if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-        debug(D_PLUGINSD, "requested an END on chart '%s'", rrdset_id(st));
+        netdata_log_debug(D_PLUGINSD, "requested an END on chart '%s'", rrdset_id(st));
 
     pluginsd_set_chart_from_parent(parser, NULL, PLUGINSD_KEYWORD_END);
     parser->user.data_collections_count++;
@@ -517,7 +517,7 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
     if (unlikely(!units))
         units = "unknown";
 
-    debug(
+    netdata_log_debug(
         D_PLUGINSD,
         "creating chart type='%s', id='%s', name='%s', family='%s', context='%s', chart='%s', priority=%d, update_every=%d",
         type, id, name ? name : "", family ? family : "", context ? context : "", rrdset_type_name(chart_type),
@@ -642,7 +642,7 @@ static inline PARSER_RC pluginsd_dimension(char **words, size_t num_words, PARSE
         algorithm = "absolute";
 
     if (unlikely(st && rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-        debug(
+        netdata_log_debug(
             D_PLUGINSD,
             "creating dimension in chart %s, id='%s', name='%s', algorithm='%s', multiplier=%ld, divisor=%ld, hidden='%s'",
             rrdset_id(st), id, name ? name : "", rrd_algorithm_name(rrd_algorithm_id(algorithm)), multiplier, divisor,
@@ -1013,7 +1013,7 @@ static inline PARSER_RC pluginsd_variable(char **words, size_t num_words, PARSER
 }
 
 static inline PARSER_RC pluginsd_flush(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser) {
-    debug(D_PLUGINSD, "requested a " PLUGINSD_KEYWORD_FLUSH);
+    netdata_log_debug(D_PLUGINSD, "requested a " PLUGINSD_KEYWORD_FLUSH);
     pluginsd_set_chart_from_parent(parser, NULL, PLUGINSD_KEYWORD_FLUSH);
     parser->user.replay.start_time = 0;
     parser->user.replay.end_time = 0;
@@ -1078,7 +1078,7 @@ static inline PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t n
     RRDHOST *host = pluginsd_require_host_from_parent(parser, PLUGINSD_KEYWORD_OVERWRITE);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
-    debug(D_PLUGINSD, "requested to OVERWRITE host labels");
+    netdata_log_debug(D_PLUGINSD, "requested to OVERWRITE host labels");
 
     if(unlikely(!host->rrdlabels))
         host->rrdlabels = rrdlabels_create();
@@ -1119,7 +1119,7 @@ static inline PARSER_RC pluginsd_clabel_commit(char **words __maybe_unused, size
     RRDSET *st = pluginsd_require_chart_from_parent(parser, PLUGINSD_KEYWORD_CLABEL_COMMIT, PLUGINSD_KEYWORD_BEGIN);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
-    debug(D_PLUGINSD, "requested to commit chart labels");
+    netdata_log_debug(D_PLUGINSD, "requested to commit chart labels");
 
     if(!parser->user.chart_rrdlabels_linked_temporarily) {
         netdata_log_error("PLUGINSD: 'host:%s' got CLABEL_COMMIT, without a CHART or BEGIN. Ignoring it.", rrdhost_hostname(host));

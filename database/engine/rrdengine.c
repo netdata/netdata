@@ -1457,7 +1457,7 @@ void async_cb(uv_async_t *handle)
 {
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
-    debug(D_RRDENGINE, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
+    netdata_log_debug(D_RRDENGINE, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
 }
 
 #define TIMER_PERIOD_MS (1000)

@@ -44,7 +44,6 @@ static int clean_kprobe_event(FILE *out, char *filename, char *father_pid, netda
 
 int clean_kprobe_events(FILE *out, int pid, netdata_ebpf_events_t *ptr)
 {
-    debug(D_EXIT, "Cleaning parent process events.");
     char filename[FILENAME_MAX + 1];
     snprintf(filename, FILENAME_MAX, "%s%s", NETDATA_DEBUGFS, "kprobe_events");
 

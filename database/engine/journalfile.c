@@ -9,12 +9,12 @@ static void after_extent_write_journalfile_v1_io(uv_fs_t* req)
     struct generic_io_descriptor *io_descr = &wal->io_descr;
     struct rrdengine_instance *ctx = io_descr->ctx;
 
-    debug(D_RRDENGINE, "%s: Journal block was written to disk.", __func__);
+    netdata_log_debug(D_RRDENGINE, "%s: Journal block was written to disk.", __func__);
     if (req->result < 0) {
         ctx_io_error(ctx);
         netdata_log_error("DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)req->result));
     } else {
-        debug(D_RRDENGINE, "%s: Journal block was written to disk.", __func__);
+        netdata_log_debug(D_RRDENGINE, "%s: Journal block was written to disk.", __func__);
     }
 
     uv_fs_req_cleanup(req);
@@ -740,7 +740,7 @@ static unsigned journalfile_replay_transaction(struct rrdengine_instance *ctx, s
     *id = 0;
     jf_header = buf;
     if (STORE_PADDING == jf_header->type) {
-        debug(D_RRDENGINE, "Skipping padding.");
+        netdata_log_debug(D_RRDENGINE, "Skipping padding.");
         return 0;
     }
     if (sizeof(*jf_header) > max_size) {
@@ -758,14 +758,14 @@ static unsigned journalfile_replay_transaction(struct rrdengine_instance *ctx, s
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, buf, sizeof(*jf_header) + payload_length);
     ret = crc32cmp(jf_trailer->checksum, crc);
-    debug(D_RRDENGINE, "Transaction %"PRIu64" was read from disk. CRC32 check: %s", *id, ret ? "FAILED" : "SUCCEEDED");
+    netdata_log_debug(D_RRDENGINE, "Transaction %"PRIu64" was read from disk. CRC32 check: %s", *id, ret ? "FAILED" : "SUCCEEDED");
     if (unlikely(ret)) {
         netdata_log_error("DBENGINE: transaction %"PRIu64" was read from disk. CRC32 check: FAILED", *id);
         return size_bytes;
     }
     switch (jf_header->type) {
     case STORE_DATA:
-        debug(D_RRDENGINE, "Replaying transaction %"PRIu64"", jf_header->id);
+        netdata_log_debug(D_RRDENGINE, "Replaying transaction %"PRIu64"", jf_header->id);
             journalfile_restore_extent_metadata(ctx, journalfile, buf + sizeof(*jf_header), payload_length);
         break;
     default:

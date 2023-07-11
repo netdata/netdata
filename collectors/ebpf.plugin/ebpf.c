@@ -1541,8 +1541,7 @@ uint32_t ebpf_enable_tracepoints(ebpf_tracepoint_t *tps)
     uint32_t cnt = 0;
     for (int i = 0; tps[i].class != NULL; i++) {
         if (ebpf_enable_tracepoint(&tps[i]) == -1) {
-            infoerr("failed to enable tracepoint %s:%s",
-                tps[i].class, tps[i].event);
+            netdata_log_error("Failed to enable tracepoint %s:%s", tps[i].class, tps[i].event);
         }
         else {
             cnt += 1;

@@ -141,7 +141,7 @@ void pubsub_connector_worker(void *instance_p)
             goto cleanup;
         }
 
-        debug(
+        netdata_log_debug(
             D_EXPORTING, "EXPORTING: pubsub_publish(): project = %s, topic = %s, buffer = %zu",
             connector_specific_config->project_id, connector_specific_config->topic_id, buffer_len);
 

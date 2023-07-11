@@ -174,7 +174,7 @@ static inline struct tc_device *tc_device_index_find(const char *id) {
 // ----------------------------------------------------------------------------
 
 static inline void tc_class_free(struct tc_device *n, struct tc_class *c) {
-    debug(D_TC_LOOP, "Removing from device '%s' class '%s', parentid '%s', leafid '%s', unused=%d",
+    netdata_log_debug(D_TC_LOOP, "Removing from device '%s' class '%s', parentid '%s', leafid '%s', unused=%d",
           string2str(n->id), string2str(c->id), string2str(c->parentid), string2str(c->leafid),
           c->unupdated);
 
@@ -271,7 +271,7 @@ static inline void tc_device_commit(struct tc_device *d) {
     dfe_done(c);
 
     if(unlikely(!d->enabled || (!updated_classes && !updated_qdiscs))) {
-        debug(D_TC_LOOP, "TC: Ignoring TC device '%s'. It is not enabled/updated.", string2str(d->name?d->name:d->id));
+        netdata_log_debug(D_TC_LOOP, "TC: Ignoring TC device '%s'. It is not enabled/updated.", string2str(d->name?d->name:d->id));
         tc_device_classes_cleanup(d);
         return;
     }
@@ -308,7 +308,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(!c->updated))
                 continue;
 
-            //debug(D_TC_LOOP, "TC: In device '%s', %s '%s'  has leafid: '%s' and parentid '%s'.",
+            //netdata_log_debug(D_TC_LOOP, "TC: In device '%s', %s '%s'  has leafid: '%s' and parentid '%s'.",
             //    d->id,
             //    c->isqdisc?"qdisc":"class",
             //    c->id,
@@ -326,7 +326,7 @@ static inline void tc_device_commit(struct tc_device *d) {
 
                 if((x->parentid && c->id == x->parentid) ||
                    (c->leafid && x->parentid && c->leafid == x->parentid)) {
-                    // debug(D_TC_LOOP, "TC: In device '%s', %s '%s' (leafid: '%s') has as leaf %s '%s' (parentid: '%s').", d->name?d->name:d->id, c->isqdisc?"qdisc":"class", c->name?c->name:c->id, c->leafid?c->leafid:c->id, x->isqdisc?"qdisc":"class", x->name?x->name:x->id, x->parentid?x->parentid:x->id);
+                    // netdata_log_debug(D_TC_LOOP, "TC: In device '%s', %s '%s' (leafid: '%s') has as leaf %s '%s' (parentid: '%s').", d->name?d->name:d->id, c->isqdisc?"qdisc":"class", c->name?c->name:c->id, c->leafid?c->leafid:c->id, x->isqdisc?"qdisc":"class", x->name?x->name:x->id, x->parentid?x->parentid:x->id);
                     c->isleaf = false;
                     x->hasparent = true;
                 }
@@ -340,7 +340,7 @@ static inline void tc_device_commit(struct tc_device *d) {
         if(unlikely(!c->updated))
             continue;
 
-        // debug(D_TC_LOOP, "TC: device '%s', %s '%s' isleaf=%d, hasparent=%d", d->id, (c->isqdisc)?"qdisc":"class", c->id, c->isleaf, c->hasparent);
+        // netdata_log_debug(D_TC_LOOP, "TC: device '%s', %s '%s' isleaf=%d, hasparent=%d", d->id, (c->isqdisc)?"qdisc":"class", c->id, c->isleaf, c->hasparent);
 
         if(unlikely((c->isleaf && c->hasparent) || d->enabled_all_classes_qdiscs)) {
             c->render = true;
@@ -355,7 +355,7 @@ static inline void tc_device_commit(struct tc_device *d) {
         //if(unlikely(!c->hasparent)) {
         //    if(root) collector_error("TC: multiple root class/qdisc for device '%s' (old: '%s', new: '%s')", d->id, root->id, c->id);
         //    root = c;
-        //    debug(D_TC_LOOP, "TC: found root class/qdisc '%s'", root->id);
+        //    netdata_log_debug(D_TC_LOOP, "TC: found root class/qdisc '%s'", root->id);
         //}
     }
     dfe_done(c);
@@ -365,8 +365,8 @@ static inline void tc_device_commit(struct tc_device *d) {
 
     if(unlikely(debug_flags & D_TC_LOOP)) {
         dfe_start_read(d->classes, c) {
-            if(c->render) debug(D_TC_LOOP, "TC: final nodes dump for '%s': class %s, OK", string2str(d->name), string2str(c->id));
-            else debug(D_TC_LOOP, "TC: final nodes dump for '%s': class '%s', IGNORE (updated: %d, isleaf: %d, hasparent: %d, parent: '%s')",
+            if(c->render) netdata_log_debug(D_TC_LOOP, "TC: final nodes dump for '%s': class %s, OK", string2str(d->name), string2str(c->id));
+            else netdata_log_debug(D_TC_LOOP, "TC: final nodes dump for '%s': class '%s', IGNORE (updated: %d, isleaf: %d, hasparent: %d, parent: '%s')",
                       string2str(d->name?d->name:d->id), string2str(c->id), c->updated, c->isleaf, c->hasparent, string2str(c->parentid));
         }
         dfe_done(c);
@@ -374,12 +374,12 @@ static inline void tc_device_commit(struct tc_device *d) {
 #endif
 
     if(unlikely(!active_nodes)) {
-        debug(D_TC_LOOP, "TC: Ignoring TC device '%s'. No useful classes/qdiscs.", string2str(d->name?d->name:d->id));
+        netdata_log_debug(D_TC_LOOP, "TC: Ignoring TC device '%s'. No useful classes/qdiscs.", string2str(d->name?d->name:d->id));
         tc_device_classes_cleanup(d);
         return;
     }
 
-    debug(D_TC_LOOP, "TC: evaluating TC device '%s'. enabled = %d/%d (bytes: %d/%d, packets: %d/%d, dropped: %d/%d, tokens: %d/%d, ctokens: %d/%d, all_classes_qdiscs: %d/%d), classes: (bytes = %llu, packets = %llu, dropped = %llu, tokens = %llu, ctokens = %llu).",
+    netdata_log_debug(D_TC_LOOP, "TC: evaluating TC device '%s'. enabled = %d/%d (bytes: %d/%d, packets: %d/%d, dropped: %d/%d, tokens: %d/%d, ctokens: %d/%d, all_classes_qdiscs: %d/%d), classes: (bytes = %llu, packets = %llu, dropped = %llu, tokens = %llu, ctokens = %llu).",
         string2str(d->name?d->name:d->id),
         d->enabled, enable_new_interfaces,
         d->enabled_bytes, enable_bytes,
@@ -676,7 +676,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             rrdlabels_add(d->st_ctokens->rrdlabels, "device_group", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
-            debug(D_TC_LOOP, "TC: Updating _ctokens chart for device '%s'", string2str(d->name?d->name:d->id));
+            netdata_log_debug(D_TC_LOOP, "TC: Updating _ctokens chart for device '%s'", string2str(d->name?d->name:d->id));
 
             if(unlikely(d->name_updated)) {
                 char name[RRD_ID_LENGTH_MAX + 1];
@@ -724,7 +724,7 @@ static inline void tc_device_set_class_name(struct tc_device *d, char *id, char 
         }
 
         if(likely(name && *name && strcmp(string2str(c->id), name) != 0)) {
-            debug(D_TC_LOOP, "TC: Setting device '%s', class '%s' name to '%s'", string2str(d->id), id, name);
+            netdata_log_debug(D_TC_LOOP, "TC: Setting device '%s', class '%s' name to '%s'", string2str(d->id), id, name);
             c->name = string_strdupz(name);
             c->name_updated = true;
         }
@@ -741,7 +741,7 @@ static inline void tc_device_set_device_name(struct tc_device *d, char *name) {
     }
 
     if(likely(name && *name && strcmp(string2str(d->id), name) != 0)) {
-        debug(D_TC_LOOP, "TC: Setting device '%s' name to '%s'", string2str(d->id), name);
+        netdata_log_debug(D_TC_LOOP, "TC: Setting device '%s' name to '%s'", string2str(d->id), name);
         d->name = string_strdupz(name);
         d->name_updated = true;
     }
@@ -752,7 +752,7 @@ static inline void tc_device_set_device_family(struct tc_device *d, char *family
     d->family = NULL;
 
     if(likely(family && *family && strcmp(string2str(d->id), family) != 0)) {
-        debug(D_TC_LOOP, "TC: Setting device '%s' family to '%s'", string2str(d->id), family);
+        netdata_log_debug(D_TC_LOOP, "TC: Setting device '%s' family to '%s'", string2str(d->id), family);
         d->family = string_strdupz(family);
         d->family_updated = true;
     }
@@ -763,7 +763,7 @@ static inline struct tc_device *tc_device_create(char *id) {
     struct tc_device *d = tc_device_index_find(id);
 
     if(!d) {
-        debug(D_TC_LOOP, "TC: Creating device '%s'", id);
+        netdata_log_debug(D_TC_LOOP, "TC: Creating device '%s'", id);
 
         struct tc_device tmp = {
             .id = string_strdupz(id),
@@ -779,7 +779,7 @@ static inline struct tc_class *tc_class_add(struct tc_device *n, char *id, bool 
     struct tc_class *c = tc_class_index_find(n, id);
 
     if(!c) {
-        debug(D_TC_LOOP, "TC: Creating in device '%s', class id '%s', parentid '%s', leafid '%s'",
+        netdata_log_debug(D_TC_LOOP, "TC: Creating in device '%s', class id '%s', parentid '%s', leafid '%s'",
               string2str(n->id), id, parentid?parentid:"", leafid?leafid:"");
 
         struct tc_class tmp = {
@@ -936,7 +936,7 @@ void *tc_main(void *ptr) {
         struct tc_class *class = NULL;
 
         snprintfz(command, TC_LINE_MAX, "exec %s %d", tc_script, localhost->rrd_update_every);
-        debug(D_TC_LOOP, "executing '%s'", command);
+        netdata_log_debug(D_TC_LOOP, "executing '%s'", command);
 
         fp_child_output = netdata_popen(command, (pid_t *)&tc_child_pid, &fp_child_input);
         if(unlikely(!fp_child_output)) {
@@ -949,23 +949,23 @@ void *tc_main(void *ptr) {
             if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
 
             buffer[TC_LINE_MAX] = '\0';
-            // debug(D_TC_LOOP, "TC: read '%s'", buffer);
+            // netdata_log_debug(D_TC_LOOP, "TC: read '%s'", buffer);
 
             tc_split_words(buffer, words, PLUGINSD_MAX_WORDS);
 
             if(unlikely(!words[0] || !*words[0])) {
-                // debug(D_TC_LOOP, "empty line");
+                // netdata_log_debug(D_TC_LOOP, "empty line");
                 worker_is_idle();
                 continue;
             }
-            // else debug(D_TC_LOOP, "First word is '%s'", words[0]);
+            // else netdata_log_debug(D_TC_LOOP, "First word is '%s'", words[0]);
 
             first_hash = simple_hash(words[0]);
 
             if(unlikely(device && ((first_hash == CLASS_HASH && strcmp(words[0], "class") == 0) ||  (first_hash == QDISC_HASH && strcmp(words[0], "qdisc") == 0)))) {
                 worker_is_busy(WORKER_TC_CLASS);
 
-                // debug(D_TC_LOOP, "CLASS line on class id='%s', parent='%s', parentid='%s', leaf='%s', leafid='%s'", words[2], words[3], words[4], words[5], words[6]);
+                // netdata_log_debug(D_TC_LOOP, "CLASS line on class id='%s', parent='%s', parentid='%s', leaf='%s', leafid='%s'", words[2], words[3], words[4], words[5], words[6]);
 
                 char *type     = words[1];  // the class/qdisc type: htb, fq_codel, etc
                 char *id       = words[2];  // the class/qdisc major:minor
@@ -1033,7 +1033,7 @@ void *tc_main(void *ptr) {
             else if(unlikely(first_hash == END_HASH && strcmp(words[0], "END") == 0)) {
                 worker_is_busy(WORKER_TC_END);
 
-                // debug(D_TC_LOOP, "END line");
+                // netdata_log_debug(D_TC_LOOP, "END line");
 
                 if(likely(device)) {
                     netdata_thread_disable_cancelability();
@@ -1048,7 +1048,7 @@ void *tc_main(void *ptr) {
             else if(unlikely(first_hash == BEGIN_HASH && strcmp(words[0], "BEGIN") == 0)) {
                 worker_is_busy(WORKER_TC_BEGIN);
 
-                // debug(D_TC_LOOP, "BEGIN line on device '%s'", words[1]);
+                // netdata_log_debug(D_TC_LOOP, "BEGIN line on device '%s'", words[1]);
 
                 if(likely(words[1] && *words[1])) {
                     device = tc_device_create(words[1]);
@@ -1063,7 +1063,7 @@ void *tc_main(void *ptr) {
             else if(unlikely(device && class && first_hash == SENT_HASH && strcmp(words[0], "Sent") == 0)) {
                 worker_is_busy(WORKER_TC_SENT);
 
-                // debug(D_TC_LOOP, "SENT line '%s'", words[1]);
+                // netdata_log_debug(D_TC_LOOP, "SENT line '%s'", words[1]);
                 if(likely(words[1] && *words[1])) {
                     class->bytes = str2ull(words[1], NULL);
                     class->updated = true;
@@ -1087,7 +1087,7 @@ void *tc_main(void *ptr) {
             else if(unlikely(device && class && class->updated && first_hash == LENDED_HASH && strcmp(words[0], "lended:") == 0)) {
                 worker_is_busy(WORKER_TC_LENDED);
 
-                // debug(D_TC_LOOP, "LENDED line '%s'", words[1]);
+                // netdata_log_debug(D_TC_LOOP, "LENDED line '%s'", words[1]);
                 //if(likely(words[1] && *words[1]))
                 //    class->lended = str2ull(words[1]);
 
@@ -1100,7 +1100,7 @@ void *tc_main(void *ptr) {
             else if(unlikely(device && class && class->updated && first_hash == TOKENS_HASH && strcmp(words[0], "tokens:") == 0)) {
                 worker_is_busy(WORKER_TC_TOKENS);
 
-                // debug(D_TC_LOOP, "TOKENS line '%s'", words[1]);
+                // netdata_log_debug(D_TC_LOOP, "TOKENS line '%s'", words[1]);
                 if(likely(words[1] && *words[1]))
                     class->tokens = str2ull(words[1], NULL);
 
@@ -1110,21 +1110,21 @@ void *tc_main(void *ptr) {
             else if(unlikely(device && first_hash == SETDEVICENAME_HASH && strcmp(words[0], "SETDEVICENAME") == 0)) {
                 worker_is_busy(WORKER_TC_SETDEVICENAME);
 
-                // debug(D_TC_LOOP, "SETDEVICENAME line '%s'", words[1]);
+                // netdata_log_debug(D_TC_LOOP, "SETDEVICENAME line '%s'", words[1]);
                 if(likely(words[1] && *words[1]))
                     tc_device_set_device_name(device, words[1]);
             }
             else if(unlikely(device && first_hash == SETDEVICEGROUP_HASH && strcmp(words[0], "SETDEVICEGROUP") == 0)) {
                 worker_is_busy(WORKER_TC_SETDEVICEGROUP);
 
-                // debug(D_TC_LOOP, "SETDEVICEGROUP line '%s'", words[1]);
+                // netdata_log_debug(D_TC_LOOP, "SETDEVICEGROUP line '%s'", words[1]);
                 if(likely(words[1] && *words[1]))
                     tc_device_set_device_family(device, words[1]);
             }
             else if(unlikely(device && first_hash == SETCLASSNAME_HASH && strcmp(words[0], "SETCLASSNAME") == 0)) {
                 worker_is_busy(WORKER_TC_SETCLASSNAME);
 
-                // debug(D_TC_LOOP, "SETCLASSNAME line '%s' '%s'", words[1], words[2]);
+                // netdata_log_debug(D_TC_LOOP, "SETCLASSNAME line '%s' '%s'", words[1], words[2]);
                 char *id    = words[1];
                 char *path  = words[2];
                 if(likely(id && *id && path && *path))
@@ -1147,7 +1147,7 @@ void *tc_main(void *ptr) {
                 worker_set_metric(WORKER_TC_CLASSES, number_of_classes);
             }
             //else {
-            //  debug(D_TC_LOOP, "IGNORED line");
+            //  netdata_log_debug(D_TC_LOOP, "IGNORED line");
             //}
 
             worker_is_idle();

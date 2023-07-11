@@ -384,7 +384,7 @@ int netdata_pclose(FILE *fp_child_input, FILE *fp_child_output, pid_t pid) {
     int ret;
     siginfo_t info;
 
-    debug(D_EXIT, "Request to netdata_pclose() on pid %d", pid);
+    netdata_log_debug(D_EXIT, "Request to netdata_pclose() on pid %d", pid);
 
     if (fp_child_input)
         fclose(fp_child_input);

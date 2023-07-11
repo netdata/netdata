@@ -286,7 +286,8 @@ static void process_nice_level(void) {
     int nice_level = (int)config_get_number(CONFIG_SECTION_GLOBAL, "process nice level", 19);
     if(nice(nice_level) == -1)
         netdata_log_error("Cannot set netdata CPU nice level to %d.", nice_level);
-    else debug(D_SYSTEM, "Set netdata nice level to %d.", nice_level);
+    else
+        netdata_log_debug(D_SYSTEM, "Set netdata nice level to %d.", nice_level);
 #endif // HAVE_NICE
 };
 
@@ -521,7 +522,8 @@ int become_daemon(int dont_fork, const char *user)
         if(become_user(user, pidfd) != 0) {
             netdata_log_error("Cannot become user '%s'. Continuing as we are.", user);
         }
-        else debug(D_SYSTEM, "Successfully became user '%s'.", user);
+        else
+            netdata_log_debug(D_SYSTEM, "Successfully became user '%s'.", user);
     }
     else {
         prepare_required_directories(getuid(), getgid());

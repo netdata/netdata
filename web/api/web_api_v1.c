@@ -414,7 +414,7 @@ inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_clien
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
-        debug(D_WEB_CLIENT, "%llu: API v1 alarm_count query param '%s' with value '%s'", w->id, name, value);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 alarm_count query param '%s' with value '%s'", w->id, name, value);
 
         char* p = value;
         if(!strcmp(name, "status")) {
@@ -654,7 +654,7 @@ inline int web_client_api_request_v1_chart(RRDHOST *host, struct web_client *w, 
 
 // returns the HTTP code
 static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *url) {
-    debug(D_WEB_CLIENT, "%llu: API v1 data with URL '%s'", w->id, url);
+    netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 data with URL '%s'", w->id, url);
 
     int ret = HTTP_RESP_BAD_REQUEST;
     BUFFER *dimensions = NULL;
@@ -693,7 +693,7 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
-        debug(D_WEB_CLIENT, "%llu: API v1 data query param '%s' with value '%s'", w->id, name, value);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 data query param '%s' with value '%s'", w->id, name, value);
 
         // name and value are now the parameters
         // they are not null and not empty
@@ -839,14 +839,14 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
 
     if(outFileName && *outFileName) {
         buffer_sprintf(w->response.header, "Content-Disposition: attachment; filename=\"%s\"\r\n", outFileName);
-        debug(D_WEB_CLIENT, "%llu: generating outfilename header: '%s'", w->id, outFileName);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: generating outfilename header: '%s'", w->id, outFileName);
     }
 
     if(format == DATASOURCE_DATATABLE_JSONP) {
         if(responseHandler == NULL)
             responseHandler = "google.visualization.Query.setResponse";
 
-        debug(D_WEB_CLIENT_ACCESS, "%llu: GOOGLE JSON/JSONP: version = '%s', reqId = '%s', sig = '%s', out = '%s', responseHandler = '%s', outFileName = '%s'",
+        netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: GOOGLE JSON/JSONP: version = '%s', reqId = '%s', sig = '%s', out = '%s', responseHandler = '%s', outFileName = '%s'",
                 w->id, google_version, google_reqId, google_sig, google_out, responseHandler, outFileName
         );
 
@@ -927,7 +927,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
 */
     }
 
-    debug(D_WEB_CLIENT, "%llu: API v1 registry with URL '%s'", w->id, url);
+    netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 registry with URL '%s'", w->id, url);
 
     // TODO
     // The browser may send multiple cookies with our id
@@ -961,7 +961,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
         if (!name || !*name) continue;
         if (!value || !*value) continue;
 
-        debug(D_WEB_CLIENT, "%llu: API v1 registry query param '%s' with value '%s'", w->id, name, value);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 registry query param '%s' with value '%s'", w->id, name, value);
 
         uint32_t hash = simple_hash(name);
 

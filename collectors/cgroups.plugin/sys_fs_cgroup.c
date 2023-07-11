@@ -427,10 +427,12 @@ void read_cgroup_plugin_configuration() {
 
         //TODO: can there be more than 1 cgroup2 mount point?
         mi = mountinfo_find_by_filesystem_super_option(root, "cgroup2", "rw"); //there is no cgroup2 specific super option - for now use 'rw' option
-        if(mi) debug(D_CGROUP, "found unified cgroup root using super options, with path: '%s'", mi->mount_point);
+        if(mi)
+            netdata_log_debug(D_CGROUP, "found unified cgroup root using super options, with path: '%s'", mi->mount_point);
         if(!mi) {
             mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup2", "cgroup");
-            if(mi) debug(D_CGROUP, "found unified cgroup root using mountsource info, with path: '%s'", mi->mount_point);
+            if(mi)
+                netdata_log_debug(D_CGROUP, "found unified cgroup root using mountsource info, with path: '%s'", mi->mount_point);
         }
         if(!mi) {
             collector_error("CGROUP: cannot find cgroup2 mountinfo. Assuming default: /sys/fs/cgroup");
@@ -439,7 +441,7 @@ void read_cgroup_plugin_configuration() {
         else s = mi->mount_point;
         set_cgroup_base_path(filename, s);
         cgroup_unified_base = config_get("plugin:cgroups", "path to unified cgroups", filename);
-        debug(D_CGROUP, "using cgroup root: '%s'", cgroup_unified_base);
+        netdata_log_debug(D_CGROUP, "using cgroup root: '%s'", cgroup_unified_base);
     }
 
     cgroup_root_max = (int)config_get_number("plugin:cgroups", "max cgroups to allow", cgroup_root_max);
@@ -982,13 +984,13 @@ static int k8s_get_container_first_proc_comm(const char *id, char *comm) {
 
     ff = procfile_reopen(ff, filename, NULL, CGROUP_PROCFILE_FLAG);
     if (unlikely(!ff)) {
-        debug(D_CGROUP, "CGROUP: k8s_is_pause_container(): cannot open file '%s'.", filename);
+        netdata_log_debug(D_CGROUP, "CGROUP: k8s_is_pause_container(): cannot open file '%s'.", filename);
         return 1;
     }
 
     ff = procfile_readall(ff);
     if (unlikely(!ff)) {
-        debug(D_CGROUP, "CGROUP: k8s_is_pause_container(): cannot read file '%s'.", filename);
+        netdata_log_debug(D_CGROUP, "CGROUP: k8s_is_pause_container(): cannot read file '%s'.", filename);
         return 1;
     }
 
@@ -1006,13 +1008,13 @@ static int k8s_get_container_first_proc_comm(const char *id, char *comm) {
 
     ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_DEFAULT);
     if (unlikely(!ff)) {
-        debug(D_CGROUP, "CGROUP: k8s_is_pause_container(): cannot open file '%s'.", filename);
+        netdata_log_debug(D_CGROUP, "CGROUP: k8s_is_pause_container(): cannot open file '%s'.", filename);
         return 1;
     }
 
     ff = procfile_readall(ff);
     if (unlikely(!ff)) {
-        debug(D_CGROUP, "CGROUP: k8s_is_pause_container(): cannot read file '%s'.", filename);
+        netdata_log_debug(D_CGROUP, "CGROUP: k8s_is_pause_container(): cannot read file '%s'.", filename);
         return 1;
     }
 
@@ -1612,7 +1614,7 @@ memory_next:
 }
 
 static inline void read_cgroup(struct cgroup *cg) {
-    debug(D_CGROUP, "reading metrics for cgroups '%s'", cg->id);
+    netdata_log_debug(D_CGROUP, "reading metrics for cgroups '%s'", cg->id);
     if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
         cgroup_read_cpuacct_stat(&cg->cpuacct_stat);
         cgroup_read_cpuacct_usage(&cg->cpuacct_usage);
@@ -1640,7 +1642,7 @@ static inline void read_cgroup(struct cgroup *cg) {
 }
 
 static inline void read_all_discovered_cgroups(struct cgroup *root) {
-    debug(D_CGROUP, "reading metrics for all cgroups");
+    netdata_log_debug(D_CGROUP, "reading metrics for all cgroups");
 
     struct cgroup *cg;
     for (cg = root; cg; cg = cg->next) {
@@ -1655,7 +1657,7 @@ static inline void read_all_discovered_cgroups(struct cgroup *root) {
 
 #define CGROUP_NETWORK_INTERFACE_MAX_LINE 2048
 static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
-    debug(D_CGROUP, "looking for the network interfaces of cgroup '%s' with chart id '%s' and title '%s'", cg->id, cg->chart_id, cg->chart_title);
+    netdata_log_debug(D_CGROUP, "looking for the network interfaces of cgroup '%s' with chart id '%s' and title '%s'", cg->id, cg->chart_id, cg->chart_title);
 
     pid_t cgroup_pid;
     char cgroup_identifier[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
@@ -1667,7 +1669,7 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
         snprintfz(cgroup_identifier, CGROUP_NETWORK_INTERFACE_MAX_LINE, "%s%s", cgroup_unified_base, cg->id);
     }
 
-    debug(D_CGROUP, "executing cgroup_identifier %s --cgroup '%s' for cgroup '%s'", cgroups_network_interface_script, cgroup_identifier, cg->id);
+    netdata_log_debug(D_CGROUP, "executing cgroup_identifier %s --cgroup '%s' for cgroup '%s'", cgroups_network_interface_script, cgroup_identifier, cg->id);
     FILE *fp_child_input, *fp_child_output;
     (void)netdata_popen_raw_default_flags_and_environment(&cgroup_pid, &fp_child_input, &fp_child_output, cgroups_network_interface_script, "--cgroup", cgroup_identifier);
     if(!fp_child_output) {
@@ -1713,7 +1715,7 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
     }
 
     netdata_pclose(fp_child_input, fp_child_output, cgroup_pid);
-    // debug(D_CGROUP, "closed cgroup_identifier for cgroup '%s'", cg->id);
+    // netdata_log_debug(D_CGROUP, "closed cgroup_identifier for cgroup '%s'", cg->id);
 }
 
 static inline void free_cgroup_network_interfaces(struct cgroup *cg) {
@@ -1793,7 +1795,7 @@ static inline void free_pressure(struct pressure *res) {
 }
 
 static inline void cgroup_free(struct cgroup *cg) {
-    debug(D_CGROUP, "Removing cgroup '%s' with chart id '%s' (was %s and %s)", cg->id, cg->chart_id, (cg->enabled)?"enabled":"disabled", (cg->available)?"available":"not available");
+    netdata_log_debug(D_CGROUP, "Removing cgroup '%s' with chart id '%s' (was %s and %s)", cg->id, cg->chart_id, (cg->enabled)?"enabled":"disabled", (cg->available)?"available":"not available");
 
     if(cg->st_cpu)                   rrdset_is_obsolete(cg->st_cpu);
     if(cg->st_cpu_limit)             rrdset_is_obsolete(cg->st_cpu_limit);
@@ -1870,8 +1872,8 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
     }
     cg->pending_renames--;
 
-    debug(D_CGROUP, "looking for the name of cgroup '%s' with chart id '%s' and title '%s'", cg->id, cg->chart_id, cg->chart_title);
-    debug(D_CGROUP, "executing command %s \"%s\" for cgroup '%s'", cgroups_rename_script, cg->intermediate_id, cg->chart_id);
+    netdata_log_debug(D_CGROUP, "looking for the name of cgroup '%s' with chart id '%s' and title '%s'", cg->id, cg->chart_id, cg->chart_title);
+    netdata_log_debug(D_CGROUP, "executing command %s \"%s\" for cgroup '%s'", cgroups_rename_script, cg->intermediate_id, cg->chart_id);
     pid_t cgroup_pid;
 
     FILE *fp_child_input, *fp_child_output;
@@ -1984,7 +1986,7 @@ static inline void convert_cgroup_to_systemd_service(struct cgroup *cg) {
 }
 
 static inline struct cgroup *discovery_cgroup_add(const char *id) {
-    debug(D_CGROUP, "adding to list, cgroup with id '%s'", id);
+    netdata_log_debug(D_CGROUP, "adding to list, cgroup with id '%s'", id);
 
     struct cgroup *cg = callocz(1, sizeof(struct cgroup));
     cg->id = strdupz(id);
@@ -2011,7 +2013,7 @@ static inline struct cgroup *discovery_cgroup_add(const char *id) {
 }
 
 static inline struct cgroup *discovery_cgroup_find(const char *id) {
-    debug(D_CGROUP, "searching for cgroup '%s'", id);
+    netdata_log_debug(D_CGROUP, "searching for cgroup '%s'", id);
 
     uint32_t hash = simple_hash(id);
 
@@ -2021,7 +2023,7 @@ static inline struct cgroup *discovery_cgroup_find(const char *id) {
             break;
     }
 
-    debug(D_CGROUP, "cgroup '%s' %s in memory", id, (cg)?"found":"not found");
+    netdata_log_debug(D_CGROUP, "cgroup '%s' %s in memory", id, (cg)?"found":"not found");
     return cg;
 }
 
@@ -2029,7 +2031,7 @@ static inline void discovery_find_cgroup_in_dir_callback(const char *dir) {
     if (!dir || !*dir) {
         dir = "/";
     }
-    debug(D_CGROUP, "examining cgroup dir '%s'", dir);
+    netdata_log_debug(D_CGROUP, "examining cgroup dir '%s'", dir);
 
     struct cgroup *cg = discovery_cgroup_find(dir);
     if (cg) {
@@ -2058,7 +2060,7 @@ static inline void discovery_find_cgroup_in_dir_callback(const char *dir) {
 
 static inline int discovery_find_dir_in_subdirs(const char *base, const char *this, void (*callback)(const char *)) {
     if(!this) this = base;
-    debug(D_CGROUP, "searching for directories in '%s' (base '%s')", this?this:"", base);
+    netdata_log_debug(D_CGROUP, "searching for directories in '%s' (base '%s')", this?this:"", base);
 
     size_t dirlen = strlen(this), baselen = strlen(base);
 
@@ -2112,7 +2114,7 @@ static inline int discovery_find_dir_in_subdirs(const char *base, const char *th
 }
 
 static inline void discovery_mark_all_cgroups_as_unavailable() {
-    debug(D_CGROUP, "marking all cgroups as not available");
+    netdata_log_debug(D_CGROUP, "marking all cgroups as not available");
     struct cgroup *cg;
     for (cg = discovered_cgroup_root; cg; cg = cg->discovered_next) {
         cg->available = 0;
@@ -2126,7 +2128,7 @@ static inline void discovery_update_filenames() {
         if(unlikely(!cg->available || !cg->enabled || cg->pending_renames))
             continue;
 
-        debug(D_CGROUP, "checking paths for cgroup '%s'", cg->id);
+        netdata_log_debug(D_CGROUP, "checking paths for cgroup '%s'", cg->id);
 
         // check for newly added cgroups
         // and update the filenames they read
@@ -2143,10 +2145,10 @@ static inline void discovery_update_filenames() {
                     cg->filename_cpu_cfs_period = strdupz(filename);
                     snprintfz(filename, FILENAME_MAX, "%s%s/cpu.cfs_quota_us", cgroup_cpuacct_base, cg->id);
                     cg->filename_cpu_cfs_quota = strdupz(filename);
-                    debug(D_CGROUP, "cpuacct.stat filename for cgroup '%s': '%s'", cg->id, cg->cpuacct_stat.filename);
+                    netdata_log_debug(D_CGROUP, "cpuacct.stat filename for cgroup '%s': '%s'", cg->id, cg->cpuacct_stat.filename);
                 }
                 else
-                    debug(D_CGROUP, "cpuacct.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "cpuacct.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
 
             if(unlikely(cgroup_enable_cpuacct_usage && !cg->cpuacct_usage.filename && !is_cgroup_systemd_service(cg))) {
@@ -2154,20 +2156,20 @@ static inline void discovery_update_filenames() {
                 if(likely(stat(filename, &buf) != -1)) {
                     cg->cpuacct_usage.filename = strdupz(filename);
                     cg->cpuacct_usage.enabled = cgroup_enable_cpuacct_usage;
-                    debug(D_CGROUP, "cpuacct.usage_percpu filename for cgroup '%s': '%s'", cg->id, cg->cpuacct_usage.filename);
+                    netdata_log_debug(D_CGROUP, "cpuacct.usage_percpu filename for cgroup '%s': '%s'", cg->id, cg->cpuacct_usage.filename);
                 }
                 else
-                    debug(D_CGROUP, "cpuacct.usage_percpu file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "cpuacct.usage_percpu file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
             if(unlikely(cgroup_enable_cpuacct_cpu_throttling && !cg->cpuacct_cpu_throttling.filename && !is_cgroup_systemd_service(cg))) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/cpu.stat", cgroup_cpuacct_base, cg->id);
                 if(likely(stat(filename, &buf) != -1)) {
                     cg->cpuacct_cpu_throttling.filename = strdupz(filename);
                     cg->cpuacct_cpu_throttling.enabled = cgroup_enable_cpuacct_cpu_throttling;
-                    debug(D_CGROUP, "cpu.stat filename for cgroup '%s': '%s'", cg->id, cg->cpuacct_cpu_throttling.filename);
+                    netdata_log_debug(D_CGROUP, "cpu.stat filename for cgroup '%s': '%s'", cg->id, cg->cpuacct_cpu_throttling.filename);
                 }
                 else
-                    debug(D_CGROUP, "cpu.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "cpu.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
             if (unlikely(
                     cgroup_enable_cpuacct_cpu_shares && !cg->cpuacct_cpu_shares.filename &&
@@ -2176,10 +2178,10 @@ static inline void discovery_update_filenames() {
                 if (likely(stat(filename, &buf) != -1)) {
                     cg->cpuacct_cpu_shares.filename = strdupz(filename);
                     cg->cpuacct_cpu_shares.enabled = cgroup_enable_cpuacct_cpu_shares;
-                    debug(
+                    netdata_log_debug(
                         D_CGROUP, "cpu.shares filename for cgroup '%s': '%s'", cg->id, cg->cpuacct_cpu_shares.filename);
                 } else
-                    debug(D_CGROUP, "cpu.shares file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "cpu.shares file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
 
             if(unlikely((cgroup_enable_detailed_memory || cgroup_used_memory) && !cg->memory.filename_detailed && (cgroup_used_memory || cgroup_enable_systemd_services_detailed_memory || !is_cgroup_systemd_service(cg)))) {
@@ -2187,10 +2189,10 @@ static inline void discovery_update_filenames() {
                 if(likely(stat(filename, &buf) != -1)) {
                     cg->memory.filename_detailed = strdupz(filename);
                     cg->memory.enabled_detailed = (cgroup_enable_detailed_memory == CONFIG_BOOLEAN_YES)?CONFIG_BOOLEAN_YES:CONFIG_BOOLEAN_AUTO;
-                    debug(D_CGROUP, "memory.stat filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_detailed);
+                    netdata_log_debug(D_CGROUP, "memory.stat filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_detailed);
                 }
                 else
-                    debug(D_CGROUP, "memory.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "memory.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
 
             if(unlikely(cgroup_enable_memory && !cg->memory.filename_usage_in_bytes)) {
@@ -2198,12 +2200,12 @@ static inline void discovery_update_filenames() {
                 if(likely(stat(filename, &buf) != -1)) {
                     cg->memory.filename_usage_in_bytes = strdupz(filename);
                     cg->memory.enabled_usage_in_bytes = cgroup_enable_memory;
-                    debug(D_CGROUP, "memory.usage_in_bytes filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_usage_in_bytes);
+                    netdata_log_debug(D_CGROUP, "memory.usage_in_bytes filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_usage_in_bytes);
                     snprintfz(filename, FILENAME_MAX, "%s%s/memory.limit_in_bytes", cgroup_memory_base, cg->id);
                     cg->filename_memory_limit = strdupz(filename);
                 }
                 else
-                    debug(D_CGROUP, "memory.usage_in_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "memory.usage_in_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
 
             if(unlikely(cgroup_enable_swap && !cg->memory.filename_msw_usage_in_bytes)) {
@@ -2213,10 +2215,10 @@ static inline void discovery_update_filenames() {
                     cg->memory.enabled_msw_usage_in_bytes = cgroup_enable_swap;
                     snprintfz(filename, FILENAME_MAX, "%s%s/memory.memsw.limit_in_bytes", cgroup_memory_base, cg->id);
                     cg->filename_memoryswap_limit = strdupz(filename);
-                    debug(D_CGROUP, "memory.msw_usage_in_bytes filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_msw_usage_in_bytes);
+                    netdata_log_debug(D_CGROUP, "memory.msw_usage_in_bytes filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_msw_usage_in_bytes);
                 }
                 else
-                    debug(D_CGROUP, "memory.msw_usage_in_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "memory.msw_usage_in_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
 
             if(unlikely(cgroup_enable_memory_failcnt && !cg->memory.filename_failcnt)) {
@@ -2224,10 +2226,10 @@ static inline void discovery_update_filenames() {
                 if(likely(stat(filename, &buf) != -1)) {
                     cg->memory.filename_failcnt = strdupz(filename);
                     cg->memory.enabled_failcnt = cgroup_enable_memory_failcnt;
-                    debug(D_CGROUP, "memory.failcnt filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_failcnt);
+                    netdata_log_debug(D_CGROUP, "memory.failcnt filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_failcnt);
                 }
                 else
-                    debug(D_CGROUP, "memory.failcnt file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "memory.failcnt file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
 
             if(unlikely(cgroup_enable_blkio_io && !cg->io_service_bytes.filename)) {
@@ -2235,16 +2237,16 @@ static inline void discovery_update_filenames() {
                 if (unlikely(stat(filename, &buf) != -1)) {
                     cg->io_service_bytes.filename = strdupz(filename);
                     cg->io_service_bytes.enabled = cgroup_enable_blkio_io;
-                    debug(D_CGROUP, "blkio.io_service_bytes_recursive filename for cgroup '%s': '%s'", cg->id, cg->io_service_bytes.filename);
+                    netdata_log_debug(D_CGROUP, "blkio.io_service_bytes_recursive filename for cgroup '%s': '%s'", cg->id, cg->io_service_bytes.filename);
                 } else {
-                    debug(D_CGROUP, "blkio.io_service_bytes_recursive file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "blkio.io_service_bytes_recursive file for cgroup '%s': '%s' does not exist.", cg->id, filename);
                     snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_service_bytes", cgroup_blkio_base, cg->id);
                     if (likely(stat(filename, &buf) != -1)) {
                         cg->io_service_bytes.filename = strdupz(filename);
                         cg->io_service_bytes.enabled = cgroup_enable_blkio_io;
-                        debug(D_CGROUP, "blkio.io_service_bytes filename for cgroup '%s': '%s'", cg->id, cg->io_service_bytes.filename);
+                        netdata_log_debug(D_CGROUP, "blkio.io_service_bytes filename for cgroup '%s': '%s'", cg->id, cg->io_service_bytes.filename);
                     } else {
-                        debug(D_CGROUP, "blkio.io_service_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                        netdata_log_debug(D_CGROUP, "blkio.io_service_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
                     }
                 }
             }
@@ -2254,16 +2256,16 @@ static inline void discovery_update_filenames() {
                 if (unlikely(stat(filename, &buf) != -1)) {
                     cg->io_serviced.filename = strdupz(filename);
                     cg->io_serviced.enabled = cgroup_enable_blkio_ops;
-                    debug(D_CGROUP, "blkio.io_serviced_recursive filename for cgroup '%s': '%s'", cg->id, cg->io_serviced.filename);
+                    netdata_log_debug(D_CGROUP, "blkio.io_serviced_recursive filename for cgroup '%s': '%s'", cg->id, cg->io_serviced.filename);
                 } else {
-                    debug(D_CGROUP, "blkio.io_serviced_recursive file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "blkio.io_serviced_recursive file for cgroup '%s': '%s' does not exist.", cg->id, filename);
                     snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_serviced", cgroup_blkio_base, cg->id);
                     if (likely(stat(filename, &buf) != -1)) {
                         cg->io_serviced.filename = strdupz(filename);
                         cg->io_serviced.enabled = cgroup_enable_blkio_ops;
-                        debug(D_CGROUP, "blkio.io_serviced filename for cgroup '%s': '%s'", cg->id, cg->io_serviced.filename);
+                        netdata_log_debug(D_CGROUP, "blkio.io_serviced filename for cgroup '%s': '%s'", cg->id, cg->io_serviced.filename);
                     } else {
-                        debug(D_CGROUP, "blkio.io_serviced file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                        netdata_log_debug(D_CGROUP, "blkio.io_serviced file for cgroup '%s': '%s' does not exist.", cg->id, filename);
                     }
                 }
             }
@@ -2273,17 +2275,17 @@ static inline void discovery_update_filenames() {
                 if (unlikely(stat(filename, &buf) != -1)) {
                     cg->throttle_io_service_bytes.filename = strdupz(filename);
                     cg->throttle_io_service_bytes.enabled = cgroup_enable_blkio_throttle_io;
-                    debug(D_CGROUP,"blkio.throttle.io_service_bytes_recursive filename for cgroup '%s': '%s'", cg->id, cg->throttle_io_service_bytes.filename);
+                    netdata_log_debug(D_CGROUP,"blkio.throttle.io_service_bytes_recursive filename for cgroup '%s': '%s'", cg->id, cg->throttle_io_service_bytes.filename);
                 } else {
-                    debug(D_CGROUP, "blkio.throttle.io_service_bytes_recursive file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "blkio.throttle.io_service_bytes_recursive file for cgroup '%s': '%s' does not exist.", cg->id, filename);
                     snprintfz(
                         filename, FILENAME_MAX, "%s%s/blkio.throttle.io_service_bytes", cgroup_blkio_base, cg->id);
                     if (likely(stat(filename, &buf) != -1)) {
                         cg->throttle_io_service_bytes.filename = strdupz(filename);
                         cg->throttle_io_service_bytes.enabled = cgroup_enable_blkio_throttle_io;
-                        debug(D_CGROUP, "blkio.throttle.io_service_bytes filename for cgroup '%s': '%s'", cg->id, cg->throttle_io_service_bytes.filename);
+                        netdata_log_debug(D_CGROUP, "blkio.throttle.io_service_bytes filename for cgroup '%s': '%s'", cg->id, cg->throttle_io_service_bytes.filename);
                     } else {
-                        debug(D_CGROUP, "blkio.throttle.io_service_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                        netdata_log_debug(D_CGROUP, "blkio.throttle.io_service_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
                     }
                 }
             }
@@ -2293,16 +2295,16 @@ static inline void discovery_update_filenames() {
                 if (unlikely(stat(filename, &buf) != -1)) {
                     cg->throttle_io_serviced.filename = strdupz(filename);
                     cg->throttle_io_serviced.enabled = cgroup_enable_blkio_throttle_ops;
-                    debug(D_CGROUP, "blkio.throttle.io_serviced_recursive filename for cgroup '%s': '%s'", cg->id, cg->throttle_io_serviced.filename);
+                    netdata_log_debug(D_CGROUP, "blkio.throttle.io_serviced_recursive filename for cgroup '%s': '%s'", cg->id, cg->throttle_io_serviced.filename);
                 } else {
-                    debug(D_CGROUP, "blkio.throttle.io_serviced_recursive file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "blkio.throttle.io_serviced_recursive file for cgroup '%s': '%s' does not exist.", cg->id, filename);
                     snprintfz(filename, FILENAME_MAX, "%s%s/blkio.throttle.io_serviced", cgroup_blkio_base, cg->id);
                     if (likely(stat(filename, &buf) != -1)) {
                         cg->throttle_io_serviced.filename = strdupz(filename);
                         cg->throttle_io_serviced.enabled = cgroup_enable_blkio_throttle_ops;
-                        debug(D_CGROUP, "blkio.throttle.io_serviced filename for cgroup '%s': '%s'", cg->id, cg->throttle_io_serviced.filename);
+                        netdata_log_debug(D_CGROUP, "blkio.throttle.io_serviced filename for cgroup '%s': '%s'", cg->id, cg->throttle_io_serviced.filename);
                     } else {
-                        debug(D_CGROUP, "blkio.throttle.io_serviced file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                        netdata_log_debug(D_CGROUP, "blkio.throttle.io_serviced file for cgroup '%s': '%s' does not exist.", cg->id, filename);
                     }
                 }
             }
@@ -2312,16 +2314,16 @@ static inline void discovery_update_filenames() {
                 if (unlikely(stat(filename, &buf) != -1)) {
                     cg->io_merged.filename = strdupz(filename);
                     cg->io_merged.enabled = cgroup_enable_blkio_merged_ops;
-                    debug(D_CGROUP, "blkio.io_merged_recursive filename for cgroup '%s': '%s'", cg->id, cg->io_merged.filename);
+                    netdata_log_debug(D_CGROUP, "blkio.io_merged_recursive filename for cgroup '%s': '%s'", cg->id, cg->io_merged.filename);
                 } else {
-                    debug(D_CGROUP, "blkio.io_merged_recursive file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "blkio.io_merged_recursive file for cgroup '%s': '%s' does not exist.", cg->id, filename);
                     snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_merged", cgroup_blkio_base, cg->id);
                     if (likely(stat(filename, &buf) != -1)) {
                         cg->io_merged.filename = strdupz(filename);
                         cg->io_merged.enabled = cgroup_enable_blkio_merged_ops;
-                        debug(D_CGROUP, "blkio.io_merged filename for cgroup '%s': '%s'", cg->id, cg->io_merged.filename);
+                        netdata_log_debug(D_CGROUP, "blkio.io_merged filename for cgroup '%s': '%s'", cg->id, cg->io_merged.filename);
                     } else {
-                        debug(D_CGROUP, "blkio.io_merged file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                        netdata_log_debug(D_CGROUP, "blkio.io_merged file for cgroup '%s': '%s' does not exist.", cg->id, filename);
                     }
                 }
             }
@@ -2331,16 +2333,16 @@ static inline void discovery_update_filenames() {
                 if (unlikely(stat(filename, &buf) != -1)) {
                     cg->io_queued.filename = strdupz(filename);
                     cg->io_queued.enabled = cgroup_enable_blkio_queued_ops;
-                    debug(D_CGROUP, "blkio.io_queued_recursive filename for cgroup '%s': '%s'", cg->id, cg->io_queued.filename);
+                    netdata_log_debug(D_CGROUP, "blkio.io_queued_recursive filename for cgroup '%s': '%s'", cg->id, cg->io_queued.filename);
                 } else {
-                    debug(D_CGROUP, "blkio.io_queued_recursive file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "blkio.io_queued_recursive file for cgroup '%s': '%s' does not exist.", cg->id, filename);
                     snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_queued", cgroup_blkio_base, cg->id);
                     if (likely(stat(filename, &buf) != -1)) {
                         cg->io_queued.filename = strdupz(filename);
                         cg->io_queued.enabled = cgroup_enable_blkio_queued_ops;
-                        debug(D_CGROUP, "blkio.io_queued filename for cgroup '%s': '%s'", cg->id, cg->io_queued.filename);
+                        netdata_log_debug(D_CGROUP, "blkio.io_queued filename for cgroup '%s': '%s'", cg->id, cg->io_queued.filename);
                     } else {
-                        debug(D_CGROUP, "blkio.io_queued file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                        netdata_log_debug(D_CGROUP, "blkio.io_queued file for cgroup '%s': '%s' does not exist.", cg->id, filename);
                     }
                 }
             }
@@ -2351,18 +2353,18 @@ static inline void discovery_update_filenames() {
                 if(likely(stat(filename, &buf) != -1)) {
                     cg->io_service_bytes.filename = strdupz(filename);
                     cg->io_service_bytes.enabled = cgroup_enable_blkio_io;
-                    debug(D_CGROUP, "io.stat filename for unified cgroup '%s': '%s'", cg->id, cg->io_service_bytes.filename);
+                    netdata_log_debug(D_CGROUP, "io.stat filename for unified cgroup '%s': '%s'", cg->id, cg->io_service_bytes.filename);
                 } else
-                    debug(D_CGROUP, "io.stat file for unified cgroup '%s': '%s' does not exist.", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "io.stat file for unified cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
             if (unlikely(cgroup_enable_blkio_ops && !cg->io_serviced.filename)) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/io.stat", cgroup_unified_base, cg->id);
                 if (likely(stat(filename, &buf) != -1)) {
                     cg->io_serviced.filename = strdupz(filename);
                     cg->io_serviced.enabled = cgroup_enable_blkio_ops;
-                    debug(D_CGROUP, "io.stat filename for unified cgroup '%s': '%s'", cg->id, cg->io_service_bytes.filename);
+                    netdata_log_debug(D_CGROUP, "io.stat filename for unified cgroup '%s': '%s'", cg->id, cg->io_service_bytes.filename);
                 } else
-                    debug(D_CGROUP, "io.stat file for unified cgroup '%s': '%s' does not exist.", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "io.stat file for unified cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
             if (unlikely(
                     (cgroup_enable_cpuacct_stat || cgroup_enable_cpuacct_cpu_throttling) &&
@@ -2376,19 +2378,19 @@ static inline void discovery_update_filenames() {
                     cg->filename_cpu_cfs_period = NULL;
                     snprintfz(filename, FILENAME_MAX, "%s%s/cpu.max", cgroup_unified_base, cg->id);
                     cg->filename_cpu_cfs_quota = strdupz(filename);
-                    debug(D_CGROUP, "cpu.stat filename for unified cgroup '%s': '%s'", cg->id, cg->cpuacct_stat.filename);
+                    netdata_log_debug(D_CGROUP, "cpu.stat filename for unified cgroup '%s': '%s'", cg->id, cg->cpuacct_stat.filename);
                 }
                 else
-                    debug(D_CGROUP, "cpu.stat file for unified cgroup '%s': '%s' does not exist.", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "cpu.stat file for unified cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
             if (unlikely(cgroup_enable_cpuacct_cpu_shares && !cg->cpuacct_cpu_shares.filename)) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/cpu.weight", cgroup_unified_base, cg->id);
                 if (likely(stat(filename, &buf) != -1)) {
                     cg->cpuacct_cpu_shares.filename = strdupz(filename);
                     cg->cpuacct_cpu_shares.enabled = cgroup_enable_cpuacct_cpu_shares;
-                    debug(D_CGROUP, "cpu.weight filename for cgroup '%s': '%s'", cg->id, cg->cpuacct_cpu_shares.filename);
+                    netdata_log_debug(D_CGROUP, "cpu.weight filename for cgroup '%s': '%s'", cg->id, cg->cpuacct_cpu_shares.filename);
                 } else
-                    debug(D_CGROUP, "cpu.weight file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "cpu.weight file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
 
             if(unlikely((cgroup_enable_detailed_memory || cgroup_used_memory) && !cg->memory.filename_detailed && (cgroup_used_memory || cgroup_enable_systemd_services_detailed_memory || !is_cgroup_systemd_service(cg)))) {
@@ -2396,10 +2398,10 @@ static inline void discovery_update_filenames() {
                 if(likely(stat(filename, &buf) != -1)) {
                     cg->memory.filename_detailed = strdupz(filename);
                     cg->memory.enabled_detailed = (cgroup_enable_detailed_memory == CONFIG_BOOLEAN_YES)?CONFIG_BOOLEAN_YES:CONFIG_BOOLEAN_AUTO;
-                    debug(D_CGROUP, "memory.stat filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_detailed);
+                    netdata_log_debug(D_CGROUP, "memory.stat filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_detailed);
                 }
                 else
-                    debug(D_CGROUP, "memory.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "memory.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
 
             if(unlikely(cgroup_enable_memory && !cg->memory.filename_usage_in_bytes)) {
@@ -2407,12 +2409,12 @@ static inline void discovery_update_filenames() {
                 if(likely(stat(filename, &buf) != -1)) {
                     cg->memory.filename_usage_in_bytes = strdupz(filename);
                     cg->memory.enabled_usage_in_bytes = cgroup_enable_memory;
-                    debug(D_CGROUP, "memory.current filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_usage_in_bytes);
+                    netdata_log_debug(D_CGROUP, "memory.current filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_usage_in_bytes);
                     snprintfz(filename, FILENAME_MAX, "%s%s/memory.max", cgroup_unified_base, cg->id);
                     cg->filename_memory_limit = strdupz(filename);
                 }
                 else
-                    debug(D_CGROUP, "memory.current file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "memory.current file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
 
             if(unlikely(cgroup_enable_swap && !cg->memory.filename_msw_usage_in_bytes)) {
@@ -2422,10 +2424,10 @@ static inline void discovery_update_filenames() {
                     cg->memory.enabled_msw_usage_in_bytes = cgroup_enable_swap;
                     snprintfz(filename, FILENAME_MAX, "%s%s/memory.swap.max", cgroup_unified_base, cg->id);
                     cg->filename_memoryswap_limit = strdupz(filename);
-                    debug(D_CGROUP, "memory.swap.current filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_msw_usage_in_bytes);
+                    netdata_log_debug(D_CGROUP, "memory.swap.current filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_msw_usage_in_bytes);
                 }
                 else
-                    debug(D_CGROUP, "memory.swap file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "memory.swap file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
 
             if (unlikely(cgroup_enable_pressure_cpu && !cg->cpu_pressure.filename)) {
@@ -2434,9 +2436,9 @@ static inline void discovery_update_filenames() {
                     cg->cpu_pressure.filename = strdupz(filename);
                     cg->cpu_pressure.some.enabled = cgroup_enable_pressure_cpu;
                     cg->cpu_pressure.full.enabled = CONFIG_BOOLEAN_NO;
-                    debug(D_CGROUP, "cpu.pressure filename for cgroup '%s': '%s'", cg->id, cg->cpu_pressure.filename);
+                    netdata_log_debug(D_CGROUP, "cpu.pressure filename for cgroup '%s': '%s'", cg->id, cg->cpu_pressure.filename);
                 } else {
-                    debug(D_CGROUP, "cpu.pressure file for cgroup '%s': '%s' does not exist", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "cpu.pressure file for cgroup '%s': '%s' does not exist", cg->id, filename);
                 }
             }
 
@@ -2446,9 +2448,9 @@ static inline void discovery_update_filenames() {
                     cg->io_pressure.filename = strdupz(filename);
                     cg->io_pressure.some.enabled = cgroup_enable_pressure_io_some;
                     cg->io_pressure.full.enabled = cgroup_enable_pressure_io_full;
-                    debug(D_CGROUP, "io.pressure filename for cgroup '%s': '%s'", cg->id, cg->io_pressure.filename);
+                    netdata_log_debug(D_CGROUP, "io.pressure filename for cgroup '%s': '%s'", cg->id, cg->io_pressure.filename);
                 } else {
-                    debug(D_CGROUP, "io.pressure file for cgroup '%s': '%s' does not exist", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "io.pressure file for cgroup '%s': '%s' does not exist", cg->id, filename);
                 }
             }
 
@@ -2458,9 +2460,9 @@ static inline void discovery_update_filenames() {
                     cg->memory_pressure.filename = strdupz(filename);
                     cg->memory_pressure.some.enabled = cgroup_enable_pressure_memory_some;
                     cg->memory_pressure.full.enabled = cgroup_enable_pressure_memory_full;
-                    debug(D_CGROUP, "memory.pressure filename for cgroup '%s': '%s'", cg->id, cg->memory_pressure.filename);
+                    netdata_log_debug(D_CGROUP, "memory.pressure filename for cgroup '%s': '%s'", cg->id, cg->memory_pressure.filename);
                 } else {
-                    debug(D_CGROUP, "memory.pressure file for cgroup '%s': '%s' does not exist", cg->id, filename);
+                    netdata_log_debug(D_CGROUP, "memory.pressure file for cgroup '%s': '%s' does not exist", cg->id, filename);
                 }
             }
         }
@@ -2477,7 +2479,7 @@ static inline void discovery_cleanup_all_cgroups() {
                 struct cgroup *t;
                 for(t = discovered_cgroup_root; t ; t = t->discovered_next) {
                     if(t != cg && t->available && !t->enabled && t->options & CGROUP_OPTIONS_DISABLED_DUPLICATE && t->hash_chart == cg->hash_chart && !strcmp(t->chart_id, cg->chart_id)) {
-                        debug(D_CGROUP, "Enabling duplicate of cgroup '%s' with id '%s', because the original with id '%s' stopped.", t->chart_id, t->id, cg->id);
+                        netdata_log_debug(D_CGROUP, "Enabling duplicate of cgroup '%s' with id '%s', because the original with id '%s' stopped.", t->chart_id, t->id, cg->id);
                         t->enabled = 1;
                         t->options &= ~CGROUP_OPTIONS_DISABLED_DUPLICATE;
                         break;
@@ -2505,7 +2507,7 @@ static inline void discovery_cleanup_all_cgroups() {
 }
 
 static inline void discovery_copy_discovered_cgroups_to_reader() {
-    debug(D_CGROUP, "copy discovered cgroups to the main group list");
+    netdata_log_debug(D_CGROUP, "copy discovered cgroups to the main group list");
 
     struct cgroup *cg;
 
@@ -2543,7 +2545,7 @@ static inline void discovery_share_cgroups_with_ebpf() {
             is_cgroup_procs_exist(ptr, cg->id);
         }
 
-        debug(D_CGROUP, "cgroup shared: NAME=%s, ENABLED=%d", ptr->name, ptr->enabled);
+        netdata_log_debug(D_CGROUP, "cgroup shared: NAME=%s, ENABLED=%d", ptr->name, ptr->enabled);
     }
 
     shm_cgroup_ebpf.header->cgroup_root_count = count;
@@ -2633,13 +2635,13 @@ static inline void discovery_process_first_time_seen_cgroup(struct cgroup *cg) {
     }
 
     if (cgroup_enable_systemd_services && matches_systemd_services_cgroups(cg->id)) {
-        debug(D_CGROUP, "cgroup '%s' (name '%s') matches 'cgroups to match as systemd services'", cg->id, cg->chart_title);
+        netdata_log_debug(D_CGROUP, "cgroup '%s' (name '%s') matches 'cgroups to match as systemd services'", cg->id, cg->chart_title);
         convert_cgroup_to_systemd_service(cg);
         return;
     }
 
     if (matches_enabled_cgroup_renames(cg->id)) {
-        debug(D_CGROUP, "cgroup '%s' (name '%s') matches 'run script to rename cgroups matching', will try to rename it", cg->id, cg->chart_title);
+        netdata_log_debug(D_CGROUP, "cgroup '%s' (name '%s') matches 'run script to rename cgroups matching', will try to rename it", cg->id, cg->chart_title);
         if (is_inside_k8s && k8s_is_container(cg->id)) {
             // it may take up to a minute for the K8s API to return data for the container
             // tested on AWS K8s cluster with 100% CPU utilization
@@ -2664,7 +2666,7 @@ static int discovery_is_cgroup_duplicate(struct cgroup *cg) {
 
 static inline void discovery_process_cgroup(struct cgroup *cg) {
     if (!cg) {
-        debug(D_CGROUP, "discovery_process_cgroup() received NULL");
+        netdata_log_debug(D_CGROUP, "discovery_process_cgroup() received NULL");
         return;
     }
     if (!cg->available || cg->processed) {
@@ -2700,12 +2702,12 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
     }
 
     if (!(cg->enabled = matches_enabled_cgroup_names(cg->chart_title))) {
-        debug(D_CGROUP, "cgroup '%s' (name '%s') disabled by 'enable by default cgroups names matching'", cg->id, cg->chart_title);
+        netdata_log_debug(D_CGROUP, "cgroup '%s' (name '%s') disabled by 'enable by default cgroups names matching'", cg->id, cg->chart_title);
         return;
     }
 
     if (!(cg->enabled = matches_enabled_cgroup_paths(cg->id))) {
-        debug(D_CGROUP, "cgroup '%s' (name '%s') disabled by 'enable by default cgroups matching'", cg->id, cg->chart_title);
+        netdata_log_debug(D_CGROUP, "cgroup '%s' (name '%s') disabled by 'enable by default cgroups matching'", cg->id, cg->chart_title);
         return;
     }
 
@@ -2730,7 +2732,7 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
 }
 
 static inline void discovery_find_all_cgroups() {
-    debug(D_CGROUP, "searching for cgroups");
+    netdata_log_debug(D_CGROUP, "searching for cgroups");
 
     worker_is_busy(WORKER_DISCOVERY_INIT);
     discovery_mark_all_cgroups_as_unavailable();
@@ -2765,7 +2767,7 @@ static inline void discovery_find_all_cgroups() {
     worker_is_busy(WORKER_DISCOVERY_SHARE);
     discovery_share_cgroups_with_ebpf();
 
-    debug(D_CGROUP, "done searching for cgroups");
+    netdata_log_debug(D_CGROUP, "done searching for cgroups");
 }
 
 static void cgroup_discovery_cleanup(void *ptr) {
@@ -3587,7 +3589,7 @@ static inline void update_cpu_limits2(struct cgroup *cg) {
         } else {
             cg->cpu_cfs_quota = str2ull(procfile_lineword(ff, 0, 0), NULL);
         }
-        debug(D_CGROUP, "CPU limits values: %llu %llu %llu", cg->cpu_cfs_period, cg->cpuset_cpus, cg->cpu_cfs_quota);
+        netdata_log_debug(D_CGROUP, "CPU limits values: %llu %llu %llu", cg->cpu_cfs_period, cg->cpuset_cpus, cg->cpu_cfs_quota);
         return;
 
 cpu_limits2_err:
@@ -3645,7 +3647,7 @@ static inline int update_memory_limits(char **filename, const RRDSETVAR_ACQUIRED
 }
 
 void update_cgroup_charts(int update_every) {
-    debug(D_CGROUP, "updating cgroups charts");
+    netdata_log_debug(D_CGROUP, "updating cgroups charts");
 
     char type[RRD_ID_LENGTH_MAX + 1];
     char title[CHART_TITLE_MAX + 1];
@@ -4754,7 +4756,7 @@ void update_cgroup_charts(int update_every) {
                                        , services_do_queued_ops, services_do_merged_ops
         );
 
-    debug(D_CGROUP, "done updating cgroups charts");
+    netdata_log_debug(D_CGROUP, "done updating cgroups charts");
 }
 
 // ----------------------------------------------------------------------------

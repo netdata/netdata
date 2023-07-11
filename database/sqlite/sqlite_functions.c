@@ -321,7 +321,7 @@ int init_database_batch(sqlite3 *database, int rebuild, int init_type, const cha
     int rc;
     char *err_msg = NULL;
     for (int i = 0; batch[i]; i++) {
-        debug(D_METADATALOG, "Executing %s", batch[i]);
+        netdata_log_debug(D_METADATALOG, "Executing %s", batch[i]);
         rc = sqlite3_exec_monitored(database, batch[i], 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
             error_report("SQLite error during database %s, rc = %d (%s)", init_type ? "cleanup" : "setup", rc, err_msg);

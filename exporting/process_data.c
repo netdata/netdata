@@ -107,7 +107,7 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
 
     if (unlikely(before < first_t || after > last_t)) {
         // the chart has not been updated in the wanted timeframe
-        debug(
+        netdata_log_debug(
             D_EXPORTING,
             "EXPORTING: %s.%s.%s: aligned timeframe %lu to %lu is outside the chart's database range %lu to %lu",
             rrdhost_hostname(host),
@@ -142,7 +142,7 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
     global_statistics_exporters_query_completed(points_read);
 
     if (unlikely(!counter)) {
-        debug(
+        netdata_log_debug(
             D_EXPORTING,
             "EXPORTING: %s.%s.%s: no values stored in database for range %lu to %lu",
             rrdhost_hostname(host),

@@ -24,45 +24,45 @@ struct array_printer {
  */
 void analytics_log_data(void)
 {
-    debug(D_ANALYTICS, "NETDATA_CONFIG_STREAM_ENABLED      : [%s]", analytics_data.netdata_config_stream_enabled);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_MEMORY_MODE         : [%s]", analytics_data.netdata_config_memory_mode);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_EXPORTING_ENABLED   : [%s]", analytics_data.netdata_config_exporting_enabled);
-    debug(D_ANALYTICS, "NETDATA_EXPORTING_CONNECTORS       : [%s]", analytics_data.netdata_exporting_connectors);
-    debug(D_ANALYTICS, "NETDATA_ALLMETRICS_PROMETHEUS_USED : [%s]", analytics_data.netdata_allmetrics_prometheus_used);
-    debug(D_ANALYTICS, "NETDATA_ALLMETRICS_SHELL_USED      : [%s]", analytics_data.netdata_allmetrics_shell_used);
-    debug(D_ANALYTICS, "NETDATA_ALLMETRICS_JSON_USED       : [%s]", analytics_data.netdata_allmetrics_json_used);
-    debug(D_ANALYTICS, "NETDATA_DASHBOARD_USED             : [%s]", analytics_data.netdata_dashboard_used);
-    debug(D_ANALYTICS, "NETDATA_COLLECTORS                 : [%s]", analytics_data.netdata_collectors);
-    debug(D_ANALYTICS, "NETDATA_COLLECTORS_COUNT           : [%s]", analytics_data.netdata_collectors_count);
-    debug(D_ANALYTICS, "NETDATA_BUILDINFO                  : [%s]", analytics_data.netdata_buildinfo);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_PAGE_CACHE_SIZE     : [%s]", analytics_data.netdata_config_page_cache_size);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_MULTIDB_DISK_QUOTA  : [%s]", analytics_data.netdata_config_multidb_disk_quota);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_HTTPS_ENABLED       : [%s]", analytics_data.netdata_config_https_enabled);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_WEB_ENABLED         : [%s]", analytics_data.netdata_config_web_enabled);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_RELEASE_CHANNEL     : [%s]", analytics_data.netdata_config_release_channel);
-    debug(D_ANALYTICS, "NETDATA_MIRRORED_HOST_COUNT        : [%s]", analytics_data.netdata_mirrored_host_count);
-    debug(D_ANALYTICS, "NETDATA_MIRRORED_HOSTS_REACHABLE   : [%s]", analytics_data.netdata_mirrored_hosts_reachable);
-    debug(D_ANALYTICS, "NETDATA_MIRRORED_HOSTS_UNREACHABLE : [%s]", analytics_data.netdata_mirrored_hosts_unreachable);
-    debug(D_ANALYTICS, "NETDATA_NOTIFICATION_METHODS       : [%s]", analytics_data.netdata_notification_methods);
-    debug(D_ANALYTICS, "NETDATA_ALARMS_NORMAL              : [%s]", analytics_data.netdata_alarms_normal);
-    debug(D_ANALYTICS, "NETDATA_ALARMS_WARNING             : [%s]", analytics_data.netdata_alarms_warning);
-    debug(D_ANALYTICS, "NETDATA_ALARMS_CRITICAL            : [%s]", analytics_data.netdata_alarms_critical);
-    debug(D_ANALYTICS, "NETDATA_CHARTS_COUNT               : [%s]", analytics_data.netdata_charts_count);
-    debug(D_ANALYTICS, "NETDATA_METRICS_COUNT              : [%s]", analytics_data.netdata_metrics_count);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_IS_PARENT           : [%s]", analytics_data.netdata_config_is_parent);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_HOSTS_AVAILABLE     : [%s]", analytics_data.netdata_config_hosts_available);
-    debug(D_ANALYTICS, "NETDATA_HOST_CLOUD_AVAILABLE       : [%s]", analytics_data.netdata_host_cloud_available);
-    debug(D_ANALYTICS, "NETDATA_HOST_ACLK_AVAILABLE        : [%s]", analytics_data.netdata_host_aclk_available);
-    debug(D_ANALYTICS, "NETDATA_HOST_ACLK_PROTOCOL         : [%s]", analytics_data.netdata_host_aclk_protocol);
-    debug(D_ANALYTICS, "NETDATA_HOST_ACLK_IMPLEMENTATION   : [%s]", analytics_data.netdata_host_aclk_implementation);
-    debug(D_ANALYTICS, "NETDATA_HOST_AGENT_CLAIMED         : [%s]", analytics_data.netdata_host_agent_claimed);
-    debug(D_ANALYTICS, "NETDATA_HOST_CLOUD_ENABLED         : [%s]", analytics_data.netdata_host_cloud_enabled);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_HTTPS_AVAILABLE     : [%s]", analytics_data.netdata_config_https_available);
-    debug(D_ANALYTICS, "NETDATA_INSTALL_TYPE               : [%s]", analytics_data.netdata_install_type);
-    debug(D_ANALYTICS, "NETDATA_PREBUILT_DISTRO            : [%s]", analytics_data.netdata_prebuilt_distro);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_IS_PRIVATE_REGISTRY : [%s]", analytics_data.netdata_config_is_private_registry);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_USE_PRIVATE_REGISTRY: [%s]", analytics_data.netdata_config_use_private_registry);
-    debug(D_ANALYTICS, "NETDATA_CONFIG_OOM_SCORE           : [%s]", analytics_data.netdata_config_oom_score);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_CONFIG_STREAM_ENABLED      : [%s]", analytics_data.netdata_config_stream_enabled);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_CONFIG_MEMORY_MODE         : [%s]", analytics_data.netdata_config_memory_mode);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_CONFIG_EXPORTING_ENABLED   : [%s]", analytics_data.netdata_config_exporting_enabled);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_EXPORTING_CONNECTORS       : [%s]", analytics_data.netdata_exporting_connectors);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_ALLMETRICS_PROMETHEUS_USED : [%s]", analytics_data.netdata_allmetrics_prometheus_used);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_ALLMETRICS_SHELL_USED      : [%s]", analytics_data.netdata_allmetrics_shell_used);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_ALLMETRICS_JSON_USED       : [%s]", analytics_data.netdata_allmetrics_json_used);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_DASHBOARD_USED             : [%s]", analytics_data.netdata_dashboard_used);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_COLLECTORS                 : [%s]", analytics_data.netdata_collectors);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_COLLECTORS_COUNT           : [%s]", analytics_data.netdata_collectors_count);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_BUILDINFO                  : [%s]", analytics_data.netdata_buildinfo);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_CONFIG_PAGE_CACHE_SIZE     : [%s]", analytics_data.netdata_config_page_cache_size);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_CONFIG_MULTIDB_DISK_QUOTA  : [%s]", analytics_data.netdata_config_multidb_disk_quota);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_CONFIG_HTTPS_ENABLED       : [%s]", analytics_data.netdata_config_https_enabled);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_CONFIG_WEB_ENABLED         : [%s]", analytics_data.netdata_config_web_enabled);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_CONFIG_RELEASE_CHANNEL     : [%s]", analytics_data.netdata_config_release_channel);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_MIRRORED_HOST_COUNT        : [%s]", analytics_data.netdata_mirrored_host_count);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_MIRRORED_HOSTS_REACHABLE   : [%s]", analytics_data.netdata_mirrored_hosts_reachable);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_MIRRORED_HOSTS_UNREACHABLE : [%s]", analytics_data.netdata_mirrored_hosts_unreachable);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_NOTIFICATION_METHODS       : [%s]", analytics_data.netdata_notification_methods);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_ALARMS_NORMAL              : [%s]", analytics_data.netdata_alarms_normal);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_ALARMS_WARNING             : [%s]", analytics_data.netdata_alarms_warning);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_ALARMS_CRITICAL            : [%s]", analytics_data.netdata_alarms_critical);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_CHARTS_COUNT               : [%s]", analytics_data.netdata_charts_count);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_METRICS_COUNT              : [%s]", analytics_data.netdata_metrics_count);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_CONFIG_IS_PARENT           : [%s]", analytics_data.netdata_config_is_parent);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_CONFIG_HOSTS_AVAILABLE     : [%s]", analytics_data.netdata_config_hosts_available);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_HOST_CLOUD_AVAILABLE       : [%s]", analytics_data.netdata_host_cloud_available);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_HOST_ACLK_AVAILABLE        : [%s]", analytics_data.netdata_host_aclk_available);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_HOST_ACLK_PROTOCOL         : [%s]", analytics_data.netdata_host_aclk_protocol);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_HOST_ACLK_IMPLEMENTATION   : [%s]", analytics_data.netdata_host_aclk_implementation);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_HOST_AGENT_CLAIMED         : [%s]", analytics_data.netdata_host_agent_claimed);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_HOST_CLOUD_ENABLED         : [%s]", analytics_data.netdata_host_cloud_enabled);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_CONFIG_HTTPS_AVAILABLE     : [%s]", analytics_data.netdata_config_https_available);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_INSTALL_TYPE               : [%s]", analytics_data.netdata_install_type);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_PREBUILT_DISTRO            : [%s]", analytics_data.netdata_prebuilt_distro);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_CONFIG_IS_PRIVATE_REGISTRY : [%s]", analytics_data.netdata_config_is_private_registry);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_CONFIG_USE_PRIVATE_REGISTRY: [%s]", analytics_data.netdata_config_use_private_registry);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_CONFIG_OOM_SCORE           : [%s]", analytics_data.netdata_config_oom_score);
 }
 
 /*
@@ -323,7 +323,7 @@ void analytics_alarms_notifications(void)
 
     pid_t command_pid;
 
-    debug(D_ANALYTICS, "Executing %s", script);
+    netdata_log_debug(D_ANALYTICS, "Executing %s", script);
 
     BUFFER *b = buffer_create(1000, NULL);
     int cnt = 0;
@@ -561,7 +561,7 @@ void analytics_main_cleanup(void *ptr)
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    debug(D_ANALYTICS, "Cleaning up...");
+    netdata_log_debug(D_ANALYTICS, "Cleaning up...");
     analytics_free_data();
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
@@ -581,7 +581,7 @@ void *analytics_main(void *ptr)
     heartbeat_init(&hb);
     usec_t step_ut = USEC_PER_SEC;
 
-    debug(D_ANALYTICS, "Analytics thread starts");
+    netdata_log_debug(D_ANALYTICS, "Analytics thread starts");
 
     //first delay after agent start
     while (service_running(SERVICE_ANALYTICS) && likely(sec <= ANALYTICS_INIT_SLEEP_SEC)) {

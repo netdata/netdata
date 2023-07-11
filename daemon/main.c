@@ -611,7 +611,7 @@ void web_server_config_options(void)
 // killpid kills pid with SIGTERM.
 int killpid(pid_t pid) {
     int ret;
-    debug(D_EXIT, "Request to kill pid %d", pid);
+    netdata_log_debug(D_EXIT, "Request to kill pid %d", pid);
 
     errno = 0;
     ret = kill(pid, SIGTERM);
@@ -1060,7 +1060,7 @@ static void get_netdata_configured_variables() {
     }
 
     netdata_configured_hostname = config_get(CONFIG_SECTION_GLOBAL, "hostname", buf);
-    debug(D_OPTIONS, "hostname set to '%s'", netdata_configured_hostname);
+    netdata_log_debug(D_OPTIONS, "hostname set to '%s'", netdata_configured_hostname);
 
     // ------------------------------------------------------------------------
     // get default database update frequency
@@ -1390,7 +1390,7 @@ int main(int argc, char **argv) {
                         return 1;
                     }
                     else {
-                        debug(D_OPTIONS, "Configuration loaded from %s.", optarg);
+                        netdata_log_debug(D_OPTIONS, "Configuration loaded from %s.", optarg);
                         load_cloud_conf(1);
                         config_loaded = 1;
                     }
@@ -1876,7 +1876,7 @@ int main(int argc, char **argv) {
         setenv("NETDATA_DEBUG_FLAGS", flags, 1);
 
         debug_flags = strtoull(flags, NULL, 0);
-        debug(D_OPTIONS, "Debug flags set to '0x%" PRIX64 "'.", debug_flags);
+        netdata_log_debug(D_OPTIONS, "Debug flags set to '0x%" PRIX64 "'.", debug_flags);
 
         if(debug_flags != 0) {
             struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
@@ -2089,10 +2089,11 @@ int main(int argc, char **argv) {
 
         if(st->enabled) {
             st->thread = mallocz(sizeof(netdata_thread_t));
-            debug(D_SYSTEM, "Starting thread %s.", st->name);
+            netdata_log_debug(D_SYSTEM, "Starting thread %s.", st->name);
             netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
         }
-        else debug(D_SYSTEM, "Not starting thread %s.", st->name);
+        else
+            netdata_log_debug(D_SYSTEM, "Not starting thread %s.", st->name);
     }
     ml_start_threads();
 
@@ -2122,7 +2123,7 @@ int main(int argc, char **argv) {
                 struct netdata_static_thread *st = &static_threads[i];
                 st->thread = mallocz(sizeof(netdata_thread_t));
                 st->enabled = 1;
-                debug(D_SYSTEM, "Starting thread %s.", st->name);
+                netdata_log_debug(D_SYSTEM, "Starting thread %s.", st->name);
                 netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
             }
         }

@@ -96,7 +96,7 @@ size_t rrdpush_compress(struct compressor_state *state, const char *data, size_t
     uint32_t len = ((compressed_data_size & 0x7f) | 0x80 | (((compressed_data_size & (0x7f << 7)) << 1) | 0x8000)) << 8;
     *(uint32_t *)state->compression_result_buffer = len | RRDPUSH_COMPRESSION_SIGNATURE;
     *out = state->compression_result_buffer;
-    debug(D_STREAM, "%s: Compressed data header: %ld", STREAM_COMPRESSION_MSG, compressed_data_size);
+    netdata_log_debug(D_STREAM, "%s: Compressed data header: %ld", STREAM_COMPRESSION_MSG, compressed_data_size);
     return compressed_data_size + RRDPUSH_COMPRESSION_SIGNATURE_SIZE;
 }
 

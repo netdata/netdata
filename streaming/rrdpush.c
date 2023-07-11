@@ -1185,7 +1185,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         }
     }
 
-    debug(D_SYSTEM, "starting STREAM receive thread.");
+    netdata_log_debug(D_SYSTEM, "starting STREAM receive thread.");
 
     rrdpush_receiver_takeover_web_connection(w, rpt);
 
