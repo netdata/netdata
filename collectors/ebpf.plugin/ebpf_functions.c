@@ -201,7 +201,6 @@ static void ebpf_function_thread_manipulation(const char *transaction,
     }
 
     time_t expires = now_realtime_sec() + em->update_every;
-    pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires);
 
     BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, false);
@@ -348,6 +347,8 @@ static void ebpf_function_thread_manipulation(const char *transaction,
 
     // Lock necessary to avoid race condition
     pthread_mutex_lock(&lock);
+    pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires);
+
     fwrite(buffer_tostring(wb), buffer_strlen(wb), 1, stdout);
 
     pluginsd_function_result_end_to_stdout();
