@@ -110,12 +110,15 @@ unsigned int workaround_flags = 0;
 
 /* Set to an appropriate alternate if desired */
 char *sdr_cache_directory = "/tmp";
+char *sdr_sensors_cache_format = ".netdata-freeipmi-sensors-%H-on-%L.sdr";
+char *sdr_sel_cache_format = ".netdata-freeipmi-sel-%H-on-%L.sdr";
 char *sensor_config_file = NULL;
 char *sel_config_file = NULL;
 
 // controlled via command line options
-unsigned int global_sel_flags = 0;
-unsigned int global_sensor_reading_flags = IPMI_MONITORING_SENSOR_READING_FLAGS_DISCRETE_READING;
+unsigned int global_sel_flags = IPMI_MONITORING_SEL_FLAGS_REREAD_SDR_CACHE;
+unsigned int global_sensor_reading_flags = IPMI_MONITORING_SENSOR_READING_FLAGS_DISCRETE_READING|IPMI_MONITORING_SENSOR_READING_FLAGS_REREAD_SDR_CACHE;
+bool remove_reread_sdr_after_first_use = true;
 
 /* Initialization flags
  *
@@ -371,6 +374,12 @@ static int netdata_read_ipmi_sensors(struct ipmi_monitoring_ipmi_config *ipmi_co
             goto cleanup;
         }
     }
+    if (sdr_sensors_cache_format) {
+        if (ipmi_monitoring_ctx_sdr_cache_filenames(ctx, sdr_sensors_cache_format) < 0) {
+            collector_error("ipmi_monitoring_ctx_sdr_cache_filenames(): %s\n", ipmi_monitoring_ctx_errormsg (ctx));
+            goto cleanup;
+        }
+    }
 
     timing_step(TIMING_STEP_FREEIPMI_DSR_CACHE_DIR);
 
@@ -472,6 +481,9 @@ cleanup:
 
     timing_report();
 
+    if(remove_reread_sdr_after_first_use)
+        global_sensor_reading_flags &= ~(IPMI_MONITORING_SENSOR_READING_FLAGS_REREAD_SDR_CACHE);
+
     return (rv);
 }
 
@@ -491,8 +503,13 @@ static int netdata_get_ipmi_sel_events_count(struct ipmi_monitoring_ipmi_config 
 
     if (sdr_cache_directory) {
         if (ipmi_monitoring_ctx_sdr_cache_directory (ctx, sdr_cache_directory) < 0) {
-            collector_error( "ipmi_monitoring_ctx_sdr_cache_directory(): %s",
-                             ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error( "ipmi_monitoring_ctx_sdr_cache_directory(): %s", ipmi_monitoring_ctx_errormsg (ctx));
+            goto cleanup;
+        }
+    }
+    if (sdr_sel_cache_format) {
+        if (ipmi_monitoring_ctx_sdr_cache_filenames(ctx, sdr_sel_cache_format) < 0) {
+            collector_error("ipmi_monitoring_ctx_sdr_cache_filenames(): %s\n", ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
     }
@@ -527,6 +544,9 @@ cleanup:
         ipmi_monitoring_ctx_destroy (ctx);
 
     timing_report();
+
+    if(remove_reread_sdr_after_first_use)
+        global_sel_flags &= ~(IPMI_MONITORING_SEL_FLAGS_REREAD_SDR_CACHE);
 
     return (rv);
 }
@@ -1461,6 +1481,7 @@ int main (int argc, char **argv) {
         else if(strcmp("reread-sdr-cache", argv[i]) == 0) {
             global_sel_flags |= IPMI_MONITORING_SEL_FLAGS_REREAD_SDR_CACHE;
             global_sensor_reading_flags |= IPMI_MONITORING_SENSOR_READING_FLAGS_REREAD_SDR_CACHE;
+            remove_reread_sdr_after_first_use = false;
             if (debug) fprintf(stderr, "%s: reread-sdr-cache enabled for both sensors and SEL\n", program_name);
         }
         else if(strcmp("interpret-oem-data", argv[i]) == 0) {
@@ -1771,13 +1792,15 @@ int main (int argc, char **argv) {
     size_t iteration = 0;
     usec_t step = 100 * USEC_PER_MS;
     bool global_chart_created = false;
+    bool tty = isatty(fileno(stderr)) == 1;
 
     heartbeat_t hb;
     heartbeat_init(&hb);
     for(iteration = 0; 1 ; iteration++) {
         usec_t dt = heartbeat_next(&hb, step);
 
-        fprintf(stdout, "\n"); // keepalive to avoid parser read timeout (2 minutes) during ipmi_detect_speed_secs()
+        if(!tty)
+            fprintf(stdout, "\n"); // keepalive to avoid parser read timeout (2 minutes) during ipmi_detect_speed_secs()
 
         struct netdata_ipmi_state state = {0 };
 
