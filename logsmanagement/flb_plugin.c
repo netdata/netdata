@@ -364,12 +364,12 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                     if(!strncmp(p->key.via.str.ptr, "stream guid", (size_t) p->key.via.str.size)){
                         char *stream_guid = (char *) p->val.via.str.ptr;
                         size_t stream_guid_size = p->val.via.str.size;
-                        debug(D_LOGS_MANAG, "stream guid:%.*s", (int) stream_guid_size, stream_guid);
+                        netdata_log_debug(D_LOGS_MANAG, "stream guid:%.*s", (int) stream_guid_size, stream_guid);
 
                         for (int i = 0; i < p_file_infos_arr->count; i++) {
                             if(!strncmp(p_file_infos_arr->data[i]->stream_guid, stream_guid, stream_guid_size)){
                                 p_file_info = p_file_infos_arr->data[i];
-                                // debug(D_LOGS_MANAG, "p_file_info match found: %s type[%s]", 
+                                // netdata_log_debug(D_LOGS_MANAG, "p_file_info match found: %s type[%s]", 
                                 //                      p_file_info->stream_guid, 
                                 //                      log_src_type_t_str[p_file_info->log_type]);
                                 break;
@@ -397,13 +397,13 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
 
                 // if(!strncmp(p->key.via.str.ptr, LOG_REC_KEY, (size_t) p->key.via.str.size) ||
                 //    !strncasecmp(p->key.via.str.ptr, LOG_REC_KEY_SYSTEMD, (size_t) p->key.via.str.size)){
-                //     debug(D_LOGS_MANAG,"msg key:[%.*s]val:[%.*s]", (int) p->key.via.str.size, p->key.via.str.ptr, (int) p->val.via.str.size, p->val.via.str.ptr);
+                //     netdata_log_debug(D_LOGS_MANAG,"msg key:[%.*s]val:[%.*s]", (int) p->key.via.str.size, p->key.via.str.ptr, (int) p->val.via.str.size, p->val.via.str.ptr);
                 //     if(likely(p->val.type == MSGPACK_OBJECT_MAP && p->val.via.map.size != 0)){
                 //         msgpack_object_kv* ac = p->val.via.map.ptr;
                 //         msgpack_object_kv* const ac_pend= p->val.via.map.ptr + p->val.via.map.size;
                 //         do{
                 //             if(!strncmp(ac->key.via.str.ptr, "Type", (size_t) ac->key.via.str.size)){
-                //                 debug(D_LOGS_MANAG,"msg key:[%.*s]val:[%.*s]", (int) ac->key.via.str.size, ac->key.via.str.ptr, (int) ac->val.via.str.size, ac->val.via.str.ptr);
+                //                 netdata_log_debug(D_LOGS_MANAG,"msg key:[%.*s]val:[%.*s]", (int) ac->key.via.str.size, ac->key.via.str.ptr, (int) ac->val.via.str.size, ac->val.via.str.ptr);
                 //             }
                 //             ac++;
                 //             continue;
@@ -580,7 +580,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                         m_assert(docker_ev_type, "docker_ev_type is NULL");
                         m_assert(docker_ev_type_size, "docker_ev_type_size is 0");
 
-                        // debug(D_LOGS_MANAG,"docker_ev_type: %.*s", docker_ev_type_size, docker_ev_type);
+                        // netdata_log_debug(D_LOGS_MANAG,"docker_ev_type: %.*s", docker_ev_type_size, docker_ev_type);
                     }
                     else if(!strncmp(p->key.via.str.ptr, "Action", (size_t) p->key.via.str.size)){
                         docker_ev_action = (char *) p->val.via.str.ptr;
@@ -589,7 +589,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                         m_assert(docker_ev_action, "docker_ev_action is NULL");
                         m_assert(docker_ev_action_size, "docker_ev_action_size is 0");
 
-                        // debug(D_LOGS_MANAG,"docker_ev_action: %.*s", docker_ev_action_size, docker_ev_action);
+                        // netdata_log_debug(D_LOGS_MANAG,"docker_ev_action: %.*s", docker_ev_action_size, docker_ev_action);
                     }
                     else if(!strncmp(p->key.via.str.ptr, "id", (size_t) p->key.via.str.size)){
                         docker_ev_id = (char *) p->val.via.str.ptr;
@@ -598,10 +598,10 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                         m_assert(docker_ev_id, "docker_ev_id is NULL");
                         m_assert(docker_ev_id_size, "docker_ev_id_size is 0");
 
-                        // debug(D_LOGS_MANAG,"docker_ev_id: %.*s", docker_ev_id_size, docker_ev_id);
+                        // netdata_log_debug(D_LOGS_MANAG,"docker_ev_id: %.*s", docker_ev_id_size, docker_ev_id);
                     }
                     else if(!strncmp(p->key.via.str.ptr, "Actor", (size_t) p->key.via.str.size)){
-                        // debug(D_LOGS_MANAG,"msg key:[%.*s]val:[%.*s]", (int) p->key.via.str.size, p->key.via.str.ptr, (int) p->val.via.str.size, p->val.via.str.ptr);
+                        // netdata_log_debug(D_LOGS_MANAG,"msg key:[%.*s]val:[%.*s]", (int) p->key.via.str.size, p->key.via.str.ptr, (int) p->val.via.str.size, p->val.via.str.ptr);
                         if(likely(p->val.type == MSGPACK_OBJECT_MAP && p->val.via.map.size != 0)){
                             msgpack_object_kv* ac = p->val.via.map.ptr;
                             msgpack_object_kv* const ac_pend= p->val.via.map.ptr + p->val.via.map.size;
@@ -613,7 +613,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                                     m_assert(docker_ev_id, "docker_ev_id is NULL");
                                     m_assert(docker_ev_id_size, "docker_ev_id_size is 0");
 
-                                    // debug(D_LOGS_MANAG,"docker_ev_id: %.*s", docker_ev_id_size, docker_ev_id);
+                                    // netdata_log_debug(D_LOGS_MANAG,"docker_ev_id: %.*s", docker_ev_id_size, docker_ev_id);
                                 }
                                 else if(!strncmp(ac->key.via.str.ptr, "Attributes", (size_t) ac->key.via.str.size)){
                                     if(likely(ac->val.type == MSGPACK_OBJECT_MAP && ac->val.via.map.size != 0)){
@@ -637,7 +637,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                                             docker_ev_attr.key_size[docker_ev_attr.size - 1] = att->key.via.str.size;
                                             docker_ev_attr.val_size[docker_ev_attr.size - 1] = att->val.via.str.size;
 
-                                            // debug(D_LOGS_MANAG, "att_key:%.*s, att_val:%.*s", 
+                                            // netdata_log_debug(D_LOGS_MANAG, "att_key:%.*s, att_val:%.*s", 
                                             // (int) docker_ev_attr.key_size[docker_ev_attr.size - 1], 
                                             // docker_ev_attr.key[docker_ev_attr.size - 1],
                                             // (int) docker_ev_attr.val_size[docker_ev_attr.size - 1], 
@@ -936,11 +936,11 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
 
             new_tmp_text_size += docker_ev_datetime_size; // -1 for null terminator, +1 for ' ' character
 
-            // debug(D_LOGS_MANAG, "docker_time:%s", docker_ev_datetime);
+            // netdata_log_debug(D_LOGS_MANAG, "docker_time:%s", docker_ev_datetime);
         }
 
         if(likely(docker_ev_type)){
-            // debug(D_LOGS_MANAG,"docker_ev_type: %.*s", (int) docker_ev_type_size, docker_ev_type);
+            // netdata_log_debug(D_LOGS_MANAG,"docker_ev_type: %.*s", (int) docker_ev_type_size, docker_ev_type);
             int i;
             for(i = 0; i < NUM_OF_DOCKER_EV_TYPES - 1; i++){
                 if(!strncmp(docker_ev_type, docker_ev_type_string[i], docker_ev_type_size)){
@@ -956,7 +956,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
         }
 
         if(likely(docker_ev_action)){
-            // debug(D_LOGS_MANAG,"docker_ev_action: %.*s", (int) docker_ev_action_size, docker_ev_action);
+            // netdata_log_debug(D_LOGS_MANAG,"docker_ev_action: %.*s", (int) docker_ev_action_size, docker_ev_action);
         //     int i;
         //     for(i = 0; i < NUM_OF_DOCKER_EV_TYPES - 1; i++){
         //         if(!strncmp(docker_ev_action, docker_ev_action_string[i], docker_ev_action_size)){
@@ -972,7 +972,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
         }
 
         if(likely(docker_ev_id)){
-            // debug(D_LOGS_MANAG,"docker_ev_id: %.*s", (int) docker_ev_id_size, docker_ev_id);
+            // netdata_log_debug(D_LOGS_MANAG,"docker_ev_id: %.*s", (int) docker_ev_id_size, docker_ev_id);
         //     int i;
         //     for(i = 0; i < NUM_OF_DOCKER_EV_TYPES - 1; i++){
         //         if(!strncmp(docker_ev_action, docker_ev_action_string[i], docker_ev_action_size)){
@@ -1099,7 +1099,7 @@ int flb_add_input(struct File_info *const p_file_info){
             char update_every_str[10]; 
             snprintfz(update_every_str, 10, "%d", p_file_info->update_every);
 
-            debug(  D_LOGS_MANAG, "Setting up %s tail for %s (basename:%s)", 
+            netdata_log_debug(  D_LOGS_MANAG, "Setting up %s tail for %s (basename:%s)", 
                     p_file_info->log_type == FLB_GENERIC ? "FLB_GENERIC" : "FLB_WEB_LOG",
                     p_file_info->filename, p_file_info->file_basename);
         
@@ -1122,7 +1122,7 @@ int flb_add_input(struct File_info *const p_file_info){
             break;
         }
         case FLB_KMSG: {
-            debug(D_LOGS_MANAG, "Setting up FLB_KMSG collector");
+            netdata_log_debug(D_LOGS_MANAG, "Setting up FLB_KMSG collector");
         
             /* Set up kmsg input */
             p_file_info->flb_input = flb_input(ctx, "kmsg", NULL);
@@ -1134,7 +1134,7 @@ int flb_add_input(struct File_info *const p_file_info){
             break;
         }
         case FLB_SYSTEMD: {
-            debug(D_LOGS_MANAG, "Setting up FLB_SYSTEMD collector");
+            netdata_log_debug(D_LOGS_MANAG, "Setting up FLB_SYSTEMD collector");
         
             /* Set up systemd input */
             p_file_info->flb_input = flb_input(ctx, "systemd", NULL);
@@ -1157,7 +1157,7 @@ int flb_add_input(struct File_info *const p_file_info){
             break;
         }
         case FLB_DOCKER_EV: {
-            debug(D_LOGS_MANAG, "Setting up FLB_DOCKER_EV collector");
+            netdata_log_debug(D_LOGS_MANAG, "Setting up FLB_DOCKER_EV collector");
 
             /* Set up Docker Events parser */
             if(flb_parser_create( "docker_events_parser", "json", NULL,
@@ -1176,7 +1176,7 @@ int flb_add_input(struct File_info *const p_file_info){
             break;
         }
         case FLB_SYSLOG: {
-            debug(D_LOGS_MANAG, "Setting up FLB_SYSLOG collector");
+            netdata_log_debug(D_LOGS_MANAG, "Setting up FLB_SYSLOG collector");
 
             /* Set up syslog parser */
             const char syslog_parser_prfx[] = "syslog_parser_";
@@ -1222,7 +1222,7 @@ int flb_add_input(struct File_info *const p_file_info){
             break;
         }
         case FLB_SERIAL: {
-            debug(D_LOGS_MANAG, "Setting up FLB_SERIAL collector");
+            netdata_log_debug(D_LOGS_MANAG, "Setting up FLB_SERIAL collector");
 
             Flb_serial_config_t *serial_config = (Flb_serial_config_t *) p_file_info->flb_config;
             if(unlikely(!serial_config || !serial_config->bitrate || !*serial_config->bitrate ||
@@ -1249,7 +1249,7 @@ int flb_add_input(struct File_info *const p_file_info){
 
     /* Set up user-configured outputs */
     for(Flb_output_config_t *output = p_file_info->flb_outputs; output; output = output->next){
-        debug(D_LOGS_MANAG, "setting up user output [%s]", output->plugin);
+        netdata_log_debug(D_LOGS_MANAG, "setting up user output [%s]", output->plugin);
 
         int out = flb_output(ctx, output->plugin, NULL);
         if(out < 0) return FLB_OUTPUT_ERROR;
@@ -1257,7 +1257,7 @@ int flb_add_input(struct File_info *const p_file_info){
             "Match", tag_s,
             NULL) != 0) return FLB_OUTPUT_SET_ERROR; 
         for(struct flb_output_config_param *param = output->param; param; param = param->next){
-            debug(D_LOGS_MANAG, "setting up param [%s][%s] of output [%s]", param->key, param->val, output->plugin);
+            netdata_log_debug(D_LOGS_MANAG, "setting up param [%s][%s] of output [%s]", param->key, param->val, output->plugin);
             if(flb_output_set(ctx, out, 
                 param->key, param->val,
                 NULL) != 0) return FLB_OUTPUT_SET_ERROR; 
@@ -1289,13 +1289,13 @@ int flb_add_fwd_input(Flb_socket_config_t *forward_in_config){
     int input, output;
 
     if(forward_in_config == NULL){
-        debug(D_LOGS_MANAG, "forward: forward_in_config is NULL");
+        netdata_log_debug(D_LOGS_MANAG, "forward: forward_in_config is NULL");
         collector_info("forward_in_config is NULL");
         return 0;
     }
 
     do{
-        debug(D_LOGS_MANAG, "forward: Setting up flb_add_fwd_input()");
+        netdata_log_debug(D_LOGS_MANAG, "forward: Setting up flb_add_fwd_input()");
         
         if((input = flb_input(ctx, "forward", NULL)) < 0) break;
 
@@ -1325,7 +1325,7 @@ int flb_add_fwd_input(Flb_socket_config_t *forward_in_config){
             "Match", "fwd*",
             NULL) != 0) break; 
 
-        debug(D_LOGS_MANAG, "forward: Set up flb_add_fwd_input() with success");
+        netdata_log_debug(D_LOGS_MANAG, "forward: Set up flb_add_fwd_input() with success");
         return 0;
     } while(0);
 

@@ -359,8 +359,8 @@ static int flb_output_param_get_cb(void *entry, void *data){
         while(*param_key == ' ') param_key++; // remove whitespace so it looks like "host"
         
         if(*param_key && strcasecmp(param_key, FLB_OUTPUT_PLUGIN_NAME_KEY)){ // ignore param_key "plugin" 
-            // debug(D_LOGS_MANAG, "config_option: name[%s], value[%s]", option->name, option->value);
-            // debug(D_LOGS_MANAG, "config option kv:[%s][%s]", param_key, option->value);
+            // netdata_log_debug(D_LOGS_MANAG, "config_option: name[%s], value[%s]", option->name, option->value);
+            // netdata_log_debug(D_LOGS_MANAG, "config option kv:[%s][%s]", param_key, option->value);
 
             struct flb_output_config_param **p = &flb_output->param;
             while((*p) != NULL) p = &((*p)->next); // Go to last param of linked list
@@ -908,7 +908,7 @@ static void logs_management_init(uv_loop_t *main_loop,
         char *cus_chart_k = mallocz(snprintf(NULL, 0, "custom %d chart", MAX_CUS_CHARTS_PER_SOURCE) + 1);
         sprintf(cus_chart_k, "custom %d chart", cus_off);
         char *cus_chart_v = appconfig_get(&log_management_config, config_section->name, cus_chart_k, NULL);
-        debug(D_LOGS_MANAG, "cus chart: (%s:%s)", cus_chart_k, cus_chart_v ? cus_chart_v : "NULL");
+        netdata_log_debug(D_LOGS_MANAG, "cus chart: (%s:%s)", cus_chart_k, cus_chart_v ? cus_chart_v : "NULL");
         freez(cus_chart_k);
         if(unlikely(!cus_chart_v)){
             collector_error("[%s]: custom %d chart = NULL, custom charts for this log source will be disabled.", 
@@ -920,7 +920,7 @@ static void logs_management_init(uv_loop_t *main_loop,
         char *cus_regex_k = mallocz(snprintf(NULL, 0, "custom %d regex", MAX_CUS_CHARTS_PER_SOURCE) + 1);
         sprintf(cus_regex_k, "custom %d regex", cus_off);
         char *cus_regex_v = appconfig_get(&log_management_config, config_section->name, cus_regex_k, NULL);
-        debug(D_LOGS_MANAG, "cus regex:(%s:%s)", cus_regex_k, cus_regex_v ? cus_regex_v : "NULL");
+        netdata_log_debug(D_LOGS_MANAG, "cus regex:(%s:%s)", cus_regex_k, cus_regex_v ? cus_regex_v : "NULL");
         freez(cus_regex_k);
         if(unlikely(!cus_regex_v)) {
             collector_error("[%s]: custom %d regex = NULL, custom charts for this log source will be disabled.", 
@@ -934,7 +934,7 @@ static void logs_management_init(uv_loop_t *main_loop,
         sprintf(cus_regex_name_k, "custom %d regex name", cus_off);
         char *cus_regex_name_v = appconfig_get( &log_management_config, config_section->name, 
                                                 cus_regex_name_k, strdupz(cus_regex_v));
-        debug(D_LOGS_MANAG, "cus regex name: (%s:%s)", cus_regex_name_k, cus_regex_name_v ? cus_regex_name_v : "NULL");
+        netdata_log_debug(D_LOGS_MANAG, "cus regex name: (%s:%s)", cus_regex_name_k, cus_regex_name_v ? cus_regex_name_v : "NULL");
         freez(cus_regex_name_k);
         m_assert(cus_regex_name_v, "cus_regex_name_v cannot be NULL, should be cus_regex_v");
              
@@ -958,7 +958,7 @@ static void logs_management_init(uv_loop_t *main_loop,
         sprintf(cus_ignore_case_k, "custom %d ignore case", cus_off);
         int cus_ignore_case_v = appconfig_get_boolean(  &log_management_config, 
                                                         config_section->name, cus_ignore_case_k, CONFIG_BOOLEAN_YES);
-        debug(D_LOGS_MANAG, "cus case: (%s:%s)", cus_ignore_case_k, cus_ignore_case_v ? "yes" : "no");
+        netdata_log_debug(D_LOGS_MANAG, "cus case: (%s:%s)", cus_ignore_case_k, cus_ignore_case_v ? "yes" : "no");
         freez(cus_ignore_case_k); 
 
         int regex_flags = cus_ignore_case_v ? REG_EXTENDED | REG_NEWLINE | REG_ICASE : REG_EXTENDED | REG_NEWLINE;
@@ -1011,7 +1011,7 @@ static void logs_management_init(uv_loop_t *main_loop,
         char *out_plugin_k = callocz(1, snprintf(NULL, 0, "output %d " FLB_OUTPUT_PLUGIN_NAME_KEY, MAX_OUTPUTS_PER_SOURCE) + 1);
         sprintf(out_plugin_k, "output %d " FLB_OUTPUT_PLUGIN_NAME_KEY, out_off);
         char *out_plugin_v = appconfig_get(&log_management_config, config_section->name, out_plugin_k, NULL);
-        debug(D_LOGS_MANAG, "output %d "FLB_OUTPUT_PLUGIN_NAME_KEY": %s", out_off, out_plugin_v ? out_plugin_v : "NULL");
+        netdata_log_debug(D_LOGS_MANAG, "output %d "FLB_OUTPUT_PLUGIN_NAME_KEY": %s", out_off, out_plugin_v ? out_plugin_v : "NULL");
         freez(out_plugin_k);
         if(unlikely(!out_plugin_v)){
             collector_error("[%s]: output %d "FLB_OUTPUT_PLUGIN_NAME_KEY" = NULL, outputs for this log source will be disabled.", 
@@ -1237,20 +1237,20 @@ void *logsmanagement_main(void *ptr) {
     }
     
 #if defined(__STDC_VERSION__)
-    debug(D_LOGS_MANAG, "__STDC_VERSION__: %ld", __STDC_VERSION__);
+    netdata_log_debug(D_LOGS_MANAG, "__STDC_VERSION__: %ld", __STDC_VERSION__);
 #else
-    debug(D_LOGS_MANAG, "__STDC_VERSION__ undefined");
+    netdata_log_debug(D_LOGS_MANAG, "__STDC_VERSION__ undefined");
 #endif // defined(__STDC_VERSION__)
-    debug(D_LOGS_MANAG, "libuv version: %s", uv_version_string());
-    debug(D_LOGS_MANAG, "LZ4 version: %s\n", LZ4_versionString());
+    netdata_log_debug(D_LOGS_MANAG, "libuv version: %s", uv_version_string());
+    netdata_log_debug(D_LOGS_MANAG, "LZ4 version: %s\n", LZ4_versionString());
 #if defined(D_LOGS_MANAG)
     char *sqlite_version = db_get_sqlite_version();
-    debug(D_LOGS_MANAG, "SQLITE version: %s\n", sqlite_version ? sqlite_version : "NULL");
+    netdata_log_debug(D_LOGS_MANAG, "SQLITE version: %s\n", sqlite_version ? sqlite_version : "NULL");
     freez(sqlite_version);
 #endif // defined(D_LOGS_MANAG)
 
 #if defined(LOGS_MANAGEMENT_STRESS_TEST) && LOGS_MANAGEMENT_STRESS_TEST == 1
-    debug(D_LOGS_MANAG, "Running Netdata with logs_management stress test enabled!");
+    netdata_log_debug(D_LOGS_MANAG, "Running Netdata with logs_management stress test enabled!");
     static uv_thread_t run_stress_test_queries_thread_id;
     uv_thread_create(&run_stress_test_queries_thread_id, run_stress_test_queries_thread, NULL);
 #endif  // LOGS_MANAGEMENT_STRESS_TEST

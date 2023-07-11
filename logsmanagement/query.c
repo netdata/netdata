@@ -168,7 +168,7 @@ LOGS_QUERY_RESULT_TYPE execute_logs_manag_query(logs_query_params_t *p_query_par
 
 #if MEASURE_QUERY_TIME
     const msec_t end_time = now_realtime_msec();
-    debug(D_LOGS_MANAG, "It took %" PRId64 "ms to execute query (%" PRId64 "ms DB search, %" 
+    netdata_log_debug(D_LOGS_MANAG, "It took %" PRId64 "ms to execute query (%" PRId64 "ms DB search, %" 
           PRId64 "ms circ buffer search), retrieving %zuKB.\n",
           (int64_t)end_time - start_time, (int64_t)db_search_time - start_time, 
           (int64_t)end_time - db_search_time,

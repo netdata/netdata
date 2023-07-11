@@ -217,7 +217,7 @@ int circ_buff_insert(Circ_buff_t *const buff){
     /* If circular buffer does not have any free items, it will be expanded
      * by reallocating the `items` array and adding one more item. */
     if (unlikely(( head == tail ) && full )) {
-        debug(D_LOGS_MANAG, "buff out of space! will be expanded.");
+        netdata_log_debug(D_LOGS_MANAG, "buff out of space! will be expanded.");
         uv_rwlock_wrlock(&buff->buff_realloc_rwlock);
 
         

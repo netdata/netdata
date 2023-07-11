@@ -72,7 +72,7 @@
 #define measure_time_end()                              \
     clock_gettime(CLOCK_THREAD_CPUTIME_ID, &end);       \
     getrusage(1, &end_rusage);                          \
-    debug(D_LOGS_MANAG, "Ru:%.9lfs T:%.9lfs", (         \
+    netdata_log_debug(D_LOGS_MANAG, "Ru:%.9lfs T:%.9lfs", (         \
         end_rusage.ru_stime.tv_usec                     \
         + end_rusage.ru_utime.tv_usec                   \
         - begin_rusage.ru_stime.tv_usec                 \
@@ -126,7 +126,7 @@ typedef enum {
 static inline str2xx_errno str2int(int *out, char *s, int base) {
     char *end;
     if (unlikely(s[0] == '\0' || isspace(s[0]))){
-        // debug(D_LOGS_MANAG, "str2int error: STR2XX_INCONVERTIBLE 1");
+        // netdata_log_debug(D_LOGS_MANAG, "str2int error: STR2XX_INCONVERTIBLE 1");
         // m_assert(0, "str2int error: STR2XX_INCONVERTIBLE");
         return STR2XX_INCONVERTIBLE;
     }
@@ -134,17 +134,17 @@ static inline str2xx_errno str2int(int *out, char *s, int base) {
     long l = strtol(s, &end, base);
     /* Both checks are needed because INT_MAX == LONG_MAX is possible. */
     if (unlikely(l > INT_MAX || (errno == ERANGE && l == LONG_MAX))){
-        debug(D_LOGS_MANAG, "str2int error: STR2XX_OVERFLOW");
+        netdata_log_debug(D_LOGS_MANAG, "str2int error: STR2XX_OVERFLOW");
         // m_assert(0, "str2int error: STR2XX_OVERFLOW");
         return STR2XX_OVERFLOW;
     }
     if (unlikely(l < INT_MIN || (errno == ERANGE && l == LONG_MIN))){
-        debug(D_LOGS_MANAG, "str2int error: STR2XX_UNDERFLOW");
+        netdata_log_debug(D_LOGS_MANAG, "str2int error: STR2XX_UNDERFLOW");
         // m_assert(0, "str2int error: STR2XX_UNDERFLOW");
         return STR2XX_UNDERFLOW;
     }
     if (unlikely(*end != '\0')){
-        debug(D_LOGS_MANAG, "str2int error: STR2XX_INCONVERTIBLE 2");
+        netdata_log_debug(D_LOGS_MANAG, "str2int error: STR2XX_INCONVERTIBLE 2");
         // m_assert(0, "str2int error: STR2XX_INCONVERTIBLE 2");
         return STR2XX_INCONVERTIBLE;
     }
@@ -155,7 +155,7 @@ static inline str2xx_errno str2int(int *out, char *s, int base) {
 static inline str2xx_errno str2float(float *out, char *s) {
     char *end;
     if (unlikely(s[0] == '\0' || isspace(s[0]))){ 
-        // debug(D_LOGS_MANAG, "str2float error: STR2XX_INCONVERTIBLE 1\n");
+        // netdata_log_debug(D_LOGS_MANAG, "str2float error: STR2XX_INCONVERTIBLE 1\n");
         // m_assert(0, "str2float error: STR2XX_INCONVERTIBLE");
         return STR2XX_INCONVERTIBLE;
     }
@@ -163,17 +163,17 @@ static inline str2xx_errno str2float(float *out, char *s) {
     float f = strtof(s, &end);
     /* Both checks are needed because INT_MAX == LONG_MAX is possible. */
     if (unlikely((errno == ERANGE && f == HUGE_VALF))){
-        debug(D_LOGS_MANAG, "str2float error: STR2XX_OVERFLOW\n");
+        netdata_log_debug(D_LOGS_MANAG, "str2float error: STR2XX_OVERFLOW\n");
         // m_assert(0, "str2float error: STR2XX_OVERFLOW");
         return STR2XX_OVERFLOW;
     }
     if (unlikely((errno == ERANGE && f == -HUGE_VALF))){
-        debug(D_LOGS_MANAG, "str2float error: STR2XX_UNDERFLOW\n");
+        netdata_log_debug(D_LOGS_MANAG, "str2float error: STR2XX_UNDERFLOW\n");
         // m_assert(0, "str2float error: STR2XX_UNDERFLOW");
         return STR2XX_UNDERFLOW;
     }
     if (unlikely((*end != '\0'))){
-        debug(D_LOGS_MANAG, "str2float error: STR2XX_INCONVERTIBLE 2\n");
+        netdata_log_debug(D_LOGS_MANAG, "str2float error: STR2XX_INCONVERTIBLE 2\n");
         // m_assert(0, "str2float error: STR2XX_INCONVERTIBLE");
         return STR2XX_INCONVERTIBLE;
     }

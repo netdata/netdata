@@ -344,7 +344,7 @@ void web_log_chart_update(struct File_info *p_file_info){
 
     if(chart_data->tv.tv_sec != p_file_info->parser_metrics->tv.tv_sec){
 
-        debug(D_LOGS_MANAG, "Updating: chart_data->tv.tv_sec:%ld p_file_info->parser_metrics->tv.tv_sec:%ld", chart_data->tv.tv_sec, p_file_info->parser_metrics->tv.tv_sec);
+        netdata_log_debug(D_LOGS_MANAG, "Updating: chart_data->tv.tv_sec:%ld p_file_info->parser_metrics->tv.tv_sec:%ld", chart_data->tv.tv_sec, p_file_info->parser_metrics->tv.tv_sec);
 
         time_t lag_in_sec = p_file_info->parser_metrics->tv.tv_sec - chart_data->tv.tv_sec - 1;
 
@@ -380,7 +380,7 @@ void web_log_chart_update(struct File_info *p_file_info){
                             string2str(chart_data->dim_vhosts[k]->name))){
                         chart_data->num_vhosts[k] += p_file_info->parser_metrics->web_log->vhost_arr.vhosts[j].count;
                         p_file_info->parser_metrics->web_log->vhost_arr.vhosts[j].count = 0;
-                        // debug(D_LOGS_MANAG, "vhost found:%s", p_file_info->parser_metrics->vhost_arr.vhosts[j].name);
+                        // netdata_log_debug(D_LOGS_MANAG, "vhost found:%s", p_file_info->parser_metrics->vhost_arr.vhosts[j].name);
                         break;
                     }
                 }
@@ -396,7 +396,7 @@ void web_log_chart_update(struct File_info *p_file_info){
                                                             chart_data->vhost_size_max * sizeof(collected_number));
                     }
 
-                    // debug(D_LOGS_MANAG, "New vhost:%s", p_file_info->parser_metrics->web_log->vhost_arr.vhosts[j].name);
+                    // netdata_log_debug(D_LOGS_MANAG, "New vhost:%s", p_file_info->parser_metrics->web_log->vhost_arr.vhosts[j].name);
                     
                     chart_data->dim_vhosts[chart_data->vhost_size - 1] = rrddim_add(chart_data->st_vhost, 
                                                                                     p_file_info->parser_metrics->web_log->vhost_arr.vhosts[j].name, 

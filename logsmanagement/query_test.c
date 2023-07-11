@@ -20,7 +20,7 @@ static void pipe_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf
         uv_close((uv_handle_t *)client, NULL);
         return;
     }
-    debug(D_LOGS_MANAG, "Read through pipe: %.*s\n", (int) nread, buf->base);
+    netdata_log_debug(D_LOGS_MANAG, "Read through pipe: %.*s\n", (int) nread, buf->base);
 
     // Deserialise streamed string
     char *pEnd;
@@ -34,12 +34,12 @@ static void pipe_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf
         query_params[i].filename[0] = strtok(NULL, ",");
         query_params[i].keyword = strtok(NULL, ",");
         size_t buff_size = (size_t)strtoll(strtok(NULL, ","), &pEnd, 10);
-        // debug(D_LOGS_MANAG, "size_of_buff in pipe_read_cb(): %zd\n", buff_size);
+        // netdata_log_debug(D_LOGS_MANAG, "size_of_buff in pipe_read_cb(): %zd\n", buff_size);
         query_params[i].results_buff = buffer_create(buff_size, NULL);
 
 
         int rc = uv_thread_create(&test_execute_query_thread_id[i], test_execute_query_thread, &query_params[i]);
-        if (unlikely(rc)) debug(D_LOGS_MANAG, "Creation of thread failed: %s\n", uv_strerror(rc));
+        if (unlikely(rc)) netdata_log_debug(D_LOGS_MANAG, "Creation of thread failed: %s\n", uv_strerror(rc));
         m_assert(!rc, "Creation of thread failed");
     }
 
@@ -54,17 +54,17 @@ static void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) 
 static void connection_cb(uv_stream_t *server, int status) {
 
     if (status == -1) {
-        debug(D_LOGS_MANAG, "uv_listen connection_cb error\n");
+        netdata_log_debug(D_LOGS_MANAG, "uv_listen connection_cb error\n");
         m_assert(0, "uv_listen connection_cb error!");
     }
 
-    debug(D_LOGS_MANAG, "Received connection on " LOGS_MANAGEMENT_STRESS_TEST_PIPENAME "\n");
+    netdata_log_debug(D_LOGS_MANAG, "Received connection on " LOGS_MANAGEMENT_STRESS_TEST_PIPENAME "\n");
 
     uv_pipe_t *client = (uv_pipe_t *)malloc(sizeof(uv_pipe_t));
     uv_pipe_init(&query_thread_uv_loop, client, 0);
     if (uv_accept(server, (uv_stream_t *)client) == 0) {
         if (uv_read_start((uv_stream_t *)client, alloc_cb, pipe_read_cb) != 0) {
-            debug(D_LOGS_MANAG, "uv_read_start() error");
+            netdata_log_debug(D_LOGS_MANAG, "uv_read_start() error");
             uv_close((uv_handle_t *)&client, NULL);
             m_assert(0, "uv_read_start() error");
         }
@@ -99,10 +99,10 @@ void test_execute_query_thread(void *args) {
     uv_fs_t open_req;
     rc = uv_fs_open(&thread_loop, &open_req, query_params.filename[0], O_RDONLY, 0, NULL);
     if (unlikely(rc < 0)) {
-        debug(D_LOGS_MANAG, "file_open() error: %s (%d) %s\n", query_params.filename[0], rc, uv_strerror(rc));
+        netdata_log_debug(D_LOGS_MANAG, "file_open() error: %s (%d) %s\n", query_params.filename[0], rc, uv_strerror(rc));
         m_assert(rc >= 0, "uv_fs_open() failed");
     } 
-    debug(D_LOGS_MANAG, "Opened file: %s\n", query_params.filename[0]);
+    netdata_log_debug(D_LOGS_MANAG, "Opened file: %s\n", query_params.filename[0]);
     file_handle = open_req.result;  // open_req->result of a uv_fs_t is the file descriptor in case of the uv_fs_open
     uv_fs_req_cleanup(&open_req);
 
@@ -119,7 +119,7 @@ void test_execute_query_thread(void *args) {
         buf = realloc(buf, query_params.results_buff->len);
         uv_buf = uv_buf_init(buf, query_params.results_buff->len);
         rc = uv_fs_read(&thread_loop, &read_req, file_handle, &uv_buf, 1, file_offset, NULL);
-        if (rc < 0) debug(D_LOGS_MANAG, "uv_fs_read() error for %s\n", query_params.filename[0]);
+        if (rc < 0) netdata_log_debug(D_LOGS_MANAG, "uv_fs_read() error for %s\n", query_params.filename[0]);
         m_assert(rc >= 0, "uv_fs_read() failed");
 
         // printf("\n============Comparison results============\n");
@@ -132,11 +132,11 @@ void test_execute_query_thread(void *args) {
 
         /* Do not compare the last char in memcmp, as it can be either '\n' or '\0' */
         rc = memcmp(buf, query_params.results_buff->buffer, query_params.results_buff->len - 1);
-        if (rc) debug(D_LOGS_MANAG, "Mismatch between DB and log file data in %s\n", query_params.filename[0]);
+        if (rc) netdata_log_debug(D_LOGS_MANAG, "Mismatch between DB and log file data in %s\n", query_params.filename[0]);
         m_assert(!rc, "Mismatch between DB and log file data!");
 
         file_offset += query_params.results_buff->len;
-        debug(D_LOGS_MANAG, "Query file offset %" PRId64 " for %s\n", file_offset, query_params.filename[0]);
+        netdata_log_debug(D_LOGS_MANAG, "Query file offset %" PRId64 " for %s\n", file_offset, query_params.filename[0]);
         uv_fs_req_cleanup(&read_req);
 
         // Simulate real query which would do buffer_create() and buffer_free() everytime 
@@ -151,23 +151,23 @@ void test_execute_query_thread(void *args) {
     uv_fs_t stat_req;
     rc = uv_fs_stat(&thread_loop, &stat_req, query_params.filename[0], NULL);
     if (rc) {
-        debug(D_LOGS_MANAG, "uv_fs_stat() error for %s: (%d) %s\n", query_params.filename[0], rc, uv_strerror(rc));
+        netdata_log_debug(D_LOGS_MANAG, "uv_fs_stat() error for %s: (%d) %s\n", query_params.filename[0], rc, uv_strerror(rc));
         m_assert(!rc, "uv_fs_stat() failed");
     } else {
         // Request succeeded; get filesize
-        // debug(D_LOGS_MANAG, "Size of %s: %lldKB\n", query_params.filename, (long long)stat_req.statbuf.st_size / 1000);
+        // netdata_log_debug(D_LOGS_MANAG, "Size of %s: %lldKB\n", query_params.filename, (long long)stat_req.statbuf.st_size / 1000);
         if (stat_req.statbuf.st_size != (uint64_t) file_offset){
-            debug(D_LOGS_MANAG, "Mismatch between log filesize (%" PRIu64 ") and data size returned from query (%" PRIu64 ") for: %s\n",
+            netdata_log_debug(D_LOGS_MANAG, "Mismatch between log filesize (%" PRIu64 ") and data size returned from query (%" PRIu64 ") for: %s\n",
                         stat_req.statbuf.st_size, (uint64_t) file_offset, query_params.filename[0]);
             m_assert(stat_req.statbuf.st_size == (uint64_t) file_offset, "Mismatch between log filesize and data size in DB!");
         }
-        debug(D_LOGS_MANAG, "Log filesize and data size from query match for %s\n", query_params.filename[0]);
+        netdata_log_debug(D_LOGS_MANAG, "Log filesize and data size from query match for %s\n", query_params.filename[0]);
     }
     uv_fs_req_cleanup(&stat_req);
 #endif
 
     const msec_t end_time = now_realtime_msec();
-    debug(D_LOGS_MANAG, "==============================\n"
+    netdata_log_debug(D_LOGS_MANAG, "==============================\n"
                         "Stress test queries for '%s' completed with success!\n"
                         "Total duration: %llums to retrieve and compare %" PRId64 "KB.\n"
                         "Query execution total duration: %llums\n"
@@ -185,21 +185,21 @@ void run_stress_test_queries_thread(void *args) {
     if (unlikely(rc)) fatal("Failed to initialise query_thread_uv_loop\n");
 
     if ((rc = uv_pipe_init(&query_thread_uv_loop, &query_data_pipe, 0))) {
-        debug(D_LOGS_MANAG, "uv_pipe_init(): %s\n", uv_strerror(rc));
+        netdata_log_debug(D_LOGS_MANAG, "uv_pipe_init(): %s\n", uv_strerror(rc));
         m_assert(0, "uv_pipe_init() failed");
     }
     // signal(SIGINT, remove_pipe);
     if ((rc = uv_pipe_bind(&query_data_pipe, LOGS_MANAGEMENT_STRESS_TEST_PIPENAME))) {
-        debug(D_LOGS_MANAG, "uv_pipe_bind() error %s. Trying again.\n", uv_err_name(rc));
+        netdata_log_debug(D_LOGS_MANAG, "uv_pipe_bind() error %s. Trying again.\n", uv_err_name(rc));
         // Try removing pipe and binding again
         remove_pipe(0);  // Delete pipe if it exists
         // uv_close((uv_handle_t *)&query_data_pipe, NULL);
         rc = uv_pipe_bind(&query_data_pipe, LOGS_MANAGEMENT_STRESS_TEST_PIPENAME);
-        debug(D_LOGS_MANAG, "uv_pipe_bind() error %s\n", uv_err_name(rc));
+        netdata_log_debug(D_LOGS_MANAG, "uv_pipe_bind() error %s\n", uv_err_name(rc));
         m_assert(!rc, "uv_pipe_bind() error!");
     }
     if ((rc = uv_listen((uv_stream_t *)&query_data_pipe, 1, connection_cb))) {
-        debug(D_LOGS_MANAG, "uv_pipe_listen() error %s\n", uv_err_name(rc));
+        netdata_log_debug(D_LOGS_MANAG, "uv_pipe_listen() error %s\n", uv_err_name(rc));
         m_assert(!rc, "uv_pipe_listen() error!");
     }
     uv_run(&query_thread_uv_loop, UV_RUN_DEFAULT);
