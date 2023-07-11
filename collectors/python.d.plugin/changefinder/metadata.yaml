@@ -13,14 +13,12 @@ metrics:
       labels: []
       metrics:
         - name: changefinder.scores
-          availability: []
           description: ChangeFinder
           unit: score
           chart_type: line
           dimensions:
             - name: a dimension per chart
         - name: changefinder.flags
-          availability: []
           description: ChangeFinder
           unit: flag
           chart_type: stacked

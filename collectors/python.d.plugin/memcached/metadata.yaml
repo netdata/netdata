@@ -24,7 +24,6 @@ metrics:
       labels: []
       metrics:
         - name: memcached.cache
-          availability: []
           description: Cache Size
           unit: MiB
           chart_type: stacked
@@ -32,7 +31,6 @@ metrics:
             - name: available
             - name: used
         - name: memcached.net
-          availability: []
           description: Network
           unit: kilobits/s
           chart_type: area
@@ -40,7 +38,6 @@ metrics:
             - name: in
             - name: out
         - name: memcached.connections
-          availability: []
           description: Connections
           unit: connections/s
           chart_type: line
@@ -49,7 +46,6 @@ metrics:
             - name: rejected
             - name: total
         - name: memcached.items
-          availability: []
           description: Items
           unit: items
           chart_type: line
@@ -57,7 +53,6 @@ metrics:
             - name: current
             - name: total
         - name: memcached.evicted_reclaimed
-          availability: []
           description: Evicted and Reclaimed Items
           unit: items
           chart_type: line
@@ -65,7 +60,6 @@ metrics:
             - name: reclaimed
             - name: evicted
         - name: memcached.get
-          availability: []
           description: Get Requests
           unit: requests
           chart_type: stacked
@@ -73,21 +67,18 @@ metrics:
             - name: hints
             - name: misses
         - name: memcached.get_rate
-          availability: []
           description: Get Request Rate
           unit: requests/s
           chart_type: line
           dimensions:
             - name: rate
         - name: memcached.set_rate
-          availability: []
           description: Set Request Rate
           unit: requests/s
           chart_type: line
           dimensions:
             - name: rate
         - name: memcached.delete
-          availability: []
           description: Delete Requests
           unit: requests
           chart_type: stacked
@@ -95,7 +86,6 @@ metrics:
             - name: hits
             - name: misses
         - name: memcached.cas
-          availability: []
           description: Check and Set Requests
           unit: requests
           chart_type: stacked
@@ -104,7 +94,6 @@ metrics:
             - name: misses
             - name: bad value
         - name: memcached.increment
-          availability: []
           description: Increment Requests
           unit: requests
           chart_type: stacked
@@ -112,7 +101,6 @@ metrics:
             - name: hits
             - name: misses
         - name: memcached.decrement
-          availability: []
           description: Decrement Requests
           unit: requests
           chart_type: stacked
@@ -120,7 +108,6 @@ metrics:
             - name: hits
             - name: misses
         - name: memcached.touch
-          availability: []
           description: Touch Requests
           unit: requests
           chart_type: stacked
@@ -128,7 +115,6 @@ metrics:
             - name: hits
             - name: misses
         - name: memcached.touch_rate
-          availability: []
           description: Touch Request Rate
           unit: requests/s
           chart_type: line

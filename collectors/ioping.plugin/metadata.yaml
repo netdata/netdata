@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: ioping.latency
-          availability: []
           description: Read Latency
           unit: microseconds
           chart_type: line

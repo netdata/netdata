@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: bind_rndc.name_server_statistics
-          availability: []
           description: Name Server Statistics
           unit: stats
           chart_type: line
@@ -31,21 +30,18 @@ metrics:
             - name: auth_answer
             - name: dropped_queries
         - name: bind_rndc.incoming_queries
-          availability: []
           description: Incoming queries
           unit: queries
           chart_type: line
           dimensions:
             - name: a dimension per incoming query type
         - name: bind_rndc.outgoing_queries
-          availability: []
           description: Outgoing queries
           unit: queries
           chart_type: line
           dimensions:
             - name: a dimension per outgoing query type
         - name: bind_rndc.stats_size
-          availability: []
           description: Named Stats File Size
           unit: MiB
           chart_type: line

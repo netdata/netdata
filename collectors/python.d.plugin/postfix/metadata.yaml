@@ -13,14 +13,12 @@ metrics:
       labels: []
       metrics:
         - name: postfix.qemails
-          availability: []
           description: Postfix Queue Emails
           unit: emails
           chart_type: line
           dimensions:
             - name: emails
         - name: postfix.qsize
-          availability: []
           description: Postfix Queue Emails Size
           unit: KiB
           chart_type: area

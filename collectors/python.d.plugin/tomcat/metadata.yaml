@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: tomcat.accesses
-          availability: []
           description: Requests
           unit: requests/s
           chart_type: area
@@ -21,7 +20,6 @@ metrics:
             - name: accesses
             - name: errors
         - name: tomcat.bandwidth
-          availability: []
           description: Bandwidth
           unit: KiB/s
           chart_type: area
@@ -29,14 +27,12 @@ metrics:
             - name: sent
             - name: received
         - name: tomcat.processing_time
-          availability: []
           description: processing time
           unit: seconds
           chart_type: area
           dimensions:
             - name: processing time
         - name: tomcat.threads
-          availability: []
           description: Threads
           unit: current threads
           chart_type: area
@@ -44,7 +40,6 @@ metrics:
             - name: current
             - name: busy
         - name: tomcat.jvm
-          availability: []
           description: JVM Memory Pool Usage
           unit: MiB
           chart_type: stacked
@@ -57,7 +52,6 @@ metrics:
             - name: compressed
             - name: metaspace
         - name: tomcat.jvm_eden
-          availability: []
           description: Eden Memory Usage
           unit: MiB
           chart_type: area
@@ -66,7 +60,6 @@ metrics:
             - name: committed
             - name: max
         - name: tomcat.jvm_survivor
-          availability: []
           description: Survivor Memory Usage
           unit: MiB
           chart_type: area
@@ -75,7 +68,6 @@ metrics:
             - name: committed
             - name: max
         - name: tomcat.jvm_tenured
-          availability: []
           description: Tenured Memory Usage
           unit: MiB
           chart_type: area

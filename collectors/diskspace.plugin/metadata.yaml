@@ -29,7 +29,6 @@ metrics:
           description: TBD
       metrics:
         - name: disk.space
-          availability: []
           description: Disk Space Usage
           unit: GiB
           chart_type: stacked
@@ -38,7 +37,6 @@ metrics:
             - name: used
             - name: reserved_for_root
         - name: disk.inodes
-          availability: []
           description: Disk Files (inodes) Usage
           unit: inodes
           chart_type: stacked

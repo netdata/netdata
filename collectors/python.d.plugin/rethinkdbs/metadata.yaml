@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: rethinkdb.cluster_connected_servers
-          availability: []
           description: Connected Servers
           unit: servers
           chart_type: stacked
@@ -21,21 +20,18 @@ metrics:
             - name: connected
             - name: missing
         - name: rethinkdb.cluster_clients_active
-          availability: []
           description: Active Clients
           unit: clients
           chart_type: line
           dimensions:
             - name: active
         - name: rethinkdb.cluster_queries
-          availability: []
           description: Queries
           unit: queries/s
           chart_type: line
           dimensions:
             - name: queries
         - name: rethinkdb.cluster_documents
-          availability: []
           description: Documents
           unit: documents/s
           chart_type: line
@@ -47,28 +43,24 @@ metrics:
       labels: []
       metrics:
         - name: rethinkdb.client_connections
-          availability: []
           description: Client Connections
           unit: connections
           chart_type: line
           dimensions:
             - name: connections
         - name: rethinkdb.clients_active
-          availability: []
           description: Active Clients
           unit: clients
           chart_type: line
           dimensions:
             - name: active
         - name: rethinkdb.queries
-          availability: []
           description: Queries
           unit: queries/s
           chart_type: line
           dimensions:
             - name: queries
         - name: rethinkdb.documents
-          availability: []
           description: Documents
           unit: documents/s
           chart_type: line

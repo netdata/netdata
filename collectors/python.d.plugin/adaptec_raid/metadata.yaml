@@ -18,28 +18,24 @@ metrics:
       labels: []
       metrics:
         - name: adaptec_raid.ld_status
-          availability: []
           description: 'Status of logical devices (1: Failed or Degraded)'
           unit: bool
           chart_type: line
           dimensions:
             - name: a dimension per logical device
         - name: adaptec_raid.pd_state
-          availability: []
           description: 'State of physical devices (1: not Online)'
           unit: bool
           chart_type: line
           dimensions:
             - name: a dimension per physical device
         - name: adaptec_raid.smart_warnings
-          availability: []
           description: S.M.A.R.T warnings
           unit: count
           chart_type: line
           dimensions:
             - name: a dimension per physical device
         - name: adaptec_raid.temperature
-          availability: []
           description: Temperature
           unit: celsius
           chart_type: line

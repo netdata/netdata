@@ -13,21 +13,18 @@ metrics:
       labels: []
       metrics:
         - name: openldap.total_connections
-          availability: []
           description: Total Connections
           unit: connections/s
           chart_type: line
           dimensions:
             - name: connections
         - name: openldap.traffic_stats
-          availability: []
           description: Traffic
           unit: KiB/s
           chart_type: line
           dimensions:
             - name: sent
         - name: openldap.operations_status
-          availability: []
           description: Operations Status
           unit: ops/s
           chart_type: line
@@ -35,21 +32,18 @@ metrics:
             - name: completed
             - name: initiated
         - name: openldap.referrals
-          availability: []
           description: Referrals
           unit: referrals/s
           chart_type: line
           dimensions:
             - name: sent
         - name: openldap.entries
-          availability: []
           description: Entries
           unit: entries/s
           chart_type: line
           dimensions:
             - name: sent
         - name: openldap.ldap_operations
-          availability: []
           description: Operations
           unit: ops/s
           chart_type: line
@@ -62,7 +56,6 @@ metrics:
             - name: modify
             - name: compare
         - name: openldap.waiters
-          availability: []
           description: Waiters
           unit: waiters/s
           chart_type: line

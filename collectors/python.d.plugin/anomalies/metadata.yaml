@@ -18,14 +18,12 @@ metrics:
       labels: []
       metrics:
         - name: anomalies.probability
-          availability: []
           description: Anomaly Probability
           unit: probability
           chart_type: line
           dimensions:
             - name: a dimension per probability
         - name: anomalies.anomaly
-          availability: []
           description: Anomaly
           unit: count
           chart_type: stacked

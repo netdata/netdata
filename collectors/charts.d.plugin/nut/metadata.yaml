@@ -23,21 +23,18 @@ metrics:
       labels: []
       metrics:
         - name: nut.charge
-          availability: []
           description: UPS Charge
           unit: percentage
           chart_type: area
           dimensions:
             - name: charge
         - name: nut.runtime
-          availability: []
           description: UPS Runtime
           unit: seconds
           chart_type: line
           dimensions:
             - name: runtime
         - name: nut.battery.voltage
-          availability: []
           description: UPS Battery Voltage
           unit: Volts
           chart_type: line
@@ -47,7 +44,6 @@ metrics:
             - name: low
             - name: nominal
         - name: nut.input.voltage
-          availability: []
           description: UPS Input Voltage
           unit: Volts
           chart_type: line
@@ -56,14 +52,12 @@ metrics:
             - name: fault
             - name: nominal
         - name: nut.input.current
-          availability: []
           description: UPS Input Current
           unit: Ampere
           chart_type: line
           dimensions:
             - name: nominal
         - name: nut.input.frequency
-          availability: []
           description: UPS Input Frequency
           unit: Hz
           chart_type: line
@@ -71,35 +65,30 @@ metrics:
             - name: frequency
             - name: nominal
         - name: nut.output.voltage
-          availability: []
           description: UPS Output Voltage
           unit: Volts
           chart_type: line
           dimensions:
             - name: voltage
         - name: nut.load
-          availability: []
           description: UPS Load
           unit: percentage
           chart_type: area
           dimensions:
             - name: load
         - name: nut.load_usage
-          availability: []
           description: UPS Load Usage
           unit: Watts
           chart_type: area
           dimensions:
             - name: load_usage
         - name: nut.temperature
-          availability: []
           description: UPS Temperature
           unit: temperature
           chart_type: line
           dimensions:
             - name: temp
         - name: nut.clients
-          availability: []
           description: UPS Connected Clients
           unit: clients
           chart_type: area

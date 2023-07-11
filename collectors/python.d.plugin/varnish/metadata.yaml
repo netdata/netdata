@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: varnish.session_connection
-          availability: []
           description: Connections Statistics
           unit: connections/s
           chart_type: line
@@ -21,14 +20,12 @@ metrics:
             - name: accepted
             - name: dropped
         - name: varnish.client_requests
-          availability: []
           description: Client Requests
           unit: requests/s
           chart_type: line
           dimensions:
             - name: received
         - name: varnish.all_time_hit_rate
-          availability: []
           description: All History Hit Rate Ratio
           unit: percentage
           chart_type: stacked
@@ -37,7 +34,6 @@ metrics:
             - name: miss
             - name: hitpass
         - name: varnish.current_poll_hit_rate
-          availability: []
           description: Current Poll Hit Rate Ratio
           unit: percentage
           chart_type: stacked
@@ -46,28 +42,24 @@ metrics:
             - name: miss
             - name: hitpass
         - name: varnish.cached_objects_expired
-          availability: []
           description: Expired Objects
           unit: expired/s
           chart_type: line
           dimensions:
             - name: objects
         - name: varnish.cached_objects_nuked
-          availability: []
           description: Least Recently Used Nuked Objects
           unit: nuked/s
           chart_type: line
           dimensions:
             - name: objects
         - name: varnish.threads_total
-          availability: []
           description: Number Of Threads In All Pools
           unit: number
           chart_type: line
           dimensions:
             - name: None
         - name: varnish.threads_statistics
-          availability: []
           description: Threads Statistics
           unit: threads/s
           chart_type: line
@@ -76,14 +68,12 @@ metrics:
             - name: failed
             - name: limited
         - name: varnish.threads_queue_len
-          availability: []
           description: Current Queue Length
           unit: requests
           chart_type: line
           dimensions:
             - name: in queue
         - name: varnish.backend_connections
-          availability: []
           description: Backend Connections Statistics
           unit: connections/s
           chart_type: line
@@ -95,14 +85,12 @@ metrics:
             - name: recycled
             - name: failed
         - name: varnish.backend_requests
-          availability: []
           description: Requests To The Backend
           unit: requests/s
           chart_type: line
           dimensions:
             - name: sent
         - name: varnish.esi_statistics
-          availability: []
           description: ESI Statistics
           unit: problems/s
           chart_type: line
@@ -110,7 +98,6 @@ metrics:
             - name: errors
             - name: warnings
         - name: varnish.memory_usage
-          availability: []
           description: Memory Usage
           unit: MiB
           chart_type: stacked
@@ -118,7 +105,6 @@ metrics:
             - name: free
             - name: allocated
         - name: varnish.uptime
-          availability: []
           description: Uptime
           unit: seconds
           chart_type: line
@@ -129,7 +115,6 @@ metrics:
       labels: []
       metrics:
         - name: varnish.backend
-          availability: []
           description: Backend {backend_name}
           unit: kilobits/s
           chart_type: area
@@ -141,7 +126,6 @@ metrics:
       labels: []
       metrics:
         - name: varnish.storage_usage
-          availability: []
           description: Storage {storage_name} Usage
           unit: KiB
           chart_type: stacked
@@ -149,7 +133,6 @@ metrics:
             - name: free
             - name: allocated
         - name: varnish.storage_alloc_objs
-          availability: []
           description: Storage {storage_name} Allocated Objects
           unit: objects
           chart_type: line

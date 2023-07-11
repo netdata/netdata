@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: expvar.memstats.heap
-          availability: []
           description: 'memory: size of heap memory structures'
           unit: KiB
           chart_type: line
@@ -21,42 +20,36 @@ metrics:
             - name: alloc
             - name: inuse
         - name: expvar.memstats.stack
-          availability: []
           description: 'memory: size of stack memory structures'
           unit: KiB
           chart_type: line
           dimensions:
             - name: inuse
         - name: expvar.memstats.mspan
-          availability: []
           description: 'memory: size of mspan memory structures'
           unit: KiB
           chart_type: line
           dimensions:
             - name: inuse
         - name: expvar.memstats.mcache
-          availability: []
           description: 'memory: size of mcache memory structures'
           unit: KiB
           chart_type: line
           dimensions:
             - name: inuse
         - name: expvar.memstats.live_objects
-          availability: []
           description: 'memory: number of live objects'
           unit: objects
           chart_type: line
           dimensions:
             - name: live
         - name: expvar.memstats.sys
-          availability: []
           description: 'memory: size of reserved virtual address space'
           unit: KiB
           chart_type: line
           dimensions:
             - name: sys
         - name: expvar.memstats.gc_pauses
-          availability: []
           description: 'memory: average duration of GC pauses'
           unit: ns
           chart_type: line

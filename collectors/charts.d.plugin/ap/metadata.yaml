@@ -13,14 +13,12 @@ metrics:
       labels: []
       metrics:
         - name: ap.clients
-          availability: []
           description: Connected clients to ${ssid} on ${dev}
           unit: clients
           chart_type: line
           dimensions:
             - name: clients
         - name: ap.net
-          availability: []
           description: Bandwidth for ${ssid} on ${dev}
           unit: kilobits/s
           chart_type: area
@@ -28,7 +26,6 @@ metrics:
             - name: received
             - name: sent
         - name: ap.packets
-          availability: []
           description: Packets for ${ssid} on ${dev}
           unit: packets/s
           chart_type: line
@@ -36,7 +33,6 @@ metrics:
             - name: received
             - name: sent
         - name: ap.issues
-          availability: []
           description: Transmit Issues for ${ssid} on ${dev}
           unit: issues/s
           chart_type: line
@@ -44,14 +40,12 @@ metrics:
             - name: retries
             - name: failures
         - name: ap.signal
-          availability: []
           description: Average Signal for ${ssid} on ${dev}
           unit: dBm
           chart_type: line
           dimensions:
             - name: average signal
         - name: ap.bitrate
-          availability: []
           description: Bitrate for ${ssid} on ${dev}
           unit: Mbps
           chart_type: line

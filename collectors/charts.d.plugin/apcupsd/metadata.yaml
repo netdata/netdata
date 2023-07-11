@@ -23,14 +23,12 @@ metrics:
       labels: []
       metrics:
         - name: apcupsd.charge
-          availability: []
           description: UPS Charge
           unit: percentage
           chart_type: area
           dimensions:
             - name: charge
         - name: apcupsd.battery.voltage
-          availability: []
           description: UPS Battery Voltage
           unit: Volts
           chart_type: line
@@ -38,7 +36,6 @@ metrics:
             - name: voltage
             - name: nominal
         - name: apcupsd.input.voltage
-          availability: []
           description: UPS Input Voltage
           unit: Volts
           chart_type: line
@@ -47,7 +44,6 @@ metrics:
             - name: min
             - name: max
         - name: apcupsd.output.voltage
-          availability: []
           description: UPS Output Voltage
           unit: Volts
           chart_type: line
@@ -55,42 +51,36 @@ metrics:
             - name: absolute
             - name: nominal
         - name: apcupsd.input.frequency
-          availability: []
           description: UPS Input Voltage
           unit: Hz
           chart_type: line
           dimensions:
             - name: frequency
         - name: apcupsd.load
-          availability: []
           description: UPS Load
           unit: percentage
           chart_type: area
           dimensions:
             - name: load
         - name: apcupsd.load_usage
-          availability: []
           description: UPS Load Usage
           unit: Watts
           chart_type: area
           dimensions:
             - name: load
         - name: apcupsd.temperature
-          availability: []
           description: UPS Temperature
           unit: Celsius
           chart_type: line
           dimensions:
             - name: temp
         - name: apcupsd.time
-          availability: []
           description: UPS Time Remaining
           unit: Minutes
           chart_type: area
           dimensions:
             - name: time
         - name: apcupsd.online
-          availability: []
           description: UPS ONLINE flag
           unit: boolean
           chart_type: line

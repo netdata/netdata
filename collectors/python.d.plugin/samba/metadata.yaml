@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: syscall.rw
-          availability: []
           description: R/Ws
           unit: KiB/s
           chart_type: area
@@ -21,7 +20,6 @@ metrics:
             - name: sendfile
             - name: recvfile
         - name: smb2.rw
-          availability: []
           description: R/Ws
           unit: KiB/s
           chart_type: area
@@ -31,7 +29,6 @@ metrics:
             - name: readin
             - name: writeout
         - name: smb2.create_close
-          availability: []
           description: Create/Close
           unit: operations/s
           chart_type: line
@@ -39,7 +36,6 @@ metrics:
             - name: create
             - name: close
         - name: smb2.get_set_info
-          availability: []
           description: Info
           unit: operations/s
           chart_type: line
@@ -47,21 +43,18 @@ metrics:
             - name: getinfo
             - name: setinfo
         - name: smb2.find
-          availability: []
           description: Find
           unit: operations/s
           chart_type: line
           dimensions:
             - name: find
         - name: smb2.notify
-          availability: []
           description: Notify
           unit: operations/s
           chart_type: line
           dimensions:
             - name: notify
         - name: smb2.sm_counters
-          availability: []
           description: Lesser Ops
           unit: count
           chart_type: stacked

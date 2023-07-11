@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: hddtemp.temperatures
-          availability: []
           description: Disk Temperatures
           unit: Celsius
           chart_type: line

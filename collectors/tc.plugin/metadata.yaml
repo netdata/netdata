@@ -19,35 +19,30 @@ metrics:
           description: TBD
       metrics:
         - name: tc.qos
-          availability: []
           description: Class Usage
           unit: kilobits/s
           chart_type: stacked
           dimensions:
             - name: a dimension per class
         - name: tc.qos_packets
-          availability: []
           description: Class Packets
           unit: packets/s
           chart_type: stacked
           dimensions:
             - name: a dimension per class
         - name: tc.qos_dropped
-          availability: []
           description: Class Dropped Packets
           unit: packets/s
           chart_type: stacked
           dimensions:
             - name: a dimension per class
         - name: tc.qos_tokens
-          availability: []
           description: Class Tokens
           unit: tokens
           chart_type: line
           dimensions:
             - name: a dimension per class
         - name: tc.qos_ctokens
-          availability: []
           description: Class cTokens
           unit: ctokens
           chart_type: line

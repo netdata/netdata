@@ -31,7 +31,6 @@ modules:
           labels: []
           metrics:
             - name: system.cpu
-              availability: []
               description: Total CPU utilization
               unit: percentage
               chart_type: stacked
@@ -47,28 +46,24 @@ modules:
                 - name: iowait
                 - name: idle
             - name: system.intr
-              availability: []
               description: CPU Interrupts
               unit: interrupts/s
               chart_type: line
               dimensions:
                 - name: interrupts
             - name: system.ctxt
-              availability: []
               description: CPU Context Switches
               unit: context switches/s
               chart_type: line
               dimensions:
                 - name: switches
             - name: system.forks
-              availability: []
               description: Started Processes
               unit: processes/s
               chart_type: line
               dimensions:
                 - name: started
             - name: system.processes
-              availability: []
               description: System Processes
               unit: processes
               chart_type: line
@@ -76,21 +71,18 @@ modules:
                 - name: running
                 - name: blocked
             - name: cpu.core_throttling
-              availability: []
               description: Core Thermal Throttling Events
               unit: events/s
               chart_type: line
               dimensions:
                 - name: a dimension per cpu core
             - name: cpu.package_throttling
-              availability: []
               description: Package Thermal Throttling Events
               unit: events/s
               chart_type: line
               dimensions:
                 - name: a dimension per package
             - name: cpu.cpufreq
-              availability: []
               description: Current CPU Frequency
               unit: MHz
               chart_type: line
@@ -103,7 +95,6 @@ modules:
               description: TBD
           metrics:
             - name: cpu.cpu
-              availability: []
               description: Core utilization
               unit: percentage
               chart_type: stacked
@@ -119,7 +110,6 @@ modules:
                 - name: iowait
                 - name: idle
             - name: cpuidle.cpu_cstate_residency_time
-              availability: []
               description: C-state residency time
               unit: percentage
               chart_type: stacked
@@ -140,7 +130,6 @@ modules:
           labels: []
           metrics:
             - name: system.entropy
-              availability: []
               description: Available Entropy
               unit: entropy
               chart_type: line
@@ -161,7 +150,6 @@ modules:
           labels: []
           metrics:
             - name: system.uptime
-              availability: []
               description: System Uptime
               unit: seconds
               chart_type: line
@@ -192,7 +180,6 @@ modules:
           labels: []
           metrics:
             - name: system.swapio
-              availability: []
               description: Swap I/O
               unit: KiB/s
               chart_type: area
@@ -200,7 +187,6 @@ modules:
                 - name: in
                 - name: out
             - name: system.pgpgio
-              availability: []
               description: Memory Paged from/to disk
               unit: KiB/s
               chart_type: area
@@ -208,7 +194,6 @@ modules:
                 - name: in
                 - name: out
             - name: system.pgfaults
-              availability: []
               description: Memory Page Faults
               unit: faults/s
               chart_type: line
@@ -216,7 +201,6 @@ modules:
                 - name: minor
                 - name: major
             - name: mem.balloon
-              availability: []
               description: Memory Ballooning Operations
               unit: KiB/s
               chart_type: line
@@ -225,7 +209,6 @@ modules:
                 - name: deflate
                 - name: migrate
             - name: mem.zswapio
-              availability: []
               description: ZSwap I/O
               unit: KiB/s
               chart_type: area
@@ -233,7 +216,6 @@ modules:
                 - name: in
                 - name: out
             - name: mem.ksm_cow
-              availability: []
               description: KSM Copy On Write Operations
               unit: KiB/s
               chart_type: line
@@ -241,7 +223,6 @@ modules:
                 - name: swapin
                 - name: write
             - name: mem.thp_faults
-              availability: []
               description: Transparent Huge Page Fault Allocations
               unit: events/s
               chart_type: line
@@ -250,7 +231,6 @@ modules:
                 - name: fallback
                 - name: fallback_charge
             - name: mem.thp_file
-              availability: []
               description: Transparent Huge Page File Allocations
               unit: events/s
               chart_type: line
@@ -260,7 +240,6 @@ modules:
                 - name: mapped
                 - name: fallback_charge
             - name: mem.thp_zero
-              availability: []
               description: Transparent Huge Zero Page Allocations
               unit: events/s
               chart_type: line
@@ -268,7 +247,6 @@ modules:
                 - name: alloc
                 - name: failed
             - name: mem.thp_collapse
-              availability: []
               description: Transparent Huge Pages Collapsed by khugepaged
               unit: events/s
               chart_type: line
@@ -276,7 +254,6 @@ modules:
                 - name: alloc
                 - name: failed
             - name: mem.thp_split
-              availability: []
               description: Transparent Huge Page Splits
               unit: events/s
               chart_type: line
@@ -286,7 +263,6 @@ modules:
                 - name: split_pmd
                 - name: split_deferred
             - name: mem.thp_swapout
-              availability: []
               description: Transparent Huge Pages Swap Out
               unit: events/s
               chart_type: line
@@ -294,7 +270,6 @@ modules:
                 - name: swapout
                 - name: fallback
             - name: mem.thp_compact
-              availability: []
               description: Transparent Huge Pages Compaction
               unit: events/s
               chart_type: line
@@ -303,14 +278,12 @@ modules:
                 - name: fail
                 - name: stall
             - name: mem.oom_kill
-              availability: []
               description: Out of Memory Kills
               unit: kills/s
               chart_type: line
               dimensions:
                 - name: kills
             - name: mem.numa
-              availability: []
               description: NUMA events
               unit: events/s
               chart_type: line
@@ -339,7 +312,6 @@ modules:
           labels: []
           metrics:
             - name: system.interrupts
-              availability: []
               description: System interrupts
               unit: interrupts/s
               chart_type: stacked
@@ -352,7 +324,6 @@ modules:
               description: TBD
           metrics:
             - name: cpu.interrupts
-              availability: []
               description: CPU interrupts
               unit: interrupts/s
               chart_type: stacked
@@ -388,7 +359,6 @@ modules:
           labels: []
           metrics:
             - name: system.load
-              availability: []
               description: System Load Average
               unit: load
               chart_type: line
@@ -397,7 +367,6 @@ modules:
                 - name: load5
                 - name: load15
             - name: system.active_processes
-              availability: []
               description: System Active Processes
               unit: processes
               chart_type: line
@@ -418,7 +387,6 @@ modules:
           labels: []
           metrics:
             - name: system.cpu_some_pressure
-              availability: []
               description: CPU some pressure
               unit: percentage
               chart_type: line
@@ -427,14 +395,12 @@ modules:
                 - name: some60
                 - name: some300
             - name: system.cpu_some_pressure_stall_time
-              availability: []
               description: CPU some pressure stall time
               unit: ms
               chart_type: line
               dimensions:
                 - name: time
             - name: system.cpu_full_pressure
-              availability: []
               description: CPU full pressure
               unit: percentage
               chart_type: line
@@ -443,14 +409,12 @@ modules:
                 - name: some60
                 - name: some300
             - name: system.cpu_full_pressure_stall_time
-              availability: []
               description: CPU full pressure stall time
               unit: ms
               chart_type: line
               dimensions:
                 - name: time
             - name: system.memory_some_pressure
-              availability: []
               description: Memory some pressure
               unit: percentage
               chart_type: line
@@ -459,14 +423,12 @@ modules:
                 - name: some60
                 - name: some300
             - name: system.memory_some_pressure_stall_time
-              availability: []
               description: Memory some pressure stall time
               unit: ms
               chart_type: line
               dimensions:
                 - name: time
             - name: system.memory_full_pressure
-              availability: []
               description: Memory full pressure
               unit: percentage
               chart_type: line
@@ -475,14 +437,12 @@ modules:
                 - name: some60
                 - name: some300
             - name: system.memory_full_pressure_stall_time
-              availability: []
               description: Memory full pressure stall time
               unit: ms
               chart_type: line
               dimensions:
                 - name: time
             - name: system.io_some_pressure
-              availability: []
               description: I/O some pressure
               unit: percentage
               chart_type: line
@@ -491,14 +451,12 @@ modules:
                 - name: some60
                 - name: some300
             - name: system.io_some_pressure_stall_time
-              availability: []
               description: I/O some pressure stall time
               unit: ms
               chart_type: line
               dimensions:
                 - name: time
             - name: system.io_full_pressure
-              availability: []
               description: I/O some pressure
               unit: percentage
               chart_type: line
@@ -507,7 +465,6 @@ modules:
                 - name: some60
                 - name: some300
             - name: system.io_full_pressure_stall_time
-              availability: []
               description: I/O some pressure stall time
               unit: ms
               chart_type: line
@@ -528,7 +485,6 @@ modules:
           labels: []
           metrics:
             - name: system.softirqs
-              availability: []
               description: System softirqs
               unit: softirqs/s
               chart_type: stacked
@@ -541,7 +497,6 @@ modules:
               description: TBD
           metrics:
             - name: cpu.softirqs
-              availability: []
               description: CPU softirqs
               unit: softirqs/s
               chart_type: stacked
@@ -575,7 +530,6 @@ modules:
           labels: []
           metrics:
             - name: system.softnet_stat
-              availability: []
               description: System softnet_stat
               unit: events/s
               chart_type: line
@@ -590,7 +544,6 @@ modules:
           labels: []
           metrics:
             - name: cpu.softnet_stat
-              availability: []
               description: CPU softnet_stat
               unit: events/s
               chart_type: line
@@ -631,7 +584,6 @@ modules:
           labels: []
           metrics:
             - name: system.ram
-              availability: []
               description: System RAM
               unit: MiB
               chart_type: stacked
@@ -641,14 +593,12 @@ modules:
                 - name: cached
                 - name: buffers
             - name: mem.available
-              availability: []
               description: Available RAM for applications
               unit: MiB
               chart_type: area
               dimensions:
                 - name: avail
             - name: system.swap
-              availability: []
               description: System Swap
               unit: MiB
               chart_type: stacked
@@ -656,21 +606,18 @@ modules:
                 - name: free
                 - name: used
             - name: mem.hwcorrupt
-              availability: []
               description: Corrupted Memory detected by ECC
               unit: MiB
               chart_type: line
               dimensions:
                 - name: HardwareCorrupted
             - name: mem.commited
-              availability: []
               description: Committed (Allocated) Memory
               unit: MiB
               chart_type: area
               dimensions:
                 - name: Commited_AS
             - name: mem.writeback
-              availability: []
               description: Writeback Memory
               unit: MiB
               chart_type: line
@@ -681,7 +628,6 @@ modules:
                 - name: NfsWriteback
                 - name: Bounce
             - name: mem.kernel
-              availability: []
               description: Memory Used by Kernel
               unit: MiB
               chart_type: stacked
@@ -692,7 +638,6 @@ modules:
                 - name: VmallocUsed
                 - name: Percpu
             - name: mem.slab
-              availability: []
               description: Reclaimable Kernel Memory
               unit: MiB
               chart_type: stacked
@@ -700,7 +645,6 @@ modules:
                 - name: reclaimable
                 - name: unreclaimable
             - name: mem.hugepage
-              availability: []
               description: Dedicated HugePages Memory
               unit: MiB
               chart_type: stacked
@@ -710,7 +654,6 @@ modules:
                 - name: surplus
                 - name: reserved
             - name: mem.transparent_hugepages
-              availability: []
               description: Transparent HugePages Memory
               unit: MiB
               chart_type: stacked
@@ -732,7 +675,6 @@ modules:
           labels: []
           metrics:
             - name: mem.pagetype_global
-              availability: []
               description: System orders available
               unit: B
               chart_type: stacked
@@ -749,7 +691,6 @@ modules:
               description: TBD
           metrics:
             - name: mem.pagetype
-              availability: []
               description: pagetype_Node{node}_{zone}_{type}
               unit: B
               chart_type: stacked
@@ -780,14 +721,12 @@ modules:
           labels: []
           metrics:
             - name: mem.ecc_ce
-              availability: []
               description: ECC Memory Correctable Errors
               unit: errors
               chart_type: line
               dimensions:
                 - name: a dimension per mem controller
             - name: mem.ecc_ue
-              availability: []
               description: ECC Memory Uncorrectable Errors
               unit: errors
               chart_type: line
@@ -810,7 +749,6 @@ modules:
               description: TBD
           metrics:
             - name: mem.numa_nodes
-              availability: []
               description: NUMA events
               unit: events/s
               chart_type: line
@@ -836,7 +774,6 @@ modules:
           labels: []
           metrics:
             - name: mem.ksm
-              availability: []
               description: Kernel Same Page Merging
               unit: MiB
               chart_type: stacked
@@ -846,7 +783,6 @@ modules:
                 - name: sharing
                 - name: volatile
             - name: mem.ksm_savings
-              availability: []
               description: Kernel Same Page Merging Savings
               unit: MiB
               chart_type: area
@@ -854,7 +790,6 @@ modules:
                 - name: savings
                 - name: offered
             - name: mem.ksm_ratios
-              availability: []
               description: Kernel Same Page Merging Effectiveness
               unit: percentage
               chart_type: line
@@ -877,7 +812,6 @@ modules:
               description: TBD
           metrics:
             - name: mem.zram_usage
-              availability: []
               description: ZRAM Memory Usage
               unit: MiB
               chart_type: area
@@ -885,7 +819,6 @@ modules:
                 - name: compressed
                 - name: metadata
             - name: mem.zram_savings
-              availability: []
               description: ZRAM Memory Savings
               unit: MiB
               chart_type: area
@@ -893,14 +826,12 @@ modules:
                 - name: savings
                 - name: original
             - name: mem.zram_ratio
-              availability: []
               description: ZRAM Compression Ratio (original to compressed)
               unit: ratio
               chart_type: line
               dimensions:
                 - name: ratio
             - name: mem.zram_efficiency
-              availability: []
               description: ZRAM Efficiency
               unit: percentage
               chart_type: line
@@ -926,42 +857,36 @@ modules:
           labels: []
           metrics:
             - name: system.ipc_semaphores
-              availability: []
               description: IPC Semaphores
               unit: semaphores
               chart_type: area
               dimensions:
                 - name: semaphores
             - name: system.ipc_semaphore_arrays
-              availability: []
               description: IPC Semaphore Arrays
               unit: arrays
               chart_type: area
               dimensions:
                 - name: arrays
             - name: system.message_queue_message
-              availability: []
               description: IPC Message Queue Number of Messages
               unit: messages
               chart_type: stacked
               dimensions:
                 - name: a dimension per queue
             - name: system.message_queue_bytes
-              availability: []
               description: IPC Message Queue Used Bytes
               unit: bytes
               chart_type: stacked
               dimensions:
                 - name: a dimension per queue
             - name: system.shared_memory_segments
-              availability: []
               description: IPC Shared Memory Number of Segments
               unit: segments
               chart_type: stacked
               dimensions:
                 - name: segments
             - name: system.shared_memory_bytes
-              availability: []
               description: IPC Shared Memory Used Bytes
               unit: bytes
               chart_type: stacked
@@ -995,7 +920,6 @@ modules:
           labels: []
           metrics:
             - name: system.io
-              availability: []
               description: Disk I/O
               unit: KiB/s
               chart_type: area
@@ -1013,7 +937,6 @@ modules:
               description: TBD
           metrics:
             - name: disk.io
-              availability: []
               description: Disk I/O Bandwidth
               unit: KiB/s
               chart_type: area
@@ -1021,14 +944,12 @@ modules:
                 - name: reads
                 - name: writes
             - name: disk_ext.io
-              availability: []
               description: Amount of Discarded Data
               unit: KiB/s
               chart_type: area
               dimensions:
                 - name: discards
             - name: disk.ops
-              availability: []
               description: Disk Completed I/O Operations
               unit: operations/s
               chart_type: line
@@ -1036,7 +957,6 @@ modules:
                 - name: reads
                 - name: writes
             - name: disk_ext.ops
-              availability: []
               description: Disk Completed Extended I/O Operations
               unit: operations/s
               chart_type: line
@@ -1044,35 +964,30 @@ modules:
                 - name: discards
                 - name: flushes
             - name: disk.qops
-              availability: []
               description: Disk Current I/O Operations
               unit: operations
               chart_type: line
               dimensions:
                 - name: operations
             - name: disk.backlog
-              availability: []
               description: Disk Backlog
               unit: milliseconds
               chart_type: area
               dimensions:
                 - name: backlog
             - name: disk.busy
-              availability: []
               description: Disk Busy Time
               unit: milliseconds
               chart_type: area
               dimensions:
                 - name: busy
             - name: disk.util
-              availability: []
               description: Disk Utilization Time
               unit: '% of time working'
               chart_type: area
               dimensions:
                 - name: utilization
             - name: disk.mops
-              availability: []
               description: Disk Merged Operations
               unit: merged operations/s
               chart_type: line
@@ -1080,14 +995,12 @@ modules:
                 - name: reads
                 - name: writes
             - name: disk_ext.mops
-              availability: []
               description: Disk Merged Discard Operations
               unit: merged operations/s
               chart_type: line
               dimensions:
                 - name: discards
             - name: disk.iotime
-              availability: []
               description: Disk Total I/O Time
               unit: milliseconds/s
               chart_type: line
@@ -1095,7 +1008,6 @@ modules:
                 - name: reads
                 - name: writes
             - name: disk_ext.iotime
-              availability: []
               description: Disk Total I/O Time for Extended Operations
               unit: milliseconds/s
               chart_type: line
@@ -1103,7 +1015,6 @@ modules:
                 - name: discards
                 - name: flushes
             - name: disk.await
-              availability: []
               description: Average Completed I/O Operation Time
               unit: milliseconds/operation
               chart_type: line
@@ -1111,7 +1022,6 @@ modules:
                 - name: reads
                 - name: writes
             - name: disk_ext.await
-              availability: []
               description: Average Completed Extended I/O Operation Time
               unit: milliseconds/operation
               chart_type: line
@@ -1119,7 +1029,6 @@ modules:
                 - name: discards
                 - name: flushes
             - name: disk.avgsz
-              availability: []
               description: Average Completed I/O Operation Bandwidth
               unit: KiB/operation
               chart_type: area
@@ -1127,21 +1036,18 @@ modules:
                 - name: reads
                 - name: writes
             - name: disk_ext.avgsz
-              availability: []
               description: Average Amount of Discarded Data
               unit: KiB/operation
               chart_type: area
               dimensions:
                 - name: discards
             - name: disk.svctm
-              availability: []
               description: Average Service Time
               unit: milliseconds/operation
               chart_type: line
               dimensions:
                 - name: svctm
             - name: disk.bcache_cache_alloc
-              availability: []
               description: BCache Cache Allocations
               unit: percentage
               chart_type: stacked
@@ -1152,7 +1058,6 @@ modules:
                 - name: metadata
                 - name: undefined
             - name: disk.bcache_hit_ratio
-              availability: []
               description: BCache Cache Hit Ratio
               unit: percentage
               chart_type: line
@@ -1162,7 +1067,6 @@ modules:
                 - name: 1day
                 - name: ever
             - name: disk.bcache_rates
-              availability: []
               description: BCache Rates
               unit: KiB/s
               chart_type: area
@@ -1170,21 +1074,18 @@ modules:
                 - name: congested
                 - name: writeback
             - name: disk.bcache_size
-              availability: []
               description: BCache Cache Sizes
               unit: MiB
               chart_type: area
               dimensions:
                 - name: dirty
             - name: disk.bcache_usage
-              availability: []
               description: BCache Cache Usage
               unit: percentage
               chart_type: area
               dimensions:
                 - name: avail
             - name: disk.bcache_cache_read_races
-              availability: []
               description: BCache Cache Read Races
               unit: operations/s
               chart_type: line
@@ -1192,7 +1093,6 @@ modules:
                 - name: races
                 - name: errors
             - name: disk.bcache
-              availability: []
               description: BCache Cache I/O Operations
               unit: operations/s
               chart_type: line
@@ -1202,7 +1102,6 @@ modules:
                 - name: collisions
                 - name: readaheads
             - name: disk.bcache_bypass
-              availability: []
               description: BCache Cache Bypass I/O Operations
               unit: operations/s
               chart_type: line
@@ -1241,7 +1140,6 @@ modules:
           labels: []
           metrics:
             - name: md.health
-              availability: []
               description: Faulty Devices In MD
               unit: failed disks
               chart_type: line
@@ -1256,7 +1154,6 @@ modules:
               description: TBD
           metrics:
             - name: md.disks
-              availability: []
               description: Disks Stats
               unit: disks
               chart_type: stacked
@@ -1264,14 +1161,12 @@ modules:
                 - name: inuse
                 - name: down
             - name: md.mismatch_cnt
-              availability: []
               description: Mismatch Count
               unit: unsynchronized blocks
               chart_type: line
               dimensions:
                 - name: count
             - name: md.status
-              availability: []
               description: Current Status
               unit: percent
               chart_type: line
@@ -1281,21 +1176,18 @@ modules:
                 - name: recovery
                 - name: reshape
             - name: md.expected_time_until_operation_finish
-              availability: []
               description: Approximate Time Until Finish
               unit: seconds
               chart_type: line
               dimensions:
                 - name: finish_in
             - name: md.operation_speed
-              availability: []
               description: Operation Speed
               unit: KiB/s
               chart_type: line
               dimensions:
                 - name: speed
             - name: md.nonredundant
-              availability: []
               description: Nonredundant Array Availability
               unit: boolean
               chart_type: line
@@ -1393,7 +1285,6 @@ modules:
           labels: []
           metrics:
             - name: system.net
-              availability: []
               description: Physical Network Interfaces Aggregated Bandwidth
               unit: kilobits/s
               chart_type: area
@@ -1409,7 +1300,6 @@ modules:
               description: TBD
           metrics:
             - name: net.net
-              availability: []
               description: Bandwidth
               unit: kilobits/s
               chart_type: area
@@ -1417,14 +1307,12 @@ modules:
                 - name: received
                 - name: sent
             - name: net.speed
-              availability: []
               description: Interface Speed
               unit: kilobits/s
               chart_type: line
               dimensions:
                 - name: speed
             - name: net.duplex
-              availability: []
               description: Interface Duplex State
               unit: state
               chart_type: line
@@ -1433,7 +1321,6 @@ modules:
                 - name: half
                 - name: unknown
             - name: net.operstate
-              availability: []
               description: Interface Operational State
               unit: state
               chart_type: line
@@ -1446,7 +1333,6 @@ modules:
                 - name: dormant
                 - name: unknown
             - name: net.carrier
-              availability: []
               description: Interface Physical Link State
               unit: state
               chart_type: line
@@ -1454,14 +1340,12 @@ modules:
                 - name: up
                 - name: down
             - name: net.mtu
-              availability: []
               description: Interface MTU
               unit: octets
               chart_type: line
               dimensions:
                 - name: mtu
             - name: net.packets
-              availability: []
               description: Packets
               unit: packets/s
               chart_type: line
@@ -1470,7 +1354,6 @@ modules:
                 - name: sent
                 - name: multicast
             - name: net.errors
-              availability: []
               description: Interface Errors
               unit: errors/s
               chart_type: line
@@ -1478,7 +1361,6 @@ modules:
                 - name: inbound
                 - name: outbound
             - name: net.drops
-              availability: []
               description: Interface Drops
               unit: drops/s
               chart_type: line
@@ -1486,7 +1368,6 @@ modules:
                 - name: inbound
                 - name: outbound
             - name: net.fifo
-              availability: []
               description: Interface FIFO Buffer Errors
               unit: errors
               chart_type: line
@@ -1494,7 +1375,6 @@ modules:
                 - name: receive
                 - name: transmit
             - name: net.compressed
-              availability: []
               description: Compressed Packets
               unit: packets/s
               chart_type: line
@@ -1502,7 +1382,6 @@ modules:
                 - name: received
                 - name: sent
             - name: net.events
-              availability: []
               description: Network Interface Events
               unit: events/s
               chart_type: line
@@ -1525,14 +1404,12 @@ modules:
           labels: []
           metrics:
             - name: wireless.status
-              availability: []
               description: Internal status reported by interface.
               unit: status
               chart_type: line
               dimensions:
                 - name: status
             - name: wireless.link_quality
-              availability: []
               description: Overall quality of the link. This is an aggregate value,
                 and depends on the driver and hardware.
               unit: value
@@ -1540,7 +1417,6 @@ modules:
               dimensions:
                 - name: link_quality
             - name: wireless.signal_level
-              availability: []
               description: The signal level is the wireless signal power level received
                 by the wireless client. The closer the value is to 0, the stronger
                 the signal.
@@ -1549,7 +1425,6 @@ modules:
               dimensions:
                 - name: signal_level
             - name: wireless.noise_level
-              availability: []
               description: The noise level indicates the amount of background noise
                 in your environment. The closer the value to 0, the greater the noise
                 level.
@@ -1558,7 +1433,6 @@ modules:
               dimensions:
                 - name: noise_level
             - name: wireless.discarded_packets
-              availability: []
               description: Packet discarded in the wireless adapter due to wireless
                 specific problems.
               unit: packets/s
@@ -1570,7 +1444,6 @@ modules:
                 - name: retry
                 - name: misc
             - name: wireless.missed_beacons
-              availability: []
               description: Number of missed beacons.
               unit: frames/s
               chart_type: line
@@ -1591,7 +1464,6 @@ modules:
           labels: []
           metrics:
             - name: ib.bytes
-              availability: []
               description: Bandwidth usage
               unit: kilobits/s
               chart_type: area
@@ -1599,7 +1471,6 @@ modules:
                 - name: Received
                 - name: Sent
             - name: ib.packets
-              availability: []
               description: Packets Statistics
               unit: packets/s
               chart_type: area
@@ -1611,7 +1482,6 @@ modules:
                 - name: Ucast_rcvd
                 - name: Ucast_sent
             - name: ib.errors
-              availability: []
               description: Error Counters
               unit: errors/s
               chart_type: line
@@ -1630,7 +1500,6 @@ modules:
                 - name: Pkts_rcvd_discarded_by_switch
                 - name: Pkts_sent_discarded_by_switch
             - name: ib.hwerrors
-              availability: []
               description: Hardware Errors
               unit: errors/s
               chart_type: line
@@ -1653,7 +1522,6 @@ modules:
                 - name: CNP_Pkts_ignored
                 - name: RoCE_ICRC_Errors
             - name: ib.hwpackets
-              availability: []
               description: Hardware Packets Statistics
               unit: packets/s
               chart_type: line
@@ -1730,7 +1598,6 @@ modules:
           labels: []
           metrics:
             - name: system.ip
-              availability: []
               description: IP Bandwidth
               unit: kilobits/s
               chart_type: area
@@ -1738,7 +1605,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ip.inerrors
-              availability: []
               description: IP Input Errors
               unit: packets/s
               chart_type: line
@@ -1747,7 +1613,6 @@ modules:
                 - name: truncated
                 - name: checksum
             - name: ip.mcast
-              availability: []
               description: IP Multicast Bandwidth
               unit: kilobits/s
               chart_type: area
@@ -1755,7 +1620,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ip.bcast
-              availability: []
               description: IP Broadcast Bandwidth
               unit: kilobits/s
               chart_type: area
@@ -1763,7 +1627,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ip.mcastpkts
-              availability: []
               description: IP Multicast Packets
               unit: packets/s
               chart_type: line
@@ -1771,7 +1634,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ip.bcastpkts
-              availability: []
               description: IP Broadcast Packets
               unit: packets/s
               chart_type: line
@@ -1779,7 +1641,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ip.ecnpkts
-              availability: []
               description: IP ECN Statistics
               unit: packets/s
               chart_type: line
@@ -1789,14 +1650,12 @@ modules:
                 - name: ECTP0
                 - name: ECTP1
             - name: ip.tcpmemorypressures
-              availability: []
               description: TCP Memory Pressures
               unit: events/s
               chart_type: line
               dimensions:
                 - name: pressures
             - name: ip.tcpconnaborts
-              availability: []
               description: TCP Connection Aborts
               unit: connections/s
               chart_type: line
@@ -1808,7 +1667,6 @@ modules:
                 - name: linger
                 - name: failed
             - name: ip.tcpreorders
-              availability: []
               description: TCP Reordered Packets by Detection Method
               unit: packets/s
               chart_type: line
@@ -1818,7 +1676,6 @@ modules:
                 - name: fack
                 - name: reno
             - name: ip.tcpofo
-              availability: []
               description: TCP Out-Of-Order Queue
               unit: packets/s
               chart_type: line
@@ -1828,7 +1685,6 @@ modules:
                 - name: merged
                 - name: pruned
             - name: ip.tcpsyncookies
-              availability: []
               description: TCP SYN Cookies
               unit: packets/s
               chart_type: line
@@ -1837,7 +1693,6 @@ modules:
                 - name: sent
                 - name: failed
             - name: ip.tcp_syn_queue
-              availability: []
               description: TCP SYN Queue Issues
               unit: packets/s
               chart_type: line
@@ -1845,7 +1700,6 @@ modules:
                 - name: drops
                 - name: cookies
             - name: ip.tcp_accept_queue
-              availability: []
               description: TCP Accept Queue Issues
               unit: packets/s
               chart_type: line
@@ -1853,7 +1707,6 @@ modules:
                 - name: overflows
                 - name: drops
             - name: ipv4.packets
-              availability: []
               description: IPv4 Packets
               unit: packets/s
               chart_type: line
@@ -1863,7 +1716,6 @@ modules:
                 - name: forwarded
                 - name: delivered
             - name: ipv4.fragsout
-              availability: []
               description: IPv4 Fragments Sent
               unit: packets/s
               chart_type: line
@@ -1872,7 +1724,6 @@ modules:
                 - name: failed
                 - name: created
             - name: ipv4.fragsin
-              availability: []
               description: IPv4 Fragments Reassembly
               unit: packets/s
               chart_type: line
@@ -1881,7 +1732,6 @@ modules:
                 - name: failed
                 - name: all
             - name: ipv4.errors
-              availability: []
               description: IPv4 Errors
               unit: packets/s
               chart_type: line
@@ -1893,7 +1743,6 @@ modules:
                 - name: InAddrErrors
                 - name: InUnknownProtos
             - name: ipv4.icmp
-              availability: []
               description: IPv4 ICMP Packets
               unit: packets/s
               chart_type: line
@@ -1901,7 +1750,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ipv4.icmp_errors
-              availability: []
               description: IPv4 ICMP Errors
               unit: packets/s
               chart_type: line
@@ -1910,7 +1758,6 @@ modules:
                 - name: OutErrors
                 - name: InCsumErrors
             - name: ipv4.icmpmsg
-              availability: []
               description: IPv4 ICMP Messages
               unit: packets/s
               chart_type: line
@@ -1936,14 +1783,12 @@ modules:
                 - name: InTimestampReps
                 - name: OutTimestampReps
             - name: ipv4.tcpsock
-              availability: []
               description: IPv4 TCP Connections
               unit: active connections
               chart_type: line
               dimensions:
                 - name: connections
             - name: ipv4.tcppackets
-              availability: []
               description: IPv4 TCP Packets
               unit: packets/s
               chart_type: line
@@ -1951,7 +1796,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ipv4.tcperrors
-              availability: []
               description: IPv4 TCP Errors
               unit: packets/s
               chart_type: line
@@ -1960,7 +1804,6 @@ modules:
                 - name: InCsumErrors
                 - name: RetransSegs
             - name: ipv4.tcpopens
-              availability: []
               description: IPv4 TCP Opens
               unit: connections/s
               chart_type: line
@@ -1968,7 +1811,6 @@ modules:
                 - name: active
                 - name: passive
             - name: ipv4.tcphandshake
-              availability: []
               description: IPv4 TCP Handshake Issues
               unit: events/s
               chart_type: line
@@ -1978,7 +1820,6 @@ modules:
                 - name: AttemptFails
                 - name: SynRetrans
             - name: ipv4.udppackets
-              availability: []
               description: IPv4 UDP Packets
               unit: packets/s
               chart_type: line
@@ -1986,7 +1827,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ipv4.udperrors
-              availability: []
               description: IPv4 UDP Errors
               unit: events/s
               chart_type: line
@@ -1998,7 +1838,6 @@ modules:
                 - name: InCsumErrors
                 - name: IgnoredMulti
             - name: ipv4.udplite
-              availability: []
               description: IPv4 UDPLite Packets
               unit: packets/s
               chart_type: line
@@ -2006,7 +1845,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ipv4.udplite_errors
-              availability: []
               description: IPv4 UDPLite Errors
               unit: packets/s
               chart_type: line
@@ -2018,7 +1856,6 @@ modules:
                 - name: InCsumErrors
                 - name: IgnoredMulti
             - name: system.ipv6
-              availability: []
               description: IPv6 Bandwidth
               unit: kilobits/s
               chart_type: area
@@ -2026,7 +1863,6 @@ modules:
                 - name: received
                 - name: sent
             - name: system.ipv6
-              availability: []
               description: IPv6 Packets
               unit: packets/s
               chart_type: line
@@ -2036,7 +1872,6 @@ modules:
                 - name: forwarded
                 - name: delivers
             - name: ipv6.fragsout
-              availability: []
               description: IPv6 Fragments Sent
               unit: packets/s
               chart_type: line
@@ -2045,7 +1880,6 @@ modules:
                 - name: failed
                 - name: all
             - name: ipv6.fragsin
-              availability: []
               description: IPv6 Fragments Reassembly
               unit: packets/s
               chart_type: line
@@ -2055,7 +1889,6 @@ modules:
                 - name: timeout
                 - name: all
             - name: ipv6.errors
-              availability: []
               description: IPv6 Errors
               unit: packets/s
               chart_type: line
@@ -2070,7 +1903,6 @@ modules:
                 - name: InNoRoutes
                 - name: OutNoRoutes
             - name: ipv6.udppackets
-              availability: []
               description: IPv6 UDP Packets
               unit: packets/s
               chart_type: line
@@ -2078,7 +1910,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ipv6.udperrors
-              availability: []
               description: IPv6 UDP Errors
               unit: events/s
               chart_type: line
@@ -2090,7 +1921,6 @@ modules:
                 - name: InCsumErrors
                 - name: IgnoredMulti
             - name: ipv6.udplitepackets
-              availability: []
               description: IPv6 UDPlite Packets
               unit: packets/s
               chart_type: line
@@ -2098,7 +1928,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ipv6.udpliteerrors
-              availability: []
               description: IPv6 UDP Lite Errors
               unit: events/s
               chart_type: line
@@ -2109,7 +1938,6 @@ modules:
                 - name: NoPorts
                 - name: InCsumErrors
             - name: ipv6.mcast
-              availability: []
               description: IPv6 Multicast Bandwidth
               unit: kilobits/s
               chart_type: area
@@ -2117,7 +1945,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ipv6.bcast
-              availability: []
               description: IPv6 Broadcast Bandwidth
               unit: kilobits/s
               chart_type: area
@@ -2125,7 +1952,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ipv6.mcastpkts
-              availability: []
               description: IPv6 Multicast Packets
               unit: packets/s
               chart_type: line
@@ -2133,7 +1959,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ipv6.icmp
-              availability: []
               description: IPv6 ICMP Messages
               unit: messages/s
               chart_type: line
@@ -2141,7 +1966,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ipv6.icmpredir
-              availability: []
               description: IPv6 ICMP Redirects
               unit: redirects/s
               chart_type: line
@@ -2149,7 +1973,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ipv6.icmperrors
-              availability: []
               description: IPv6 ICMP Errors
               unit: errors/s
               chart_type: line
@@ -2166,7 +1989,6 @@ modules:
                 - name: OutTimeExcds
                 - name: OutParmProblems
             - name: ipv6.icmpechos
-              availability: []
               description: IPv6 ICMP Echo
               unit: messages/s
               chart_type: line
@@ -2176,7 +1998,6 @@ modules:
                 - name: InEchoReplies
                 - name: OutEchoReplies
             - name: ipv6.groupmemb
-              availability: []
               description: IPv6 ICMP Group Membership
               unit: messages/s
               chart_type: line
@@ -2188,7 +2009,6 @@ modules:
                 - name: InReductions
                 - name: OutReductions
             - name: ipv6.icmprouter
-              availability: []
               description: IPv6 Router Messages
               unit: messages/s
               chart_type: line
@@ -2198,7 +2018,6 @@ modules:
                 - name: InAdvertisements
                 - name: OutAdvertisements
             - name: ipv6.icmpneighbor
-              availability: []
               description: IPv6 Neighbor Messages
               unit: messages/s
               chart_type: line
@@ -2208,7 +2027,6 @@ modules:
                 - name: InAdvertisements
                 - name: OutAdvertisements
             - name: ipv6.icmpmldv2
-              availability: []
               description: IPv6 ICMP MLDv2 Reports
               unit: reports/s
               chart_type: line
@@ -2216,7 +2034,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ipv6.icmptypes
-              availability: []
               description: IPv6 ICMP Types
               unit: messages/s
               chart_type: line
@@ -2232,7 +2049,6 @@ modules:
                 - name: OutType135
                 - name: OutType143
             - name: ipv6.ect
-              availability: []
               description: IPv6 ECT Packets
               unit: packets/s
               chart_type: line
@@ -2242,7 +2058,6 @@ modules:
                 - name: InECT0Pkts
                 - name: InCEPkts
             - name: ipv6.ect
-              availability: []
               description: IPv6 ECT Packets
               unit: packets/s
               chart_type: line
@@ -2266,14 +2081,12 @@ modules:
           labels: []
           metrics:
             - name: ipv4.sockstat_sockets
-              availability: []
               description: IPv4 Sockets Used
               unit: sockets
               chart_type: line
               dimensions:
                 - name: used
             - name: ipv4.sockstat_tcp_sockets
-              availability: []
               description: IPv4 TCP Sockets
               unit: sockets
               chart_type: line
@@ -2283,49 +2096,42 @@ modules:
                 - name: inuse
                 - name: timewait
             - name: ipv4.sockstat_tcp_mem
-              availability: []
               description: IPv4 TCP Sockets Memory
               unit: KiB
               chart_type: area
               dimensions:
                 - name: mem
             - name: ipv4.sockstat_udp_sockets
-              availability: []
               description: IPv4 UDP Sockets
               unit: sockets
               chart_type: line
               dimensions:
                 - name: inuse
             - name: ipv4.sockstat_udp_mem
-              availability: []
               description: IPv4 UDP Sockets Memory
               unit: sockets
               chart_type: line
               dimensions:
                 - name: mem
             - name: ipv4.sockstat_udplite_sockets
-              availability: []
               description: IPv4 UDPLITE Sockets
               unit: sockets
               chart_type: line
               dimensions:
                 - name: inuse
             - name: ipv4.sockstat_raw_sockets
-              availability: []
               description: IPv4 RAW Sockets
               unit: sockets
               chart_type: line
               dimensions:
                 - name: inuse
             - name: ipv4.sockstat_frag_sockets
-              availability: []
               description: IPv4 FRAG Sockets
               unit: fragments
               chart_type: line
               dimensions:
                 - name: inuse
             - name: ipv4.sockstat_frag_mem
-              availability: []
               description: IPv4 FRAG Sockets Memory
               unit: KiB
               chart_type: area
@@ -2346,35 +2152,30 @@ modules:
           labels: []
           metrics:
             - name: ipv6.sockstat6_tcp_sockets
-              availability: []
               description: IPv6 TCP Sockets
               unit: sockets
               chart_type: line
               dimensions:
                 - name: inuse
             - name: ipv6.sockstat6_udp_sockets
-              availability: []
               description: IPv6 UDP Sockets
               unit: sockets
               chart_type: line
               dimensions:
                 - name: inuse
             - name: ipv6.sockstat6_udplite_sockets
-              availability: []
               description: IPv6 UDPLITE Sockets
               unit: sockets
               chart_type: line
               dimensions:
                 - name: inuse
             - name: ipv6.sockstat6_raw_sockets
-              availability: []
               description: IPv6 RAW Sockets
               unit: sockets
               chart_type: line
               dimensions:
                 - name: inuse
             - name: ipv6.sockstat6_frag_sockets
-              availability: []
               description: IPv6 FRAG Sockets
               unit: fragments
               chart_type: line
@@ -2395,14 +2196,12 @@ modules:
           labels: []
           metrics:
             - name: ipvs.sockets
-              availability: []
               description: IPVS New Connections
               unit: connections/s
               chart_type: line
               dimensions:
                 - name: connections
             - name: ipvs.packets
-              availability: []
               description: IPVS Packets
               unit: packets/s
               chart_type: line
@@ -2410,7 +2209,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ipvs.net
-              availability: []
               description: IPVS Bandwidth
               unit: kilobits/s
               chart_type: area
@@ -2432,7 +2230,6 @@ modules:
           labels: []
           metrics:
             - name: nfs.net
-              availability: []
               description: NFS Client Network
               unit: operations/s
               chart_type: stacked
@@ -2440,7 +2237,6 @@ modules:
                 - name: udp
                 - name: tcp
             - name: nfs.rpc
-              availability: []
               description: NFS Client Remote Procedure Calls Statistics
               unit: calls/s
               chart_type: line
@@ -2449,21 +2245,18 @@ modules:
                 - name: retransmits
                 - name: auth_refresh
             - name: nfs.proc2
-              availability: []
               description: NFS v2 Client Remote Procedure Calls
               unit: calls/s
               chart_type: stacked
               dimensions:
                 - name: a dimension per proc2 call
             - name: nfs.proc3
-              availability: []
               description: NFS v3 Client Remote Procedure Calls
               unit: calls/s
               chart_type: stacked
               dimensions:
                 - name: a dimension per proc3 call
             - name: nfs.proc4
-              availability: []
               description: NFS v4 Client Remote Procedure Calls
               unit: calls/s
               chart_type: stacked
@@ -2484,7 +2277,6 @@ modules:
           labels: []
           metrics:
             - name: nfsd.readcache
-              availability: []
               description: NFS Server Read Cache
               unit: reads/s
               chart_type: stacked
@@ -2493,14 +2285,12 @@ modules:
                 - name: misses
                 - name: nocache
             - name: nfsd.filehandles
-              availability: []
               description: NFS Server File Handles
               unit: handles/s
               chart_type: line
               dimensions:
                 - name: stale
             - name: nfsd.io
-              availability: []
               description: NFS Server I/O
               unit: kilobytes/s
               chart_type: area
@@ -2508,14 +2298,12 @@ modules:
                 - name: read
                 - name: write
             - name: nfsd.threads
-              availability: []
               description: NFS Server Threads
               unit: threads
               chart_type: line
               dimensions:
                 - name: threads
             - name: nfsd.net
-              availability: []
               description: NFS Server Network Statistics
               unit: packets/s
               chart_type: line
@@ -2523,7 +2311,6 @@ modules:
                 - name: udp
                 - name: tcp
             - name: nfsd.rpc
-              availability: []
               description: NFS Server Remote Procedure Calls Statistics
               unit: calls/s
               chart_type: line
@@ -2532,28 +2319,24 @@ modules:
                 - name: bad_format
                 - name: bad_auth
             - name: nfsd.proc2
-              availability: []
               description: NFS v2 Server Remote Procedure Calls
               unit: calls/s
               chart_type: stacked
               dimensions:
                 - name: a dimension per proc2 call
             - name: nfsd.proc3
-              availability: []
               description: NFS v3 Server Remote Procedure Calls
               unit: calls/s
               chart_type: stacked
               dimensions:
                 - name: a dimension per proc3 call
             - name: nfsd.proc4
-              availability: []
               description: NFS v4 Server Remote Procedure Calls
               unit: calls/s
               chart_type: stacked
               dimensions:
                 - name: a dimension per proc4 call
             - name: nfsd.proc4ops
-              availability: []
               description: NFS v4 Server Operations
               unit: operations/s
               chart_type: stacked
@@ -2574,14 +2357,12 @@ modules:
           labels: []
           metrics:
             - name: sctp.established
-              availability: []
               description: SCTP current total number of established associations
               unit: associations
               chart_type: line
               dimensions:
                 - name: established
             - name: sctp.transitions
-              availability: []
               description: SCTP Association Transitions
               unit: transitions/s
               chart_type: line
@@ -2591,7 +2372,6 @@ modules:
                 - name: aborted
                 - name: shutdown
             - name: sctp.packets
-              availability: []
               description: SCTP Packets
               unit: packets/s
               chart_type: line
@@ -2599,7 +2379,6 @@ modules:
                 - name: received
                 - name: sent
             - name: sctp.packet_errors
-              availability: []
               description: SCTP Packet Errors
               unit: packets/s
               chart_type: line
@@ -2607,7 +2386,6 @@ modules:
                 - name: invalid
                 - name: checksum
             - name: sctp.fragmentation
-              availability: []
               description: SCTP Fragmentation
               unit: packets/s
               chart_type: line
@@ -2629,14 +2407,12 @@ modules:
           labels: []
           metrics:
             - name: netfilter.conntrack_sockets
-              availability: []
               description: Connection Tracker Connections
               unit: active connections
               chart_type: line
               dimensions:
                 - name: connections
             - name: netfilter.conntrack_new
-              availability: []
               description: Connection Tracker New Connections
               unit: connections/s
               chart_type: line
@@ -2645,7 +2421,6 @@ modules:
                 - name: ignore
                 - name: invalid
             - name: netfilter.conntrack_changes
-              availability: []
               description: Connection Tracker Changes
               unit: changes/s
               chart_type: line
@@ -2654,7 +2429,6 @@ modules:
                 - name: deleted
                 - name: delete_list
             - name: netfilter.conntrack_expect
-              availability: []
               description: Connection Tracker Expectations
               unit: expectations/s
               chart_type: line
@@ -2663,7 +2437,6 @@ modules:
                 - name: deleted
                 - name: new
             - name: netfilter.conntrack_search
-              availability: []
               description: Connection Tracker Searches
               unit: searches/s
               chart_type: line
@@ -2672,7 +2445,6 @@ modules:
                 - name: restarted
                 - name: found
             - name: netfilter.conntrack_errors
-              availability: []
               description: Connection Tracker Errors
               unit: events/s
               chart_type: line
@@ -2696,21 +2468,18 @@ modules:
           labels: []
           metrics:
             - name: netfilter.synproxy_syn_received
-              availability: []
               description: SYNPROXY SYN Packets received
               unit: packets/s
               chart_type: line
               dimensions:
                 - name: received
             - name: netfilter.synproxy_conn_reopened
-              availability: []
               description: SYNPROXY Connections Reopened
               unit: connections/s
               chart_type: line
               dimensions:
                 - name: reopened
             - name: netfilter.synproxy_cookies
-              availability: []
               description: SYNPROXY TCP Cookies
               unit: cookies/s
               chart_type: line
@@ -2740,7 +2509,6 @@ modules:
               description: TBD
           metrics:
             - name: zfspool.state
-              availability: []
               description: ZFS pool state
               unit: boolean
               chart_type: line
@@ -2772,7 +2540,6 @@ modules:
           labels: []
           metrics:
             - name: zfs.arc_size
-              availability: []
               description: ZFS ARC Size
               unit: MiB
               chart_type: area
@@ -2782,7 +2549,6 @@ modules:
                 - name: min
                 - name: max
             - name: zfs.l2_size
-              availability: []
               description: ZFS L2 ARC Size
               unit: MiB
               chart_type: area
@@ -2790,7 +2556,6 @@ modules:
                 - name: actual
                 - name: size
             - name: zfs.reads
-              availability: []
               description: ZFS Reads
               unit: reads/s
               chart_type: area
@@ -2801,7 +2566,6 @@ modules:
                 - name: metadata
                 - name: l2
             - name: zfs.bytes
-              availability: []
               description: ZFS ARC L2 Read/Write Rate
               unit: KiB/s
               chart_type: area
@@ -2809,7 +2573,6 @@ modules:
                 - name: read
                 - name: write
             - name: zfs.hits
-              availability: []
               description: ZFS ARC Hits
               unit: percentage
               chart_type: stacked
@@ -2817,7 +2580,6 @@ modules:
                 - name: hits
                 - name: misses
             - name: zfs.hits_rate
-              availability: []
               description: ZFS ARC Hits Rate
               unit: events/s
               chart_type: stacked
@@ -2825,7 +2587,6 @@ modules:
                 - name: hits
                 - name: misses
             - name: zfs.dhits
-              availability: []
               description: ZFS Demand Hits
               unit: percentage
               chart_type: stacked
@@ -2833,7 +2594,6 @@ modules:
                 - name: hits
                 - name: misses
             - name: zfs.dhits_rate
-              availability: []
               description: ZFS Demand Hits Rate
               unit: events/s
               chart_type: stacked
@@ -2841,7 +2601,6 @@ modules:
                 - name: hits
                 - name: misses
             - name: zfs.phits
-              availability: []
               description: ZFS Prefetch Hits
               unit: percentage
               chart_type: stacked
@@ -2849,7 +2608,6 @@ modules:
                 - name: hits
                 - name: misses
             - name: zfs.phits_rate
-              availability: []
               description: ZFS Prefetch Hits Rate
               unit: events/s
               chart_type: stacked
@@ -2857,7 +2615,6 @@ modules:
                 - name: hits
                 - name: misses
             - name: zfs.mhits
-              availability: []
               description: ZFS Metadata Hits
               unit: percentage
               chart_type: stacked
@@ -2865,7 +2622,6 @@ modules:
                 - name: hits
                 - name: misses
             - name: zfs.mhits_rate
-              availability: []
               description: ZFS Metadata Hits Rate
               unit: events/s
               chart_type: stacked
@@ -2873,7 +2629,6 @@ modules:
                 - name: hits
                 - name: misses
             - name: zfs.l2hits
-              availability: []
               description: ZFS L2 Hits
               unit: percentage
               chart_type: stacked
@@ -2881,7 +2636,6 @@ modules:
                 - name: hits
                 - name: misses
             - name: zfs.l2hits_rate
-              availability: []
               description: ZFS L2 Hits Rate
               unit: events/s
               chart_type: stacked
@@ -2889,7 +2643,6 @@ modules:
                 - name: hits
                 - name: misses
             - name: zfs.list_hits
-              availability: []
               description: ZFS List Hits
               unit: hits/s
               chart_type: area
@@ -2899,7 +2652,6 @@ modules:
                 - name: mru
                 - name: mru_ghost
             - name: zfs.arc_size_breakdown
-              availability: []
               description: ZFS ARC Size Breakdown
               unit: percentage
               chart_type: stacked
@@ -2907,7 +2659,6 @@ modules:
                 - name: recent
                 - name: frequent
             - name: zfs.memory_ops
-              availability: []
               description: ZFS Memory Operations
               unit: operations/s
               chart_type: line
@@ -2916,7 +2667,6 @@ modules:
                 - name: throttled
                 - name: indirect
             - name: zfs.important_ops
-              availability: []
               description: ZFS Important Operations
               unit: operations/s
               chart_type: line
@@ -2926,7 +2676,6 @@ modules:
                 - name: mutex_miss
                 - name: hash_collisions
             - name: zfs.actual_hits
-              availability: []
               description: ZFS Actual Cache Hits
               unit: percentage
               chart_type: stacked
@@ -2934,7 +2683,6 @@ modules:
                 - name: hits
                 - name: misses
             - name: zfs.actual_hits_rate
-              availability: []
               description: ZFS Actual Cache Hits Rate
               unit: events/s
               chart_type: stacked
@@ -2942,7 +2690,6 @@ modules:
                 - name: hits
                 - name: misses
             - name: zfs.demand_data_hits
-              availability: []
               description: ZFS Data Demand Efficiency
               unit: percentage
               chart_type: stacked
@@ -2950,7 +2697,6 @@ modules:
                 - name: hits
                 - name: misses
             - name: zfs.demand_data_hits_rate
-              availability: []
               description: ZFS Data Demand Efficiency Rate
               unit: events/s
               chart_type: stacked
@@ -2958,7 +2704,6 @@ modules:
                 - name: hits
                 - name: misses
             - name: zfs.prefetch_data_hits
-              availability: []
               description: ZFS Data Prefetch Efficiency
               unit: percentage
               chart_type: stacked
@@ -2966,7 +2711,6 @@ modules:
                 - name: hits
                 - name: misses
             - name: zfs.prefetch_data_hits_rate
-              availability: []
               description: ZFS Data Prefetch Efficiency Rate
               unit: events/s
               chart_type: stacked
@@ -2974,7 +2718,6 @@ modules:
                 - name: hits
                 - name: misses
             - name: zfs.hash_elements
-              availability: []
               description: ZFS ARC Hash Elements
               unit: elements
               chart_type: line
@@ -2982,7 +2725,6 @@ modules:
                 - name: current
                 - name: max
             - name: zfs.hash_chains
-              availability: []
               description: ZFS ARC Hash Chains
               unit: chains
               chart_type: line
@@ -3048,7 +2790,6 @@ modules:
               description: TBD
           metrics:
             - name: btrfs.disk
-              availability: []
               description: BTRFS Physical Disk Allocation
               unit: MiB
               chart_type: stacked
@@ -3061,7 +2802,6 @@ modules:
                 - name: sys_free
                 - name: sys_used
             - name: btrfs.data
-              availability: []
               description: BTRFS Data Allocation
               unit: MiB
               chart_type: stacked
@@ -3069,7 +2809,6 @@ modules:
                 - name: free
                 - name: used
             - name: btrfs.metadata
-              availability: []
               description: BTRFS Metadata Allocation
               unit: MiB
               chart_type: stacked
@@ -3078,7 +2817,6 @@ modules:
                 - name: used
                 - name: reserved
             - name: btrfs.system
-              availability: []
               description: BTRFS System Allocation
               unit: MiB
               chart_type: stacked
@@ -3086,21 +2824,18 @@ modules:
                 - name: free
                 - name: used
             - name: btrfs.commits
-              availability: []
               description: BTRFS Commits
               unit: commits
               chart_type: line
               dimensions:
                 - name: commits
             - name: btrfs.commits_perc_time
-              availability: []
               description: BTRFS Commits Time Share
               unit: percentage
               chart_type: line
               dimensions:
                 - name: commits
             - name: btrfs.commit_timings
-              availability: []
               description: BTRFS Commit Timings
               unit: ms
               chart_type: line
@@ -3118,7 +2853,6 @@ modules:
               description: TBD
           metrics:
             - name: btrfs.device_errors
-              availability: []
               description: BTRFS Device Errors
               unit: errors
               chart_type: line
@@ -3145,14 +2879,12 @@ modules:
               description: TBD
           metrics:
             - name: powersupply.capacity
-              availability: []
               description: Battery capacity
               unit: percentage
               chart_type: line
               dimensions:
                 - name: capacity
             - name: powersupply.charge
-              availability: []
               description: Battery charge
               unit: Ah
               chart_type: line
@@ -3163,7 +2895,6 @@ modules:
                 - name: full
                 - name: full_design
             - name: powersupply.energy
-              availability: []
               description: Battery energy
               unit: Wh
               chart_type: line
@@ -3174,7 +2905,6 @@ modules:
                 - name: full
                 - name: full_design
             - name: powersupply.voltage
-              availability: []
               description: Power supply voltage
               unit: V
               chart_type: line

@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: w1sensor.temp
-          availability: []
           description: 1-Wire Temperature Sensor
           unit: Celsius
           chart_type: line

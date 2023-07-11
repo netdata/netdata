@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: exim.qemails
-          availability: []
           description: Exim Queue Emails
           unit: emails
           chart_type: line

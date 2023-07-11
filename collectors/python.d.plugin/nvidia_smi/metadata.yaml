@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: nvidia_smi.pci_bandwidth
-          availability: []
           description: PCI Express Bandwidth Utilization
           unit: KiB/s
           chart_type: area
@@ -21,7 +20,6 @@ metrics:
             - name: rx
             - name: tx
         - name: nvidia_smi.pci_bandwidth_percent
-          availability: []
           description: PCI Express Bandwidth Percent
           unit: percentage
           chart_type: area
@@ -29,28 +27,24 @@ metrics:
             - name: rx_percent
             - name: tx_percent
         - name: nvidia_smi.fan_speed
-          availability: []
           description: Fan Speed
           unit: percentage
           chart_type: line
           dimensions:
             - name: speed
         - name: nvidia_smi.gpu_utilization
-          availability: []
           description: GPU Utilization
           unit: percentage
           chart_type: line
           dimensions:
             - name: utilization
         - name: nvidia_smi.mem_utilization
-          availability: []
           description: Memory Bandwidth Utilization
           unit: percentage
           chart_type: line
           dimensions:
             - name: utilization
         - name: nvidia_smi.encoder_utilization
-          availability: []
           description: Encoder/Decoder Utilization
           unit: percentage
           chart_type: line
@@ -58,7 +52,6 @@ metrics:
             - name: encoder
             - name: decoder
         - name: nvidia_smi.memory_allocated
-          availability: []
           description: Memory Usage
           unit: MiB
           chart_type: stacked
@@ -66,7 +59,6 @@ metrics:
             - name: free
             - name: used
         - name: nvidia_smi.bar1_memory_usage
-          availability: []
           description: Bar1 Memory Usage
           unit: MiB
           chart_type: stacked
@@ -74,14 +66,12 @@ metrics:
             - name: free
             - name: used
         - name: nvidia_smi.temperature
-          availability: []
           description: Temperature
           unit: celsius
           chart_type: line
           dimensions:
             - name: temp
         - name: nvidia_smi.clocks
-          availability: []
           description: Clock Frequencies
           unit: MHz
           chart_type: line
@@ -91,35 +81,30 @@ metrics:
             - name: sm
             - name: mem
         - name: nvidia_smi.power
-          availability: []
           description: Power Utilization
           unit: Watts
           chart_type: line
           dimensions:
             - name: power
         - name: nvidia_smi.power_state
-          availability: []
           description: Power State
           unit: state
           chart_type: line
           dimensions:
             - name: a dimension per {power_state}
         - name: nvidia_smi.processes_mem
-          availability: []
           description: Memory Used by Each Process
           unit: MiB
           chart_type: stacked
           dimensions:
             - name: a dimension per process
         - name: nvidia_smi.user_mem
-          availability: []
           description: Memory Used by Each User
           unit: MiB
           chart_type: stacked
           dimensions:
             - name: a dimension per user
         - name: nvidia_smi.user_num
-          availability: []
           description: Number of User on GPU
           unit: num
           chart_type: line

@@ -39,14 +39,12 @@ modules:
               description: TBD
           metrics:
             - name: cgroup.cpu_limit
-              availability: []
               description: CPU Usage within the limits
               unit: percentage
               chart_type: line
               dimensions:
                 - name: used
             - name: cgroup.cpu
-              availability: []
               description: CPU Usage (100% = 1 core)
               unit: percentage
               chart_type: stacked
@@ -54,35 +52,30 @@ modules:
                 - name: user
                 - name: system
             - name: cgroup.cpu_per_core
-              availability: []
               description: CPU Usage (100% = 1 core) Per Core
               unit: percentage
               chart_type: line
               dimensions:
                 - name: a dimension per core
             - name: cgroup.throttled
-              availability: []
               description: CPU Throttled Runnable Periods
               unit: percentage
               chart_type: line
               dimensions:
                 - name: throttled
             - name: cgroup.throttled_duration
-              availability: []
               description: CPU Throttled Time Duration
               unit: ms
               chart_type: line
               dimensions:
                 - name: duration
             - name: cgroup.cpu_shares
-              availability: []
               description: CPU Time Relative Share
               unit: shares
               chart_type: line
               dimensions:
                 - name: shares
             - name: cgroup.mem
-              availability: []
               description: Memory Usage
               unit: MiB
               chart_type: stacked
@@ -93,7 +86,6 @@ modules:
                 - name: rss_huge
                 - name: mapped_file
             - name: cgroup.writeback
-              availability: []
               description: Writeback Memory
               unit: MiB
               chart_type: area
@@ -101,7 +93,6 @@ modules:
                 - name: dirty
                 - name: writeback
             - name: cgroup.mem_activity
-              availability: []
               description: Memory Activity
               unit: MiB/s
               chart_type: line
@@ -109,7 +100,6 @@ modules:
                 - name: in
                 - name: out
             - name: cgroup.pgfaults
-              availability: []
               description: Memory Page Faults
               unit: MiB/s
               chart_type: line
@@ -117,7 +107,6 @@ modules:
                 - name: pgfault
                 - name: swap
             - name: cgroup.mem_usage
-              availability: []
               description: Used Memory
               unit: MiB
               chart_type: stacked
@@ -125,7 +114,6 @@ modules:
                 - name: ram
                 - name: swap
             - name: cgroup.mem_usage_limit
-              availability: []
               description: Used RAM within the limits
               unit: MiB
               chart_type: stacked
@@ -133,21 +121,18 @@ modules:
                 - name: available
                 - name: used
             - name: cgroup.mem_utilization
-              availability: []
               description: Memory Utilization
               unit: percentage
               chart_type: line
               dimensions:
                 - name: utilization
             - name: cgroup.mem_failcnt
-              availability: []
               description: Memory Limit Failures
               unit: count
               chart_type: line
               dimensions:
                 - name: failures
             - name: cgroup.io
-              availability: []
               description: I/O Bandwidth (all disks)
               unit: KiB/s
               chart_type: area
@@ -155,7 +140,6 @@ modules:
                 - name: read
                 - name: write
             - name: cgroup.serviced_ops
-              availability: []
               description: Serviced I/O Operations (all disks)
               unit: operations/s
               chart_type: line
@@ -163,7 +147,6 @@ modules:
                 - name: read
                 - name: write
             - name: cgroup.throttle_io
-              availability: []
               description: Throttle I/O Bandwidth (all disks)
               unit: KiB/s
               chart_type: area
@@ -171,7 +154,6 @@ modules:
                 - name: read
                 - name: write
             - name: cgroup.throttle_serviced_ops
-              availability: []
               description: Throttle Serviced I/O Operations (all disks)
               unit: operations/s
               chart_type: line
@@ -179,7 +161,6 @@ modules:
                 - name: read
                 - name: write
             - name: cgroup.queued_ops
-              availability: []
               description: Queued I/O Operations (all disks)
               unit: operations
               chart_type: line
@@ -187,7 +168,6 @@ modules:
                 - name: read
                 - name: write
             - name: cgroup.merged_ops
-              availability: []
               description: Merged I/O Operations (all disks)
               unit: operations/s
               chart_type: line
@@ -195,7 +175,6 @@ modules:
                 - name: read
                 - name: write
             - name: cgroup.cpu_some_pressure
-              availability: []
               description: CPU some pressure
               unit: percentage
               chart_type: line
@@ -204,14 +183,12 @@ modules:
                 - name: some60
                 - name: some300
             - name: cgroup.cpu_some_pressure_stall_time
-              availability: []
               description: CPU some pressure stall time
               unit: ms
               chart_type: line
               dimensions:
                 - name: time
             - name: cgroup.cpu_full_pressure
-              availability: []
               description: CPU full pressure
               unit: percentage
               chart_type: line
@@ -220,14 +197,12 @@ modules:
                 - name: some60
                 - name: some300
             - name: cgroup.cpu_full_pressure_stall_time
-              availability: []
               description: CPU full pressure stall time
               unit: ms
               chart_type: line
               dimensions:
                 - name: time
             - name: cgroup.memory_some_pressure
-              availability: []
               description: Memory some pressure
               unit: percentage
               chart_type: line
@@ -236,14 +211,12 @@ modules:
                 - name: some60
                 - name: some300
             - name: cgroup.memory_some_pressure_stall_time
-              availability: []
               description: Memory some pressure stall time
               unit: ms
               chart_type: line
               dimensions:
                 - name: time
             - name: cgroup.memory_full_pressure
-              availability: []
               description: Memory full pressure
               unit: percentage
               chart_type: line
@@ -252,14 +225,12 @@ modules:
                 - name: some60
                 - name: some300
             - name: cgroup.memory_full_pressure_stall_time
-              availability: []
               description: Memory full pressure stall time
               unit: ms
               chart_type: line
               dimensions:
                 - name: time
             - name: cgroup.io_some_pressure
-              availability: []
               description: I/O some pressure
               unit: percentage
               chart_type: line
@@ -268,14 +239,12 @@ modules:
                 - name: some60
                 - name: some300
             - name: cgroup.io_some_pressure_stall_time
-              availability: []
               description: I/O some pressure stall time
               unit: ms
               chart_type: line
               dimensions:
                 - name: time
             - name: cgroup.io_full_pressure
-              availability: []
               description: I/O some pressure
               unit: percentage
               chart_type: line
@@ -284,7 +253,6 @@ modules:
                 - name: some60
                 - name: some300
             - name: cgroup.io_full_pressure_stall_time
-              availability: []
               description: I/O some pressure stall time
               unit: ms
               chart_type: line
@@ -317,14 +285,12 @@ modules:
               description: TBD
           metrics:
             - name: k8s.cgroup.cpu_limit
-              availability: []
               description: CPU Usage within the limits
               unit: percentage
               chart_type: line
               dimensions:
                 - name: used
             - name: k8s.cgroup.cpu
-              availability: []
               description: CPU Usage (100% = 1000 mCPU)
               unit: percentage
               chart_type: stacked
@@ -332,35 +298,30 @@ modules:
                 - name: user
                 - name: system
             - name: k8s.cgroup.cpu_per_core
-              availability: []
               description: CPU Usage (100% = 1000 mCPU) Per Core
               unit: percentage
               chart_type: line
               dimensions:
                 - name: a dimension per core
             - name: k8s.cgroup.throttled
-              availability: []
               description: CPU Throttled Runnable Periods
               unit: percentage
               chart_type: line
               dimensions:
                 - name: throttled
             - name: k8s.cgroup.throttled_duration
-              availability: []
               description: CPU Throttled Time Duration
               unit: ms
               chart_type: line
               dimensions:
                 - name: duration
             - name: k8s.cgroup.cpu_shares
-              availability: []
               description: CPU Time Relative Share
               unit: shares
               chart_type: line
               dimensions:
                 - name: shares
             - name: k8s.cgroup.mem
-              availability: []
               description: Memory Usage
               unit: MiB
               chart_type: stacked
@@ -371,7 +332,6 @@ modules:
                 - name: rss_huge
                 - name: mapped_file
             - name: k8s.cgroup.writeback
-              availability: []
               description: Writeback Memory
               unit: MiB
               chart_type: area
@@ -379,7 +339,6 @@ modules:
                 - name: dirty
                 - name: writeback
             - name: k8s.cgroup.mem_activity
-              availability: []
               description: Memory Activity
               unit: MiB/s
               chart_type: line
@@ -387,7 +346,6 @@ modules:
                 - name: in
                 - name: out
             - name: k8s.cgroup.pgfaults
-              availability: []
               description: Memory Page Faults
               unit: MiB/s
               chart_type: line
@@ -395,7 +353,6 @@ modules:
                 - name: pgfault
                 - name: swap
             - name: k8s.cgroup.mem_usage
-              availability: []
               description: Used Memory
               unit: MiB
               chart_type: stacked
@@ -403,7 +360,6 @@ modules:
                 - name: ram
                 - name: swap
             - name: k8s.cgroup.mem_usage_limit
-              availability: []
               description: Used RAM within the limits
               unit: MiB
               chart_type: stacked
@@ -411,21 +367,18 @@ modules:
                 - name: available
                 - name: used
             - name: k8s.cgroup.mem_utilization
-              availability: []
               description: Memory Utilization
               unit: percentage
               chart_type: line
               dimensions:
                 - name: utilization
             - name: k8s.cgroup.mem_failcnt
-              availability: []
               description: Memory Limit Failures
               unit: count
               chart_type: line
               dimensions:
                 - name: failures
             - name: k8s.cgroup.io
-              availability: []
               description: I/O Bandwidth (all disks)
               unit: KiB/s
               chart_type: area
@@ -433,7 +386,6 @@ modules:
                 - name: read
                 - name: write
             - name: k8s.cgroup.serviced_ops
-              availability: []
               description: Serviced I/O Operations (all disks)
               unit: operations/s
               chart_type: line
@@ -441,7 +393,6 @@ modules:
                 - name: read
                 - name: write
             - name: k8s.cgroup.throttle_io
-              availability: []
               description: Throttle I/O Bandwidth (all disks)
               unit: KiB/s
               chart_type: area
@@ -449,7 +400,6 @@ modules:
                 - name: read
                 - name: write
             - name: k8s.cgroup.throttle_serviced_ops
-              availability: []
               description: Throttle Serviced I/O Operations (all disks)
               unit: operations/s
               chart_type: line
@@ -457,7 +407,6 @@ modules:
                 - name: read
                 - name: write
             - name: k8s.cgroup.queued_ops
-              availability: []
               description: Queued I/O Operations (all disks)
               unit: operations
               chart_type: line
@@ -465,7 +414,6 @@ modules:
                 - name: read
                 - name: write
             - name: k8s.cgroup.merged_ops
-              availability: []
               description: Merged I/O Operations (all disks)
               unit: operations/s
               chart_type: line
@@ -473,7 +421,6 @@ modules:
                 - name: read
                 - name: write
             - name: k8s.cgroup.cpu_some_pressure
-              availability: []
               description: CPU some pressure
               unit: percentage
               chart_type: line
@@ -482,14 +429,12 @@ modules:
                 - name: some60
                 - name: some300
             - name: k8s.cgroup.cpu_some_pressure_stall_time
-              availability: []
               description: CPU some pressure stall time
               unit: ms
               chart_type: line
               dimensions:
                 - name: time
             - name: k8s.cgroup.cpu_full_pressure
-              availability: []
               description: CPU full pressure
               unit: percentage
               chart_type: line
@@ -498,14 +443,12 @@ modules:
                 - name: some60
                 - name: some300
             - name: k8s.cgroup.cpu_full_pressure_stall_time
-              availability: []
               description: CPU full pressure stall time
               unit: ms
               chart_type: line
               dimensions:
                 - name: time
             - name: k8s.cgroup.memory_some_pressure
-              availability: []
               description: Memory some pressure
               unit: percentage
               chart_type: line
@@ -514,14 +457,12 @@ modules:
                 - name: some60
                 - name: some300
             - name: k8s.cgroup.memory_some_pressure_stall_time
-              availability: []
               description: Memory some pressure stall time
               unit: ms
               chart_type: line
               dimensions:
                 - name: time
             - name: k8s.cgroup.memory_full_pressure
-              availability: []
               description: Memory full pressure
               unit: percentage
               chart_type: line
@@ -530,14 +471,12 @@ modules:
                 - name: some60
                 - name: some300
             - name: k8s.cgroup.memory_full_pressure_stall_time
-              availability: []
               description: Memory full pressure stall time
               unit: ms
               chart_type: line
               dimensions:
                 - name: time
             - name: k8s.cgroup.io_some_pressure
-              availability: []
               description: I/O some pressure
               unit: percentage
               chart_type: line
@@ -546,14 +485,12 @@ modules:
                 - name: some60
                 - name: some300
             - name: k8s.cgroup.io_some_pressure_stall_time
-              availability: []
               description: I/O some pressure stall time
               unit: ms
               chart_type: line
               dimensions:
                 - name: time
             - name: k8s.cgroup.io_full_pressure
-              availability: []
               description: I/O some pressure
               unit: percentage
               chart_type: line
@@ -562,7 +499,6 @@ modules:
                 - name: some60
                 - name: some300
             - name: k8s.cgroup.io_full_pressure_stall_time
-              availability: []
               description: I/O some pressure stall time
               unit: ms
               chart_type: line
@@ -610,7 +546,6 @@ modules:
               description: TBD
           metrics:
             - name: cgroup.net_net
-              availability: []
               description: Bandwidth
               unit: kilobits/s
               chart_type: area
@@ -618,7 +553,6 @@ modules:
                 - name: received
                 - name: sent
             - name: cgroup.net_packets
-              availability: []
               description: Packets
               unit: pps
               chart_type: line
@@ -627,7 +561,6 @@ modules:
                 - name: sent
                 - name: multicast
             - name: cgroup.net_errors
-              availability: []
               description: Interface Errors
               unit: errors/s
               chart_type: line
@@ -635,7 +568,6 @@ modules:
                 - name: inbound
                 - name: outbound
             - name: cgroup.net_drops
-              availability: []
               description: Interface Drops
               unit: errors/s
               chart_type: line
@@ -643,7 +575,6 @@ modules:
                 - name: inbound
                 - name: outbound
             - name: cgroup.net_fifo
-              availability: []
               description: Interface FIFO Buffer Errors
               unit: errors/s
               chart_type: line
@@ -651,7 +582,6 @@ modules:
                 - name: receive
                 - name: transmit
             - name: cgroup.net_compressed
-              availability: []
               description: Interface FIFO Buffer Errors
               unit: pps
               chart_type: line
@@ -659,7 +589,6 @@ modules:
                 - name: receive
                 - name: sent
             - name: cgroup.net_events
-              availability: []
               description: Network Interface Events
               unit: events/s
               chart_type: line
@@ -668,7 +597,6 @@ modules:
                 - name: collisions
                 - name: carrier
             - name: cgroup.net_operstate
-              availability: []
               description: Interface Operational State
               unit: state
               chart_type: line
@@ -681,7 +609,6 @@ modules:
                 - name: dormant
                 - name: unknown
             - name: cgroup.net_carrier
-              availability: []
               description: Interface Physical Link State
               unit: state
               chart_type: line
@@ -689,7 +616,6 @@ modules:
                 - name: up
                 - name: down
             - name: cgroup.net_mtu
-              availability: []
               description: Interface MTU
               unit: octets
               chart_type: line
@@ -726,7 +652,6 @@ modules:
               description: TBD
           metrics:
             - name: k8s.cgroup.net_net
-              availability: []
               description: Bandwidth
               unit: kilobits/s
               chart_type: area
@@ -734,7 +659,6 @@ modules:
                 - name: received
                 - name: sent
             - name: k8s.cgroup.net_packets
-              availability: []
               description: Packets
               unit: pps
               chart_type: line
@@ -743,7 +667,6 @@ modules:
                 - name: sent
                 - name: multicast
             - name: k8s.cgroup.net_errors
-              availability: []
               description: Interface Errors
               unit: errors/s
               chart_type: line
@@ -751,7 +674,6 @@ modules:
                 - name: inbound
                 - name: outbound
             - name: k8s.cgroup.net_drops
-              availability: []
               description: Interface Drops
               unit: errors/s
               chart_type: line
@@ -759,7 +681,6 @@ modules:
                 - name: inbound
                 - name: outbound
             - name: k8s.cgroup.net_fifo
-              availability: []
               description: Interface FIFO Buffer Errors
               unit: errors/s
               chart_type: line
@@ -767,7 +688,6 @@ modules:
                 - name: receive
                 - name: transmit
             - name: k8s.cgroup.net_compressed
-              availability: []
               description: Interface FIFO Buffer Errors
               unit: pps
               chart_type: line
@@ -775,7 +695,6 @@ modules:
                 - name: receive
                 - name: sent
             - name: k8s.cgroup.net_events
-              availability: []
               description: Network Interface Events
               unit: events/s
               chart_type: line
@@ -784,7 +703,6 @@ modules:
                 - name: collisions
                 - name: carrier
             - name: k8s.cgroup.net_operstate
-              availability: []
               description: Interface Operational State
               unit: state
               chart_type: line
@@ -797,7 +715,6 @@ modules:
                 - name: dormant
                 - name: unknown
             - name: k8s.cgroup.net_carrier
-              availability: []
               description: Interface Physical Link State
               unit: state
               chart_type: line
@@ -805,7 +722,6 @@ modules:
                 - name: up
                 - name: down
             - name: k8s.cgroup.net_mtu
-              availability: []
               description: Interface MTU
               unit: octets
               chart_type: line
@@ -826,168 +742,144 @@ modules:
           labels: []
           metrics:
             - name: services.cpu
-              availability: []
               description: Systemd Services CPU utilization (100% = 1 core)
               unit: percentage
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.mem_usage
-              availability: []
               description: Systemd Services Used Memory
               unit: MiB
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.mem_rss
-              availability: []
               description: Systemd Services RSS Memory
               unit: MiB
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.mem_mapped
-              availability: []
               description: Systemd Services Mapped Memory
               unit: MiB
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.mem_cache
-              availability: []
               description: Systemd Services Cache Memory
               unit: MiB
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.mem_writeback
-              availability: []
               description: Systemd Services Writeback Memory
               unit: MiB
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.mem_pgfault
-              availability: []
               description: Systemd Services Memory Minor Page Faults
               unit: MiB/s
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.mem_pgmajfault
-              availability: []
               description: Systemd Services Memory Major Page Faults
               unit: MiB/s
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.mem_pgpgin
-              availability: []
               description: Systemd Services Memory Charging Activity
               unit: MiB/s
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.mem_pgpgout
-              availability: []
               description: Systemd Services Memory Uncharging Activity
               unit: MiB/s
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.mem_failcnt
-              availability: []
               description: Systemd Services Memory Limit Failures
               unit: failures
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.swap_usage
-              availability: []
               description: Systemd Services Swap Memory Used
               unit: MiB
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.io_read
-              availability: []
               description: Systemd Services Disk Read Bandwidth
               unit: KiB/s
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.io_write
-              availability: []
               description: Systemd Services Disk Write Bandwidth
               unit: KiB/s
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.io_ops_read
-              availability: []
               description: Systemd Services Disk Read Operations
               unit: operations/s
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.io_ops_write
-              availability: []
               description: Systemd Services Disk Write Operations
               unit: operations/s
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.throttle_io_read
-              availability: []
               description: Systemd Services Throttle Disk Read Bandwidth
               unit: KiB/s
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.services.throttle_io_write
-              availability: []
               description: Systemd Services Throttle Disk Write Bandwidth
               unit: KiB/s
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.throttle_io_ops_read
-              availability: []
               description: Systemd Services Throttle Disk Read Operations
               unit: operations/s
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: throttle_io_ops_write
-              availability: []
               description: Systemd Services Throttle Disk Write Operations
               unit: operations/s
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.queued_io_ops_read
-              availability: []
               description: Systemd Services Queued Disk Read Operations
               unit: operations/s
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.queued_io_ops_write
-              availability: []
               description: Systemd Services Queued Disk Write Operations
               unit: operations/s
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.merged_io_ops_read
-              availability: []
               description: Systemd Services Merged Disk Read Operations
               unit: operations/s
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.merged_io_ops_write
-              availability: []
               description: Systemd Services Merged Disk Write Operations
               unit: operations/s
               chart_type: stacked

@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: squid.clients_net
-          availability: []
           description: Squid Client Bandwidth
           unit: kilobits/s
           chart_type: area
@@ -22,7 +21,6 @@ metrics:
             - name: out
             - name: hits
         - name: squid.clients_requests
-          availability: []
           description: Squid Client Requests
           unit: requests/s
           chart_type: line
@@ -31,7 +29,6 @@ metrics:
             - name: hits
             - name: errors
         - name: squid.servers_net
-          availability: []
           description: Squid Server Bandwidth
           unit: kilobits/s
           chart_type: area
@@ -39,7 +36,6 @@ metrics:
             - name: in
             - name: out
         - name: squid.servers_requests
-          availability: []
           description: Squid Server Requests
           unit: requests/s
           chart_type: line

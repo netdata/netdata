@@ -13,21 +13,18 @@ metrics:
       labels: []
       metrics:
         - name: fail2ban.faile_attempts
-          availability: []
           description: Failed attempts
           unit: attempts/s
           chart_type: line
           dimensions:
             - name: a dimension per jail
         - name: fail2ban.bans
-          availability: []
           description: Bans
           unit: bans/s
           chart_type: line
           dimensions:
             - name: a dimension per jail
         - name: fail2ban.banned_ips
-          availability: []
           description: Banned IP addresses (since the last restart of netdata)
           unit: ips
           chart_type: line

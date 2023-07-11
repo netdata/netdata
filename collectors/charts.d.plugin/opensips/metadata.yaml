@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: opensips.dialogs_active
-          availability: []
           description: OpenSIPS Active Dialogs
           unit: dialogs
           chart_type: area
@@ -21,7 +20,6 @@ metrics:
             - name: active
             - name: early
         - name: opensips.users
-          availability: []
           description: OpenSIPS Users
           unit: users
           chart_type: line
@@ -31,7 +29,6 @@ metrics:
             - name: contacts
             - name: expires
         - name: opensips.registrar
-          availability: []
           description: OpenSIPS Registrar
           unit: registrations/s
           chart_type: line
@@ -39,7 +36,6 @@ metrics:
             - name: accepted
             - name: rejected
         - name: opensips.transactions
-          availability: []
           description: OpenSIPS Transactions
           unit: transactions/s
           chart_type: line
@@ -47,7 +43,6 @@ metrics:
             - name: UAS
             - name: UAC
         - name: opensips.core_rcv
-          availability: []
           description: OpenSIPS Core Receives
           unit: queries/s
           chart_type: line
@@ -55,7 +50,6 @@ metrics:
             - name: requests
             - name: replies
         - name: opensips.core_fwd
-          availability: []
           description: OpenSIPS Core Forwards
           unit: queries/s
           chart_type: line
@@ -63,7 +57,6 @@ metrics:
             - name: requests
             - name: replies
         - name: opensips.core_drop
-          availability: []
           description: OpenSIPS Core Drops
           unit: queries/s
           chart_type: line
@@ -71,7 +64,6 @@ metrics:
             - name: requests
             - name: replies
         - name: opensips.core_err
-          availability: []
           description: OpenSIPS Core Errors
           unit: queries/s
           chart_type: line
@@ -79,7 +71,6 @@ metrics:
             - name: requests
             - name: replies
         - name: opensips.core_bad
-          availability: []
           description: OpenSIPS Core Bad
           unit: queries/s
           chart_type: line
@@ -88,7 +79,6 @@ metrics:
             - name: unsupported_methods
             - name: bad_msg_hdr
         - name: opensips.tm_replies
-          availability: []
           description: OpenSIPS TM Replies
           unit: replies/s
           chart_type: line
@@ -97,7 +87,6 @@ metrics:
             - name: relayed
             - name: local
         - name: opensips.transactions_status
-          availability: []
           description: OpenSIPS Transactions Status
           unit: transactions/s
           chart_type: line
@@ -108,14 +97,12 @@ metrics:
             - name: 5xx
             - name: 6xx
         - name: opensips.transactions_inuse
-          availability: []
           description: OpenSIPS InUse Transactions
           unit: transactions
           chart_type: line
           dimensions:
             - name: inuse
         - name: opensips.sl_replies
-          availability: []
           description: OpenSIPS SL Replies
           unit: replies/s
           chart_type: line
@@ -130,7 +117,6 @@ metrics:
             - name: error
             - name: ACKed
         - name: opensips.dialogs
-          availability: []
           description: OpenSIPS Dialogs
           unit: dialogs/s
           chart_type: line
@@ -139,7 +125,6 @@ metrics:
             - name: expire
             - name: failed
         - name: opensips.net_waiting
-          availability: []
           description: OpenSIPS Network Waiting
           unit: kilobytes
           chart_type: line
@@ -147,7 +132,6 @@ metrics:
             - name: UDP
             - name: TCP
         - name: opensips.uri_checks
-          availability: []
           description: OpenSIPS URI Checks
           unit: checks / sec
           chart_type: line
@@ -155,7 +139,6 @@ metrics:
             - name: positive
             - name: negative
         - name: opensips.traces
-          availability: []
           description: OpenSIPS Traces
           unit: traces / sec
           chart_type: line
@@ -163,7 +146,6 @@ metrics:
             - name: requests
             - name: replies
         - name: opensips.shmem
-          availability: []
           description: OpenSIPS Shared Memory
           unit: kilobytes
           chart_type: line
@@ -174,7 +156,6 @@ metrics:
             - name: max_used
             - name: free
         - name: opensips.shmem_fragment
-          availability: []
           description: OpenSIPS Shared Memory Fragmentation
           unit: fragments
           chart_type: line

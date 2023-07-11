@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: icecast.listeners
-          availability: []
           description: Number Of Listeners
           unit: listeners
           chart_type: line

@@ -13,56 +13,48 @@ metrics:
       labels: []
       metrics:
         - name: uwsgi.requests
-          availability: []
           description: Requests
           unit: requests/s
           chart_type: stacked
           dimensions:
             - name: a dimension per worker
         - name: uwsgi.tx
-          availability: []
           description: Transmitted data
           unit: KiB/s
           chart_type: stacked
           dimensions:
             - name: a dimension per worker
         - name: uwsgi.avg_rt
-          availability: []
           description: Average request time
           unit: milliseconds
           chart_type: line
           dimensions:
             - name: a dimension per worker
         - name: uwsgi.memory_rss
-          availability: []
           description: RSS (Resident Set Size)
           unit: MiB
           chart_type: stacked
           dimensions:
             - name: a dimension per worker
         - name: uwsgi.memory_vsz
-          availability: []
           description: VSZ (Virtual Memory Size)
           unit: MiB
           chart_type: stacked
           dimensions:
             - name: a dimension per worker
         - name: uwsgi.exceptions
-          availability: []
           description: Exceptions
           unit: exceptions
           chart_type: line
           dimensions:
             - name: exceptions
         - name: uwsgi.harakiris
-          availability: []
           description: Harakiris
           unit: harakiris
           chart_type: line
           dimensions:
             - name: harakiris
         - name: uwsgi.respawns
-          availability: []
           description: Respawns
           unit: respawns
           chart_type: line

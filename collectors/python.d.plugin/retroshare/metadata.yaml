@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: retroshare.bandwidth
-          availability: []
           description: RetroShare Bandwidth
           unit: kilobits/s
           chart_type: area
@@ -21,7 +20,6 @@ metrics:
             - name: Upload
             - name: Download
         - name: retroshare.peers
-          availability: []
           description: RetroShare Peers
           unit: peers
           chart_type: line
@@ -29,7 +27,6 @@ metrics:
             - name: All friends
             - name: Connected friends
         - name: retroshare.dht
-          availability: []
           description: Retroshare DHT
           unit: peers
           chart_type: line

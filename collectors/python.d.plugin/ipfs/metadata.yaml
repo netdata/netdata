@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: ipfs.bandwidth
-          availability: []
           description: IPFS Bandwidth
           unit: kilobits/s
           chart_type: line
@@ -21,14 +20,12 @@ metrics:
             - name: in
             - name: out
         - name: ipfs.peers
-          availability: []
           description: IPFS Peers
           unit: peers
           chart_type: line
           dimensions:
             - name: peers
         - name: ipfs.repo_size
-          availability: []
           description: IPFS Repo Size
           unit: GiB
           chart_type: area
@@ -36,7 +33,6 @@ metrics:
             - name: avail
             - name: size
         - name: ipfs.repo_objects
-          availability: []
           description: IPFS Repo Objects
           unit: objects
           chart_type: line

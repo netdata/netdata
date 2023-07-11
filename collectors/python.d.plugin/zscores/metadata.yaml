@@ -13,14 +13,12 @@ metrics:
       labels: []
       metrics:
         - name: zscores.z
-          availability: []
           description: Z Score
           unit: z
           chart_type: line
           dimensions:
             - name: a dimension per chart or dimension
         - name: zscores.3stddev
-          availability: []
           description: Z Score >3
           unit: count
           chart_type: stacked

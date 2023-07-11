@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: gearman.total_jobs
-          availability: []
           description: Total Jobs
           unit: Jobs
           chart_type: line
@@ -25,7 +24,6 @@ metrics:
       labels: []
       metrics:
         - name: gearman.single_job
-          availability: []
           description: '{job_name}'
           unit: Jobs
           chart_type: stacked

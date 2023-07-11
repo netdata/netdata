@@ -13,14 +13,12 @@ metrics:
       labels: []
       metrics:
         - name: alarms.status
-          availability: []
           description: Alarms ({status mapping})
           unit: status
           chart_type: line
           dimensions:
             - name: a dimension per alarm
         - name: alarms.status
-          availability: []
           description: Alarm Values
           unit: value
           chart_type: line

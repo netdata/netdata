@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: system.idlejitter
-          availability: []
           description: CPU Idle Jitter
           unit: microseconds lost/s
           chart_type: line

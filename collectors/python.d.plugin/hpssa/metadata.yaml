@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: hpssa.ctrl_status
-          availability: []
           description: Status 1 is OK, Status 0 is not OK
           unit: Status
           chart_type: line
@@ -22,7 +21,6 @@ metrics:
             - name: cache_{adapter slot}_status
             - name: battery_{adapter slot}_status per adapter
         - name: hpssa.ctrl_temperature
-          availability: []
           description: Temperature
           unit: Celsius
           chart_type: line
@@ -30,21 +28,18 @@ metrics:
             - name: ctrl_{adapter slot}_temperature
             - name: cache_{adapter slot}_temperature per adapter
         - name: hpssa.ld_status
-          availability: []
           description: Status 1 is OK, Status 0 is not OK
           unit: Status
           chart_type: line
           dimensions:
             - name: a dimension per logical drive
         - name: hpssa.pd_status
-          availability: []
           description: Status 1 is OK, Status 0 is not OK
           unit: Status
           chart_type: line
           dimensions:
             - name: a dimension per physical drive
         - name: hpssa.pd_temperature
-          availability: []
           description: Temperature
           unit: Celsius
           chart_type: line

@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: perf.cpu_cycles
-          availability: []
           description: CPU cycles
           unit: cycles/s
           chart_type: line
@@ -21,21 +20,18 @@ metrics:
             - name: cpu
             - name: ref_cpu
         - name: perf.instructions
-          availability: []
           description: Instructions
           unit: instructions/s
           chart_type: line
           dimensions:
             - name: instructions
         - name: perf.instructions_per_cycle
-          availability: []
           description: Instructions per Cycle(IPC)
           unit: instructions/cycle
           chart_type: line
           dimensions:
             - name: ipc
         - name: perf.branch_instructions
-          availability: []
           description: Branch instructions
           unit: instructions/s
           chart_type: line
@@ -43,7 +39,6 @@ metrics:
             - name: instructions
             - name: misses
         - name: perf.cache
-          availability: []
           description: Cache operations
           unit: operations/s
           chart_type: line
@@ -51,14 +46,12 @@ metrics:
             - name: references
             - name: misses
         - name: perf.bus_cycles
-          availability: []
           description: Bus cycles
           unit: cycles/s
           chart_type: line
           dimensions:
             - name: bus
         - name: perf.stalled_cycles
-          availability: []
           description: Stalled frontend and backend cycles
           unit: cycles/s
           chart_type: line
@@ -66,28 +59,24 @@ metrics:
             - name: frontend
             - name: backend
         - name: perf.migrations
-          availability: []
           description: CPU migrations
           unit: migrations
           chart_type: line
           dimensions:
             - name: migrations
         - name: perf.alignment_faults
-          availability: []
           description: Alignment faults
           unit: faults
           chart_type: line
           dimensions:
             - name: faults
         - name: perf.emulation_faults
-          availability: []
           description: Emulation faults
           unit: faults
           chart_type: line
           dimensions:
             - name: faults
         - name: perf.l1d_cache
-          availability: []
           description: L1D cache operations
           unit: events/s
           chart_type: line
@@ -97,14 +86,12 @@ metrics:
             - name: write_access
             - name: write_misses
         - name: perf.l1d_cache_prefetch
-          availability: []
           description: L1D prefetch cache operations
           unit: prefetches/s
           chart_type: line
           dimensions:
             - name: prefetches
         - name: perf.l1i_cache
-          availability: []
           description: L1I cache operations
           unit: events/s
           chart_type: line
@@ -112,7 +99,6 @@ metrics:
             - name: read_access
             - name: read_misses
         - name: perf.ll_cache
-          availability: []
           description: LL cache operations
           unit: events/s
           chart_type: line
@@ -122,7 +108,6 @@ metrics:
             - name: write_access
             - name: write_misses
         - name: perf.dtlb_cache
-          availability: []
           description: DTLB cache operations
           unit: events/s
           chart_type: line
@@ -132,7 +117,6 @@ metrics:
             - name: write_access
             - name: write_misses
         - name: perf.itlb_cache
-          availability: []
           description: ITLB cache operations
           unit: events/s
           chart_type: line
@@ -140,7 +124,6 @@ metrics:
             - name: read_access
             - name: read_misses
         - name: perf.pbu_cache
-          availability: []
           description: PBU cache operations
           unit: events/s
           chart_type: line

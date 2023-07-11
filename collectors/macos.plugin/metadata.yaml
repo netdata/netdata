@@ -46,7 +46,6 @@ modules:
           labels: []
           metrics:
             - name: system.cpu
-              availability: []
               description: Total CPU utilization
               unit: percentage
               chart_type: stacked
@@ -56,7 +55,6 @@ modules:
                 - name: system
                 - name: idle
             - name: system.ram
-              availability: []
               description: System RAM
               unit: MiB
               chart_type: stacked
@@ -70,7 +68,6 @@ modules:
                 - name: speculative
                 - name: free
             - name: system.swapio
-              availability: []
               description: Swap I/O
               unit: KiB/s
               chart_type: area
@@ -78,7 +75,6 @@ modules:
                 - name: io
                 - name: out
             - name: mem.pgfaults
-              availability: []
               description: Memory Page Faults
               unit: faults/s
               chart_type: line
@@ -144,7 +140,6 @@ modules:
           labels: []
           metrics:
             - name: system.load
-              availability: []
               description: System Load Average
               unit: load
               chart_type: line
@@ -153,7 +148,6 @@ modules:
                 - name: load5
                 - name: load15
             - name: system.swap
-              availability: []
               description: System Swap
               unit: MiB
               chart_type: stacked
@@ -161,7 +155,6 @@ modules:
                 - name: free
                 - name: used
             - name: system.ipv4
-              availability: []
               description: IPv4 Bandwidth
               unit: kilobits/s
               chart_type: area
@@ -169,7 +162,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ipv4.tcppackets
-              availability: []
               description: IPv4 TCP Packets
               unit: packets/s
               chart_type: line
@@ -177,7 +169,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ipv4.tcperrors
-              availability: []
               description: IPv4 TCP Errors
               unit: packets/s
               chart_type: line
@@ -186,7 +177,6 @@ modules:
                 - name: InCsumErrors
                 - name: RetransSegs
             - name: ipv4.tcphandshake
-              availability: []
               description: IPv4 TCP Handshake Issues
               unit: events/s
               chart_type: line
@@ -196,7 +186,6 @@ modules:
                 - name: PassiveOpens
                 - name: AttemptFails
             - name: ipv4.tcpconnaborts
-              availability: []
               description: TCP Connection Aborts
               unit: connections/s
               chart_type: line
@@ -206,14 +195,12 @@ modules:
                 - name: nomemory
                 - name: timeout
             - name: ipv4.tcpofo
-              availability: []
               description: TCP Out-Of-Order Queue
               unit: packets/s
               chart_type: line
               dimensions:
                 - name: inqueue
             - name: ipv4.tcpsyncookies
-              availability: []
               description: TCP SYN Cookies
               unit: packets/s
               chart_type: line
@@ -222,7 +209,6 @@ modules:
                 - name: sent
                 - name: failed
             - name: ipv4.ecnpkts
-              availability: []
               description: IPv4 ECN Statistics
               unit: packets/s
               chart_type: line
@@ -230,7 +216,6 @@ modules:
                 - name: CEP
                 - name: NoECTP
             - name: ipv4.udppackets
-              availability: []
               description: IPv4 UDP Packets
               unit: packets/s
               chart_type: line
@@ -238,7 +223,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ipv4.udperrors
-              availability: []
               description: IPv4 UDP Errors
               unit: events/s
               chart_type: line
@@ -249,7 +233,6 @@ modules:
                 - name: InCsumErrors
                 - name: IgnoredMulti
             - name: ipv4.icmp
-              availability: []
               description: IPv4 ICMP Packets
               unit: packets/s
               chart_type: line
@@ -257,7 +240,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ipv4.icmp_errors
-              availability: []
               description: IPv4 ICMP Errors
               unit: packets/s
               chart_type: line
@@ -266,7 +248,6 @@ modules:
                 - name: OutErrors
                 - name: InCsumErrors
             - name: ipv4.icmpmsg
-              availability: []
               description: IPv4 ICMP Messages
               unit: packets/s
               chart_type: line
@@ -276,7 +257,6 @@ modules:
                 - name: InEchos
                 - name: OutEchos
             - name: ipv4.packets
-              availability: []
               description: IPv4 Packets
               unit: packets/s
               chart_type: line
@@ -286,7 +266,6 @@ modules:
                 - name: forwarded
                 - name: delivered
             - name: ipv4.fragsout
-              availability: []
               description: IPv4 Fragments Sent
               unit: packets/s
               chart_type: line
@@ -295,7 +274,6 @@ modules:
                 - name: failed
                 - name: created
             - name: ipv4.fragsin
-              availability: []
               description: IPv4 Fragments Reassembly
               unit: packets/s
               chart_type: line
@@ -304,7 +282,6 @@ modules:
                 - name: failed
                 - name: all
             - name: ipv4.errors
-              availability: []
               description: IPv4 Errors
               unit: packets/s
               chart_type: line
@@ -316,7 +293,6 @@ modules:
                 - name: InAddrErrors
                 - name: InUnknownProtos
             - name: ipv6.packets
-              availability: []
               description: IPv6 Packets
               unit: packets/s
               chart_type: line
@@ -326,7 +302,6 @@ modules:
                 - name: forwarded
                 - name: delivers
             - name: ipv6.fragsout
-              availability: []
               description: IPv6 Fragments Sent
               unit: packets/s
               chart_type: line
@@ -335,7 +310,6 @@ modules:
                 - name: failed
                 - name: all
             - name: ipv6.fragsin
-              availability: []
               description: IPv6 Fragments Reassembly
               unit: packets/s
               chart_type: line
@@ -345,7 +319,6 @@ modules:
                 - name: timeout
                 - name: all
             - name: ipv6.errors
-              availability: []
               description: IPv6 Errors
               unit: packets/s
               chart_type: line
@@ -358,7 +331,6 @@ modules:
                 - name: InNoRoutes
                 - name: OutNoRoutes
             - name: ipv6.icmp
-              availability: []
               description: IPv6 ICMP Messages
               unit: messages/s
               chart_type: line
@@ -366,7 +338,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ipv6.icmpredir
-              availability: []
               description: IPv6 ICMP Redirects
               unit: redirects/s
               chart_type: line
@@ -374,7 +345,6 @@ modules:
                 - name: received
                 - name: sent
             - name: ipv6.icmperrors
-              availability: []
               description: IPv6 ICMP Errors
               unit: errors/s
               chart_type: line
@@ -390,7 +360,6 @@ modules:
                 - name: OutTimeExcds
                 - name: OutParmProblems
             - name: ipv6.icmpechos
-              availability: []
               description: IPv6 ICMP Echo
               unit: messages/s
               chart_type: line
@@ -400,7 +369,6 @@ modules:
                 - name: InEchoReplies
                 - name: OutEchoReplies
             - name: ipv6.icmprouter
-              availability: []
               description: IPv6 Router Messages
               unit: messages/s
               chart_type: line
@@ -410,7 +378,6 @@ modules:
                 - name: InAdvertisements
                 - name: OutAdvertisements
             - name: ipv6.icmpneighbor
-              availability: []
               description: IPv6 Neighbor Messages
               unit: messages/s
               chart_type: line
@@ -420,7 +387,6 @@ modules:
                 - name: InAdvertisements
                 - name: OutAdvertisements
             - name: ipv6.icmptypes
-              availability: []
               description: IPv6 ICMP Types
               unit: messages/s
               chart_type: line
@@ -436,7 +402,6 @@ modules:
                 - name: OutType135
                 - name: OutType143
             - name: system.uptime
-              availability: []
               description: System Uptime
               unit: seconds
               chart_type: line
@@ -544,7 +509,6 @@ modules:
           labels: []
           metrics:
             - name: disk.io
-              availability: []
               description: Disk I/O Bandwidth
               unit: KiB/s
               chart_type: area
@@ -552,7 +516,6 @@ modules:
                 - name: read
                 - name: writes
             - name: disk.ops
-              availability: []
               description: Disk Completed I/O Operations
               unit: operations/s
               chart_type: line
@@ -560,14 +523,12 @@ modules:
                 - name: read
                 - name: writes
             - name: disk.util
-              availability: []
               description: Disk Utilization Time
               unit: '% of time working'
               chart_type: area
               dimensions:
                 - name: utilization
             - name: disk.iotime
-              availability: []
               description: Disk Total I/O Time
               unit: milliseconds/s
               chart_type: line
@@ -575,7 +536,6 @@ modules:
                 - name: reads
                 - name: writes
             - name: disk.await
-              availability: []
               description: Average Completed I/O Operation Time
               unit: milliseconds/operation
               chart_type: line
@@ -583,7 +543,6 @@ modules:
                 - name: reads
                 - name: writes
             - name: disk.avgsz
-              availability: []
               description: Average Completed I/O Operation Bandwidth
               unit: KiB/operation
               chart_type: line
@@ -591,7 +550,6 @@ modules:
                 - name: reads
                 - name: writes
             - name: disk.svctm
-              availability: []
               description: Average Service Time
               unit: milliseconds/operation
               chart_type: line
@@ -602,7 +560,6 @@ modules:
           labels: []
           metrics:
             - name: system.io
-              availability: []
               description: Disk I/O
               unit: KiB/s
               chart_type: area
@@ -614,7 +571,6 @@ modules:
           labels: []
           metrics:
             - name: disk.space
-              availability: []
               description: Disk Space Usage for {mounted dir} [{mounted filesystem}]
               unit: GiB
               chart_type: stacked
@@ -623,7 +579,6 @@ modules:
                 - name: used
                 - name: reserved_for_root
             - name: disk.inodes
-              availability: []
               description: Disk Files (inodes) Usage for {mounted dir} [{mounted filesystem}]
               unit: inodes
               chart_type: stacked
@@ -636,7 +591,6 @@ modules:
           labels: []
           metrics:
             - name: net.net
-              availability: []
               description: Bandwidth
               unit: kilobits/s
               chart_type: area
@@ -644,7 +598,6 @@ modules:
                 - name: received
                 - name: sent
             - name: net.packets
-              availability: []
               description: Packets
               unit: packets/s
               chart_type: line
@@ -654,7 +607,6 @@ modules:
                 - name: multicast_received
                 - name: multicast_sent
             - name: net.errors
-              availability: []
               description: Interface Errors
               unit: errors/s
               chart_type: line
@@ -662,14 +614,12 @@ modules:
                 - name: inbound
                 - name: outbound
             - name: net.drops
-              availability: []
               description: Interface Drops
               unit: drops/s
               chart_type: line
               dimensions:
                 - name: inbound
             - name: net.events
-              availability: []
               description: Network Interface Events
               unit: events/s
               chart_type: line

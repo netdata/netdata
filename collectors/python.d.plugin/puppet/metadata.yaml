@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: puppet.jvm
-          availability: []
           description: JVM Heap
           unit: MiB
           chart_type: area
@@ -21,7 +20,6 @@ metrics:
             - name: committed
             - name: used
         - name: puppet.jvm
-          availability: []
           description: JVM Non-Heap
           unit: MiB
           chart_type: area
@@ -29,7 +27,6 @@ metrics:
             - name: committed
             - name: used
         - name: puppet.cpu
-          availability: []
           description: CPU usage
           unit: percentage
           chart_type: stacked
@@ -37,7 +34,6 @@ metrics:
             - name: execution
             - name: GC
         - name: puppet.fdopen
-          availability: []
           description: File Descriptors
           unit: descriptors
           chart_type: line

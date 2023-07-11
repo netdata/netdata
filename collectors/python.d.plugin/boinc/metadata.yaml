@@ -28,7 +28,6 @@ metrics:
       labels: []
       metrics:
         - name: boinc.tasks
-          availability: []
           description: Overall Tasks
           unit: tasks
           chart_type: line
@@ -36,7 +35,6 @@ metrics:
             - name: Total
             - name: Active
         - name: boinc.states
-          availability: []
           description: Tasks per State
           unit: tasks
           chart_type: line
@@ -50,7 +48,6 @@ metrics:
             - name: Aborted
             - name: Failed Uploads
         - name: boinc.sched
-          availability: []
           description: Tasks per Scheduler State
           unit: tasks
           chart_type: line
@@ -59,7 +56,6 @@ metrics:
             - name: Preempted
             - name: Scheduled
         - name: boinc.process
-          availability: []
           description: Tasks per Process State
           unit: tasks
           chart_type: line

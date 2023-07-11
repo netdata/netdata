@@ -17,7 +17,6 @@ modules:
               description: TBD
           metrics:
             - name: mem.fragmentation_index_dma
-              availability: []
               description: Memory fragmentation index for each order
               unit: index
               chart_type: line
@@ -34,7 +33,6 @@ modules:
                 - name: order9
                 - name: order10
             - name: mem.fragmentation_index_dma32
-              availability: []
               description: Memory fragmentation index for each order
               unit: index
               chart_type: line
@@ -51,7 +49,6 @@ modules:
                 - name: order9
                 - name: order10
             - name: mem.fragmentation_index_normal
-              availability: []
               description: Memory fragmentation index for each order
               unit: index
               chart_type: line
@@ -82,28 +79,24 @@ modules:
           labels: []
           metrics:
             - name: system.zswap_pool_compression_ratio
-              availability: []
               description: Zswap compression ratio
               unit: ratio
               chart_type: line
               dimensions:
                 - name: compression_ratio
             - name: system.zswap_pool_compressed_size
-              availability: []
               description: Zswap compressed bytes currently stored
               unit: bytes
               chart_type: area
               dimensions:
                 - name: compressed_size
             - name: system.zswap_pool_raw_size
-              availability: []
               description: Zswap uncompressed bytes currently stored
               unit: bytes
               chart_type: area
               dimensions:
                 - name: uncompressed_size
             - name: system.zswap_rejections
-              availability: []
               description: Zswap rejections
               unit: rejections/s
               chart_type: stacked
@@ -113,14 +106,12 @@ modules:
                 - name: alloc_fail
                 - name: reclaim_fail
             - name: system.zswap_pool_limit_hit
-              availability: []
               description: Zswap pool limit was reached
               unit: events/s
               chart_type: line
               dimensions:
                 - name: limit
             - name: system.zswap_written_back_raw_bytes
-              availability: []
               description: Zswap uncomressed bytes written back when pool limit was
                 reached
               unit: bytes/s
@@ -128,14 +119,12 @@ modules:
               dimensions:
                 - name: written_back
             - name: system.zswap_same_filled_raw_size
-              availability: []
               description: Zswap same-value filled uncompressed bytes currently stored
               unit: bytes
               chart_type: area
               dimensions:
                 - name: same_filled
             - name: system.zswap_duplicate_entry
-              availability: []
               description: Zswap duplicate store was encountered
               unit: entries/s
               chart_type: line

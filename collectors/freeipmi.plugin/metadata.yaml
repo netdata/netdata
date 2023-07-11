@@ -1,84 +1,98 @@
-module_name: freeipmi.plugin
-plugin_name: freeipmi.plugin
-alerts:
-  - name: ipmi_sensors_states
-    link: https://github.com/netdata/netdata/blob/master/health/health.d/ipmi.conf
-    metric: ipmi.sensors_states
-    info: number of IPMI sensors in non-nominal state
-    os: linux
-metrics:
-  folding:
-    title: Metrics
-    enabled: false
-  description: ''
-  availability: []
-  scopes:
-    - name: global
+name: freeipmi.plugin
+modules:
+  - module_name: sel
+    plugin_name: freeipmi.plugin
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
       description: ''
-      labels: []
-      metrics:
-        - name: ipmi.sel
-          availability: []
-          description: IPMI Events
-          unit: events
-          chart_type: area
-          dimensions:
-            - name: events
-        - name: ipmi.sensors_states
-          availability: []
-          description: IPMI Sensors State
-          unit: sensors
-          chart_type: line
-          dimensions:
-            - name: nominal
-            - name: critical
-            - name: warning
-        - name: ipmi.temperatures_c
-          availability: []
-          description: System Celsius Temperatures read by IPMI
-          unit: Celsius
-          chart_type: line
-          dimensions:
-            - name: a dimension per sensor
-        - name: ipmi.temperatures_f
-          availability: []
-          description: System Celsius Temperatures read by IPMI
-          unit: Fahrenheit
-          chart_type: line
-          dimensions:
-            - name: a dimension per sensor
-        - name: ipmi.voltages
-          availability: []
-          description: System Voltages read by IPMI
-          unit: Volts
-          chart_type: line
-          dimensions:
-            - name: a dimension per sensor
-        - name: ipmi.amps
-          availability: []
-          description: System Current read by IPMI
-          unit: Amps
-          chart_type: line
-          dimensions:
-            - name: a dimension per sensor
-        - name: ipmi.rpm
-          availability: []
-          description: System Fans read by IPMI
-          unit: RPM
-          chart_type: line
-          dimensions:
-            - name: a dimension per sensor
-        - name: ipmi.watts
-          availability: []
-          description: System Power read by IPMI
-          unit: Watts
-          chart_type: line
-          dimensions:
-            - name: a dimension per sensor
-        - name: ipmi.percent
-          availability: []
-          description: System Metrics read by IPMI
-          unit: '%'
-          chart_type: line
-          dimensions:
-            - name: a dimension per sensor
+      availability: []
+      scopes:
+        - name: global
+          description: ''
+          labels: []
+          metrics:
+            - name: ipmi.sel
+              description: IPMI Events
+              unit: events
+              chart_type: area
+              dimensions:
+                - name: events
+  - module_name: sensors
+    plugin_name: freeipmi.plugin
+    alerts:
+      - name: ipmi_sensor_state
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/ipmi.conf
+        metric: ipmi.sensor_state
+        info: IPMI sensor ${label:sensor} (${label:component}) state
+        os: linux
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ''
+      availability: []
+      scopes:
+        - name: sensor
+          description: ''
+          labels:
+            - name: sensor
+              description: TBD
+            - name: type
+              description: TBD
+            - name: component
+              description: TBD
+          metrics:
+            - name: ipmi.sensor_state
+              description: IPMI Sensors State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: nominal
+                - name: critical
+                - name: warning
+                - name: unknown
+            - name: ipmi.sensor_temperature_c
+              description: IPMI Sensor Temperature Celsius
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: temperature
+            - name: ipmi.sensor_temperature_f
+              description: IPMI Sensor Temperature Fahrenheit
+              unit: Fahrenheit
+              chart_type: line
+              dimensions:
+                - name: temperature
+            - name: ipmi.sensor_voltage
+              description: IPMI Sensor Voltage
+              unit: Volts
+              chart_type: line
+              dimensions:
+                - name: voltage
+            - name: ipmi.sensor_ampere
+              description: IPMI Sensor Current
+              unit: Amps
+              chart_type: line
+              dimensions:
+                - name: ampere
+            - name: ipmi.sensor_fan_speed
+              description: IPMI Sensor Fans Speed
+              unit: RPM
+              chart_type: line
+              dimensions:
+                - name: rotations
+            - name: ipmi.sensor_power
+              description: IPMI Sensor Power
+              unit: Watts
+              chart_type: line
+              dimensions:
+                - name: power
+            - name: ipmi.sensor_reading_percent
+              description: IPMI Sensor Reading Percentage
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: percentage

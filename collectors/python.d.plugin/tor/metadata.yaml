@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: tor.traffic
-          availability: []
           description: Tor Traffic
           unit: KiB/s
           chart_type: area

@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: spigotmc.tps
-          availability: []
           description: Spigot Ticks Per Second
           unit: ticks
           chart_type: line
@@ -22,14 +21,12 @@ metrics:
             - name: 5 Minute Average
             - name: 15 Minute Average
         - name: spigotmc.users
-          availability: []
           description: Minecraft Users
           unit: users
           chart_type: area
           dimensions:
             - name: Users
         - name: spigotmc.mem
-          availability: []
           description: Minecraft Memory Usage
           unit: MiB
           chart_type: line

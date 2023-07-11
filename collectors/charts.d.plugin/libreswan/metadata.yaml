@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: libreswan.net
-          availability: []
           description: LibreSWAN Tunnel ${name} Traffic
           unit: kilobits/s
           chart_type: area
@@ -21,7 +20,6 @@ metrics:
             - name: in
             - name: out
         - name: libreswan.uptime
-          availability: []
           description: LibreSWAN Tunnel ${name} Uptime
           unit: seconds
           chart_type: line

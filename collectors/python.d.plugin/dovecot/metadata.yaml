@@ -13,28 +13,24 @@ metrics:
       labels: []
       metrics:
         - name: dovecot.sessions
-          availability: []
           description: Dovecot Active Sessions
           unit: number
           chart_type: line
           dimensions:
             - name: active sessions
         - name: dovecot.logins
-          availability: []
           description: Dovecot Logins
           unit: number
           chart_type: line
           dimensions:
             - name: logins
         - name: dovecot.commands
-          availability: []
           description: Dovecot Commands
           unit: commands
           chart_type: line
           dimensions:
             - name: commands
         - name: dovecot.faults
-          availability: []
           description: Dovecot Page Faults
           unit: faults
           chart_type: line
@@ -42,7 +38,6 @@ metrics:
             - name: minor
             - name: major
         - name: dovecot.context_switches
-          availability: []
           description: Dovecot Context Switches
           unit: switches
           chart_type: line
@@ -50,7 +45,6 @@ metrics:
             - name: voluntary
             - name: involuntary
         - name: dovecot.io
-          availability: []
           description: Dovecot Disk I/O
           unit: KiB/s
           chart_type: area
@@ -58,7 +52,6 @@ metrics:
             - name: read
             - name: write
         - name: dovecot.net
-          availability: []
           description: Dovecot Network Bandwidth
           unit: kilobits/s
           chart_type: area
@@ -66,7 +59,6 @@ metrics:
             - name: read
             - name: write
         - name: dovecot.syscalls
-          availability: []
           description: Dovecot Number of SysCalls
           unit: syscalls/s
           chart_type: line
@@ -74,7 +66,6 @@ metrics:
             - name: read
             - name: write
         - name: dovecot.lookup
-          availability: []
           description: Dovecot Lookups
           unit: number/s
           chart_type: stacked
@@ -82,14 +73,12 @@ metrics:
             - name: path
             - name: attr
         - name: dovecot.cache
-          availability: []
           description: Dovecot Cache Hits
           unit: hits/s
           chart_type: line
           dimensions:
             - name: hits
         - name: dovecot.auth
-          availability: []
           description: Dovecot Authentications
           unit: attempts
           chart_type: stacked
@@ -97,7 +86,6 @@ metrics:
             - name: ok
             - name: failed
         - name: dovecot.auth_cache
-          availability: []
           description: Dovecot Authentication Cache
           unit: number
           chart_type: stacked

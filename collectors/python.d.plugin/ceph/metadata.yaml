@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: ceph.general_usage
-          availability: []
           description: Ceph General Space
           unit: KiB
           chart_type: stacked
@@ -21,14 +20,12 @@ metrics:
             - name: avail
             - name: used
         - name: ceph.general_objects
-          availability: []
           description: Ceph General Objects
           unit: objects
           chart_type: area
           dimensions:
             - name: cluster
         - name: ceph.general_bytes
-          availability: []
           description: Ceph General Read/Write Data/s
           unit: KiB/s
           chart_type: area
@@ -36,7 +33,6 @@ metrics:
             - name: read
             - name: write
         - name: ceph.general_operations
-          availability: []
           description: Ceph General Read/Write Operations/s
           unit: operations
           chart_type: area
@@ -44,7 +40,6 @@ metrics:
             - name: read
             - name: write
         - name: ceph.general_latency
-          availability: []
           description: Ceph General Apply/Commit latency
           unit: milliseconds
           chart_type: area
@@ -52,70 +47,60 @@ metrics:
             - name: apply
             - name: commit
         - name: ceph.pool_usage
-          availability: []
           description: Ceph Pools
           unit: KiB
           chart_type: line
           dimensions:
             - name: a dimension per Ceph Pool
         - name: ceph.pool_objects
-          availability: []
           description: Ceph Pools
           unit: objects
           chart_type: line
           dimensions:
             - name: a dimension per Ceph Pool
         - name: ceph.pool_read_bytes
-          availability: []
           description: Ceph Read Pool Data/s
           unit: KiB/s
           chart_type: area
           dimensions:
             - name: a dimension per Ceph Pool
         - name: ceph.pool_write_bytes
-          availability: []
           description: Ceph Write Pool Data/s
           unit: KiB/s
           chart_type: area
           dimensions:
             - name: a dimension per Ceph Pool
         - name: ceph.pool_read_operations
-          availability: []
           description: Ceph Read Pool Operations/s
           unit: operations
           chart_type: area
           dimensions:
             - name: a dimension per Ceph Pool
         - name: ceph.pool_write_operations
-          availability: []
           description: Ceph Write Pool Operations/s
           unit: operations
           chart_type: area
           dimensions:
             - name: a dimension per Ceph Pool
         - name: ceph.osd_usage
-          availability: []
           description: Ceph OSDs
           unit: KiB
           chart_type: line
           dimensions:
             - name: a dimension per Ceph OSD
         - name: ceph.osd_size
-          availability: []
           description: Ceph OSDs size
           unit: KiB
           chart_type: line
           dimensions:
             - name: a dimension per Ceph OSD
         - name: ceph.apply_latency
-          availability: []
           description: Ceph OSDs apply latency
           unit: milliseconds
           chart_type: line
           dimensions:
             - name: a dimension per Ceph OSD
         - name: ceph.commit_latency
-          availability: []
           description: Ceph OSDs commit latency
           unit: milliseconds
           chart_type: line

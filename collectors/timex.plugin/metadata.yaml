@@ -13,14 +13,12 @@ metrics:
       labels: []
       metrics:
         - name: system.clock_sync_state
-          availability: []
           description: System Clock Synchronization State
           unit: state
           chart_type: line
           dimensions:
             - name: state
         - name: system.clock_status
-          availability: []
           description: System Clock Status
           unit: status
           chart_type: line
@@ -28,7 +26,6 @@ metrics:
             - name: unsync
             - name: clockerr
         - name: system.clock_sync_offset
-          availability: []
           description: Computed Time Offset Between Local System and Reference Clock
           unit: milliseconds
           chart_type: line

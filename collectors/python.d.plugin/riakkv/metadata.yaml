@@ -44,7 +44,6 @@ metrics:
       labels: []
       metrics:
         - name: riak.kv.throughput
-          availability: []
           description: Reads & writes coordinated by this node
           unit: operations/s
           chart_type: line
@@ -52,7 +51,6 @@ metrics:
             - name: gets
             - name: puts
         - name: riak.dt.vnode_updates
-          availability: []
           description: Update operations coordinated by local vnodes by data type
           unit: operations/s
           chart_type: line
@@ -61,21 +59,18 @@ metrics:
             - name: sets
             - name: maps
         - name: riak.search
-          availability: []
           description: Search queries on the node
           unit: queries/s
           chart_type: line
           dimensions:
             - name: queries
         - name: riak.search.documents
-          availability: []
           description: Documents indexed by search
           unit: documents/s
           chart_type: line
           dimensions:
             - name: indexed
         - name: riak.consistent.operations
-          availability: []
           description: Consistent node operations
           unit: operations/s
           chart_type: line
@@ -83,7 +78,6 @@ metrics:
             - name: gets
             - name: puts
         - name: riak.kv.latency.get
-          availability: []
           description: Time between reception of a client GET request and subsequent
             response to client
           unit: ms
@@ -95,7 +89,6 @@ metrics:
             - name: '99'
             - name: '100'
         - name: riak.kv.latency.put
-          availability: []
           description: Time between reception of a client PUT request and subsequent
             response to client
           unit: ms
@@ -107,7 +100,6 @@ metrics:
             - name: '99'
             - name: '100'
         - name: riak.dt.latency.counter_merge
-          availability: []
           description: Time it takes to perform an Update Counter operation
           unit: ms
           chart_type: line
@@ -118,7 +110,6 @@ metrics:
             - name: '99'
             - name: '100'
         - name: riak.dt.latency.set_merge
-          availability: []
           description: Time it takes to perform an Update Set operation
           unit: ms
           chart_type: line
@@ -129,7 +120,6 @@ metrics:
             - name: '99'
             - name: '100'
         - name: riak.dt.latency.map_merge
-          availability: []
           description: Time it takes to perform an Update Map operation
           unit: ms
           chart_type: line
@@ -140,7 +130,6 @@ metrics:
             - name: '99'
             - name: '100'
         - name: riak.search.latency.query
-          availability: []
           description: Search query latency
           unit: ms
           chart_type: line
@@ -152,7 +141,6 @@ metrics:
             - name: '999'
             - name: max
         - name: riak.search.latency.index
-          availability: []
           description: Time it takes Search to index a new document
           unit: ms
           chart_type: line
@@ -164,7 +152,6 @@ metrics:
             - name: '999'
             - name: max
         - name: riak.consistent.latency.get
-          availability: []
           description: Strongly consistent read latency
           unit: ms
           chart_type: line
@@ -175,7 +162,6 @@ metrics:
             - name: '99'
             - name: '100'
         - name: riak.consistent.latency.put
-          availability: []
           description: Strongly consistent write latency
           unit: ms
           chart_type: line
@@ -186,14 +172,12 @@ metrics:
             - name: '99'
             - name: '100'
         - name: riak.vm
-          availability: []
           description: Total processes running in the Erlang VM
           unit: total
           chart_type: line
           dimensions:
             - name: processes
         - name: riak.vm.memory.processes
-          availability: []
           description: Memory allocated & used by Erlang processes
           unit: MB
           chart_type: line
@@ -201,7 +185,6 @@ metrics:
             - name: allocated
             - name: used
         - name: riak.kv.siblings_encountered.get
-          availability: []
           description: Number of siblings encountered during GET operations by this
             node during the past minute
           unit: siblings
@@ -213,7 +196,6 @@ metrics:
             - name: '99'
             - name: '100'
         - name: riak.kv.objsize.get
-          availability: []
           description: Object size encountered by this node during the past minute
           unit: KB
           chart_type: line
@@ -224,7 +206,6 @@ metrics:
             - name: '99'
             - name: '100'
         - name: riak.search.vnodeq_size
-          availability: []
           description: Number of unprocessed messages in the vnode message queues
             of Search on this node in the past minute
           unit: messages
@@ -236,28 +217,24 @@ metrics:
             - name: '99'
             - name: '100'
         - name: riak.search.index
-          availability: []
           description: Number of document index errors encountered by Search
           unit: errors
           chart_type: line
           dimensions:
             - name: errors
         - name: riak.core.protobuf_connections
-          availability: []
           description: Protocol buffer connections by status
           unit: connections
           chart_type: line
           dimensions:
             - name: active
         - name: riak.core.repairs
-          availability: []
           description: Number of repair operations this node has coordinated
           unit: repairs
           chart_type: line
           dimensions:
             - name: read
         - name: riak.core.fsm_active
-          availability: []
           description: Active finite state machines by kind
           unit: fsms
           chart_type: line
@@ -267,7 +244,6 @@ metrics:
             - name: secondary index
             - name: list keys
         - name: riak.core.fsm_rejected
-          availability: []
           description: Finite state machines being rejected by Sidejobs overload protection
           unit: fsms
           chart_type: line
@@ -275,7 +251,6 @@ metrics:
             - name: get
             - name: put
         - name: riak.search.index
-          availability: []
           description: Number of writes to Search failed due to bad data format by
             reason
           unit: writes

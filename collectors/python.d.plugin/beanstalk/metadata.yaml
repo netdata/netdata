@@ -20,7 +20,6 @@ metrics:
       labels: []
       metrics:
         - name: beanstalk.cpu_usage
-          availability: []
           description: Cpu Usage
           unit: cpu time
           chart_type: area
@@ -28,7 +27,6 @@ metrics:
             - name: user
             - name: system
         - name: beanstalk.jobs_rate
-          availability: []
           description: Jobs Rate
           unit: jobs/s
           chart_type: line
@@ -36,14 +34,12 @@ metrics:
             - name: total
             - name: timeouts
         - name: beanstalk.connections_rate
-          availability: []
           description: Connections Rate
           unit: connections/s
           chart_type: area
           dimensions:
             - name: connections
         - name: beanstalk.commands_rate
-          availability: []
           description: Commands Rate
           unit: commands/s
           chart_type: stacked
@@ -68,14 +64,12 @@ metrics:
             - name: list-tubes-watched
             - name: pause-tube
         - name: beanstalk.connections_rate
-          availability: []
           description: Current Tubes
           unit: tubes
           chart_type: area
           dimensions:
             - name: tubes
         - name: beanstalk.current_jobs
-          availability: []
           description: Current Jobs
           unit: jobs
           chart_type: stacked
@@ -86,7 +80,6 @@ metrics:
             - name: delayed
             - name: buried
         - name: beanstalk.current_connections
-          availability: []
           description: Current Connections
           unit: connections
           chart_type: line
@@ -96,7 +89,6 @@ metrics:
             - name: workers
             - name: waiting
         - name: beanstalk.binlog
-          availability: []
           description: Binlog
           unit: records/s
           chart_type: line
@@ -104,7 +96,6 @@ metrics:
             - name: written
             - name: migrated
         - name: beanstalk.uptime
-          availability: []
           description: seconds
           unit: seconds
           chart_type: line
@@ -115,14 +106,12 @@ metrics:
       labels: []
       metrics:
         - name: beanstalk.jobs_rate
-          availability: []
           description: Jobs Rate
           unit: jobs/s
           chart_type: area
           dimensions:
             - name: jobs
         - name: beanstalk.jobs
-          availability: []
           description: Jobs
           unit: jobs
           chart_type: stacked
@@ -133,7 +122,6 @@ metrics:
             - name: delayed
             - name: buried
         - name: beanstalk.connections
-          availability: []
           description: Connections
           unit: connections
           chart_type: stacked
@@ -142,7 +130,6 @@ metrics:
             - name: waiting
             - name: watching
         - name: beanstalk.commands
-          availability: []
           description: Commands
           unit: commands/s
           chart_type: stacked
@@ -150,7 +137,6 @@ metrics:
             - name: deletes
             - name: pauses
         - name: beanstalk.pause
-          availability: []
           description: Pause
           unit: seconds
           chart_type: stacked

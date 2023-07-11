@@ -13,49 +13,42 @@ metrics:
       labels: []
       metrics:
         - name: sensors.temperature
-          availability: []
           description: Temperature
           unit: Celsius
           chart_type: line
           dimensions:
             - name: a dimension per sensor
         - name: sensors.voltage
-          availability: []
           description: Voltage
           unit: Volts
           chart_type: line
           dimensions:
             - name: a dimension per sensor
         - name: sensors.current
-          availability: []
           description: Current
           unit: Ampere
           chart_type: line
           dimensions:
             - name: a dimension per sensor
         - name: sensors.power
-          availability: []
           description: Power
           unit: Watt
           chart_type: line
           dimensions:
             - name: a dimension per sensor
         - name: sensors.fan
-          availability: []
           description: Fans speed
           unit: Rotations/min
           chart_type: line
           dimensions:
             - name: a dimension per sensor
         - name: sensors.energy
-          availability: []
           description: Energy
           unit: Joule
           chart_type: line
           dimensions:
             - name: a dimension per sensor
         - name: sensors.humidity
-          availability: []
           description: Humidity
           unit: Percent
           chart_type: line

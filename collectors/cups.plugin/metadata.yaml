@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: cups.dests_state
-          availability: []
           description: Destinations by state
           unit: dests
           chart_type: stacked
@@ -22,7 +21,6 @@ metrics:
             - name: printing
             - name: stopped
         - name: cups.dests_option
-          availability: []
           description: Destinations by option
           unit: dests
           chart_type: line
@@ -31,7 +29,6 @@ metrics:
             - name: acceptingjobs
             - name: shared
         - name: cups.job_num
-          availability: []
           description: Active jobs
           unit: jobs
           chart_type: stacked
@@ -40,7 +37,6 @@ metrics:
             - name: held
             - name: processing
         - name: cups.job_size
-          availability: []
           description: Active jobs size
           unit: KB
           chart_type: stacked
@@ -53,7 +49,6 @@ metrics:
       labels: []
       metrics:
         - name: cups.destination_job_num
-          availability: []
           description: Active jobs of {destination}
           unit: jobs
           chart_type: stacked
@@ -62,7 +57,6 @@ metrics:
             - name: held
             - name: processing
         - name: cups.destination_job_size
-          availability: []
           description: Active jobs size of {destination}
           unit: KB
           chart_type: stacked

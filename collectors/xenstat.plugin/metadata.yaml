@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: xenstat.mem
-          availability: []
           description: Memory Usage
           unit: MiB
           chart_type: stacked
@@ -21,21 +20,18 @@ metrics:
             - name: free
             - name: used
         - name: xenstat.domains
-          availability: []
           description: Number of Domains
           unit: domains
           chart_type: line
           dimensions:
             - name: domains
         - name: xenstat.cpus
-          availability: []
           description: Number of CPUs
           unit: cpus
           chart_type: line
           dimensions:
             - name: cpus
         - name: xenstat.cpu_freq
-          availability: []
           description: CPU Frequency
           unit: MHz
           chart_type: line
@@ -46,7 +42,6 @@ metrics:
       labels: []
       metrics:
         - name: xendomain.states
-          availability: []
           description: Domain States
           unit: boolean
           chart_type: line
@@ -58,14 +53,12 @@ metrics:
             - name: crashed
             - name: dying
         - name: xendomain.cpu
-          availability: []
           description: CPU Usage (100% = 1 core)
           unit: percentage
           chart_type: line
           dimensions:
             - name: used
         - name: xendomain.mem
-          availability: []
           description: Memory Reservation
           unit: MiB
           chart_type: line
@@ -73,7 +66,6 @@ metrics:
             - name: maximum
             - name: current
         - name: xendomain.vcpu
-          availability: []
           description: CPU Usage per VCPU
           unit: percentage
           chart_type: line
@@ -84,14 +76,12 @@ metrics:
       labels: []
       metrics:
         - name: xendomain.oo_req_vbd
-          availability: []
           description: VBD{%u} Out Of Requests
           unit: requests/s
           chart_type: line
           dimensions:
             - name: requests
         - name: xendomain.requests_vbd
-          availability: []
           description: VBD{%u} Requests
           unit: requests/s
           chart_type: line
@@ -99,7 +89,6 @@ metrics:
             - name: read
             - name: write
         - name: xendomain.sectors_vbd
-          availability: []
           description: VBD{%u} Read/Written Sectors
           unit: sectors/s
           chart_type: line
@@ -111,7 +100,6 @@ metrics:
       labels: []
       metrics:
         - name: xendomain.bytes_network
-          availability: []
           description: Network{%u} Received/Sent Bytes
           unit: kilobits/s
           chart_type: line
@@ -119,7 +107,6 @@ metrics:
             - name: received
             - name: sent
         - name: xendomain.packets_network
-          availability: []
           description: Network{%u} Received/Sent Packets
           unit: packets/s
           chart_type: line
@@ -127,7 +114,6 @@ metrics:
             - name: received
             - name: sent
         - name: xendomain.errors_network
-          availability: []
           description: Network{%u} Receive/Transmit Errors
           unit: errors/s
           chart_type: line
@@ -135,7 +121,6 @@ metrics:
             - name: received
             - name: sent
         - name: xendomain.drops_network
-          availability: []
           description: Network{%u} Receive/Transmit Drops
           unit: drops/s
           chart_type: line

@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: traefik.response_statuses
-          availability: []
           description: Response statuses
           unit: requests/s
           chart_type: stacked
@@ -24,7 +23,6 @@ metrics:
             - name: bad
             - name: other
         - name: traefik.response_codes
-          availability: []
           description: Responses by codes
           unit: requests/s
           chart_type: stacked
@@ -36,42 +34,36 @@ metrics:
             - name: 1xx
             - name: other
         - name: traefik.detailed_response_codes
-          availability: []
           description: Detailed response codes
           unit: requests/s
           chart_type: stacked
           dimensions:
             - name: a dimension for each response code family
         - name: traefik.requests
-          availability: []
           description: Requests
           unit: requests/s
           chart_type: line
           dimensions:
             - name: requests
         - name: traefik.total_response_time
-          availability: []
           description: Total response time
           unit: seconds
           chart_type: line
           dimensions:
             - name: response
         - name: traefik.average_response_time
-          availability: []
           description: Average response time
           unit: milliseconds
           chart_type: line
           dimensions:
             - name: response
         - name: traefik.average_response_time_per_iteration
-          availability: []
           description: Average response time per iteration
           unit: milliseconds
           chart_type: line
           dimensions:
             - name: response
         - name: traefik.uptime
-          availability: []
           description: Uptime
           unit: seconds
           chart_type: line

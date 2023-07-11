@@ -13,7 +13,6 @@ metrics:
       labels: []
       metrics:
         - name: netfilter.netlink_new
-          availability: []
           description: Connection Tracker New Connections
           unit: connections/s
           chart_type: line
@@ -22,7 +21,6 @@ metrics:
             - name: ignore
             - name: invalid
         - name: netfilter.netlink_changes
-          availability: []
           description: Connection Tracker Changes
           unit: changes/s
           chart_type: line
@@ -31,7 +29,6 @@ metrics:
             - name: delete
             - name: delete_list
         - name: netfilter.netlink_search
-          availability: []
           description: Connection Tracker Searches
           unit: searches/s
           chart_type: line
@@ -40,7 +37,6 @@ metrics:
             - name: search_restart
             - name: found
         - name: netfilter.netlink_errors
-          availability: []
           description: Connection Tracker Errors
           unit: events/s
           chart_type: line
@@ -50,7 +46,6 @@ metrics:
             - name: drop
             - name: early_drop
         - name: netfilter.netlink_expect
-          availability: []
           description: Connection Tracker Expectations
           unit: expectations/s
           chart_type: line
@@ -59,14 +54,12 @@ metrics:
             - name: deleted
             - name: new
         - name: netfilter.nfacct_packets
-          availability: []
           description: Netfilter Accounting Packets
           unit: packets/s
           chart_type: line
           dimensions:
             - name: a dimension per nfacct object
         - name: netfilter.nfacct_bytes
-          availability: []
           description: Netfilter Accounting Bandwidth
           unit: kilobytes/s
           chart_type: line

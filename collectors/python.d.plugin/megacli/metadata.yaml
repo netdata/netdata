@@ -34,21 +34,18 @@ metrics:
       labels: []
       metrics:
         - name: megacli.adapter_degraded
-          availability: []
           description: Adapter State
           unit: is degraded
           chart_type: line
           dimensions:
             - name: a dimension per adapter
         - name: megacli.pd_media_error
-          availability: []
           description: Physical Drives Media Errors
           unit: errors/s
           chart_type: line
           dimensions:
             - name: a dimension per physical drive
         - name: megacli.pd_predictive_failure
-          availability: []
           description: Physical Drives Predictive Failures
           unit: failures/s
           chart_type: line
@@ -59,14 +56,12 @@ metrics:
       labels: []
       metrics:
         - name: megacli.bbu_relative_charge
-          availability: []
           description: Relative State of Charge
           unit: percentage
           chart_type: line
           dimensions:
             - name: adapter {battery id}
         - name: megacli.bbu_cycle_count
-          availability: []
           description: Cycle Count
           unit: cycle count
           chart_type: line
