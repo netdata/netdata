@@ -27,14 +27,14 @@ int init_graphite_instance(struct instance *instance)
 #endif
 
     instance->start_batch_formatting = NULL;
-    instance->start_host_formatting = format_host_labels_graphite_plaintext;
+    instance->start_host_formatting = NULL;
     instance->start_chart_formatting = format_chart_graphite_remote_write;
 
     if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED)
         instance->metric_formatting = format_dimension_collected_graphite_plaintext;
     else
         instance->metric_formatting = format_dimension_stored_graphite_plaintext;
-    instance->netdata_info_formatting = NULL;
+    instance->netdata_info_formatting = format_netdata_info_labels_graphite;
 
     instance->end_chart_formatting = NULL;
     instance->variables_formatting = NULL;
@@ -92,17 +92,18 @@ void sanitize_graphite_label_value(char *dst, const char *src, size_t len)
  * @param host a data collecting host.
  * @return Always returns 0.
  */
-int format_host_labels_graphite_plaintext(struct instance *instance, RRDHOST *host)
+int format_netdata_info_labels_graphite(struct instance *instance, RRDHOST *host)
 {
-    if (!instance->labels_buffer)
-        instance->labels_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_exporters);
-    else
-        buffer_reset(instance->labels_buffer);
-
     if (unlikely(!sending_labels_configured(instance)))
         return 0;
 
-    rrdlabels_to_buffer(host->rrdlabels, instance->labels_buffer, ";", "=", "", "",
+    static BUFFER *host_labels = NULL;
+    if (!host_labels)
+        host_labels = buffer_create(1024, &netdata_buffers_statistics.buffers_exporters);
+    else
+        buffer_reset(host_labels);
+
+    rrdlabels_to_buffer(host->rrdlabels, host_labels, ";", "=", "", "",
                         exporting_labels_filter_callback, instance,
                         NULL, sanitize_graphite_label_value);
 
@@ -118,6 +119,11 @@ int format_host_labels_graphite_plaintext(struct instance *instance, RRDHOST *ho
  */
 int format_chart_graphite_remote_write(struct instance *instance, RRDSET *st)
 {
+    if (!instance->labels_buffer)
+        instance->labels_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_exporters);
+    else
+        buffer_reset(instance->labels_buffer);
+
     if (unlikely(!sending_labels_configured(instance)))
         return 0;
 
