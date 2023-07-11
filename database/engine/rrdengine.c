@@ -354,7 +354,7 @@ static void wal_cleanup1(void) {
     if(!spinlock_trylock(&wal_globals.protected.spinlock))
         return;
 
-    if(wal_globals.protected.available_items && wal_globals.protected.available > storage_tiers) {
+    if (wal_globals.protected.available_items && wal_globals.protected.available > rrdb.storage_tiers) {
         wal = wal_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
         wal_globals.protected.available--;
@@ -582,7 +582,7 @@ struct {
 } dbengine_page_alloc_globals = {};
 
 static inline ARAL *page_size_lookup(size_t size) {
-    for(size_t tier = 0; tier < storage_tiers ;tier++)
+    for (size_t tier = 0; tier < rrdb.storage_tiers ;tier++)
         if(size == tier_page_size[tier])
             return dbengine_page_alloc_globals.aral[tier];
 
@@ -590,8 +590,8 @@ static inline ARAL *page_size_lookup(size_t size) {
 }
 
 static void dbengine_page_alloc_init(void) {
-    for(size_t i = storage_tiers; i > 0 ;i--) {
-        size_t tier = storage_tiers - i;
+    for (size_t i = rrdb.storage_tiers; i > 0 ;i--) {
+        size_t tier = rrdb.storage_tiers - i;
 
         char buf[20 + 1];
         snprintfz(buf, 20, "tier%zu-pages", tier);

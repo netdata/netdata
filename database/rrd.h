@@ -90,12 +90,6 @@ const char *rrdset_type_name(RRDSET_TYPE chart_type);
 
 #include "contexts/rrdcontext.h"
 
-extern bool unittest_running;
-extern bool dbengine_enabled;
-extern size_t storage_tiers;
-extern bool use_direct_io;
-extern size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
-
 typedef enum __attribute__ ((__packed__)) {
     RRD_BACKFILL_NONE = 0,
     RRD_BACKFILL_FULL,
@@ -1286,6 +1280,12 @@ static inline void rrdhost_retention(RRDHOST *host, time_t now, bool online, tim
 struct rrdb {
     DICTIONARY *rrdhost_root_index;
     DICTIONARY *rrdhost_root_index_hostname;
+
+    bool unittest_running;
+    bool dbengine_enabled;
+    size_t storage_tiers;
+    bool use_direct_io;
+    size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
 };
 
 extern struct rrdb rrdb;

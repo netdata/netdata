@@ -653,9 +653,9 @@ bind_fail:
 static bool dimension_can_be_deleted(uuid_t *dim_uuid __maybe_unused)
 {
 #ifdef ENABLE_DBENGINE
-    if(dbengine_enabled) {
+    if (rrdb.dbengine_enabled) {
         bool no_retention = true;
-        for (size_t tier = 0; tier < storage_tiers; tier++) {
+        for (size_t tier = 0; tier < rrdb.storage_tiers; tier++) {
             if (!multidb_ctx[tier])
                 continue;
             time_t first_time_t = 0, last_time_t = 0;
@@ -1335,7 +1335,7 @@ static void metadata_event_loop(void *arg)
                     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SCANNING_HOSTS)))
                         break;
 
-                    if (unittest_running)
+                    if (rrdb.unittest_running)
                         break;
 
                     data = mallocz(sizeof(*data));
@@ -1363,7 +1363,7 @@ static void metadata_event_loop(void *arg)
                     }
                     break;
                 case METADATA_LOAD_HOST_CONTEXT:;
-                    if (unittest_running)
+                    if (rrdb.unittest_running)
                         break;
 
                     data = callocz(1,sizeof(*data));

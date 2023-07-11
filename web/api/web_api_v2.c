@@ -521,7 +521,7 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
 
     if(tier_str && *tier_str) {
         tier = str2ul(tier_str);
-        if(tier < storage_tiers)
+        if(tier < rrdb.storage_tiers)
             options |= RRDR_OPTION_SELECTED_TIER;
         else
             tier = 0;

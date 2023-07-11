@@ -1005,7 +1005,7 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
         buffer_json_cloud_status(wb, now_s);
 
         buffer_json_member_add_array(wb, "db_size");
-        for (size_t tier = 0; tier < storage_tiers; tier++) {
+        for (size_t tier = 0; tier < rrdb.storage_tiers; tier++) {
             STORAGE_ENGINE_ID storage_engine_id = localhost->db[tier].id;
 
             size_t max = storage_engine_disk_space_max(storage_engine_id, localhost->db[tier].instance);

@@ -119,6 +119,10 @@ STRING *rrd_string_strdupz(const char *s) {
 }
 
 struct rrdb rrdb = {
-    NULL,
-    NULL
+    .rrdhost_root_index = NULL,
+    .rrdhost_root_index_hostname = NULL,
+    .unittest_running = false,
+    .dbengine_enabled = false,
+    .use_direct_io = true,
+    .storage_tiers_grouping_iterations = { 1, 60, 60, 60, 60 },
 };

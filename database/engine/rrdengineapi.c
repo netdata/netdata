@@ -1079,7 +1079,7 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
         datafiles++;
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
-    ssize_t cpus = (ssize_t)get_netdata_cpus() / (ssize_t)storage_tiers;
+    ssize_t cpus = (ssize_t) get_netdata_cpus() / rrdb.storage_tiers;
     if(cpus > (ssize_t)datafiles)
         cpus = (ssize_t)datafiles;
 
@@ -1226,7 +1226,7 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     // 4. then wait for completion
 
     bool logged = false;
-    while(__atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED) && !unittest_running) {
+    while (__atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED) && !rrdb.unittest_running) {
         if(!logged) {
             netdata_log_info("DBENGINE: waiting for collectors to finish on tier %d...", (ctx->config.legacy) ? -1 : ctx->config.tier);
             logged = true;

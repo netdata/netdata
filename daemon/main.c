@@ -8,7 +8,6 @@
 #warning COMPILING 32BIT NETDATA
 #endif
 
-bool unittest_running = false;
 int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
 
@@ -327,9 +326,9 @@ void netdata_cleanup_and_exit(int ret) {
     (void) rename(agent_crash_file, agent_incomplete_shutdown_file);
 
 #ifdef ENABLE_DBENGINE
-    if(dbengine_enabled) {
+    if (rrdb.dbengine_enabled) {
         delta_shutdown_time("dbengine exit mode");
-        for (size_t tier = 0; tier < storage_tiers; tier++)
+        for (size_t tier = 0; tier < rrdb.storage_tiers; tier++)
             rrdeng_exit_mode(multidb_ctx[tier]);
     }
 #endif
@@ -418,9 +417,9 @@ void netdata_cleanup_and_exit(int ret) {
         // exit cleanly
 
 #ifdef ENABLE_DBENGINE
-        if(dbengine_enabled) {
+        if (rrdb.dbengine_enabled) {
             delta_shutdown_time("flush dbengine tiers");
-            for (size_t tier = 0; tier < storage_tiers; tier++)
+            for (size_t tier = 0; tier < rrdb.storage_tiers; tier++)
                 rrdeng_prepare_exit(multidb_ctx[tier]);
         }
 #endif
@@ -436,13 +435,13 @@ void netdata_cleanup_and_exit(int ret) {
         metadata_sync_shutdown();
 
 #ifdef ENABLE_DBENGINE
-        if(dbengine_enabled) {
+        if (rrdb.dbengine_enabled) {
             delta_shutdown_time("wait for dbengine collectors to finish");
 
             size_t running = 1;
             while(running) {
                 running = 0;
-                for (size_t tier = 0; tier < storage_tiers; tier++)
+                for (size_t tier = 0; tier < rrdb.storage_tiers; tier++)
                     running += rrdeng_collectors_running(multidb_ctx[tier]);
 
                 if(running) {
@@ -460,7 +459,7 @@ void netdata_cleanup_and_exit(int ret) {
             }
 
             delta_shutdown_time("stop dbengine tiers");
-            for (size_t tier = 0; tier < storage_tiers; tier++)
+            for (size_t tier = 0; tier < rrdb.storage_tiers; tier++)
                 rrdeng_exit(multidb_ctx[tier]);
         }
 #endif
@@ -1451,7 +1450,7 @@ int main(int argc, char **argv) {
                         }
 
                         if(strcmp(optarg, "unittest") == 0) {
-                            unittest_running = true;
+                            rrdb.unittest_running = true;
 
                             if (pluginsd_parser_unittest())
                                 return 1;
@@ -1472,7 +1471,7 @@ int main(int argc, char **argv) {
                             default_rrd_update_every = 1;
                             default_storage_engine_id = STORAGE_ENGINE_RAM;
                             default_health_enabled = 0;
-                            storage_tiers = 1;
+                            rrdb.storage_tiers = 1;
                             registry_init();
                             if(rrd_init("unittest", NULL, true)) {
                                 fprintf(stderr, "rrd_init failed for unittest\n");
@@ -1501,52 +1500,52 @@ int main(int argc, char **argv) {
                             return command_argument_sanitization_tests();
                         }
                         else if(strcmp(optarg, "dicttest") == 0) {
-                            unittest_running = true;
+                            rrdb.unittest_running = true;
                             return dictionary_unittest(10000);
                         }
                         else if(strcmp(optarg, "araltest") == 0) {
-                            unittest_running = true;
+                            rrdb.unittest_running = true;
                             return aral_unittest(10000);
                         }
                         else if(strcmp(optarg, "stringtest") == 0) {
-                            unittest_running = true;
+                            rrdb.unittest_running = true;
                             return string_unittest(10000);
                         }
                         else if(strcmp(optarg, "rrdlabelstest") == 0) {
-                            unittest_running = true;
+                            rrdb.unittest_running = true;
                             return rrdlabels_unittest();
                         }
                         else if(strcmp(optarg, "buffertest") == 0) {
-                            unittest_running = true;
+                            rrdb.unittest_running = true;
                             return buffer_unittest();
                         }
 #ifdef ENABLE_DBENGINE
                         else if(strcmp(optarg, "mctest") == 0) {
-                            unittest_running = true;
+                            rrdb.unittest_running = true;
                             return mc_unittest();
                         }
                         else if(strcmp(optarg, "ctxtest") == 0) {
-                            unittest_running = true;
+                            rrdb.unittest_running = true;
                             return ctx_unittest();
                         }
                         else if(strcmp(optarg, "metatest") == 0) {
-                            unittest_running = true;
+                            rrdb.unittest_running = true;
                             return metadata_unittest();
                         }
                         else if(strcmp(optarg, "pgctest") == 0) {
-                            unittest_running = true;
+                            rrdb.unittest_running = true;
                             return pgc_unittest();
                         }
                         else if(strcmp(optarg, "mrgtest") == 0) {
-                            unittest_running = true;
+                            rrdb.unittest_running = true;
                             return mrg_unittest();
                         }
                         else if(strcmp(optarg, "julytest") == 0) {
-                            unittest_running = true;
+                            rrdb.unittest_running = true;
                             return julytest();
                         }
                         else if(strcmp(optarg, "parsertest") == 0) {
-                            unittest_running = true;
+                            rrdb.unittest_running = true;
                             return pluginsd_parser_unittest();
                         }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {

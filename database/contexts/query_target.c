@@ -220,7 +220,7 @@ static inline void query_metric_release(QUERY_TARGET *qt, QUERY_METRIC *qm) {
     qm->plan.used = 0;
 
     // reset the tiers
-    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < rrdb.storage_tiers ;tier++) {
         if(qm->tiers[tier].db_metric_handle) {
             STORAGE_ENGINE_ID storage_engine_id = query_metric_storage_engine(qt, qm, tier);
             storage_engine_metric_release(storage_engine_id, qm->tiers[tier].db_metric_handle);
@@ -245,9 +245,9 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
         time_t db_first_time_s;
         time_t db_last_time_s;
         time_t db_update_every_s;
-    } tier_retention[storage_tiers];
+    } tier_retention[rrdb.storage_tiers];
 
-    for (size_t tier = 0; tier < storage_tiers; tier++) {
+    for (size_t tier = 0; tier < rrdb.storage_tiers; tier++) {
         STORAGE_ENGINE_ID storage_engine_id = qn->rrdhost->db[tier].id;
         tier_retention[tier].storage_engine_id = storage_engine_id;
         tier_retention[tier].db_update_every_s = (time_t) (qn->rrdhost->db[tier].tier_grouping * ri->update_every_s);
@@ -285,7 +285,7 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
         }
     }
 
-    for (size_t tier = 0; tier < storage_tiers; tier++) {
+    for (size_t tier = 0; tier < rrdb.storage_tiers; tier++) {
         if(!qt->db.tiers[tier].update_every || (tier_retention[tier].db_update_every_s && tier_retention[tier].db_update_every_s < qt->db.tiers[tier].update_every))
             qt->db.tiers[tier].update_every = tier_retention[tier].db_update_every_s;
 
@@ -329,7 +329,7 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
         if (!qt->db.last_time_s || common_last_time_s > qt->db.last_time_s)
             qt->db.last_time_s = common_last_time_s;
 
-        for (size_t tier = 0; tier < storage_tiers; tier++) {
+        for (size_t tier = 0; tier < rrdb.storage_tiers; tier++) {
             internal_fatal(tier_retention[tier].storage_engine_id != query_metric_storage_engine(qt, qm, tier), "QUERY TARGET: storage engine mismatch");
             qm->tiers[tier].db_metric_handle = tier_retention[tier].db_metric_handle;
             qm->tiers[tier].db_first_time_s = tier_retention[tier].db_first_time_s;
@@ -341,7 +341,7 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
     }
 
     // cleanup anything we allocated to the retention we will not use
-    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < rrdb.storage_tiers ;tier++) {
         if (tier_retention[tier].db_metric_handle)
             storage_engine_metric_release(tier_retention[tier].storage_engine_id, tier_retention[tier].db_metric_handle);
     }
