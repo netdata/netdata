@@ -161,7 +161,10 @@ Also, the `log path` configuration option must be defined per log source in `log
 This collector will collect logs from the kernel message log buffer. See also documentation of [Fluent Bit kmsg input plugin](https://docs.fluentbit.io/manual/pipeline/inputs/kernel-logs).
 
 > **Warning**
-> If `use log timestamp` is set to `auto` and the system has been in suspend and resumed since the last boot, timestamps of new `kmsg` logs will be incorrect and log collection will not work. This is a know limitation when reading the kernel log buffer records and it is recommended to use `use log timestamp = no` in this scenario.
+> If `use log timestamp` is set to `auto` and the system has been in suspend and resumed since the last boot, timestamps of new `kmsg` logs will be incorrect and log collection will not work. This is a know limitation when reading the kernel log buffer records and it is recommended to use `use log timestamp = no` in this case.
+
+> **Note**
+> `/dev/kmsg` normally returns all the logs in the kernel log buffer every time it is read. To avoid duplicate logs, the collector will discard any previous logs the first time `/dev/kmsg` is read after an agent restart and it will collect only new kernel logs.
 
 |  Configuration Option | Description  |
 |      :------------:  	| ------------ |
@@ -175,8 +178,11 @@ This collector will collect logs from the kernel message log buffer. See also do
 
 </a>
 
+This collector will collect logs from the journald daemon. See also documentation of [Fluent Bit systemd input plugin](https://docs.fluentbit.io/manual/pipeline/inputs/systemd).
+
 |  Configuration Option | Description  |
 |      :------------:  	| ------------ |
+| `log path` | Path to the systemd journal directory. If set to `auto`, the default path will be used to read local-only logs. |
 | `priority value chart` | Enable chart showing Syslog Priority values (PRIVAL) of collected logs. The Priority value ranges from 0 to 191 and represents both the Facility and Severity. It is calculated by first multiplying the Facility number by 8 and then adding the numerical value of the Severity. Please see the [rfc5424: Syslog Protocol](https://www.rfc-editor.org/rfc/rfc5424#section-6.2.1) document for more information.|
 | `severity chart` | Enable chart showing Syslog Severity values of collected logs. Severity values are in the range of 0 to 7 inclusive.|
 | `facility chart` | Enable chart showing Syslog Facility values of collected logs. Facility values show which subsystem generated the log and are in the range of 0 to 23 inclusive.|
@@ -187,9 +193,12 @@ This collector will collect logs from the kernel message log buffer. See also do
 
 </a>
 
+This collector will use the Docker API to collect Docker events logs. See also documentation of [Fluent Bit docker events input plugin](https://docs.fluentbit.io/manual/pipeline/inputs/docker-events).
+
 |  Configuration Option | Description  |
 |      :------------:  	| ------------ |
-|`event type chart` | Enable chart showing the Docker object type of the collected logs.|
+| `log path` | Docker socket UNIX path. If set to `auto`, the default path will be used. |
+| `event type chart` | Enable chart showing the Docker object type of the collected logs. |
 
 <a name="collector-configuration-web-log"/>
 
@@ -197,7 +206,27 @@ This collector will collect logs from the kernel message log buffer. See also do
 
 </a>
 
-**TODO**
+This collector will collect [Apache](https://httpd.apache.org/) and [Nginx](https://nginx.org/) access logs.
+
+|  Configuration Option | Description  |
+|      :------------:  	| ------------ |
+| `log path` | The path to the web server's `access.log`. If set to `auto`, the collector will attempt to auto-discover it, provided the name of the configuration section is either `Apache access.log` or `Nginx access.log`. |
+| `log format` | The log format to be used for parsing. Unlike the [`GO weblog`]() module, only the `CSV` parser is supported and it can be configured [in the same way](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md#known-fields) as in the `GO` module. If set to `auto`, the collector will attempt to auto-detect the log format using the same logic explained [here](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md#log-parser-auto-detection). |
+| `verify parsed logs` | If set to `yes`, the parser will attempt to verify that the parsed fields are valid, before extracting metrics from them. If they are invalid (for example, the response code is less than `100`), the `invalid` dimension will be incremented instead. Setting this to `no` will result in a slight performance gain. |
+| `vhosts chart` | Enable chart showing names of the virtual hosts extracted from the collected logs. |
+| `ports chart` | Enable chart showing port numbers extracted from the collected logs. |
+| `IP versions chart` | Enable chart showing IP versions (`v4` or `v6`) extracted from the collected logs. |
+| `unique client IPs - current poll chart` | Enable chart showing unique client IPs in each collection interval. |
+| `unique client IPs - all-time chart` | Enable chart showing unique client IPs since agent startup. It is recommended to set this to `no` as it can have a negative impact on long-term performance. |
+| `http request methods chart` | Enable chart showing HTTP request methods extracted from the collected logs. |
+| `http protocol versions chart` | Enable chart showing HTTP protocol versions exctracted from the collected logs. |
+| `bandwidth chart` | Enable chart showing request and response bandwidth extracted from the collected logs. |
+| `timings chart` | Enable chart showing request processing time stats extracted from the collected logs. |
+| `response code families chart` | Enable chart showing response code families (`1xx`, `2xx` etc.) extracted from the collected logs. |
+| `response codes chart` | Enable chart showing response codes extracted from the collected logs. |
+| `response code types chart` | Enable chart showing response code types (`success`, `redirect` etc.) extracted from the collected logs. |
+| `SSL protocols chart` | Enable chart showing SSL protocols (`TLSV1`, `TLSV1.1` etc.) exctracted from the collected logs. |
+| `SSL chipher suites chart` | Enable chart showing SSL chipher suites exctracted from the collected logs. |
 
 <a name="collector-configuration-syslog"/>
 
@@ -209,7 +238,7 @@ This collector will collect logs through a Unix socket server (UDP or TCP) or ov
 
 |  Configuration Option | Description  |
 |      :------------:  	| ------------ |
-|`mode` | Type of socket to be created to listen for incoming syslog messages. Supported modes are: `unix_tcp`, `unix_udp`, `tcp` and `udp`.|
+| `mode` | Type of socket to be created to listen for incoming syslog messages. Supported modes are: `unix_tcp`, `unix_udp`, `tcp` and `udp`.|
 | `log path` | If `mode == unix_tcp` or `mode == unix_udp`, Netdata will create a UNIX socket on this path to listen for syslog messages. Otherwise, this option is not used.|
 | `unix_perm` | If `mode == unix_tcp` or `mode == unix_udp`, this sets the permissions of the generated UNIX socket. Otherwise, this option is not used.|
 | `listen` | If `mode == tcp` or `mode == udp`, this sets the network interface to bind.|
