@@ -942,6 +942,8 @@ static void netdata_update_ipmi_sensor_reading(
             sn->last_collected_metric_ut = state->sensors.now_ut;
         }
 
+        sn->sensor_state = sensor_state;
+
         sn->last_collected_state_ut = state->sensors.now_ut;
 
         dictionary_acquired_item_release(state->sensors.dict, item);
