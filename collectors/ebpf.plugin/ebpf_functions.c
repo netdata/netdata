@@ -166,6 +166,9 @@ static void ebpf_function_thread_manipulation(const char *transaction,
                 lem->running_time = 0;
                 if (period > 0) // user is modifying period to run
                     lem->lifetime = period;
+#ifdef NETDATA_INTERNAL_CHECKS
+                netdata_log_info("Thread %s had lifetime updated for %d", thread_name, period);
+#endif
             }
             pthread_mutex_unlock(&ebpf_exit_cleanup);
         } else if(strncmp(keyword, EBPF_THREADS_DISABLE_CATEGORY, sizeof(EBPF_THREADS_DISABLE_CATEGORY) -1) == 0) {
@@ -243,7 +246,7 @@ static void ebpf_function_thread_manipulation(const char *transaction,
             buffer_json_add_array_item_string(wb, EBPF_THREAD_STATUS_RUNNING);
 
             // Time remaining
-            buffer_json_add_array_item_uint64(wb, (wem->lifetime - wem->running_time));
+            buffer_json_add_array_item_uint64(wb, (wem->lifetime) ? (wem->lifetime - wem->running_time) : 0);
 
             // action
             buffer_json_add_array_item_string(wb, "Enabled/Disabled");
