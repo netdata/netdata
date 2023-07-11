@@ -1,0 +1,44 @@
+module_name: squid
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: squid instance
+      description: ""
+      labels: []
+      metrics:
+        - name: squid.clients_net
+          description: Squid Client Bandwidth
+          unit: "kilobits/s"
+          chart_type: area
+          dimensions:
+            - name: in
+            - name: out
+            - name: hits
+        - name: squid.clients_requests
+          description: Squid Client Requests
+          unit: "requests/s"
+          chart_type: line
+          dimensions:
+            - name: requests
+            - name: hits
+            - name: errors
+        - name: squid.servers_net
+          description: Squid Server Bandwidth
+          unit: "kilobits/s"
+          chart_type: area
+          dimensions:
+            - name: in
+            - name: out
+        - name: squid.servers_requests
+          description: Squid Server Requests
+          unit: "requests/s"
+          chart_type: line
+          dimensions:
+            - name: requests
+            - name: errors

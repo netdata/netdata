@@ -1,0 +1,49 @@
+module_name: bind_rndc
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: bind_rndc.name_server_statistics
+          description: Name Server Statistics
+          unit: "stats"
+          chart_type: line
+          dimensions:
+            - name: requests
+            - name: rejected_queries
+            - name: success
+            - name: failure
+            - name: responses
+            - name: duplicate
+            - name: recursion
+            - name: nxrrset
+            - name: nxdomain
+            - name: non_auth_answer
+            - name: auth_answer
+            - name: dropped_queries
+        - name: bind_rndc.incoming_queries
+          description: Incoming queries
+          unit: "queries"
+          chart_type: line
+          dimensions:
+            - name: a dimension per incoming query type
+        - name: bind_rndc.outgoing_queries
+          description: Outgoing queries
+          unit: "queries"
+          chart_type: line
+          dimensions:
+            - name: a dimension per outgoing query type
+        - name: bind_rndc.stats_size
+          description: Named Stats File Size
+          unit: "MiB"
+          chart_type: line
+          dimensions:
+            - name: stats_size

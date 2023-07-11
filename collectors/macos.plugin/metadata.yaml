@@ -1,0 +1,629 @@
+name: macos.plugin
+modules:
+  - module_name: mach_smi
+    plugin_name: macos.plugin
+    alerts:
+      - name: 10min_cpu_usage
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
+        metric: system.cpu
+        info: average CPU utilization over the last 10 minutes (excluding iowait,
+          nice and steal)
+        os: "linux"
+      - name: 10min_cpu_iowait
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
+        metric: system.cpu
+        info: average CPU iowait time over the last 10 minutes
+        os: "linux"
+      - name: 20min_steal_cpu
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
+        metric: system.cpu
+        info: average CPU steal time over the last 20 minutes
+        os: "linux"
+      - name: ram_in_use
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
+        metric: system.ram
+        info: system memory utilization
+        os: "linux"
+      - name: ram_in_use
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
+        metric: system.ram
+        info: system memory utilization
+        os: "freebsd"
+      - name: 30min_ram_swapped_out
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/swap.conf
+        metric: system.swapio
+        info: percentage of the system RAM swapped in the last 30 minutes
+        os: "linux freebsd"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: system.cpu
+              description: Total CPU utilization
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: user
+                - name: nice
+                - name: system
+                - name: idle
+            - name: system.ram
+              description: System RAM
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: active
+                - name: wired
+                - name: throttled
+                - name: compressor
+                - name: inactive
+                - name: purgeable
+                - name: speculative
+                - name: free
+            - name: system.swapio
+              description: Swap I/O
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: io
+                - name: out
+            - name: mem.pgfaults
+              description: Memory Page Faults
+              unit: "faults/s"
+              chart_type: line
+              dimensions:
+                - name: memory
+                - name: cow
+                - name: pagein
+                - name: pageout
+                - name: compress
+                - name: decompress
+                - name: zero_fill
+                - name: reactivate
+                - name: purge
+  - module_name: sysctl
+    plugin_name: macos.plugin
+    alerts:
+      - name: load_cpu_number
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
+        metric: system.load
+        info: number of active CPU cores in the system
+        os: "linux"
+      - name: load_average_15
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
+        metric: system.load
+        info: system fifteen-minute load average
+        os: "linux"
+      - name: load_average_5
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
+        metric: system.load
+        info: system five-minute load average
+        os: "linux"
+      - name: 1m_ipv4_tcp_resets_sent
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
+        metric: ipv4.tcphandshake
+        info: average number of sent TCP RESETS over the last minute
+        os: "linux"
+      - name: 10s_ipv4_tcp_resets_sent
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
+        metric: ipv4.tcphandshake
+        info: average number of sent TCP RESETS over the last 10 seconds. This can
+          indicate a port scan, or that a service running on this host has crashed.
+          Netdata will not send a clear notification for this alarm.
+        os: "linux"
+      - name: 1m_ipv4_tcp_resets_received
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
+        metric: ipv4.tcphandshake
+        info: average number of received TCP RESETS over the last minute
+        os: "linux freebsd"
+      - name: 1m_ipv4_udp_receive_buffer_errors
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf
+        metric: ipv4.udperrors
+        info: average number of UDP receive buffer errors over the last minute
+        os: "linux freebsd"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: system.load
+              description: System Load Average
+              unit: "load"
+              chart_type: line
+              dimensions:
+                - name: load1
+                - name: load5
+                - name: load15
+            - name: system.swap
+              description: System Swap
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used
+            - name: system.ipv4
+              description: IPv4 Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.tcppackets
+              description: IPv4 TCP Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.tcperrors
+              description: IPv4 TCP Errors
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InErrs
+                - name: InCsumErrors
+                - name: RetransSegs
+            - name: ipv4.tcphandshake
+              description: IPv4 TCP Handshake Issues
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: EstabResets
+                - name: ActiveOpens
+                - name: PassiveOpens
+                - name: AttemptFails
+            - name: ipv4.tcpconnaborts
+              description: TCP Connection Aborts
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: baddata
+                - name: userclosed
+                - name: nomemory
+                - name: timeout
+            - name: ipv4.tcpofo
+              description: TCP Out-Of-Order Queue
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: inqueue
+            - name: ipv4.tcpsyncookies
+              description: TCP SYN Cookies
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+                - name: failed
+            - name: ipv4.ecnpkts
+              description: IPv4 ECN Statistics
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: CEP
+                - name: NoECTP
+            - name: ipv4.udppackets
+              description: IPv4 UDP Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.udperrors
+              description: IPv4 UDP Errors
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: RcvbufErrors
+                - name: InErrors
+                - name: NoPorts
+                - name: InCsumErrors
+                - name: IgnoredMulti
+            - name: ipv4.icmp
+              description: IPv4 ICMP Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.icmp_errors
+              description: IPv4 ICMP Errors
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InErrors
+                - name: OutErrors
+                - name: InCsumErrors
+            - name: ipv4.icmpmsg
+              description: IPv4 ICMP Messages
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InEchoReps
+                - name: OutEchoReps
+                - name: InEchos
+                - name: OutEchos
+            - name: ipv4.packets
+              description: IPv4 Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+                - name: forwarded
+                - name: delivered
+            - name: ipv4.fragsout
+              description: IPv4 Fragments Sent
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: created
+            - name: ipv4.fragsin
+              description: IPv4 Fragments Reassembly
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: all
+            - name: ipv4.errors
+              description: IPv4 Errors
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InDiscards
+                - name: OutDiscards
+                - name: InHdrErrors
+                - name: OutNoRoutes
+                - name: InAddrErrors
+                - name: InUnknownProtos
+            - name: ipv6.packets
+              description: IPv6 Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+                - name: forwarded
+                - name: delivers
+            - name: ipv6.fragsout
+              description: IPv6 Fragments Sent
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: all
+            - name: ipv6.fragsin
+              description: IPv6 Fragments Reassembly
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: timeout
+                - name: all
+            - name: ipv6.errors
+              description: IPv6 Errors
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InDiscards
+                - name: OutDiscards
+                - name: InHdrErrors
+                - name: InAddrErrors
+                - name: InTruncatedPkts
+                - name: InNoRoutes
+                - name: OutNoRoutes
+            - name: ipv6.icmp
+              description: IPv6 ICMP Messages
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.icmpredir
+              description: IPv6 ICMP Redirects
+              unit: "redirects/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.icmperrors
+              description: IPv6 ICMP Errors
+              unit: "errors/s"
+              chart_type: line
+              dimensions:
+                - name: InErrors
+                - name: OutErrors
+                - name: InCsumErrors
+                - name: InDestUnreachs
+                - name: InPktTooBigs
+                - name: InTimeExcds
+                - name: InParmProblems
+                - name: OutDestUnreachs
+                - name: OutTimeExcds
+                - name: OutParmProblems
+            - name: ipv6.icmpechos
+              description: IPv6 ICMP Echo
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: InEchos
+                - name: OutEchos
+                - name: InEchoReplies
+                - name: OutEchoReplies
+            - name: ipv6.icmprouter
+              description: IPv6 Router Messages
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: InSolicits
+                - name: OutSolicits
+                - name: InAdvertisements
+                - name: OutAdvertisements
+            - name: ipv6.icmpneighbor
+              description: IPv6 Neighbor Messages
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: InSolicits
+                - name: OutSolicits
+                - name: InAdvertisements
+                - name: OutAdvertisements
+            - name: ipv6.icmptypes
+              description: IPv6 ICMP Types
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: InType1
+                - name: InType128
+                - name: InType129
+                - name: InType136
+                - name: OutType1
+                - name: OutType128
+                - name: OutType129
+                - name: OutType133
+                - name: OutType135
+                - name: OutType143
+            - name: system.uptime
+              description: System Uptime
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: uptime
+  - module_name: iokit
+    plugin_name: macos.plugin
+    alerts:
+      - name: 10min_disk_utilization
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
+        metric: disk.util
+        info: average percentage of time ${label:device} disk was busy over the last
+          10 minutes
+        os: "linux freebsd"
+      - name: disk_space_usage
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
+        metric: disk.space
+        info: disk ${label:mount_point} space utilization
+        os: "linux freebsd"
+      - name: disk_inode_usage
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+        os: "linux freebsd"
+      - name: interface_speed
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.net
+        info: network interface ${label:device} current speed
+        os: "*"
+      - name: 1m_received_traffic_overflow
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.net
+        info: average inbound utilization for the network interface ${label:device}
+          over the last minute
+        os: "linux"
+      - name: 1m_sent_traffic_overflow
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.net
+        info: average outbound utilization for the network interface ${label:device}
+          over the last minute
+        os: "linux"
+      - name: inbound_packets_dropped_ratio
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.packets
+        info: ratio of inbound dropped packets for the network interface ${label:device}
+          over the last 10 minutes
+        os: "linux"
+      - name: outbound_packets_dropped_ratio
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.packets
+        info: ratio of outbound dropped packets for the network interface ${label:device}
+          over the last 10 minutes
+        os: "linux"
+      - name: wifi_inbound_packets_dropped_ratio
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.packets
+        info: ratio of inbound dropped packets for the network interface ${label:device}
+          over the last 10 minutes
+        os: "linux"
+      - name: wifi_outbound_packets_dropped_ratio
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.packets
+        info: ratio of outbound dropped packets for the network interface ${label:device}
+          over the last 10 minutes
+        os: "linux"
+      - name: 1m_received_packets_rate
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.packets
+        info: average number of packets received by the network interface ${label:device}
+          over the last minute
+        os: "linux freebsd"
+      - name: interface_inbound_errors
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.errors
+        info: number of inbound errors for the network interface ${label:device} in
+          the last 10 minutes
+        os: "freebsd"
+      - name: interface_outbound_errors
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.errors
+        info: number of outbound errors for the network interface ${label:device}
+          in the last 10 minutes
+        os: "freebsd"
+      - name: inbound_packets_dropped
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.drops
+        info: number of inbound dropped packets for the network interface ${label:device}
+          in the last 10 minutes
+        os: "linux"
+      - name: outbound_packets_dropped
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.drops
+        info: number of outbound dropped packets for the network interface ${label:device}
+          in the last 10 minutes
+        os: "linux"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: disk
+          description: ""
+          labels: []
+          metrics:
+            - name: disk.io
+              description: Disk I/O Bandwidth
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: writes
+            - name: disk.ops
+              description: Disk Completed I/O Operations
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: writes
+            - name: disk.util
+              description: Disk Utilization Time
+              unit: "% of time working"
+              chart_type: area
+              dimensions:
+                - name: utilization
+            - name: disk.iotime
+              description: Disk Total I/O Time
+              unit: "milliseconds/s"
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.await
+              description: Average Completed I/O Operation Time
+              unit: "milliseconds/operation"
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.avgsz
+              description: Average Completed I/O Operation Bandwidth
+              unit: "KiB/operation"
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.svctm
+              description: Average Service Time
+              unit: "milliseconds/operation"
+              chart_type: line
+              dimensions:
+                - name: svctm
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: system.io
+              description: Disk I/O
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out
+        - name: mount point
+          description: ""
+          labels: []
+          metrics:
+            - name: disk.space
+              description: Disk Space Usage for {mounted dir} [{mounted filesystem}]
+              unit: "GiB"
+              chart_type: stacked
+              dimensions:
+                - name: avail
+                - name: used
+                - name: reserved_for_root
+            - name: disk.inodes
+              description: Disk Files (inodes) Usage for {mounted dir} [{mounted filesystem}]
+              unit: "inodes"
+              chart_type: stacked
+              dimensions:
+                - name: avail
+                - name: used
+                - name: reserved_for_root
+        - name: network device
+          description: ""
+          labels: []
+          metrics:
+            - name: net.net
+              description: Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: net.packets
+              description: Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+                - name: multicast_received
+                - name: multicast_sent
+            - name: net.errors
+              description: Interface Errors
+              unit: "errors/s"
+              chart_type: line
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: net.drops
+              description: Interface Drops
+              unit: "drops/s"
+              chart_type: line
+              dimensions:
+                - name: inbound
+            - name: net.events
+              description: Network Interface Events
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: frames
+                - name: collisions
+                - name: carrier

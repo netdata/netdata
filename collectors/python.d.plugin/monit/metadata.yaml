@@ -1,0 +1,86 @@
+module_name: monit
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: monit.filesystems
+          description: Filesystems
+          unit: "filesystems"
+          chart_type: line
+          dimensions:
+            - name: a dimension per target
+        - name: monit.directories
+          description: Directories
+          unit: "directories"
+          chart_type: line
+          dimensions:
+            - name: a dimension per target
+        - name: monit.files
+          description: Files
+          unit: "files"
+          chart_type: line
+          dimensions:
+            - name: a dimension per target
+        - name: monit.fifos
+          description: Pipes (fifo)
+          unit: "pipes"
+          chart_type: line
+          dimensions:
+            - name: a dimension per target
+        - name: monit.programs
+          description: Programs statuses
+          unit: "programs"
+          chart_type: line
+          dimensions:
+            - name: a dimension per target
+        - name: monit.services
+          description: Processes statuses
+          unit: "processes"
+          chart_type: line
+          dimensions:
+            - name: a dimension per target
+        - name: monit.process_uptime
+          description: Processes uptime
+          unit: "seconds"
+          chart_type: line
+          dimensions:
+            - name: a dimension per target
+        - name: monit.process_threads
+          description: Processes threads
+          unit: "threads"
+          chart_type: line
+          dimensions:
+            - name: a dimension per target
+        - name: monit.process_childrens
+          description: Child processes
+          unit: "children"
+          chart_type: line
+          dimensions:
+            - name: a dimension per target
+        - name: monit.hosts
+          description: Hosts
+          unit: "hosts"
+          chart_type: line
+          dimensions:
+            - name: a dimension per target
+        - name: monit.host_latency
+          description: Hosts latency
+          unit: "milliseconds"
+          chart_type: line
+          dimensions:
+            - name: a dimension per target
+        - name: monit.networks
+          description: Network interfaces and addresses
+          unit: "interfaces"
+          chart_type: line
+          dimensions:
+            - name: a dimension per target

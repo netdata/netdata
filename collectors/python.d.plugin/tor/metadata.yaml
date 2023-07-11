@@ -1,0 +1,21 @@
+module_name: tor
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: tor.traffic
+          description: Tor Traffic
+          unit: "KiB/s"
+          chart_type: area
+          dimensions:
+            - name: read
+            - name: write

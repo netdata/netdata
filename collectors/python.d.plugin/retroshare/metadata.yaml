@@ -1,0 +1,35 @@
+module_name: retroshare
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: retroshare.bandwidth
+          description: RetroShare Bandwidth
+          unit: "kilobits/s"
+          chart_type: area
+          dimensions:
+            - name: Upload
+            - name: Download
+        - name: retroshare.peers
+          description: RetroShare Peers
+          unit: "peers"
+          chart_type: line
+          dimensions:
+            - name: All friends
+            - name: Connected friends
+        - name: retroshare.dht
+          description: Retroshare DHT
+          unit: "peers"
+          chart_type: line
+          dimensions:
+            - name: DHT nodes estimated
+            - name: RS nodes estimated

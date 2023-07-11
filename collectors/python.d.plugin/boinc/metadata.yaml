@@ -1,0 +1,68 @@
+module_name: boinc
+plugin_name: python.d.plugin
+alerts:
+  - name: boinc_total_tasks
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
+    metric: boinc.tasks
+    info: average number of total tasks over the last 10 minutes
+    os: "*"
+  - name: boinc_compute_errors
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
+    metric: boinc.states
+    info: average number of compute errors over the last 10 minutes
+    os: "*"
+  - name: boinc_upload_errors
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
+    metric: boinc.states
+    info: average number of failed uploads over the last 10 minutes
+    os: "*"
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: boinc.tasks
+          description: Overall Tasks
+          unit: "tasks"
+          chart_type: line
+          dimensions:
+            - name: Total
+            - name: Active
+        - name: boinc.states
+          description: Tasks per State
+          unit: "tasks"
+          chart_type: line
+          dimensions:
+            - name: New
+            - name: Downloading
+            - name: Ready to Run
+            - name: Compute Errors
+            - name: Uploading
+            - name: Uploaded
+            - name: Aborted
+            - name: Failed Uploads
+        - name: boinc.sched
+          description: Tasks per Scheduler State
+          unit: "tasks"
+          chart_type: line
+          dimensions:
+            - name: Uninitialized
+            - name: Preempted
+            - name: Scheduled
+        - name: boinc.process
+          description: Tasks per Process State
+          unit: "tasks"
+          chart_type: line
+          dimensions:
+            - name: Uninitialized
+            - name: Executing
+            - name: Suspended
+            - name: Aborted
+            - name: Quit
+            - name: Copy Pending

@@ -1,0 +1,69 @@
+module_name: megacli
+plugin_name: python.d.plugin
+alerts:
+  - name: megacli_adapter_state
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/megacli.conf
+    metric: megacli.adapter_degraded
+    info: 'adapter is in the degraded state (0: false, 1: true)'
+    os: "linux"
+  - name: megacli_pd_media_errors
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/megacli.conf
+    metric: megacli.pd_media_error
+    info: number of physical drive media errors
+    os: "linux"
+  - name: megacli_pd_predictive_failures
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/megacli.conf
+    metric: megacli.pd_predictive_failure
+    info: number of physical drive predictive failures
+    os: "linux"
+  - name: megacli_bbu_relative_charge
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/megacli.conf
+    metric: megacli.bbu_relative_charge
+    info: average battery backup unit (BBU) relative state of charge over the last
+      10 seconds
+    os: "linux"
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: megacli.adapter_degraded
+          description: Adapter State
+          unit: "is degraded"
+          chart_type: line
+          dimensions:
+            - name: a dimension per adapter
+        - name: megacli.pd_media_error
+          description: Physical Drives Media Errors
+          unit: "errors/s"
+          chart_type: line
+          dimensions:
+            - name: a dimension per physical drive
+        - name: megacli.pd_predictive_failure
+          description: Physical Drives Predictive Failures
+          unit: "failures/s"
+          chart_type: line
+          dimensions:
+            - name: a dimension per physical drive
+    - name: battery
+      description: ""
+      labels: []
+      metrics:
+        - name: megacli.bbu_relative_charge
+          description: Relative State of Charge
+          unit: "percentage"
+          chart_type: line
+          dimensions:
+            - name: adapter {battery id}
+        - name: megacli.bbu_cycle_count
+          description: Cycle Count
+          unit: "cycle count"
+          chart_type: line
+          dimensions:
+            - name: adapter {battery id}

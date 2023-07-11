@@ -1,0 +1,26 @@
+module_name: postfix
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: postfix.qemails
+          description: Postfix Queue Emails
+          unit: "emails"
+          chart_type: line
+          dimensions:
+            - name: emails
+        - name: postfix.qsize
+          description: Postfix Queue Emails Size
+          unit: "KiB"
+          chart_type: area
+          dimensions:
+            - name: size

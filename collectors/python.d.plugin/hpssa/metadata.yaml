@@ -1,0 +1,47 @@
+module_name: hpssa
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: hpssa.ctrl_status
+          description: Status 1 is OK, Status 0 is not OK
+          unit: "Status"
+          chart_type: line
+          dimensions:
+            - name: ctrl_{adapter slot}_status
+            - name: cache_{adapter slot}_status
+            - name: battery_{adapter slot}_status per adapter
+        - name: hpssa.ctrl_temperature
+          description: Temperature
+          unit: "Celsius"
+          chart_type: line
+          dimensions:
+            - name: ctrl_{adapter slot}_temperature
+            - name: cache_{adapter slot}_temperature per adapter
+        - name: hpssa.ld_status
+          description: Status 1 is OK, Status 0 is not OK
+          unit: "Status"
+          chart_type: line
+          dimensions:
+            - name: a dimension per logical drive
+        - name: hpssa.pd_status
+          description: Status 1 is OK, Status 0 is not OK
+          unit: "Status"
+          chart_type: line
+          dimensions:
+            - name: a dimension per physical drive
+        - name: hpssa.pd_temperature
+          description: Temperature
+          unit: "Celsius"
+          chart_type: line
+          dimensions:
+            - name: a dimension per physical drive

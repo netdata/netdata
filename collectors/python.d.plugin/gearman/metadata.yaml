@@ -1,0 +1,33 @@
+module_name: gearman
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: gearman.total_jobs
+          description: Total Jobs
+          unit: "Jobs"
+          chart_type: line
+          dimensions:
+            - name: Pending
+            - name: Running
+    - name: gearman job
+      description: ""
+      labels: []
+      metrics:
+        - name: gearman.single_job
+          description: '{job_name}'
+          unit: "Jobs"
+          chart_type: stacked
+          dimensions:
+            - name: Pending
+            - name: Idle
+            - name: Runnning

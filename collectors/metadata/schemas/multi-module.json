@@ -1,0 +1,16 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "plugin_name": {
+            "type": "string"
+        },
+        "modules": {
+            "type": "array",
+            "description": "A list of single module templates",
+            "items": {
+                "$ref": "./single-module.json"
+            }
+        }
+    }
+}

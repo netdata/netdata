@@ -1,0 +1,20 @@
+module_name: hddtemp
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: hddtemp.temperatures
+          description: Disk Temperatures
+          unit: "Celsius"
+          chart_type: line
+          dimensions:
+            - name: a dimension per disk

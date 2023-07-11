@@ -1,0 +1,224 @@
+module_name: smartd_log
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: smartd_log.read_error_rate
+          description: Read Error Rate
+          unit: "value"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.seek_error_rate
+          description: Seek Error Rate
+          unit: "value"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.soft_read_error_rate
+          description: Soft Read Error Rate
+          unit: "errors"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.write_error_rate
+          description: Write Error Rate
+          unit: "value"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.read_total_err_corrected
+          description: Read Error Corrected
+          unit: "errors"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.read_total_unc_errors
+          description: Read Error Uncorrected
+          unit: "errors"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.write_total_err_corrected
+          description: Write Error Corrected
+          unit: "errors"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.write_total_unc_errors
+          description: Write Error Uncorrected
+          unit: "errors"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.verify_total_err_corrected
+          description: Verify Error Corrected
+          unit: "errors"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.verify_total_unc_errors
+          description: Verify Error Uncorrected
+          unit: "errors"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.sata_interface_downshift
+          description: SATA Interface Downshift
+          unit: "events"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.udma_crc_error_count
+          description: UDMA CRC Error Count
+          unit: "errors"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.throughput_performance
+          description: Throughput Performance
+          unit: "value"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.seek_time_performance
+          description: Seek Time Performance
+          unit: "value"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.start_stop_count
+          description: Start/Stop Count
+          unit: "events"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.power_on_hours_count
+          description: Power-On Hours Count
+          unit: "hours"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.power_cycle_count
+          description: Power Cycle Count
+          unit: "events"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.unexpected_power_loss
+          description: Unexpected Power Loss
+          unit: "events"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.spin_up_time
+          description: Spin-Up Time
+          unit: "ms"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.spin_up_retries
+          description: Spin-up Retries
+          unit: "retries"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.calibration_retries
+          description: Calibration Retries
+          unit: "retries"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.airflow_temperature_celsius
+          description: Airflow Temperature Celsius
+          unit: "celsius"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.temperature_celsius
+          description: Temperature
+          unit: "celsius"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.reallocated_sectors_count
+          description: Reallocated Sectors Count
+          unit: "sectors"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.reserved_block_count
+          description: Reserved Block Count
+          unit: "percentage"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.program_fail_count
+          description: Program Fail Count
+          unit: "errors"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.erase_fail_count
+          description: Erase Fail Count
+          unit: "failures"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.wear_leveller_worst_case_erase_count
+          description: Wear Leveller Worst Case Erase Count
+          unit: "erases"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.unused_reserved_nand_blocks
+          description: Unused Reserved NAND Blocks
+          unit: "blocks"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.reallocation_event_count
+          description: Reallocation Event Count
+          unit: "events"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.current_pending_sector_count
+          description: Current Pending Sector Count
+          unit: "sectors"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.offline_uncorrectable_sector_count
+          description: Offline Uncorrectable Sector Count
+          unit: "sectors"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.percent_lifetime_used
+          description: Percent Lifetime Used
+          unit: "percentage"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.media_wearout_indicator
+          description: Media Wearout Indicator
+          unit: "percentage"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device
+        - name: smartd_log.nand_writes_1gib
+          description: NAND Writes
+          unit: "GiB"
+          chart_type: line
+          dimensions:
+            - name: a dimension per device

@@ -1,0 +1,129 @@
+module_name: xenstat.plugin
+plugin_name: xenstat.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: xenstat.mem
+          description: Memory Usage
+          unit: "MiB"
+          chart_type: stacked
+          dimensions:
+            - name: free
+            - name: used
+        - name: xenstat.domains
+          description: Number of Domains
+          unit: "domains"
+          chart_type: line
+          dimensions:
+            - name: domains
+        - name: xenstat.cpus
+          description: Number of CPUs
+          unit: "cpus"
+          chart_type: line
+          dimensions:
+            - name: cpus
+        - name: xenstat.cpu_freq
+          description: CPU Frequency
+          unit: "MHz"
+          chart_type: line
+          dimensions:
+            - name: frequency
+    - name: xendomain
+      description: ""
+      labels: []
+      metrics:
+        - name: xendomain.states
+          description: Domain States
+          unit: "boolean"
+          chart_type: line
+          dimensions:
+            - name: running
+            - name: blocked
+            - name: paused
+            - name: shutdown
+            - name: crashed
+            - name: dying
+        - name: xendomain.cpu
+          description: CPU Usage (100% = 1 core)
+          unit: "percentage"
+          chart_type: line
+          dimensions:
+            - name: used
+        - name: xendomain.mem
+          description: Memory Reservation
+          unit: "MiB"
+          chart_type: line
+          dimensions:
+            - name: maximum
+            - name: current
+        - name: xendomain.vcpu
+          description: CPU Usage per VCPU
+          unit: "percentage"
+          chart_type: line
+          dimensions:
+            - name: a dimension per vcpu
+    - name: xendomain, vbd
+      description: ""
+      labels: []
+      metrics:
+        - name: xendomain.oo_req_vbd
+          description: VBD{%u} Out Of Requests
+          unit: "requests/s"
+          chart_type: line
+          dimensions:
+            - name: requests
+        - name: xendomain.requests_vbd
+          description: VBD{%u} Requests
+          unit: "requests/s"
+          chart_type: line
+          dimensions:
+            - name: read
+            - name: write
+        - name: xendomain.sectors_vbd
+          description: VBD{%u} Read/Written Sectors
+          unit: "sectors/s"
+          chart_type: line
+          dimensions:
+            - name: read
+            - name: write
+    - name: xendomain, network
+      description: ""
+      labels: []
+      metrics:
+        - name: xendomain.bytes_network
+          description: Network{%u} Received/Sent Bytes
+          unit: "kilobits/s"
+          chart_type: line
+          dimensions:
+            - name: received
+            - name: sent
+        - name: xendomain.packets_network
+          description: Network{%u} Received/Sent Packets
+          unit: "packets/s"
+          chart_type: line
+          dimensions:
+            - name: received
+            - name: sent
+        - name: xendomain.errors_network
+          description: Network{%u} Receive/Transmit Errors
+          unit: "errors/s"
+          chart_type: line
+          dimensions:
+            - name: received
+            - name: sent
+        - name: xendomain.drops_network
+          description: Network{%u} Receive/Transmit Drops
+          unit: "drops/s"
+          chart_type: line
+          dimensions:
+            - name: received
+            - name: sent
