@@ -1026,6 +1026,8 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
             return web_client_permission_denied(w);
     }
 
+    buffer_no_cacheable(w->response.data);
+
     switch(action) {
         case 'A':
             if(unlikely(!machine_guid || !machine_url || !url_name)) {
