@@ -110,14 +110,15 @@ unsigned int workaround_flags = 0;
 
 /* Set to an appropriate alternate if desired */
 char *sdr_cache_directory = "/tmp";
-char *sdr_cache_format = ".netdata-freeipmi-%H-on-%L.sdr";
-char *sdr_cache_format_simple_pattern = ".netdata-freeipmi-*-on-*.sdr";
+char *sdr_sensors_cache_format = ".netdata-freeipmi-sensors-%H-on-%L.sdr";
+char *sdr_sel_cache_format = ".netdata-freeipmi-sel-%H-on-%L.sdr";
 char *sensor_config_file = NULL;
 char *sel_config_file = NULL;
 
 // controlled via command line options
-unsigned int global_sel_flags = 0;
-unsigned int global_sensor_reading_flags = IPMI_MONITORING_SENSOR_READING_FLAGS_DISCRETE_READING;
+unsigned int global_sel_flags = IPMI_MONITORING_SEL_FLAGS_REREAD_SDR_CACHE;
+unsigned int global_sensor_reading_flags = IPMI_MONITORING_SENSOR_READING_FLAGS_DISCRETE_READING|IPMI_MONITORING_SENSOR_READING_FLAGS_REREAD_SDR_CACHE;
+bool remove_reread_sdr_after_first_use = true;
 
 /* Initialization flags
  *
@@ -373,8 +374,8 @@ static int netdata_read_ipmi_sensors(struct ipmi_monitoring_ipmi_config *ipmi_co
             goto cleanup;
         }
     }
-    if (sdr_cache_format) {
-        if (ipmi_monitoring_ctx_sdr_cache_filenames(ctx, sdr_cache_format) < 0) {
+    if (sdr_sensors_cache_format) {
+        if (ipmi_monitoring_ctx_sdr_cache_filenames(ctx, sdr_sensors_cache_format) < 0) {
             collector_error("ipmi_monitoring_ctx_sdr_cache_filenames(): %s\n", ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
@@ -480,6 +481,9 @@ cleanup:
 
     timing_report();
 
+    if(remove_reread_sdr_after_first_use)
+        global_sensor_reading_flags &= ~(IPMI_MONITORING_SENSOR_READING_FLAGS_REREAD_SDR_CACHE);
+
     return (rv);
 }
 
@@ -503,8 +507,8 @@ static int netdata_get_ipmi_sel_events_count(struct ipmi_monitoring_ipmi_config 
             goto cleanup;
         }
     }
-    if (sdr_cache_format) {
-        if (ipmi_monitoring_ctx_sdr_cache_filenames(ctx, sdr_cache_format) < 0) {
+    if (sdr_sel_cache_format) {
+        if (ipmi_monitoring_ctx_sdr_cache_filenames(ctx, sdr_sel_cache_format) < 0) {
             collector_error("ipmi_monitoring_ctx_sdr_cache_filenames(): %s\n", ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
@@ -540,6 +544,9 @@ cleanup:
         ipmi_monitoring_ctx_destroy (ctx);
 
     timing_report();
+
+    if(remove_reread_sdr_after_first_use)
+        global_sel_flags &= ~(IPMI_MONITORING_SEL_FLAGS_REREAD_SDR_CACHE);
 
     return (rv);
 }
@@ -1418,32 +1425,6 @@ static size_t send_ipmi_sel_metrics_to_netdata(struct netdata_ipmi_state *state)
     return state->sel.events;
 }
 
-void cleanup_sdr_cache(void) {
-    struct dirent *de;
-
-    // Create SIMPLE_PATTERN
-    SIMPLE_PATTERN *pattern = simple_pattern_create(sdr_cache_format_simple_pattern, "|", SIMPLE_PATTERN_EXACT, true);
-
-    DIR *dr = opendir(sdr_cache_directory);
-    if (!dr)
-        return;
-
-    while ((de = readdir(dr)) != NULL) {
-        if (simple_pattern_matches(pattern, de->d_name) && strncmp(de->d_name, sdr_cache_format_simple_pattern, 15) == 0) {
-            char file_path[PATH_MAX];
-            snprintf(file_path, PATH_MAX, "%s/%s", sdr_cache_directory, de->d_name);
-            collector_info("remove SDR cache file '%s'", file_path);
-            if (remove(file_path) != 0)
-                collector_error("unable to delete file %s", file_path);
-            break;
-        }
-    }
-
-    closedir(dr);
-
-    simple_pattern_free(pattern);
-}
-
 // ----------------------------------------------------------------------------
 // main, command line arguments parsing
 
@@ -1500,6 +1481,7 @@ int main (int argc, char **argv) {
         else if(strcmp("reread-sdr-cache", argv[i]) == 0) {
             global_sel_flags |= IPMI_MONITORING_SEL_FLAGS_REREAD_SDR_CACHE;
             global_sensor_reading_flags |= IPMI_MONITORING_SENSOR_READING_FLAGS_REREAD_SDR_CACHE;
+            remove_reread_sdr_after_first_use = false;
             if (debug) fprintf(stderr, "%s: reread-sdr-cache enabled for both sensors and SEL\n", program_name);
         }
         else if(strcmp("interpret-oem-data", argv[i]) == 0) {
@@ -1737,8 +1719,6 @@ int main (int argc, char **argv) {
 
         collector_error("%s(): ignoring parameter '%s'", __FUNCTION__, argv[i]);
     }
-
-    cleanup_sdr_cache();
 
     errno = 0;
 
