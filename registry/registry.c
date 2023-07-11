@@ -33,11 +33,13 @@ static void registry_set_cookie(struct web_client *w, const char *guid) {
     strftime(e_date, sizeof(e_date), "%a, %d %b %Y %H:%M:%S %Z", etm);
 
     buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s\r\n", guid, e_date);
+    buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; SameSite=Strict; Expires=%s\r\n", guid, e_date);
     if(registry.enable_cookies_samesite_secure)
         buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; SameSite=None; Secure\r\n", guid, e_date);
 
     if(registry.registry_domain && *registry.registry_domain) {
         buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; Domain=%s\r\n", guid, e_date, registry.registry_domain);
+        buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; Domain=%s; SameSite=Strict\r\n", guid, e_date, registry.registry_domain);
         if(registry.enable_cookies_samesite_secure)
             buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; Domain=%s; SameSite=None; Secure\r\n", guid, e_date, registry.registry_domain);
     }
