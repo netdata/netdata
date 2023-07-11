@@ -424,7 +424,7 @@ void *httpd_main(void *ptr) {
 
     // register a plugin
     plugin.default_config.data = default_config;
-    plugin.default_config.data_size = strlen(default_config) + 1;
+    plugin.default_config.data_size = strlen(default_config);
     register_plugin(&plugin);
 
     // register a module
@@ -433,7 +433,7 @@ void *httpd_main(void *ptr) {
     m->type = SINGLE;
 
     m->default_config.data = module1_default_config;
-    m->default_config.data_size = strlen(module1_default_config) + 1;
+    m->default_config.data_size = strlen(module1_default_config);
 
     struct configurable_plugin *plg = get_plugin_by_name("http_check");
     register_module(plg, m);
