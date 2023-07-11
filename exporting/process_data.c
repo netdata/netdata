@@ -200,6 +200,28 @@ void start_host_formatting(struct engine *engine, RRDHOST *host)
 }
 
 /**
+ * Start host formatting for every connector instance's buffer
+ *
+ * @param engine an engine data structure.
+ * @param host a data collecting host.
+ */
+void start_netdata_info_formatting(struct engine *engine, RRDHOST *host)
+{
+    for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
+        if (instance->scheduled) {
+            if (rrdhost_is_exportable(instance, host)) {
+                if (instance->netdata_info_formatting && instance->netdata_info_formatting(instance, host) != 0) {
+                    netdata_log_error("EXPORTING: cannot start host formatting for %s", instance->config.name);
+                    disable_instance(instance);
+                }
+            } else {
+                instance->skip_host = 1;
+            }
+        }
+    }
+}
+
+/**
  * Start chart formatting for every connector instance's buffer
  *
  * @param engine an engine data structure.
@@ -343,6 +365,7 @@ void prepare_buffers(struct engine *engine)
     RRDHOST *host;
     rrdhost_foreach_read(host) {
         start_host_formatting(engine, host);
+        start_netdata_info_formatting(engine, host);
         RRDSET *st;
         rrdset_foreach_read(st, host) {
             start_chart_formatting(engine, st);
