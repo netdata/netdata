@@ -1,4 +1,4 @@
-name: apps.plugin
+name: Apps.plugin
 modules:
   - module_name: system
     plugin_name: apps.plugin

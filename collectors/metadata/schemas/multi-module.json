@@ -7,7 +7,7 @@
         },
         "modules": {
             "type": "array",
-            "description": "A list of single module templates",
+            "description": "AA list of single module templates",
             "items": {
                 "$ref": "./single-module.json"
             }

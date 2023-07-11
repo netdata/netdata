@@ -1,4 +1,4 @@
-metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+Metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
 system.processes_state,,"running, sleeping_interruptible, sleeping_uninterruptible, zombie, stopped",processes,"System Processes State",line,,apps.plugin,system
 apps.cpu,,a dimension per app group,percentage,"Apps CPU Time (100% = 1 core)",stacked,,apps.plugin,apps
 apps.cpu_user,,a dimension per app group,percentage,"Apps CPU User Time (100% = 1 core)",stacked,,apps.plugin,apps
