@@ -1792,13 +1792,15 @@ int main (int argc, char **argv) {
     size_t iteration = 0;
     usec_t step = 100 * USEC_PER_MS;
     bool global_chart_created = false;
+    bool tty = isatty(fileno(stdout)) == 1;
 
     heartbeat_t hb;
     heartbeat_init(&hb);
     for(iteration = 0; 1 ; iteration++) {
         usec_t dt = heartbeat_next(&hb, step);
 
-        fprintf(stdout, "\n"); // keepalive to avoid parser read timeout (2 minutes) during ipmi_detect_speed_secs()
+        if(!tty)
+            fprintf(stdout, "\n"); // keepalive to avoid parser read timeout (2 minutes) during ipmi_detect_speed_secs()
 
         struct netdata_ipmi_state state = {0 };
 
