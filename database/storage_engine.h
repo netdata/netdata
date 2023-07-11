@@ -8,7 +8,6 @@
 
 extern STORAGE_ENGINE_ID default_storage_engine_id;
 extern int default_rrd_history_entries;
-extern int default_rrd_update_every;
 
 static inline STORAGE_METRICS_GROUP *storage_engine_metrics_group_get(STORAGE_ENGINE_ID id, STORAGE_INSTANCE *instance, uuid_t *uuid)
 {

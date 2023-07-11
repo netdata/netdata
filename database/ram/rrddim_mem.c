@@ -447,7 +447,7 @@ size_t rrddim_disk_space_used(STORAGE_INSTANCE *db_instance) {
 
 time_t rrddim_global_first_time_s(STORAGE_INSTANCE *db_instance) {
     UNUSED(db_instance);
-    return now_realtime_sec() - (time_t)(default_rrd_history_entries * default_rrd_update_every);
+    return now_realtime_sec() - (time_t)(default_rrd_history_entries * rrdb.default_rrd_update_every);
 }
 
 size_t rrddim_currently_collected_metrics(STORAGE_INSTANCE *db_instance) {

@@ -96,13 +96,12 @@ typedef enum __attribute__ ((__packed__)) {
     RRD_BACKFILL_NEW
 } RRD_BACKFILL;
 
-#define UPDATE_EVERY 1
-#define UPDATE_EVERY_MAX 3600
+#define UPDATE_EVERY_MIN 1
+#define UPDATE_EVERY_MAX 600
 
 #define RRD_DEFAULT_HISTORY_ENTRIES 3600
 #define RRD_HISTORY_ENTRIES_MAX (86400*365)
 
-extern int default_rrd_update_every;
 extern int default_rrd_history_entries;
 extern int gap_when_lost_iterations_above;
 extern time_t rrdset_free_obsolete_time_s;
@@ -1286,6 +1285,8 @@ struct rrdb {
 
     size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
     RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS];
+
+    int default_rrd_update_every;
 };
 
 extern struct rrdb rrdb;

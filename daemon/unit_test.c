@@ -1269,7 +1269,7 @@ int run_test(struct test *test)
     fprintf(stderr, "\nRunning test '%s':\n%s\n", test->name, test->description);
 
     default_storage_engine_id = STORAGE_ENGINE_ALLOC;
-    default_rrd_update_every = test->update_every;
+    rrdb.default_rrd_update_every = test->update_every;
 
     char name[101];
     snprintfz(name, 100, "unittest-%s", test->name);
@@ -1538,7 +1538,7 @@ int unit_test(long delay, long shift)
 
     //debug_flags = 0xffffffff;
     default_storage_engine_id = STORAGE_ENGINE_ALLOC;
-    default_rrd_update_every = 1;
+    rrdb.default_rrd_update_every = 1;
 
     int do_abs = 1;
     int do_inc = 1;
@@ -1841,7 +1841,7 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name)
             , ""
             , program_name
             , program_version
-            , default_rrd_update_every
+            , rrdb.default_rrd_update_every
             , default_rrd_history_entries
             , STORAGE_ENGINE_DBENGINE
             , default_health_enabled

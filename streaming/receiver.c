@@ -715,7 +715,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
 
 
     struct plugind cd = {
-            .update_every = default_rrd_update_every,
+            .update_every = rrdb.default_rrd_update_every,
             .unsafe = {
                     .spinlock = NETDATA_SPINLOCK_INITIALIZER,
                     .running = true,
