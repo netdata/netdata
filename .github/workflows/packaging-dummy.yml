@@ -11,7 +11,7 @@ on:
       - reopened
       - labeled
       - synchronize
-    paths: # This MUST be kept in-sync with the paths key for the packaging.yml workflow.
+    paths-ignore: # This MUST be kept in-sync with the paths key for the packaging.yml workflow.
       - '**.c'
       - '**.cc'
       - '**.h'
