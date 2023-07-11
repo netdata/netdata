@@ -1440,6 +1440,8 @@ void cleanup_sdr_cache(void) {
     }
 
     closedir(dr);
+
+    simple_pattern_free(pattern);
 }
 
 // ----------------------------------------------------------------------------
