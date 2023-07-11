@@ -166,16 +166,26 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w) {
     if(host->node_id)
         buffer_json_member_add_uuid(w->response.data, "node_id", host->node_id);
 
-    char *claim_id = get_agent_claimid();
-    if(claim_id) {
-        buffer_json_member_add_string(w->response.data, "claim_id", claim_id);
-        freez(claim_id);
+    buffer_json_member_add_object(w->response.data, "agent");
+    {
+        buffer_json_member_add_string(w->response.data, "machine_guid", localhost->machine_guid);
+
+        if(localhost->node_id)
+            buffer_json_member_add_uuid(w->response.data, "node_id", localhost->node_id);
+
+        char *claim_id = get_agent_claimid();
+        if (claim_id) {
+            buffer_json_member_add_string(w->response.data, "claim_id", claim_id);
+            freez(claim_id);
+        }
+
+        buffer_json_member_add_boolean(w->response.data, "bearer_protection", netdata_is_protected_by_bearer);
     }
+    buffer_json_object_close(w->response.data);
 
     buffer_json_member_add_string(w->response.data, "registry", registry.registry_to_announce);
     buffer_json_member_add_string(w->response.data, "cloud_base_url", registry.cloud_base_url);
     buffer_json_member_add_boolean(w->response.data, "anonymous_statistics", netdata_anonymous_statistics_enabled);
-    buffer_json_member_add_boolean(w->response.data, "bearer_protection", netdata_is_protected_by_bearer);
 
     buffer_json_member_add_array(w->response.data, "nodes");
     RRDHOST *h;
