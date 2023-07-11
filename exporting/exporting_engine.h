@@ -220,6 +220,7 @@ struct instance {
     int (*start_host_formatting)(struct instance *instance, RRDHOST *host);
     int (*start_chart_formatting)(struct instance *instance, RRDSET *st);
     int (*metric_formatting)(struct instance *instance, RRDDIM *rd);
+    int (*netdata_info_formatting)(struct instance *instance, RRDHOST *host);
     int (*end_chart_formatting)(struct instance *instance, RRDSET *st);
     int (*variables_formatting)(struct instance *instance, RRDHOST *host);
     int (*end_host_formatting)(struct instance *instance, RRDHOST *host);

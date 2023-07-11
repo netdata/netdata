@@ -35,6 +35,7 @@ int init_opentsdb_telnet_instance(struct instance *instance)
         instance->metric_formatting = format_dimension_collected_opentsdb_telnet;
     else
         instance->metric_formatting = format_dimension_stored_opentsdb_telnet;
+    instance->netdata_info_formatting = NULL;
 
     instance->end_chart_formatting = NULL;
     instance->variables_formatting = NULL;
@@ -91,6 +92,7 @@ int init_opentsdb_http_instance(struct instance *instance)
         instance->metric_formatting = format_dimension_collected_opentsdb_http;
     else
         instance->metric_formatting = format_dimension_stored_opentsdb_http;
+    instance->netdata_info_formatting = NULL;
 
     instance->end_chart_formatting = NULL;
     instance->variables_formatting = NULL;

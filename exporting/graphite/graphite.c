@@ -34,6 +34,7 @@ int init_graphite_instance(struct instance *instance)
         instance->metric_formatting = format_dimension_collected_graphite_plaintext;
     else
         instance->metric_formatting = format_dimension_stored_graphite_plaintext;
+    instance->netdata_info_formatting = NULL;
 
     instance->end_chart_formatting = NULL;
     instance->variables_formatting = NULL;
