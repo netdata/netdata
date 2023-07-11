@@ -111,6 +111,7 @@ unsigned int workaround_flags = 0;
 /* Set to an appropriate alternate if desired */
 char *sdr_cache_directory = "/tmp";
 char *sdr_cache_format = ".netdata-freeipmi-%H-on-%L.sdr";
+char *sdr_cache_format_simple_pattern = ".netdata-freeipmi-*-on-*.sdr";
 char *sensor_config_file = NULL;
 char *sel_config_file = NULL;
 
@@ -1417,6 +1418,30 @@ static size_t send_ipmi_sel_metrics_to_netdata(struct netdata_ipmi_state *state)
     return state->sel.events;
 }
 
+void cleanup_sdr_cache(void) {
+    struct dirent *de;
+
+    // Create SIMPLE_PATTERN
+    SIMPLE_PATTERN *pattern = simple_pattern_create(sdr_cache_format_simple_pattern, "|", SIMPLE_PATTERN_EXACT, true);
+
+    DIR *dr = opendir(sdr_cache_directory);
+    if (!dr)
+        return;
+
+    while ((de = readdir(dr)) != NULL) {
+        if (simple_pattern_matches(pattern, de->d_name) && strncmp(de->d_name, sdr_cache_format_simple_pattern, 15) == 0) {
+            char file_path[PATH_MAX];
+            snprintf(file_path, PATH_MAX, "%s/%s", sdr_cache_directory, de->d_name);
+            collector_info("remove SDR cache file '%s'", file_path);
+            if (remove(file_path) != 0)
+                collector_error("unable to delete file %s", file_path);
+            break;
+        }
+    }
+
+    closedir(dr);
+}
+
 // ----------------------------------------------------------------------------
 // main, command line arguments parsing
 
@@ -1710,6 +1735,8 @@ int main (int argc, char **argv) {
 
         collector_error("%s(): ignoring parameter '%s'", __FUNCTION__, argv[i]);
     }
+
+    cleanup_sdr_cache();
 
     errno = 0;
 
