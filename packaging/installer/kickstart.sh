@@ -300,7 +300,8 @@ telemetry_event() {
     "system_kernel_name": "${KERNEL_NAME}",
     "system_kernel_version": "$(uname -r)",
     "system_architecture": "$(uname -m)",
-    "system_total_ram": "${TOTAL_RAM:-unknown}"
+    "system_total_ram": "${TOTAL_RAM:-unknown}",
+    "netdata_generic_machine_id": "${DISTINCT_ID}"
   }
 }
 EOF
