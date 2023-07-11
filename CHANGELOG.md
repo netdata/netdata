@@ -6,10 +6,16 @@
 
 **Merged pull requests:**
 
+- bearer improvements [\#15342](https://github.com/netdata/netdata/pull/15342) ([ktsaou](https://github.com/ktsaou))
+- add internal stats metrics csv [\#15337](https://github.com/netdata/netdata/pull/15337) ([ilyam8](https://github.com/ilyam8))
+- Add missing required field in schema [\#15335](https://github.com/netdata/netdata/pull/15335) ([Ancairon](https://github.com/Ancairon))
 - Fix compilation on BSD [\#15331](https://github.com/netdata/netdata/pull/15331) ([thiagoftsm](https://github.com/thiagoftsm))
 - alerts\_transitions outputs hostnames and items statistics [\#15329](https://github.com/netdata/netdata/pull/15329) ([ktsaou](https://github.com/ktsaou))
+- Use spinlock in host and chart [\#15328](https://github.com/netdata/netdata/pull/15328) ([stelfrag](https://github.com/stelfrag))
+- multi-threaded version of freeipmi.plugin [\#15327](https://github.com/netdata/netdata/pull/15327) ([ktsaou](https://github.com/ktsaou))
 - Single module schema, add required properties [\#15326](https://github.com/netdata/netdata/pull/15326) ([Ancairon](https://github.com/Ancairon))
 - Fix coverity issue 394862 - Argument cannot be negative [\#15324](https://github.com/netdata/netdata/pull/15324) ([stelfrag](https://github.com/stelfrag))
+- bearer authorization API [\#15321](https://github.com/netdata/netdata/pull/15321) ([ktsaou](https://github.com/ktsaou))
 - local-listeners: use host prefix in read\_cmdline [\#15320](https://github.com/netdata/netdata/pull/15320) ([ilyam8](https://github.com/ilyam8))
 - local-listener using libnetdata [\#15319](https://github.com/netdata/netdata/pull/15319) ([ktsaou](https://github.com/ktsaou))
 - avoid memory allocations for alert transitions facets processing [\#15318](https://github.com/netdata/netdata/pull/15318) ([ktsaou](https://github.com/ktsaou))
@@ -400,10 +406,6 @@
 - fix: detect the host os in k8s on non-docker cri [\#14694](https://github.com/netdata/netdata/pull/14694) ([witalisoft](https://github.com/witalisoft))
 - Remove google hangouts from list of integrations [\#14689](https://github.com/netdata/netdata/pull/14689) ([cakrit](https://github.com/cakrit))
 - Fix Azure IMDS [\#14686](https://github.com/netdata/netdata/pull/14686) ([shyamvalsan](https://github.com/shyamvalsan))
-- Send an EOF from charts.d.plugin before exit [\#14680](https://github.com/netdata/netdata/pull/14680) ([MrZammler](https://github.com/MrZammler))
-- Fix conditionals for claim-only case in kickstart.sh. [\#14679](https://github.com/netdata/netdata/pull/14679) ([Ferroin](https://github.com/Ferroin))
-- Improve guideline docs [\#14678](https://github.com/netdata/netdata/pull/14678) ([Ancairon](https://github.com/Ancairon))
-- Fix kernel test script [\#14676](https://github.com/netdata/netdata/pull/14676) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
