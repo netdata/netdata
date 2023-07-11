@@ -1245,7 +1245,7 @@ void *netdata_ipmi_collection_thread(void *ptr) {
                 t->state.sel.last_iteration_ut = 0;
             }
 
-            return ptr;
+            break;
         }
 
         spinlock_lock(&t->spinlock);
