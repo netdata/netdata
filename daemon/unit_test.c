@@ -1842,7 +1842,7 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name)
             , program_name
             , program_version
             , rrdb.default_rrd_update_every
-            , default_rrd_history_entries
+            , rrdb.default_rrd_history_entries
             , STORAGE_ENGINE_DBENGINE
             , default_health_enabled
             , default_rrdpush_enabled

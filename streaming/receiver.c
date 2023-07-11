@@ -550,7 +550,7 @@ void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, con
 static void rrdpush_receive(struct receiver_state *rpt)
 {
     rpt->config.storage_engine_id = default_storage_engine_id;
-    rpt->config.history = default_rrd_history_entries;
+    rpt->config.history = rrdb.default_rrd_history_entries;
 
     rpt->config.health_enabled = (int)default_health_enabled;
     rpt->config.alarms_delay = 60;

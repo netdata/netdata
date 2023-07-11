@@ -1087,14 +1087,14 @@ static void get_netdata_configured_variables() {
     // get default database size
 
     if(default_storage_engine_id != STORAGE_ENGINE_DBENGINE && default_storage_engine_id != STORAGE_ENGINE_NONE) {
-        default_rrd_history_entries = (int)config_get_number(
+        rrdb.default_rrd_history_entries = (int)config_get_number(
             CONFIG_SECTION_DB, "retention",
             align_entries_to_pagesize(default_storage_engine_id, RRD_DEFAULT_HISTORY_ENTRIES));
 
-        long h = align_entries_to_pagesize(default_storage_engine_id, default_rrd_history_entries);
-        if (h != default_rrd_history_entries) {
+        long h = align_entries_to_pagesize(default_storage_engine_id, rrdb.default_rrd_history_entries);
+        if (h != rrdb.default_rrd_history_entries) {
             config_set_number(CONFIG_SECTION_DB, "retention", h);
-            default_rrd_history_entries = (int)h;
+            rrdb.default_rrd_history_entries = (int)h;
         }
     }
 

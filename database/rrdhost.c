@@ -1024,7 +1024,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
             , program_name
             , program_version
             , rrdb.default_rrd_update_every
-            , default_rrd_history_entries
+            , rrdb.default_rrd_history_entries
             , default_storage_engine_id
             , default_health_enabled
             , default_rrdpush_enabled

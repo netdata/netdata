@@ -13,7 +13,6 @@
 int rrd_delete_unupdated_dimensions = 0;
 */
 
-int default_rrd_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
 int gap_when_lost_iterations_above = 1;
 
 // ----------------------------------------------------------------------------
@@ -138,4 +137,5 @@ struct rrdb rrdb = {
         RRD_BACKFILL_NEW
     },
     .default_rrd_update_every = UPDATE_EVERY_MIN,
+    .default_rrd_history_entries = RRD_DEFAULT_HISTORY_ENTRIES,
 };
