@@ -1788,21 +1788,18 @@ int main (int argc, char **argv) {
     if(debug) fprintf(stderr, "%s: starting data collection\n", program_name);
 
     time_t started_t = now_monotonic_sec();
+    time_t last_echo_s = started_t;
 
     size_t iteration = 0;
     usec_t step = 100 * USEC_PER_MS;
     bool global_chart_created = false;
-    bool tty = isatty(fileno(stdout)) == 1;
 
     heartbeat_t hb;
     heartbeat_init(&hb);
     for(iteration = 0; 1 ; iteration++) {
         usec_t dt = heartbeat_next(&hb, step);
 
-        if(!tty)
-            fprintf(stdout, "\n"); // keepalive to avoid parser read timeout (2 minutes) during ipmi_detect_speed_secs()
-
-        struct netdata_ipmi_state state = {0 };
+        struct netdata_ipmi_state state = { 0 };
 
         spinlock_lock(&sensors_data.spinlock);
         state.sensors = sensors_data.state.sensors;
@@ -1825,7 +1822,13 @@ int main (int argc, char **argv) {
                 }
                 break;
 
-            case ICS_INIT:
+            case ICS_INIT: {
+                    time_t now_t = now_monotonic_sec();
+                    if(now_t - last_echo_s > 60) {
+                        last_echo_s = now_t;
+                        fprintf(stdout, "\n"); // keepalive to avoid parser read timeout (2 minutes) during ipmi_detect_speed_secs()
+                    }
+                }
                 continue;
 
             case ICS_INIT_FAILED:
