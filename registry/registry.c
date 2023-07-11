@@ -312,6 +312,12 @@ int registry_request_search_json(RRDHOST *host, struct web_client *w, char *pers
     if(!registry.enabled)
         return registry_json_disabled(host, w, "search");
 
+    if(!person_guid || !person_guid[0]) {
+        registry_json_header(host, w, "search", REGISTRY_STATUS_FAILED);
+        registry_json_footer(w);
+        return HTTP_RESP_PRECOND_FAIL;
+    }
+
     registry_lock();
 
     REGISTRY_MACHINE *m = registry_request_machine(person_guid, request_machine);
@@ -344,6 +350,12 @@ int registry_request_search_json(RRDHOST *host, struct web_client *w, char *pers
 int registry_request_switch_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url __maybe_unused, char *new_person_guid, time_t when __maybe_unused) {
     if(!registry.enabled)
         return registry_json_disabled(host, w, "switch");
+
+    if(!person_guid || !person_guid[0]) {
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "Who are you? Person GUID is missing");
+        return HTTP_RESP_PRECOND_FAIL;
+    }
 
     if(!registry_is_valid_url(url)) {
         buffer_flush(w->response.data);

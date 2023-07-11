@@ -900,7 +900,7 @@ cleanup:
 // /api/v1/registry?action=delete&machine=${machine_guid}&name=${hostname}&url=${url}&delete_url=${delete_url}
 //
 // Search for the URLs of a machine:
-// /api/v1/registry?action=search&machine=${machine_guid}&name=${hostname}&url=${url}&for=${machine_guid}
+// /api/v1/registry?action=search&for=${machine_guid}
 //
 // Impersonate:
 // /api/v1/registry?action=switch&machine=${machine_guid}&name=${hostname}&url=${url}&to=${new_person_guid}

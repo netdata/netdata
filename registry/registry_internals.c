@@ -221,7 +221,7 @@ REGISTRY_MACHINE *registry_request_machine(const char *person_guid, char *reques
     person_guid = pbuf;
 
     // make sure the person GUID is valid
-    if(regenerate_guid(request_machine, pbuf) == -1) {
+    if(regenerate_guid(request_machine, mbuf) == -1) {
         netdata_log_info("REGISTRY: %s(): invalid search machine GUID '%s'", __FUNCTION__ , request_machine);
         return NULL;
     }
