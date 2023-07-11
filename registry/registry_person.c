@@ -7,7 +7,7 @@
 // PERSON_URL INDEX
 
 inline REGISTRY_PERSON_URL *registry_person_url_index_find(REGISTRY_PERSON *p, STRING *url) {
-    debug(D_REGISTRY, "Registry: registry_person_url_index_find('%s', '%s')", p->guid, string2str(url));
+    netdata_log_debug(D_REGISTRY, "Registry: registry_person_url_index_find('%s', '%s')", p->guid, string2str(url));
 
     REGISTRY_PERSON_URL *pu;
     for(pu = p->person_urls ; pu ;pu = pu->next)

@@ -28,7 +28,7 @@ void registry_machine_url_unlink_from_machine_and_free(REGISTRY_MACHINE *m, REGI
 }
 
 REGISTRY_MACHINE_URL *registry_machine_url_allocate(REGISTRY_MACHINE *m, STRING *u, time_t when) {
-    debug(D_REGISTRY, "REGISTRY: registry_machine_url_allocate('%s', '%s'): allocating %zu bytes", m->guid, string2str(u), sizeof(REGISTRY_MACHINE_URL));
+    netdata_log_debug(D_REGISTRY, "REGISTRY: registry_machine_url_allocate('%s', '%s'): allocating %zu bytes", m->guid, string2str(u), sizeof(REGISTRY_MACHINE_URL));
 
     REGISTRY_MACHINE_URL *mu = aral_mallocz(registry.machine_urls_aral);
 
@@ -37,7 +37,7 @@ REGISTRY_MACHINE_URL *registry_machine_url_allocate(REGISTRY_MACHINE *m, STRING 
     mu->url = string_dup(u);
     mu->flags = REGISTRY_URL_FLAGS_DEFAULT;
 
-    debug(D_REGISTRY, "REGISTRY: registry_machine_url_allocate('%s', '%s'): indexing URL in machine", m->guid, string2str(u));
+    netdata_log_debug(D_REGISTRY, "REGISTRY: registry_machine_url_allocate('%s', '%s'): indexing URL in machine", m->guid, string2str(u));
 
     DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(m->machine_urls, mu, prev, next);
 
@@ -98,7 +98,7 @@ REGISTRY_MACHINE_URL *registry_machine_link_to_url(REGISTRY_MACHINE *m, STRING *
         registry.machines_urls_count++;
     }
     else {
-        debug(D_REGISTRY, "REGISTRY: registry_machine_link_to_url('%s', '%s'): found", m->guid, string2str(url));
+        netdata_log_debug(D_REGISTRY, "REGISTRY: registry_machine_link_to_url('%s', '%s'): found", m->guid, string2str(url));
         mu->usages++;
         if(likely(mu->last_t < (uint32_t)when)) mu->last_t = (uint32_t)when;
     }
