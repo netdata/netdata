@@ -5,82 +5,82 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: monit.filesystems
           description: Filesystems
-          unit: filesystems
+          unit: "filesystems"
           chart_type: line
           dimensions:
             - name: a dimension per target
         - name: monit.directories
           description: Directories
-          unit: directories
+          unit: "directories"
           chart_type: line
           dimensions:
             - name: a dimension per target
         - name: monit.files
           description: Files
-          unit: files
+          unit: "files"
           chart_type: line
           dimensions:
             - name: a dimension per target
         - name: monit.fifos
           description: Pipes (fifo)
-          unit: pipes
+          unit: "pipes"
           chart_type: line
           dimensions:
             - name: a dimension per target
         - name: monit.programs
           description: Programs statuses
-          unit: programs
+          unit: "programs"
           chart_type: line
           dimensions:
             - name: a dimension per target
         - name: monit.services
           description: Processes statuses
-          unit: processes
+          unit: "processes"
           chart_type: line
           dimensions:
             - name: a dimension per target
         - name: monit.process_uptime
           description: Processes uptime
-          unit: seconds
+          unit: "seconds"
           chart_type: line
           dimensions:
             - name: a dimension per target
         - name: monit.process_threads
           description: Processes threads
-          unit: threads
+          unit: "threads"
           chart_type: line
           dimensions:
             - name: a dimension per target
         - name: monit.process_childrens
           description: Child processes
-          unit: children
+          unit: "children"
           chart_type: line
           dimensions:
             - name: a dimension per target
         - name: monit.hosts
           description: Hosts
-          unit: hosts
+          unit: "hosts"
           chart_type: line
           dimensions:
             - name: a dimension per target
         - name: monit.host_latency
           description: Hosts latency
-          unit: milliseconds
+          unit: "milliseconds"
           chart_type: line
           dimensions:
             - name: a dimension per target
         - name: monit.networks
           description: Network interfaces and addresses
-          unit: interfaces
+          unit: "interfaces"
           chart_type: line
           dimensions:
             - name: a dimension per target

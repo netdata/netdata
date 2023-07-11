@@ -5,16 +5,16 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: spigotmc.tps
           description: Spigot Ticks Per Second
-          unit: ticks
+          unit: "ticks"
           chart_type: line
           dimensions:
             - name: 1 Minute Average
@@ -22,13 +22,13 @@ metrics:
             - name: 15 Minute Average
         - name: spigotmc.users
           description: Minecraft Users
-          unit: users
+          unit: "users"
           chart_type: area
           dimensions:
             - name: Users
         - name: spigotmc.mem
           description: Minecraft Memory Usage
-          unit: MiB
+          unit: "MiB"
           chart_type: line
           dimensions:
             - name: used

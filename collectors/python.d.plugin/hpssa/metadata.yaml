@@ -5,16 +5,16 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: hpssa.ctrl_status
           description: Status 1 is OK, Status 0 is not OK
-          unit: Status
+          unit: "Status"
           chart_type: line
           dimensions:
             - name: ctrl_{adapter slot}_status
@@ -22,26 +22,26 @@ metrics:
             - name: battery_{adapter slot}_status per adapter
         - name: hpssa.ctrl_temperature
           description: Temperature
-          unit: Celsius
+          unit: "Celsius"
           chart_type: line
           dimensions:
             - name: ctrl_{adapter slot}_temperature
             - name: cache_{adapter slot}_temperature per adapter
         - name: hpssa.ld_status
           description: Status 1 is OK, Status 0 is not OK
-          unit: Status
+          unit: "Status"
           chart_type: line
           dimensions:
             - name: a dimension per logical drive
         - name: hpssa.pd_status
           description: Status 1 is OK, Status 0 is not OK
-          unit: Status
+          unit: "Status"
           chart_type: line
           dimensions:
             - name: a dimension per physical drive
         - name: hpssa.pd_temperature
           description: Temperature
-          unit: Celsius
+          unit: "Celsius"
           chart_type: line
           dimensions:
             - name: a dimension per physical drive

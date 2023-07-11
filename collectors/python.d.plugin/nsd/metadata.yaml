@@ -5,29 +5,29 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: nsd.queries
           description: queries
-          unit: queries/s
+          unit: "queries/s"
           chart_type: line
           dimensions:
             - name: queries
         - name: nsd.zones
           description: zones
-          unit: zones
+          unit: "zones"
           chart_type: stacked
           dimensions:
             - name: master
             - name: slave
         - name: nsd.protocols
           description: protocol
-          unit: queries/s
+          unit: "queries/s"
           chart_type: stacked
           dimensions:
             - name: udp
@@ -36,7 +36,7 @@ metrics:
             - name: tcp6
         - name: nsd.type
           description: query type
-          unit: queries/s
+          unit: "queries/s"
           chart_type: stacked
           dimensions:
             - name: A
@@ -53,14 +53,14 @@ metrics:
             - name: ANY
         - name: nsd.transfer
           description: transfer
-          unit: queries/s
+          unit: "queries/s"
           chart_type: stacked
           dimensions:
             - name: NOTIFY
             - name: AXFR
         - name: nsd.rcode
           description: return code
-          unit: queries/s
+          unit: "queries/s"
           chart_type: stacked
           dimensions:
             - name: NOERROR

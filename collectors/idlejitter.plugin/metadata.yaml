@@ -5,16 +5,16 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: system.idlejitter
           description: CPU Idle Jitter
-          unit: microseconds lost/s
+          unit: "microseconds lost/s"
           chart_type: line
           dimensions:
             - name: min

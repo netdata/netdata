@@ -5,37 +5,37 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: puppet.jvm
           description: JVM Heap
-          unit: MiB
+          unit: "MiB"
           chart_type: area
           dimensions:
             - name: committed
             - name: used
         - name: puppet.jvm
           description: JVM Non-Heap
-          unit: MiB
+          unit: "MiB"
           chart_type: area
           dimensions:
             - name: committed
             - name: used
         - name: puppet.cpu
           description: CPU usage
-          unit: percentage
+          unit: "percentage"
           chart_type: stacked
           dimensions:
             - name: execution
             - name: GC
         - name: puppet.fdopen
           description: File Descriptors
-          unit: descriptors
+          unit: "descriptors"
           chart_type: line
           dimensions:
             - name: used

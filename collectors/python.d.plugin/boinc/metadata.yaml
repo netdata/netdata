@@ -5,38 +5,38 @@ alerts:
     link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
     metric: boinc.tasks
     info: average number of total tasks over the last 10 minutes
-    os: '*'
+    os: "*"
   - name: boinc_compute_errors
     link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
     metric: boinc.states
     info: average number of compute errors over the last 10 minutes
-    os: '*'
+    os: "*"
   - name: boinc_upload_errors
     link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
     metric: boinc.states
     info: average number of failed uploads over the last 10 minutes
-    os: '*'
+    os: "*"
 metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: boinc.tasks
           description: Overall Tasks
-          unit: tasks
+          unit: "tasks"
           chart_type: line
           dimensions:
             - name: Total
             - name: Active
         - name: boinc.states
           description: Tasks per State
-          unit: tasks
+          unit: "tasks"
           chart_type: line
           dimensions:
             - name: New
@@ -49,7 +49,7 @@ metrics:
             - name: Failed Uploads
         - name: boinc.sched
           description: Tasks per Scheduler State
-          unit: tasks
+          unit: "tasks"
           chart_type: line
           dimensions:
             - name: Uninitialized
@@ -57,7 +57,7 @@ metrics:
             - name: Scheduled
         - name: boinc.process
           description: Tasks per Process State
-          unit: tasks
+          unit: "tasks"
           chart_type: line
           dimensions:
             - name: Uninitialized

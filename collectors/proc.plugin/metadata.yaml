@@ -8,31 +8,31 @@ modules:
         metric: system.cpu
         info: average CPU utilization over the last 10 minutes (excluding iowait,
           nice and steal)
-        os: linux
+        os: "linux"
       - name: 10min_cpu_iowait
         link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
         metric: system.cpu
         info: average CPU iowait time over the last 10 minutes
-        os: linux
+        os: "linux"
       - name: 20min_steal_cpu
         link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
         metric: system.cpu
         info: average CPU steal time over the last 20 minutes
-        os: linux
+        os: "linux"
     metrics:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: system.cpu
               description: Total CPU utilization
-              unit: percentage
+              unit: "percentage"
               chart_type: stacked
               dimensions:
                 - name: guest_nice
@@ -47,56 +47,56 @@ modules:
                 - name: idle
             - name: system.intr
               description: CPU Interrupts
-              unit: interrupts/s
+              unit: "interrupts/s"
               chart_type: line
               dimensions:
                 - name: interrupts
             - name: system.ctxt
               description: CPU Context Switches
-              unit: context switches/s
+              unit: "context switches/s"
               chart_type: line
               dimensions:
                 - name: switches
             - name: system.forks
               description: Started Processes
-              unit: processes/s
+              unit: "processes/s"
               chart_type: line
               dimensions:
                 - name: started
             - name: system.processes
               description: System Processes
-              unit: processes
+              unit: "processes"
               chart_type: line
               dimensions:
                 - name: running
                 - name: blocked
             - name: cpu.core_throttling
               description: Core Thermal Throttling Events
-              unit: events/s
+              unit: "events/s"
               chart_type: line
               dimensions:
                 - name: a dimension per cpu core
             - name: cpu.package_throttling
               description: Package Thermal Throttling Events
-              unit: events/s
+              unit: "events/s"
               chart_type: line
               dimensions:
                 - name: a dimension per package
             - name: cpu.cpufreq
               description: Current CPU Frequency
-              unit: MHz
+              unit: "MHz"
               chart_type: line
               dimensions:
                 - name: a dimension per cpu core
         - name: cpu core
-          description: ''
+          description: ""
           labels:
             - name: cpu
               description: TBD
           metrics:
             - name: cpu.cpu
               description: Core utilization
-              unit: percentage
+              unit: "percentage"
               chart_type: stacked
               dimensions:
                 - name: guest_nice
@@ -111,7 +111,7 @@ modules:
                 - name: idle
             - name: cpuidle.cpu_cstate_residency_time
               description: C-state residency time
-              unit: percentage
+              unit: "percentage"
               chart_type: stacked
               dimensions:
                 - name: a dimension per c-state
@@ -122,16 +122,16 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: system.entropy
               description: Available Entropy
-              unit: entropy
+              unit: "entropy"
               chart_type: line
               dimensions:
                 - name: entropy
@@ -142,16 +142,16 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: system.uptime
               description: System Uptime
-              unit: seconds
+              unit: "seconds"
               chart_type: line
               dimensions:
                 - name: uptime
@@ -162,47 +162,47 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/health/health.d/swap.conf
         metric: system.swapio
         info: percentage of the system RAM swapped in the last 30 minutes
-        os: linux freebsd
+        os: "linux freebsd"
       - name: oom_kill
         link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
         metric: mem.oom_kill
         info: number of out of memory kills in the last 30 minutes
-        os: linux
+        os: "linux"
     metrics:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: system.swapio
               description: Swap I/O
-              unit: KiB/s
+              unit: "KiB/s"
               chart_type: area
               dimensions:
                 - name: in
                 - name: out
             - name: system.pgpgio
               description: Memory Paged from/to disk
-              unit: KiB/s
+              unit: "KiB/s"
               chart_type: area
               dimensions:
                 - name: in
                 - name: out
             - name: system.pgfaults
               description: Memory Page Faults
-              unit: faults/s
+              unit: "faults/s"
               chart_type: line
               dimensions:
                 - name: minor
                 - name: major
             - name: mem.balloon
               description: Memory Ballooning Operations
-              unit: KiB/s
+              unit: "KiB/s"
               chart_type: line
               dimensions:
                 - name: inflate
@@ -210,21 +210,21 @@ modules:
                 - name: migrate
             - name: mem.zswapio
               description: ZSwap I/O
-              unit: KiB/s
+              unit: "KiB/s"
               chart_type: area
               dimensions:
                 - name: in
                 - name: out
             - name: mem.ksm_cow
               description: KSM Copy On Write Operations
-              unit: KiB/s
+              unit: "KiB/s"
               chart_type: line
               dimensions:
                 - name: swapin
                 - name: write
             - name: mem.thp_faults
               description: Transparent Huge Page Fault Allocations
-              unit: events/s
+              unit: "events/s"
               chart_type: line
               dimensions:
                 - name: alloc
@@ -232,7 +232,7 @@ modules:
                 - name: fallback_charge
             - name: mem.thp_file
               description: Transparent Huge Page File Allocations
-              unit: events/s
+              unit: "events/s"
               chart_type: line
               dimensions:
                 - name: alloc
@@ -241,21 +241,21 @@ modules:
                 - name: fallback_charge
             - name: mem.thp_zero
               description: Transparent Huge Zero Page Allocations
-              unit: events/s
+              unit: "events/s"
               chart_type: line
               dimensions:
                 - name: alloc
                 - name: failed
             - name: mem.thp_collapse
               description: Transparent Huge Pages Collapsed by khugepaged
-              unit: events/s
+              unit: "events/s"
               chart_type: line
               dimensions:
                 - name: alloc
                 - name: failed
             - name: mem.thp_split
               description: Transparent Huge Page Splits
-              unit: events/s
+              unit: "events/s"
               chart_type: line
               dimensions:
                 - name: split
@@ -264,14 +264,14 @@ modules:
                 - name: split_deferred
             - name: mem.thp_swapout
               description: Transparent Huge Pages Swap Out
-              unit: events/s
+              unit: "events/s"
               chart_type: line
               dimensions:
                 - name: swapout
                 - name: fallback
             - name: mem.thp_compact
               description: Transparent Huge Pages Compaction
-              unit: events/s
+              unit: "events/s"
               chart_type: line
               dimensions:
                 - name: success
@@ -279,13 +279,13 @@ modules:
                 - name: stall
             - name: mem.oom_kill
               description: Out of Memory Kills
-              unit: kills/s
+              unit: "kills/s"
               chart_type: line
               dimensions:
                 - name: kills
             - name: mem.numa
               description: NUMA events
-              unit: events/s
+              unit: "events/s"
               chart_type: line
               dimensions:
                 - name: local
@@ -304,28 +304,28 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: system.interrupts
               description: System interrupts
-              unit: interrupts/s
+              unit: "interrupts/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per device
         - name: cpu core
-          description: ''
+          description: ""
           labels:
             - name: cpu
               description: TBD
           metrics:
             - name: cpu.interrupts
               description: CPU interrupts
-              unit: interrupts/s
+              unit: "interrupts/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per device
@@ -336,31 +336,31 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
         metric: system.load
         info: number of active CPU cores in the system
-        os: linux
+        os: "linux"
       - name: load_average_15
         link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
         metric: system.load
         info: system fifteen-minute load average
-        os: linux
+        os: "linux"
       - name: load_average_5
         link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
         metric: system.load
         info: system five-minute load average
-        os: linux
+        os: "linux"
     metrics:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: system.load
               description: System Load Average
-              unit: load
+              unit: "load"
               chart_type: line
               dimensions:
                 - name: load1
@@ -368,7 +368,7 @@ modules:
                 - name: load15
             - name: system.active_processes
               description: System Active Processes
-              unit: processes
+              unit: "processes"
               chart_type: line
               dimensions:
                 - name: active
@@ -379,16 +379,16 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: system.cpu_some_pressure
               description: CPU some pressure
-              unit: percentage
+              unit: "percentage"
               chart_type: line
               dimensions:
                 - name: some10
@@ -396,13 +396,13 @@ modules:
                 - name: some300
             - name: system.cpu_some_pressure_stall_time
               description: CPU some pressure stall time
-              unit: ms
+              unit: "ms"
               chart_type: line
               dimensions:
                 - name: time
             - name: system.cpu_full_pressure
               description: CPU full pressure
-              unit: percentage
+              unit: "percentage"
               chart_type: line
               dimensions:
                 - name: some10
@@ -410,13 +410,13 @@ modules:
                 - name: some300
             - name: system.cpu_full_pressure_stall_time
               description: CPU full pressure stall time
-              unit: ms
+              unit: "ms"
               chart_type: line
               dimensions:
                 - name: time
             - name: system.memory_some_pressure
               description: Memory some pressure
-              unit: percentage
+              unit: "percentage"
               chart_type: line
               dimensions:
                 - name: some10
@@ -424,13 +424,13 @@ modules:
                 - name: some300
             - name: system.memory_some_pressure_stall_time
               description: Memory some pressure stall time
-              unit: ms
+              unit: "ms"
               chart_type: line
               dimensions:
                 - name: time
             - name: system.memory_full_pressure
               description: Memory full pressure
-              unit: percentage
+              unit: "percentage"
               chart_type: line
               dimensions:
                 - name: some10
@@ -438,13 +438,13 @@ modules:
                 - name: some300
             - name: system.memory_full_pressure_stall_time
               description: Memory full pressure stall time
-              unit: ms
+              unit: "ms"
               chart_type: line
               dimensions:
                 - name: time
             - name: system.io_some_pressure
               description: I/O some pressure
-              unit: percentage
+              unit: "percentage"
               chart_type: line
               dimensions:
                 - name: some10
@@ -452,13 +452,13 @@ modules:
                 - name: some300
             - name: system.io_some_pressure_stall_time
               description: I/O some pressure stall time
-              unit: ms
+              unit: "ms"
               chart_type: line
               dimensions:
                 - name: time
             - name: system.io_full_pressure
               description: I/O some pressure
-              unit: percentage
+              unit: "percentage"
               chart_type: line
               dimensions:
                 - name: some10
@@ -466,7 +466,7 @@ modules:
                 - name: some300
             - name: system.io_full_pressure_stall_time
               description: I/O some pressure stall time
-              unit: ms
+              unit: "ms"
               chart_type: line
               dimensions:
                 - name: time
@@ -477,28 +477,28 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: system.softirqs
               description: System softirqs
-              unit: softirqs/s
+              unit: "softirqs/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per softirq
         - name: cpu core
-          description: ''
+          description: ""
           labels:
             - name: cpu
               description: TBD
           metrics:
             - name: cpu.softirqs
               description: CPU softirqs
-              unit: softirqs/s
+              unit: "softirqs/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per softirq
@@ -510,28 +510,28 @@ modules:
         metric: system.softnet_stat
         info: average number of dropped packets in the last minute due to exceeded
           net.core.netdev_max_backlog
-        os: linux
+        os: "linux"
       - name: 1min_netdev_budget_ran_outs
         link: https://github.com/netdata/netdata/blob/master/health/health.d/softnet.conf
         metric: system.softnet_stat
         info: average number of times ksoftirq ran out of sysctl net.core.netdev_budget
           or net.core.netdev_budget_usecs with work remaining over the last minute
           (this can be a cause for dropped packets)
-        os: linux
+        os: "linux"
     metrics:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: system.softnet_stat
               description: System softnet_stat
-              unit: events/s
+              unit: "events/s"
               chart_type: line
               dimensions:
                 - name: processed
@@ -540,12 +540,12 @@ modules:
                 - name: received_rps
                 - name: flow_limit_count
         - name: cpu core
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: cpu.softnet_stat
               description: CPU softnet_stat
-              unit: events/s
+              unit: "events/s"
               chart_type: line
               dimensions:
                 - name: processed
@@ -560,32 +560,32 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
         metric: system.ram
         info: system memory utilization
-        os: linux
+        os: "linux"
       - name: ram_in_use
         link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
         metric: system.ram
         info: system memory utilization
-        os: freebsd
+        os: "freebsd"
       - name: ram_available
         link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
         metric: mem.available
         info: percentage of estimated amount of RAM available for userspace processes,
           without causing swapping
-        os: linux
+        os: "linux"
     metrics:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: system.ram
               description: System RAM
-              unit: MiB
+              unit: "MiB"
               chart_type: stacked
               dimensions:
                 - name: free
@@ -594,32 +594,32 @@ modules:
                 - name: buffers
             - name: mem.available
               description: Available RAM for applications
-              unit: MiB
+              unit: "MiB"
               chart_type: area
               dimensions:
                 - name: avail
             - name: system.swap
               description: System Swap
-              unit: MiB
+              unit: "MiB"
               chart_type: stacked
               dimensions:
                 - name: free
                 - name: used
             - name: mem.hwcorrupt
               description: Corrupted Memory detected by ECC
-              unit: MiB
+              unit: "MiB"
               chart_type: line
               dimensions:
                 - name: HardwareCorrupted
             - name: mem.commited
               description: Committed (Allocated) Memory
-              unit: MiB
+              unit: "MiB"
               chart_type: area
               dimensions:
                 - name: Commited_AS
             - name: mem.writeback
               description: Writeback Memory
-              unit: MiB
+              unit: "MiB"
               chart_type: line
               dimensions:
                 - name: Dirty
@@ -629,7 +629,7 @@ modules:
                 - name: Bounce
             - name: mem.kernel
               description: Memory Used by Kernel
-              unit: MiB
+              unit: "MiB"
               chart_type: stacked
               dimensions:
                 - name: Slab
@@ -639,14 +639,14 @@ modules:
                 - name: Percpu
             - name: mem.slab
               description: Reclaimable Kernel Memory
-              unit: MiB
+              unit: "MiB"
               chart_type: stacked
               dimensions:
                 - name: reclaimable
                 - name: unreclaimable
             - name: mem.hugepage
               description: Dedicated HugePages Memory
-              unit: MiB
+              unit: "MiB"
               chart_type: stacked
               dimensions:
                 - name: free
@@ -655,7 +655,7 @@ modules:
                 - name: reserved
             - name: mem.transparent_hugepages
               description: Transparent HugePages Memory
-              unit: MiB
+              unit: "MiB"
               chart_type: stacked
               dimensions:
                 - name: anonymous
@@ -667,21 +667,21 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: mem.pagetype_global
               description: System orders available
-              unit: B
+              unit: "B"
               chart_type: stacked
               dimensions:
                 - name: a dimension per pagesize
         - name: node, zone, type
-          description: ''
+          description: ""
           labels:
             - name: node_id
               description: TBD
@@ -692,7 +692,7 @@ modules:
           metrics:
             - name: mem.pagetype
               description: pagetype_Node{node}_{zone}_{type}
-              unit: B
+              unit: "B"
               chart_type: stacked
               dimensions:
                 - name: a dimension per pagesize
@@ -703,32 +703,32 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/health/health.d/memory.conf
         metric: mem.ecc_ce
         info: number of ECC correctable errors in the last 10 minutes
-        os: linux
+        os: "linux"
       - name: 1hour_ecc_memory_uncorrectable
         link: https://github.com/netdata/netdata/blob/master/health/health.d/memory.conf
         metric: mem.ecc_ue
         info: number of ECC uncorrectable errors in the last 10 minutes
-        os: linux
+        os: "linux"
     metrics:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: mem.ecc_ce
               description: ECC Memory Correctable Errors
-              unit: errors
+              unit: "errors"
               chart_type: line
               dimensions:
                 - name: a dimension per mem controller
             - name: mem.ecc_ue
               description: ECC Memory Uncorrectable Errors
-              unit: errors
+              unit: "errors"
               chart_type: line
               dimensions:
                 - name: a dimension per mem controller
@@ -739,18 +739,18 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: numa node
-          description: ''
+          description: ""
           labels:
             - name: numa_node
               description: TBD
           metrics:
             - name: mem.numa_nodes
               description: NUMA events
-              unit: events/s
+              unit: "events/s"
               chart_type: line
               dimensions:
                 - name: hit
@@ -766,16 +766,16 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: mem.ksm
               description: Kernel Same Page Merging
-              unit: MiB
+              unit: "MiB"
               chart_type: stacked
               dimensions:
                 - name: shared
@@ -784,14 +784,14 @@ modules:
                 - name: volatile
             - name: mem.ksm_savings
               description: Kernel Same Page Merging Savings
-              unit: MiB
+              unit: "MiB"
               chart_type: area
               dimensions:
                 - name: savings
                 - name: offered
             - name: mem.ksm_ratios
               description: Kernel Same Page Merging Effectiveness
-              unit: percentage
+              unit: "percentage"
               chart_type: line
               dimensions:
                 - name: savings
@@ -802,38 +802,38 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: zram device
-          description: ''
+          description: ""
           labels:
             - name: device
               description: TBD
           metrics:
             - name: mem.zram_usage
               description: ZRAM Memory Usage
-              unit: MiB
+              unit: "MiB"
               chart_type: area
               dimensions:
                 - name: compressed
                 - name: metadata
             - name: mem.zram_savings
               description: ZRAM Memory Savings
-              unit: MiB
+              unit: "MiB"
               chart_type: area
               dimensions:
                 - name: savings
                 - name: original
             - name: mem.zram_ratio
               description: ZRAM Compression Ratio (original to compressed)
-              unit: ratio
+              unit: "ratio"
               chart_type: line
               dimensions:
                 - name: ratio
             - name: mem.zram_efficiency
               description: ZRAM Efficiency
-              unit: percentage
+              unit: "percentage"
               chart_type: line
               dimensions:
                 - name: percent
@@ -844,51 +844,51 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/health/health.d/ipc.conf
         metric: system.ipc_semaphores
         info: IPC semaphore utilization
-        os: linux
+        os: "linux"
     metrics:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: system.ipc_semaphores
               description: IPC Semaphores
-              unit: semaphores
+              unit: "semaphores"
               chart_type: area
               dimensions:
                 - name: semaphores
             - name: system.ipc_semaphore_arrays
               description: IPC Semaphore Arrays
-              unit: arrays
+              unit: "arrays"
               chart_type: area
               dimensions:
                 - name: arrays
             - name: system.message_queue_message
               description: IPC Message Queue Number of Messages
-              unit: messages
+              unit: "messages"
               chart_type: stacked
               dimensions:
                 - name: a dimension per queue
             - name: system.message_queue_bytes
               description: IPC Message Queue Used Bytes
-              unit: bytes
+              unit: "bytes"
               chart_type: stacked
               dimensions:
                 - name: a dimension per queue
             - name: system.shared_memory_segments
               description: IPC Shared Memory Number of Segments
-              unit: segments
+              unit: "segments"
               chart_type: stacked
               dimensions:
                 - name: segments
             - name: system.shared_memory_bytes
               description: IPC Shared Memory Used Bytes
-              unit: bytes
+              unit: "bytes"
               chart_type: stacked
               dimensions:
                 - name: bytes
@@ -900,34 +900,34 @@ modules:
         metric: disk.util
         info: average percentage of time ${label:device} disk was busy over the last
           10 minutes
-        os: linux freebsd
+        os: "linux freebsd"
       - name: bcache_cache_errors
         link: https://github.com/netdata/netdata/blob/master/health/health.d/bcache.conf
         metric: disk.bcache_cache_read_races
         info: number of times data was read from the cache, the bucket was reused
           and invalidated in the last 10 minutes (when this occurs the data is reread
           from the backing device)
-        os: freebsd
+        os: "freebsd"
     metrics:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: system.io
               description: Disk I/O
-              unit: KiB/s
+              unit: "KiB/s"
               chart_type: area
               dimensions:
                 - name: in
                 - name: out
         - name: disk
-          description: ''
+          description: ""
           labels:
             - name: device
               description: TBD
@@ -938,118 +938,118 @@ modules:
           metrics:
             - name: disk.io
               description: Disk I/O Bandwidth
-              unit: KiB/s
+              unit: "KiB/s"
               chart_type: area
               dimensions:
                 - name: reads
                 - name: writes
             - name: disk_ext.io
               description: Amount of Discarded Data
-              unit: KiB/s
+              unit: "KiB/s"
               chart_type: area
               dimensions:
                 - name: discards
             - name: disk.ops
               description: Disk Completed I/O Operations
-              unit: operations/s
+              unit: "operations/s"
               chart_type: line
               dimensions:
                 - name: reads
                 - name: writes
             - name: disk_ext.ops
               description: Disk Completed Extended I/O Operations
-              unit: operations/s
+              unit: "operations/s"
               chart_type: line
               dimensions:
                 - name: discards
                 - name: flushes
             - name: disk.qops
               description: Disk Current I/O Operations
-              unit: operations
+              unit: "operations"
               chart_type: line
               dimensions:
                 - name: operations
             - name: disk.backlog
               description: Disk Backlog
-              unit: milliseconds
+              unit: "milliseconds"
               chart_type: area
               dimensions:
                 - name: backlog
             - name: disk.busy
               description: Disk Busy Time
-              unit: milliseconds
+              unit: "milliseconds"
               chart_type: area
               dimensions:
                 - name: busy
             - name: disk.util
               description: Disk Utilization Time
-              unit: '% of time working'
+              unit: "% of time working"
               chart_type: area
               dimensions:
                 - name: utilization
             - name: disk.mops
               description: Disk Merged Operations
-              unit: merged operations/s
+              unit: "merged operations/s"
               chart_type: line
               dimensions:
                 - name: reads
                 - name: writes
             - name: disk_ext.mops
               description: Disk Merged Discard Operations
-              unit: merged operations/s
+              unit: "merged operations/s"
               chart_type: line
               dimensions:
                 - name: discards
             - name: disk.iotime
               description: Disk Total I/O Time
-              unit: milliseconds/s
+              unit: "milliseconds/s"
               chart_type: line
               dimensions:
                 - name: reads
                 - name: writes
             - name: disk_ext.iotime
               description: Disk Total I/O Time for Extended Operations
-              unit: milliseconds/s
+              unit: "milliseconds/s"
               chart_type: line
               dimensions:
                 - name: discards
                 - name: flushes
             - name: disk.await
               description: Average Completed I/O Operation Time
-              unit: milliseconds/operation
+              unit: "milliseconds/operation"
               chart_type: line
               dimensions:
                 - name: reads
                 - name: writes
             - name: disk_ext.await
               description: Average Completed Extended I/O Operation Time
-              unit: milliseconds/operation
+              unit: "milliseconds/operation"
               chart_type: line
               dimensions:
                 - name: discards
                 - name: flushes
             - name: disk.avgsz
               description: Average Completed I/O Operation Bandwidth
-              unit: KiB/operation
+              unit: "KiB/operation"
               chart_type: area
               dimensions:
                 - name: reads
                 - name: writes
             - name: disk_ext.avgsz
               description: Average Amount of Discarded Data
-              unit: KiB/operation
+              unit: "KiB/operation"
               chart_type: area
               dimensions:
                 - name: discards
             - name: disk.svctm
               description: Average Service Time
-              unit: milliseconds/operation
+              unit: "milliseconds/operation"
               chart_type: line
               dimensions:
                 - name: svctm
             - name: disk.bcache_cache_alloc
               description: BCache Cache Allocations
-              unit: percentage
+              unit: "percentage"
               chart_type: stacked
               dimensions:
                 - name: ununsed
@@ -1059,7 +1059,7 @@ modules:
                 - name: undefined
             - name: disk.bcache_hit_ratio
               description: BCache Cache Hit Ratio
-              unit: percentage
+              unit: "percentage"
               chart_type: line
               dimensions:
                 - name: 5min
@@ -1068,33 +1068,33 @@ modules:
                 - name: ever
             - name: disk.bcache_rates
               description: BCache Rates
-              unit: KiB/s
+              unit: "KiB/s"
               chart_type: area
               dimensions:
                 - name: congested
                 - name: writeback
             - name: disk.bcache_size
               description: BCache Cache Sizes
-              unit: MiB
+              unit: "MiB"
               chart_type: area
               dimensions:
                 - name: dirty
             - name: disk.bcache_usage
               description: BCache Cache Usage
-              unit: percentage
+              unit: "percentage"
               chart_type: area
               dimensions:
                 - name: avail
             - name: disk.bcache_cache_read_races
               description: BCache Cache Read Races
-              unit: operations/s
+              unit: "operations/s"
               chart_type: line
               dimensions:
                 - name: races
                 - name: errors
             - name: disk.bcache
               description: BCache Cache I/O Operations
-              unit: operations/s
+              unit: "operations/s"
               chart_type: line
               dimensions:
                 - name: hits
@@ -1103,7 +1103,7 @@ modules:
                 - name: readaheads
             - name: disk.bcache_bypass
               description: BCache Cache Bypass I/O Operations
-              unit: operations/s
+              unit: "operations/s"
               chart_type: line
               dimensions:
                 - name: hits
@@ -1115,38 +1115,38 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/health/health.d/mdstat.conf
         metric: md.disks
         info: number of seconds since the last successful data collection
-        os: '*'
+        os: "*"
       - name: mdstat_disks
         link: https://github.com/netdata/netdata/blob/master/health/health.d/mdstat.conf
         metric: md.disks
         info: number of devices in the down state for the ${label:device} ${label:raid_level}
           array. Any number > 0 indicates that the array is degraded.
-        os: '*'
+        os: "*"
       - name: mdstat_mismatch_cnt
         link: https://github.com/netdata/netdata/blob/master/health/health.d/mdstat.conf
         metric: md.mismatch_cnt
         info: number of unsynchronized blocks for the ${label:device} ${label:raid_level}
           array
-        os: '*'
+        os: "*"
     metrics:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: md.health
               description: Faulty Devices In MD
-              unit: failed disks
+              unit: "failed disks"
               chart_type: line
               dimensions:
                 - name: a dimension per md array
         - name: md array
-          description: ''
+          description: ""
           labels:
             - name: device
               description: TBD
@@ -1155,20 +1155,20 @@ modules:
           metrics:
             - name: md.disks
               description: Disks Stats
-              unit: disks
+              unit: "disks"
               chart_type: stacked
               dimensions:
                 - name: inuse
                 - name: down
             - name: md.mismatch_cnt
               description: Mismatch Count
-              unit: unsynchronized blocks
+              unit: "unsynchronized blocks"
               chart_type: line
               dimensions:
                 - name: count
             - name: md.status
               description: Current Status
-              unit: percent
+              unit: "percent"
               chart_type: line
               dimensions:
                 - name: check
@@ -1177,19 +1177,19 @@ modules:
                 - name: reshape
             - name: md.expected_time_until_operation_finish
               description: Approximate Time Until Finish
-              unit: seconds
+              unit: "seconds"
               chart_type: line
               dimensions:
                 - name: finish_in
             - name: md.operation_speed
               description: Operation Speed
-              unit: KiB/s
+              unit: "KiB/s"
               chart_type: line
               dimensions:
                 - name: speed
             - name: md.nonredundant
               description: Nonredundant Array Availability
-              unit: boolean
+              unit: "boolean"
               chart_type: line
               dimensions:
                 - name: available
@@ -1200,99 +1200,99 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
         metric: net.net
         info: network interface ${label:device} current speed
-        os: '*'
+        os: "*"
       - name: 1m_received_traffic_overflow
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
         metric: net.net
         info: average inbound utilization for the network interface ${label:device}
           over the last minute
-        os: linux
+        os: "linux"
       - name: 1m_sent_traffic_overflow
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
         metric: net.net
         info: average outbound utilization for the network interface ${label:device}
           over the last minute
-        os: linux
+        os: "linux"
       - name: inbound_packets_dropped_ratio
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
         metric: net.packets
         info: ratio of inbound dropped packets for the network interface ${label:device}
           over the last 10 minutes
-        os: linux
+        os: "linux"
       - name: outbound_packets_dropped_ratio
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
         metric: net.packets
         info: ratio of outbound dropped packets for the network interface ${label:device}
           over the last 10 minutes
-        os: linux
+        os: "linux"
       - name: wifi_inbound_packets_dropped_ratio
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
         metric: net.packets
         info: ratio of inbound dropped packets for the network interface ${label:device}
           over the last 10 minutes
-        os: linux
+        os: "linux"
       - name: wifi_outbound_packets_dropped_ratio
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
         metric: net.packets
         info: ratio of outbound dropped packets for the network interface ${label:device}
           over the last 10 minutes
-        os: linux
+        os: "linux"
       - name: 1m_received_packets_rate
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
         metric: net.packets
         info: average number of packets received by the network interface ${label:device}
           over the last minute
-        os: linux freebsd
+        os: "linux freebsd"
       - name: interface_inbound_errors
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
         metric: net.errors
         info: number of inbound errors for the network interface ${label:device} in
           the last 10 minutes
-        os: freebsd
+        os: "freebsd"
       - name: interface_outbound_errors
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
         metric: net.errors
         info: number of outbound errors for the network interface ${label:device}
           in the last 10 minutes
-        os: freebsd
+        os: "freebsd"
       - name: inbound_packets_dropped
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
         metric: net.drops
         info: number of inbound dropped packets for the network interface ${label:device}
           in the last 10 minutes
-        os: linux
+        os: "linux"
       - name: outbound_packets_dropped
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
         metric: net.drops
         info: number of outbound dropped packets for the network interface ${label:device}
           in the last 10 minutes
-        os: linux
+        os: "linux"
       - name: 10min_fifo_errors
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
         metric: net.fifo
         info: number of FIFO errors for the network interface ${label:device} in the
           last 10 minutes
-        os: linux
+        os: "linux"
     metrics:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: system.net
               description: Physical Network Interfaces Aggregated Bandwidth
-              unit: kilobits/s
+              unit: "kilobits/s"
               chart_type: area
               dimensions:
                 - name: received
                 - name: sent
         - name: network device
-          description: ''
+          description: ""
           labels:
             - name: interface_type
               description: TBD
@@ -1301,20 +1301,20 @@ modules:
           metrics:
             - name: net.net
               description: Bandwidth
-              unit: kilobits/s
+              unit: "kilobits/s"
               chart_type: area
               dimensions:
                 - name: received
                 - name: sent
             - name: net.speed
               description: Interface Speed
-              unit: kilobits/s
+              unit: "kilobits/s"
               chart_type: line
               dimensions:
                 - name: speed
             - name: net.duplex
               description: Interface Duplex State
-              unit: state
+              unit: "state"
               chart_type: line
               dimensions:
                 - name: full
@@ -1322,7 +1322,7 @@ modules:
                 - name: unknown
             - name: net.operstate
               description: Interface Operational State
-              unit: state
+              unit: "state"
               chart_type: line
               dimensions:
                 - name: up
@@ -1334,20 +1334,20 @@ modules:
                 - name: unknown
             - name: net.carrier
               description: Interface Physical Link State
-              unit: state
+              unit: "state"
               chart_type: line
               dimensions:
                 - name: up
                 - name: down
             - name: net.mtu
               description: Interface MTU
-              unit: octets
+              unit: "octets"
               chart_type: line
               dimensions:
                 - name: mtu
             - name: net.packets
               description: Packets
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: received
@@ -1355,35 +1355,35 @@ modules:
                 - name: multicast
             - name: net.errors
               description: Interface Errors
-              unit: errors/s
+              unit: "errors/s"
               chart_type: line
               dimensions:
                 - name: inbound
                 - name: outbound
             - name: net.drops
               description: Interface Drops
-              unit: drops/s
+              unit: "drops/s"
               chart_type: line
               dimensions:
                 - name: inbound
                 - name: outbound
             - name: net.fifo
               description: Interface FIFO Buffer Errors
-              unit: errors
+              unit: "errors"
               chart_type: line
               dimensions:
                 - name: receive
                 - name: transmit
             - name: net.compressed
               description: Compressed Packets
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: received
                 - name: sent
             - name: net.events
               description: Network Interface Events
-              unit: events/s
+              unit: "events/s"
               chart_type: line
               dimensions:
                 - name: frames
@@ -1396,23 +1396,23 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: wireless device
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: wireless.status
               description: Internal status reported by interface.
-              unit: status
+              unit: "status"
               chart_type: line
               dimensions:
                 - name: status
             - name: wireless.link_quality
               description: Overall quality of the link. This is an aggregate value,
                 and depends on the driver and hardware.
-              unit: value
+              unit: "value"
               chart_type: line
               dimensions:
                 - name: link_quality
@@ -1420,7 +1420,7 @@ modules:
               description: The signal level is the wireless signal power level received
                 by the wireless client. The closer the value is to 0, the stronger
                 the signal.
-              unit: dBm
+              unit: "dBm"
               chart_type: line
               dimensions:
                 - name: signal_level
@@ -1428,14 +1428,14 @@ modules:
               description: The noise level indicates the amount of background noise
                 in your environment. The closer the value to 0, the greater the noise
                 level.
-              unit: dBm
+              unit: "dBm"
               chart_type: line
               dimensions:
                 - name: noise_level
             - name: wireless.discarded_packets
               description: Packet discarded in the wireless adapter due to wireless
                 specific problems.
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: nwid
@@ -1445,7 +1445,7 @@ modules:
                 - name: misc
             - name: wireless.missed_beacons
               description: Number of missed beacons.
-              unit: frames/s
+              unit: "frames/s"
               chart_type: line
               dimensions:
                 - name: missed_beacons
@@ -1456,23 +1456,23 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: infiniband port
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: ib.bytes
               description: Bandwidth usage
-              unit: kilobits/s
+              unit: "kilobits/s"
               chart_type: area
               dimensions:
                 - name: Received
                 - name: Sent
             - name: ib.packets
               description: Packets Statistics
-              unit: packets/s
+              unit: "packets/s"
               chart_type: area
               dimensions:
                 - name: Received
@@ -1483,7 +1483,7 @@ modules:
                 - name: Ucast_sent
             - name: ib.errors
               description: Error Counters
-              unit: errors/s
+              unit: "errors/s"
               chart_type: line
               dimensions:
                 - name: Pkts_malformated
@@ -1501,7 +1501,7 @@ modules:
                 - name: Pkts_sent_discarded_by_switch
             - name: ib.hwerrors
               description: Hardware Errors
-              unit: errors/s
+              unit: "errors/s"
               chart_type: line
               dimensions:
                 - name: Duplicated_packets
@@ -1523,7 +1523,7 @@ modules:
                 - name: RoCE_ICRC_Errors
             - name: ib.hwpackets
               description: Hardware Packets Statistics
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: RoCEv2_Congestion_sent
@@ -1546,67 +1546,67 @@ modules:
         metric: ip.tcp_syn_queue
         info: average number of SYN requests was dropped due to the full TCP SYN queue
           over the last minute (SYN cookies were not enabled)
-        os: linux
+        os: "linux"
       - name: 1m_tcp_syn_queue_cookies
         link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_listen.conf
         metric: ip.tcp_syn_queue
         info: average number of sent SYN cookies due to the full TCP SYN queue over
           the last minute
-        os: linux
+        os: "linux"
       - name: 1m_tcp_accept_queue_overflows
         link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_listen.conf
         metric: ip.tcp_accept_queue
         info: average number of overflows in the TCP accept queue over the last minute
-        os: linux
+        os: "linux"
       - name: 1m_tcp_accept_queue_drops
         link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_listen.conf
         metric: ip.tcp_accept_queue
         info: average number of dropped packets in the TCP accept queue over the last
           minute
-        os: linux
+        os: "linux"
       - name: 1m_ipv4_tcp_resets_sent
         link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
         metric: ipv4.tcphandshake
         info: average number of sent TCP RESETS over the last minute
-        os: linux
+        os: "linux"
       - name: 10s_ipv4_tcp_resets_sent
         link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
         metric: ipv4.tcphandshake
         info: average number of sent TCP RESETS over the last 10 seconds. This can
           indicate a port scan, or that a service running on this host has crashed.
           Netdata will not send a clear notification for this alarm.
-        os: linux
+        os: "linux"
       - name: 1m_ipv4_tcp_resets_received
         link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
         metric: ipv4.tcphandshake
         info: average number of received TCP RESETS over the last minute
-        os: linux freebsd
+        os: "linux freebsd"
       - name: 1m_ipv4_udp_receive_buffer_errors
         link: https://github.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf
         metric: ipv4.udperrors
         info: average number of UDP receive buffer errors over the last minute
-        os: linux freebsd
+        os: "linux freebsd"
     metrics:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: system.ip
               description: IP Bandwidth
-              unit: kilobits/s
+              unit: "kilobits/s"
               chart_type: area
               dimensions:
                 - name: received
                 - name: sent
             - name: ip.inerrors
               description: IP Input Errors
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: noroutes
@@ -1614,35 +1614,35 @@ modules:
                 - name: checksum
             - name: ip.mcast
               description: IP Multicast Bandwidth
-              unit: kilobits/s
+              unit: "kilobits/s"
               chart_type: area
               dimensions:
                 - name: received
                 - name: sent
             - name: ip.bcast
               description: IP Broadcast Bandwidth
-              unit: kilobits/s
+              unit: "kilobits/s"
               chart_type: area
               dimensions:
                 - name: received
                 - name: sent
             - name: ip.mcastpkts
               description: IP Multicast Packets
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: received
                 - name: sent
             - name: ip.bcastpkts
               description: IP Broadcast Packets
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: received
                 - name: sent
             - name: ip.ecnpkts
               description: IP ECN Statistics
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: CEP
@@ -1651,13 +1651,13 @@ modules:
                 - name: ECTP1
             - name: ip.tcpmemorypressures
               description: TCP Memory Pressures
-              unit: events/s
+              unit: "events/s"
               chart_type: line
               dimensions:
                 - name: pressures
             - name: ip.tcpconnaborts
               description: TCP Connection Aborts
-              unit: connections/s
+              unit: "connections/s"
               chart_type: line
               dimensions:
                 - name: baddata
@@ -1668,7 +1668,7 @@ modules:
                 - name: failed
             - name: ip.tcpreorders
               description: TCP Reordered Packets by Detection Method
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: timestamp
@@ -1677,7 +1677,7 @@ modules:
                 - name: reno
             - name: ip.tcpofo
               description: TCP Out-Of-Order Queue
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: inqueue
@@ -1686,7 +1686,7 @@ modules:
                 - name: pruned
             - name: ip.tcpsyncookies
               description: TCP SYN Cookies
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: received
@@ -1694,21 +1694,21 @@ modules:
                 - name: failed
             - name: ip.tcp_syn_queue
               description: TCP SYN Queue Issues
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: drops
                 - name: cookies
             - name: ip.tcp_accept_queue
               description: TCP Accept Queue Issues
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: overflows
                 - name: drops
             - name: ipv4.packets
               description: IPv4 Packets
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: received
@@ -1717,7 +1717,7 @@ modules:
                 - name: delivered
             - name: ipv4.fragsout
               description: IPv4 Fragments Sent
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: ok
@@ -1725,7 +1725,7 @@ modules:
                 - name: created
             - name: ipv4.fragsin
               description: IPv4 Fragments Reassembly
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: ok
@@ -1733,7 +1733,7 @@ modules:
                 - name: all
             - name: ipv4.errors
               description: IPv4 Errors
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: InDiscards
@@ -1744,14 +1744,14 @@ modules:
                 - name: InUnknownProtos
             - name: ipv4.icmp
               description: IPv4 ICMP Packets
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: received
                 - name: sent
             - name: ipv4.icmp_errors
               description: IPv4 ICMP Errors
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: InErrors
@@ -1759,7 +1759,7 @@ modules:
                 - name: InCsumErrors
             - name: ipv4.icmpmsg
               description: IPv4 ICMP Messages
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: InEchoReps
@@ -1784,20 +1784,20 @@ modules:
                 - name: OutTimestampReps
             - name: ipv4.tcpsock
               description: IPv4 TCP Connections
-              unit: active connections
+              unit: "active connections"
               chart_type: line
               dimensions:
                 - name: connections
             - name: ipv4.tcppackets
               description: IPv4 TCP Packets
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: received
                 - name: sent
             - name: ipv4.tcperrors
               description: IPv4 TCP Errors
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: InErrs
@@ -1805,14 +1805,14 @@ modules:
                 - name: RetransSegs
             - name: ipv4.tcpopens
               description: IPv4 TCP Opens
-              unit: connections/s
+              unit: "connections/s"
               chart_type: line
               dimensions:
                 - name: active
                 - name: passive
             - name: ipv4.tcphandshake
               description: IPv4 TCP Handshake Issues
-              unit: events/s
+              unit: "events/s"
               chart_type: line
               dimensions:
                 - name: EstabResets
@@ -1821,14 +1821,14 @@ modules:
                 - name: SynRetrans
             - name: ipv4.udppackets
               description: IPv4 UDP Packets
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: received
                 - name: sent
             - name: ipv4.udperrors
               description: IPv4 UDP Errors
-              unit: events/s
+              unit: "events/s"
               chart_type: line
               dimensions:
                 - name: RcvbufErrors
@@ -1839,14 +1839,14 @@ modules:
                 - name: IgnoredMulti
             - name: ipv4.udplite
               description: IPv4 UDPLite Packets
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: received
                 - name: sent
             - name: ipv4.udplite_errors
               description: IPv4 UDPLite Errors
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: RcvbufErrors
@@ -1857,14 +1857,14 @@ modules:
                 - name: IgnoredMulti
             - name: system.ipv6
               description: IPv6 Bandwidth
-              unit: kilobits/s
+              unit: "kilobits/s"
               chart_type: area
               dimensions:
                 - name: received
                 - name: sent
             - name: system.ipv6
               description: IPv6 Packets
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: received
@@ -1873,7 +1873,7 @@ modules:
                 - name: delivers
             - name: ipv6.fragsout
               description: IPv6 Fragments Sent
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: ok
@@ -1881,7 +1881,7 @@ modules:
                 - name: all
             - name: ipv6.fragsin
               description: IPv6 Fragments Reassembly
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: ok
@@ -1890,7 +1890,7 @@ modules:
                 - name: all
             - name: ipv6.errors
               description: IPv6 Errors
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: InDiscards
@@ -1904,14 +1904,14 @@ modules:
                 - name: OutNoRoutes
             - name: ipv6.udppackets
               description: IPv6 UDP Packets
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: received
                 - name: sent
             - name: ipv6.udperrors
               description: IPv6 UDP Errors
-              unit: events/s
+              unit: "events/s"
               chart_type: line
               dimensions:
                 - name: RcvbufErrors
@@ -1922,14 +1922,14 @@ modules:
                 - name: IgnoredMulti
             - name: ipv6.udplitepackets
               description: IPv6 UDPlite Packets
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: received
                 - name: sent
             - name: ipv6.udpliteerrors
               description: IPv6 UDP Lite Errors
-              unit: events/s
+              unit: "events/s"
               chart_type: line
               dimensions:
                 - name: RcvbufErrors
@@ -1939,42 +1939,42 @@ modules:
                 - name: InCsumErrors
             - name: ipv6.mcast
               description: IPv6 Multicast Bandwidth
-              unit: kilobits/s
+              unit: "kilobits/s"
               chart_type: area
               dimensions:
                 - name: received
                 - name: sent
             - name: ipv6.bcast
               description: IPv6 Broadcast Bandwidth
-              unit: kilobits/s
+              unit: "kilobits/s"
               chart_type: area
               dimensions:
                 - name: received
                 - name: sent
             - name: ipv6.mcastpkts
               description: IPv6 Multicast Packets
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: received
                 - name: sent
             - name: ipv6.icmp
               description: IPv6 ICMP Messages
-              unit: messages/s
+              unit: "messages/s"
               chart_type: line
               dimensions:
                 - name: received
                 - name: sent
             - name: ipv6.icmpredir
               description: IPv6 ICMP Redirects
-              unit: redirects/s
+              unit: "redirects/s"
               chart_type: line
               dimensions:
                 - name: received
                 - name: sent
             - name: ipv6.icmperrors
               description: IPv6 ICMP Errors
-              unit: errors/s
+              unit: "errors/s"
               chart_type: line
               dimensions:
                 - name: InErrors
@@ -1990,7 +1990,7 @@ modules:
                 - name: OutParmProblems
             - name: ipv6.icmpechos
               description: IPv6 ICMP Echo
-              unit: messages/s
+              unit: "messages/s"
               chart_type: line
               dimensions:
                 - name: InEchos
@@ -1999,7 +1999,7 @@ modules:
                 - name: OutEchoReplies
             - name: ipv6.groupmemb
               description: IPv6 ICMP Group Membership
-              unit: messages/s
+              unit: "messages/s"
               chart_type: line
               dimensions:
                 - name: InQueries
@@ -2010,7 +2010,7 @@ modules:
                 - name: OutReductions
             - name: ipv6.icmprouter
               description: IPv6 Router Messages
-              unit: messages/s
+              unit: "messages/s"
               chart_type: line
               dimensions:
                 - name: InSolicits
@@ -2019,7 +2019,7 @@ modules:
                 - name: OutAdvertisements
             - name: ipv6.icmpneighbor
               description: IPv6 Neighbor Messages
-              unit: messages/s
+              unit: "messages/s"
               chart_type: line
               dimensions:
                 - name: InSolicits
@@ -2028,14 +2028,14 @@ modules:
                 - name: OutAdvertisements
             - name: ipv6.icmpmldv2
               description: IPv6 ICMP MLDv2 Reports
-              unit: reports/s
+              unit: "reports/s"
               chart_type: line
               dimensions:
                 - name: received
                 - name: sent
             - name: ipv6.icmptypes
               description: IPv6 ICMP Types
-              unit: messages/s
+              unit: "messages/s"
               chart_type: line
               dimensions:
                 - name: InType1
@@ -2050,7 +2050,7 @@ modules:
                 - name: OutType143
             - name: ipv6.ect
               description: IPv6 ECT Packets
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: InNoECTPkts
@@ -2059,7 +2059,7 @@ modules:
                 - name: InCEPkts
             - name: ipv6.ect
               description: IPv6 ECT Packets
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: InNoECTPkts
@@ -2073,22 +2073,22 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: ipv4.sockstat_sockets
               description: IPv4 Sockets Used
-              unit: sockets
+              unit: "sockets"
               chart_type: line
               dimensions:
                 - name: used
             - name: ipv4.sockstat_tcp_sockets
               description: IPv4 TCP Sockets
-              unit: sockets
+              unit: "sockets"
               chart_type: line
               dimensions:
                 - name: alloc
@@ -2097,43 +2097,43 @@ modules:
                 - name: timewait
             - name: ipv4.sockstat_tcp_mem
               description: IPv4 TCP Sockets Memory
-              unit: KiB
+              unit: "KiB"
               chart_type: area
               dimensions:
                 - name: mem
             - name: ipv4.sockstat_udp_sockets
               description: IPv4 UDP Sockets
-              unit: sockets
+              unit: "sockets"
               chart_type: line
               dimensions:
                 - name: inuse
             - name: ipv4.sockstat_udp_mem
               description: IPv4 UDP Sockets Memory
-              unit: sockets
+              unit: "sockets"
               chart_type: line
               dimensions:
                 - name: mem
             - name: ipv4.sockstat_udplite_sockets
               description: IPv4 UDPLITE Sockets
-              unit: sockets
+              unit: "sockets"
               chart_type: line
               dimensions:
                 - name: inuse
             - name: ipv4.sockstat_raw_sockets
               description: IPv4 RAW Sockets
-              unit: sockets
+              unit: "sockets"
               chart_type: line
               dimensions:
                 - name: inuse
             - name: ipv4.sockstat_frag_sockets
               description: IPv4 FRAG Sockets
-              unit: fragments
+              unit: "fragments"
               chart_type: line
               dimensions:
                 - name: inuse
             - name: ipv4.sockstat_frag_mem
               description: IPv4 FRAG Sockets Memory
-              unit: KiB
+              unit: "KiB"
               chart_type: area
               dimensions:
                 - name: mem
@@ -2144,40 +2144,40 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: ipv6.sockstat6_tcp_sockets
               description: IPv6 TCP Sockets
-              unit: sockets
+              unit: "sockets"
               chart_type: line
               dimensions:
                 - name: inuse
             - name: ipv6.sockstat6_udp_sockets
               description: IPv6 UDP Sockets
-              unit: sockets
+              unit: "sockets"
               chart_type: line
               dimensions:
                 - name: inuse
             - name: ipv6.sockstat6_udplite_sockets
               description: IPv6 UDPLITE Sockets
-              unit: sockets
+              unit: "sockets"
               chart_type: line
               dimensions:
                 - name: inuse
             - name: ipv6.sockstat6_raw_sockets
               description: IPv6 RAW Sockets
-              unit: sockets
+              unit: "sockets"
               chart_type: line
               dimensions:
                 - name: inuse
             - name: ipv6.sockstat6_frag_sockets
               description: IPv6 FRAG Sockets
-              unit: fragments
+              unit: "fragments"
               chart_type: line
               dimensions:
                 - name: inuse
@@ -2188,29 +2188,29 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: ipvs.sockets
               description: IPVS New Connections
-              unit: connections/s
+              unit: "connections/s"
               chart_type: line
               dimensions:
                 - name: connections
             - name: ipvs.packets
               description: IPVS Packets
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: received
                 - name: sent
             - name: ipvs.net
               description: IPVS Bandwidth
-              unit: kilobits/s
+              unit: "kilobits/s"
               chart_type: area
               dimensions:
                 - name: received
@@ -2222,23 +2222,23 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: nfs.net
               description: NFS Client Network
-              unit: operations/s
+              unit: "operations/s"
               chart_type: stacked
               dimensions:
                 - name: udp
                 - name: tcp
             - name: nfs.rpc
               description: NFS Client Remote Procedure Calls Statistics
-              unit: calls/s
+              unit: "calls/s"
               chart_type: line
               dimensions:
                 - name: calls
@@ -2246,19 +2246,19 @@ modules:
                 - name: auth_refresh
             - name: nfs.proc2
               description: NFS v2 Client Remote Procedure Calls
-              unit: calls/s
+              unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per proc2 call
             - name: nfs.proc3
               description: NFS v3 Client Remote Procedure Calls
-              unit: calls/s
+              unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per proc3 call
             - name: nfs.proc4
               description: NFS v4 Client Remote Procedure Calls
-              unit: calls/s
+              unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per proc4 call
@@ -2269,16 +2269,16 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: nfsd.readcache
               description: NFS Server Read Cache
-              unit: reads/s
+              unit: "reads/s"
               chart_type: stacked
               dimensions:
                 - name: hits
@@ -2286,33 +2286,33 @@ modules:
                 - name: nocache
             - name: nfsd.filehandles
               description: NFS Server File Handles
-              unit: handles/s
+              unit: "handles/s"
               chart_type: line
               dimensions:
                 - name: stale
             - name: nfsd.io
               description: NFS Server I/O
-              unit: kilobytes/s
+              unit: "kilobytes/s"
               chart_type: area
               dimensions:
                 - name: read
                 - name: write
             - name: nfsd.threads
               description: NFS Server Threads
-              unit: threads
+              unit: "threads"
               chart_type: line
               dimensions:
                 - name: threads
             - name: nfsd.net
               description: NFS Server Network Statistics
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: udp
                 - name: tcp
             - name: nfsd.rpc
               description: NFS Server Remote Procedure Calls Statistics
-              unit: calls/s
+              unit: "calls/s"
               chart_type: line
               dimensions:
                 - name: calls
@@ -2320,25 +2320,25 @@ modules:
                 - name: bad_auth
             - name: nfsd.proc2
               description: NFS v2 Server Remote Procedure Calls
-              unit: calls/s
+              unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per proc2 call
             - name: nfsd.proc3
               description: NFS v3 Server Remote Procedure Calls
-              unit: calls/s
+              unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per proc3 call
             - name: nfsd.proc4
               description: NFS v4 Server Remote Procedure Calls
-              unit: calls/s
+              unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per proc4 call
             - name: nfsd.proc4ops
               description: NFS v4 Server Operations
-              unit: operations/s
+              unit: "operations/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per proc4 operation
@@ -2349,22 +2349,22 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: sctp.established
               description: SCTP current total number of established associations
-              unit: associations
+              unit: "associations"
               chart_type: line
               dimensions:
                 - name: established
             - name: sctp.transitions
               description: SCTP Association Transitions
-              unit: transitions/s
+              unit: "transitions/s"
               chart_type: line
               dimensions:
                 - name: active
@@ -2373,21 +2373,21 @@ modules:
                 - name: shutdown
             - name: sctp.packets
               description: SCTP Packets
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: received
                 - name: sent
             - name: sctp.packet_errors
               description: SCTP Packet Errors
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: invalid
                 - name: checksum
             - name: sctp.fragmentation
               description: SCTP Fragmentation
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: reassembled
@@ -2399,22 +2399,22 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: netfilter.conntrack_sockets
               description: Connection Tracker Connections
-              unit: active connections
+              unit: "active connections"
               chart_type: line
               dimensions:
                 - name: connections
             - name: netfilter.conntrack_new
               description: Connection Tracker New Connections
-              unit: connections/s
+              unit: "connections/s"
               chart_type: line
               dimensions:
                 - name: new
@@ -2422,7 +2422,7 @@ modules:
                 - name: invalid
             - name: netfilter.conntrack_changes
               description: Connection Tracker Changes
-              unit: changes/s
+              unit: "changes/s"
               chart_type: line
               dimensions:
                 - name: inserted
@@ -2430,7 +2430,7 @@ modules:
                 - name: delete_list
             - name: netfilter.conntrack_expect
               description: Connection Tracker Expectations
-              unit: expectations/s
+              unit: "expectations/s"
               chart_type: line
               dimensions:
                 - name: created
@@ -2438,7 +2438,7 @@ modules:
                 - name: new
             - name: netfilter.conntrack_search
               description: Connection Tracker Searches
-              unit: searches/s
+              unit: "searches/s"
               chart_type: line
               dimensions:
                 - name: searched
@@ -2446,7 +2446,7 @@ modules:
                 - name: found
             - name: netfilter.conntrack_errors
               description: Connection Tracker Errors
-              unit: events/s
+              unit: "events/s"
               chart_type: line
               dimensions:
                 - name: icmp_error
@@ -2460,28 +2460,28 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: netfilter.synproxy_syn_received
               description: SYNPROXY SYN Packets received
-              unit: packets/s
+              unit: "packets/s"
               chart_type: line
               dimensions:
                 - name: received
             - name: netfilter.synproxy_conn_reopened
               description: SYNPROXY Connections Reopened
-              unit: connections/s
+              unit: "connections/s"
               chart_type: line
               dimensions:
                 - name: reopened
             - name: netfilter.synproxy_cookies
               description: SYNPROXY TCP Cookies
-              unit: cookies/s
+              unit: "cookies/s"
               chart_type: line
               dimensions:
                 - name: valid
@@ -2494,23 +2494,23 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/health/health.d/zfs.conf
         metric: zfspool.state
         info: ZFS pool ${label:pool} state is degraded
-        os: '*'
+        os: "*"
     metrics:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: zfs pool
-          description: ''
+          description: ""
           labels:
             - name: pool
               description: TBD
           metrics:
             - name: zfspool.state
               description: ZFS pool state
-              unit: boolean
+              unit: "boolean"
               chart_type: line
               dimensions:
                 - name: online
@@ -2527,21 +2527,21 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/health/health.d/zfs.conf
         metric: zfs.memory_ops
         info: number of times ZFS had to limit the ARC growth in the last 10 minutes
-        os: '*'
+        os: "*"
     metrics:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: zfs.arc_size
               description: ZFS ARC Size
-              unit: MiB
+              unit: "MiB"
               chart_type: area
               dimensions:
                 - name: arcsz
@@ -2550,14 +2550,14 @@ modules:
                 - name: max
             - name: zfs.l2_size
               description: ZFS L2 ARC Size
-              unit: MiB
+              unit: "MiB"
               chart_type: area
               dimensions:
                 - name: actual
                 - name: size
             - name: zfs.reads
               description: ZFS Reads
-              unit: reads/s
+              unit: "reads/s"
               chart_type: area
               dimensions:
                 - name: arc
@@ -2567,84 +2567,84 @@ modules:
                 - name: l2
             - name: zfs.bytes
               description: ZFS ARC L2 Read/Write Rate
-              unit: KiB/s
+              unit: "KiB/s"
               chart_type: area
               dimensions:
                 - name: read
                 - name: write
             - name: zfs.hits
               description: ZFS ARC Hits
-              unit: percentage
+              unit: "percentage"
               chart_type: stacked
               dimensions:
                 - name: hits
                 - name: misses
             - name: zfs.hits_rate
               description: ZFS ARC Hits Rate
-              unit: events/s
+              unit: "events/s"
               chart_type: stacked
               dimensions:
                 - name: hits
                 - name: misses
             - name: zfs.dhits
               description: ZFS Demand Hits
-              unit: percentage
+              unit: "percentage"
               chart_type: stacked
               dimensions:
                 - name: hits
                 - name: misses
             - name: zfs.dhits_rate
               description: ZFS Demand Hits Rate
-              unit: events/s
+              unit: "events/s"
               chart_type: stacked
               dimensions:
                 - name: hits
                 - name: misses
             - name: zfs.phits
               description: ZFS Prefetch Hits
-              unit: percentage
+              unit: "percentage"
               chart_type: stacked
               dimensions:
                 - name: hits
                 - name: misses
             - name: zfs.phits_rate
               description: ZFS Prefetch Hits Rate
-              unit: events/s
+              unit: "events/s"
               chart_type: stacked
               dimensions:
                 - name: hits
                 - name: misses
             - name: zfs.mhits
               description: ZFS Metadata Hits
-              unit: percentage
+              unit: "percentage"
               chart_type: stacked
               dimensions:
                 - name: hits
                 - name: misses
             - name: zfs.mhits_rate
               description: ZFS Metadata Hits Rate
-              unit: events/s
+              unit: "events/s"
               chart_type: stacked
               dimensions:
                 - name: hits
                 - name: misses
             - name: zfs.l2hits
               description: ZFS L2 Hits
-              unit: percentage
+              unit: "percentage"
               chart_type: stacked
               dimensions:
                 - name: hits
                 - name: misses
             - name: zfs.l2hits_rate
               description: ZFS L2 Hits Rate
-              unit: events/s
+              unit: "events/s"
               chart_type: stacked
               dimensions:
                 - name: hits
                 - name: misses
             - name: zfs.list_hits
               description: ZFS List Hits
-              unit: hits/s
+              unit: "hits/s"
               chart_type: area
               dimensions:
                 - name: mfu
@@ -2653,14 +2653,14 @@ modules:
                 - name: mru_ghost
             - name: zfs.arc_size_breakdown
               description: ZFS ARC Size Breakdown
-              unit: percentage
+              unit: "percentage"
               chart_type: stacked
               dimensions:
                 - name: recent
                 - name: frequent
             - name: zfs.memory_ops
               description: ZFS Memory Operations
-              unit: operations/s
+              unit: "operations/s"
               chart_type: line
               dimensions:
                 - name: direct
@@ -2668,7 +2668,7 @@ modules:
                 - name: indirect
             - name: zfs.important_ops
               description: ZFS Important Operations
-              unit: operations/s
+              unit: "operations/s"
               chart_type: line
               dimensions:
                 - name: evict_skip
@@ -2677,56 +2677,56 @@ modules:
                 - name: hash_collisions
             - name: zfs.actual_hits
               description: ZFS Actual Cache Hits
-              unit: percentage
+              unit: "percentage"
               chart_type: stacked
               dimensions:
                 - name: hits
                 - name: misses
             - name: zfs.actual_hits_rate
               description: ZFS Actual Cache Hits Rate
-              unit: events/s
+              unit: "events/s"
               chart_type: stacked
               dimensions:
                 - name: hits
                 - name: misses
             - name: zfs.demand_data_hits
               description: ZFS Data Demand Efficiency
-              unit: percentage
+              unit: "percentage"
               chart_type: stacked
               dimensions:
                 - name: hits
                 - name: misses
             - name: zfs.demand_data_hits_rate
               description: ZFS Data Demand Efficiency Rate
-              unit: events/s
+              unit: "events/s"
               chart_type: stacked
               dimensions:
                 - name: hits
                 - name: misses
             - name: zfs.prefetch_data_hits
               description: ZFS Data Prefetch Efficiency
-              unit: percentage
+              unit: "percentage"
               chart_type: stacked
               dimensions:
                 - name: hits
                 - name: misses
             - name: zfs.prefetch_data_hits_rate
               description: ZFS Data Prefetch Efficiency Rate
-              unit: events/s
+              unit: "events/s"
               chart_type: stacked
               dimensions:
                 - name: hits
                 - name: misses
             - name: zfs.hash_elements
               description: ZFS ARC Hash Elements
-              unit: elements
+              unit: "elements"
               chart_type: line
               dimensions:
                 - name: current
                 - name: max
             - name: zfs.hash_chains
               description: ZFS ARC Hash Chains
-              unit: chains
+              unit: "chains"
               chart_type: line
               dimensions:
                 - name: current
@@ -2738,51 +2738,51 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
         metric: btrfs.disk
         info: percentage of allocated BTRFS physical disk space
-        os: '*'
+        os: "*"
       - name: btrfs_data
         link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
         metric: btrfs.data
         info: utilization of BTRFS data space
-        os: '*'
+        os: "*"
       - name: btrfs_metadata
         link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
         metric: btrfs.metadata
         info: utilization of BTRFS metadata space
-        os: '*'
+        os: "*"
       - name: btrfs_system
         link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
         metric: btrfs.system
         info: utilization of BTRFS system space
-        os: '*'
+        os: "*"
       - name: btrfs_device_read_errors
         link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
         metric: btrfs.device_errors
         info: number of encountered BTRFS read errors
-        os: '*'
+        os: "*"
       - name: btrfs_device_write_errors
         link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
         metric: btrfs.device_errors
         info: number of encountered BTRFS write errors
-        os: '*'
+        os: "*"
       - name: btrfs_device_flush_errors
         link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
         metric: btrfs.device_errors
         info: number of encountered BTRFS flush errors
-        os: '*'
+        os: "*"
       - name: btrfs_device_corruption_errors
         link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
         metric: btrfs.device_errors
         info: number of encountered BTRFS corruption errors
-        os: '*'
+        os: "*"
     metrics:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: btrfs filesystem
-          description: ''
+          description: ""
           labels:
             - name: filesystem_uuid
               description: TBD
@@ -2791,7 +2791,7 @@ modules:
           metrics:
             - name: btrfs.disk
               description: BTRFS Physical Disk Allocation
-              unit: MiB
+              unit: "MiB"
               chart_type: stacked
               dimensions:
                 - name: unallocated
@@ -2803,14 +2803,14 @@ modules:
                 - name: sys_used
             - name: btrfs.data
               description: BTRFS Data Allocation
-              unit: MiB
+              unit: "MiB"
               chart_type: stacked
               dimensions:
                 - name: free
                 - name: used
             - name: btrfs.metadata
               description: BTRFS Metadata Allocation
-              unit: MiB
+              unit: "MiB"
               chart_type: stacked
               dimensions:
                 - name: free
@@ -2818,32 +2818,32 @@ modules:
                 - name: reserved
             - name: btrfs.system
               description: BTRFS System Allocation
-              unit: MiB
+              unit: "MiB"
               chart_type: stacked
               dimensions:
                 - name: free
                 - name: used
             - name: btrfs.commits
               description: BTRFS Commits
-              unit: commits
+              unit: "commits"
               chart_type: line
               dimensions:
                 - name: commits
             - name: btrfs.commits_perc_time
               description: BTRFS Commits Time Share
-              unit: percentage
+              unit: "percentage"
               chart_type: line
               dimensions:
                 - name: commits
             - name: btrfs.commit_timings
               description: BTRFS Commit Timings
-              unit: ms
+              unit: "ms"
               chart_type: line
               dimensions:
                 - name: last
                 - name: max
         - name: btrfs device
-          description: ''
+          description: ""
           labels:
             - name: device_id
               description: TBD
@@ -2854,7 +2854,7 @@ modules:
           metrics:
             - name: btrfs.device_errors
               description: BTRFS Device Errors
-              unit: errors
+              unit: "errors"
               chart_type: line
               dimensions:
                 - name: write_errs
@@ -2869,24 +2869,24 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: power device
-          description: ''
+          description: ""
           labels:
             - name: device
               description: TBD
           metrics:
             - name: powersupply.capacity
               description: Battery capacity
-              unit: percentage
+              unit: "percentage"
               chart_type: line
               dimensions:
                 - name: capacity
             - name: powersupply.charge
               description: Battery charge
-              unit: Ah
+              unit: "Ah"
               chart_type: line
               dimensions:
                 - name: empty_design
@@ -2896,7 +2896,7 @@ modules:
                 - name: full_design
             - name: powersupply.energy
               description: Battery energy
-              unit: Wh
+              unit: "Wh"
               chart_type: line
               dimensions:
                 - name: empty_design
@@ -2906,7 +2906,7 @@ modules:
                 - name: full_design
             - name: powersupply.voltage
               description: Power supply voltage
-              unit: V
+              unit: "V"
               chart_type: line
               dimensions:
                 - name: min_design

@@ -5,16 +5,16 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: icecast.listeners
           description: Number Of Listeners
-          unit: listeners
+          unit: "listeners"
           chart_type: line
           dimensions:
             - name: a dimension for each active source

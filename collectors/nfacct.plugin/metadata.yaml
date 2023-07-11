@@ -5,16 +5,16 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: netfilter.netlink_new
           description: Connection Tracker New Connections
-          unit: connections/s
+          unit: "connections/s"
           chart_type: line
           dimensions:
             - name: new
@@ -22,7 +22,7 @@ metrics:
             - name: invalid
         - name: netfilter.netlink_changes
           description: Connection Tracker Changes
-          unit: changes/s
+          unit: "changes/s"
           chart_type: line
           dimensions:
             - name: insert
@@ -30,7 +30,7 @@ metrics:
             - name: delete_list
         - name: netfilter.netlink_search
           description: Connection Tracker Searches
-          unit: searches/s
+          unit: "searches/s"
           chart_type: line
           dimensions:
             - name: searched
@@ -38,7 +38,7 @@ metrics:
             - name: found
         - name: netfilter.netlink_errors
           description: Connection Tracker Errors
-          unit: events/s
+          unit: "events/s"
           chart_type: line
           dimensions:
             - name: icmp_error
@@ -47,7 +47,7 @@ metrics:
             - name: early_drop
         - name: netfilter.netlink_expect
           description: Connection Tracker Expectations
-          unit: expectations/s
+          unit: "expectations/s"
           chart_type: line
           dimensions:
             - name: created
@@ -55,13 +55,13 @@ metrics:
             - name: new
         - name: netfilter.nfacct_packets
           description: Netfilter Accounting Packets
-          unit: packets/s
+          unit: "packets/s"
           chart_type: line
           dimensions:
             - name: a dimension per nfacct object
         - name: netfilter.nfacct_bytes
           description: Netfilter Accounting Bandwidth
-          unit: kilobytes/s
+          unit: "kilobytes/s"
           chart_type: line
           dimensions:
             - name: a dimension per nfacct object

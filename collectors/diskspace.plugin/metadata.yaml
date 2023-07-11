@@ -5,21 +5,21 @@ alerts:
     link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
     metric: disk.space
     info: disk ${label:mount_point} space utilization
-    os: linux freebsd
+    os: "linux freebsd"
   - name: disk_inode_usage
     link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
     metric: disk.inodes
     info: disk ${label:mount_point} inode utilization
-    os: linux freebsd
+    os: "linux freebsd"
 metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: mount point
-      description: ''
+      description: ""
       labels:
         - name: mount_point
           description: TBD
@@ -30,7 +30,7 @@ metrics:
       metrics:
         - name: disk.space
           description: Disk Space Usage
-          unit: GiB
+          unit: "GiB"
           chart_type: stacked
           dimensions:
             - name: avail
@@ -38,7 +38,7 @@ metrics:
             - name: reserved_for_root
         - name: disk.inodes
           description: Disk Files (inodes) Usage
-          unit: inodes
+          unit: "inodes"
           chart_type: stacked
           dimensions:
             - name: avail

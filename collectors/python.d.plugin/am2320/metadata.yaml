@@ -5,22 +5,22 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: am2320.temperature
           description: Temperature
-          unit: celsius
+          unit: "celsius"
           chart_type: line
           dimensions:
             - name: temperature
         - name: am2320.humidity
           description: Relative Humidity
-          unit: percentage
+          unit: "percentage"
           chart_type: line
           dimensions:
             - name: humidity

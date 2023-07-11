@@ -5,16 +5,16 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: disk
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: ioping.latency
           description: Read Latency
-          unit: microseconds
+          unit: "microseconds"
           chart_type: line
           dimensions:
             - name: latency

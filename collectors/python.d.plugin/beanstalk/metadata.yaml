@@ -7,41 +7,41 @@ alerts:
     info: number of buried jobs across all tubes. You need to manually kick them so
       they can be processed. Presence of buried jobs in a tube does not affect new
       jobs.
-    os: freebsd
+    os: "freebsd"
 metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: beanstalk.cpu_usage
           description: Cpu Usage
-          unit: cpu time
+          unit: "cpu time"
           chart_type: area
           dimensions:
             - name: user
             - name: system
         - name: beanstalk.jobs_rate
           description: Jobs Rate
-          unit: jobs/s
+          unit: "jobs/s"
           chart_type: line
           dimensions:
             - name: total
             - name: timeouts
         - name: beanstalk.connections_rate
           description: Connections Rate
-          unit: connections/s
+          unit: "connections/s"
           chart_type: area
           dimensions:
             - name: connections
         - name: beanstalk.commands_rate
           description: Commands Rate
-          unit: commands/s
+          unit: "commands/s"
           chart_type: stacked
           dimensions:
             - name: put
@@ -65,13 +65,13 @@ metrics:
             - name: pause-tube
         - name: beanstalk.connections_rate
           description: Current Tubes
-          unit: tubes
+          unit: "tubes"
           chart_type: area
           dimensions:
             - name: tubes
         - name: beanstalk.current_jobs
           description: Current Jobs
-          unit: jobs
+          unit: "jobs"
           chart_type: stacked
           dimensions:
             - name: urgent
@@ -81,7 +81,7 @@ metrics:
             - name: buried
         - name: beanstalk.current_connections
           description: Current Connections
-          unit: connections
+          unit: "connections"
           chart_type: line
           dimensions:
             - name: written
@@ -90,30 +90,30 @@ metrics:
             - name: waiting
         - name: beanstalk.binlog
           description: Binlog
-          unit: records/s
+          unit: "records/s"
           chart_type: line
           dimensions:
             - name: written
             - name: migrated
         - name: beanstalk.uptime
           description: seconds
-          unit: seconds
+          unit: "seconds"
           chart_type: line
           dimensions:
             - name: uptime
     - name: tube
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: beanstalk.jobs_rate
           description: Jobs Rate
-          unit: jobs/s
+          unit: "jobs/s"
           chart_type: area
           dimensions:
             - name: jobs
         - name: beanstalk.jobs
           description: Jobs
-          unit: jobs
+          unit: "jobs"
           chart_type: stacked
           dimensions:
             - name: urgent
@@ -123,7 +123,7 @@ metrics:
             - name: buried
         - name: beanstalk.connections
           description: Connections
-          unit: connections
+          unit: "connections"
           chart_type: stacked
           dimensions:
             - name: using
@@ -131,14 +131,14 @@ metrics:
             - name: watching
         - name: beanstalk.commands
           description: Commands
-          unit: commands/s
+          unit: "commands/s"
           chart_type: stacked
           dimensions:
             - name: deletes
             - name: pauses
         - name: beanstalk.pause
           description: Pause
-          unit: seconds
+          unit: "seconds"
           chart_type: stacked
           dimensions:
             - name: since

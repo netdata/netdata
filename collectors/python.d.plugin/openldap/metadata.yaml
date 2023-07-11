@@ -5,47 +5,47 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: openldap.total_connections
           description: Total Connections
-          unit: connections/s
+          unit: "connections/s"
           chart_type: line
           dimensions:
             - name: connections
         - name: openldap.traffic_stats
           description: Traffic
-          unit: KiB/s
+          unit: "KiB/s"
           chart_type: line
           dimensions:
             - name: sent
         - name: openldap.operations_status
           description: Operations Status
-          unit: ops/s
+          unit: "ops/s"
           chart_type: line
           dimensions:
             - name: completed
             - name: initiated
         - name: openldap.referrals
           description: Referrals
-          unit: referrals/s
+          unit: "referrals/s"
           chart_type: line
           dimensions:
             - name: sent
         - name: openldap.entries
           description: Entries
-          unit: entries/s
+          unit: "entries/s"
           chart_type: line
           dimensions:
             - name: sent
         - name: openldap.ldap_operations
           description: Operations
-          unit: ops/s
+          unit: "ops/s"
           chart_type: line
           dimensions:
             - name: bind
@@ -57,7 +57,7 @@ metrics:
             - name: compare
         - name: openldap.waiters
           description: Waiters
-          unit: waiters/s
+          unit: "waiters/s"
           chart_type: line
           dimensions:
             - name: write

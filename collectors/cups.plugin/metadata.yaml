@@ -5,16 +5,16 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: cups.dests_state
           description: Destinations by state
-          unit: dests
+          unit: "dests"
           chart_type: stacked
           dimensions:
             - name: idle
@@ -22,7 +22,7 @@ metrics:
             - name: stopped
         - name: cups.dests_option
           description: Destinations by option
-          unit: dests
+          unit: "dests"
           chart_type: line
           dimensions:
             - name: total
@@ -30,7 +30,7 @@ metrics:
             - name: shared
         - name: cups.job_num
           description: Active jobs
-          unit: jobs
+          unit: "jobs"
           chart_type: stacked
           dimensions:
             - name: pending
@@ -38,19 +38,19 @@ metrics:
             - name: processing
         - name: cups.job_size
           description: Active jobs size
-          unit: KB
+          unit: "KB"
           chart_type: stacked
           dimensions:
             - name: pending
             - name: held
             - name: processing
     - name: destination
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: cups.destination_job_num
           description: Active jobs of {destination}
-          unit: jobs
+          unit: "jobs"
           chart_type: stacked
           dimensions:
             - name: pending
@@ -58,7 +58,7 @@ metrics:
             - name: processing
         - name: cups.destination_job_size
           description: Active jobs size of {destination}
-          unit: KB
+          unit: "KB"
           chart_type: stacked
           dimensions:
             - name: pending

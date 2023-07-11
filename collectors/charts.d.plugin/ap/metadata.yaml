@@ -5,49 +5,49 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: wireless device
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: ap.clients
           description: Connected clients to ${ssid} on ${dev}
-          unit: clients
+          unit: "clients"
           chart_type: line
           dimensions:
             - name: clients
         - name: ap.net
           description: Bandwidth for ${ssid} on ${dev}
-          unit: kilobits/s
+          unit: "kilobits/s"
           chart_type: area
           dimensions:
             - name: received
             - name: sent
         - name: ap.packets
           description: Packets for ${ssid} on ${dev}
-          unit: packets/s
+          unit: "packets/s"
           chart_type: line
           dimensions:
             - name: received
             - name: sent
         - name: ap.issues
           description: Transmit Issues for ${ssid} on ${dev}
-          unit: issues/s
+          unit: "issues/s"
           chart_type: line
           dimensions:
             - name: retries
             - name: failures
         - name: ap.signal
           description: Average Signal for ${ssid} on ${dev}
-          unit: dBm
+          unit: "dBm"
           chart_type: line
           dimensions:
             - name: average signal
         - name: ap.bitrate
           description: Bitrate for ${ssid} on ${dev}
-          unit: Mbps
+          unit: "Mbps"
           chart_type: line
           dimensions:
             - name: receive

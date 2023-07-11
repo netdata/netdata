@@ -7,16 +7,16 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: ipmi.sel
               description: IPMI Events
-              unit: events
+              unit: "events"
               chart_type: area
               dimensions:
                 - name: events
@@ -27,16 +27,16 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/health/health.d/ipmi.conf
         metric: ipmi.sensor_state
         info: IPMI sensor ${label:sensor} (${label:component}) state
-        os: linux
+        os: "linux"
     metrics:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: sensor
-          description: ''
+          description: ""
           labels:
             - name: sensor
               description: TBD
@@ -47,7 +47,7 @@ modules:
           metrics:
             - name: ipmi.sensor_state
               description: IPMI Sensors State
-              unit: state
+              unit: "state"
               chart_type: line
               dimensions:
                 - name: nominal
@@ -56,43 +56,43 @@ modules:
                 - name: unknown
             - name: ipmi.sensor_temperature_c
               description: IPMI Sensor Temperature Celsius
-              unit: Celsius
+              unit: "Celsius"
               chart_type: line
               dimensions:
                 - name: temperature
             - name: ipmi.sensor_temperature_f
               description: IPMI Sensor Temperature Fahrenheit
-              unit: Fahrenheit
+              unit: "Fahrenheit"
               chart_type: line
               dimensions:
                 - name: temperature
             - name: ipmi.sensor_voltage
               description: IPMI Sensor Voltage
-              unit: Volts
+              unit: "Volts"
               chart_type: line
               dimensions:
                 - name: voltage
             - name: ipmi.sensor_ampere
               description: IPMI Sensor Current
-              unit: Amps
+              unit: "Amps"
               chart_type: line
               dimensions:
                 - name: ampere
             - name: ipmi.sensor_fan_speed
               description: IPMI Sensor Fans Speed
-              unit: RPM
+              unit: "RPM"
               chart_type: line
               dimensions:
                 - name: rotations
             - name: ipmi.sensor_power
               description: IPMI Sensor Power
-              unit: Watts
+              unit: "Watts"
               chart_type: line
               dimensions:
                 - name: power
             - name: ipmi.sensor_reading_percent
               description: IPMI Sensor Reading Percentage
-              unit: '%'
+              unit: "%"
               chart_type: line
               dimensions:
                 - name: percentage

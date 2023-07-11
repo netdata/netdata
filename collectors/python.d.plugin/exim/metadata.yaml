@@ -5,16 +5,16 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: exim.qemails
           description: Exim Queue Emails
-          unit: emails
+          unit: "emails"
           chart_type: line
           dimensions:
             - name: emails

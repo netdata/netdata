@@ -5,16 +5,16 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: tor.traffic
           description: Tor Traffic
-          unit: KiB/s
+          unit: "KiB/s"
           chart_type: area
           dimensions:
             - name: read

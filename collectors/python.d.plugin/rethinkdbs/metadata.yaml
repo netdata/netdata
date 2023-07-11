@@ -5,64 +5,64 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: rethinkdb.cluster_connected_servers
           description: Connected Servers
-          unit: servers
+          unit: "servers"
           chart_type: stacked
           dimensions:
             - name: connected
             - name: missing
         - name: rethinkdb.cluster_clients_active
           description: Active Clients
-          unit: clients
+          unit: "clients"
           chart_type: line
           dimensions:
             - name: active
         - name: rethinkdb.cluster_queries
           description: Queries
-          unit: queries/s
+          unit: "queries/s"
           chart_type: line
           dimensions:
             - name: queries
         - name: rethinkdb.cluster_documents
           description: Documents
-          unit: documents/s
+          unit: "documents/s"
           chart_type: line
           dimensions:
             - name: reads
             - name: writes
     - name: database server
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: rethinkdb.client_connections
           description: Client Connections
-          unit: connections
+          unit: "connections"
           chart_type: line
           dimensions:
             - name: connections
         - name: rethinkdb.clients_active
           description: Active Clients
-          unit: clients
+          unit: "clients"
           chart_type: line
           dimensions:
             - name: active
         - name: rethinkdb.queries
           description: Queries
-          unit: queries/s
+          unit: "queries/s"
           chart_type: line
           dimensions:
             - name: queries
         - name: rethinkdb.documents
           description: Documents
-          unit: documents/s
+          unit: "documents/s"
           chart_type: line
           dimensions:
             - name: reads

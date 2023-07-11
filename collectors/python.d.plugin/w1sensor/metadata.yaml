@@ -5,16 +5,16 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: w1sensor.temp
           description: 1-Wire Temperature Sensor
-          unit: Celsius
+          unit: "Celsius"
           chart_type: line
           dimensions:
             - name: a dimension per sensor

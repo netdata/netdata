@@ -5,22 +5,22 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: changefinder.scores
           description: ChangeFinder
-          unit: score
+          unit: "score"
           chart_type: line
           dimensions:
             - name: a dimension per chart
         - name: changefinder.flags
           description: ChangeFinder
-          unit: flag
+          unit: "flag"
           chart_type: stacked
           dimensions:
             - name: a dimension per chart

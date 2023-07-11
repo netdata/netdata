@@ -7,18 +7,18 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: node
-          description: ''
+          description: ""
           labels:
             - name: numa_node
               description: TBD
           metrics:
             - name: mem.fragmentation_index_dma
               description: Memory fragmentation index for each order
-              unit: index
+              unit: "index"
               chart_type: line
               dimensions:
                 - name: order0
@@ -34,7 +34,7 @@ modules:
                 - name: order10
             - name: mem.fragmentation_index_dma32
               description: Memory fragmentation index for each order
-              unit: index
+              unit: "index"
               chart_type: line
               dimensions:
                 - name: order0
@@ -50,7 +50,7 @@ modules:
                 - name: order10
             - name: mem.fragmentation_index_normal
               description: Memory fragmentation index for each order
-              unit: index
+              unit: "index"
               chart_type: line
               dimensions:
                 - name: order0
@@ -71,34 +71,34 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ''
+      description: ""
       availability: []
       scopes:
         - name: global
-          description: ''
+          description: ""
           labels: []
           metrics:
             - name: system.zswap_pool_compression_ratio
               description: Zswap compression ratio
-              unit: ratio
+              unit: "ratio"
               chart_type: line
               dimensions:
                 - name: compression_ratio
             - name: system.zswap_pool_compressed_size
               description: Zswap compressed bytes currently stored
-              unit: bytes
+              unit: "bytes"
               chart_type: area
               dimensions:
                 - name: compressed_size
             - name: system.zswap_pool_raw_size
               description: Zswap uncompressed bytes currently stored
-              unit: bytes
+              unit: "bytes"
               chart_type: area
               dimensions:
                 - name: uncompressed_size
             - name: system.zswap_rejections
               description: Zswap rejections
-              unit: rejections/s
+              unit: "rejections/s"
               chart_type: stacked
               dimensions:
                 - name: compress_poor
@@ -107,26 +107,26 @@ modules:
                 - name: reclaim_fail
             - name: system.zswap_pool_limit_hit
               description: Zswap pool limit was reached
-              unit: events/s
+              unit: "events/s"
               chart_type: line
               dimensions:
                 - name: limit
             - name: system.zswap_written_back_raw_bytes
               description: Zswap uncomressed bytes written back when pool limit was
                 reached
-              unit: bytes/s
+              unit: "bytes/s"
               chart_type: area
               dimensions:
                 - name: written_back
             - name: system.zswap_same_filled_raw_size
               description: Zswap same-value filled uncompressed bytes currently stored
-              unit: bytes
+              unit: "bytes"
               chart_type: area
               dimensions:
                 - name: same_filled
             - name: system.zswap_duplicate_entry
               description: Zswap duplicate store was encountered
-              unit: entries/s
+              unit: "entries/s"
               chart_type: line
               dimensions:
                 - name: duplicate

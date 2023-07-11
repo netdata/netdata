@@ -5,38 +5,38 @@ alerts:
     link: https://github.com/netdata/netdata/blob/master/health/health.d/nut.conf
     metric: nut.charge
     info: average UPS charge over the last minute
-    os: '*'
+    os: "*"
   - name: nut_10min_ups_load
     link: https://github.com/netdata/netdata/blob/master/health/health.d/nut.conf
     metric: nut.load
     info: average UPS load over the last 10 minutes
-    os: '*'
+    os: "*"
 metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: ups
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: nut.charge
           description: UPS Charge
-          unit: percentage
+          unit: "percentage"
           chart_type: area
           dimensions:
             - name: charge
         - name: nut.runtime
           description: UPS Runtime
-          unit: seconds
+          unit: "seconds"
           chart_type: line
           dimensions:
             - name: runtime
         - name: nut.battery.voltage
           description: UPS Battery Voltage
-          unit: Volts
+          unit: "Volts"
           chart_type: line
           dimensions:
             - name: voltage
@@ -45,7 +45,7 @@ metrics:
             - name: nominal
         - name: nut.input.voltage
           description: UPS Input Voltage
-          unit: Volts
+          unit: "Volts"
           chart_type: line
           dimensions:
             - name: voltage
@@ -53,44 +53,44 @@ metrics:
             - name: nominal
         - name: nut.input.current
           description: UPS Input Current
-          unit: Ampere
+          unit: "Ampere"
           chart_type: line
           dimensions:
             - name: nominal
         - name: nut.input.frequency
           description: UPS Input Frequency
-          unit: Hz
+          unit: "Hz"
           chart_type: line
           dimensions:
             - name: frequency
             - name: nominal
         - name: nut.output.voltage
           description: UPS Output Voltage
-          unit: Volts
+          unit: "Volts"
           chart_type: line
           dimensions:
             - name: voltage
         - name: nut.load
           description: UPS Load
-          unit: percentage
+          unit: "percentage"
           chart_type: area
           dimensions:
             - name: load
         - name: nut.load_usage
           description: UPS Load Usage
-          unit: Watts
+          unit: "Watts"
           chart_type: area
           dimensions:
             - name: load_usage
         - name: nut.temperature
           description: UPS Temperature
-          unit: temperature
+          unit: "temperature"
           chart_type: line
           dimensions:
             - name: temp
         - name: nut.clients
           description: UPS Connected Clients
-          unit: clients
+          unit: "clients"
           chart_type: area
           dimensions:
             - name: clients

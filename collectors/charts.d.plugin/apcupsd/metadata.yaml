@@ -5,39 +5,39 @@ alerts:
     link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
     metric: apcupsd.charge
     info: average UPS charge over the last minute
-    os: '*'
+    os: "*"
   - name: apcupsd_10min_ups_load
     link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
     metric: apcupsd.load
     info: average UPS load over the last 10 minutes
-    os: '*'
+    os: "*"
 metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: ups
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: apcupsd.charge
           description: UPS Charge
-          unit: percentage
+          unit: "percentage"
           chart_type: area
           dimensions:
             - name: charge
         - name: apcupsd.battery.voltage
           description: UPS Battery Voltage
-          unit: Volts
+          unit: "Volts"
           chart_type: line
           dimensions:
             - name: voltage
             - name: nominal
         - name: apcupsd.input.voltage
           description: UPS Input Voltage
-          unit: Volts
+          unit: "Volts"
           chart_type: line
           dimensions:
             - name: voltage
@@ -45,44 +45,44 @@ metrics:
             - name: max
         - name: apcupsd.output.voltage
           description: UPS Output Voltage
-          unit: Volts
+          unit: "Volts"
           chart_type: line
           dimensions:
             - name: absolute
             - name: nominal
         - name: apcupsd.input.frequency
           description: UPS Input Voltage
-          unit: Hz
+          unit: "Hz"
           chart_type: line
           dimensions:
             - name: frequency
         - name: apcupsd.load
           description: UPS Load
-          unit: percentage
+          unit: "percentage"
           chart_type: area
           dimensions:
             - name: load
         - name: apcupsd.load_usage
           description: UPS Load Usage
-          unit: Watts
+          unit: "Watts"
           chart_type: area
           dimensions:
             - name: load
         - name: apcupsd.temperature
           description: UPS Temperature
-          unit: Celsius
+          unit: "Celsius"
           chart_type: line
           dimensions:
             - name: temp
         - name: apcupsd.time
           description: UPS Time Remaining
-          unit: Minutes
+          unit: "Minutes"
           chart_type: area
           dimensions:
             - name: time
         - name: apcupsd.online
           description: UPS ONLINE flag
-          unit: boolean
+          unit: "boolean"
           chart_type: line
           dimensions:
             - name: online

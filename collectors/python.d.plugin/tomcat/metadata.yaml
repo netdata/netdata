@@ -5,43 +5,43 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: tomcat.accesses
           description: Requests
-          unit: requests/s
+          unit: "requests/s"
           chart_type: area
           dimensions:
             - name: accesses
             - name: errors
         - name: tomcat.bandwidth
           description: Bandwidth
-          unit: KiB/s
+          unit: "KiB/s"
           chart_type: area
           dimensions:
             - name: sent
             - name: received
         - name: tomcat.processing_time
           description: processing time
-          unit: seconds
+          unit: "seconds"
           chart_type: area
           dimensions:
             - name: processing time
         - name: tomcat.threads
           description: Threads
-          unit: current threads
+          unit: "current threads"
           chart_type: area
           dimensions:
             - name: current
             - name: busy
         - name: tomcat.jvm
           description: JVM Memory Pool Usage
-          unit: MiB
+          unit: "MiB"
           chart_type: stacked
           dimensions:
             - name: free
@@ -53,7 +53,7 @@ metrics:
             - name: metaspace
         - name: tomcat.jvm_eden
           description: Eden Memory Usage
-          unit: MiB
+          unit: "MiB"
           chart_type: area
           dimensions:
             - name: used
@@ -61,7 +61,7 @@ metrics:
             - name: max
         - name: tomcat.jvm_survivor
           description: Survivor Memory Usage
-          unit: MiB
+          unit: "MiB"
           chart_type: area
           dimensions:
             - name: used
@@ -69,7 +69,7 @@ metrics:
             - name: max
         - name: tomcat.jvm_tenured
           description: Tenured Memory Usage
-          unit: MiB
+          unit: "MiB"
           chart_type: area
           dimensions:
             - name: used

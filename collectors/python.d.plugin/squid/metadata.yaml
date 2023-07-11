@@ -5,16 +5,16 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: squid instance
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: squid.clients_net
           description: Squid Client Bandwidth
-          unit: kilobits/s
+          unit: "kilobits/s"
           chart_type: area
           dimensions:
             - name: in
@@ -22,7 +22,7 @@ metrics:
             - name: hits
         - name: squid.clients_requests
           description: Squid Client Requests
-          unit: requests/s
+          unit: "requests/s"
           chart_type: line
           dimensions:
             - name: requests
@@ -30,14 +30,14 @@ metrics:
             - name: errors
         - name: squid.servers_net
           description: Squid Server Bandwidth
-          unit: kilobits/s
+          unit: "kilobits/s"
           chart_type: area
           dimensions:
             - name: in
             - name: out
         - name: squid.servers_requests
           description: Squid Server Requests
-          unit: requests/s
+          unit: "requests/s"
           chart_type: line
           dimensions:
             - name: requests

@@ -5,28 +5,28 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: mem.slabmemory
           description: Memory Usage
-          unit: B
+          unit: "B"
           chart_type: line
           dimensions:
             - name: a dimension per cache
         - name: mem.slabfilling
           description: Object Filling
-          unit: '%'
+          unit: "%"
           chart_type: line
           dimensions:
             - name: a dimension per cache
         - name: mem.slabwaste
           description: Memory waste
-          unit: B
+          unit: "B"
           chart_type: line
           dimensions:
             - name: a dimension per cache

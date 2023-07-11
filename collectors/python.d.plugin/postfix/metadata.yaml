@@ -5,22 +5,22 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: postfix.qemails
           description: Postfix Queue Emails
-          unit: emails
+          unit: "emails"
           chart_type: line
           dimensions:
             - name: emails
         - name: postfix.qsize
           description: Postfix Queue Emails Size
-          unit: KiB
+          unit: "KiB"
           chart_type: area
           dimensions:
             - name: size

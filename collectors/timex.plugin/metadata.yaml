@@ -5,29 +5,29 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: system.clock_sync_state
           description: System Clock Synchronization State
-          unit: state
+          unit: "state"
           chart_type: line
           dimensions:
             - name: state
         - name: system.clock_status
           description: System Clock Status
-          unit: status
+          unit: "status"
           chart_type: line
           dimensions:
             - name: unsync
             - name: clockerr
         - name: system.clock_sync_offset
           description: Computed Time Offset Between Local System and Reference Clock
-          unit: milliseconds
+          unit: "milliseconds"
           chart_type: line
           dimensions:
             - name: offset

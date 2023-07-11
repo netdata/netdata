@@ -5,27 +5,27 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: gearman.total_jobs
           description: Total Jobs
-          unit: Jobs
+          unit: "Jobs"
           chart_type: line
           dimensions:
             - name: Pending
             - name: Running
     - name: gearman job
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: gearman.single_job
           description: '{job_name}'
-          unit: Jobs
+          unit: "Jobs"
           chart_type: stacked
           dimensions:
             - name: Pending

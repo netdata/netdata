@@ -5,52 +5,52 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: chip
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: sensors.temperature
           description: Temperature
-          unit: Celsius
+          unit: "Celsius"
           chart_type: line
           dimensions:
             - name: a dimension per sensor
         - name: sensors.voltage
           description: Voltage
-          unit: Volts
+          unit: "Volts"
           chart_type: line
           dimensions:
             - name: a dimension per sensor
         - name: sensors.current
           description: Current
-          unit: Ampere
+          unit: "Ampere"
           chart_type: line
           dimensions:
             - name: a dimension per sensor
         - name: sensors.power
           description: Power
-          unit: Watt
+          unit: "Watt"
           chart_type: line
           dimensions:
             - name: a dimension per sensor
         - name: sensors.fan
           description: Fans speed
-          unit: Rotations/min
+          unit: "Rotations/min"
           chart_type: line
           dimensions:
             - name: a dimension per sensor
         - name: sensors.energy
           description: Energy
-          unit: Joule
+          unit: "Joule"
           chart_type: line
           dimensions:
             - name: a dimension per sensor
         - name: sensors.humidity
           description: Humidity
-          unit: Percent
+          unit: "Percent"
           chart_type: line
           dimensions:
             - name: a dimension per sensor

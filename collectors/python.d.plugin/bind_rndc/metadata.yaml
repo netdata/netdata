@@ -5,16 +5,16 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ''
+  description: ""
   availability: []
   scopes:
     - name: global
-      description: ''
+      description: ""
       labels: []
       metrics:
         - name: bind_rndc.name_server_statistics
           description: Name Server Statistics
-          unit: stats
+          unit: "stats"
           chart_type: line
           dimensions:
             - name: requests
@@ -31,19 +31,19 @@ metrics:
             - name: dropped_queries
         - name: bind_rndc.incoming_queries
           description: Incoming queries
-          unit: queries
+          unit: "queries"
           chart_type: line
           dimensions:
             - name: a dimension per incoming query type
         - name: bind_rndc.outgoing_queries
           description: Outgoing queries
-          unit: queries
+          unit: "queries"
           chart_type: line
           dimensions:
             - name: a dimension per outgoing query type
         - name: bind_rndc.stats_size
           description: Named Stats File Size
-          unit: MiB
+          unit: "MiB"
           chart_type: line
           dimensions:
             - name: stats_size
