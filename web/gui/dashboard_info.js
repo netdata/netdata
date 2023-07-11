@@ -801,6 +801,12 @@ netdataDashboard.menu = {
         info: 'Performance metrics exctracted from the Apache server <b>access.log</b>. If Go plugins are enabled, see also <a href="#menu_web_log_apache" target="_blank">the web log apache collector</a>.'
     },
 
+    'Nginx access.log': {
+        title: 'Nginx access.log',
+        icon: '<i class="fas fa-book"></i>',
+        info: 'Performance metrics exctracted from the Nginx server <b>access.log</b>. If Go plugins are enabled, see also <a href="#menu_web_log_nginx" target="_blank">the web log nginx collector</a>.'
+    },
+
     'Netdata error.log': {
         title: 'Netdata error.log',
         icon: '<i class="fas fa-book"></i>',
