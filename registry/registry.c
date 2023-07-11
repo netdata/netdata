@@ -308,19 +308,13 @@ int registry_request_delete_json(RRDHOST *host, struct web_client *w, char *pers
 // public SEARCH request
 
 // the main method for searching the URLs of a netdata
-int registry_request_search_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url, char *request_machine, time_t when) {
+int registry_request_search_json(RRDHOST *host, struct web_client *w, char *person_guid, char *request_machine) {
     if(!registry.enabled)
         return registry_json_disabled(host, w, "search");
 
-    if(!registry_is_valid_url(url)) {
-        buffer_flush(w->response.data);
-        buffer_strcat(w->response.data, "Invalid URL given in the request");
-        return HTTP_RESP_BAD_REQUEST;
-    }
-
     registry_lock();
 
-    REGISTRY_MACHINE *m = registry_request_machine(person_guid, machine_guid, url, request_machine, when);
+    REGISTRY_MACHINE *m = registry_request_machine(person_guid, request_machine);
     if(!m) {
         registry_json_header(host, w, "search", REGISTRY_STATUS_FAILED);
         registry_json_footer(w);

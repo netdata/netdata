@@ -55,6 +55,7 @@ REGISTRY_MACHINE *registry_machine_allocate(const char *machine_guid, time_t whe
 
     m->first_t = m->last_t = (uint32_t)when;
     m->usages = 0;
+    m->links = 0;
 
     registry.machines_count++;
 

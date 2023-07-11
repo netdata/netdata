@@ -1050,15 +1050,15 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
             return registry_request_delete_json(host, w, person_guid, machine_guid, machine_url, delete_url, now_realtime_sec());
 
         case 'S':
-            if(unlikely(!machine_guid || !machine_url || !search_machine_guid)) {
-                netdata_log_error("Invalid registry request - search requires these parameters: machine ('%s'), url ('%s'), for ('%s')", machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", search_machine_guid?search_machine_guid:"UNSET");
+            if(unlikely(!search_machine_guid)) {
+                netdata_log_error("Invalid registry request - search requires these parameters: for ('%s')", search_machine_guid?search_machine_guid:"UNSET");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Search request.");
                 return HTTP_RESP_BAD_REQUEST;
             }
 
             web_client_enable_tracking_required(w);
-            return registry_request_search_json(host, w, person_guid, machine_guid, machine_url, search_machine_guid, now_realtime_sec());
+            return registry_request_search_json(host, w, person_guid, search_machine_guid);
 
         case 'W':
             if(unlikely(!machine_guid || !machine_url || !to_person_guid)) {
