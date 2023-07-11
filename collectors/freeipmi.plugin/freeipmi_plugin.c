@@ -518,7 +518,7 @@ static int netdata_get_ipmi_sel_events_count(struct ipmi_monitoring_ipmi_config 
         goto cleanup;
     }
 
-    netdata_update_ipmi_sel_events_count(state, sel_count >= 0 ? sel_count : 0);
+    netdata_update_ipmi_sel_events_count(state, sel_count);
 
     rv = 0;
 
