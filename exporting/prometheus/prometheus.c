@@ -957,7 +957,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
         prometheus_exporter_instance->before,
         output_options);
 
-    dfe_start_reentrant(rrdhost_root_index, host)
+    dfe_start_reentrant(rrdb.rrdhost_root_index, host)
     {
         rrd_stats_api_v1_charts_allmetrics_prometheus(
             prometheus_exporter_instance, host, filter_string, wb, prefix, exporting_options, 1, output_options);

@@ -829,7 +829,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
     size_t max_ml_anomalous = 0, max_ml_normal = 0, max_ml_trained = 0, max_ml_pending = 0, max_ml_silenced = 0;
     {
         RRDHOST *host;
-        dfe_start_read(rrdhost_root_index, host) {
+        dfe_start_read(rrdb.rrdhost_root_index, host) {
                     RRDHOST_STATUS s;
                     rrdhost_status(host, now, &s);
                     buffer_json_add_array_item_array(wb);

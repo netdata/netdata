@@ -209,7 +209,7 @@ static RRDHOST *rrdhost_find_by_node_id(const char *node_id) {
         return NULL;
 
     RRDHOST *host = NULL;
-    dfe_start_read(rrdhost_root_index, host) {
+    dfe_start_read(rrdb.rrdhost_root_index, host) {
         if(!host->node_id) continue;
 
         if(uuid_memcmp(&uuid, host->node_id) == 0)

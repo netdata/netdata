@@ -117,3 +117,8 @@ STRING *rrd_string_strdupz(const char *s) {
     freez(tmp);
     return ret;
 }
+
+struct rrdb rrdb = {
+    NULL,
+    NULL
+};

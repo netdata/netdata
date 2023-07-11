@@ -728,7 +728,7 @@ skip_run:
 static void cleanup_health_log(void)
 {
     RRDHOST *host;
-    dfe_start_reentrant(rrdhost_root_index, host) {
+    dfe_start_reentrant(rrdb.rrdhost_root_index, host) {
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))
             continue;
         sql_health_alarm_log_cleanup(host);
@@ -990,7 +990,7 @@ static void start_all_host_load_context(uv_work_t *req __maybe_unused)
     struct host_context_load_thread *hclt = callocz(max_threads, sizeof(*hclt));
 
     size_t thread_index;
-    dfe_start_reentrant(rrdhost_root_index, host) {
+    dfe_start_reentrant(rrdb.rrdhost_root_index, host) {
        if (rrdhost_flag_check(host, RRDHOST_FLAG_CONTEXT_LOAD_IN_PROGRESS) ||
            !rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
            continue;
@@ -1141,7 +1141,7 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
     if (!data->max_count)
         transaction_started = !db_execute(db_meta, "BEGIN TRANSACTION;");
 
-    dfe_start_reentrant(rrdhost_root_index, host) {
+    dfe_start_reentrant(rrdb.rrdhost_root_index, host) {
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) || !rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE))
             continue;
 

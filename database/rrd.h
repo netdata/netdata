@@ -10,6 +10,7 @@ extern "C" {
 #include "libnetdata/libnetdata.h"
 
 // forward typedefs
+typedef struct rrdb RRDB;
 typedef struct rrdhost RRDHOST;
 typedef struct rrddim RRDDIM;
 typedef struct rrdset RRDSET;
@@ -990,7 +991,6 @@ extern RRDHOST *localhost;
 #define rrdhost_is_online(host) ((host) == localhost || rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST) || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED))
 bool rrdhost_matches_window(RRDHOST *host, time_t after, time_t before, time_t now);
 
-extern DICTIONARY *rrdhost_root_index;
 size_t rrdhost_hosts_available(void);
 
 RRDHOST_ACQUIRED *rrdhost_find_and_acquire(const char *machine_guid);
@@ -1279,6 +1279,16 @@ static inline void rrdhost_retention(RRDHOST *host, time_t now, bool online, tim
 #include "sqlite/sqlite_aclk_alert.h"
 #include "sqlite/sqlite_aclk_node.h"
 #include "sqlite/sqlite_health.h"
+
+// ----------------------------------------------------------------------------
+// RRDB 
+
+struct rrdb {
+    DICTIONARY *rrdhost_root_index;
+    DICTIONARY *rrdhost_root_index_hostname;
+};
+
+extern struct rrdb rrdb;
 
 #ifdef __cplusplus
 }

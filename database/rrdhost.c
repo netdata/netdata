@@ -48,7 +48,7 @@ RRDHOST *find_host_by_node_id(char *node_id) {
         return NULL;
 
     RRDHOST *host, *ret = NULL;
-    dfe_start_read(rrdhost_root_index, host) {
+    dfe_start_read(rrdb.rrdhost_root_index, host) {
         if (host->node_id && !(uuid_memcmp(host->node_id, &node_uuid))) {
             ret = host;
             break;
@@ -62,27 +62,22 @@ RRDHOST *find_host_by_node_id(char *node_id) {
 // ----------------------------------------------------------------------------
 // RRDHOST indexes management
 
-DICTIONARY *rrdhost_root_index = NULL;
-static DICTIONARY *rrdhost_root_index_hostname = NULL;
+static void rrdhost_indexes_init() {
+    internal_fatal(rrdb.rrdhost_root_index || rrdb.rrdhost_root_index_hostname,
+                   "Host indexes have already been initialized");
 
-static inline void rrdhost_init() {
-    if(unlikely(!rrdhost_root_index)) {
-        rrdhost_root_index = dictionary_create_advanced(
-            DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE,
-            &dictionary_stats_category_rrdhost, 0);
-    }
+    DICT_OPTIONS dict_opts = DICT_OPTION_NAME_LINK_DONT_CLONE |
+                             DICT_OPTION_VALUE_LINK_DONT_CLONE |
+                             DICT_OPTION_DONT_OVERWRITE_VALUE;
 
-    if(unlikely(!rrdhost_root_index_hostname)) {
-        rrdhost_root_index_hostname = dictionary_create_advanced(
-            DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE,
-            &dictionary_stats_category_rrdhost, 0);
-    }
+    rrdb.rrdhost_root_index = dictionary_create_advanced(dict_opts, &dictionary_stats_category_rrdhost, 0);
+    rrdb.rrdhost_root_index_hostname = dictionary_create_advanced(dict_opts, &dictionary_stats_category_rrdhost, 0);
 }
 
 RRDHOST_ACQUIRED *rrdhost_find_and_acquire(const char *machine_guid) {
     netdata_log_debug(D_RRD_CALLS, "rrdhost_find_and_acquire() host %s", machine_guid);
 
-    return (RRDHOST_ACQUIRED *)dictionary_get_and_acquire_item(rrdhost_root_index, machine_guid);
+    return (RRDHOST_ACQUIRED *)dictionary_get_and_acquire_item(rrdb.rrdhost_root_index, machine_guid);
 }
 
 RRDHOST *rrdhost_acquired_to_rrdhost(RRDHOST_ACQUIRED *rha) {
@@ -96,22 +91,22 @@ void rrdhost_acquired_release(RRDHOST_ACQUIRED *rha) {
     if(unlikely(!rha))
         return;
 
-    dictionary_acquired_item_release(rrdhost_root_index, (const DICTIONARY_ITEM *)rha);
+    dictionary_acquired_item_release(rrdb.rrdhost_root_index, (const DICTIONARY_ITEM *)rha);
 }
 
 // ----------------------------------------------------------------------------
 // RRDHOST index by UUID
 
 inline size_t rrdhost_hosts_available(void) {
-    return dictionary_entries(rrdhost_root_index);
+    return dictionary_entries(rrdb.rrdhost_root_index);
 }
 
 inline RRDHOST *rrdhost_find_by_guid(const char *guid) {
-    return dictionary_get(rrdhost_root_index, guid);
+    return dictionary_get(rrdb.rrdhost_root_index, guid);
 }
 
 static inline RRDHOST *rrdhost_index_add_by_guid(RRDHOST *host) {
-    RRDHOST *ret_machine_guid = dictionary_set(rrdhost_root_index, host->machine_guid, host, sizeof(RRDHOST));
+    RRDHOST *ret_machine_guid = dictionary_set(rrdb.rrdhost_root_index, host->machine_guid, host, sizeof(RRDHOST));
     if(ret_machine_guid == host)
         rrdhost_option_set(host, RRDHOST_OPTION_INDEXED_MACHINE_GUID);
     else {
@@ -125,7 +120,7 @@ static inline RRDHOST *rrdhost_index_add_by_guid(RRDHOST *host) {
 
 static void rrdhost_index_del_by_guid(RRDHOST *host) {
     if(rrdhost_option_check(host, RRDHOST_OPTION_INDEXED_MACHINE_GUID)) {
-        if(!dictionary_del(rrdhost_root_index, host->machine_guid))
+        if(!dictionary_del(rrdb.rrdhost_root_index, host->machine_guid))
             netdata_log_error("RRDHOST: %s() failed to delete machine guid '%s' from index",
                               __FUNCTION__, host->machine_guid);
 
@@ -140,14 +135,14 @@ inline RRDHOST *rrdhost_find_by_hostname(const char *hostname) {
     if(unlikely(!strcmp(hostname, "localhost")))
         return localhost;
 
-    return dictionary_get(rrdhost_root_index_hostname, hostname);
+    return dictionary_get(rrdb.rrdhost_root_index_hostname, hostname);
 }
 
 static inline void rrdhost_index_del_hostname(RRDHOST *host) {
     if(unlikely(!host->hostname)) return;
 
     if(rrdhost_option_check(host, RRDHOST_OPTION_INDEXED_HOSTNAME)) {
-        if(!dictionary_del(rrdhost_root_index_hostname, rrdhost_hostname(host)))
+        if(!dictionary_del(rrdb.rrdhost_root_index_hostname, rrdhost_hostname(host)))
             netdata_log_error("RRDHOST: %s() failed to delete hostname '%s' from index",
                               __FUNCTION__, rrdhost_hostname(host));
 
@@ -158,7 +153,7 @@ static inline void rrdhost_index_del_hostname(RRDHOST *host) {
 static inline RRDHOST *rrdhost_index_add_hostname(RRDHOST *host) {
     if(!host->hostname) return host;
 
-    RRDHOST *ret_hostname = dictionary_set(rrdhost_root_index_hostname, rrdhost_hostname(host), host, sizeof(RRDHOST));
+    RRDHOST *ret_hostname = dictionary_set(rrdb.rrdhost_root_index_hostname, rrdhost_hostname(host), host, sizeof(RRDHOST));
     if(ret_hostname == host)
         rrdhost_option_set(host, RRDHOST_OPTION_INDEXED_HOSTNAME);
     else {
@@ -975,7 +970,7 @@ void dbengine_init(char *hostname) {
 }
 
 int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unittest) {
-    rrdhost_init();
+    rrdhost_indexes_init();
 
     if (unlikely(sql_init_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
         if (default_storage_engine_id == STORAGE_ENGINE_DBENGINE) {
@@ -1281,7 +1276,7 @@ void rrdhost_free_all(void) {
 
 void rrd_finalize_collection_for_all_hosts(void) {
     RRDHOST *host;
-    dfe_start_reentrant(rrdhost_root_index, host) {
+    dfe_start_reentrant(rrdb.rrdhost_root_index, host) {
         rrdhost_finalize_collection(host);
     }
     dfe_done(host);

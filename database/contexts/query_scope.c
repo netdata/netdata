@@ -17,7 +17,7 @@ ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN 
     uint64_t a_hash = 0;
     uint64_t t_hash = 0;
 
-    dfe_start_read(rrdhost_root_index, host) {
+    dfe_start_read(rrdb.rrdhost_root_index, host) {
         if(host->node_id)
             uuid_unparse_lower(*host->node_id, host_node_id_str);
         else

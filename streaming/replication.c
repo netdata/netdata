@@ -1601,7 +1601,7 @@ static void verify_all_hosts_charts_are_streaming_now(void) {
 
     size_t errors = 0;
     RRDHOST *host;
-    dfe_start_read(rrdhost_root_index, host)
+    dfe_start_read(rrdb.rrdhost_root_index, host)
         errors += verify_host_charts_are_streaming_now(host);
     dfe_done(host);
 
