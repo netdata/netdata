@@ -512,6 +512,7 @@ set(DEBUGFS_PLUGIN_FILES
         collectors/debugfs.plugin/debugfs_plugin.h
         collectors/debugfs.plugin/debugfs_extfrag.c
         collectors/debugfs.plugin/debugfs_zswap.c
+        collectors/debugfs.plugin/sys_devices_virtual_powercap.c
         )
 
 set(FREEBSD_PLUGIN_FILES

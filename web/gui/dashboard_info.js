@@ -1177,6 +1177,10 @@ netdataDashboard.submenu = {
         info: 'A connection is an established line of communication between a client and the PostgreSQL server. Each connection adds to the load on the PostgreSQL server. To guard against running out of memory or overloading the database the <i>max_connections</i> parameter (default = 100) defines the maximum number of concurrent connections to the database server. A separate parameter, <i>superuser_reserved_connections</i> (default = 3), defines the quota for superuser connections (so that superusers can connect even if all other connection slots are blocked).'
     },
 
+    'system.power_consumption': {
+        info: 'The current power consumption of the zones defined by the <a href="https://www.kernel.org/doc/html/next/power/powercap/powercap.html" target="_blank">power capping framework</a>.'
+    }
+
 };
 
 // ----------------------------------------------------------------------------
@@ -1728,6 +1732,10 @@ netdataDashboard.context = {
     'system.process_status': {
         title : 'Task status',
         info: 'Difference between the number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#process-exit" target="_blank">functions</a> that close a task and release a task.'+ ebpfChartProvides
+    },
+
+    'system.power_consumption': {
+        info: 'The current power consumption of the zones defined by the <a href="https://www.kernel.org/doc/html/next/power/powercap/powercap.html" target="_blank">power capping framework</a>.'
     },
 
     // ------------------------------------------------------------------------
