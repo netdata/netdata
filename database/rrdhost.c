@@ -5,8 +5,6 @@
 
 static void rrdhost_streaming_sender_structures_init(RRDHOST *host);
 
-RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS] = { RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW };
-
 #if RRD_STORAGE_TIERS != 5
 #error RRD_STORAGE_TIERS is not 5 - you need to update the grouping iterations per tier
 #endif
@@ -866,7 +864,7 @@ void dbengine_init(char *hostname) {
 
         int disk_space_mb = default_multidb_disk_quota_mb / divisor;
         size_t grouping_iterations = rrdb.storage_tiers_grouping_iterations[tier];
-        RRD_BACKFILL backfill = storage_tiers_backfill[tier];
+        RRD_BACKFILL backfill = rrdb.storage_tiers_backfill[tier];
 
         if(tier > 0) {
             snprintfz(dbengineconfig, 200, "dbengine tier %zu multihost disk space MB", tier);
@@ -895,7 +893,7 @@ void dbengine_init(char *hostname) {
         }
 
         rrdb.storage_tiers_grouping_iterations[tier] = grouping_iterations;
-        storage_tiers_backfill[tier] = backfill;
+        rrdb.storage_tiers_backfill[tier] = backfill;
 
         if(tier > 0 && get_tier_grouping(tier) > 65535) {
             rrdb.storage_tiers_grouping_iterations[tier] = 1;

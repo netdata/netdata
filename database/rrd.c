@@ -124,5 +124,18 @@ struct rrdb rrdb = {
     .unittest_running = false,
     .dbengine_enabled = false,
     .use_direct_io = true,
-    .storage_tiers_grouping_iterations = { 1, 60, 60, 60, 60 },
+    .storage_tiers_grouping_iterations = {
+        1,
+        60,
+        60,
+        60,
+        60
+    },
+    .storage_tiers_backfill = {
+        RRD_BACKFILL_NEW,
+        RRD_BACKFILL_NEW,
+        RRD_BACKFILL_NEW,
+        RRD_BACKFILL_NEW,
+        RRD_BACKFILL_NEW
+    },
 };

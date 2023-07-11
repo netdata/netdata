@@ -96,8 +96,6 @@ typedef enum __attribute__ ((__packed__)) {
     RRD_BACKFILL_NEW
 } RRD_BACKFILL;
 
-extern RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS];
-
 #define UPDATE_EVERY 1
 #define UPDATE_EVERY_MAX 3600
 
@@ -1285,7 +1283,9 @@ struct rrdb {
     bool dbengine_enabled;
     size_t storage_tiers;
     bool use_direct_io;
+
     size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
+    RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS];
 };
 
 extern struct rrdb rrdb;

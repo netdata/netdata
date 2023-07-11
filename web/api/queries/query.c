@@ -1950,8 +1950,10 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
 void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut);
 
 void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s) {
-    if(unlikely(tier >= rrdb.storage_tiers)) return;
-    if(storage_tiers_backfill[tier] == RRD_BACKFILL_NONE) return;
+    if (unlikely(tier >= rrdb.storage_tiers))
+        return;
+    if (rrdb.storage_tiers_backfill[tier] == RRD_BACKFILL_NONE)
+        return;
 
     struct rrddim_tier *t = &rd->tiers[tier];
     if(unlikely(!t)) return;
@@ -1962,7 +1964,8 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
     time_t time_diff   = now_s - latest_time_s;
 
     // if the user wants only NEW backfilling, and we don't have any data
-    if(storage_tiers_backfill[tier] == RRD_BACKFILL_NEW && latest_time_s <= 0) return;
+    if (rrdb.storage_tiers_backfill[tier] == RRD_BACKFILL_NEW && latest_time_s <= 0)
+        return;
 
     // there is really nothing we can do
     if(now_s <= latest_time_s || time_diff < granularity) return;
