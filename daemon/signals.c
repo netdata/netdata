@@ -59,7 +59,7 @@ void signals_block(void) {
     sigfillset(&sigset);
 
     if(pthread_sigmask(SIG_BLOCK, &sigset, NULL) == -1)
-        error("SIGNAL: Could not block signals for threads");
+        netdata_log_error("SIGNAL: Could not block signals for threads");
 }
 
 void signals_unblock(void) {
@@ -67,7 +67,7 @@ void signals_unblock(void) {
     sigfillset(&sigset);
 
     if(pthread_sigmask(SIG_UNBLOCK, &sigset, NULL) == -1) {
-        error("SIGNAL: Could not unblock signals for threads");
+        netdata_log_error("SIGNAL: Could not unblock signals for threads");
     }
 }
 
@@ -91,7 +91,7 @@ void signals_init(void) {
         }
 
         if(sigaction(signals_waiting[i].signo, &sa, NULL) == -1)
-            error("SIGNAL: Failed to change signal handler for: %s", signals_waiting[i].name);
+            netdata_log_error("SIGNAL: Failed to change signal handler for: %s", signals_waiting[i].name);
     }
 }
 
@@ -104,7 +104,7 @@ void signals_restore_SIGCHLD(void)
     sa.sa_handler = signal_handler;
 
     if(sigaction(SIGCHLD, &sa, NULL) == -1)
-        error("SIGNAL: Failed to change signal handler for: SIGCHLD");
+        netdata_log_error("SIGNAL: Failed to change signal handler for: SIGCHLD");
 }
 
 void signals_reset(void) {
@@ -116,7 +116,7 @@ void signals_reset(void) {
     int i;
     for (i = 0; signals_waiting[i].action != NETDATA_SIGNAL_END_OF_LIST; i++) {
         if(sigaction(signals_waiting[i].signo, &sa, NULL) == -1)
-            error("SIGNAL: Failed to reset signal handler for: %s", signals_waiting[i].name);
+            netdata_log_error("SIGNAL: Failed to reset signal handler for: %s", signals_waiting[i].name);
     }
 }
 
@@ -125,41 +125,41 @@ static void reap_child(pid_t pid) {
     siginfo_t i;
 
     errno = 0;
-    debug(D_CHILDS, "SIGNAL: reap_child(%d)...", pid);
+    netdata_log_debug(D_CHILDS, "SIGNAL: reap_child(%d)...", pid);
     if (netdata_waitid(P_PID, (id_t)pid, &i, WEXITED|WNOHANG) == -1) {
         if (errno != ECHILD)
-            error("SIGNAL: waitid(%d): failed to wait for child", pid);
+            netdata_log_error("SIGNAL: waitid(%d): failed to wait for child", pid);
         else
-            info("SIGNAL: waitid(%d): failed - it seems the child is already reaped", pid);
+            netdata_log_info("SIGNAL: waitid(%d): failed - it seems the child is already reaped", pid);
         return;
     }
     else if (i.si_pid == 0) {
         // Process didn't exit, this shouldn't happen.
-        error("SIGNAL: waitid(%d): reports pid 0 - child has not exited", pid);
+        netdata_log_error("SIGNAL: waitid(%d): reports pid 0 - child has not exited", pid);
         return;
     }
 
     switch (i.si_code) {
         case CLD_EXITED:
-            info("SIGNAL: reap_child(%d) exited with code: %d", pid, i.si_status);
+            netdata_log_info("SIGNAL: reap_child(%d) exited with code: %d", pid, i.si_status);
             break;
         case CLD_KILLED:
-            info("SIGNAL: reap_child(%d) killed by signal: %d", pid, i.si_status);
+            netdata_log_info("SIGNAL: reap_child(%d) killed by signal: %d", pid, i.si_status);
             break;
         case CLD_DUMPED:
-            info("SIGNAL: reap_child(%d) dumped core by signal: %d", pid, i.si_status);
+            netdata_log_info("SIGNAL: reap_child(%d) dumped core by signal: %d", pid, i.si_status);
             break;
         case CLD_STOPPED:
-            info("SIGNAL: reap_child(%d) stopped by signal: %d", pid, i.si_status);
+            netdata_log_info("SIGNAL: reap_child(%d) stopped by signal: %d", pid, i.si_status);
             break;
         case CLD_TRAPPED:
-            info("SIGNAL: reap_child(%d) trapped by signal: %d", pid, i.si_status);
+            netdata_log_info("SIGNAL: reap_child(%d) trapped by signal: %d", pid, i.si_status);
             break;
         case CLD_CONTINUED:
-            info("SIGNAL: reap_child(%d) continued by signal: %d", pid, i.si_status);
+            netdata_log_info("SIGNAL: reap_child(%d) continued by signal: %d", pid, i.si_status);
             break;
         default:
-            info("SIGNAL: reap_child(%d) gave us a SIGCHLD with code %d and status %d.", pid, i.si_code, i.si_status);
+            netdata_log_info("SIGNAL: reap_child(%d) gave us a SIGCHLD with code %d and status %d.", pid, i.si_code, i.si_status);
             break;
     }
 }
@@ -204,28 +204,28 @@ void signals_handle(void) {
                         switch (signals_waiting[i].action) {
                             case NETDATA_SIGNAL_RELOAD_HEALTH:
                                 error_log_limit_unlimited();
-                                info("SIGNAL: Received %s. Reloading HEALTH configuration...", name);
+                                netdata_log_info("SIGNAL: Received %s. Reloading HEALTH configuration...", name);
                                 error_log_limit_reset();
                                 execute_command(CMD_RELOAD_HEALTH, NULL, NULL);
                                 break;
 
                             case NETDATA_SIGNAL_SAVE_DATABASE:
                                 error_log_limit_unlimited();
-                                info("SIGNAL: Received %s. Saving databases...", name);
+                                netdata_log_info("SIGNAL: Received %s. Saving databases...", name);
                                 error_log_limit_reset();
                                 execute_command(CMD_SAVE_DATABASE, NULL, NULL);
                                 break;
 
                             case NETDATA_SIGNAL_REOPEN_LOGS:
                                 error_log_limit_unlimited();
-                                info("SIGNAL: Received %s. Reopening all log files...", name);
+                                netdata_log_info("SIGNAL: Received %s. Reopening all log files...", name);
                                 error_log_limit_reset();
                                 execute_command(CMD_REOPEN_LOGS, NULL, NULL);
                                 break;
 
                             case NETDATA_SIGNAL_EXIT_CLEANLY:
                                 error_log_limit_unlimited();
-                                info("SIGNAL: Received %s. Cleaning up to exit...", name);
+                                netdata_log_info("SIGNAL: Received %s. Cleaning up to exit...", name);
                                 commands_exit();
                                 netdata_cleanup_and_exit(0);
                                 exit(0);
@@ -240,7 +240,7 @@ void signals_handle(void) {
                                 break;
 
                             default:
-                                info("SIGNAL: Received %s. No signal handler configured. Ignoring it.", name);
+                                netdata_log_info("SIGNAL: Received %s. No signal handler configured. Ignoring it.", name);
                                 break;
                         }
                     }
@@ -248,6 +248,6 @@ void signals_handle(void) {
             }
         }
         else
-            error("SIGNAL: pause() returned but it was not interrupted by a signal.");
+            netdata_log_error("SIGNAL: pause() returned but it was not interrupted by a signal.");
     }
 }

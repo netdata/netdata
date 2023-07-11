@@ -40,9 +40,9 @@ static void svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
 
     const char *cache_filename = rrddim_cache_filename(rd);
     if(cache_filename) {
-        info("Deleting dimension file '%s'.", cache_filename);
+        netdata_log_info("Deleting dimension file '%s'.", cache_filename);
         if (unlikely(unlink(cache_filename) == -1))
-            error("Cannot delete dimension file '%s'", cache_filename);
+            netdata_log_error("Cannot delete dimension file '%s'", cache_filename);
     }
 
     if (rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
@@ -87,11 +87,11 @@ static bool svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_dimensio
     dfe_start_write(st->rrddim_root_index, rd) {
         if(unlikely(
                 all_dimensions ||
-                (rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && (rd->last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now))
+                (rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && (rd->collector.last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now))
                     )) {
 
             if(dictionary_acquired_item_references(rd_dfe.item) == 1) {
-                info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rrddim_name(rd), rrddim_id(rd), rrdset_name(st), rrdset_id(st));
+                netdata_log_info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rrddim_name(rd), rrddim_id(rd), rrdset_name(st), rrdset_id(st));
                 svc_rrddim_obsolete_to_archive(rd);
             }
             else
@@ -227,7 +227,7 @@ restart_after_removal:
         if(!rrdhost_should_be_removed(host, protected_host, now))
             continue;
 
-        info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", rrdhost_hostname(host), host->machine_guid);
+        netdata_log_info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", rrdhost_hostname(host), host->machine_guid);
 
         if (rrdhost_option_check(host, RRDHOST_OPTION_DELETE_ORPHAN_HOST)
             /* don't delete multi-host DB host files */
@@ -254,7 +254,7 @@ static void service_main_cleanup(void *ptr)
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    debug(D_SYSTEM, "Cleaning up...");
+    netdata_log_debug(D_SYSTEM, "Cleaning up...");
     worker_unregister();
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
@@ -290,7 +290,7 @@ void *service_main(void *ptr)
     heartbeat_init(&hb);
     usec_t step = USEC_PER_SEC * SERVICE_HEARTBEAT;
 
-    debug(D_SYSTEM, "Service thread starts");
+    netdata_log_debug(D_SYSTEM, "Service thread starts");
 
     while (service_running(SERVICE_MAINTENANCE)) {
         worker_is_idle();

@@ -22,7 +22,7 @@ identity of the Netdata Agent when it connects to the Cloud. While the data does
 from Agents to the browser, we do not store or log it.
 
 You can connect a node during the Netdata Cloud onboarding process, or after you created a Space by clicking on **Connect
-Nodes** in the [Spaces management area](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md#manage-spaces).
+Nodes** in the [Spaces management area](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-spaces#manage-spaces).
 
 There are two important notes regarding connecting nodes:
 

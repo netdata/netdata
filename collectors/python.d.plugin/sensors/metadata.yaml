@@ -1,0 +1,56 @@
+module_name: sensors
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: chip
+      description: ""
+      labels: []
+      metrics:
+        - name: sensors.temperature
+          description: Temperature
+          unit: "Celsius"
+          chart_type: line
+          dimensions:
+            - name: a dimension per sensor
+        - name: sensors.voltage
+          description: Voltage
+          unit: "Volts"
+          chart_type: line
+          dimensions:
+            - name: a dimension per sensor
+        - name: sensors.current
+          description: Current
+          unit: "Ampere"
+          chart_type: line
+          dimensions:
+            - name: a dimension per sensor
+        - name: sensors.power
+          description: Power
+          unit: "Watt"
+          chart_type: line
+          dimensions:
+            - name: a dimension per sensor
+        - name: sensors.fan
+          description: Fans speed
+          unit: "Rotations/min"
+          chart_type: line
+          dimensions:
+            - name: a dimension per sensor
+        - name: sensors.energy
+          description: Energy
+          unit: "Joule"
+          chart_type: line
+          dimensions:
+            - name: a dimension per sensor
+        - name: sensors.humidity
+          description: Humidity
+          unit: "Percent"
+          chart_type: line
+          dimensions:
+            - name: a dimension per sensor

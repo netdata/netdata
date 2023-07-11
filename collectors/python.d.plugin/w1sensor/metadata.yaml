@@ -1,0 +1,20 @@
+module_name: w1sensor
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: w1sensor.temp
+          description: 1-Wire Temperature Sensor
+          unit: "Celsius"
+          chart_type: line
+          dimensions:
+            - name: a dimension per sensor

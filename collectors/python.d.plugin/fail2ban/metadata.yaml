@@ -1,0 +1,32 @@
+module_name: fail2ban
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: fail2ban.faile_attempts
+          description: Failed attempts
+          unit: "attempts/s"
+          chart_type: line
+          dimensions:
+            - name: a dimension per jail
+        - name: fail2ban.bans
+          description: Bans
+          unit: "bans/s"
+          chart_type: line
+          dimensions:
+            - name: a dimension per jail
+        - name: fail2ban.banned_ips
+          description: Banned IP addresses (since the last restart of netdata)
+          unit: "ips"
+          chart_type: line
+          dimensions:
+            - name: a dimension per jail

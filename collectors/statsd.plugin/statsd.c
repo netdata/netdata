@@ -370,7 +370,7 @@ static void dictionary_metric_insert_callback(const DICTIONARY_ITEM *item, void 
     STATSD_METRIC *m = (STATSD_METRIC *)value;
     const char *name = dictionary_acquired_item_name(item);
 
-    debug(D_STATSD, "Creating new %s metric '%s'", index->name, name);
+    netdata_log_debug(D_STATSD, "Creating new %s metric '%s'", index->name, name);
 
     m->name = name;
     m->hash = simple_hash(name);
@@ -401,7 +401,7 @@ static void dictionary_metric_delete_callback(const DICTIONARY_ITEM *item, void 
 }
 
 static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, const char *name) {
-    debug(D_STATSD, "searching for metric '%s' under '%s'", name, index->name);
+    netdata_log_debug(D_STATSD, "searching for metric '%s' under '%s'", name, index->name);
 
 #ifdef STATSD_MULTITHREADED
     // avoid the write lock of dictionary_set() for existing metrics
@@ -571,7 +571,7 @@ static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
     if(!is_metric_useful_for_collection(m)) return;
 
     if(unlikely(!value || !*value)) {
-        error("STATSD: metric of type set, with empty value is ignored.");
+        netdata_log_error("STATSD: metric of type set, with empty value is ignored.");
         return;
     }
 
@@ -606,7 +606,7 @@ static inline void statsd_process_dictionary(STATSD_METRIC *m, const char *value
     if(!is_metric_useful_for_collection(m)) return;
 
     if(unlikely(!value || !*value)) {
-        error("STATSD: metric of type set, with empty value is ignored.");
+        netdata_log_error("STATSD: metric of type set, with empty value is ignored.");
         return;
     }
 
@@ -673,7 +673,7 @@ static inline const char *statsd_parse_field_trim(const char *start, char *end) 
 }
 
 static void statsd_process_metric(const char *name, const char *value, const char *type, const char *sampling, const char *tags) {
-    debug(D_STATSD, "STATSD: raw metric '%s', value '%s', type '%s', sampling '%s', tags '%s'", name?name:"(null)", value?value:"(null)", type?type:"(null)", sampling?sampling:"(null)", tags?tags:"(null)");
+    netdata_log_debug(D_STATSD, "STATSD: raw metric '%s', value '%s', type '%s', sampling '%s', tags '%s'", name?name:"(null)", value?value:"(null)", type?type:"(null)", sampling?sampling:"(null)", tags?tags:"(null)");
 
     if(unlikely(!name || !*name)) return;
     if(unlikely(!type || !*type)) type = "m";
@@ -720,7 +720,7 @@ static void statsd_process_metric(const char *name, const char *value, const cha
     }
     else {
         statsd.unknown_types++;
-        error("STATSD: metric '%s' with value '%s' is sent with unknown metric type '%s'", name, value?value:"", type);
+        netdata_log_error("STATSD: metric '%s' with value '%s' is sent with unknown metric type '%s'", name, value?value:"", type);
     }
 
     if(m && tags && *tags) {
@@ -768,7 +768,7 @@ static void statsd_process_metric(const char *name, const char *value, const cha
 
 static inline size_t statsd_process(char *buffer, size_t size, int require_newlines) {
     buffer[size] = '\0';
-    debug(D_STATSD, "RECEIVED: %zu bytes: '%s'", size, buffer);
+    netdata_log_debug(D_STATSD, "RECEIVED: %zu bytes: '%s'", size, buffer);
 
     const char *s = buffer;
     while(*s) {
@@ -892,14 +892,14 @@ static void statsd_del_callback(POLLINFO *pi) {
         if(t->type == STATSD_SOCKET_DATA_TYPE_TCP) {
             if(t->len != 0) {
                 statsd.socket_errors++;
-                error("STATSD: client is probably sending unterminated metrics. Closed socket left with '%s'. Trying to process it.", t->buffer);
+                netdata_log_error("STATSD: client is probably sending unterminated metrics. Closed socket left with '%s'. Trying to process it.", t->buffer);
                 statsd_process(t->buffer, t->len, 0);
             }
             statsd.tcp_socket_disconnects++;
             statsd.tcp_socket_connected--;
         }
         else
-            error("STATSD: internal error: received socket data type is %d, but expected %d", (int)t->type, (int)STATSD_SOCKET_DATA_TYPE_TCP);
+            netdata_log_error("STATSD: internal error: received socket data type is %d, but expected %d", (int)t->type, (int)STATSD_SOCKET_DATA_TYPE_TCP);
 
         freez(t);
     }
@@ -920,7 +920,7 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
         case SOCK_STREAM: {
             struct statsd_tcp *d = (struct statsd_tcp *)pi->data;
             if(unlikely(!d)) {
-                error("STATSD: internal error: expected TCP data pointer is NULL");
+                netdata_log_error("STATSD: internal error: expected TCP data pointer is NULL");
                 statsd.socket_errors++;
                 retval = -1;
                 goto cleanup;
@@ -928,7 +928,7 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
 
 #ifdef NETDATA_INTERNAL_CHECKS
             if(unlikely(d->type != STATSD_SOCKET_DATA_TYPE_TCP)) {
-                error("STATSD: internal error: socket data type should be %d, but it is %d", (int)STATSD_SOCKET_DATA_TYPE_TCP, (int)d->type);
+                netdata_log_error("STATSD: internal error: socket data type should be %d, but it is %d", (int)STATSD_SOCKET_DATA_TYPE_TCP, (int)d->type);
                 statsd.socket_errors++;
                 retval = -1;
                 goto cleanup;
@@ -942,14 +942,14 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
                 if (rc < 0) {
                     // read failed
                     if (errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR) {
-                        error("STATSD: recv() on TCP socket %d failed.", fd);
+                        netdata_log_error("STATSD: recv() on TCP socket %d failed.", fd);
                         statsd.socket_errors++;
                         ret = -1;
                     }
                 }
                 else if (!rc) {
                     // connection closed
-                    debug(D_STATSD, "STATSD: client disconnected.");
+                    netdata_log_debug(D_STATSD, "STATSD: client disconnected.");
                     ret = -1;
                 }
                 else {
@@ -976,7 +976,7 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
         case SOCK_DGRAM: {
             struct statsd_udp *d = (struct statsd_udp *)pi->data;
             if(unlikely(!d)) {
-                error("STATSD: internal error: expected UDP data pointer is NULL");
+                netdata_log_error("STATSD: internal error: expected UDP data pointer is NULL");
                 statsd.socket_errors++;
                 retval = -1;
                 goto cleanup;
@@ -984,7 +984,7 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
 
 #ifdef NETDATA_INTERNAL_CHECKS
             if(unlikely(d->type != STATSD_SOCKET_DATA_TYPE_UDP)) {
-                error("STATSD: internal error: socket data should be %d, but it is %d", (int)d->type, (int)STATSD_SOCKET_DATA_TYPE_UDP);
+                netdata_log_error("STATSD: internal error: socket data should be %d, but it is %d", (int)d->type, (int)STATSD_SOCKET_DATA_TYPE_UDP);
                 statsd.socket_errors++;
                 retval = -1;
                 goto cleanup;
@@ -998,7 +998,7 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
                 if (rc < 0) {
                     // read failed
                     if (errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR) {
-                        error("STATSD: recvmmsg() on UDP socket %d failed.", fd);
+                        netdata_log_error("STATSD: recvmmsg() on UDP socket %d failed.", fd);
                         statsd.socket_errors++;
                         retval = -1;
                         goto cleanup;
@@ -1024,7 +1024,7 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
                 if (rc < 0) {
                     // read failed
                     if (errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR) {
-                        error("STATSD: recv() on UDP socket %d failed.", fd);
+                        netdata_log_error("STATSD: recv() on UDP socket %d failed.", fd);
                         statsd.socket_errors++;
                         retval = -1;
                         goto cleanup;
@@ -1043,7 +1043,7 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
         }
 
         default: {
-            error("STATSD: internal error: unknown socktype %d on socket %d", pi->socktype, fd);
+            netdata_log_error("STATSD: internal error: unknown socktype %d on socket %d", pi->socktype, fd);
             statsd.socket_errors++;
             retval = -1;
             goto cleanup;
@@ -1061,7 +1061,7 @@ static int statsd_snd_callback(POLLINFO *pi, short int *events) {
     (void)events;
 
     worker_is_busy(WORKER_JOB_TYPE_SND_DATA);
-    error("STATSD: snd_callback() called, but we never requested to send data to statsd clients.");
+    netdata_log_error("STATSD: snd_callback() called, but we never requested to send data to statsd clients.");
     worker_is_idle();
 
     return -1;
@@ -1169,7 +1169,7 @@ static STATSD_APP_CHART_DIM_VALUE_TYPE string2valuetype(const char *type, size_t
     else if(!strcmp(type, "stddev")) return STATSD_APP_CHART_DIM_VALUE_TYPE_STDDEV;
     else if(!strcmp(type, "percentile")) return STATSD_APP_CHART_DIM_VALUE_TYPE_PERCENTILE;
 
-    error("STATSD: invalid type '%s' at line %zu of file '%s'. Using 'last'.", type, line, filename);
+    netdata_log_error("STATSD: invalid type '%s' at line %zu of file '%s'. Using 'last'.", type, line, filename);
     return STATSD_APP_CHART_DIM_VALUE_TYPE_LAST;
 }
 
@@ -1231,20 +1231,20 @@ static STATSD_APP_CHART_DIM *add_dimension_to_app_chart(
     }
     chart->dimensions_count++;
 
-    debug(D_STATSD, "Added dimension '%s' to chart '%s' of app '%s', for metric '%s', with type %u, multiplier %d, divisor %d",
+    netdata_log_debug(D_STATSD, "Added dimension '%s' to chart '%s' of app '%s', for metric '%s', with type %u, multiplier %d, divisor %d",
             dim->name, chart->id, app->name, dim->metric, dim->value_type, dim->multiplier, dim->divisor);
 
     return dim;
 }
 
 static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHART *chart, DICTIONARY *dict) {
-    debug(D_STATSD, "STATSD configuration reading file '%s'", filename);
+    netdata_log_debug(D_STATSD, "STATSD configuration reading file '%s'", filename);
 
     char *buffer = mallocz(STATSD_CONF_LINE_MAX + 1);
 
     FILE *fp = fopen(filename, "r");
     if(!fp) {
-        error("STATSD: cannot open file '%s'.", filename);
+        netdata_log_error("STATSD: cannot open file '%s'.", filename);
         freez(buffer);
         return -1;
     }
@@ -1257,11 +1257,11 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
 
         s = trim(buffer);
         if (!s || *s == '#') {
-            debug(D_STATSD, "STATSD: ignoring line %zu of file '%s', it is empty.", line, filename);
+            netdata_log_debug(D_STATSD, "STATSD: ignoring line %zu of file '%s', it is empty.", line, filename);
             continue;
         }
 
-        debug(D_STATSD, "STATSD: processing line %zu of file '%s': %s", line, filename, buffer);
+        netdata_log_debug(D_STATSD, "STATSD: processing line %zu of file '%s': %s", line, filename, buffer);
 
         if(*s == 'i' && strncmp(s, "include", 7) == 0) {
             s = trim(&s[7]);
@@ -1281,7 +1281,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                 freez(tmp);
             }
             else
-                error("STATSD: ignoring line %zu of file '%s', include filename is empty", line, filename);
+                netdata_log_error("STATSD: ignoring line %zu of file '%s', include filename is empty", line, filename);
 
             continue;
         }
@@ -1348,20 +1348,20 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                 }
             }
             else
-                error("STATSD: ignoring line %zu ('%s') of file '%s', [app] is not defined.", line, s, filename);
+                netdata_log_error("STATSD: ignoring line %zu ('%s') of file '%s', [app] is not defined.", line, s, filename);
 
             continue;
         }
 
         if(!app) {
-            error("STATSD: ignoring line %zu ('%s') of file '%s', it is outside all sections.", line, s, filename);
+            netdata_log_error("STATSD: ignoring line %zu ('%s') of file '%s', it is outside all sections.", line, s, filename);
             continue;
         }
 
         char *name = s;
         char *value = strchr(s, '=');
         if(!value) {
-            error("STATSD: ignoring line %zu ('%s') of file '%s', there is no = in it.", line, s, filename);
+            netdata_log_error("STATSD: ignoring line %zu ('%s') of file '%s', there is no = in it.", line, s, filename);
             continue;
         }
         *value = '\0';
@@ -1371,11 +1371,11 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
         value = trim(value);
 
         if(!name || *name == '#') {
-            error("STATSD: ignoring line %zu of file '%s', name is empty.", line, filename);
+            netdata_log_error("STATSD: ignoring line %zu of file '%s', name is empty.", line, filename);
             continue;
         }
         if(!value) {
-            debug(D_CONFIG, "STATSD: ignoring line %zu of file '%s', value is empty.", line, filename);
+            netdata_log_debug(D_CONFIG, "STATSD: ignoring line %zu of file '%s', value is empty.", line, filename);
             continue;
         }
 
@@ -1418,7 +1418,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                     app->rrd_history_entries = 5;
             }
             else {
-                error("STATSD: ignoring line %zu ('%s') of file '%s'. Unknown keyword for the [app] section.", line, name, filename);
+                netdata_log_error("STATSD: ignoring line %zu ('%s') of file '%s'. Unknown keyword for the [app] section.", line, name, filename);
                 continue;
             }
         }
@@ -1456,7 +1456,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
             else if (!strcmp(name, "dimension")) {
                 // metric [name [type [multiplier [divisor]]]]
                 char *words[10] = { NULL };
-                size_t num_words = pluginsd_split_words(value, words, 10);
+                size_t num_words = quoted_strings_splitter_pluginsd(value, words, 10);
 
                 int pattern = 0;
                 size_t i = 0;
@@ -1512,7 +1512,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                     dim->metric_pattern = simple_pattern_create(dim->metric, NULL, SIMPLE_PATTERN_EXACT, true);
             }
             else {
-                error("STATSD: ignoring line %zu ('%s') of file '%s'. Unknown keyword for the [%s] section.", line, name, filename, chart->id);
+                netdata_log_error("STATSD: ignoring line %zu ('%s') of file '%s'. Unknown keyword for the [%s] section.", line, name, filename, chart->id);
                 continue;
             }
         }
@@ -1625,7 +1625,7 @@ static inline RRDSET *statsd_private_rrdset_create(
 }
 
 static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
-    debug(D_STATSD, "updating private chart for gauge metric '%s'", m->name);
+    netdata_log_debug(D_STATSD, "updating private chart for gauge metric '%s'", m->name);
 
     if(unlikely(!m->st || m->options & STATSD_METRIC_OPTION_UPDATED_CHART_METADATA)) {
         m->options &= ~STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
@@ -1665,7 +1665,7 @@ static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
 }
 
 static inline void statsd_private_chart_counter_or_meter(STATSD_METRIC *m, const char *dim, const char *family) {
-    debug(D_STATSD, "updating private chart for %s metric '%s'", dim, m->name);
+    netdata_log_debug(D_STATSD, "updating private chart for %s metric '%s'", dim, m->name);
 
     if(unlikely(!m->st || m->options & STATSD_METRIC_OPTION_UPDATED_CHART_METADATA)) {
         m->options &= ~STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
@@ -1705,7 +1705,7 @@ static inline void statsd_private_chart_counter_or_meter(STATSD_METRIC *m, const
 }
 
 static inline void statsd_private_chart_set(STATSD_METRIC *m) {
-    debug(D_STATSD, "updating private chart for set metric '%s'", m->name);
+    netdata_log_debug(D_STATSD, "updating private chart for set metric '%s'", m->name);
 
     if(unlikely(!m->st || m->options & STATSD_METRIC_OPTION_UPDATED_CHART_METADATA)) {
         m->options &= ~STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
@@ -1745,7 +1745,7 @@ static inline void statsd_private_chart_set(STATSD_METRIC *m) {
 }
 
 static inline void statsd_private_chart_dictionary(STATSD_METRIC *m) {
-    debug(D_STATSD, "updating private chart for dictionary metric '%s'", m->name);
+    netdata_log_debug(D_STATSD, "updating private chart for dictionary metric '%s'", m->name);
 
     if(unlikely(!m->st || m->options & STATSD_METRIC_OPTION_UPDATED_CHART_METADATA)) {
         m->options &= ~STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
@@ -1788,7 +1788,7 @@ static inline void statsd_private_chart_dictionary(STATSD_METRIC *m) {
 }
 
 static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, const char *dim, const char *family, const char *units) {
-    debug(D_STATSD, "updating private chart for %s metric '%s'", dim, m->name);
+    netdata_log_debug(D_STATSD, "updating private chart for %s metric '%s'", dim, m->name);
 
     if(unlikely(!m->st || m->options & STATSD_METRIC_OPTION_UPDATED_CHART_METADATA)) {
         m->options &= ~STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
@@ -1843,7 +1843,7 @@ static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, con
 // statsd flush metrics
 
 static inline void statsd_flush_gauge(STATSD_METRIC *m) {
-    debug(D_STATSD, "flushing gauge metric '%s'", m->name);
+    netdata_log_debug(D_STATSD, "flushing gauge metric '%s'", m->name);
 
     int updated = 0;
     if(unlikely(!m->reset && m->count)) {
@@ -1858,7 +1858,7 @@ static inline void statsd_flush_gauge(STATSD_METRIC *m) {
 }
 
 static inline void statsd_flush_counter_or_meter(STATSD_METRIC *m, const char *dim, const char *family) {
-    debug(D_STATSD, "flushing %s metric '%s'", dim, m->name);
+    netdata_log_debug(D_STATSD, "flushing %s metric '%s'", dim, m->name);
 
     int updated = 0;
     if(unlikely(!m->reset && m->count)) {
@@ -1881,7 +1881,7 @@ static inline void statsd_flush_meter(STATSD_METRIC *m) {
 }
 
 static inline void statsd_flush_set(STATSD_METRIC *m) {
-    debug(D_STATSD, "flushing set metric '%s'", m->name);
+    netdata_log_debug(D_STATSD, "flushing set metric '%s'", m->name);
 
     int updated = 0;
     if(unlikely(!m->reset && m->count)) {
@@ -1899,7 +1899,7 @@ static inline void statsd_flush_set(STATSD_METRIC *m) {
 }
 
 static inline void statsd_flush_dictionary(STATSD_METRIC *m) {
-    debug(D_STATSD, "flushing dictionary metric '%s'", m->name);
+    netdata_log_debug(D_STATSD, "flushing dictionary metric '%s'", m->name);
 
     int updated = 0;
     if(unlikely(!m->reset && m->count)) {
@@ -1927,7 +1927,7 @@ static inline void statsd_flush_dictionary(STATSD_METRIC *m) {
 }
 
 static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char *dim, const char *family, const char *units) {
-    debug(D_STATSD, "flushing %s metric '%s'", dim, m->name);
+    netdata_log_debug(D_STATSD, "flushing %s metric '%s'", dim, m->name);
 
     int updated = 0;
     if(unlikely(!m->reset && m->count && m->histogram.ext->used > 0)) {
@@ -1952,7 +1952,7 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
 
         netdata_mutex_unlock(&m->histogram.ext->mutex);
 
-        debug(D_STATSD, "STATSD %s metric %s: min " COLLECTED_NUMBER_FORMAT ", max " COLLECTED_NUMBER_FORMAT ", last " COLLECTED_NUMBER_FORMAT ", pcent " COLLECTED_NUMBER_FORMAT ", median " COLLECTED_NUMBER_FORMAT ", stddev " COLLECTED_NUMBER_FORMAT ", sum " COLLECTED_NUMBER_FORMAT,
+        netdata_log_debug(D_STATSD, "STATSD %s metric %s: min " COLLECTED_NUMBER_FORMAT ", max " COLLECTED_NUMBER_FORMAT ", last " COLLECTED_NUMBER_FORMAT ", pcent " COLLECTED_NUMBER_FORMAT ", median " COLLECTED_NUMBER_FORMAT ", stddev " COLLECTED_NUMBER_FORMAT ", sum " COLLECTED_NUMBER_FORMAT,
               dim, m->name, m->histogram.ext->last_min, m->histogram.ext->last_max, m->last, m->histogram.ext->last_percentile, m->histogram.ext->last_median, m->histogram.ext->last_stddev, m->histogram.ext->last_sum);
 
         m->histogram.ext->zeroed = 0;
@@ -2049,7 +2049,7 @@ static inline void link_metric_to_app_dimension(STATSD_APP *app, STATSD_METRIC *
     }
     else {
         if (dim->value_type != STATSD_APP_CHART_DIM_VALUE_TYPE_LAST)
-            error("STATSD: unsupported value type for dimension '%s' of chart '%s' of app '%s' on metric '%s'", dim->name, chart->id, app->name, m->name);
+            netdata_log_error("STATSD: unsupported value type for dimension '%s' of chart '%s' of app '%s' on metric '%s'", dim->name, chart->id, app->name, m->name);
 
         dim->value_ptr = &m->last;
         dim->algorithm = statsd_algorithm_for_metric(m);
@@ -2066,7 +2066,7 @@ static inline void link_metric_to_app_dimension(STATSD_APP *app, STATSD_METRIC *
 
     chart->dimensions_linked_count++;
     m->options |= STATSD_METRIC_OPTION_USED_IN_APPS;
-    debug(D_STATSD, "metric '%s' of type %u linked with app '%s', chart '%s', dimension '%s', algorithm '%s'", m->name, m->type, app->name, chart->id, dim->name, rrd_algorithm_name(dim->algorithm));
+    netdata_log_debug(D_STATSD, "metric '%s' of type %u linked with app '%s', chart '%s', dimension '%s', algorithm '%s'", m->name, m->type, app->name, chart->id, dim->name, rrd_algorithm_name(dim->algorithm));
 }
 
 static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC *m) {
@@ -2075,7 +2075,7 @@ static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC
     STATSD_APP *app;
     for(app = statsd.apps; app ;app = app->next) {
         if(unlikely(simple_pattern_matches(app->metrics, m->name))) {
-            debug(D_STATSD, "metric '%s' matches app '%s'", m->name, app->name);
+            netdata_log_debug(D_STATSD, "metric '%s' matches app '%s'", m->name, app->name);
 
             // the metric should get the options from the app
 
@@ -2189,18 +2189,18 @@ static inline RRDDIM *statsd_add_dim_to_app_chart(STATSD_APP *app, STATSD_APP_CH
 
         dim->rd = rrddim_add(chart->st, metric, dim->name, dim->multiplier, dim->divisor, dim->algorithm);
         if(dim->flags != RRDDIM_FLAG_NONE) dim->rd->flags |= dim->flags;
-        if(dim->options != RRDDIM_OPTION_NONE) dim->rd->options |= dim->options;
+        if(dim->options != RRDDIM_OPTION_NONE) dim->rd->collector.options |= dim->options;
         return dim->rd;
     }
 
     dim->rd = rrddim_add(chart->st, dim->metric, dim->name, dim->multiplier, dim->divisor, dim->algorithm);
     if(dim->flags != RRDDIM_FLAG_NONE) dim->rd->flags |= dim->flags;
-    if(dim->options != RRDDIM_OPTION_NONE) dim->rd->options |= dim->options;
+    if(dim->options != RRDDIM_OPTION_NONE) dim->rd->collector.options |= dim->options;
     return dim->rd;
 }
 
 static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *chart) {
-    debug(D_STATSD, "updating chart '%s' for app '%s'", chart->id, app->name);
+    netdata_log_debug(D_STATSD, "updating chart '%s' for app '%s'", chart->id, app->name);
 
     if(!chart->st) {
         chart->st = rrdset_create_custom(
@@ -2232,22 +2232,22 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
                 statsd_add_dim_to_app_chart(app, chart, dim);
 
             if (unlikely(dim->value_ptr)) {
-                debug(D_STATSD, "updating dimension '%s' (%s) of chart '%s' (%s) for app '%s' with value " COLLECTED_NUMBER_FORMAT, dim->name, rrddim_id(dim->rd), chart->id, rrdset_id(chart->st), app->name, *dim->value_ptr);
+                netdata_log_debug(D_STATSD, "updating dimension '%s' (%s) of chart '%s' (%s) for app '%s' with value " COLLECTED_NUMBER_FORMAT, dim->name, rrddim_id(dim->rd), chart->id, rrdset_id(chart->st), app->name, *dim->value_ptr);
                 rrddim_set_by_pointer(chart->st, dim->rd, *dim->value_ptr);
             }
         }
     }
 
     rrdset_done(chart->st);
-    debug(D_STATSD, "completed update of chart '%s' for app '%s'", chart->id, app->name);
+    netdata_log_debug(D_STATSD, "completed update of chart '%s' for app '%s'", chart->id, app->name);
 }
 
 static inline void statsd_update_all_app_charts(void) {
-    // debug(D_STATSD, "updating app charts");
+    // netdata_log_debug(D_STATSD, "updating app charts");
 
     STATSD_APP *app;
     for(app = statsd.apps; app ;app = app->next) {
-        // debug(D_STATSD, "updating charts for app '%s'", app->name);
+        // netdata_log_debug(D_STATSD, "updating charts for app '%s'", app->name);
 
         STATSD_APP_CHART *chart;
         for(chart = app->charts; chart ;chart = chart->next) {
@@ -2257,7 +2257,7 @@ static inline void statsd_update_all_app_charts(void) {
         }
     }
 
-    // debug(D_STATSD, "completed update of app charts");
+    // netdata_log_debug(D_STATSD, "completed update of app charts");
 }
 
 const char *statsd_metric_type_string(STATSD_METRIC_TYPE type) {
@@ -2290,7 +2290,7 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
 
         if(unlikely(!(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_CHECKED))) {
             if(unlikely(statsd.private_charts >= statsd.max_private_charts_hard)) {
-                debug(D_STATSD, "STATSD: metric '%s' will not be charted, because the hard limit of the maximum number "
+                netdata_log_debug(D_STATSD, "STATSD: metric '%s' will not be charted, because the hard limit of the maximum number "
                                 "of charts has been reached.", m->name);
 
                 collector_info("STATSD: metric '%s' will not be charted, because the hard limit of the maximum number "
@@ -2301,10 +2301,10 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
             }
             else {
                 if (simple_pattern_matches(statsd.charts_for, m->name)) {
-                    debug(D_STATSD, "STATSD: metric '%s' will be charted.", m->name);
+                    netdata_log_debug(D_STATSD, "STATSD: metric '%s' will be charted.", m->name);
                     m->options |= STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED;
                 } else {
-                    debug(D_STATSD, "STATSD: metric '%s' will not be charted.", m->name);
+                    netdata_log_debug(D_STATSD, "STATSD: metric '%s' will not be charted.", m->name);
                     m->options &= ~STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED;
                 }
             }

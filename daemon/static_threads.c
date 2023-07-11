@@ -13,6 +13,7 @@ void *pluginsd_main(void *ptr);
 void *service_main(void *ptr);
 void *statsd_main(void *ptr);
 void *timex_main(void *ptr);
+void *profile_main(void *ptr);
 void *replication_thread_main(void *ptr __maybe_unused);
 #ifdef ENABLE_LOGSMANAGEMENT
 // void *logsmanagement_plugin_main(void *ptr);
@@ -146,15 +147,15 @@ const struct netdata_static_thread static_threads_common[] = {
         .start_routine = socket_listen_main_static_threaded
     },
 
-#ifdef ENABLE_HTTPD
+#ifdef ENABLE_H2O
     {
-        .name = "httpd",
+        .name = "h2o",
         .config_section = NULL,
         .config_name = NULL,
         .enabled = 0,
         .thread = NULL,
         .init_routine = NULL,
-        .start_routine = httpd_main
+        .start_routine = h2o_main
     },
 #endif
 
@@ -188,6 +189,15 @@ const struct netdata_static_thread static_threads_common[] = {
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = replication_thread_main
+    },
+    {
+        .name = "P[PROFILE]",
+        .config_section = CONFIG_SECTION_PLUGINS,
+        .config_name = "profile",
+        .enabled = 0,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = profile_main
     },
 
 #if defined(ENABLE_LOGSMANAGEMENT)

@@ -93,7 +93,7 @@ struct web_client *web_client_get_from_cache(void) {
         web_clients_cache.avail.count--;
         spinlock_unlock(&web_clients_cache.avail.spinlock);
 
-        web_client_zero(w);
+        web_client_reuse_from_cache(w);
 
         spinlock_lock(&web_clients_cache.used.spinlock);
         web_clients_cache.used.reused++;

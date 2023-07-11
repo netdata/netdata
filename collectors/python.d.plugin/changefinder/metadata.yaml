@@ -1,0 +1,26 @@
+module_name: changefinder
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: changefinder.scores
+          description: ChangeFinder
+          unit: "score"
+          chart_type: line
+          dimensions:
+            - name: a dimension per chart
+        - name: changefinder.flags
+          description: ChangeFinder
+          unit: "flag"
+          chart_type: stacked
+          dimensions:
+            - name: a dimension per chart

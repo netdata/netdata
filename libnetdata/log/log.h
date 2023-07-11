@@ -110,19 +110,19 @@ typedef struct error_with_limit {
 #define error_limit_static_thread_var(var, log_every_secs, sleep_usecs) static __thread ERROR_LIMIT var = { .last_logged = 0, .count = 0, .log_every = (log_every_secs), .sleep_ut = (sleep_usecs) }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-#define debug(type, args...) do { if(unlikely(debug_flags & type)) debug_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
+#define netdata_log_debug(type, args...) do { if(unlikely(debug_flags & type)) debug_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #define internal_error(condition, args...) do { if(unlikely(condition)) error_int(0, "IERR", __FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #define internal_fatal(condition, args...) do { if(unlikely(condition)) fatal_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #else
-#define debug(type, args...) debug_dummy()
+#define netdata_log_debug(type, args...) debug_dummy()
 #define internal_error(args...) debug_dummy()
 #define internal_fatal(args...) debug_dummy()
 #endif
 
-#define info(args...)    info_int(0, __FILE__, __FUNCTION__, __LINE__, ##args)
+#define netdata_log_info(args...)    info_int(0, __FILE__, __FUNCTION__, __LINE__, ##args)
 #define collector_info(args...)    info_int(1, __FILE__, __FUNCTION__, __LINE__, ##args)
 #define infoerr(args...) error_int(0, "INFO", __FILE__, __FUNCTION__, __LINE__, ##args)
-#define error(args...)   error_int(0, "ERROR", __FILE__, __FUNCTION__, __LINE__, ##args)
+#define netdata_log_error(args...)   error_int(0, "ERROR", __FILE__, __FUNCTION__, __LINE__, ##args)
 #define collector_infoerr(args...) error_int(1, "INFO", __FILE__, __FUNCTION__, __LINE__, ##args)
 #define collector_error(args...)   error_int(1, "ERROR", __FILE__, __FUNCTION__, __LINE__, ##args)
 #define error_limit(erl, args...)   error_limit_int(erl, "ERROR", __FILE__, __FUNCTION__, __LINE__, ##args)

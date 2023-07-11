@@ -39,7 +39,7 @@ int init_json_instance(struct instance *instance)
 
     instance->buffer = (void *)buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
     if (!instance->buffer) {
-        error("EXPORTING: cannot create buffer for json exporting connector instance %s", instance->config.name);
+        netdata_log_error("EXPORTING: cannot create buffer for json exporting connector instance %s", instance->config.name);
         return 1;
     }
 
@@ -200,9 +200,9 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
         rrdset_units(st),
         rrddim_id(rd),
         rrddim_name(rd),
-        rd->last_collected_value,
+        rd->collector.last_collected_value,
 
-        (unsigned long long)rd->last_collected_time.tv_sec);
+        (unsigned long long)rd->collector.last_collected_time.tv_sec);
 
     if (instance->config.type != EXPORTING_CONNECTOR_TYPE_JSON_HTTP) {
         buffer_strcat(instance->buffer, "\n");

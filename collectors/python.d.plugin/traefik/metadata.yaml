@@ -1,0 +1,71 @@
+module_name: traefik
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: traefik.response_statuses
+          description: Response statuses
+          unit: "requests/s"
+          chart_type: stacked
+          dimensions:
+            - name: success
+            - name: error
+            - name: redirect
+            - name: bad
+            - name: other
+        - name: traefik.response_codes
+          description: Responses by codes
+          unit: "requests/s"
+          chart_type: stacked
+          dimensions:
+            - name: 2xx
+            - name: 5xx
+            - name: 3xx
+            - name: 4xx
+            - name: 1xx
+            - name: other
+        - name: traefik.detailed_response_codes
+          description: Detailed response codes
+          unit: "requests/s"
+          chart_type: stacked
+          dimensions:
+            - name: a dimension for each response code family
+        - name: traefik.requests
+          description: Requests
+          unit: "requests/s"
+          chart_type: line
+          dimensions:
+            - name: requests
+        - name: traefik.total_response_time
+          description: Total response time
+          unit: "seconds"
+          chart_type: line
+          dimensions:
+            - name: response
+        - name: traefik.average_response_time
+          description: Average response time
+          unit: "milliseconds"
+          chart_type: line
+          dimensions:
+            - name: response
+        - name: traefik.average_response_time_per_iteration
+          description: Average response time per iteration
+          unit: "milliseconds"
+          chart_type: line
+          dimensions:
+            - name: response
+        - name: traefik.uptime
+          description: Uptime
+          unit: "seconds"
+          chart_type: line
+          dimensions:
+            - name: uptime

@@ -128,7 +128,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) 
         ACLK_STATS_UNLOCK;
     }
 
-    w->response.code = web_client_api_request_with_node_selection(localhost, w, path);
+    w->response.code = (short)web_client_api_request_with_node_selection(localhost, w, path);
     web_client_timeout_checkpoint_response_ready(w, &t);
 
     if(buffer_strlen(w->response.data) > ACLK_MAX_WEB_RESPONSE_SIZE) {
@@ -164,7 +164,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) 
                 w->response.zinitialized = true;
                 w->response.zoutput = true;
             } else
-                error("Failed to initialize zlib. Proceeding without compression.");
+                netdata_log_error("Failed to initialize zlib. Proceeding without compression.");
         }
     }
 
@@ -177,9 +177,9 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) 
             z_ret = deflate(&w->response.zstream, Z_FINISH);
             if(z_ret < 0) {
                 if(w->response.zstream.msg)
-                    error("Error compressing body. ZLIB error: \"%s\"", w->response.zstream.msg);
+                    netdata_log_error("Error compressing body. ZLIB error: \"%s\"", w->response.zstream.msg);
                 else
-                    error("Unknown error during zlib compression.");
+                    netdata_log_error("Unknown error during zlib compression.");
                 retval = 1;
                 w->response.code = 500;
                 aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, w->response.code, CLOUD_EC_ZLIB_ERROR, CLOUD_EMSG_ZLIB_ERROR, NULL, 0);
@@ -286,10 +286,10 @@ static void aclk_query_process_msg(struct aclk_query_thread *query_thr, aclk_que
 
     worker_is_busy(query->type);
     if (query->type == HTTP_API_V2) {
-        debug(D_ACLK, "Processing Queued Message of type: \"http_api_request_v2\"");
+        netdata_log_debug(D_ACLK, "Processing Queued Message of type: \"http_api_request_v2\"");
         http_api_v2(query_thr, query);
     } else {
-        debug(D_ACLK, "Processing Queued Message of type: \"%s\"", query->data.bin_payload.msg_name);
+        netdata_log_debug(D_ACLK, "Processing Queued Message of type: \"%s\"", query->data.bin_payload.msg_name);
         send_bin_msg(query_thr, query);
     }
 
@@ -357,7 +357,7 @@ void *aclk_query_main_thread(void *ptr)
 #define TASK_LEN_MAX 22
 void aclk_query_threads_start(struct aclk_query_threads *query_threads, mqtt_wss_client client)
 {
-    info("Starting %d query threads.", query_threads->count);
+    netdata_log_info("Starting %d query threads.", query_threads->count);
 
     char thread_name[TASK_LEN_MAX];
     query_threads->thread_list = callocz(query_threads->count, sizeof(struct aclk_query_thread));
@@ -366,7 +366,7 @@ void aclk_query_threads_start(struct aclk_query_threads *query_threads, mqtt_wss
         query_threads->thread_list[i].client = client;
 
         if(unlikely(snprintfz(thread_name, TASK_LEN_MAX, "ACLK_QRY[%d]", i) < 0))
-            error("snprintf encoding error");
+            netdata_log_error("snprintf encoding error");
         netdata_thread_create(
             &query_threads->thread_list[i].thread, thread_name, NETDATA_THREAD_OPTION_JOINABLE, aclk_query_main_thread,
             &query_threads->thread_list[i]);

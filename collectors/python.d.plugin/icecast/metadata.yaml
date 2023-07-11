@@ -1,0 +1,20 @@
+module_name: icecast
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: icecast.listeners
+          description: Number Of Listeners
+          unit: "listeners"
+          chart_type: line
+          dimensions:
+            - name: a dimension for each active source

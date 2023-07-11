@@ -192,9 +192,9 @@ static void aral_delete_leftover_files(const char *name, const char *path, const
             continue;
 
         snprintfz(full_path, FILENAME_MAX, "%s/%s", path, de->d_name);
-        info("ARAL: '%s' removing left-over file '%s'", name, full_path);
+        netdata_log_info("ARAL: '%s' removing left-over file '%s'", name, full_path);
         if(unlikely(unlink(full_path) == -1))
-            error("ARAL: '%s' cannot delete file '%s'", name, full_path);
+            netdata_log_error("ARAL: '%s' cannot delete file '%s'", name, full_path);
     }
 
     closedir(dir);
@@ -324,7 +324,7 @@ void aral_del_page___no_lock_needed(ARAL *ar, ARAL_PAGE *page TRACE_ALLOCATIONS_
         netdata_munmap(page->data, page->size);
 
         if (unlikely(unlink(page->filename) == 1))
-            error("Cannot delete file '%s'", page->filename);
+            netdata_log_error("Cannot delete file '%s'", page->filename);
 
         freez((void *)page->filename);
 
@@ -756,7 +756,7 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
               ar->config.name, ar->config.requested_element_size, sizeof(uintptr_t), ARAL_NATURAL_ALIGNMENT,
               ar->config.element_size, ar->config.page_ptr_offset);
 
-    //info("ARAL: element size %zu, sizeof(uintptr_t) %zu, natural alignment %zu, final element size %zu, page_ptr_offset %zu",
+    //netdata_log_info("ARAL: element size %zu, sizeof(uintptr_t) %zu, natural alignment %zu, final element size %zu, page_ptr_offset %zu",
     //      ar->element_size, sizeof(uintptr_t), ARAL_NATURAL_ALIGNMENT, ar->internal.element_size, ar->internal.page_ptr_offset);
 
 
@@ -764,7 +764,7 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
         ar->config.initial_page_elements = 2;
 
     if(ar->config.mmap.enabled && (!ar->config.mmap.cache_dir || !*ar->config.mmap.cache_dir)) {
-        error("ARAL: '%s' mmap cache directory is not configured properly, disabling mmap.", ar->config.name);
+        netdata_log_error("ARAL: '%s' mmap cache directory is not configured properly, disabling mmap.", ar->config.name);
         ar->config.mmap.enabled = false;
         internal_fatal(true, "ARAL: '%s' mmap cache directory is not configured properly", ar->config.name);
     }
@@ -1056,7 +1056,7 @@ int aral_stress_test(size_t threads, size_t elements, size_t seconds) {
         __atomic_add_fetch(&auc.errors, 1, __ATOMIC_RELAXED);
     }
 
-    info("ARAL: did %zu malloc, %zu free, "
+    netdata_log_info("ARAL: did %zu malloc, %zu free, "
          "using %zu threads, in %llu usecs",
          auc.ar->aral_lock.user_malloc_operations,
          auc.ar->aral_lock.user_free_operations,

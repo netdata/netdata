@@ -85,7 +85,7 @@ static inline void safe_log_proxy_error(char *str, const char *proxy)
 {
     char *log = strdupz(proxy);
     safe_log_proxy_censor(log);
-    error("%s Provided Value:\"%s\"", str, log);
+    netdata_log_error("%s Provided Value:\"%s\"", str, log);
     freez(log);
 }
 

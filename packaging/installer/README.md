@@ -7,6 +7,8 @@ import TabItem from '@theme/TabItem';
 
 This document will guide you through installing the open-source Netdata monitoring Agent on Linux, Docker, Kubernetes, and many others, often with one command.
 
+Netdata is very flexible and can be used to monitor all kinds of infrastructure. Read more about possible [Deployment strategies](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/deployment-strategies.md) to understand what better suites your needs.
+
 ## Get started
 
 Netdata is a free and open-source (FOSS) monitoring agent that collects thousands of hardware and software metrics from

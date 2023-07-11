@@ -1,0 +1,72 @@
+module_name: litespeed
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: litespeed.net_throughput
+          description: Network Throughput HTTP
+          unit: "kilobits/s"
+          chart_type: area
+          dimensions:
+            - name: in
+            - name: out
+        - name: litespeed.net_throughput
+          description: Network Throughput HTTPS
+          unit: "kilobits/s"
+          chart_type: area
+          dimensions:
+            - name: in
+            - name: out
+        - name: litespeed.connections
+          description: Connections HTTP
+          unit: "conns"
+          chart_type: stacked
+          dimensions:
+            - name: free
+            - name: used
+        - name: litespeed.connections
+          description: Connections HTTPS
+          unit: "conns"
+          chart_type: stacked
+          dimensions:
+            - name: free
+            - name: used
+        - name: litespeed.requests
+          description: Requests
+          unit: "requests/s"
+          chart_type: line
+          dimensions:
+            - name: requests
+        - name: litespeed.requests_processing
+          description: Requests In Processing
+          unit: "requests"
+          chart_type: line
+          dimensions:
+            - name: processing
+        - name: litespeed.cache
+          description: Public Cache Hits
+          unit: "hits/s"
+          chart_type: line
+          dimensions:
+            - name: hits
+        - name: litespeed.cache
+          description: Private Cache Hits
+          unit: "hits/s"
+          chart_type: line
+          dimensions:
+            - name: hits
+        - name: litespeed.static
+          description: Static Hits
+          unit: "hits/s"
+          chart_type: line
+          dimensions:
+            - name: hits

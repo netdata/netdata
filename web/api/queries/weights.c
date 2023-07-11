@@ -936,7 +936,7 @@ static size_t registered_results_to_json_multinode_no_group_by(
 
     buffer_json_object_close(wb); //dictionaries
 
-    buffer_json_agents_array_v2(wb, &qwd->timings, 0, false);
+    buffer_json_agents_v2(wb, &qwd->timings, 0, false, true);
     buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
     buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
     buffer_json_finalize(wb);
@@ -1067,7 +1067,7 @@ static size_t registered_results_to_json_multinode_group_by(
     dfe_done(aw);
     buffer_json_array_close(wb); // result
 
-    buffer_json_agents_array_v2(wb, &qwd->timings, 0, false);
+    buffer_json_agents_v2(wb, &qwd->timings, 0, false, true);
     buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
     buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
     buffer_json_finalize(wb);
@@ -1244,7 +1244,7 @@ static double kstwo(
         return NAN;
 
     if(unlikely(base_size != baseline_points - 1 || high_size != highlight_points - 1)) {
-        error("Metric correlations: internal error - calculate_pairs_diff() returns the wrong number of entries");
+        netdata_log_error("Metric correlations: internal error - calculate_pairs_diff() returns the wrong number of entries");
         return NAN;
     }
 
@@ -1292,7 +1292,7 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
         stats->db_points_per_tier[tr] += r->internal.qt->db.tiers[tr].points;
 
     if(r->d != 1 || r->internal.qt->query.used != 1) {
-        error("WEIGHTS: on query '%s' expected 1 dimension in RRDR but got %zu r->d and %zu qt->query.used",
+        netdata_log_error("WEIGHTS: on query '%s' expected 1 dimension in RRDR but got %zu r->d and %zu qt->query.used",
               r->internal.qt->id, r->d, (size_t)r->internal.qt->query.used);
         goto cleanup;
     }
@@ -1368,11 +1368,11 @@ static void rrdset_metric_correlations_ks2(
 
         // these conditions should never happen, but still let's check
         if(unlikely(prob < 0.0)) {
-            error("Metric correlations: kstwo() returned a negative number: %f", prob);
+            netdata_log_error("Metric correlations: kstwo() returned a negative number: %f", prob);
             prob = -prob;
         }
         if(unlikely(prob > 1.0)) {
-            error("Metric correlations: kstwo() returned a number above 1.0: %f", prob);
+            netdata_log_error("Metric correlations: kstwo() returned a number above 1.0: %f", prob);
             prob = 1.0;
         }
 
@@ -1447,7 +1447,7 @@ static void rrdset_metric_correlations_volume(
     merge_query_value_to_stats(&highlight_countif, stats, 1);
 
     if(!netdata_double_isnumber(highlight_countif.value)) {
-        info("WEIGHTS: highlighted countif query failed, but highlighted average worked - strange...");
+        netdata_log_info("WEIGHTS: highlighted countif query failed, but highlighted average worked - strange...");
         return;
     }
 

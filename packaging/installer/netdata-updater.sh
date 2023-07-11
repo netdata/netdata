@@ -37,6 +37,8 @@ PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packag
 NETDATA_STABLE_BASE_URL="${NETDATA_BASE_URL:-https://github.com/netdata/netdata/releases}"
 NETDATA_NIGHTLY_BASE_URL="${NETDATA_BASE_URL:-https://github.com/netdata/netdata-nightlies/releases}"
 
+NETDATA_UPDATER_JITTER=3600
+
 script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 if [ -x "${script_dir}/netdata-updater" ]; then
@@ -101,6 +103,14 @@ exit_reason() {
       fi
     fi
   fi
+}
+
+is_integer () {
+  case "${1#[+-]}" in
+    *[!0123456789]*) return 1 ;;
+    '')              return 1 ;;
+    *)               return 0 ;;
+  esac
 }
 
 issystemd() {
@@ -859,6 +869,11 @@ if [ -r "$(dirname "${ENVIRONMENT_FILE}")/.install-type" ]; then
   . "$(dirname "${ENVIRONMENT_FILE}")/.install-type" || fatal "Failed to source $(dirname "${ENVIRONMENT_FILE}")/.install-type" U0015
 fi
 
+if [ -r "$(dirname "${ENVIRONMENT_FILE}")/netdata-updater.conf" ]; then
+  # shellcheck source=/dev/null
+  . "$(dirname "${ENVIRONMENT_FILE}")/netdata-updater.conf"
+fi
+
 while [ -n "${1}" ]; do
   case "${1}" in
     --not-running-from-cron) NETDATA_NOT_RUNNING_FROM_CRON=1 ;;
@@ -867,17 +882,17 @@ while [ -n "${1}" ]; do
     --non-interactive) INTERACTIVE=0 ;;
     --interactive) INTERACTIVE=1 ;;
     --tmpdir-path)
-        NETDATA_TMPDIR_PATH="${2}"
-        shift 1
-        ;;
+      NETDATA_TMPDIR_PATH="${2}"
+      shift 1
+      ;;
     --enable-auto-updates)
-        enable_netdata_updater "${2}"
-        exit $?
-        ;;
+      enable_netdata_updater "${2}"
+      exit $?
+      ;;
     --disable-auto-updates)
-        disable_netdata_updater
-        exit $?
-        ;;
+      disable_netdata_updater
+      exit $?
+      ;;
     *) fatal "Unrecognized option ${1}" U001A ;;
   esac
 
@@ -888,12 +903,16 @@ done
 # and disconnecting/reconnecting at the same time (or near to).
 # But only we're not a controlling terminal (tty)
 # Randomly sleep between 1s and 60m
-if [ ! -t 1 ] && [ -z "${NETDATA_NOT_RUNNING_FROM_CRON}" ]; then
-    rnd="$(awk '
+if [ ! -t 1 ] && \
+   [ -z "${GITHUB_ACTIONS}" ] && \
+   [ -z "${NETDATA_NOT_RUNNING_FROM_CRON}" ] && \
+   is_integer "${NETDATA_UPDATER_JITTER}" && \
+   [ "${NETDATA_UPDATER_JITTER}" -gt 1 ]; then
+    rnd="$(awk "
       BEGIN { srand()
-              printf("%d\n", 3600 * rand())
-      }')"
-    sleep $(((rnd % 3600) + 1))
+              printf(\"%d\\n\", ${NETDATA_UPDATER_JITTER} * rand())
+      }")"
+    sleep $(((rnd % NETDATA_UPDATER_JITTER) + 1))
 fi
 
 # We dont expect to find lib dir variable on older installations, so load this path if none found

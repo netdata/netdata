@@ -571,7 +571,7 @@ static void labels_add_already_sanitized(DICTIONARY *dict, const char *key, cons
 
 void rrdlabels_add(DICTIONARY *dict, const char *name, const char *value, RRDLABEL_SRC ls) {
     if(!dict) {
-        error("%s(): called with NULL dictionary.", __FUNCTION__ );
+        netdata_log_error("%s(): called with NULL dictionary.", __FUNCTION__ );
         return;
     }
 
@@ -580,7 +580,7 @@ void rrdlabels_add(DICTIONARY *dict, const char *name, const char *value, RRDLAB
     rrdlabels_sanitize_value(v, value, RRDLABELS_MAX_VALUE_LENGTH);
 
     if(!*n) {
-        error("%s: cannot add name '%s' (value '%s') which is sanitized as empty string", __FUNCTION__, name, value);
+        netdata_log_error("%s: cannot add name '%s' (value '%s') which is sanitized as empty string", __FUNCTION__, name, value);
         return;
     }
 
@@ -621,7 +621,7 @@ static const char *get_quoted_string_up_to(char *dst, size_t dst_size, const cha
 
 void rrdlabels_add_pair(DICTIONARY *dict, const char *string, RRDLABEL_SRC ls) {
     if(!dict) {
-        error("%s(): called with NULL dictionary.", __FUNCTION__ );
+        netdata_log_error("%s(): called with NULL dictionary.", __FUNCTION__ );
         return;
     }
 

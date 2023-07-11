@@ -106,6 +106,7 @@ static int
         enable_file_charts = 1,
         max_fds_cache_seconds = 60,
 #endif
+        enable_function_cmdline = 0,
         enable_detailed_uptime_charts = 0,
         enable_users_charts = 1,
         enable_groups_charts = 1,
@@ -665,7 +666,7 @@ int read_user_or_group_ids(struct user_or_group_ids *ids, struct timespec *last_
         }
         else {
             if(unlikely(avl_insert(&ids->index, (avl_t *) user_or_group_id) != (void *) user_or_group_id)) {
-                error("INTERNAL ERROR: duplicate indexing of id during realloc");
+                netdata_log_error("INTERNAL ERROR: duplicate indexing of id during realloc");
             };
 
             user_or_group_id->next = ids->root;
@@ -681,7 +682,7 @@ int read_user_or_group_ids(struct user_or_group_ids *ids, struct timespec *last_
     while(user_or_group_id) {
         if(unlikely(!user_or_group_id->updated)) {
             if(unlikely((struct user_or_group_id *)avl_remove(&ids->index, (avl_t *) user_or_group_id) != user_or_group_id))
-                error("INTERNAL ERROR: removal of unused id from index, removed a different id");
+                netdata_log_error("INTERNAL ERROR: removal of unused id from index, removed a different id");
 
             if(prev_user_id)
                 prev_user_id->next = user_or_group_id->next;
@@ -946,7 +947,7 @@ static int read_apps_groups_conf(const char *path, const char *file)
             // add this target
             struct target *n = get_apps_groups_target(s, w, name);
             if(!n) {
-                error("Cannot create target '%s' (line %zu, word %zu)", s, line, word);
+                netdata_log_error("Cannot create target '%s' (line %zu, word %zu)", s, line, word);
                 continue;
             }
 
@@ -996,7 +997,7 @@ static inline void del_pid_entry(pid_t pid) {
     struct pid_stat *p = all_pids[pid];
 
     if(unlikely(!p)) {
-        error("attempted to free pid %d that is not allocated.", pid);
+        netdata_log_error("attempted to free pid %d that is not allocated.", pid);
         return;
     }
 
@@ -1034,7 +1035,7 @@ static inline void del_pid_entry(pid_t pid) {
 
 static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
     if(unlikely(!status)) {
-        // error("command failed log %u, errno %d", log, errno);
+        // netdata_log_error("command failed log %u, errno %d", log, errno);
 
         if(unlikely(debug_enabled || errno != ENOENT)) {
             if(unlikely(debug_enabled || !(p->log_thrown & log))) {
@@ -1042,33 +1043,33 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
                 switch(log) {
                     case PID_LOG_IO:
                         #ifdef __FreeBSD__
-                        error("Cannot fetch process %d I/O info (command '%s')", p->pid, p->comm);
+                        netdata_log_error("Cannot fetch process %d I/O info (command '%s')", p->pid, p->comm);
                         #else
-                        error("Cannot process %s/proc/%d/io (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
+                        netdata_log_error("Cannot process %s/proc/%d/io (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
                         #endif
                         break;
 
                     case PID_LOG_STATUS:
                         #ifdef __FreeBSD__
-                        error("Cannot fetch process %d status info (command '%s')", p->pid, p->comm);
+                        netdata_log_error("Cannot fetch process %d status info (command '%s')", p->pid, p->comm);
                         #else
-                        error("Cannot process %s/proc/%d/status (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
+                        netdata_log_error("Cannot process %s/proc/%d/status (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
                         #endif
                         break;
 
                     case PID_LOG_CMDLINE:
                         #ifdef __FreeBSD__
-                        error("Cannot fetch process %d command line (command '%s')", p->pid, p->comm);
+                        netdata_log_error("Cannot fetch process %d command line (command '%s')", p->pid, p->comm);
                         #else
-                        error("Cannot process %s/proc/%d/cmdline (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
+                        netdata_log_error("Cannot process %s/proc/%d/cmdline (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
                         #endif
                         break;
 
                     case PID_LOG_FDS:
                         #ifdef __FreeBSD__
-                        error("Cannot fetch process %d files (command '%s')", p->pid, p->comm);
+                        netdata_log_error("Cannot fetch process %d files (command '%s')", p->pid, p->comm);
                         #else
-                        error("Cannot process entries in %s/proc/%d/fd (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
+                        netdata_log_error("Cannot process entries in %s/proc/%d/fd (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
                         #endif
                         break;
 
@@ -1076,7 +1077,7 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
                         break;
 
                     default:
-                        error("unhandled error for pid %d, command '%s'", p->pid, p->comm);
+                        netdata_log_error("unhandled error for pid %d, command '%s'", p->pid, p->comm);
                         break;
                 }
             }
@@ -1084,7 +1085,7 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
         errno = 0;
     }
     else if(unlikely(p->log_thrown & log)) {
-        // error("unsetting log %u on pid %d", log, p->pid);
+        // netdata_log_error("unsetting log %u on pid %d", log, p->pid);
         p->log_thrown &= ~log;
     }
 
@@ -1470,7 +1471,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
 
     if(enable_guest_charts) {
         enable_guest_charts = 0;
-        info("Guest charts aren't supported by FreeBSD");
+        netdata_log_info("Guest charts aren't supported by FreeBSD");
     }
 #else
     pid_incremental_rate(stat, p->minflt,  str2kernel_uint_t(procfile_lineword(ff, 0,  9)));
@@ -1732,7 +1733,7 @@ cleanup:
 int file_descriptor_compare(void* a, void* b) {
 #ifdef NETDATA_INTERNAL_CHECKS
     if(((struct file_descriptor *)a)->magic != 0x0BADCAFE || ((struct file_descriptor *)b)->magic != 0x0BADCAFE)
-        error("Corrupted index data detected. Please report this.");
+        netdata_log_error("Corrupted index data detected. Please report this.");
 #endif /* NETDATA_INTERNAL_CHECKS */
 
     if(((struct file_descriptor *)a)->hash < ((struct file_descriptor *)b)->hash)
@@ -1776,7 +1777,7 @@ static inline void file_descriptor_not_used(int id)
 
 #ifdef NETDATA_INTERNAL_CHECKS
         if(all_files[id].magic != 0x0BADCAFE) {
-            error("Ignoring request to remove empty file id %d.", id);
+            netdata_log_error("Ignoring request to remove empty file id %d.", id);
             return;
         }
 #endif /* NETDATA_INTERNAL_CHECKS */
@@ -1790,7 +1791,7 @@ static inline void file_descriptor_not_used(int id)
                 debug_log("  >> slot %d is empty.", id);
 
                 if(unlikely(file_descriptor_remove(&all_files[id]) != (void *)&all_files[id]))
-                    error("INTERNAL ERROR: removal of unused fd from index, removed a different fd");
+                    netdata_log_error("INTERNAL ERROR: removal of unused fd from index, removed a different fd");
 
 #ifdef NETDATA_INTERNAL_CHECKS
                 all_files[id].magic = 0x00000000;
@@ -1799,9 +1800,14 @@ static inline void file_descriptor_not_used(int id)
             }
         }
         else
-            error("Request to decrease counter of fd %d (%s), while the use counter is 0", id, all_files[id].name);
+            netdata_log_error("Request to decrease counter of fd %d (%s), while the use counter is 0",
+                              id,
+                              all_files[id].name);
     }
-    else    error("Request to decrease counter of fd %d, which is outside the array size (1 to %d)", id, all_files_size);
+    else
+        netdata_log_error("Request to decrease counter of fd %d, which is outside the array size (1 to %d)",
+                          id,
+                          all_files_size);
 }
 
 static inline void all_files_grow() {
@@ -1823,7 +1829,7 @@ static inline void all_files_grow() {
         for(i = 0; i < all_files_size; i++) {
             if(!all_files[i].count) continue;
             if(unlikely(file_descriptor_add(&all_files[i]) != (void *)&all_files[i]))
-                error("INTERNAL ERROR: duplicate indexing of fd during realloc.");
+                netdata_log_error("INTERNAL ERROR: duplicate indexing of fd during realloc.");
         }
 
         debug_log("  >> re-indexing done.");
@@ -1864,7 +1870,7 @@ static inline int file_descriptor_set_on_empty_slot(const char *name, uint32_t h
 
 #ifdef NETDATA_INTERNAL_CHECKS
             if(all_files[c].magic == 0x0BADCAFE && all_files[c].name && file_descriptor_find(all_files[c].name, all_files[c].hash))
-                error("fd on position %d is not cleared properly. It still has %s in it.", c, all_files[c].name);
+                netdata_log_error("fd on position %d is not cleared properly. It still has %s in it.", c, all_files[c].name);
 #endif /* NETDATA_INTERNAL_CHECKS */
 
             debug_log("  >> %s fd position %d for %s (last name: %s)", all_files[c].name?"re-using":"using", c, name, all_files[c].name);
@@ -1895,7 +1901,7 @@ static inline int file_descriptor_set_on_empty_slot(const char *name, uint32_t h
     all_files[c].magic = 0x0BADCAFE;
 #endif /* NETDATA_INTERNAL_CHECKS */
     if(unlikely(file_descriptor_add(&all_files[c]) != (void *)&all_files[c]))
-        error("INTERNAL ERROR: duplicate indexing of fd.");
+        netdata_log_error("INTERNAL ERROR: duplicate indexing of fd.");
 
     debug_log("using fd position %d (name: %s)", c, all_files[c].name);
 
@@ -2013,13 +2019,13 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
     mib[3] = p->pid;
 
     if (unlikely(sysctl(mib, 4, NULL, &size, NULL, 0))) {
-        error("sysctl error: Can't get file descriptors data size for pid %d", p->pid);
+        netdata_log_error("sysctl error: Can't get file descriptors data size for pid %d", p->pid);
         return 0;
     }
     if (likely(size > 0))
         fdsbuf = reallocz(fdsbuf, size);
     if (unlikely(sysctl(mib, 4, fdsbuf, &size, NULL, 0))) {
-        error("sysctl error: Can't get file descriptors data for pid %d", p->pid);
+        netdata_log_error("sysctl error: Can't get file descriptors data for pid %d", p->pid);
         return 0;
     }
 
@@ -2192,7 +2198,7 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
             // cannot read the link
 
             if(debug_enabled || (p->target && p->target->debug_enabled))
-                error("Cannot read link %s", p->fds[fdid].filename);
+                netdata_log_error("Cannot read link %s", p->fds[fdid].filename);
 
             if(unlikely(p->fds[fdid].fd < 0)) {
                 file_descriptor_not_used(-p->fds[fdid].fd);
@@ -2523,7 +2529,7 @@ static inline void link_all_processes_to_their_parents(void) {
         }
         else {
             p->parent = NULL;
-            error("pid %d %s states parent %d, but the later does not exist.", p->pid, p->comm, p->ppid);
+            netdata_log_error("pid %d %s states parent %d, but the later does not exist.", p->pid, p->comm, p->ppid);
         }
     }
 }
@@ -2561,7 +2567,7 @@ static int compar_pid(const void *pid1, const void *pid2) {
 
 static inline int collect_data_for_pid(pid_t pid, void *ptr) {
     if(unlikely(pid < 0 || pid > pid_max)) {
-        error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, 0, pid_max);
+        netdata_log_error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, 0, pid_max);
         return 0;
     }
 
@@ -2580,7 +2586,7 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
 
     // check its parent pid
     if(unlikely(p->ppid < 0 || p->ppid > pid_max)) {
-        error("Pid %d (command '%s') states invalid parent pid %d. Using 0.", pid, p->comm, p->ppid);
+        netdata_log_error("Pid %d (command '%s') states invalid parent pid %d. Using 0.", pid, p->comm, p->ppid);
         p->ppid = 0;
     }
 
@@ -2632,7 +2638,7 @@ static int collect_data_for_all_processes(void) {
 
     int mib[3] = { CTL_KERN, KERN_PROC, KERN_PROC_PROC };
     if (unlikely(sysctl(mib, 3, NULL, &new_procbase_size, NULL, 0))) {
-        error("sysctl error: Can't get processes data size");
+        netdata_log_error("sysctl error: Can't get processes data size");
         return 0;
     }
 
@@ -2652,7 +2658,7 @@ static int collect_data_for_all_processes(void) {
 
     // get the processes from the system
     if (unlikely(sysctl(mib, 3, procbase, &new_procbase_size, NULL, 0))) {
-        error("sysctl error: Can't get processes data");
+        netdata_log_error("sysctl error: Can't get processes data");
         return 0;
     }
 
@@ -2680,7 +2686,7 @@ static int collect_data_for_all_processes(void) {
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
         if(unlikely(slc != all_pids_count)) {
-            error("Internal error: I was thinking I had %zu processes in my arrays, but it seems there are %zu.", all_pids_count, slc);
+            netdata_log_error("Internal error: I was thinking I had %zu processes in my arrays, but it seems there are %zu.", all_pids_count, slc);
             all_pids_count = slc;
         }
 
@@ -3104,7 +3110,7 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
     }
 
     if(unlikely(!w)) {
-        error("pid %d %s was left without a target!", p->pid, p->comm);
+        netdata_log_error("pid %d %s was left without a target!", p->pid, p->comm);
         return;
     }
 
@@ -4122,6 +4128,10 @@ static void parse_args(int argc, char **argv)
             enable_detailed_uptime_charts = 1;
             continue;
         }
+        if(strcmp("with-function-cmdline", argv[i]) == 0) {
+            enable_function_cmdline = 1;
+            continue;
+        }
 
         if(strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {
             fprintf(stderr,
@@ -4138,6 +4148,11 @@ static void parse_args(int argc, char **argv)
                     " SECONDS                set the data collection frequency\n"
                     "\n"
                     " debug                  enable debugging (lot of output)\n"
+                    "\n"
+                    " with-function-cmdline  enable reporting the complete command line for processes\n"
+                    "                        it includes the command and passed arguments\n"
+                    "                        it may include sensitive data such as passwords and tokens\n"
+                    "                        enabling this could be a security risk\n"
                     "\n"
                     " with-childs\n"
                     " without-childs         enable / disable aggregating exited\n"
@@ -4177,35 +4192,35 @@ static void parse_args(int argc, char **argv)
             exit(1);
         }
 
-        error("Cannot understand option %s", argv[i]);
+        netdata_log_error("Cannot understand option %s", argv[i]);
         exit(1);
     }
 
     if(freq > 0) update_every = freq;
 
     if(read_apps_groups_conf(user_config_dir, "groups")) {
-        info("Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'", user_config_dir, stock_config_dir);
+        netdata_log_info("Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'", user_config_dir, stock_config_dir);
 
         if(read_apps_groups_conf(stock_config_dir, "groups")) {
-            error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.", stock_config_dir);
+            netdata_log_error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.", stock_config_dir);
             exit(1);
         }
         else
-            info("Loaded config file '%s/apps_groups.conf'", stock_config_dir);
+            netdata_log_info("Loaded config file '%s/apps_groups.conf'", stock_config_dir);
     }
     else
-        info("Loaded config file '%s/apps_groups.conf'", user_config_dir);
+        netdata_log_info("Loaded config file '%s/apps_groups.conf'", user_config_dir);
 }
 
 static int am_i_running_as_root() {
     uid_t uid = getuid(), euid = geteuid();
 
     if(uid == 0 || euid == 0) {
-        if(debug_enabled) info("I am running with escalated privileges, uid = %u, euid = %u.", uid, euid);
+        if(debug_enabled) netdata_log_info("I am running with escalated privileges, uid = %u, euid = %u.", uid, euid);
         return 1;
     }
 
-    if(debug_enabled) info("I am not running with escalated privileges, uid = %u, euid = %u.", uid, euid);
+    if(debug_enabled) netdata_log_info("I am not running with escalated privileges, uid = %u, euid = %u.", uid, euid);
     return 0;
 }
 
@@ -4213,40 +4228,40 @@ static int am_i_running_as_root() {
 static int check_capabilities() {
     cap_t caps = cap_get_proc();
     if(!caps) {
-        error("Cannot get current capabilities.");
+        netdata_log_error("Cannot get current capabilities.");
         return 0;
     }
     else if(debug_enabled)
-        info("Received my capabilities from the system.");
+        netdata_log_info("Received my capabilities from the system.");
 
     int ret = 1;
 
     cap_flag_value_t cfv = CAP_CLEAR;
     if(cap_get_flag(caps, CAP_DAC_READ_SEARCH, CAP_EFFECTIVE, &cfv) == -1) {
-        error("Cannot find if CAP_DAC_READ_SEARCH is effective.");
+        netdata_log_error("Cannot find if CAP_DAC_READ_SEARCH is effective.");
         ret = 0;
     }
     else {
         if(cfv != CAP_SET) {
-            error("apps.plugin should run with CAP_DAC_READ_SEARCH.");
+            netdata_log_error("apps.plugin should run with CAP_DAC_READ_SEARCH.");
             ret = 0;
         }
         else if(debug_enabled)
-            info("apps.plugin runs with CAP_DAC_READ_SEARCH.");
+            netdata_log_info("apps.plugin runs with CAP_DAC_READ_SEARCH.");
     }
 
     cfv = CAP_CLEAR;
     if(cap_get_flag(caps, CAP_SYS_PTRACE, CAP_EFFECTIVE, &cfv) == -1) {
-        error("Cannot find if CAP_SYS_PTRACE is effective.");
+        netdata_log_error("Cannot find if CAP_SYS_PTRACE is effective.");
         ret = 0;
     }
     else {
         if(cfv != CAP_SET) {
-            error("apps.plugin should run with CAP_SYS_PTRACE.");
+            netdata_log_error("apps.plugin should run with CAP_SYS_PTRACE.");
             ret = 0;
         }
         else if(debug_enabled)
-            info("apps.plugin runs with CAP_SYS_PTRACE.");
+            netdata_log_info("apps.plugin runs with CAP_SYS_PTRACE.");
     }
 
     cap_free(caps);
@@ -4372,7 +4387,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
     struct pid_stat *p;
 
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
-    size_t num_words = pluginsd_split_words(function, words, PLUGINSD_MAX_WORDS);
+    size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
 
     struct target *category = NULL, *user = NULL, *group = NULL;
     const char *process_name = NULL;
@@ -4538,10 +4553,10 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         // cmd
         buffer_json_add_array_item_string(wb, p->comm);
 
-#ifdef NETDATA_DEV_MODE
         // cmdline
-        buffer_json_add_array_item_string(wb, (p->cmdline && *p->cmdline) ? p->cmdline : p->comm);
-#endif
+        if (enable_function_cmdline) {
+            buffer_json_add_array_item_string(wb, (p->cmdline && *p->cmdline) ? p->cmdline : p->comm);
+        }
 
         // ppid
         buffer_json_add_array_item_uint64(wb, p->ppid);
@@ -4648,13 +4663,14 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
 
-#ifdef NETDATA_DEV_MODE
-        buffer_rrdf_table_add_field(wb, field_id++, "CmdLine", "Command Line", RRDF_FIELD_TYPE_DETAIL_STRING,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0,
-                                    NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-#endif
+        if (enable_function_cmdline) {
+            buffer_rrdf_table_add_field(wb, field_id++, "CmdLine", "Command Line", RRDF_FIELD_TYPE_STRING,
+                                        RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0,
+                                        NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                        RRDF_FIELD_FILTER_MULTISELECT,
+                                        RRDF_FIELD_OPTS_NONE, NULL);
+        }
+
         buffer_rrdf_table_add_field(wb, field_id++, "PPID", "Parent Process ID", RRDF_FIELD_TYPE_INTEGER,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL,
                                     NAN, RRDF_FIELD_SORT_ASCENDING, "PID", RRDF_FIELD_SUMMARY_COUNT,
@@ -5219,7 +5235,7 @@ void *reader_main(void *arg __maybe_unused) {
     while(!apps_plugin_exit && (s = fgets(buffer, PLUGINSD_LINE_MAX, stdin))) {
 
         char *words[PLUGINSD_MAX_WORDS] = { NULL };
-        size_t num_words = pluginsd_split_words(buffer, words, PLUGINSD_MAX_WORDS);
+        size_t num_words = quoted_strings_splitter_pluginsd(buffer, words, PLUGINSD_MAX_WORDS);
 
         const char *keyword = get_word(words, num_words, 0);
 
@@ -5229,7 +5245,7 @@ void *reader_main(void *arg __maybe_unused) {
             char *function = get_word(words, num_words, 3);
 
             if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
-                error("Received incomplete %s (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
+                netdata_log_error("Received incomplete %s (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
                       keyword,
                       transaction?transaction:"(unset)",
                       timeout_s?timeout_s:"(unset)",
@@ -5255,12 +5271,12 @@ void *reader_main(void *arg __maybe_unused) {
             }
         }
         else
-            error("Received unknown command: %s", keyword?keyword:"(unset)");
+            netdata_log_error("Received unknown command: %s", keyword?keyword:"(unset)");
     }
 
     if(!s || feof(stdin) || ferror(stdin)) {
         apps_plugin_exit = true;
-        error("Received error on stdin.");
+        netdata_log_error("Received error on stdin.");
     }
 
     exit(1);
@@ -5300,23 +5316,23 @@ int main(int argc, char **argv) {
 
     user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
     if(user_config_dir == NULL) {
-        // info("NETDATA_CONFIG_DIR is not passed from netdata");
+        // netdata_log_info("NETDATA_CONFIG_DIR is not passed from netdata");
         user_config_dir = CONFIG_DIR;
     }
-    // else info("Found NETDATA_USER_CONFIG_DIR='%s'", user_config_dir);
+    // else netdata_log_info("Found NETDATA_USER_CONFIG_DIR='%s'", user_config_dir);
 
     stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
     if(stock_config_dir == NULL) {
-        // info("NETDATA_CONFIG_DIR is not passed from netdata");
+        // netdata_log_info("NETDATA_CONFIG_DIR is not passed from netdata");
         stock_config_dir = LIBCONFIG_DIR;
     }
-    // else info("Found NETDATA_USER_CONFIG_DIR='%s'", user_config_dir);
+    // else netdata_log_info("Found NETDATA_USER_CONFIG_DIR='%s'", user_config_dir);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {
         struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
         if(setrlimit(RLIMIT_CORE, &rl) != 0)
-            info("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
+            netdata_log_info("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
 #ifdef HAVE_SYS_PRCTL_H
         prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
 #endif
@@ -5340,14 +5356,14 @@ int main(int argc, char **argv) {
     if(!check_capabilities() && !am_i_running_as_root() && !check_proc_1_io()) {
         uid_t uid = getuid(), euid = geteuid();
 #ifdef HAVE_CAPABILITY
-        error("apps.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
+        netdata_log_error("apps.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
                       "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
                       "To enable capabilities run: sudo setcap cap_dac_read_search,cap_sys_ptrace+ep %s; "
                       "To enable setuid to root run: sudo chown root:netdata %s; sudo chmod 4750 %s; "
               , uid, euid, argv[0], argv[0], argv[0]
         );
 #else
-        error("apps.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
+        netdata_log_error("apps.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
                       "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
                       "Your system does not support capabilities. "
                       "To enable setuid to root run: sudo chown root:netdata %s; sudo chmod 4750 %s; "
@@ -5356,7 +5372,7 @@ int main(int argc, char **argv) {
 #endif
     }
 
-    info("started on pid %d", getpid());
+    netdata_log_info("started on pid %d", getpid());
 
     snprintfz(all_user_ids.filename, FILENAME_MAX, "%s/etc/passwd", netdata_configured_host_prefix);
     debug_log("passwd file: '%s'", all_user_ids.filename);
@@ -5408,7 +5424,7 @@ int main(int argc, char **argv) {
             get_MemTotal();
 
         if(!collect_data_for_all_processes()) {
-            error("Cannot collect /proc data for running processes. Disabling apps.plugin...");
+            netdata_log_error("Cannot collect /proc data for running processes. Disabling apps.plugin...");
             printf("DISABLE\n");
             netdata_mutex_unlock(&mutex);
             netdata_thread_cancel(reader_thread);

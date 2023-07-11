@@ -249,7 +249,7 @@ void rrddimvar_add_and_leave_released(RRDDIM *rd, RRDVAR_TYPE type, const char *
 void rrddimvar_rename_all(RRDDIM *rd) {
     RRDSET *st = rd->rrdset;
 
-    debug(D_VARIABLES, "RRDDIMVAR rename for chart id '%s' name '%s', dimension id '%s', name '%s'", rrdset_id(st), rrdset_name(st), rrddim_id(rd), rrddim_name(rd));
+    netdata_log_debug(D_VARIABLES, "RRDDIMVAR rename for chart id '%s' name '%s', dimension id '%s', name '%s'", rrdset_id(st), rrdset_name(st), rrddim_id(rd), rrddim_name(rd));
 
     RRDDIMVAR *rs;
     dfe_start_write(st->rrddimvar_root_index, rs) {
@@ -262,7 +262,7 @@ void rrddimvar_rename_all(RRDDIM *rd) {
 void rrddimvar_delete_all(RRDDIM *rd) {
     RRDSET *st = rd->rrdset;
 
-    debug(D_VARIABLES, "RRDDIMVAR delete for chart id '%s' name '%s', dimension id '%s', name '%s'", rrdset_id(st), rrdset_name(st), rrddim_id(rd), rrddim_name(rd));
+    netdata_log_debug(D_VARIABLES, "RRDDIMVAR delete for chart id '%s' name '%s', dimension id '%s', name '%s'", rrdset_id(st), rrdset_name(st), rrddim_id(rd), rrddim_name(rd));
 
     RRDDIMVAR *rs;
     dfe_start_write(st->rrddimvar_root_index, rs) {

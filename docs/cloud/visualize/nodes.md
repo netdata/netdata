@@ -14,9 +14,9 @@ real-time charts.
 Use the [Overview](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md) for monitoring an infrastructure in real time using
 composite charts and Netdata's familiar dashboard UI.
 
-Check the [War Room docs](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md) for details on the utility bar, which contains the [node
-filter](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md#node-filter) and the [timeframe
-selector](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md#play-pause-force-play-and-timeframe-selector).
+Check the [node
+filter](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/node-filter.md) and the [Visualization date time controls
+selector](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.md) for tools available on the utility bar.
 
 ## Add and customize metrics columns
 

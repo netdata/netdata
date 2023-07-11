@@ -69,6 +69,9 @@ slabinfo.plugin
 cgroup-network
 !cgroup-network/
 
+local-listeners
+!local-listeners/
+
 ebpf.plugin
 collectors/ebpf.plugin/reset_netdata_trace.sh
 !ebpf.plugin/

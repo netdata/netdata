@@ -3,7 +3,209 @@
 #include "web_api_v2.h"
 #include "../rtc/webrtc.h"
 
-static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unused, struct web_client *w, char *url, CONTEXTS_V2_OPTIONS options) {
+struct bearer_token {
+    time_t created_s;
+    time_t expires_s;
+};
+
+static void bearer_token_cleanup(void) {
+    static time_t attempts = 0;
+
+    if(++attempts % 1000 != 0)
+        return;
+
+    time_t now_s = now_monotonic_sec();
+
+    struct bearer_token *z;
+    dfe_start_read(netdata_authorized_bearers, z) {
+        if(z->expires_s < now_s)
+            dictionary_del(netdata_authorized_bearers, z_dfe.name);
+    }
+    dfe_done(z);
+
+    dictionary_garbage_collect(netdata_authorized_bearers);
+}
+
+static void bearer_get_token(uuid_t *uuid) {
+    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    static bool initialized = false;
+
+    if(!initialized) {
+        spinlock_lock(&spinlock);
+        if (!netdata_authorized_bearers) {
+            netdata_authorized_bearers = dictionary_create_advanced(
+                    DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                    NULL, sizeof(struct bearer_token));
+        }
+        spinlock_unlock(&spinlock);
+        initialized = true;
+    }
+
+    char uuid_str[UUID_STR_LEN];
+
+    uuid_generate_random(*uuid);
+    uuid_unparse_lower(*uuid, uuid_str);
+
+    struct bearer_token t = { 0 }, *z;
+    z = dictionary_set(netdata_authorized_bearers, uuid_str, &t, sizeof(t));
+    if(!z->created_s) {
+        z->created_s = now_monotonic_sec();
+        z->expires_s = z->created_s + 86400;
+    }
+
+    bearer_token_cleanup();
+}
+
+#define HTTP_REQUEST_AUTHORIZATION_BEARER "\r\nAuthorization: Bearer "
+
+bool extract_bearer_token_from_request(struct web_client *w, char *dst, size_t dst_len) {
+    const char *req = buffer_tostring(w->response.data);
+    size_t req_len = buffer_strlen(w->response.data);
+    const char *bearer = strcasestr(req, HTTP_REQUEST_AUTHORIZATION_BEARER);
+
+    if(!bearer)
+        return false;
+
+    const char *token_start = bearer + sizeof(HTTP_REQUEST_AUTHORIZATION_BEARER) - 1;
+
+    while(isspace(*token_start))
+        token_start++;
+
+    const char *token_end = token_start + UUID_STR_LEN - 1 + 2;
+    if (token_end > req + req_len)
+        return false;
+
+    strncpyz(dst, token_start, dst_len - 1);
+    uuid_t uuid;
+    if (uuid_parse(dst, uuid) != 0)
+        return false;
+
+    return true;
+}
+
+bool api_check_bearer_token(struct web_client *w) {
+    if(!netdata_authorized_bearers)
+        return false;
+
+    char token[UUID_STR_LEN];
+    if(!extract_bearer_token_from_request(w, token, sizeof(token)))
+        return false;
+
+    struct bearer_token *z = dictionary_get(netdata_authorized_bearers, token);
+    return z && z->expires_s > now_monotonic_sec();
+}
+
+static bool verify_agent_uuids(const char *machine_guid, const char *node_id, const char *claim_id) {
+    if(!machine_guid || !node_id || !claim_id)
+        return false;
+
+    if(strcmp(machine_guid, localhost->machine_guid) != 0)
+        return false;
+
+    char *agent_claim_id = get_agent_claimid();
+
+    bool not_verified = (!agent_claim_id || strcmp(claim_id, agent_claim_id) != 0);
+    freez(agent_claim_id);
+
+    if(not_verified || !localhost->node_id)
+        return false;
+
+    char buf[UUID_STR_LEN];
+    uuid_unparse_lower(*localhost->node_id, buf);
+
+    if(strcmp(node_id, buf) != 0)
+        return false;
+
+    return true;
+}
+
+int api_v2_bearer_protection(RRDHOST *host __maybe_unused, struct web_client *w __maybe_unused, char *url) {
+    char *machine_guid = NULL;
+    char *claim_id = NULL;
+    char *node_id = NULL;
+    bool protection = netdata_is_protected_by_bearer;
+
+    while (url) {
+        char *value = strsep_skip_consecutive_separators(&url, "&");
+        if (!value || !*value) continue;
+
+        char *name = strsep_skip_consecutive_separators(&value, "=");
+        if (!name || !*name) continue;
+        if (!value || !*value) continue;
+
+        if(!strcmp(name, "bearer_protection")) {
+            if(!strcmp(value, "on") || !strcmp(value, "true") || !strcmp(value, "yes"))
+                protection = true;
+            else
+                protection = false;
+        }
+        else if(!strcmp(name, "machine_guid"))
+            machine_guid = value;
+        else if(!strcmp(name, "claim_id"))
+            claim_id = value;
+        else if(!strcmp(name, "node_id"))
+            node_id = value;
+    }
+
+    if(!verify_agent_uuids(machine_guid, node_id, claim_id)) {
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "The request is missing or not matching local UUIDs");
+        return HTTP_RESP_BAD_REQUEST;
+    }
+
+    netdata_is_protected_by_bearer = protection;
+
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_member_add_boolean(wb, "bearer_protection", netdata_is_protected_by_bearer);
+    buffer_json_finalize(wb);
+
+    return HTTP_RESP_OK;
+}
+
+int api_v2_bearer_token(RRDHOST *host __maybe_unused, struct web_client *w __maybe_unused, char *url __maybe_unused) {
+    char *machine_guid = NULL;
+    char *claim_id = NULL;
+    char *node_id = NULL;
+
+    while(url) {
+        char *value = strsep_skip_consecutive_separators(&url, "&");
+        if (!value || !*value) continue;
+
+        char *name = strsep_skip_consecutive_separators(&value, "=");
+        if (!name || !*name) continue;
+        if (!value || !*value) continue;
+
+        if(!strcmp(name, "machine_guid"))
+            machine_guid = value;
+        else if(!strcmp(name, "claim_id"))
+            claim_id = value;
+        else if(!strcmp(name, "node_id"))
+            node_id = value;
+    }
+
+    if(!verify_agent_uuids(machine_guid, node_id, claim_id)) {
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "The request is missing or not matching local UUIDs");
+        return HTTP_RESP_BAD_REQUEST;
+    }
+
+    uuid_t uuid;
+    bearer_get_token(&uuid);
+
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_member_add_string(wb, "mg", localhost->machine_guid);
+    buffer_json_member_add_boolean(wb, "bearer_protection", netdata_is_protected_by_bearer);
+    buffer_json_member_add_uuid(wb, "token", &uuid);
+    buffer_json_finalize(wb);
+
+    return HTTP_RESP_OK;
+}
+
+static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unused, struct web_client *w, char *url, CONTEXTS_V2_MODE mode) {
     struct api_v2_contexts_request req = { 0 };
 
     while(url) {
@@ -17,25 +219,65 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
         // name and value are now the parameters
         // they are not null and not empty
 
-        if(!strcmp(name, "scope_nodes")) req.scope_nodes = value;
-        else if(!strcmp(name, "nodes")) req.nodes = value;
-        else if((options & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH)) && !strcmp(name, "scope_contexts")) req.scope_contexts = value;
-        else if((options & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH)) && !strcmp(name, "contexts")) req.contexts = value;
-        else if((options & CONTEXTS_V2_SEARCH) && !strcmp(name, "q")) req.q = value;
-        else if(!strcmp(name, "options")) {
-            if(strstr(value, "minify"))
-                options |= CONTEXTS_V2_MINIFY;
-            else if(strstr(value, "debug"))
-                options |= CONTEXTS_V2_DEBUG;
+        if(!strcmp(name, "scope_nodes"))
+            req.scope_nodes = value;
+        else if(!strcmp(name, "nodes"))
+            req.nodes = value;
+        else if((mode & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_ALERTS | CONTEXTS_V2_ALERT_TRANSITIONS)) && !strcmp(name, "scope_contexts"))
+            req.scope_contexts = value;
+        else if((mode & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_ALERTS | CONTEXTS_V2_ALERT_TRANSITIONS)) && !strcmp(name, "contexts"))
+            req.contexts = value;
+        else if((mode & CONTEXTS_V2_SEARCH) && !strcmp(name, "q"))
+            req.q = value;
+        else if(!strcmp(name, "options"))
+            req.options = web_client_api_request_v2_context_options(value);
+        else if(!strcmp(name, "after"))
+            req.after = str2l(value);
+        else if(!strcmp(name, "before"))
+            req.before = str2l(value);
+        else if(!strcmp(name, "timeout"))
+            req.timeout_ms = str2l(value);
+        else if(mode & (CONTEXTS_V2_ALERTS | CONTEXTS_V2_ALERT_TRANSITIONS)) {
+            if (!strcmp(name, "alert"))
+                req.alerts.alert = value;
+            else if (!strcmp(name, "transition"))
+                req.alerts.transition = value;
+            else if(mode & CONTEXTS_V2_ALERTS) {
+                if (!strcmp(name, "status"))
+                    req.alerts.status = web_client_api_request_v2_alert_status(value);
+            }
+            else if(mode & CONTEXTS_V2_ALERT_TRANSITIONS) {
+                if (!strcmp(name, "last"))
+                    req.alerts.last = strtoul(value, NULL, 0);
+                else if(!strcmp(name, "context"))
+                    req.contexts = value;
+                else if (!strcmp(name, "anchor_gi")) {
+                    req.alerts.global_id_anchor = str2ull(value, NULL);
+                }
+                else {
+                    for(int i = 0; i < ATF_TOTAL_ENTRIES ;i++) {
+                        if(!strcmp(name, alert_transition_facets[i].query_param))
+                            req.alerts.facets[i] = value;
+                    }
+                }
+            }
         }
-        else if(!strcmp(name, "after")) req.after = str2l(value);
-        else if(!strcmp(name, "before")) req.before = str2l(value);
-        else if(!strcmp(name, "timeout")) req.timeout_ms = str2l(value);
     }
+
+    if ((mode & CONTEXTS_V2_ALERT_TRANSITIONS) && !req.alerts.last)
+        req.alerts.last = 1;
 
     buffer_flush(w->response.data);
     buffer_no_cacheable(w->response.data);
-    return rrdcontext_to_json_v2(w->response.data, &req, options);
+    return rrdcontext_to_json_v2(w->response.data, &req, mode);
+}
+
+static int web_client_api_request_v2_alert_transitions(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_ALERT_TRANSITIONS | CONTEXTS_V2_NODES);
+}
+
+static int web_client_api_request_v2_alerts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_ALERTS | CONTEXTS_V2_NODES);
 }
 
 static int web_client_api_request_v2_functions(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
@@ -58,13 +300,51 @@ static int web_client_api_request_v2_nodes(RRDHOST *host __maybe_unused, struct 
     return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_INFO);
 }
 
-static int web_client_api_request_v2_nodes_instances(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_NODES | CONTEXTS_V2_NODES_INSTANCES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_AGENTS_INFO | CONTEXTS_V2_VERSIONS);
+static int web_client_api_request_v2_info(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_AGENTS | CONTEXTS_V2_AGENTS_INFO);
+}
+
+static int web_client_api_request_v2_node_instances(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_NODES | CONTEXTS_V2_NODE_INSTANCES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_AGENTS_INFO | CONTEXTS_V2_VERSIONS);
 }
 
 static int web_client_api_request_v2_weights(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     return web_client_api_request_weights(host, w, url, WEIGHTS_METHOD_VALUE, WEIGHTS_FORMAT_MULTINODE, 2);
 }
+
+static int web_client_api_request_v2_claim(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return api_v2_claim(w, url);
+}
+
+static int web_client_api_request_v2_alert_config(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    const char *config = NULL;
+
+    while(url) {
+        char *value = strsep_skip_consecutive_separators(&url, "&");
+        if(!value || !*value) continue;
+
+        char *name = strsep_skip_consecutive_separators(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        // name and value are now the parameters
+        // they are not null and not empty
+
+        if(!strcmp(name, "config"))
+            config = value;
+    }
+
+    buffer_flush(w->response.data);
+
+    if(!config) {
+        w->response.data->content_type = CT_TEXT_PLAIN;
+        buffer_strcat(w->response.data, "A config hash ID is required. Add ?config=UUID query param");
+        return HTTP_RESP_BAD_REQUEST;
+    }
+
+    return contexts_v2_alert_config_to_json(w, config);
+}
+
 
 #define GROUP_BY_KEY_MAX_LENGTH 30
 static struct {
@@ -307,14 +587,14 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
 
     if(outFileName && *outFileName) {
         buffer_sprintf(w->response.header, "Content-Disposition: attachment; filename=\"%s\"\r\n", outFileName);
-        debug(D_WEB_CLIENT, "%llu: generating outfilename header: '%s'", w->id, outFileName);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: generating outfilename header: '%s'", w->id, outFileName);
     }
 
     if(format == DATASOURCE_DATATABLE_JSONP) {
         if(responseHandler == NULL)
             responseHandler = "google.visualization.Query.setResponse";
 
-        debug(D_WEB_CLIENT_ACCESS, "%llu: GOOGLE JSON/JSONP: version = '%s', reqId = '%s', sig = '%s', out = '%s', responseHandler = '%s', outFileName = '%s'",
+        netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: GOOGLE JSON/JSONP: version = '%s', reqId = '%s', sig = '%s', out = '%s', responseHandler = '%s', outFileName = '%s'",
               w->id, google_version, google_reqId, google_sig, google_out, responseHandler, outFileName
         );
 
@@ -358,103 +638,35 @@ cleanup:
     return ret;
 }
 
-static int web_client_api_request_v2_alerts(RRDHOST *host __maybe_unused, struct web_client *w, char *url)
-{
-    time_t after = 0;
-    time_t before = 0;
-    struct api_v2_alerts_request req = { 0 };
-
-    CONTEXTS_V2_OPTIONS options =  CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_NODES;
-    ALERT_OPTIONS alert_options = 0;
-
-    while(url) {
-        char *value = strsep_skip_consecutive_separators(&url, "&");
-        if(!value || !*value) continue;
-
-        char *name = strsep_skip_consecutive_separators(&value, "=");
-        if(!name || !*name) continue;
-        if(!value || !*value) continue;
-
-        // name and value are now the parameters
-        // they are not null and not empty
-
-        if (!strcmp(name, "scope_nodes")) {
-            req.scope_nodes = value;
-            options |= CONTEXTS_V2_NODES;
-        }
-        else if (!strcmp(name, "nodes")) {
-            req.nodes = value;
-            options |= CONTEXTS_V2_NODES;
-        }
-        else if (!strcmp(name, "scope_contexts")) {
-            req.scope_contexts = value;
-            options |= CONTEXTS_V2_CONTEXTS;
-        }
-        else if (!strcmp(name, "instance_id"))
-            req.alert_id = (time_t)strtoul(value, NULL, 0);
-        else if (!strcmp(name, "last"))
-            req.last = strtoul(value, NULL, 0);
-        else if (!strcmp(name, "transition_id")) {
-            req.transition_id = value;
-        } else if (!strcmp(name, "alert_name")) {
-            req.alert_name = value;
-            req.alert_name_pattern = string_to_simple_pattern(value);
-        } else if (!strcmp(name, "config_hash")) {
-            req.config_hash = value;
-            req.config_hash_pattern = string_to_simple_pattern(value);
-        } else if (!strcmp(name, "contexts")) {
-            req.contexts = value;
-            options |= CONTEXTS_V2_CONTEXTS;
-        } else if (!strcmp(name, "state")) {
-            req.state = value;  // all | warning | critical, clear, undefined, uninitialiazed
-        } else if (!strcmp(name, "q"))
-            req.q = value;
-        else if (!strcmp(name, "after"))
-            after = (time_t)strtoul(value, NULL, 0);
-        else if (!strcmp(name, "before"))
-            before = (time_t)strtoul(value, NULL, 0);
-        else if (!strcmp(name, "output")) {
-            // config, instances, transitions
-            alert_options |= web_client_api_request_v2_alert_options(value);
-        }
-
-        // TODO: All states and special "ACTIVE"
-    }
-
-    buffer_flush(w->response.data);
-    buffer_no_cacheable(w->response.data);
-    w->response.data->content_type = CT_APPLICATION_JSON;
-    buffer_json_initialize( w->response.data, "\"", "\"", 0, true, alert_options & ALERT_OPTION_MINIFY);
-
-    if (alert_options & ALERT_OPTION_INSTANCES && !req.last)
-        req.last = 1;
-
-    req.options = alert_options;
-    req.after = after;
-    req.before = before;
-
-    return alerts_to_json_v2(w->response.data, &req, options);
-}
-
 static int web_client_api_request_v2_webrtc(RRDHOST *host __maybe_unused, struct web_client *w, char *url __maybe_unused) {
     return webrtc_new_connection(w->post_payload, w->response.data);
 }
 
 static struct web_api_command api_commands_v2[] = {
-        {"data", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_data},
-        {"nodes", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_nodes},
-        {"nodes_instances", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_nodes_instances},
-        {"contexts", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_contexts},
-        {"weights", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_weights},
-        {"versions", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_versions},
-        {"functions", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_functions},
-        {"q", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_q},
+        {"info",                0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_info},
 
-        {"rtc_offer", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v2_webrtc},
-        {"alerts", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_alerts},
+        {"data",                0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_data},
+        {"weights",             0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_weights},
+
+        {"contexts",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_contexts},
+        {"nodes",               0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_nodes},
+        {"node_instances",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_node_instances},
+        {"versions",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_versions},
+        {"functions",           0, WEB_CLIENT_ACL_ACLK | WEB_CLIENT_ACL_BEARER_REQUIRED | ACL_DEV_OPEN_ACCESS, web_client_api_request_v2_functions},
+        {"q",                   0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_q},
+        {"alerts",              0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_alerts},
+
+        {"alert_transitions",   0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_alert_transitions},
+        {"alert_config",        0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_alert_config},
+
+        {"claim",               0, WEB_CLIENT_ACL_NOCHECK,                                                     web_client_api_request_v2_claim},
+
+        {"rtc_offer",           0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS,                                  web_client_api_request_v2_webrtc},
+        {"bearer_protection",   0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, api_v2_bearer_protection},
+        {"bearer_get_token",    0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, api_v2_bearer_token},
 
         // terminator
-        {NULL, 0, WEB_CLIENT_ACL_NONE, NULL},
+        {NULL,                  0, WEB_CLIENT_ACL_NONE,                 NULL},
 };
 
 inline int web_client_api_request_v2(RRDHOST *host, struct web_client *w, char *url_path_endpoint) {

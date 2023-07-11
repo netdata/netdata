@@ -39,8 +39,8 @@ struct config stream_config = {
 };
 
 unsigned int default_rrdpush_enabled = 0;
-#ifdef ENABLE_COMPRESSION
-unsigned int default_compression_enabled = 1;
+#ifdef ENABLE_RRDPUSH_COMPRESSION
+unsigned int default_rrdpush_compression_enabled = 1;
 #endif
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
@@ -57,12 +57,12 @@ static void load_stream_conf() {
     errno = 0;
     char *filename = strdupz_path_subpath(netdata_configured_user_config_dir, "stream.conf");
     if(!appconfig_load(&stream_config, filename, 0, NULL)) {
-        info("CONFIG: cannot load user config '%s'. Will try stock config.", filename);
+        netdata_log_info("CONFIG: cannot load user config '%s'. Will try stock config.", filename);
         freez(filename);
 
         filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "stream.conf");
         if(!appconfig_load(&stream_config, filename, 0, NULL))
-            info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
+            netdata_log_info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
     }
     freez(filename);
 }
@@ -142,13 +142,13 @@ int rrdpush_init() {
 
     rrdhost_free_orphan_time_s    = config_get_number(CONFIG_SECTION_DB, "cleanup orphan hosts after secs", rrdhost_free_orphan_time_s);
 
-#ifdef ENABLE_COMPRESSION
-    default_compression_enabled = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM,
-        "enable compression", default_compression_enabled);
+#ifdef ENABLE_RRDPUSH_COMPRESSION
+    default_rrdpush_compression_enabled = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM,
+                                                                              "enable compression", default_rrdpush_compression_enabled);
 #endif
 
     if(default_rrdpush_enabled && (!default_rrdpush_destination || !*default_rrdpush_destination || !default_rrdpush_api_key || !*default_rrdpush_api_key)) {
-        error("STREAM [send]: cannot enable sending thread - information is missing.");
+        netdata_log_error("STREAM [send]: cannot enable sending thread - information is missing.");
         default_rrdpush_enabled = 0;
     }
 
@@ -156,7 +156,7 @@ int rrdpush_init() {
     netdata_ssl_validate_certificate_sender = !appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "ssl skip certificate verification", !netdata_ssl_validate_certificate);
 
     if(!netdata_ssl_validate_certificate_sender)
-        info("SSL: streaming senders will skip SSL certificates verification.");
+        netdata_log_info("SSL: streaming senders will skip SSL certificates verification.");
 
     netdata_ssl_ca_path = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CApath", NULL);
     netdata_ssl_ca_file = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CAfile", NULL);
@@ -362,7 +362,7 @@ static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_sta
             buffer_fast_strcat(wb, "SET \"", 5);
             buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
             buffer_fast_strcat(wb, "\" = ", 4);
-            buffer_print_int64(wb, rd->collected_value);
+            buffer_print_int64(wb, rd->collector.collected_value);
             buffer_fast_strcat(wb, "\n", 1);
         }
         else {
@@ -436,10 +436,10 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET_V2 " '", sizeof(PLUGINSD_KEYWORD_SET_V2) - 1 + 2);
     buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
     buffer_fast_strcat(wb, "' ", 2);
-    buffer_print_int64_encoded(wb, integer_encoding, rd->last_collected_value);
+    buffer_print_int64_encoded(wb, integer_encoding, rd->collector.last_collected_value);
     buffer_fast_strcat(wb, " ", 1);
 
-    if((NETDATA_DOUBLE)rd->last_collected_value == n)
+    if((NETDATA_DOUBLE)rd->collector.last_collected_value == n)
         buffer_fast_strcat(wb, "#", 1);
     else
         buffer_print_netdata_double_encoded(wb, doubles_encoding, n);
@@ -479,13 +479,13 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
 
         if(unlikely(!(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS))) {
             rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS);
-            error("STREAM %s [send]: not ready - collected metrics are not sent to parent.", rrdhost_hostname(host));
+            netdata_log_error("STREAM %s [send]: not ready - collected metrics are not sent to parent.", rrdhost_hostname(host));
         }
 
         return (RRDSET_STREAM_BUFFER) { .wb = NULL, };
     }
     else if(unlikely(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS)) {
-        info("STREAM %s [send]: sending metrics to parent...", rrdhost_hostname(host));
+        netdata_log_info("STREAM %s [send]: sending metrics to parent...", rrdhost_hostname(host));
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS);
     }
 
@@ -588,7 +588,7 @@ int connect_to_one_of_destinations(
         if(d->postpone_reconnection_until > now)
             continue;
 
-        info(
+        netdata_log_info(
             "STREAM %s: connecting to '%s' (default port: %d)...",
             rrdhost_hostname(host),
             string2str(d->destination),
@@ -597,7 +597,7 @@ int connect_to_one_of_destinations(
         if (reconnects_counter)
             *reconnects_counter += 1;
 
-        d->last_attempt = now;
+        d->since = now;
         d->attempts++;
         sock = connect_to_this(string2str(d->destination), default_port, timeout);
 
@@ -645,7 +645,7 @@ bool destinations_init_add_one(char *entry, void *data) {
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(t->list, d, prev, next);
 
     t->count++;
-    info("STREAM: added streaming destination No %d: '%s' to host '%s'", t->count, string2str(d->destination), rrdhost_hostname(t->host));
+    netdata_log_info("STREAM: added streaming destination No %d: '%s' to host '%s'", t->count, string2str(d->destination), rrdhost_hostname(t->host));
 
     return false; // we return false, so that we will get all defined destinations
 }
@@ -683,11 +683,11 @@ void rrdpush_destinations_free(RRDHOST *host) {
 
 // Either the receiver lost the connection or the host is being destroyed.
 // The sender mutex guards thread creation, any spurious data is wiped on reconnection.
-void rrdpush_sender_thread_stop(RRDHOST *host, const char *reason, bool wait) {
+void rrdpush_sender_thread_stop(RRDHOST *host, STREAM_HANDSHAKE reason, bool wait) {
     if (!host->sender)
         return;
 
-    netdata_mutex_lock(&host->sender->mutex);
+    sender_lock(host->sender);
 
     if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN)) {
 
@@ -698,19 +698,18 @@ void rrdpush_sender_thread_stop(RRDHOST *host, const char *reason, bool wait) {
         netdata_thread_cancel(host->rrdpush_sender_thread);
     }
 
-    netdata_mutex_unlock(&host->sender->mutex);
+    sender_unlock(host->sender);
 
     if(wait) {
-        netdata_mutex_lock(&host->sender->mutex);
+        sender_lock(host->sender);
         while(host->sender->tid) {
-            netdata_mutex_unlock(&host->sender->mutex);
+            sender_unlock(host->sender);
             sleep_usec(10 * USEC_PER_MS);
-            netdata_mutex_lock(&host->sender->mutex);
+            sender_lock(host->sender);
         }
-        netdata_mutex_unlock(&host->sender->mutex);
+        sender_unlock(host->sender);
     }
 }
-
 
 // ----------------------------------------------------------------------------
 // rrdpush receiver thread
@@ -721,19 +720,19 @@ void log_stream_connection(const char *client_ip, const char *client_port, const
 
 
 static void rrdpush_sender_thread_spawn(RRDHOST *host) {
-    netdata_mutex_lock(&host->sender->mutex);
+    sender_lock(host->sender);
 
     if(!rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN)) {
         char tag[NETDATA_THREAD_TAG_MAX + 1];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM_SENDER "[%s]", rrdhost_hostname(host));
 
         if(netdata_thread_create(&host->rrdpush_sender_thread, tag, NETDATA_THREAD_OPTION_DEFAULT, rrdpush_sender_thread, (void *) host->sender))
-            error("STREAM %s [send]: failed to create new thread for client.", rrdhost_hostname(host));
+            netdata_log_error("STREAM %s [send]: failed to create new thread for client.", rrdhost_hostname(host));
         else
             rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
     }
 
-    netdata_mutex_unlock(&host->sender->mutex);
+    sender_unlock(host->sender);
 }
 
 int rrdpush_receiver_permission_denied(struct web_client *w) {
@@ -784,7 +783,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         return rrdpush_receiver_too_busy_now(w);
 
     struct receiver_state *rpt = callocz(1, sizeof(*rpt));
-    rpt->last_msg_t = now_realtime_sec();
+    rpt->last_msg_t = now_monotonic_sec();
     rpt->capabilities = STREAM_CAP_INVALID;
     rpt->hops = 1;
 
@@ -883,7 +882,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
                 rpt->capabilities = convert_stream_version_to_capabilities(1, NULL, false);
 
             if (unlikely(rrdhost_set_system_info_variable(rpt->system_info, name, value))) {
-                info("STREAM '%s' [receive from [%s]:%s]: "
+                netdata_log_info("STREAM '%s' [receive from [%s]:%s]: "
                      "request has parameter '%s' = '%s', which is not used."
                      , (rpt->hostname && *rpt->hostname) ? rpt->hostname : "-"
                      , rpt->client_ip, rpt->client_port
@@ -1076,7 +1075,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
 #endif
                 rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
 
-            error("STREAM '%s' [receive from [%s]:%s]: "
+            netdata_log_error("STREAM '%s' [receive from [%s]:%s]: "
                   "failed to reply."
                   , rpt->hostname
                   , rpt->client_ip, rpt->client_port
@@ -1140,7 +1139,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         if (host) {
             netdata_mutex_lock(&host->receiver_lock);
             if (host->receiver) {
-                age = now_realtime_sec() - host->receiver->last_msg_t;
+                age = now_monotonic_sec() - host->receiver->last_msg_t;
 
                 if (age < 30)
                     receiver_working = true;
@@ -1151,12 +1150,12 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         }
         rrd_unlock();
 
-        if (receiver_stale && stop_streaming_receiver(host, "STALE RECEIVER")) {
+        if (receiver_stale && stop_streaming_receiver(host, STREAM_HANDSHAKE_DISCONNECT_STALE_RECEIVER)) {
             // we stopped the receiver
             // we can proceed with this connection
             receiver_stale = false;
 
-            info("STREAM '%s' [receive from [%s]:%s]: "
+            netdata_log_info("STREAM '%s' [receive from [%s]:%s]: "
                  "stopped previous stale receiver to accept this one."
                  , rpt->hostname
                  , rpt->client_ip, rpt->client_port
@@ -1186,7 +1185,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         }
     }
 
-    debug(D_SYSTEM, "starting STREAM receive thread.");
+    netdata_log_debug(D_SYSTEM, "starting STREAM receive thread.");
 
     rrdpush_receiver_takeover_web_connection(w, rpt);
 
@@ -1224,7 +1223,7 @@ static struct {
     { STREAM_HANDSHAKE_OK_V3, "CONNECTED" },
     { STREAM_HANDSHAKE_OK_V2, "CONNECTED" },
     { STREAM_HANDSHAKE_OK_V1, "CONNECTED" },
-    { STREAM_HANDSHAKE_NEVER, "NOT_TRIED_YET" },
+    { STREAM_HANDSHAKE_NEVER, "" },
     { STREAM_HANDSHAKE_ERROR_BAD_HANDSHAKE, "BAD HANDSHAKE" },
     { STREAM_HANDSHAKE_ERROR_LOCALHOST, "LOCALHOST" },
     { STREAM_HANDSHAKE_ERROR_ALREADY_CONNECTED, "ALREADY CONNECTED" },
@@ -1236,7 +1235,17 @@ static struct {
     { STREAM_HANDSHAKE_ERROR_CANT_CONNECT, "CANT CONNECT" },
     { STREAM_HANDSHAKE_BUSY_TRY_LATER, "BUSY TRY LATER" },
     { STREAM_HANDSHAKE_INTERNAL_ERROR, "INTERNAL ERROR" },
-    { STREAM_HANDSHAKE_INITIALIZATION, "INITIALIZING" },
+    { STREAM_HANDSHAKE_INITIALIZATION, "REMOTE IS INITIALIZING" },
+    { STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, "DISCONNECTED HOST CLEANUP" },
+    { STREAM_HANDSHAKE_DISCONNECT_STALE_RECEIVER, "DISCONNECTED STALE RECEIVER" },
+    { STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN, "DISCONNECTED SHUTDOWN REQUESTED" },
+    { STREAM_HANDSHAKE_DISCONNECT_NETDATA_EXIT, "DISCONNECTED NETDATA EXIT" },
+    { STREAM_HANDSHAKE_DISCONNECT_PARSER_EXIT, "DISCONNECTED PARSE ENDED" },
+    { STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_ERROR, "DISCONNECTED SOCKET READ ERROR" },
+    { STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, "DISCONNECTED PARSE ERROR" },
+    { STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT, "DISCONNECTED RECEIVER LEFT" },
+    { STREAM_HANDSHAKE_DISCONNECT_ORPHAN_HOST, "DISCONNECTED ORPHAN HOST" },
+    { STREAM_HANDSHAKE_NON_STREAMABLE_HOST, "NON STREAMABLE HOST" },
     { 0, NULL },
 };
 
@@ -1301,7 +1310,7 @@ void log_receiver_capabilities(struct receiver_state *rpt) {
     BUFFER *wb = buffer_create(100, NULL);
     stream_capabilities_to_string(wb, rpt->capabilities);
 
-    info("STREAM %s [receive from [%s]:%s]: established link with negotiated capabilities: %s",
+    netdata_log_info("STREAM %s [receive from [%s]:%s]: established link with negotiated capabilities: %s",
          rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, buffer_tostring(wb));
 
     buffer_free(wb);
@@ -1311,7 +1320,7 @@ void log_sender_capabilities(struct sender_state *s) {
     BUFFER *wb = buffer_create(100, NULL);
     stream_capabilities_to_string(wb, s->capabilities);
 
-    info("STREAM %s [send to %s]: established link with negotiated capabilities: %s",
+    netdata_log_info("STREAM %s [send to %s]: established link with negotiated capabilities: %s",
          rrdhost_hostname(s->host), s->connected_to, buffer_tostring(wb));
 
     buffer_free(wb);

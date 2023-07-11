@@ -495,6 +495,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %files
 %doc README.md
 %config(noreplace) %{_sysconfdir}/%{name}/netdata.conf
+%config(noreplace) %{_sysconfdir}/%{name}/netdata-updater.conf
 %attr(0755,root,netdata) %{_sysconfdir}/%{name}/edit-config
 %attr(0644,root,netdata) %{_sysconfdir}/%{name}/.install-type
 %dir %{_sysconfdir}/%{name}/health.d
@@ -535,6 +536,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 # the helper script reads /proc/PID/fdinfo/* files, runs virsh, etc.
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network
 %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network-helper.sh
+
+# local-listeners detects the local processes that are listening for connections
+%attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/local-listeners
 
 # Enforce 0644 for files and 0755 for directories
 # for the netdata web directory

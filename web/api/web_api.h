@@ -9,6 +9,11 @@
 #include "web/api/health/health_cmdapi.h"
 #include "web/api/queries/weights.h"
 
+extern bool netdata_is_protected_by_bearer;
+extern DICTIONARY *netdata_authorized_bearers;
+bool api_check_bearer_token(struct web_client *w);
+bool extract_bearer_token_from_request(struct web_client *w, char *dst, size_t dst_len);
+
 struct web_api_command {
     const char *command;
     uint32_t hash;

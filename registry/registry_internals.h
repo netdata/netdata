@@ -10,27 +10,23 @@
 
 #define REGISTRY_DICTIONARY_OPTIONS (DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_SINGLE_THREADED)
 
+#define REGISTRY_VERIFY_COOKIES_GUID "11111111-2222-3333-4444-555555555555"
+#define is_dummy_person(person_guid) (strcmp(person_guid, REGISTRY_VERIFY_COOKIES_GUID) == 0)
+
 // ----------------------------------------------------------------------------
 // COMMON structures
 
 struct registry {
     int enabled;
+    netdata_mutex_t lock;
 
     // entries counters / statistics
     unsigned long long persons_count;
     unsigned long long machines_count;
     unsigned long long usages_count;
-    unsigned long long urls_count;
     unsigned long long persons_urls_count;
     unsigned long long machines_urls_count;
     unsigned long long log_count;
-
-    // memory counters / statistics
-    unsigned long long persons_memory;
-    unsigned long long machines_memory;
-    unsigned long long urls_memory;
-    unsigned long long persons_urls_memory;
-    unsigned long long machines_urls_memory;
 
     // configuration
     unsigned long long save_registry_every_entries;
@@ -58,12 +54,15 @@ struct registry {
     DICTIONARY *persons;    // dictionary of REGISTRY_PERSON *,  with key the REGISTRY_PERSON.guid
     DICTIONARY *machines;   // dictionary of REGISTRY_MACHINE *, with key the REGISTRY_MACHINE.guid
 
-    avl_tree_type registry_urls_root_index;
+    ARAL *persons_aral;
+    ARAL *machines_aral;
 
-    netdata_mutex_t lock;
+    ARAL *person_urls_aral;
+    ARAL *machine_urls_aral;
+
+    struct aral_statistics aral_stats;
 };
 
-#include "registry_url.h"
 #include "registry_machine.h"
 #include "registry_person.h"
 #include "registry.h"
@@ -71,12 +70,12 @@ struct registry {
 extern struct registry registry;
 
 // REGISTRY LOW-LEVEL REQUESTS (in registry-internals.c)
-REGISTRY_PERSON *registry_request_access(char *person_guid, char *machine_guid, char *url, char *name, time_t when);
-REGISTRY_PERSON *registry_request_delete(char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when);
-REGISTRY_MACHINE *registry_request_machine(char *person_guid, char *machine_guid, char *url, char *request_machine, time_t when);
+REGISTRY_PERSON *registry_request_access(const char *person_guid, char *machine_guid, char *url, char *name, time_t when);
+REGISTRY_PERSON *registry_request_delete(const char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when);
+REGISTRY_MACHINE *registry_request_machine(const char *person_guid, char *machine_guid, char *url, char *request_machine, time_t when);
 
 // REGISTRY LOG (in registry_log.c)
-void registry_log(char action, REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY_URL *u, char *name);
+void registry_log(char action, REGISTRY_PERSON *p, REGISTRY_MACHINE *m, STRING *u, const char *name);
 int registry_log_open(void);
 void registry_log_close(void);
 void registry_log_recreate(void);

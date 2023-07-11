@@ -172,7 +172,7 @@ void aclk_check_node_info_and_collectors(void)
     dfe_done(host);
 
     if(pending)
-        info("ACLK: %zu nodes are pending for contexts to load, skipped sending node info for them", pending);
+        netdata_log_info("ACLK: %zu nodes are pending for contexts to load, skipped sending node info for them", pending);
 }
 
 #endif

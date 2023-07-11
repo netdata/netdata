@@ -102,7 +102,7 @@ pkg_check_modules(LIBLZ4 REQUIRED liblz4)
 set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${LIBLZ4_CFLAGS_OTHER})
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${LIBLZ4_LIBRARIES})
 set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${LIBLZ4_INCLUDE_DIRS})
-# set(NETDATA_REQUIRED_DEFINES "${NETDATA_REQUIRED_DEFINES} -DENABLE_COMPRESSION=1")
+# set(NETDATA_REQUIRED_DEFINES "${NETDATA_REQUIRED_DEFINES} -DENABLE_LZ4=1")
 
 # -----------------------------------------------------------------------------
 # Judy General purpose dynamic array
@@ -491,8 +491,6 @@ set(LIBNETDATA_FILES
         libnetdata/string/utf8.h
         libnetdata/worker_utilization/worker_utilization.c
         libnetdata/worker_utilization/worker_utilization.h
-		libnetdata/parser/parser.h
-		libnetdata/parser/parser.c
         libnetdata/http/http_defs.h
         )
 
@@ -555,6 +553,10 @@ set(DISKSPACE_PLUGIN_FILES
 
 set(TIMEX_PLUGIN_FILES
         collectors/timex.plugin/plugin_timex.c
+        )
+
+set(PROFILE_PLUGIN_FILES
+        collectors/profile.plugin/plugin_profile.cc
         )
 
 set(FREEIPMI_PLUGIN_FILES
@@ -698,8 +700,6 @@ set(REGISTRY_PLUGIN_FILES
         registry/registry_machine.h
         registry/registry_person.c
         registry/registry_person.h
-        registry/registry_url.c
-        registry/registry_url.h
         )
 
 set(STATSD_PLUGIN_FILES
@@ -1325,6 +1325,7 @@ ENDIF()
 
 list(APPEND NETDATA_FILES ${ACLK_ALWAYS_BUILD})
 list(APPEND NETDATA_FILES ${TIMEX_PLUGIN_FILES})
+list(APPEND NETDATA_FILES ${PROFILE_PLUGIN_FILES})
 
 # -----------------------------------------------------------------------------
 # netdata

@@ -49,11 +49,11 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     rd->rrdset = st;
 
     if(rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST))
-        rd->collections_counter = 1;
+        rd->collector.counter = 1;
 
     if(ctr->memory_mode == RRD_MEMORY_MODE_MAP || ctr->memory_mode == RRD_MEMORY_MODE_SAVE) {
         if(!rrddim_memory_load_or_create_map_save(st, rd, ctr->memory_mode)) {
-            info("Failed to use memory mode %s for chart '%s', dimension '%s', falling back to ram", (ctr->memory_mode == RRD_MEMORY_MODE_MAP)?"map":"save", rrdset_name(st), rrddim_name(rd));
+            netdata_log_info("Failed to use memory mode %s for chart '%s', dimension '%s', falling back to ram", (ctr->memory_mode == RRD_MEMORY_MODE_MAP)?"map":"save", rrdset_name(st), rrddim_name(rd));
             ctr->memory_mode = RRD_MEMORY_MODE_RAM;
         }
     }
@@ -64,7 +64,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
         rd->db.data = netdata_mmap(NULL, entries * sizeof(storage_number), MAP_PRIVATE, 1, false, NULL);
         if(!rd->db.data) {
-            info("Failed to use memory mode ram for chart '%s', dimension '%s', falling back to alloc", rrdset_name(st), rrddim_name(rd));
+            netdata_log_info("Failed to use memory mode ram for chart '%s', dimension '%s', falling back to alloc", rrdset_name(st), rrddim_name(rd));
             ctr->memory_mode = RRD_MEMORY_MODE_ALLOC;
         }
         else {
@@ -102,10 +102,10 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         }
 
         if(!initialized)
-            error("Failed to initialize all db tiers for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
+            netdata_log_error("Failed to initialize all db tiers for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
 
         if(!rd->tiers[0].db_metric_handle)
-            error("Failed to initialize the first db tier for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
+            netdata_log_error("Failed to initialize the first db tier for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
     }
 
     // initialize data collection for all tiers
@@ -120,7 +120,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         }
 
         if(!initialized)
-            error("Failed to initialize data collection for all db tiers for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
+            netdata_log_error("Failed to initialize data collection for all db tiers for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
     }
 
     if(rrdset_number_of_dimensions(st) != 0) {
@@ -133,7 +133,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         if(td && (td->algorithm != rd->algorithm || ABS(td->multiplier) != ABS(rd->multiplier) || ABS(td->divisor) != ABS(rd->divisor))) {
             if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
 #ifdef NETDATA_INTERNAL_CHECKS
-                info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already "
+                netdata_log_info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already "
                      "present (algorithm is '%s' vs '%s', multiplier is %d vs %d, "
                      "divisor is %d vs %d).",
                      rrddim_name(rd),
@@ -197,7 +197,7 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     ml_dimension_delete(rd);
 
-    debug(D_RRD_CALLS, "rrddim_free() %s.%s", rrdset_name(st), rrddim_name(rd));
+    netdata_log_debug(D_RRD_CALLS, "rrddim_free() %s.%s", rrdset_name(st), rrddim_name(rd));
 
     if (!rrddim_finalize_collection_and_check_retention(rd) && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         /* This metric has no data and no references */
@@ -318,13 +318,13 @@ static inline RRDDIM *rrddim_index_find(RRDSET *st, const char *id) {
 // RRDDIM - find a dimension
 
 inline RRDDIM *rrddim_find(RRDSET *st, const char *id) {
-    debug(D_RRD_CALLS, "rrddim_find() for chart %s, dimension %s", rrdset_name(st), id);
+    netdata_log_debug(D_RRD_CALLS, "rrddim_find() for chart %s, dimension %s", rrdset_name(st), id);
 
     return rrddim_index_find(st, id);
 }
 
 inline RRDDIM_ACQUIRED *rrddim_find_and_acquire(RRDSET *st, const char *id) {
-    debug(D_RRD_CALLS, "rrddim_find_and_acquire() for chart %s, dimension %s", rrdset_name(st), id);
+    netdata_log_debug(D_RRD_CALLS, "rrddim_find_and_acquire() for chart %s, dimension %s", rrdset_name(st), id);
 
     return (RRDDIM_ACQUIRED *)dictionary_get_and_acquire_item(st->rrddim_root_index, id);
 }
@@ -361,7 +361,7 @@ inline int rrddim_reset_name(RRDSET *st, RRDDIM *rd, const char *name) {
     if(unlikely(!name || !*name || !strcmp(rrddim_name(rd), name)))
         return 0;
 
-    debug(D_RRD_CALLS, "rrddim_reset_name() from %s.%s to %s.%s", rrdset_name(st), rrddim_name(rd), rrdset_name(st), name);
+    netdata_log_debug(D_RRD_CALLS, "rrddim_reset_name() from %s.%s to %s.%s", rrdset_name(st), rrddim_name(rd), rrdset_name(st), name);
 
     STRING *old = rd->name;
     rd->name = rrd_string_strdupz(name);
@@ -379,7 +379,7 @@ inline int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm)
     if(unlikely(rd->algorithm == algorithm))
         return 0;
 
-    debug(D_RRD_CALLS, "Updating algorithm of dimension '%s/%s' from %s to %s", rrdset_id(st), rrddim_name(rd), rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(algorithm));
+    netdata_log_debug(D_RRD_CALLS, "Updating algorithm of dimension '%s/%s' from %s to %s", rrdset_id(st), rrddim_name(rd), rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(algorithm));
     rd->algorithm = algorithm;
     rrddim_clear_exposed(rd);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
@@ -392,7 +392,7 @@ inline int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, int32_t multiplier) {
     if(unlikely(rd->multiplier == multiplier))
         return 0;
 
-    debug(D_RRD_CALLS, "Updating multiplier of dimension '%s/%s' from %d to %d",
+    netdata_log_debug(D_RRD_CALLS, "Updating multiplier of dimension '%s/%s' from %d to %d",
           rrdset_id(st), rrddim_name(rd), rd->multiplier, multiplier);
     rd->multiplier = multiplier;
     rrddim_clear_exposed(rd);
@@ -406,7 +406,7 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, int32_t divisor) {
     if(unlikely(rd->divisor == divisor))
         return 0;
 
-    debug(D_RRD_CALLS, "Updating divisor of dimension '%s/%s' from %d to %d",
+    netdata_log_debug(D_RRD_CALLS, "Updating divisor of dimension '%s/%s' from %d to %d",
           rrdset_id(st), rrddim_name(rd), rd->divisor, divisor);
     rd->divisor = divisor;
     rrddim_clear_exposed(rd);
@@ -493,13 +493,13 @@ void rrddim_free(RRDSET *st, RRDDIM *rd) {
 // RRDDIM - set dimension options
 
 int rrddim_hide(RRDSET *st, const char *id) {
-    debug(D_RRD_CALLS, "rrddim_hide() for chart %s, dimension %s", rrdset_name(st), id);
+    netdata_log_debug(D_RRD_CALLS, "rrddim_hide() for chart %s, dimension %s", rrdset_name(st), id);
 
     RRDHOST *host = st->rrdhost;
 
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), rrdhost_hostname(host));
+        netdata_log_error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), rrdhost_hostname(host));
         return 1;
     }
     if (!rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
@@ -513,12 +513,12 @@ int rrddim_hide(RRDSET *st, const char *id) {
 }
 
 int rrddim_unhide(RRDSET *st, const char *id) {
-    debug(D_RRD_CALLS, "rrddim_unhide() for chart %s, dimension %s", rrdset_name(st), id);
+    netdata_log_debug(D_RRD_CALLS, "rrddim_unhide() for chart %s, dimension %s", rrdset_name(st), id);
 
     RRDHOST *host = st->rrdhost;
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), rrdhost_hostname(host));
+        netdata_log_error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), rrdhost_hostname(host));
         return 1;
     }
     if (rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
@@ -533,10 +533,10 @@ int rrddim_unhide(RRDSET *st, const char *id) {
 }
 
 inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
-    debug(D_RRD_CALLS, "rrddim_is_obsolete() for chart %s, dimension %s", rrdset_name(st), rrddim_name(rd));
+    netdata_log_debug(D_RRD_CALLS, "rrddim_is_obsolete() for chart %s, dimension %s", rrdset_name(st), rrddim_name(rd));
 
     if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))) {
-        info("Cannot obsolete already archived dimension %s from chart %s", rrddim_name(rd), rrdset_name(st));
+        netdata_log_info("Cannot obsolete already archived dimension %s from chart %s", rrddim_name(rd), rrdset_name(st));
         return;
     }
     rrddim_flag_set(rd, RRDDIM_FLAG_OBSOLETE);
@@ -546,7 +546,7 @@ inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
 }
 
 inline void rrddim_isnot_obsolete(RRDSET *st __maybe_unused, RRDDIM *rd) {
-    debug(D_RRD_CALLS, "rrddim_isnot_obsolete() for chart %s, dimension %s", rrdset_name(st), rrddim_name(rd));
+    netdata_log_debug(D_RRD_CALLS, "rrddim_isnot_obsolete() for chart %s, dimension %s", rrdset_name(st), rrddim_name(rd));
 
     rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
     rrdcontext_updated_rrddim_flags(rd);
@@ -563,18 +563,18 @@ inline collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_
 }
 
 collected_number rrddim_timed_set_by_pointer(RRDSET *st __maybe_unused, RRDDIM *rd, struct timeval collected_time, collected_number value) {
-    debug(D_RRD_CALLS, "rrddim_set_by_pointer() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, rrdset_name(st), rrddim_name(rd), value);
+    netdata_log_debug(D_RRD_CALLS, "rrddim_set_by_pointer() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, rrdset_name(st), rrddim_name(rd), value);
 
-    rd->last_collected_time = collected_time;
-    rd->collected_value = value;
+    rd->collector.last_collected_time = collected_time;
+    rd->collector.collected_value = value;
     rrddim_set_updated(rd);
-    rd->collections_counter++;
+    rd->collector.counter++;
 
     collected_number v = (value >= 0) ? value : -value;
-    if (unlikely(v > rd->collected_value_max))
-        rd->collected_value_max = v;
+    if (unlikely(v > rd->collector.collected_value_max))
+        rd->collector.collected_value_max = v;
 
-    return rd->last_collected_value;
+    return rd->collector.last_collected_value;
 }
 
 
@@ -582,7 +582,7 @@ collected_number rrddim_set(RRDSET *st, const char *id, collected_number value) 
     RRDHOST *host = st->rrdhost;
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), rrdhost_hostname(host));
+        netdata_log_error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), rrdhost_hostname(host));
         return 0;
     }
 
@@ -644,9 +644,9 @@ void rrddim_memory_file_update(RRDDIM *rd) {
     if(!rd || !rd->db.rd_on_file) return;
     struct rrddim_map_save_v019 *rd_on_file = rd->db.rd_on_file;
 
-    rd_on_file->last_collected_time.tv_sec = rd->last_collected_time.tv_sec;
-    rd_on_file->last_collected_time.tv_usec = rd->last_collected_time.tv_usec;
-    rd_on_file->last_collected_value = rd->last_collected_value;
+    rd_on_file->last_collected_time.tv_sec = rd->collector.last_collected_time.tv_sec;
+    rd_on_file->last_collected_time.tv_usec = rd->collector.last_collected_time.tv_usec;
+    rd_on_file->last_collected_value = rd->collector.last_collected_value;
 }
 
 void rrddim_memory_file_free(RRDDIM *rd) {
@@ -706,39 +706,39 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
     int reset = 0;
     rd_on_file->magic[sizeof(RRDDIMENSION_MAGIC_V019)] = '\0';
     if(strcmp(rd_on_file->magic, RRDDIMENSION_MAGIC_V019) != 0) {
-        info("Initializing file %s.", fullfilename);
+        netdata_log_info("Initializing file %s.", fullfilename);
         memset(rd_on_file, 0, size);
         reset = 1;
     }
     else if(rd_on_file->memsize != size) {
-        error("File %s does not have the desired size, expected %lu but found %lu. Clearing it.", fullfilename, size, (unsigned long int) rd_on_file->memsize);
+        netdata_log_error("File %s does not have the desired size, expected %lu but found %lu. Clearing it.", fullfilename, size, (unsigned long int) rd_on_file->memsize);
         memset(rd_on_file, 0, size);
         reset = 1;
     }
     else if(rd_on_file->update_every != st->update_every) {
-        error("File %s does not have the same update frequency, expected %d but found %d. Clearing it.", fullfilename, st->update_every, rd_on_file->update_every);
+        netdata_log_error("File %s does not have the same update frequency, expected %d but found %d. Clearing it.", fullfilename, st->update_every, rd_on_file->update_every);
         memset(rd_on_file, 0, size);
         reset = 1;
     }
     else if(dt_usec(&now, &rd_on_file->last_collected_time) > (rd_on_file->entries * rd_on_file->update_every * USEC_PER_SEC)) {
-        info("File %s is too old (last collected %llu seconds ago, but the database is %ld seconds). Clearing it.", fullfilename, dt_usec(&now, &rd_on_file->last_collected_time) / USEC_PER_SEC, rd_on_file->entries * rd_on_file->update_every);
+        netdata_log_info("File %s is too old (last collected %llu seconds ago, but the database is %ld seconds). Clearing it.", fullfilename, dt_usec(&now, &rd_on_file->last_collected_time) / USEC_PER_SEC, rd_on_file->entries * rd_on_file->update_every);
         memset(rd_on_file, 0, size);
         reset = 1;
     }
 
     if(!reset) {
-        rd->last_collected_value = rd_on_file->last_collected_value;
+        rd->collector.last_collected_value = rd_on_file->last_collected_value;
 
         if(rd_on_file->algorithm != rd->algorithm)
-            info("File %s does not have the expected algorithm (expected %u '%s', found %u '%s'). Previous values may be wrong.",
+            netdata_log_info("File %s does not have the expected algorithm (expected %u '%s', found %u '%s'). Previous values may be wrong.",
                  fullfilename, rd->algorithm, rrd_algorithm_name(rd->algorithm), rd_on_file->algorithm, rrd_algorithm_name(rd_on_file->algorithm));
 
         if(rd_on_file->multiplier != rd->multiplier)
-            info("File %s does not have the expected multiplier (expected %d, found %ld). "
+            netdata_log_info("File %s does not have the expected multiplier (expected %d, found %ld). "
                  "Previous values may be wrong.", fullfilename, rd->multiplier, (long)rd_on_file->multiplier);
 
         if(rd_on_file->divisor != rd->divisor)
-            info("File %s does not have the expected divisor (expected %d, found %ld). "
+            netdata_log_info("File %s does not have the expected divisor (expected %d, found %ld). "
                  "Previous values may be wrong.", fullfilename, rd->divisor, (long)rd_on_file->divisor);
     }
 

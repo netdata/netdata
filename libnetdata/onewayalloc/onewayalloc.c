@@ -176,7 +176,7 @@ void onewayalloc_freez(ONEWAYALLOC *owa __maybe_unused, const void *ptr __maybe_
 
     // not found - it is not ours
     // let's free it with the system allocator
-    error("ONEWAYALLOC: request to free address 0x%p that is not allocated by this OWA", ptr);
+    netdata_log_error("ONEWAYALLOC: request to free address 0x%p that is not allocated by this OWA", ptr);
 #endif
 
     return;
@@ -195,7 +195,7 @@ void onewayalloc_destroy(ONEWAYALLOC *owa) {
 
     OWA_PAGE *head = (OWA_PAGE *)owa;
 
-    //info("OWA: %zu allocations of %zu total bytes, in %zu pages of %zu total bytes",
+    //netdata_log_info("OWA: %zu allocations of %zu total bytes, in %zu pages of %zu total bytes",
     //     head->stats_mallocs_made, head->stats_mallocs_size,
     //     head->stats_pages, head->stats_pages_size);
 

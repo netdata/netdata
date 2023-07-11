@@ -1,0 +1,94 @@
+module_name: dovecot
+plugin_name: python.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: dovecot.sessions
+          description: Dovecot Active Sessions
+          unit: "number"
+          chart_type: line
+          dimensions:
+            - name: active sessions
+        - name: dovecot.logins
+          description: Dovecot Logins
+          unit: "number"
+          chart_type: line
+          dimensions:
+            - name: logins
+        - name: dovecot.commands
+          description: Dovecot Commands
+          unit: "commands"
+          chart_type: line
+          dimensions:
+            - name: commands
+        - name: dovecot.faults
+          description: Dovecot Page Faults
+          unit: "faults"
+          chart_type: line
+          dimensions:
+            - name: minor
+            - name: major
+        - name: dovecot.context_switches
+          description: Dovecot Context Switches
+          unit: "switches"
+          chart_type: line
+          dimensions:
+            - name: voluntary
+            - name: involuntary
+        - name: dovecot.io
+          description: Dovecot Disk I/O
+          unit: "KiB/s"
+          chart_type: area
+          dimensions:
+            - name: read
+            - name: write
+        - name: dovecot.net
+          description: Dovecot Network Bandwidth
+          unit: "kilobits/s"
+          chart_type: area
+          dimensions:
+            - name: read
+            - name: write
+        - name: dovecot.syscalls
+          description: Dovecot Number of SysCalls
+          unit: "syscalls/s"
+          chart_type: line
+          dimensions:
+            - name: read
+            - name: write
+        - name: dovecot.lookup
+          description: Dovecot Lookups
+          unit: "number/s"
+          chart_type: stacked
+          dimensions:
+            - name: path
+            - name: attr
+        - name: dovecot.cache
+          description: Dovecot Cache Hits
+          unit: "hits/s"
+          chart_type: line
+          dimensions:
+            - name: hits
+        - name: dovecot.auth
+          description: Dovecot Authentications
+          unit: "attempts"
+          chart_type: stacked
+          dimensions:
+            - name: ok
+            - name: failed
+        - name: dovecot.auth_cache
+          description: Dovecot Authentication Cache
+          unit: "number"
+          chart_type: stacked
+          dimensions:
+            - name: hit
+            - name: miss

@@ -48,7 +48,7 @@ void debug_sockets() {
 		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & WEB_CLIENT_ACL_MGMT)?"management ":"");
 		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & WEB_CLIENT_ACL_STREAMING)?"streaming ":"");
 		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & WEB_CLIENT_ACL_NETDATACONF)?"netdata.conf ":"");
-		debug(D_WEB_CLIENT, "Socket fd %d name '%s' acl_flags: %s",
+        netdata_log_debug(D_WEB_CLIENT, "Socket fd %d name '%s' acl_flags: %s",
 			  i,
 			  api_sockets.fds_names[i],
 			  buffer_tostring(wb));

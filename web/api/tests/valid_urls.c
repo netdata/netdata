@@ -46,7 +46,7 @@ void repr(char *result, int result_size, char const *buf, int size)
 
 ssize_t send(int sockfd, const void *buf, size_t len, int flags)
 {
-    info("Mocking send: %zu bytes\n", len);
+    netdata_log_info("Mocking send: %zu bytes\n", len);
     (void)sockfd;
     (void)buf;
     (void)flags;

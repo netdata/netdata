@@ -125,7 +125,7 @@ jobs:
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           repo: ${{ github.repository }}
-          workflow: Build
+          workflow: build.yml
           ref: ${{ needs.update-changelogs.outputs.ref }}
           inputs: '{"version": "${{ needs.update-changelogs.outputs.version }}", "type": "${{ needs.update-changelogs.outputs.type }}"}'
       - name: Failure Notification
@@ -160,7 +160,7 @@ jobs:
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           repo: ${{ github.repository }}
-          workflow: Docker
+          workflow: docker.yml
           ref: ${{ needs.update-changelogs.outputs.ref }}
           inputs: '{"version": "${{ needs.update-changelogs.outputs.version }}"}'
       - name: Failure Notification
@@ -195,7 +195,7 @@ jobs:
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           repo: ${{ github.repository }}
-          workflow: Packages
+          workflow: packaging.yml
           ref: ${{ needs.update-changelogs.outputs.ref }}
           inputs: '{"version": "${{ needs.update-changelogs.outputs.version }}", "type": "${{ needs.update-changelogs.outputs.type }}"}'
       - name: Failure Notification

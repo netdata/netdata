@@ -247,7 +247,7 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
         is_1st_metric_writer = false;
         char uuid[UUID_STR_LEN + 1];
         uuid_unparse(*mrg_metric_uuid(main_mrg, metric), uuid);
-        error("DBENGINE: metric '%s' is already collected and should not be collected twice - expect gaps on the charts", uuid);
+        netdata_log_error("DBENGINE: metric '%s' is already collected and should not be collected twice - expect gaps on the charts", uuid);
     }
 
     metric = mrg_metric_dup(main_mrg, metric);
@@ -312,7 +312,7 @@ static bool page_has_only_empty_metrics(struct rrdeng_collect_handle *handle) {
         default: {
             static bool logged = false;
             if(!logged) {
-                error("DBENGINE: cannot check page for nulls on unknown page type id %d", (mrg_metric_ctx(handle->metric))->config.page_type);
+                netdata_log_error("DBENGINE: cannot check page for nulls on unknown page type id %d", (mrg_metric_ctx(handle->metric))->config.page_type);
                 logged = true;
             }
             return false;
@@ -908,7 +908,7 @@ STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim
         default: {
             static bool logged = false;
             if(!logged) {
-                error("DBENGINE: unknown page type %d found. Cannot decode it. Ignoring its metrics.", handle->ctx->config.page_type);
+                netdata_log_error("DBENGINE: unknown page type %d found. Cannot decode it. Ignoring its metrics.", handle->ctx->config.page_type);
                 logged = true;
             }
             storage_point_empty(sp, sp.start_time_s, sp.end_time_s);
@@ -986,7 +986,7 @@ bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *db_instance, uuid_t *dim_
 {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
     if (unlikely(!ctx)) {
-        error("DBENGINE: invalid STORAGE INSTANCE to %s()", __FUNCTION__);
+        netdata_log_error("DBENGINE: invalid STORAGE INSTANCE to %s()", __FUNCTION__);
         return false;
     }
 
@@ -1010,6 +1010,16 @@ size_t rrdeng_disk_space_max(STORAGE_INSTANCE *db_instance) {
 size_t rrdeng_disk_space_used(STORAGE_INSTANCE *db_instance) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
     return __atomic_load_n(&ctx->atomic.current_disk_space, __ATOMIC_RELAXED);
+}
+
+time_t rrdeng_global_first_time_s(STORAGE_INSTANCE *db_instance) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+    return __atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED);
+}
+
+size_t rrdeng_currently_collected_metrics(STORAGE_INSTANCE *db_instance) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+    return __atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED);
 }
 
 /*
@@ -1072,20 +1082,20 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
         datafiles++;
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
-    size_t cpus = get_netdata_cpus() / storage_tiers;
-    if(cpus > datafiles)
-        cpus = datafiles;
+    ssize_t cpus = (ssize_t)get_netdata_cpus() / (ssize_t)storage_tiers;
+    if(cpus > (ssize_t)datafiles)
+        cpus = (ssize_t)datafiles;
 
-    if(cpus > (size_t)libuv_worker_threads)
-        cpus = (size_t)libuv_worker_threads;
+    if(cpus > (ssize_t)libuv_worker_threads)
+        cpus = (ssize_t)libuv_worker_threads;
 
-    if(cpus >= MRG_PARTITIONS / 2)
-        cpus = MRG_PARTITIONS / 2 - 1;
+    if(cpus >= (ssize_t)get_netdata_cpus() / 2)
+        cpus = (ssize_t)(get_netdata_cpus() / 2 - 1);
 
     if(cpus < 1)
         cpus = 1;
 
-    info("DBENGINE: populating retention to MRG from %zu journal files of tier %d, using %zu threads...", datafiles, ctx->config.tier, cpus);
+    netdata_log_info("DBENGINE: populating retention to MRG from %zu journal files of tier %d, using %zd threads...", datafiles, ctx->config.tier, cpus);
 
     if(datafiles > 2) {
         struct rrdengine_datafile *datafile;
@@ -1126,7 +1136,7 @@ void rrdeng_readiness_wait(struct rrdengine_instance *ctx) {
     ctx->loading.populate_mrg.array = NULL;
     ctx->loading.populate_mrg.size = 0;
 
-    info("DBENGINE: tier %d is ready for data collection and queries", ctx->config.tier);
+    netdata_log_info("DBENGINE: tier %d is ready for data collection and queries", ctx->config.tier);
 }
 
 bool rrdeng_is_legacy(STORAGE_INSTANCE *db_instance) {
@@ -1150,7 +1160,7 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
     /* reserve RRDENG_FD_BUDGET_PER_INSTANCE file descriptors for this instance */
     rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, RRDENG_FD_BUDGET_PER_INSTANCE);
     if (rrdeng_reserved_file_descriptors > max_open_files) {
-        error(
+        netdata_log_error(
             "Exceeded the budget of available file descriptors (%u/%u), cannot create new dbengine instance.",
             (unsigned)rrdeng_reserved_file_descriptors,
             (unsigned)max_open_files);
@@ -1181,6 +1191,9 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
 
     ctx->atomic.transaction_id = 1;
     ctx->quiesce.enabled = false;
+
+    rw_spinlock_init(&ctx->njfv2idx.spinlock);
+    ctx->atomic.first_time_s = LONG_MAX;
 
     if (rrdeng_dbengine_spawn(ctx) && !init_rrd_files(ctx)) {
         // success - we run this ctx too
@@ -1218,16 +1231,16 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     bool logged = false;
     while(__atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED) && !unittest_running) {
         if(!logged) {
-            info("DBENGINE: waiting for collectors to finish on tier %d...", (ctx->config.legacy) ? -1 : ctx->config.tier);
+            netdata_log_info("DBENGINE: waiting for collectors to finish on tier %d...", (ctx->config.legacy) ? -1 : ctx->config.tier);
             logged = true;
         }
         sleep_usec(100 * USEC_PER_MS);
     }
 
-    info("DBENGINE: flushing main cache for tier %d", (ctx->config.legacy) ? -1 : ctx->config.tier);
+    netdata_log_info("DBENGINE: flushing main cache for tier %d", (ctx->config.legacy) ? -1 : ctx->config.tier);
     pgc_flush_all_hot_and_dirty_pages(main_cache, (Word_t)ctx);
 
-    info("DBENGINE: shutting down tier %d", (ctx->config.legacy) ? -1 : ctx->config.tier);
+    netdata_log_info("DBENGINE: shutting down tier %d", (ctx->config.legacy) ? -1 : ctx->config.tier);
     struct completion completion = {};
     completion_init(&completion);
     rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_SHUTDOWN, NULL, &completion, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);

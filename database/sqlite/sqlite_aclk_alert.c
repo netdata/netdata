@@ -69,7 +69,7 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
         return 0;
     }
 
-    if (unlikely(uuid_is_null(ae->config_hash_id))) 
+    if (unlikely(uuid_is_null(ae->config_hash_id)))
         return 0;
 
     char sql[ACLK_SYNC_QUERY_SIZE];
@@ -101,7 +101,6 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
         if (sqlite3_column_type(res, 1) != SQLITE_NULL)
             uuid_copy(config_hash_id, *((uuid_t *) sqlite3_column_blob(res, 1)));
         unique_id = (uint32_t) sqlite3_column_int64(res, 2);
-        
     } else {
         send = 1;
         goto done;
@@ -118,11 +117,8 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
     }
 
     //same status, same config
-    if (ae->new_status == RRDCALC_STATUS_CLEAR || ae->new_status == RRDCALC_STATUS_UNDEFINED) {
-        send = 0;
-        update_filtered(ae, unique_id, uuid_str);
-        goto done;
-    }
+    send = 0;
+    update_filtered(ae, unique_id, uuid_str);
 
 done:
     rc = sqlite3_finalize(res);
@@ -309,6 +305,8 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host_id for pushing alert event.");
         sqlite3_finalize(res);
+        buffer_free(sql);
+        freez(claim_id);
         return;
     }
 
@@ -456,11 +454,11 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
     sqlite3_stmt *res = NULL;
     int rc;
 
-    netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_write_lock(&host->health_log.spinlock);
 
     buffer_sprintf(sql, "delete from aclk_alert_%s; ", uuid_str);
     if (unlikely(db_execute(db_meta, buffer_tostring(sql)))) {
-        netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+        rw_spinlock_write_unlock(&host->health_log.spinlock);
         buffer_free(sql);
         return;
     }
@@ -474,7 +472,7 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement when trying to queue existing alerts.");
-        netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+        rw_spinlock_write_unlock(&host->health_log.spinlock);
         buffer_free(sql);
         return;
     }
@@ -483,7 +481,7 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host_id for when trying to queue existing alerts.");
         sqlite3_finalize(res);
-        netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+        rw_spinlock_write_unlock(&host->health_log.spinlock);
         buffer_free(sql);
         return;
     }
@@ -497,7 +495,7 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement to queue existing alerts, rc = %d", rc);
 
-    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_write_unlock(&host->health_log.spinlock);
 
     buffer_free(sql);
     rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
@@ -521,7 +519,7 @@ void aclk_send_alarm_configuration(char *config_hash)
 #define SQL_SELECT_ALERT_CONFIG "SELECT alarm, template, on_key, class, type, component, os, hosts, plugin," \
     "module, charts, families, lookup, every, units, green, red, calc, warn, crit, to_key, exec, delay, repeat, info," \
     "options, host_labels, p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after," \
-    "p_db_lookup_before, p_update_every FROM alert_hash WHERE hash_id = @hash_id;"
+    "p_db_lookup_before, p_update_every, chart_labels FROM alert_hash WHERE hash_id = @hash_id;"
 int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash __maybe_unused)
 {
     int rc = 0;
@@ -621,6 +619,8 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
         }
 
         alarm_config.p_update_every = sqlite3_column_int(res, 32);
+
+        alarm_config.chart_labels = sqlite3_column_bytes(res, 33) > 0 ? strdupz((char *)sqlite3_column_text(res, 33)) : NULL;
 
         p_alarm_config.cfg_hash = strdupz((char *) config_hash);
         p_alarm_config.cfg = alarm_config;
@@ -888,7 +888,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
     char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
-    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_read_lock(&host->health_log.spinlock);
 
     ALARM_ENTRY *ae = host->health_log.alarms;
 
@@ -973,7 +973,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
             aclk_send_alarm_snapshot(snapshot_proto);
     }
 
-    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+    rw_spinlock_read_unlock(&host->health_log.spinlock);
     wc->alerts_snapshot_uuid = NULL;
 
     freez(claim_id);

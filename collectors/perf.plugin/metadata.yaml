@@ -1,0 +1,131 @@
+module_name: perf.plugin
+plugin_name: perf.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: perf.cpu_cycles
+          description: CPU cycles
+          unit: "cycles/s"
+          chart_type: line
+          dimensions:
+            - name: cpu
+            - name: ref_cpu
+        - name: perf.instructions
+          description: Instructions
+          unit: "instructions/s"
+          chart_type: line
+          dimensions:
+            - name: instructions
+        - name: perf.instructions_per_cycle
+          description: Instructions per Cycle(IPC)
+          unit: "instructions/cycle"
+          chart_type: line
+          dimensions:
+            - name: ipc
+        - name: perf.branch_instructions
+          description: Branch instructions
+          unit: "instructions/s"
+          chart_type: line
+          dimensions:
+            - name: instructions
+            - name: misses
+        - name: perf.cache
+          description: Cache operations
+          unit: "operations/s"
+          chart_type: line
+          dimensions:
+            - name: references
+            - name: misses
+        - name: perf.bus_cycles
+          description: Bus cycles
+          unit: "cycles/s"
+          chart_type: line
+          dimensions:
+            - name: bus
+        - name: perf.stalled_cycles
+          description: Stalled frontend and backend cycles
+          unit: "cycles/s"
+          chart_type: line
+          dimensions:
+            - name: frontend
+            - name: backend
+        - name: perf.migrations
+          description: CPU migrations
+          unit: "migrations"
+          chart_type: line
+          dimensions:
+            - name: migrations
+        - name: perf.alignment_faults
+          description: Alignment faults
+          unit: "faults"
+          chart_type: line
+          dimensions:
+            - name: faults
+        - name: perf.emulation_faults
+          description: Emulation faults
+          unit: "faults"
+          chart_type: line
+          dimensions:
+            - name: faults
+        - name: perf.l1d_cache
+          description: L1D cache operations
+          unit: "events/s"
+          chart_type: line
+          dimensions:
+            - name: read_access
+            - name: read_misses
+            - name: write_access
+            - name: write_misses
+        - name: perf.l1d_cache_prefetch
+          description: L1D prefetch cache operations
+          unit: "prefetches/s"
+          chart_type: line
+          dimensions:
+            - name: prefetches
+        - name: perf.l1i_cache
+          description: L1I cache operations
+          unit: "events/s"
+          chart_type: line
+          dimensions:
+            - name: read_access
+            - name: read_misses
+        - name: perf.ll_cache
+          description: LL cache operations
+          unit: "events/s"
+          chart_type: line
+          dimensions:
+            - name: read_access
+            - name: read_misses
+            - name: write_access
+            - name: write_misses
+        - name: perf.dtlb_cache
+          description: DTLB cache operations
+          unit: "events/s"
+          chart_type: line
+          dimensions:
+            - name: read_access
+            - name: read_misses
+            - name: write_access
+            - name: write_misses
+        - name: perf.itlb_cache
+          description: ITLB cache operations
+          unit: "events/s"
+          chart_type: line
+          dimensions:
+            - name: read_access
+            - name: read_misses
+        - name: perf.pbu_cache
+          description: PBU cache operations
+          unit: "events/s"
+          chart_type: line
+          dimensions:
+            - name: read_access

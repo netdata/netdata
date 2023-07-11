@@ -1220,7 +1220,7 @@ static int ebpf_cachestat_set_internal_value()
     }
 
     if (!address.addr) {
-        error("%s cachestat.", NETDATA_EBPF_DEFAULT_FNT_NOT_FOUND);
+        netdata_log_error("%s cachestat.", NETDATA_EBPF_DEFAULT_FNT_NOT_FOUND);
         return -1;
     }
 
@@ -1261,7 +1261,7 @@ static int ebpf_cachestat_load_bpf(ebpf_module_t *em)
 #endif
 
     if (ret)
-        error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
+        netdata_log_error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
 
     return ret;
 }

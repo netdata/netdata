@@ -7,13 +7,7 @@
 # ======================================================================
 # Constants
 
-AGENT_BUG_REPORT_URL="https://github.com/netdata/netdata/issues/new/choose"
-CLOUD_BUG_REPORT_URL="https://github.com/netdata/netdata-cloud/issues/new/choose"
 DEFAULT_RELEASE_CHANNEL="nightly"
-DISCORD_INVITE="https://discord.gg/5ygS846fR6"
-DISCUSSIONS_URL="https://github.com/netdata/netdata/discussions"
-DOCS_URL="https://learn.netdata.cloud/docs/"
-FORUM_URL="https://community.netdata.cloud/"
 KICKSTART_OPTIONS="${*}"
 KICKSTART_SOURCE="$(
     self=${0}
@@ -25,16 +19,27 @@ KICKSTART_SOURCE="$(
     cd "${self%/*}" || exit 1
     echo "$(pwd -P)/${self##*/}"
 )"
-PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 DEFAULT_PLUGIN_PACKAGES=""
 PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
-PUBLIC_CLOUD_URL="https://app.netdata.cloud"
-REPOCONFIG_DEB_URL_PREFIX="https://repo.netdata.cloud/repos/repoconfig"
 REPOCONFIG_DEB_VERSION="2-1"
-REPOCONFIG_RPM_URL_PREFIX="https://repo.netdata.cloud/repos/repoconfig"
 REPOCONFIG_RPM_VERSION="2-1"
 START_TIME="$(date +%s)"
 STATIC_INSTALL_ARCHES="x86_64 armv7l aarch64 ppc64le"
+
+# ======================================================================
+# URLs used throughout the script
+
+AGENT_BUG_REPORT_URL="https://github.com/netdata/netdata/issues/new/choose"
+CLOUD_BUG_REPORT_URL="https://github.com/netdata/netdata-cloud/issues/new/choose"
+DISCORD_INVITE="https://discord.gg/5ygS846fR6"
+DISCUSSIONS_URL="https://github.com/netdata/netdata/discussions"
+DOCS_URL="https://learn.netdata.cloud/docs/"
+FORUM_URL="https://community.netdata.cloud/"
+INSTALL_DOC_URL="https://learn.netdata.cloud/docs/install-the-netdata-agent/one-line-installer-for-all-linux-systems"
+PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
+PUBLIC_CLOUD_URL="https://app.netdata.cloud"
+REPOCONFIG_DEB_URL_PREFIX="https://repo.netdata.cloud/repos/repoconfig"
+REPOCONFIG_RPM_URL_PREFIX="https://repo.netdata.cloud/repos/repoconfig"
 TELEMETRY_URL="https://us-east1-netdata-analytics-bi.cloudfunctions.net/ingest_agent_events"
 
 # ======================================================================
@@ -83,6 +88,7 @@ CURL="$(PATH="${PATH}:/opt/netdata/bin" command -v curl 2>/dev/null && true)"
 BADCACHE_MSG="Usually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by retrying in an hour"
 BADNET_MSG="This is usually a result of a networking issue"
 ERROR_F0003="Could not find a usable HTTP client. Either curl or wget is required to proceed with installation."
+BADOPT_MSG="If you are following a third-party guide online, please see ${INSTALL_DOC_URL} for current instructions for using this script. If you are using a local copy of this script instead of fetching it from our servers, consider updating it. If you intended to pass this option to the installer code, please use either --local-build-options or --static-install-options to specify it instead."
 
 # ======================================================================
 # Core program logic
@@ -896,7 +902,7 @@ handle_existing_install() {
     kickstart-*|legacy-*|binpkg-*|manual-static|unknown)
       if [ "${INSTALL_TYPE}" = "unknown" ]; then
         if [ "${EXISTING_INSTALL_IS_NATIVE}" -eq 1 ]; then
-          warning "Found an existing netdata install managed by the system package manager, but could not determine the install type. Usually this means you installed an unsupported third-party netdata package."
+          warning "Found an existing netdata install managed by the system package manager, but could not determine the install type. Usually this means you installed an unsupported third-party netdata package. This script supports claiming most such installs, but attempting to update or reinstall them using this script may be dangerous."
         else
           warning "Found an existing netdata install at ${ndprefix}, but could not determine the install type. Usually this means you installed Netdata through your distribution’s regular package repositories or some other unsupported method."
         fi
@@ -940,7 +946,7 @@ handle_existing_install() {
           promptmsg="Attempting to update an installation managed by the system package manager is known to not work in most cases. If you are trying to install the latest version of Netdata, you will need to manually uninstall it through your system package manager. ${claimonly_notice} Are you sure you want to continue?"
         else
           failmsg="We do not support trying to update or claim installations when we cannot determine the install type. You will need to uninstall the existing install using the same method you used to install it to proceed. ${claimonly_notice}"
-          promptmsg="Attempting to update an existing install is not officially supported. It may work, but it also might break your system. ${claimonly_notice} Are you sure you want to continue?"
+          promptmsg="Attempting to update an existing install with an unknown installation type is not officially supported. It may work, but it also might break your system. ${claimonly_notice} Are you sure you want to continue?"
         fi
         if [ "${INTERACTIVE}" -eq 0 ] && [ "${ACTION}" != "claim" ]; then
           fatal "${failmsg}" F0106
@@ -2213,7 +2219,8 @@ parse_args() {
           fatal "A source directory must be specified with the --offline-install-source option." F0501
         fi
         ;;
-      *) fatal "Unrecognized option '${1}'. If you intended to pass this option to the installer code, please use either --local-build-options or --static-install-options to specify it instead." F050E ;;
+      "--"|"all"|"--yes"|"-y"|"--force"|"--accept") warning "Option '${1}' is not recognized, ignoring it. ${BADOPT_MSG}" ;;
+      *) fatal "Unrecognized option '${1}'. ${BADOPT_MSG}" F050E ;;
     esac
     shift 1
   done

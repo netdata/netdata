@@ -59,7 +59,7 @@ static alarms::v1::AlarmStatus aclk_alarm_status_to_proto(enum aclk_alarm_status
         case aclk_alarm_status::ALARM_STATUS_CRITICAL:
             return alarms::v1::ALARM_STATUS_CRITICAL;
         default:
-            error("Unknown alarm status");
+            netdata_log_error("Unknown alarm status");
             return alarms::v1::ALARM_STATUS_UNKNOWN;
     }
 }

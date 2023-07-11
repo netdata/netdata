@@ -259,7 +259,7 @@ static uint32_t oomkill_read_data(int32_t *keys)
         if (unlikely(test < 0)) {
             // since there's only 1 thread doing these deletions, it should be
             // impossible to get this condition.
-            error("key unexpectedly not available for deletion.");
+            netdata_log_error("key unexpectedly not available for deletion.");
         }
     }
 
@@ -379,14 +379,14 @@ void *ebpf_oomkill_thread(void *ptr)
         // we need to disable it.
         pthread_mutex_lock(&ebpf_exit_cleanup);
         if (em->enabled)
-            info("%s apps integration is completely disabled.", NETDATA_DEFAULT_OOM_DISABLED_MSG);
+            netdata_log_info("%s apps integration is completely disabled.", NETDATA_DEFAULT_OOM_DISABLED_MSG);
         pthread_mutex_unlock(&ebpf_exit_cleanup);
 
         goto endoomkill;
     } else if (running_on_kernel < NETDATA_EBPF_KERNEL_4_14) {
         pthread_mutex_lock(&ebpf_exit_cleanup);
         if (em->enabled)
-            info("%s kernel does not have necessary tracepoints.", NETDATA_DEFAULT_OOM_DISABLED_MSG);
+            netdata_log_info("%s kernel does not have necessary tracepoints.", NETDATA_DEFAULT_OOM_DISABLED_MSG);
         pthread_mutex_unlock(&ebpf_exit_cleanup);
 
         goto endoomkill;

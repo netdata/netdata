@@ -1,0 +1,20 @@
+module_name: ioping.plugin
+plugin_name: ioping.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: disk
+      description: ""
+      labels: []
+      metrics:
+        - name: ioping.latency
+          description: Read Latency
+          unit: "microseconds"
+          chart_type: line
+          dimensions:
+            - name: latency

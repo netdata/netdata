@@ -139,7 +139,7 @@ void *proc_main(void *ptr)
 
     if (config_get_boolean("plugin:proc", "/proc/net/dev", CONFIG_BOOLEAN_YES)) {
         netdev_thread = mallocz(sizeof(netdata_thread_t));
-        debug(D_SYSTEM, "Starting thread %s.", THREAD_NETDEV_NAME);
+        netdata_log_debug(D_SYSTEM, "Starting thread %s.", THREAD_NETDEV_NAME);
         netdata_thread_create(
             netdev_thread, THREAD_NETDEV_NAME, NETDATA_THREAD_OPTION_JOINABLE, netdev_main, netdev_thread);
     }
@@ -180,7 +180,7 @@ void *proc_main(void *ptr)
             if (unlikely(!pm->enabled))
                 continue;
 
-            debug(D_PROCNETDEV_LOOP, "PROC calling %s.", pm->name);
+            netdata_log_debug(D_PROCNETDEV_LOOP, "PROC calling %s.", pm->name);
 
             worker_is_busy(i);
             pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);

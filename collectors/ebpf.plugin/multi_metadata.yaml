@@ -1,0 +1,1489 @@
+name: ebpf.plugin
+modules:
+  - module_name: filedescriptor
+    plugin_name: ebpf.plugin
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: cgroup
+          description: ""
+          labels: []
+          metrics:
+            - name: cgroup.fd_open
+              description: Number of open files
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: open
+            - name: cgroup.fd_open_error
+              description: Fails to open files
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: open
+            - name: cgroup.fd_closed
+              description: Files closed
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: close
+            - name: cgroup.fd_close_error
+              description: Fails to close files
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: close
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: services.file_open
+              description: Number of open files
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.file_open_error
+              description: Fails to open files
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.file_closed
+              description: Files closed
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.file_close_error
+              description: Fails to close files
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: apps.file_open
+              description: Number of open files
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.file_open_error
+              description: Fails to open files
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.file_closed
+              description: Files closed
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.file_close_error
+              description: Fails to close files
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: filesystem.file_descriptor
+              description: Open and close calls
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: open
+                - name: close
+            - name: filesystem.file_error
+              description: Open fails
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: open
+                - name: close
+  - module_name: processes
+    plugin_name: ebpf.plugin
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: system.process_thread
+              description: Start process
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: process
+            - name: system.process_status
+              description: Process not closed
+              unit: "difference"
+              chart_type: line
+              dimensions:
+                - name: process
+                - name: zombie
+            - name: system.exit
+              description: Exit process
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: process
+            - name: system.task_error
+              description: Fails to create process
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: task
+            - name: apps.process_create
+              description: Process started
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.thread_create
+              description: Threads started
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.task_exit
+              description: Tasks starts exit process
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.task_close
+              description: Tasks closed
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.task_error
+              description: Errors to create process or threads
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+        - name: cgroup
+          description: ""
+          labels: []
+          metrics:
+            - name: cgroup.process_create
+              description: Process started
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: process
+            - name: cgroup.thread_create
+              description: Threads started
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: thread
+            - name: cgroup.task_exit
+              description: Tasks starts exit process
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: exit
+            - name: cgroup.task_close
+              description: Tasks closed
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: process
+            - name: cgroup.task_error
+              description: Errors to create process or threads
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: process
+            - name: services.process_create
+              description: Process started
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.thread_create
+              description: Threads started
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.task_close
+              description: Tasks starts exit process
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.task_exit
+              description: Tasks closed
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.task_error
+              description: Errors to create process or threads
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+  - module_name: disk
+    plugin_name: ebpf.plugin
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: disk
+          description: ""
+          labels: []
+          metrics:
+            - name: disk.latency_io
+              description: Disk latency
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: latency
+  - module_name: hardirq
+    plugin_name: ebpf.plugin
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: system.hardirq_latency
+              description: Hardware IRQ latency
+              unit: "milisecondds"
+              chart_type: stacked
+              dimensions:
+                - name: hardirq names
+  - module_name: cachestat
+    plugin_name: ebpf.plugin
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: apps.cachestat_ratio
+              description: Hit ratio
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.cachestat_dirties
+              description: Number of dirty pages
+              unit: "page/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.cachestat_hits
+              description: Number of accessed files
+              unit: "hits/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.cachestat_misses
+              description: Files out of page cache
+              unit: "misses/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: services.cachestat_ratio
+              description: Hit ratio
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.cachestat_dirties
+              description: Number of dirty pages
+              unit: "page/s"
+              chart_type: line
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.cachestat_hits
+              description: Number of accessed files
+              unit: "hits/s"
+              chart_type: line
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.cachestat_misses
+              description: Files out of page cache
+              unit: "misses/s"
+              chart_type: line
+              dimensions:
+                - name: a dimension per systemd service
+            - name: mem.cachestat_ratio
+              description: Hit ratio
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: ratio
+            - name: mem.cachestat_dirties
+              description: Number of dirty pages
+              unit: "page/s"
+              chart_type: line
+              dimensions:
+                - name: dirty
+            - name: mem.cachestat_hits
+              description: Number of accessed files
+              unit: "hits/s"
+              chart_type: line
+              dimensions:
+                - name: hit
+            - name: mem.cachestat_misses
+              description: Files out of page cache
+              unit: "misses/s"
+              chart_type: line
+              dimensions:
+                - name: miss
+        - name: cgroup
+          description: ""
+          labels: []
+          metrics:
+            - name: cgroup.cachestat_ratio
+              description: Hit ratio
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: ratio
+            - name: cgroup.cachestat_dirties
+              description: Number of dirty pages
+              unit: "page/s"
+              chart_type: line
+              dimensions:
+                - name: dirty
+            - name: cgroup.cachestat_hits
+              description: Number of accessed files
+              unit: "hits/s"
+              chart_type: line
+              dimensions:
+                - name: hit
+            - name: cgroup.cachestat_misses
+              description: Files out of page cache
+              unit: "misses/s"
+              chart_type: line
+              dimensions:
+                - name: miss
+  - module_name: sync
+    plugin_name: ebpf.plugin
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: mem.file_sync
+              description: Monitor calls for <code>fsync(2)</code> and <code>fdatasync(2)</code>.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: fsync
+                - name: fdatasync
+            - name: mem.meory_map
+              description: Monitor calls for <code>msync(2)</code>.
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: msync
+            - name: mem.sync
+              description: Monitor calls for <code>sync(2)</code> and <code>syncfs(2)</code>.
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: sync
+                - name: syncfs
+            - name: mem.file_segment
+              description: Monitor calls for <code>sync_file_range(2)</code>.
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: sync_file_range
+  - module_name: mdflush
+    plugin_name: ebpf.plugin
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: mdstat.mdstat_flush
+              description: MD flushes
+              unit: "flushes"
+              chart_type: stacked
+              dimensions:
+                - name: disk
+  - module_name: swap
+    plugin_name: ebpf.plugin
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: cgroup
+          description: ""
+          labels: []
+          metrics:
+            - name: cgroup.swap_read
+              description: Calls to function <code>swap_readpage</code>.
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: read
+            - name: cgroup.swap_write
+              description: Calls to function <code>swap_writepage</code>.
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: write
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: services.swap_read
+              description: Calls to <code>swap_readpage</code>.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.swap_write
+              description: Calls to function <code>swap_writepage</code>.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: apps.swap_read_call
+              description: Calls to function <code>swap_readpage</code>.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.swap_write_call
+              description: Calls to function <code>swap_writepage</code>.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: system.swapcalls
+              description: Calls to access swap memory
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: write
+                - name: read
+  - module_name: oomkill
+    plugin_name: ebpf.plugin
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: cgroup
+          description: ""
+          labels: []
+          metrics:
+            - name: cgroup.oomkills
+              description: OOM kills. This chart is provided by eBPF plugin.
+              unit: "kills"
+              chart_type: line
+              dimensions:
+                - name: cgroup name
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: services.oomkills
+              description: OOM kills. This chart is provided by eBPF plugin.
+              unit: "kills"
+              chart_type: line
+              dimensions:
+                - name: a dimension per systemd service
+            - name: apps.oomkills
+              description: OOM kills
+              unit: "kills"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+  - module_name: socket
+    plugin_name: ebpf.plugin
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: ip.inbound_conn
+              description: Inbound connections.
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: connection_tcp
+            - name: ip.tcp_outbound_conn
+              description: TCP outbound connections.
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: received
+            - name: ip.tcp_functions
+              description: Calls to internal functions
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: send
+                - name: closed
+            - name: ip.total_tcp_bandwidth
+              description: TCP bandwidth
+              unit: "kilobits/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: send
+            - name: ip.tcp_error
+              description: TCP errors
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: send
+            - name: ip.tcp_retransmit
+              description: Packages retransmitted
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: retransmited
+            - name: ip.udp_functions
+              description: UDP calls
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: send
+            - name: ip.total_udp_bandwidth
+              description: UDP bandwidth
+              unit: "kilobits/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: send
+            - name: ip.udp_error
+              description: UDP errors
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: send
+            - name: apps.outbound_conn_v4
+              description: Calls to tcp_v4_connection
+              unit: "connections/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.outbound_conn_v6
+              description: Calls to tcp_v6_connection
+              unit: "connections/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.total_bandwidth_sent
+              description: Bytes sent
+              unit: "kilobits/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.total_bandwidth_recv
+              description: bytes received
+              unit: "kilobits/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.bandwidth_tcp_send
+              description: Calls for tcp_sendmsg
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.bandwidth_tcp_recv
+              description: Calls for tcp_cleanup_rbuf
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.bandwidth_tcp_retransmit
+              description: Calls for tcp_retransmit
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.bandwidth_udp_send
+              description: Calls for udp_sendmsg
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.bandwidth_udp_recv
+              description: Calls for udp_recvmsg
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: services.net_conn_ipv4
+              description: Calls to tcp_v4_connection
+              unit: "connections/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.net_conn_ipv6
+              description: Calls to tcp_v6_connection
+              unit: "connections/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.net_bytes_recv
+              description: Bytes received
+              unit: "kilobits/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.net_bytes_sent
+              description: Bytes sent
+              unit: "kilobits/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.net_tcp_recv
+              description: Calls to tcp_cleanup_rbuf.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.net_tcp_send
+              description: Calls to tcp_sendmsg.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.net_tcp_retransmit
+              description: Calls to tcp_retransmit
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.net_udp_send
+              description: Calls to udp_sendmsg
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.net_udp_recv
+              description: Calls to udp_recvmsg
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+        - name: cgroup
+          description: ""
+          labels: []
+          metrics:
+            - name: cgroup.net_conn_ipv4
+              description: Calls to tcp_v4_connection
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: connected_v4
+            - name: cgroup.net_conn_ipv6
+              description: Calls to tcp_v6_connection
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: connected_v6
+            - name: cgroup.net_bytes_recv
+              description: Bytes received
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: received
+            - name: cgroup.net_bytes_sent
+              description: Bytes sent
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: sent
+            - name: cgroup.net_tcp_recv
+              description: Calls to tcp_cleanup_rbuf.
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: received
+            - name: cgroup.net_tcp_send
+              description: Calls to tcp_sendmsg.
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: sent
+            - name: cgroup.net_retransmit
+              description: Calls to tcp_retransmit.
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: retransmitted
+            - name: cgroup.net_udp_send
+              description: Calls to udp_sendmsg
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: sent
+            - name: cgroup.net_udp_recv
+              description: Calls to udp_recvmsg
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: received
+  - module_name: dcstat
+    plugin_name: ebpf.plugin
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: apps.dc_ratio
+              description: Percentage of files inside directory cache
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.dc_reference
+              description: Count file access
+              unit: "files"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.dc_not_cache
+              description: Files not present inside directory cache
+              unit: "files"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.dc_not_found
+              description: Files not found
+              unit: "files"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: services.dc_ratio
+              description: Percentage of files inside directory cache
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.dc_reference
+              description: Count file access
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.dc_not_cache
+              description: Files not present inside directory cache
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.dc_not_found
+              description: Files not found
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: a dimension per systemd service
+            - name: filesystem.dc_hit_ratio
+              description: Percentage of files inside directory cache
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: ratio
+        - name: cgroup
+          description: ""
+          labels: []
+          metrics:
+            - name: cgroup.dc_ratio
+              description: Percentage of files inside directory cache
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: ratio
+            - name: cgroup.dc_reference
+              description: Count file access
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: reference
+            - name: cgroup.dc_not_cache
+              description: Files not present inside directory cache
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: slow
+            - name: cgroup.dc_not_found
+              description: Files not found
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: miss
+        - name: filesystem
+          description: ""
+          labels: []
+          metrics:
+            - name: filesystem.dc_reference
+              description: Variables used to calculate hit ratio.
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: reference
+                - name: slow
+                - name: miss
+  - module_name: filesystem
+    plugin_name: ebpf.plugin
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: filesystem
+          description: ""
+          labels: []
+          metrics:
+            - name: filesystem.read_latency
+              description: ext4 latency for each read request.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: latency period
+            - name: filesystem.open_latency
+              description: ext4 latency for each open request.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: latency period
+            - name: filesystem.sync_latency
+              description: ext4 latency for each sync request.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: latency period
+        - name: iilesystem
+          description: ""
+          labels: []
+          metrics:
+            - name: filesystem.write_latency
+              description: ext4 latency for each write request.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: latency period
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: filesystem.attributte_latency
+              description: nfs latency for each attribute request.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: latency period
+  - module_name: shm
+    plugin_name: ebpf.plugin
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: cgroup
+          description: ""
+          labels: []
+          metrics:
+            - name: cgroup.shmget
+              description: Calls to syscall <code>shmget(2)</code>.
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: get
+            - name: cgroup.shmat
+              description: Calls to syscall <code>shmat(2)</code>.
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: at
+            - name: cgroup.shmdt
+              description: Calls to syscall <code>shmdt(2)</code>.
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: dt
+            - name: cgroup.shmctl
+              description: Calls to syscall <code>shmctl(2)</code>.
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: ctl
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: services.shmget
+              description: Calls to syscall <code>shmget(2)</code>.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.shmat
+              description: Calls to syscall <code>shmat(2)</code>.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.shmdt
+              description: Calls to syscall <code>shmdt(2)</code>.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.shmctl
+              description: Calls to syscall <code>shmctl(2)</code>.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: apps.shmget_call
+              description: Calls to syscall <code>shmget(2)</code>.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.shmat_call
+              description: Calls to syscall <code>shmat(2)</code>.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.shmdt_call
+              description: Calls to syscall <code>shmdt(2)</code>.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.shmctl_call
+              description: Calls to syscall <code>shmctl(2)</code>.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: system.shared_memory_calls
+              description: Calls to shared memory system calls
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: get
+                - name: at
+                - name: dt
+                - name: ctl
+  - module_name: softirq
+    plugin_name: ebpf.plugin
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: system.softirq_latency
+              description: Software IRQ latency
+              unit: "miliseconds"
+              chart_type: stacked
+              dimensions:
+                - name: soft IRQs
+  - module_name: mount
+    plugin_name: ebpf.plugin
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: mount_points.call
+              description: Calls to mount and umount syscalls
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: mount
+                - name: umount
+            - name: mount_points.error
+              description: Errors to mount and umount file systems
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: mount
+                - name: umount
+  - module_name: vfs
+    plugin_name: ebpf.plugin
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: cgroup
+          description: ""
+          labels: []
+          metrics:
+            - name: cgroup.vfs_unlink
+              description: Files deleted
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: delete
+            - name: cgroup.vfs_write
+              description: Write to disk
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: write
+            - name: cgroup.vfs_write_error
+              description: Fails to write
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: write
+            - name: cgroup.vfs_read
+              description: Read from disk
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: read
+            - name: cgroup.vfs_read_error
+              description: Fails to read
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: read
+            - name: cgroup.vfs_write_bytes
+              description: Bytes written on disk
+              unit: "bytes/s"
+              chart_type: line
+              dimensions:
+                - name: write
+            - name: cgroup.vfs_read_bytes
+              description: Bytes read from disk
+              unit: "bytes/s"
+              chart_type: line
+              dimensions:
+                - name: read
+            - name: cgroup.vfs_fsync
+              description: Calls for <code>vfs_fsync</code>
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: fsync
+            - name: cgroup.vfs_fsync_error
+              description: Sync error
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: fsync
+            - name: cgroup.vfs_open
+              description: Calls for <code>vfs_open</code>
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: open
+            - name: cgroup.vfs_open_error
+              description: Open error
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: open
+            - name: cgroup.vfs_create
+              description: Calls for <code>vfs_create</code>
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: create
+            - name: cgroup.vfs_create_error
+              description: Create error
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: create
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: services.vfs_unlink
+              description: Files deleted
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_write
+              description: Write to disk
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_write_error
+              description: Fails to write
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_read
+              description: Read from disk
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_read_error
+              description: Fails to read
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_write_bytes
+              description: Bytes written on disk
+              unit: "bytes/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_read_bytes
+              description: Bytes read from disk
+              unit: "bytes/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_fsync
+              description: Calls to <code>vfs_fsync</code>
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_fsync_error
+              description: Sync error
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_open
+              description: Calls to <code>vfs_open</code>
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_open_error
+              description: Open error
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_create
+              description: Calls to <code>vfs_create</code>
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.vfs_create_error
+              description: Create error
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: filesystem.vfs_deleted_objects
+              description: Remove files
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: delete
+            - name: filesystem.vfs_io
+              description: Calls to IO
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+            - name: filesystem.vfs_io_bytes
+              description: Bytes written and read
+              unit: "bytes/s"
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+            - name: filesystem.vfs_io_error
+              description: Fails to write or read
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+            - name: filesystem.vfs_fsync
+              description: Calls for <code>vfs_fsync</code>
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: fsync
+            - name: filesystem.vfs_fsync_error
+              description: Fails to synchronize
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: fsync
+            - name: filesystem.vfs_open
+              description: Calls for <code>vfs_open</code>
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: open
+            - name: filesystem.vfs_open_error
+              description: Fails to open a file
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: open
+            - name: filesystem.vfs_create
+              description: Calls for <code>vfs_create</code>
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: create
+            - name: filesystem.vfs_create_error
+              description: Fails to create a file.
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: create
+            - name: apps.file_deleted
+              description: Files deleted
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_write_call
+              description: Write to disk
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_write_error
+              description: Fails to write
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_read_call
+              description: Read from disk
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_read_error
+              description: Fails to read
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_write_bytes
+              description: Bytes written on disk
+              unit: "bytes/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_read_bytes
+              description: Bytes read on disk
+              unit: "bytes/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_fsync
+              description: Calls for <code>vfs_fsync</code>
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_fsync_error
+              description: Sync error
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_open
+              description: Calls for <code>vfs_open</code>
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_open_error
+              description: Open error
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_create
+              description: Calls for <code>vfs_create</code>
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+            - name: apps.vfs_create_error
+              description: Create error
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per app group
+  - module_name: process
+    plugin_name: ebpf.plugin
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: netdata.ebpf_aral_stat_size
+              description: Bytes allocated for ARAL.
+              unit: "bytes"
+              chart_type: stacked
+              dimensions:
+                - name: memory
+            - name: netdata.ebpf_aral_stat_alloc
+              description: Calls to allocate memory.
+              unit: "calls"
+              chart_type: stacked
+              dimensions:
+                - name: aral
+            - name: netdata.ebpf_threads
+              description: Threads info
+              unit: "threads"
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: running
+            - name: netdata.ebpf_load_methods
+              description: Load info
+              unit: "methods"
+              chart_type: line
+              dimensions:
+                - name: legacy
+                - name: co-re
+            - name: netdata.ebpf_kernel_memory
+              description: Memory allocated for hash tables.
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: memory_locked
+            - name: netdata.ebpf_hash_tables_count
+              description: Number of hash tables loaded
+              unit: "hash tables"
+              chart_type: line
+              dimensions:
+                - name: hash_table
+            - name: netdata.ebpf_aral_stat_size
+              description: Bytes allocated for ARAL
+              unit: "bytes"
+              chart_type: stacked
+              dimensions:
+                - name: memory
+            - name: netdata.ebpf_aral_stat_alloc
+              description: Calls to allocate memory
+              unit: "calls"
+              chart_type: stacked
+              dimensions:
+                - name: aral
+            - name: netdata.ebpf_aral_stat_size
+              description: Bytes allocated for ARAL.
+              unit: "bytes"
+              chart_type: stacked
+              dimensions:
+                - name: memory
+            - name: netdata.ebpf_aral_stat_alloc
+              description: Calls to allocate memory
+              unit: "calls"
+              chart_type: stacked
+              dimensions:
+                - name: aral

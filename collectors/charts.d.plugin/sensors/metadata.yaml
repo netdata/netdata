@@ -1,0 +1,56 @@
+module_name: sensors
+plugin_name: charts.d.plugin
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: sensor chip
+      description: ""
+      labels: []
+      metrics:
+        - name: sensors.temp
+          description: Temperature
+          unit: "Celsius"
+          chart_type: line
+          dimensions:
+            - name: '{filename}'
+        - name: sensors.volt
+          description: Voltage
+          unit: "Volts"
+          chart_type: line
+          dimensions:
+            - name: '{filename}'
+        - name: sensors.curr
+          description: Current
+          unit: "Ampere"
+          chart_type: line
+          dimensions:
+            - name: '{filename}'
+        - name: sensors.power
+          description: Power
+          unit: "Watt"
+          chart_type: line
+          dimensions:
+            - name: '{filename}'
+        - name: sensors.fans
+          description: Fans Speed
+          unit: "Rotations / Minute"
+          chart_type: line
+          dimensions:
+            - name: '{filename}'
+        - name: sensors.energy
+          description: Energy
+          unit: "Joule"
+          chart_type: area
+          dimensions:
+            - name: '{filename}'
+        - name: sensors.humidity
+          description: Humidity
+          unit: "Percent"
+          chart_type: line
+          dimensions:
+            - name: '{filename}'
