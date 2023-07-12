@@ -21,7 +21,6 @@ size_t get_tier_grouping(size_t tier) {
 }
 
 RRDHOST *localhost = NULL;
-netdata_rwlock_t rrd_rwlock = NETDATA_RWLOCK_INITIALIZER;
 
 bool is_storage_engine_shared(STORAGE_INSTANCE *engine __maybe_unused) {
 #ifdef ENABLE_DBENGINE

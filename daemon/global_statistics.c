@@ -2460,7 +2460,7 @@ static void dbengine2_statistics_charts(void) {
         rrdset_done(st_query_timings);
     }
 
-    if(netdata_rwlock_tryrdlock(&rrd_rwlock) == 0) {
+    if(rrd_tryrdlock() == 0) {
         priority = 135400;
 
         RRDHOST *host;

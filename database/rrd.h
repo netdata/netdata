@@ -993,11 +993,10 @@ void rrdhost_acquired_release(RRDHOST_ACQUIRED *rha);
 // ----------------------------------------------------------------------------
 // global lock for all RRDHOSTs
 
-extern netdata_rwlock_t rrd_rwlock;
-
-#define rrd_rdlock() netdata_rwlock_rdlock(&rrd_rwlock)
-#define rrd_wrlock() netdata_rwlock_wrlock(&rrd_rwlock)
-#define rrd_unlock() netdata_rwlock_unlock(&rrd_rwlock)
+#define rrd_rdlock() netdata_rwlock_rdlock(&rrdb.rrd_rwlock)
+#define rrd_wrlock() netdata_rwlock_wrlock(&rrdb.rrd_rwlock)
+#define rrd_unlock() netdata_rwlock_unlock(&rrdb.rrd_rwlock)
+#define rrd_tryrdlock() netdata_rwlock_tryrdlock(&rrdb.rrd_rwlock)
 
 // ----------------------------------------------------------------------------
 
@@ -1289,6 +1288,8 @@ struct rrdb {
     bool ieee754_doubles;
 
     time_t rrdhost_free_orphan_time_s;
+
+    netdata_rwlock_t rrd_rwlock;
 };
 
 extern struct rrdb rrdb;
