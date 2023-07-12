@@ -6,7 +6,19 @@
 
 **Merged pull requests:**
 
+- format the sdr cache filenames [\#15361](https://github.com/netdata/netdata/pull/15361) ([ktsaou](https://github.com/ktsaou))
+- fix\(freeipmi\): set sensor state on every reading [\#15360](https://github.com/netdata/netdata/pull/15360) ([ilyam8](https://github.com/ilyam8))
+- Rename multi module yamls to same name but wuth prefix [\#15356](https://github.com/netdata/netdata/pull/15356) ([Ancairon](https://github.com/Ancairon))
+- Update dashboard to version v3.0.1. [\#15352](https://github.com/netdata/netdata/pull/15352) ([netdatabot](https://github.com/netdatabot))
+- Fix installation type command [\#15351](https://github.com/netdata/netdata/pull/15351) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- bearer protection - additions [\#15349](https://github.com/netdata/netdata/pull/15349) ([ktsaou](https://github.com/ktsaou))
+- health: fix evaluating expression with `nan` [\#15348](https://github.com/netdata/netdata/pull/15348) ([ilyam8](https://github.com/ilyam8))
+- add missing labels to freeipmi metrics csv [\#15347](https://github.com/netdata/netdata/pull/15347) ([ilyam8](https://github.com/ilyam8))
+- Fix coverity issues [\#15345](https://github.com/netdata/netdata/pull/15345) ([stelfrag](https://github.com/stelfrag))
 - bearer improvements [\#15342](https://github.com/netdata/netdata/pull/15342) ([ktsaou](https://github.com/ktsaou))
+- Attempt to more aggressively skip CI jobs on PRs if those jobs are irrelevant to the PR. [\#15341](https://github.com/netdata/netdata/pull/15341) ([Ferroin](https://github.com/Ferroin))
+- Remove availability from required fields on metric level [\#15340](https://github.com/netdata/netdata/pull/15340) ([Ancairon](https://github.com/Ancairon))
+- docs: make the default Docker installation provide the full feature set [\#15339](https://github.com/netdata/netdata/pull/15339) ([ilyam8](https://github.com/ilyam8))
 - add internal stats metrics csv [\#15337](https://github.com/netdata/netdata/pull/15337) ([ilyam8](https://github.com/ilyam8))
 - Add missing required field in schema [\#15335](https://github.com/netdata/netdata/pull/15335) ([Ancairon](https://github.com/Ancairon))
 - Fix compilation on BSD [\#15331](https://github.com/netdata/netdata/pull/15331) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -15,6 +27,7 @@
 - multi-threaded version of freeipmi.plugin [\#15327](https://github.com/netdata/netdata/pull/15327) ([ktsaou](https://github.com/ktsaou))
 - Single module schema, add required properties [\#15326](https://github.com/netdata/netdata/pull/15326) ([Ancairon](https://github.com/Ancairon))
 - Fix coverity issue 394862 - Argument cannot be negative [\#15324](https://github.com/netdata/netdata/pull/15324) ([stelfrag](https://github.com/stelfrag))
+- Rename log Macros \(debug\) [\#15322](https://github.com/netdata/netdata/pull/15322) ([thiagoftsm](https://github.com/thiagoftsm))
 - bearer authorization API [\#15321](https://github.com/netdata/netdata/pull/15321) ([ktsaou](https://github.com/ktsaou))
 - local-listeners: use host prefix in read\_cmdline [\#15320](https://github.com/netdata/netdata/pull/15320) ([ilyam8](https://github.com/ilyam8))
 - local-listener using libnetdata [\#15319](https://github.com/netdata/netdata/pull/15319) ([ktsaou](https://github.com/ktsaou))
@@ -64,6 +77,7 @@
 - delay collecting virtual network interfaces [\#15244](https://github.com/netdata/netdata/pull/15244) ([ilyam8](https://github.com/ilyam8))
 - Assorted kickstart script improvements. [\#15243](https://github.com/netdata/netdata/pull/15243) ([Ferroin](https://github.com/Ferroin))
 - Install the correct systemd unit file on older RPM systems. [\#15240](https://github.com/netdata/netdata/pull/15240) ([Ferroin](https://github.com/Ferroin))
+- Add yaml metadata for metrics.csv files [\#15238](https://github.com/netdata/netdata/pull/15238) ([Ancairon](https://github.com/Ancairon))
 - Add module column to apps.plugin csv [\#15235](https://github.com/netdata/netdata/pull/15235) ([Ancairon](https://github.com/Ancairon))
 - Fix coverity 393183 & 393182 [\#15234](https://github.com/netdata/netdata/pull/15234) ([MrZammler](https://github.com/MrZammler))
 - Create index for health log migration [\#15233](https://github.com/netdata/netdata/pull/15233) ([stelfrag](https://github.com/stelfrag))
@@ -200,7 +214,6 @@
 - Try to detect bind mounts [\#14831](https://github.com/netdata/netdata/pull/14831) ([MrZammler](https://github.com/MrZammler))
 - Remove old logic for handling of legacy stock config files. [\#14829](https://github.com/netdata/netdata/pull/14829) ([Ferroin](https://github.com/Ferroin))
 - fix infiniband bytes counters multiplier and divisor [\#14748](https://github.com/netdata/netdata/pull/14748) ([ilyam8](https://github.com/ilyam8))
-- New eBPF option [\#14691](https://github.com/netdata/netdata/pull/14691) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.39.1](https://github.com/netdata/netdata/tree/v1.39.1) (2023-05-18)
 
@@ -396,16 +409,6 @@
 - Change H1 of collector docs to separate from the website [\#14715](https://github.com/netdata/netdata/pull/14715) ([cakrit](https://github.com/cakrit))
 - Add instructions for reconnecting a Docker node to another Space [\#14714](https://github.com/netdata/netdata/pull/14714) ([Ancairon](https://github.com/Ancairon))
 - fix system info disk size detection on raspberry pi  [\#14711](https://github.com/netdata/netdata/pull/14711) ([ilyam8](https://github.com/ilyam8))
-- /api/v2 part 4 [\#14706](https://github.com/netdata/netdata/pull/14706) ([ktsaou](https://github.com/ktsaou))
-- Don’t try to use tput in edit-config unless it’s installed. [\#14705](https://github.com/netdata/netdata/pull/14705) ([Ferroin](https://github.com/Ferroin))
-- Bundle libyaml [\#14704](https://github.com/netdata/netdata/pull/14704) ([MrZammler](https://github.com/MrZammler))
-- Handle conffiles for DEB packages explicitly instead of automatically. [\#14703](https://github.com/netdata/netdata/pull/14703) ([Ferroin](https://github.com/Ferroin))
-- Use static thread-pool for training. [\#14702](https://github.com/netdata/netdata/pull/14702) ([vkalintiris](https://github.com/vkalintiris))
-- Revert "Handle conffiles for DEB packages explicitly instead of automatically." [\#14700](https://github.com/netdata/netdata/pull/14700) ([tkatsoulas](https://github.com/tkatsoulas))
-- Fix compilation error when --disable-cloud is specified [\#14695](https://github.com/netdata/netdata/pull/14695) ([stelfrag](https://github.com/stelfrag))
-- fix: detect the host os in k8s on non-docker cri [\#14694](https://github.com/netdata/netdata/pull/14694) ([witalisoft](https://github.com/witalisoft))
-- Remove google hangouts from list of integrations [\#14689](https://github.com/netdata/netdata/pull/14689) ([cakrit](https://github.com/cakrit))
-- Fix Azure IMDS [\#14686](https://github.com/netdata/netdata/pull/14686) ([shyamvalsan](https://github.com/shyamvalsan))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
