@@ -88,6 +88,8 @@ struct configurable_plugin {
 
     set_config_cb_t set_config_cb;
     void *set_config_cb_usr_ctx;
+
+    unsigned int plugins_d:1;
 };
 
 //int has_module

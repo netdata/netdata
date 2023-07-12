@@ -1834,6 +1834,97 @@ static inline PARSER_RC pluginsd_exit(char **words __maybe_unused, size_t num_wo
     return PARSER_RC_STOP;
 }
 
+enum set_config_result _plugin_set_config_cb(void *usr_ctx, dyncfg_config_t *cfg)
+{
+
+}
+
+static void set_cfg_data_cb(BUFFER *wb, int code, void *callback_data)
+{
+    PARSER *parser = callback_data;
+}
+
+void call_virtual_function(PARSER *parser, const char *name) {
+    usec_t now = now_realtime_usec();
+    BUFFER *wb = buffer_create(4096, NULL);
+
+    struct inflight_function tmp = {
+        .started_ut = now,
+        .timeout_ut = now + 1 + USEC_PER_SEC,
+        .destination_wb = wb,
+        .timeout = 1,
+        .function = string_strdupz(name),
+        .callback = set_cfg_data_cb,
+        .callback_data = parser
+    };
+
+    uuid_t uuid;
+    uuid_generate_time(uuid);
+
+    char key[UUID_STR_LEN];
+    uuid_unparse_lower(uuid, key);
+
+    dictionary_write_lock(parser->inflight.functions);
+
+    // if there is any error, our dictionary callbacks will call the caller callback to notify
+    // the caller about the error - no need for error handling here.
+    dictionary_set(parser->inflight.functions, key, &tmp, sizeof(struct inflight_function));
+
+    if(!parser->inflight.smaller_timeout || tmp.timeout_ut < parser->inflight.smaller_timeout)
+        parser->inflight.smaller_timeout = tmp.timeout_ut;
+
+    // garbage collect stale inflight functions
+    if(parser->inflight.smaller_timeout < now)
+        inflight_functions_garbage_collect(parser, now);
+
+    dictionary_write_unlock(parser->inflight.functions);
+}
+
+static inline PARSER_RC pluginsd_register_plugin(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser __maybe_unused) {
+    netdata_log_info("PLUGINSD: DYNCFG_ENABLE");
+
+    if (unlikely (num_words != 2))
+        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_ENABLE, "missing name parameter");
+
+    struct configurable_plugin *cfg = callocz(1, sizeof(struct configurable_plugin));
+    parser->user.cd->configuration = cfg;
+
+    cfg->name = strdupz(words[1]);
+    cfg->set_config_cb = _plugin_set_config_cb;
+    cfg->plugins_d = 1;
+    
+//    call_virtual_function(parser, "get_plugin_config");
+
+    register_plugin(parser->user.cd->configuration);
+    return PARSER_RC_OK;
+}
+
+static inline PARSER_RC pluginsd_register_module(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser __maybe_unused) {
+    netdata_log_info("PLUGINSD: DYNCFG_REG_MODULE");
+
+    struct configurable_plugin *plug_cfg = parser->user.cd->configuration;
+    if (unlikely(plug_cfg == NULL))
+        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_MODULE, "you have to enable dynamic configuration first using " PLUGINSD_KEYWORD_DYNCFG_ENABLE);
+    
+    if (unlikely(num_words != 3))
+        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_MODULE, "expected 2 parameters module_name followed by module_type");
+
+    struct module *mod = callocz(1, sizeof(struct module));
+
+    mod->type = str2_module_type(words[2]);
+    if (unlikely(mod->type == MOD_TYPE_UNKNOWN)) {
+        freez(mod);
+        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_MODULE, "unknown module type (allowed: job_array, single)");
+    }
+
+    mod->name = strdupz(words[1]);
+
+    mod->set_config_cb = _plugin_set_config_cb;
+
+    register_module(plug_cfg, mod);
+    return PARSER_RC_OK;
+}
+
 static inline PARSER_RC streaming_claimed_id(char **words, size_t num_words, PARSER *parser)
 {
     const char *host_uuid_str = get_word(words, num_words, 1);
@@ -2137,6 +2228,12 @@ PARSER_RC parser_execute(PARSER *parser, PARSER_KEYWORD *keyword, char **words, 
 
         case 99:
             return pluginsd_exit(words, num_words, parser);
+
+        case 101:
+            return pluginsd_register_plugin(words, num_words, parser);
+        
+        case 102:
+            return pluginsd_register_module(words, num_words, parser);
 
         default:
             fatal("Unknown keyword '%s' with id %zu", keyword->keyword, keyword->id);

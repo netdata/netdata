@@ -335,12 +335,14 @@ int register_plugin(struct configurable_plugin *plugin)
 
     pthread_mutex_init(&plugin->lock, NULL);
 
-    plugin->config = load_config(plugin->name, NULL, NULL);
-    if (plugin->config.data == NULL) {
-        plugin->config = plugin->default_config;
+    if (!plugin->plugins_d) {
+        plugin->config = load_config(plugin->name, NULL, NULL);
         if (plugin->config.data == NULL) {
-            error_report("DYNCFG module \"%s\" has no default config", plugin->name);
-            return 1;
+            plugin->config = plugin->default_config;
+            if (plugin->config.data == NULL) {
+                error_report("DYNCFG module \"%s\" has no default config", plugin->name);
+                return 1;
+            }
         }
     }
 
@@ -362,12 +364,14 @@ int register_module(struct configurable_plugin *plugin, struct module *module)
 
     module->plugin = plugin;
 
-    module->config = load_config(plugin->name, module->name, NULL);
-    if (module->config.data == NULL) {
-        module->config = module->default_config;
+    if (!plugin->plugins_d) {
+        module->config = load_config(plugin->name, module->name, NULL);
         if (module->config.data == NULL) {
-            error_report("DYNCFG module \"%s\" has no default config", module->name);
-            return 1;
+            module->config = module->default_config;
+            if (module->config.data == NULL) {
+                error_report("DYNCFG module \"%s\" has no default config", module->name);
+                return 1;
+            }
         }
     }
 
