@@ -56,14 +56,16 @@
               "type": "array",
               "description": "Only supported OS/platforms. Platforms supported by Netdata will be ignored, only those listed are considered supported.",
               "items": {
-                "type": "string"
+                "type": "string",
+                "minLength": 2
               }
             },
             "exclude": {
               "type": "array",
               "description": "Unsupported OS/platforms. The result set is all platforms supported by Netdata except for those excluded.",
               "items": {
-                "type": "string"
+                "type": "string",
+                "minLength": 2
               }
             }
           },
