@@ -43,6 +43,8 @@
 static netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
 static bool plugin_should_exit = false;
 
+// ----------------------------------------------------------------------------
+
 struct systemd_journal_request {
     usec_t after_ut;
     usec_t before_ut;
@@ -51,6 +53,8 @@ struct systemd_journal_request {
     size_t items;
 
     const char *filters;
+
+    usec_t stop_monotonic_ut;
 
     BUFFER *wb;
 
@@ -77,8 +81,12 @@ int systemd_journal_query(struct systemd_journal_request *c) {
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
 
+    bool timed_out = false;
+    size_t row_counter = 0;
     sd_journal_seek_realtime_usec(j, c->before_ut);
     SD_JOURNAL_FOREACH_BACKWARDS(j) {
+            row_counter++;
+
             uint64_t msg_ut;
             sd_journal_get_realtime_usec(j, &msg_ut);
             if (msg_ut < c->after_ut)
@@ -104,6 +112,11 @@ int systemd_journal_query(struct systemd_journal_request *c) {
             }
 
             facets_row_finished(facets, msg_ut);
+
+            if((row_counter % 100) == 0 && now_monotonic_usec() > c->stop_monotonic_ut) {
+                timed_out = true;
+                break;
+            }
         }
 
     sd_journal_close(j);
@@ -111,6 +124,7 @@ int systemd_journal_query(struct systemd_journal_request *c) {
     buffer_flush(c->wb);
     buffer_json_initialize(c->wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT | BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAYS);
     buffer_json_member_add_uint64(c->wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_boolean(c->wb, "timed_out", timed_out);
     buffer_json_member_add_string(c->wb, "type", "table");
     buffer_json_member_add_time_t(c->wb, "update_every", 1);
     buffer_json_member_add_string(c->wb, "help", SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION);
@@ -155,6 +169,7 @@ static void function_systemd_journal(const char *transaction, char *function __m
             .anchor = 0,
             .items = 50,
             .filters = NULL,
+            .stop_monotonic_ut = now_monotonic_usec() + (timeout - 1) * USEC_PER_SEC,
             .response = HTTP_RESP_INTERNAL_SERVER_ERROR,
     };
 
@@ -249,10 +264,11 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     heartbeat_t hb;
     heartbeat_init(&hb);
     for(iteration = 0; 1 ; iteration++) {
-        heartbeat_next(&hb, step);
         netdata_mutex_unlock(&mutex);
+        heartbeat_next(&hb, step);
+        netdata_mutex_lock(&mutex);
 
-        if(tty)
+        if(!tty)
             fprintf(stdout, "\n");
 
         fflush(stdout);

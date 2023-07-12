@@ -270,7 +270,7 @@ static inline size_t sanitize_function_text(char *dst, const char *src, size_t d
 // we keep a dictionary per RRDSET with these functions
 // the dictionary is created on demand (only when a function is added to an RRDSET)
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     RRD_FUNCTION_LOCAL  = (1 << 0),
     RRD_FUNCTION_GLOBAL = (1 << 1),
 
@@ -279,7 +279,7 @@ typedef enum {
 
 struct rrd_collector_function {
     bool sync;                      // when true, the function is called synchronously
-    uint8_t options;                // RRD_FUNCTION_OPTIONS
+    RRD_FUNCTION_OPTIONS options;   // RRD_FUNCTION_OPTIONS
     STRING *help;
     int timeout;                    // the default timeout of the function
 

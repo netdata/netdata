@@ -2,6 +2,35 @@
 
 #define FACET_VALUE_UNSET "[UNSET]"
 
+// ----------------------------------------------------------------------------
+
+#define BASE64_STRING_HASH_SIZE 19
+
+static inline void uint32_to_char(uint32_t num, char *out) {
+    static char id_encoding_characters[64 + 1] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+    int i;
+    for(i = 5; i >= 0; --i) {
+        out[i] = id_encoding_characters[num & 63];
+        num >> 6;
+    }
+    out[6] = '\0';
+}
+
+static inline void bash64_hash_keys_and_values(const char *src, char *out) {
+    uint32_t hash1 = fnv1a_hash32(src);
+    uint32_t hash2 = djb2_hash32(src);
+    uint32_t hash3 = larson_hash32(src);
+
+    uint32_to_char(hash1, out);
+    uint32_to_char(hash2, &out[6]);
+    uint32_to_char(hash3, &out[12]);
+
+    out[18] = '\0';
+}
+
+// ----------------------------------------------------------------------------
+
 typedef struct facet_value {
     bool selected;
 
@@ -58,6 +87,8 @@ struct facets {
     } operations;
 };
 
+// ----------------------------------------------------------------------------
+
 static inline void facet_value_is_used(FACET_KEY *k, FACET_VALUE *v) {
     if(!k->key_found_in_row)
         v->rows_matching_facet_value++;
@@ -84,6 +115,9 @@ static inline bool facets_key_is_filterable(FACETS *facets, const char *key) {
     return included && !excluded;
 }
 
+// ----------------------------------------------------------------------------
+// FACET_VALUE dictionary hooks
+
 static void facet_value_insert_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
     FACET_VALUE *v = value;
     FACET_KEY *k = data;
@@ -108,6 +142,9 @@ static void facet_value_delete_callback(const DICTIONARY_ITEM *item __maybe_unus
     FACET_VALUE *v = value;
     (void)v;
 }
+
+// ----------------------------------------------------------------------------
+// FACET_KEY dictionary hooks
 
 static void facet_key_insert_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
     FACET_KEY *k = value;
@@ -135,6 +172,8 @@ static void facet_key_delete_callback(const DICTIONARY_ITEM *item __maybe_unused
     buffer_free(k->current_value);
 }
 
+// ----------------------------------------------------------------------------
+
 FACETS *facets_create(uint32_t items_to_return, usec_t anchor, const char *filtered_keys, const char *non_filtered_keys) {
     FACETS *facets = callocz(1, sizeof(FACETS));
     facets->keys = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE|DICT_OPTION_FIXED_SIZE, NULL, sizeof(FACET_KEY));
@@ -159,6 +198,8 @@ void facets_destroy(FACETS *facets) {
     simple_pattern_free(facets->excluded_keys);
     freez(facets);
 }
+
+// ----------------------------------------------------------------------------
 
 static inline void facets_check_value(FACETS *facets __maybe_unused, FACET_KEY *k) {
     if(buffer_strlen(k->current_value) == 0)
@@ -188,20 +229,8 @@ void facets_add_key_value_length(FACETS *facets, const char *key, const char *va
     facets_check_value(facets, k);
 }
 
-void facets_rows_begin(FACETS *facets) {
-    FACET_KEY *k;
-    dfe_start_read(facets->keys, k) {
-        k->key_found_in_row = 0;
-        k->key_values_selected_in_row = 0;
-        buffer_flush(k->current_value);
-    }
-    dfe_done(k);
-}
-
-static void facets_row_free(FACETS *facets __maybe_unused, FACET_ROW *row) {
-    dictionary_destroy(row->dict);
-    freez(row);
-}
+// ----------------------------------------------------------------------------
+// FACET_ROW dictionary hooks
 
 static void facet_row_key_value_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
     FACET_ROW_KEY_VALUE *rkv = value;
@@ -227,6 +256,14 @@ static void facet_row_key_value_delete_callback(const DICTIONARY_ITEM *item __ma
     FACET_ROW *row = data; (void)row;
 
     buffer_free(rkv->wb);
+}
+
+// ----------------------------------------------------------------------------
+// FACET_ROW management
+
+static void facets_row_free(FACETS *facets __maybe_unused, FACET_ROW *row) {
+    dictionary_destroy(row->dict);
+    freez(row);
 }
 
 static FACET_ROW *facets_row_create(FACETS *facets, usec_t usec, FACET_ROW *into) {
@@ -256,6 +293,8 @@ static FACET_ROW *facets_row_create(FACETS *facets, usec_t usec, FACET_ROW *into
 
     return row;
 }
+
+// ----------------------------------------------------------------------------
 
 static void facets_row_keep(FACETS *facets, usec_t usec) {
     facets->operations.matched++;
@@ -328,6 +367,16 @@ static void facets_row_keep(FACETS *facets, usec_t usec) {
     }
 }
 
+void facets_rows_begin(FACETS *facets) {
+    FACET_KEY *k;
+    dfe_start_read(facets->keys, k) {
+                k->key_found_in_row = 0;
+                k->key_values_selected_in_row = 0;
+                buffer_flush(k->current_value);
+            }
+    dfe_done(k);
+}
+
 void facets_row_finished(FACETS *facets, usec_t usec) {
     facets->operations.evaluated++;
 
@@ -392,6 +441,9 @@ void facets_row_finished(FACETS *facets, usec_t usec) {
     facets_rows_begin(facets);
 }
 
+// ----------------------------------------------------------------------------
+// output
+
 void facets_report(FACETS *facets, BUFFER *wb) {
     buffer_json_member_add_array(wb, "facets");
     {
@@ -425,7 +477,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
     }
     buffer_json_array_close(wb); // facets
 
-    buffer_json_member_add_array(wb, "columns");
+    buffer_json_member_add_object(wb, "columns");
     {
         size_t field_id = 0;
         buffer_rrdf_table_add_field(
@@ -458,7 +510,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
         }
         dfe_done(k);
     }
-    buffer_json_array_close(wb); // columns
+    buffer_json_object_close(wb); // columns
 
     buffer_json_member_add_array(wb, "data");
     {
@@ -479,7 +531,8 @@ void facets_report(FACETS *facets, BUFFER *wb) {
     buffer_json_array_close(wb); // data
 
     buffer_json_member_add_string(wb, "default_sort_column", "timestamp");
-
+    buffer_json_member_add_array(wb, "default_charts");
+    buffer_json_array_close(wb);
 
     buffer_json_member_add_object(wb, "items");
     {
