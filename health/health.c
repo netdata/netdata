@@ -22,7 +22,6 @@ char *silencers_filename;
 SIMPLE_PATTERN *conf_enabled_alarms = NULL;
 DICTIONARY *health_rrdvars;
 
-
 void health_entry_flags_to_json_array(BUFFER *wb, const char *key, HEALTH_ENTRY_FLAGS flags) {
     buffer_json_member_add_array(wb, key);
 
@@ -803,14 +802,27 @@ static void initialize_health(RRDHOST *host)
 
     long n = config_get_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", host->health_log.max);
     if(n < 10) {
-        netdata_log_error("Host '%s': health configuration has invalid max log entries %ld. Using default %u",
-                          rrdhost_hostname(host),
-                          n,
-                          host->health_log.max);
+        log_health("Host '%s': health configuration has invalid max log entries %ld. Using default %u", rrdhost_hostname(host), n, host->health_log.max);
         config_set_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", (long)host->health_log.max);
     }
     else
         host->health_log.max = (unsigned int)n;
+
+    uint32_t m = config_get_number(CONFIG_SECTION_HEALTH, "health log history", HEALTH_LOG_DEFAULT_HISTORY);
+    if (m < HEALTH_LOG_MINIMUM_HISTORY) {
+        log_health("Host '%s': health configuration has invalid health log history %u. Using minimum %d", rrdhost_hostname(host), m, HEALTH_LOG_MINIMUM_HISTORY);
+        config_set_number(CONFIG_SECTION_HEALTH, "health log history", HEALTH_LOG_MINIMUM_HISTORY);
+        m = HEALTH_LOG_MINIMUM_HISTORY;
+    }
+
+    //default health log history is 5 days and not less than a day
+    if (host->health_log.health_log_history) {
+        if (host->health_log.health_log_history < HEALTH_LOG_MINIMUM_HISTORY)
+            host->health_log.health_log_history = HEALTH_LOG_MINIMUM_HISTORY;
+    } else
+        host->health_log.health_log_history = m;
+
+    log_health("[%s]: Health log history is set to %u seconds (%u days)", rrdhost_hostname(host), host->health_log.health_log_history, host->health_log.health_log_history / 86400);
 
     conf_enabled_alarms = simple_pattern_create(config_get(CONFIG_SECTION_HEALTH, "enabled alarms", "*"), NULL,
                                                 SIMPLE_PATTERN_EXACT, true);

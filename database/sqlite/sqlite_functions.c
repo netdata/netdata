@@ -49,7 +49,6 @@ const char *database_config[] = {
     "config_hash_id blob, name text, chart text, family text, recipient text, units text, exec text, "
     "chart_context text, last_transition_id blob, UNIQUE (host_id, alarm_id)) ;",
 
-    //TODO indexes
     "CREATE INDEX IF NOT EXISTS health_log_ind_1 ON health_log (host_id);",
 
     "CREATE TABLE IF NOT EXISTS health_log_detail (health_log_id int, unique_id int, alarm_id int, alarm_event_id int, "
@@ -62,7 +61,6 @@ const char *database_config[] = {
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_2 ON health_log_detail (global_id);",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_3 ON health_log_detail (transition_id);",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_4 ON health_log_detail (health_log_id);",
-    //TODO more indexes
 
     NULL
 };
