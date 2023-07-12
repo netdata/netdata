@@ -554,7 +554,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
 
     rpt->config.health_enabled = (int)default_health_enabled;
     rpt->config.alarms_delay = 60;
-    rpt->config.alarms_delay = HEALTH_LOG_DEFAULT_HISTORY;
+    rpt->config.alarms_history = HEALTH_LOG_DEFAULT_HISTORY;
 
     rpt->config.rrdpush_enabled = (int)default_rrdpush_enabled;
     rpt->config.rrdpush_destination = default_rrdpush_destination;
