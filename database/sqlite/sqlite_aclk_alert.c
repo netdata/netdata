@@ -246,7 +246,7 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
     int rc;
 
     if (unlikely(!wc->alert_updates)) {
-        log_access("ACLK STA [%s (%s)]: Ignoring alert push event, updates have been turned off for this node.", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
+        netdata_log_access("ACLK STA [%s (%s)]: Ignoring alert push event, updates have been turned off for this node.", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
         return;
     }
 
@@ -409,7 +409,7 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
 
     } else {
         if (wc->alerts_log_first_sequence_id)
-            log_access(
+            netdata_log_access(
                 "ACLK RES [%s (%s)]: ALERTS SENT from %" PRIu64 " to %" PRIu64 "",
                 wc->node_id,
                 wc->host ? rrdhost_hostname(wc->host) : "N/A",
@@ -511,7 +511,7 @@ void aclk_send_alarm_configuration(char *config_hash)
     if (unlikely(!wc))
         return;
 
-    log_access("ACLK REQ [%s (%s)]: Request to send alert config %s.", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A", config_hash);
+    netdata_log_access("ACLK REQ [%s (%s)]: Request to send alert config %s.", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A", config_hash);
 
     aclk_push_alert_config(wc->node_id, config_hash);
 }
@@ -627,13 +627,13 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
     }
 
     if (likely(p_alarm_config.cfg_hash)) {
-        log_access("ACLK RES [%s (%s)]: Sent alert config %s.", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A", config_hash);
+        netdata_log_access("ACLK RES [%s (%s)]: Sent alert config %s.", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A", config_hash);
         aclk_send_provide_alarm_cfg(&p_alarm_config);
         freez(p_alarm_config.cfg_hash);
         destroy_aclk_alarm_configuration(&alarm_config);
     }
     else
-        log_access("ACLK STA [%s (%s)]: Alert config for %s not found.", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A", config_hash);
+        netdata_log_access("ACLK STA [%s (%s)]: Alert config for %s not found.", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A", config_hash);
 
 bind_fail:
     rc = sqlite3_finalize(res);
@@ -668,15 +668,15 @@ void aclk_start_alert_streaming(char *node_id, bool resets)
         return;
 
     if (unlikely(!host->health.health_enabled)) {
-        log_access("ACLK STA [%s (N/A)]: Ignoring request to stream alert state changes, health is disabled.", node_id);
+        netdata_log_access("ACLK STA [%s (N/A)]: Ignoring request to stream alert state changes, health is disabled.", node_id);
         return;
     }
 
     if (resets) {
-        log_access("ACLK REQ [%s (%s)]: STREAM ALERTS ENABLED (RESET REQUESTED)", node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
+        netdata_log_access("ACLK REQ [%s (%s)]: STREAM ALERTS ENABLED (RESET REQUESTED)", node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
         sql_queue_existing_alerts_to_aclk(host);
     } else
-        log_access("ACLK REQ [%s (%s)]: STREAM ALERTS ENABLED", node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
+        netdata_log_access("ACLK REQ [%s (%s)]: STREAM ALERTS ENABLED", node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
 
     wc->alert_updates = 1;
     wc->alert_queue_removed = SEND_REMOVED_AFTER_HEALTH_LOOPS;
@@ -726,7 +726,7 @@ void sql_process_queue_removed_alerts_to_aclk(char *node_id)
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement to queue removed alerts, rc = %d", rc);
 
-    log_access("ACLK STA [%s (%s)]: QUEUED REMOVED ALERTS", wc->node_id, rrdhost_hostname(wc->host));
+    netdata_log_access("ACLK STA [%s (%s)]: QUEUED REMOVED ALERTS", wc->node_id, rrdhost_hostname(wc->host));
 
     rrdhost_flag_set(wc->host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
     wc->alert_queue_removed = 0;
@@ -754,18 +754,18 @@ void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id __maybe_unus
 
     RRDHOST *host = find_host_by_node_id(node_id);
     if (unlikely(!host)) {
-        log_access("ACLK STA [%s (N/A)]: ACLK node id does not exist", node_id);
+        netdata_log_access("ACLK STA [%s (N/A)]: ACLK node id does not exist", node_id);
         return;
     }
 
     struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *)host->aclk_sync_host_config;
 
     if (unlikely(!wc)) {
-       log_access("ACLK STA [%s (N/A)]: ACLK node id does not exist", node_id);
+       netdata_log_access("ACLK STA [%s (N/A)]: ACLK node id does not exist", node_id);
        return;
     }
 
-    log_access(
+    netdata_log_access(
             "IN [%s (%s)]: Request to send alerts snapshot, snapshot_uuid %s",
             node_id,
             wc->host ? rrdhost_hostname(wc->host) : "N/A",
@@ -858,7 +858,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
     RRDHOST *host = find_host_by_node_id(node_id);
 
     if (unlikely(!host)) {
-        log_access("AC [%s (N/A)]: Node id not found", node_id);
+        netdata_log_access("AC [%s (N/A)]: Node id not found", node_id);
         freez(node_id);
         return;
     }
@@ -868,7 +868,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
 
     // we perhaps we don't need this for snapshots
     if (unlikely(!wc->alert_updates)) {
-        log_access(
+        netdata_log_access(
             "ACLK STA [%s (%s)]: Ignoring alert snapshot event, updates have been turned off for this node.",
             wc->node_id,
             wc->host ? rrdhost_hostname(wc->host) : "N/A");
@@ -882,7 +882,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
     if (unlikely(!claim_id))
         return;
 
-    log_access("ACLK REQ [%s (%s)]: Sending alerts snapshot, snapshot_uuid %s", wc->node_id, rrdhost_hostname(wc->host), wc->alerts_snapshot_uuid);
+    netdata_log_access("ACLK REQ [%s (%s)]: Sending alerts snapshot, snapshot_uuid %s", wc->node_id, rrdhost_hostname(wc->host), wc->alerts_snapshot_uuid);
 
     uint32_t cnt = 0;
     char uuid_str[UUID_STR_LEN];
@@ -1047,11 +1047,11 @@ void aclk_send_alarm_checkpoint(char *node_id, char *claim_id __maybe_unused)
 
     wc = (struct aclk_sync_host_config *)host->aclk_sync_host_config;
     if (unlikely(!wc)) {
-        log_access("ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT REQUEST RECEIVED FOR INVALID NODE", node_id);
+        netdata_log_access("ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT REQUEST RECEIVED FOR INVALID NODE", node_id);
         return;
     }
 
-    log_access("ACLK REQ [%s (%s)]: ALERTS CHECKPOINT REQUEST RECEIVED", node_id, rrdhost_hostname(host));
+    netdata_log_access("ACLK REQ [%s (%s)]: ALERTS CHECKPOINT REQUEST RECEIVED", node_id, rrdhost_hostname(host));
 
     wc->alert_checkpoint_req = SEND_CHECKPOINT_AFTER_HEALTH_LOOPS;
 }
@@ -1080,14 +1080,14 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
 #ifdef ENABLE_ACLK
     struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
     if (unlikely(!wc)) {
-        log_access("ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT REQUEST RECEIVED FOR INVALID NODE", rrdhost_hostname(host));
+        netdata_log_access("ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT REQUEST RECEIVED FOR INVALID NODE", rrdhost_hostname(host));
         return;
     }
 
     if (rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS)) {
         //postpone checkpoint send
         wc->alert_checkpoint_req+=3;
-        log_access("ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT POSTPONED", rrdhost_hostname(host));
+        netdata_log_access("ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT POSTPONED", rrdhost_hostname(host));
         return;
     }
 
@@ -1150,9 +1150,9 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
 
         aclk_send_provide_alarm_checkpoint(&alarm_checkpoint);
         freez(claim_id);
-        log_access("ACLK RES [%s (%s)]: ALERTS CHECKPOINT SENT", wc->node_id, rrdhost_hostname(host));
+        netdata_log_access("ACLK RES [%s (%s)]: ALERTS CHECKPOINT SENT", wc->node_id, rrdhost_hostname(host));
     } else {
-        log_access("ACLK RES [%s (%s)]: FAILED TO CREATE ALERTS CHECKPOINT HASH", wc->node_id, rrdhost_hostname(host));
+        netdata_log_access("ACLK RES [%s (%s)]: FAILED TO CREATE ALERTS CHECKPOINT HASH", wc->node_id, rrdhost_hostname(host));
     }
     wc->alert_checkpoint_req = 0;
     buffer_free(alarms_to_hash);

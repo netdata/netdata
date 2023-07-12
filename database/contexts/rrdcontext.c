@@ -279,7 +279,7 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
     rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
     char node_str[UUID_STR_LEN];
     uuid_unparse_lower(*host->node_id, node_str);
-    log_access("ACLK REQ [%s (%s)]: STREAM CONTEXTS ENABLED", node_str, rrdhost_hostname(host));
+    netdata_log_access("ACLK REQ [%s (%s)]: STREAM CONTEXTS ENABLED", node_str, rrdhost_hostname(host));
 }
 
 void rrdcontext_hub_stop_streaming_command(void *ptr) {

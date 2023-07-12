@@ -50,7 +50,7 @@ static void build_node_collectors(char *node_id __maybe_unused)
     dictionary_destroy(dict);
     freez(upd_node_collectors.claim_id);
 
-    log_access("ACLK RES [%s (%s)]: NODE COLLECTORS SENT", node_id, rrdhost_hostname(host));
+    netdata_log_access("ACLK RES [%s (%s)]: NODE COLLECTORS SENT", node_id, rrdhost_hostname(host));
 
     freez(node_id);
 }
@@ -124,7 +124,7 @@ static void build_node_info(char *node_id __maybe_unused)
     node_info.data.host_labels_ptr = host->rrdlabels;
 
     aclk_update_node_info(&node_info);
-    log_access("ACLK RES [%s (%s)]: NODE INFO SENT for guid [%s] (%s)", wc->node_id, rrdhost_hostname(wc->host), host->machine_guid, wc->host == localhost ? "parent" : "child");
+    netdata_log_access("ACLK RES [%s (%s)]: NODE INFO SENT for guid [%s] (%s)", wc->node_id, rrdhost_hostname(wc->host), host->machine_guid, wc->host == localhost ? "parent" : "child");
 
     rrd_unlock();
     freez(node_info.claim_id);

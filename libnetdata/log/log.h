@@ -134,8 +134,8 @@ void info_int( int is_collector, const char *file, const char *function, const u
 void error_int( int is_collector, const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(6, 7);
 void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, unsigned long line __maybe_unused, const char *fmt, ... ) PRINTFLIKE(6, 7);;
 void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) NORETURN PRINTFLIKE(4, 5);
-void log_access( const char *fmt, ... ) PRINTFLIKE(1, 2);
-void log_health( const char *fmt, ... ) PRINTFLIKE(1, 2);
+void netdata_log_access( const char *fmt, ... ) PRINTFLIKE(1, 2);
+void netdata_log_health( const char *fmt, ... ) PRINTFLIKE(1, 2);
 
 #ifdef ENABLE_ACLK
 void log_aclk_message_bin( const char *data, const size_t data_len, int tx, const char *mqtt_topic, const char *message_name);
