@@ -3,8 +3,9 @@
 #ifndef NETDATA_EBPF_VFS_H
 #define NETDATA_EBPF_VFS_H 1
 
-// Module name
+// Module name & description
 #define NETDATA_EBPF_MODULE_NAME_VFS "vfs"
+#define NETDATA_EBPF_VFS_MODULE_DESC "Monitor VFS (Virtual File System) functions. This thread is integrated with apps and cgroup."
 
 #define NETDATA_DIRECTORY_VFS_CONFIG_FILE "vfs.conf"
 

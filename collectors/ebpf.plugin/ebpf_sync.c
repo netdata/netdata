@@ -248,7 +248,6 @@ static inline int ebpf_sync_load_and_attach(struct sync_bpf *obj, ebpf_module_t 
  *
  *****************************************************************/
 
-#ifdef LIBBPF_MAJOR_VERSION
 /**
  * Cleanup Objects
  *
@@ -259,28 +258,86 @@ void ebpf_sync_cleanup_objects()
     int i;
     for (i = 0; local_syscalls[i].syscall; i++) {
         ebpf_sync_syscalls_t *w = &local_syscalls[i];
-        if (w->sync_obj)
+#ifdef LIBBPF_MAJOR_VERSION
+        if (w->sync_obj) {
             sync_bpf__destroy(w->sync_obj);
+            w->sync_obj = NULL;
+        }
+#endif
+        if (w->probe_links) {
+            ebpf_unload_legacy_code(w->objects, w->probe_links);
+            w->objects = NULL;
+            w->probe_links = NULL;
+        }
     }
 }
-#endif
+
+/*
+    static void ebpf_create_sync_chart(char *id,
+                                       char *title,
+                                       int order,
+                                       int idx,
+                                       int end,
+                                       int update_every)
+    {
+        ebpf_write_chart_cmd(NETDATA_EBPF_MEMORY_GROUP, id, title, EBPF_COMMON_DIMENSION_CALL,
+                             NETDATA_EBPF_SYNC_SUBMENU, NETDATA_EBPF_CHART_TYPE_LINE, NULL, order,
+                             update_every,
+                             NETDATA_EBPF_MODULE_NAME_SYNC);
+ */
 
 /**
- * Sync Free
+ * Obsolete global
  *
- * Cleanup variables after child threads to stop
+ * Obsolete global charts created by thread.
  *
- * @param ptr thread data.
+ * @param em a pointer to `struct ebpf_module`
  */
-static void ebpf_sync_free(ebpf_module_t *em)
+static void ebpf_obsolete_sync_global(ebpf_module_t *em)
 {
-#ifdef LIBBPF_MAJOR_VERSION
-    ebpf_sync_cleanup_objects();
-#endif
+    if (local_syscalls[NETDATA_SYNC_FSYNC_IDX].enabled && local_syscalls[NETDATA_SYNC_FDATASYNC_IDX].enabled)
+        ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP,
+                                  NETDATA_EBPF_FILE_SYNC_CHART,
+                                  "Monitor calls for <code>fsync(2)</code> and <code>fdatasync(2)</code>.",
+                                  EBPF_COMMON_DIMENSION_CALL,
+                                  NETDATA_EBPF_SYNC_SUBMENU,
+                                  NETDATA_EBPF_CHART_TYPE_LINE,
+                                  NULL,
+                                  21300,
+                                  em->update_every);
 
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
+    if (local_syscalls[NETDATA_SYNC_MSYNC_IDX].enabled)
+        ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP,
+                                  NETDATA_EBPF_MSYNC_CHART,
+                               "Monitor calls for <code>msync(2)</code>.",
+                                  EBPF_COMMON_DIMENSION_CALL,
+                                  NETDATA_EBPF_SYNC_SUBMENU,
+                                  NETDATA_EBPF_CHART_TYPE_LINE,
+                                  NULL,
+                                  21301,
+                                  em->update_every);
+
+    if (local_syscalls[NETDATA_SYNC_SYNC_IDX].enabled && local_syscalls[NETDATA_SYNC_SYNCFS_IDX].enabled)
+        ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP,
+                                  NETDATA_EBPF_SYNC_CHART,
+                               "Monitor calls for <code>sync(2)</code> and <code>syncfs(2)</code>.",
+                                  EBPF_COMMON_DIMENSION_CALL,
+                                  NETDATA_EBPF_SYNC_SUBMENU,
+                                  NETDATA_EBPF_CHART_TYPE_LINE,
+                                  NULL,
+                                  21302,
+                                  em->update_every);
+
+    if (local_syscalls[NETDATA_SYNC_SYNC_FILE_RANGE_IDX].enabled)
+        ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP,
+                                  NETDATA_EBPF_FILE_SEGMENT_CHART,
+                               "Monitor calls for <code>sync_file_range(2)</code>.",
+                                  EBPF_COMMON_DIMENSION_CALL,
+                                  NETDATA_EBPF_SYNC_SUBMENU,
+                                  NETDATA_EBPF_CHART_TYPE_LINE,
+                                  NULL,
+                                  21303,
+                                  em->update_every);
 }
 
 /**
@@ -293,7 +350,19 @@ static void ebpf_sync_free(ebpf_module_t *em)
 static void ebpf_sync_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    ebpf_sync_free(em);
+
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        pthread_mutex_lock(&lock);
+        ebpf_obsolete_sync_global(em);
+        pthread_mutex_unlock(&lock);
+    }
+
+    ebpf_sync_cleanup_objects();
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_update_stats(&plugin_statistics, em);
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************
@@ -489,7 +558,9 @@ static void sync_collector(ebpf_module_t *em)
     int update_every = em->update_every;
     int counter = update_every - 1;
     int maps_per_core = em->maps_per_core;
-    while (!ebpf_exit_plugin) {
+    uint32_t running_time = 0;
+    uint32_t lifetime = em->lifetime;
+    while (!ebpf_exit_plugin && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_exit_plugin || ++counter != update_every)
             continue;
@@ -501,6 +572,15 @@ static void sync_collector(ebpf_module_t *em)
         sync_send_data();
 
         pthread_mutex_unlock(&lock);
+
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (running_time && !em->running_time)
+            running_time = update_every;
+        else
+            running_time += update_every;
+
+        em->running_time = running_time;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 
@@ -574,6 +654,8 @@ static void ebpf_create_sync_charts(int update_every)
         ebpf_create_sync_chart(NETDATA_EBPF_FILE_SEGMENT_CHART,
                                "Monitor calls for <code>sync_file_range(2)</code>.", 21303,
                                NETDATA_SYNC_SYNC_FILE_RANGE_IDX, NETDATA_SYNC_SYNC_FILE_RANGE_IDX, update_every);
+
+    fflush(stdout);
 }
 
 /**

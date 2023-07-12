@@ -3,6 +3,9 @@
 #ifndef NETDATA_EBPF_SOFTIRQ_H
 #define NETDATA_EBPF_SOFTIRQ_H 1
 
+// Module observation
+#define NETDATA_EBPF_SOFTIRQ_MODULE_DESC "Show time spent servicing individual software interrupt requests (soft IRQs)."
+
 /*****************************************************************
  *  copied from kernel-collectors repo, with modifications needed
  *  for inclusion here.

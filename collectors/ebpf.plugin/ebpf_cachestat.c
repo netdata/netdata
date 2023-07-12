@@ -58,6 +58,10 @@ netdata_ebpf_targets_t cachestat_targets[] = { {.name = "add_to_page_cache_lru",
 static char *account_page[NETDATA_CACHESTAT_ACCOUNT_DIRTY_END] ={ "account_page_dirtied",
                                                                   "__set_page_dirty", "__folio_mark_dirty"  };
 
+#ifdef NETDATA_DEV_MODE
+int cachestat_disable_priority;
+#endif
+
 #ifdef LIBBPF_MAJOR_VERSION
 /**
  * Disable probe
@@ -336,6 +340,179 @@ static inline int ebpf_cachestat_load_and_attach(struct cachestat_bpf *obj, ebpf
  *
  *****************************************************************/
 
+static void ebpf_obsolete_specific_cachestat_charts(char *type, int update_every);
+
+/**
+ * Obsolete services
+ *
+ * Obsolete all service charts created
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
+static void ebpf_obsolete_services(ebpf_module_t *em)
+{
+    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              NETDATA_CACHESTAT_HIT_RATIO_CHART,
+                              "Hit ratio",
+                              EBPF_COMMON_DIMENSION_PERCENTAGE,
+                              NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NETDATA_SYSTEMD_CACHESTAT_HIT_RATIO_CONTEXT,
+                              21100,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              NETDATA_CACHESTAT_DIRTY_CHART,
+                              "Number of dirty pages",
+                              EBPF_CACHESTAT_DIMENSION_PAGE,
+                              NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NETDATA_SYSTEMD_CACHESTAT_MODIFIED_CACHE_CONTEXT,
+                              21101,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              NETDATA_CACHESTAT_HIT_CHART,
+                              "Number of accessed files",
+                              EBPF_CACHESTAT_DIMENSION_HITS,
+                              NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NETDATA_SYSTEMD_CACHESTAT_HIT_FILE_CONTEXT,
+                              21102,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              NETDATA_CACHESTAT_MISSES_CHART,
+                              "Files out of page cache",
+                              EBPF_CACHESTAT_DIMENSION_MISSES,
+                              NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NETDATA_SYSTEMD_CACHESTAT_MISS_FILES_CONTEXT,
+                              21103,
+                              em->update_every);
+}
+
+/**
+ * Obsolete cgroup chart
+ *
+ * Send obsolete for all charts created before to close.
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
+static inline void ebpf_obsolete_cachestat_cgroup_charts(ebpf_module_t *em) {
+    pthread_mutex_lock(&mutex_cgroup_shm);
+
+    ebpf_obsolete_services(em);
+
+    ebpf_cgroup_target_t *ect;
+    for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
+        if (ect->systemd)
+            continue;
+
+        ebpf_obsolete_specific_cachestat_charts(ect->name, em->update_every);
+    }
+    pthread_mutex_unlock(&mutex_cgroup_shm);
+}
+
+/**
+ * Obsolete global
+ *
+ * Obsolete global charts created by thread.
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
+static void ebpf_obsolete_cachestat_global(ebpf_module_t *em)
+{
+    ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP,
+                              NETDATA_CACHESTAT_HIT_RATIO_CHART,
+                              "Hit ratio",
+                              EBPF_COMMON_DIMENSION_PERCENTAGE,
+                              NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NULL,
+                              21100,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP,
+                              NETDATA_CACHESTAT_DIRTY_CHART,
+                              "Number of dirty pages",
+                              EBPF_CACHESTAT_DIMENSION_PAGE,
+                              NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NULL,
+                              21101,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP,
+                              NETDATA_CACHESTAT_HIT_CHART,
+                              "Number of accessed files",
+                              EBPF_CACHESTAT_DIMENSION_HITS,
+                              NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NULL,
+                              21102,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP,
+                              NETDATA_CACHESTAT_MISSES_CHART,
+                              "Files out of page cache",
+                              EBPF_CACHESTAT_DIMENSION_MISSES,
+                              NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NULL,
+                              21103,
+                              em->update_every);
+}
+
+/**
+ * Obsolette apps charts
+ *
+ * Obsolete apps charts.
+ *
+ * @param em a pointer to the structure with the default values.
+ */
+void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
+{
+    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
+                              NETDATA_CACHESTAT_HIT_RATIO_CHART,
+                              "Hit ratio",
+                              EBPF_COMMON_DIMENSION_PERCENTAGE,
+                              NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NULL,
+                              20090,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
+                              NETDATA_CACHESTAT_DIRTY_CHART,
+                              "Number of dirty pages",
+                              EBPF_CACHESTAT_DIMENSION_PAGE,
+                              NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                              NULL,
+                              20091,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY, NETDATA_CACHESTAT_HIT_CHART,
+                              "Number of accessed files",
+                              EBPF_CACHESTAT_DIMENSION_HITS,
+                              NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                               NULL,
+                              20092,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
+                              NETDATA_CACHESTAT_MISSES_CHART,
+                              "Files out of page cache",
+                              EBPF_CACHESTAT_DIMENSION_MISSES,
+                              NETDATA_CACHESTAT_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                               NULL,
+                              20093,
+                              em->update_every);
+}
+
 /**
  * Cachestat exit.
  *
@@ -347,17 +524,47 @@ static void ebpf_cachestat_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        pthread_mutex_lock(&lock);
+        if (em->cgroup_charts) {
+            ebpf_obsolete_cachestat_cgroup_charts(em);
+            fflush(stdout);
+        }
+
+        if (em->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
+            ebpf_obsolete_cachestat_apps_charts(em);
+        }
+
+        ebpf_obsolete_cachestat_global(em);
+
+#ifdef NETDATA_DEV_MODE
+    if (ebpf_aral_cachestat_pid)
+        ebpf_statistic_obsolete_aral_chart(em, cachestat_disable_priority);
+#endif
+
+
+        fflush(stdout);
+        pthread_mutex_unlock(&lock);
+    }
+
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
+
 #ifdef LIBBPF_MAJOR_VERSION
-    if (cachestat_bpf_obj)
+    if (cachestat_bpf_obj) {
         cachestat_bpf__destroy(cachestat_bpf_obj);
+        cachestat_bpf_obj = NULL;
+    }
 #endif
 
     if (em->objects) {
         ebpf_unload_legacy_code(em->objects, em->probe_links);
+        em->objects = NULL;
+        em->probe_links = NULL;
     }
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_update_stats(&plugin_statistics, em);
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -1079,7 +1286,9 @@ static void cachestat_collector(ebpf_module_t *em)
     heartbeat_init(&hb);
     int counter = update_every - 1;
     //This will be cancelled by its parent
-    while (!ebpf_exit_plugin) {
+    uint32_t running_time = 0;
+    uint32_t lifetime = em->lifetime;
+    while (!ebpf_exit_plugin && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
 
         if (ebpf_exit_plugin || ++counter != update_every)
@@ -1112,6 +1321,15 @@ static void cachestat_collector(ebpf_module_t *em)
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
+
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (running_time && !em->running_time)
+            running_time = update_every;
+        else
+            running_time += update_every;
+
+        em->running_time = running_time;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 
@@ -1307,11 +1525,11 @@ void *ebpf_cachestat_thread(void *ptr)
 
     pthread_mutex_lock(&lock);
     ebpf_update_stats(&plugin_statistics, em);
-    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
     ebpf_create_memory_charts(em);
 #ifdef NETDATA_DEV_MODE
     if (ebpf_aral_cachestat_pid)
-        ebpf_statistic_create_aral_chart(NETDATA_EBPF_CACHESTAT_ARAL_NAME, em);
+        cachestat_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_CACHESTAT_ARAL_NAME, em);
 #endif
 
     pthread_mutex_unlock(&lock);

@@ -3,8 +3,9 @@
 #ifndef NETDATA_EBPF_DISK_H
 #define NETDATA_EBPF_DISK_H 1
 
-// Module name
+// Module name & description
 #define NETDATA_EBPF_MODULE_NAME_DISK "disk"
+#define NETDATA_EBPF_DISK_MODULE_DESC "Monitor disk latency independent of filesystem."
 
 #include "libnetdata/avl/avl.h"
 #include "libnetdata/ebpf/ebpf.h"

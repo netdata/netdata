@@ -4935,7 +4935,11 @@ netdataDashboard.context = {
     },
 
     'netdata.ebpf_threads': {
-        info: 'Show total number of threads and number of active threads. For more details about the threads, see the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ebpf-programs-configuration-options" target="_blank">official documentation</a>.'
+        info: 'Show thread status. Threads running have value 1 an stopped value 0. For more details about the threads, see the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ebpf-programs-configuration-options" target="_blank">official documentation</a>.'
+    },
+
+    'netdata.ebpf_life_time': {
+        info: 'Time remaining for thread shutdown itself.'
     },
 
     'netdata.ebpf_load_methods': {

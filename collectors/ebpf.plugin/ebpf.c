@@ -30,6 +30,8 @@ int ebpf_nprocs;
 int isrh = 0;
 int main_thread_id = 0;
 int process_pid_fd = -1;
+static size_t global_iterations_counter = 1;
+bool publish_internal_metrics = true;
 
 pthread_mutex_t lock;
 pthread_mutex_t ebpf_exit_cleanup;
@@ -47,7 +49,8 @@ struct netdata_static_thread cgroup_integration_thread = {
 };
 
 ebpf_module_t ebpf_modules[] = {
-    { .thread_name = "process", .config_name = "process", .enabled = 0, .start_routine = ebpf_process_thread,
+    { .thread_name = "process", .config_name = "process", .thread_description = NETDATA_EBPF_MODULE_PROCESS_DESC,
+      .enabled = 0, .start_routine = ebpf_process_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .apps_routine = ebpf_process_create_apps_charts, .maps = NULL,
@@ -56,8 +59,9 @@ ebpf_module_t ebpf_modules[] = {
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_10 |
                   NETDATA_V5_14,
       .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL,
-      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
-    { .thread_name = "socket", .config_name = "socket", .enabled = 0, .start_routine = ebpf_socket_thread,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES, .lifetime = EBPF_DEFAULT_LIFETIME, .running_time = 0 },
+      { .thread_name = "socket", .config_name = "socket", .thread_description = NETDATA_EBPF_SOCKET_MODULE_DESC,
+      .enabled = 0, .start_routine = ebpf_socket_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .apps_routine = ebpf_socket_create_apps_charts, .maps = NULL,
@@ -65,8 +69,9 @@ ebpf_module_t ebpf_modules[] = {
       .config_file = NETDATA_NETWORK_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
       .load = EBPF_LOAD_LEGACY, .targets = socket_targets, .probe_links = NULL, .objects = NULL,
-      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
-    { .thread_name = "cachestat", .config_name = "cachestat", .enabled = 0, .start_routine = ebpf_cachestat_thread,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES, .lifetime = EBPF_DEFAULT_LIFETIME, .running_time = 0},
+    { .thread_name = "cachestat", .config_name = "cachestat", .thread_description = NETDATA_EBPF_CACHESTAT_MODULE_DESC,
+      .enabled = 0, .start_routine = ebpf_cachestat_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .apps_routine = ebpf_cachestat_create_apps_charts, .maps = cachestat_maps,
@@ -75,8 +80,9 @@ ebpf_module_t ebpf_modules[] = {
       .kernels = NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18|
                  NETDATA_V5_4 | NETDATA_V5_14 | NETDATA_V5_15 | NETDATA_V5_16,
       .load = EBPF_LOAD_LEGACY, .targets = cachestat_targets, .probe_links = NULL, .objects = NULL,
-      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
-    { .thread_name = "sync", .config_name = "sync", .enabled = 0, .start_routine = ebpf_sync_thread,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES, .lifetime = EBPF_DEFAULT_LIFETIME, .running_time = 0},
+    { .thread_name = "sync", .config_name = "sync", .thread_description = NETDATA_EBPF_SYNC_MODULE_DESC,
+      .enabled = 0, .start_routine = ebpf_sync_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .apps_routine = NULL, .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &sync_config,
@@ -84,8 +90,9 @@ ebpf_module_t ebpf_modules[] = {
       // All syscalls have the same kernels
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
       .load = EBPF_LOAD_LEGACY, .targets = sync_targets, .probe_links = NULL, .objects = NULL,
-      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
-    { .thread_name = "dc", .config_name = "dc", .enabled = 0, .start_routine = ebpf_dcstat_thread,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES, .lifetime = EBPF_DEFAULT_LIFETIME, .running_time = 0},
+    { .thread_name = "dc", .config_name = "dc", .thread_description = NETDATA_EBPF_DC_MODULE_DESC,
+      .enabled = 0, .start_routine = ebpf_dcstat_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .apps_routine = ebpf_dcstat_create_apps_charts, .maps = dcstat_maps,
@@ -93,8 +100,9 @@ ebpf_module_t ebpf_modules[] = {
       .config_file = NETDATA_DIRECTORY_DCSTAT_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
       .load = EBPF_LOAD_LEGACY, .targets = dc_targets, .probe_links = NULL, .objects = NULL,
-      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
-    { .thread_name = "swap", .config_name = "swap", .enabled = 0, .start_routine = ebpf_swap_thread,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES, .lifetime = EBPF_DEFAULT_LIFETIME, .running_time = 0},
+    { .thread_name = "swap", .config_name = "swap", .thread_description = NETDATA_EBPF_SWAP_MODULE_DESC,
+      .enabled = 0, .start_routine = ebpf_swap_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .apps_routine = ebpf_swap_create_apps_charts, .maps = NULL,
@@ -102,8 +110,9 @@ ebpf_module_t ebpf_modules[] = {
       .config_file = NETDATA_DIRECTORY_SWAP_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
       .load = EBPF_LOAD_LEGACY, .targets = swap_targets, .probe_links = NULL, .objects = NULL,
-      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
-    { .thread_name = "vfs", .config_name = "vfs", .enabled = 0, .start_routine = ebpf_vfs_thread,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES, .lifetime = EBPF_DEFAULT_LIFETIME, .running_time = 0},
+    { .thread_name = "vfs", .config_name = "vfs", .thread_description = NETDATA_EBPF_VFS_MODULE_DESC,
+      .enabled = 0, .start_routine = ebpf_vfs_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .apps_routine = ebpf_vfs_create_apps_charts, .maps = NULL,
@@ -111,32 +120,36 @@ ebpf_module_t ebpf_modules[] = {
       .config_file = NETDATA_DIRECTORY_VFS_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
       .load = EBPF_LOAD_LEGACY, .targets = vfs_targets, .probe_links = NULL, .objects = NULL,
-      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
-    { .thread_name = "filesystem", .config_name = "filesystem", .enabled = 0, .start_routine = ebpf_filesystem_thread,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES, .lifetime = EBPF_DEFAULT_LIFETIME, .running_time = 0},
+    { .thread_name = "filesystem", .config_name = "filesystem", .thread_description = NETDATA_EBPF_FS_MODULE_DESC,
+      .enabled = 0, .start_routine = ebpf_filesystem_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .apps_routine = NULL, .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &fs_config,
       .config_file = NETDATA_FILESYSTEM_CONFIG_FILE,
       //We are setting kernels as zero, because we load eBPF programs according the kernel running.
       .kernels = 0, .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL,
-      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES },
-    { .thread_name = "disk", .config_name = "disk", .enabled = 0, .start_routine = ebpf_disk_thread,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES, .lifetime = EBPF_DEFAULT_LIFETIME, .running_time = 0},
+    { .thread_name = "disk", .config_name = "disk", .thread_description = NETDATA_EBPF_DISK_MODULE_DESC,
+      .enabled = 0, .start_routine = ebpf_disk_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .apps_routine = NULL, .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &disk_config,
       .config_file = NETDATA_DISK_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
       .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL,
-      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
-    { .thread_name = "mount", .config_name = "mount", .enabled = 0, .start_routine = ebpf_mount_thread,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES, .lifetime = EBPF_DEFAULT_LIFETIME, .running_time = 0},
+    { .thread_name = "mount", .config_name = "mount", .thread_description = NETDATA_EBPF_MOUNT_MODULE_DESC,
+      .enabled = 0, .start_routine = ebpf_mount_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .apps_routine = NULL, .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &mount_config,
       .config_file = NETDATA_MOUNT_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
       .load = EBPF_LOAD_LEGACY, .targets = mount_targets, .probe_links = NULL, .objects = NULL,
-      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
-    { .thread_name = "fd", .config_name = "fd", .enabled = 0, .start_routine = ebpf_fd_thread,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES, .lifetime = EBPF_DEFAULT_LIFETIME, .running_time = 0},
+    { .thread_name = "fd", .config_name = "fd", .thread_description = NETDATA_EBPF_FD_MODULE_DESC,
+      .enabled = 0, .start_routine = ebpf_fd_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .apps_routine = ebpf_fd_create_apps_charts, .maps = NULL,
@@ -145,24 +158,27 @@ ebpf_module_t ebpf_modules[] = {
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_11 |
                   NETDATA_V5_14,
       .load = EBPF_LOAD_LEGACY, .targets = fd_targets, .probe_links = NULL, .objects = NULL,
-      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
-    { .thread_name = "hardirq", .config_name = "hardirq", .enabled = 0, .start_routine = ebpf_hardirq_thread,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES, .lifetime = EBPF_DEFAULT_LIFETIME, .running_time = 0},
+    { .thread_name = "hardirq", .config_name = "hardirq", .thread_description = NETDATA_EBPF_HARDIRQ_MODULE_DESC,
+      .enabled = 0, .start_routine = ebpf_hardirq_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .apps_routine = NULL, .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &hardirq_config,
       .config_file = NETDATA_HARDIRQ_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
       .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL,
-      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
-    { .thread_name = "softirq", .config_name = "softirq", .enabled = 0, .start_routine = ebpf_softirq_thread,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES, .lifetime = EBPF_DEFAULT_LIFETIME, .running_time = 0},
+    { .thread_name = "softirq", .config_name = "softirq", .thread_description = NETDATA_EBPF_SOFTIRQ_MODULE_DESC,
+      .enabled = 0, .start_routine = ebpf_softirq_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .apps_routine = NULL, .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &softirq_config,
       .config_file = NETDATA_SOFTIRQ_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
       .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL,
-      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
-    { .thread_name = "oomkill", .config_name = "oomkill", .enabled = 0, .start_routine = ebpf_oomkill_thread,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES, .lifetime = EBPF_DEFAULT_LIFETIME, .running_time = 0},
+    { .thread_name = "oomkill", .config_name = "oomkill", .thread_description = NETDATA_EBPF_OOMKILL_MODULE_DESC,
+      .enabled = 0, .start_routine = ebpf_oomkill_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .apps_routine = ebpf_oomkill_create_apps_charts, .maps = NULL,
@@ -170,8 +186,9 @@ ebpf_module_t ebpf_modules[] = {
       .config_file = NETDATA_OOMKILL_CONFIG_FILE,
       .kernels =  NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
       .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL,
-      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
-    { .thread_name = "shm", .config_name = "shm", .enabled = 0, .start_routine = ebpf_shm_thread,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES, .lifetime = EBPF_DEFAULT_LIFETIME, .running_time = 0},
+    { .thread_name = "shm", .config_name = "shm", .thread_description = NETDATA_EBPF_SHM_MODULE_DESC,
+      .enabled = 0, .start_routine = ebpf_shm_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .apps_routine = ebpf_shm_create_apps_charts, .maps = NULL,
@@ -179,15 +196,25 @@ ebpf_module_t ebpf_modules[] = {
       .config_file = NETDATA_DIRECTORY_SHM_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
       .load = EBPF_LOAD_LEGACY, .targets = shm_targets, .probe_links = NULL, .objects = NULL,
-      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
-    { .thread_name = "mdflush", .config_name = "mdflush", .enabled = 0, .start_routine = ebpf_mdflush_thread,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES, .lifetime = EBPF_DEFAULT_LIFETIME, .running_time = 0},
+    { .thread_name = "mdflush", .config_name = "mdflush", .thread_description = NETDATA_EBPF_MD_MODULE_DESC,
+      .enabled = 0, .start_routine = ebpf_mdflush_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .apps_routine = NULL, .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &mdflush_config,
       .config_file = NETDATA_DIRECTORY_MDFLUSH_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
       .load = EBPF_LOAD_LEGACY, .targets = mdflush_targets, .probe_links = NULL, .objects = NULL,
-      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES},
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES, .lifetime = EBPF_DEFAULT_LIFETIME, .running_time = 0},
+    { .thread_name = "functions", .config_name = "functions", .thread_description = NETDATA_EBPF_FUNCTIONS_MODULE_DESC,
+      .enabled = 1, .start_routine = ebpf_function_thread,
+      .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
+      .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
+      .apps_routine = NULL, .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = NULL,
+      .config_file = NETDATA_DIRECTORY_FUNCTIONS_CONFIG_FILE,
+      .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
+      .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL,
+      .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES, .lifetime = EBPF_DEFAULT_LIFETIME, .running_time = 0},
     { .thread_name = NULL, .enabled = 0, .start_routine = NULL, .update_every = EBPF_DEFAULT_UPDATE_EVERY,
       .global_charts = 0, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO, .apps_level = NETDATA_APPS_NOT_SET,
       .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0, .apps_routine = NULL, .maps = NULL,
@@ -348,6 +375,16 @@ struct netdata_static_thread ebpf_threads[] = {
     },
     {
         .name = "EBPF MDFLUSH",
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    },
+    {
+        .name = "EBPF FUNCTIONS",
         .config_section = NULL,
         .config_name = NULL,
         .env_name = NULL,
@@ -586,7 +623,7 @@ static inline void ebpf_check_before2go()
         int j;
         pthread_mutex_lock(&ebpf_exit_cleanup);
         for (j = 0; ebpf_modules[j].thread_name != NULL; j++) {
-            if (ebpf_modules[j].enabled == NETDATA_THREAD_EBPF_RUNNING)
+            if (ebpf_modules[j].enabled < NETDATA_THREAD_EBPF_STOPPING)
                 i++;
         }
         pthread_mutex_unlock(&ebpf_exit_cleanup);
@@ -665,7 +702,7 @@ static void ebpf_unload_unique_maps()
     int i;
     for (i = 0; ebpf_modules[i].thread_name; i++) {
         // These threads are cleaned with other functions
-        if (i > EBPF_MODULE_SOCKET_IDX)
+        if (i != EBPF_MODULE_SOCKET_IDX)
             continue;
 
         if (ebpf_modules[i].enabled != NETDATA_THREAD_EBPF_STOPPED) {
@@ -680,13 +717,10 @@ static void ebpf_unload_unique_maps()
             continue;
         }
 
-        if (i == EBPF_MODULE_SOCKET_IDX) {
 #ifdef LIBBPF_MAJOR_VERSION
-            if (socket_bpf_obj)
-                socket_bpf__destroy(socket_bpf_obj);
+        if (socket_bpf_obj)
+            socket_bpf__destroy(socket_bpf_obj);
 #endif
-        }
-
     }
 }
 
@@ -698,7 +732,7 @@ static void ebpf_unload_unique_maps()
 static void ebpf_unload_filesystems()
 {
     if (ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].enabled == NETDATA_THREAD_EBPF_NOT_RUNNING ||
-        ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].enabled == NETDATA_THREAD_EBPF_RUNNING ||
+        ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].enabled < NETDATA_THREAD_EBPF_STOPPING ||
         ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].load != EBPF_LOAD_LEGACY)
         return;
 
@@ -719,7 +753,7 @@ static void ebpf_unload_filesystems()
 static void ebpf_unload_sync()
 {
     if (ebpf_modules[EBPF_MODULE_SYNC_IDX].enabled == NETDATA_THREAD_EBPF_NOT_RUNNING ||
-        ebpf_modules[EBPF_MODULE_SYNC_IDX].enabled == NETDATA_THREAD_EBPF_RUNNING)
+    ebpf_modules[EBPF_MODULE_SYNC_IDX].enabled < NETDATA_THREAD_EBPF_STOPPING)
         return;
 
     int i;
@@ -757,7 +791,7 @@ static void ebpf_stop_threads(int sig)
     only_one = 1;
     int i;
     for (i = 0; ebpf_modules[i].thread_name != NULL; i++) {
-        if (ebpf_modules[i].enabled == NETDATA_THREAD_EBPF_RUNNING) {
+        if (ebpf_modules[i].enabled < NETDATA_THREAD_EBPF_STOPPING) {
             netdata_thread_cancel(*ebpf_modules[i].thread->thread);
 #ifdef NETDATA_DEV_MODE
             netdata_log_info("Sending cancel for thread %s", ebpf_modules[i].thread_name);
@@ -791,6 +825,19 @@ static void ebpf_stop_threads(int sig)
  *  FUNCTIONS TO CREATE CHARTS
  *
  *****************************************************************/
+
+/**
+ * Create apps for module
+ *
+ * Create apps chart that will be used with specific module
+ *
+ * @param em     the module main structure.
+ * @param root   a pointer for the targets.
+ */
+static inline void ebpf_create_apps_for_module(ebpf_module_t *em, struct ebpf_target *root) {
+    if (em->enabled < NETDATA_THREAD_EBPF_STOPPING && em->apps_charts && em->apps_routine)
+        em->apps_routine(em, root);
+}
 
 /**
  * Create apps charts
@@ -833,14 +880,21 @@ static void ebpf_create_apps_charts(struct ebpf_target *root)
         }
     }
 
-    if (!newly_added)
-        return;
+    int i;
+    if (!newly_added) {
+        for (i = 0; i < EBPF_MODULE_FUNCTION_IDX ; i++) {
+            ebpf_module_t *current = &ebpf_modules[i];
+            if (current->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
+                continue;
 
-    int counter;
-    for (counter = 0; ebpf_modules[counter].thread_name; counter++) {
-        ebpf_module_t *current = &ebpf_modules[counter];
-        if (current->enabled == NETDATA_THREAD_EBPF_RUNNING && current->apps_charts && current->apps_routine)
-            current->apps_routine(current, root);
+            ebpf_create_apps_for_module(current, root);
+        }
+        return;
+    }
+
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX ; i++) {
+        ebpf_module_t *current = &ebpf_modules[i];
+        ebpf_create_apps_for_module(current, root);
     }
 }
 
@@ -1169,7 +1223,7 @@ void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, 
  * @param name    the name used to create aral
  * @param em      a pointer to the structure with the default values.
  */
-void ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em)
+int ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em)
 {
     static int priority = 140100;
     char *mem = { NETDATA_EBPF_STAT_DIMENSION_MEMORY };
@@ -1207,6 +1261,40 @@ void ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em)
     ebpf_write_global_dimension(aral,
                                 aral,
                                 ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+
+    return priority - 2;
+}
+
+/**
+ * ARAL Charts
+ *
+ * Add chart to monitor ARAL usage
+ * Caller must call this function with mutex locked.
+ *
+ * @param em      a pointer to the structure with the default values.
+ * @param prio    the initial priority used to disable charts.
+ */
+void ebpf_statistic_obsolete_aral_chart(ebpf_module_t *em, int prio)
+{
+    ebpf_write_chart_obsolete(NETDATA_MONITORING_FAMILY,
+                              em->memory_allocations,
+                              "Calls to allocate memory.",
+                              "calls",
+                              NETDATA_EBPF_FAMILY,
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                              "netdata.ebpf_aral_stat_alloc",
+                              prio++,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_MONITORING_FAMILY,
+                              em->memory_allocations,
+                              "Calls to allocate memory.",
+                              "calls",
+                              NETDATA_EBPF_FAMILY,
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                              "netdata.ebpf_aral_stat_alloc",
+                              prio++,
+                              em->update_every);
 }
 
 /**
@@ -1280,7 +1368,7 @@ void ebpf_global_labels(netdata_syscall_stat_t *is, netdata_publish_syscall_t *p
 static inline void ebpf_set_thread_mode(netdata_run_mode_t lmode)
 {
     int i;
-    for (i = 0; ebpf_modules[i].thread_name; i++) {
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
         ebpf_modules[i].mode = lmode;
     }
 }
@@ -1289,16 +1377,15 @@ static inline void ebpf_set_thread_mode(netdata_run_mode_t lmode)
  * Enable specific charts selected by user.
  *
  * @param em             the structure that will be changed
- * @param disable_apps   the status about the apps charts.
  * @param disable_cgroup the status about the cgroups charts.
  */
-static inline void ebpf_enable_specific_chart(struct ebpf_module *em, int disable_apps, int disable_cgroup)
+static inline void ebpf_enable_specific_chart(struct ebpf_module *em, int disable_cgroup)
 {
     em->enabled = CONFIG_BOOLEAN_YES;
 
     // oomkill stores data inside apps submenu, so it always need to have apps_enabled for plugin to create
     // its chart, without this comparison eBPF.plugin will try to store invalid data when apps is disabled.
-    if (!disable_apps || !strcmp(em->thread_name, "oomkill")) {
+    if (!strcmp(em->thread_name, "oomkill")) {
         em->apps_charts = NETDATA_EBPF_APPS_FLAG_YES;
     }
 
@@ -1307,20 +1394,6 @@ static inline void ebpf_enable_specific_chart(struct ebpf_module *em, int disabl
     }
 
     em->global_charts = CONFIG_BOOLEAN_YES;
-}
-
-/**
- * Enable all charts
- *
- * @param apps    what is the current status of apps
- * @param cgroups what is the current status of cgroups
- */
-static inline void ebpf_enable_all_charts(int apps, int cgroups)
-{
-    int i;
-    for (i = 0; ebpf_modules[i].thread_name; i++) {
-        ebpf_enable_specific_chart(&ebpf_modules[i], apps, cgroups);
-    }
 }
 
 /**
@@ -1337,34 +1410,19 @@ static inline void disable_all_global_charts()
     }
 }
 
-
 /**
  * Enable the specified chart group
  *
  * @param idx            the index of ebpf_modules that I am enabling
- * @param disable_apps   should I keep apps charts?
  */
-static inline void ebpf_enable_chart(int idx, int disable_apps, int disable_cgroup)
+static inline void ebpf_enable_chart(int idx, int disable_cgroup)
 {
     int i;
     for (i = 0; ebpf_modules[i].thread_name; i++) {
         if (i == idx) {
-            ebpf_enable_specific_chart(&ebpf_modules[i], disable_apps, disable_cgroup);
+            ebpf_enable_specific_chart(&ebpf_modules[i], disable_cgroup);
             break;
         }
-    }
-}
-
-/**
- * Disable APPs
- *
- * Disable charts for apps loading only global charts.
- */
-static inline void ebpf_disable_apps()
-{
-    int i;
-    for (i = 0; ebpf_modules[i].thread_name; i++) {
-        ebpf_modules[i].apps_charts = NETDATA_EBPF_APPS_FLAG_NO;
     }
 }
 
@@ -1671,32 +1729,10 @@ void ebpf_start_pthread_variables()
 }
 
 /**
- * Am I collecting PIDs?
- *
- * Test if eBPF plugin needs to collect PID information.
- *
- * @return It returns 1 if at least one thread needs to collect the data, or zero otherwise.
- */
-static inline uint32_t ebpf_am_i_collect_pids()
-{
-    uint32_t ret = 0;
-    int i;
-    for (i = 0; ebpf_modules[i].thread_name; i++) {
-        ret |= ebpf_modules[i].cgroup_charts | (ebpf_modules[i].apps_charts & NETDATA_EBPF_APPS_FLAG_YES);
-    }
-
-    return ret;
-}
-
-/**
  * Allocate the vectors used for all threads.
  */
 static void ebpf_allocate_common_vectors()
 {
-    if (unlikely(!ebpf_am_i_collect_pids())) {
-        return;
-    }
-
     ebpf_all_pids = callocz((size_t)pid_max, sizeof(struct ebpf_pid_stat *));
     ebpf_aral_init();
 }
@@ -1706,7 +1742,7 @@ static void ebpf_allocate_common_vectors()
  *
  * @param ptr the option given by users
  */
-static inline void how_to_load(char *ptr)
+static inline void ebpf_how_to_load(char *ptr)
 {
     if (!strcasecmp(ptr, EBPF_CFG_LOAD_MODE_RETURN))
         ebpf_set_thread_mode(MODE_RETURN);
@@ -1715,6 +1751,20 @@ static inline void how_to_load(char *ptr)
     else
         netdata_log_error("the option %s for \"ebpf load mode\" is not a valid option.", ptr);
 }
+
+/**
+ * Define whether we should have charts for apps
+ *
+ * @param lmode  the mode that will be used for them.
+ */
+static inline void ebpf_set_apps_mode(netdata_apps_integration_flags_t value)
+{
+    int i;
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
+        ebpf_modules[i].apps_charts = value;
+    }
+}
+
 
 /**
  * Update interval
@@ -1745,6 +1795,21 @@ static void ebpf_update_table_size()
                                                     EBPF_CFG_PID_SIZE, ND_EBPF_DEFAULT_PID_SIZE);
     for (i = 0; ebpf_modules[i].thread_name; i++) {
         ebpf_modules[i].pid_map_size = value;
+    }
+}
+
+/**
+ * Update lifetime
+ *
+ * Update the period of time that specific thread will run
+ */
+static void ebpf_update_lifetime()
+{
+    int i;
+    uint32_t value = (uint32_t) appconfig_get_number(&collector_config, EBPF_GLOBAL_SECTION,
+                                                     EBPF_CFG_LIFETIME, EBPF_DEFAULT_LIFETIME);
+    for (i = 0; ebpf_modules[i].thread_name; i++) {
+        ebpf_modules[i].lifetime = value;
     }
 }
 
@@ -1793,12 +1858,11 @@ static void ebpf_update_map_per_core()
 /**
  * Read collector values
  *
- * @param disable_apps    variable to store information related to apps.
  * @param disable_cgroups variable to store information related to cgroups.
  * @param update_every    value to overwrite the update frequency set by the server.
  * @param origin          specify the configuration file loaded
  */
-static void read_collector_values(int *disable_apps, int *disable_cgroups,
+static void read_collector_values(int *disable_cgroups,
                                   int update_every, netdata_ebpf_load_mode_t origin)
 {
     // Read global section
@@ -1810,7 +1874,7 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
         value = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_LOAD_MODE,
                               EBPF_CFG_LOAD_MODE_DEFAULT);
 
-    how_to_load(value);
+    ebpf_how_to_load(value);
 
     btf_path = appconfig_get(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_PROGRAM_PATH,
                              EBPF_DEFAULT_BTF_PATH);
@@ -1827,6 +1891,8 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
 
     ebpf_update_table_size();
 
+    ebpf_update_lifetime();
+
     // This is kept to keep compatibility
     uint32_t enabled = appconfig_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, "disable apps",
                                              CONFIG_BOOLEAN_NO);
@@ -1836,7 +1902,8 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
                                         CONFIG_BOOLEAN_YES);
         enabled =  (enabled == CONFIG_BOOLEAN_NO)?CONFIG_BOOLEAN_YES:CONFIG_BOOLEAN_NO;
     }
-    *disable_apps = (int)enabled;
+
+    ebpf_set_apps_mode(!enabled);
 
     // Cgroup is a positive sentence, so we need to invert the values to disable apps.
     // We are using the same pattern for cgroup and apps
@@ -1848,10 +1915,8 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
     // Read ebpf programs section
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION,
                                     ebpf_modules[EBPF_MODULE_PROCESS_IDX].config_name, CONFIG_BOOLEAN_YES);
-    int started = 0;
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_PROCESS_IDX, *disable_apps, *disable_cgroups);
-        started++;
+        ebpf_enable_chart(EBPF_MODULE_PROCESS_IDX, *disable_cgroups);
     }
 
     // This is kept to keep compatibility
@@ -1862,8 +1927,7 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
                                         ebpf_modules[EBPF_MODULE_SOCKET_IDX].config_name,
                                         CONFIG_BOOLEAN_NO);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_apps, *disable_cgroups);
-        started++;
+        ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_cgroups);
     }
 
     // This is kept to keep compatibility
@@ -1875,123 +1939,98 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
     network_viewer_opt.enabled = enabled;
     if (enabled) {
         if (!ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled)
-            ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_apps, *disable_cgroups);
+            ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_cgroups);
 
         // Read network viewer section if network viewer is enabled
         // This is kept here to keep backward compatibility
         parse_network_viewer_section(&collector_config);
         parse_service_name_section(&collector_config);
-        started++;
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "cachestat",
                                     CONFIG_BOOLEAN_NO);
 
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_CACHESTAT_IDX, *disable_apps, *disable_cgroups);
-        started++;
+        ebpf_enable_chart(EBPF_MODULE_CACHESTAT_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "sync",
                                     CONFIG_BOOLEAN_YES);
 
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_SYNC_IDX, *disable_apps, *disable_cgroups);
-        started++;
+        ebpf_enable_chart(EBPF_MODULE_SYNC_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "dcstat",
                                     CONFIG_BOOLEAN_NO);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_DCSTAT_IDX, *disable_apps, *disable_cgroups);
-        started++;
+        ebpf_enable_chart(EBPF_MODULE_DCSTAT_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "swap",
                                     CONFIG_BOOLEAN_NO);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_SWAP_IDX, *disable_apps, *disable_cgroups);
-        started++;
+        ebpf_enable_chart(EBPF_MODULE_SWAP_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "vfs",
                                     CONFIG_BOOLEAN_NO);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_VFS_IDX, *disable_apps, *disable_cgroups);
-        started++;
+        ebpf_enable_chart(EBPF_MODULE_VFS_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "filesystem",
                                     CONFIG_BOOLEAN_NO);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_FILESYSTEM_IDX, *disable_apps, *disable_cgroups);
-        started++;
+        ebpf_enable_chart(EBPF_MODULE_FILESYSTEM_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "disk",
                                     CONFIG_BOOLEAN_NO);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_DISK_IDX, *disable_apps, *disable_cgroups);
-        started++;
+        ebpf_enable_chart(EBPF_MODULE_DISK_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "mount",
                                     CONFIG_BOOLEAN_YES);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_MOUNT_IDX, *disable_apps, *disable_cgroups);
-        started++;
+        ebpf_enable_chart(EBPF_MODULE_MOUNT_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "fd",
                                     CONFIG_BOOLEAN_YES);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_FD_IDX, *disable_apps, *disable_cgroups);
-        started++;
+        ebpf_enable_chart(EBPF_MODULE_FD_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "hardirq",
                                     CONFIG_BOOLEAN_YES);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_HARDIRQ_IDX, *disable_apps, *disable_cgroups);
-        started++;
+        ebpf_enable_chart(EBPF_MODULE_HARDIRQ_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "softirq",
                                     CONFIG_BOOLEAN_YES);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_SOFTIRQ_IDX, *disable_apps, *disable_cgroups);
-        started++;
+        ebpf_enable_chart(EBPF_MODULE_SOFTIRQ_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "oomkill",
                                     CONFIG_BOOLEAN_YES);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_OOMKILL_IDX, *disable_apps, *disable_cgroups);
-        started++;
+        ebpf_enable_chart(EBPF_MODULE_OOMKILL_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "shm",
                                     CONFIG_BOOLEAN_YES);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_SHM_IDX, *disable_apps, *disable_cgroups);
-        started++;
+        ebpf_enable_chart(EBPF_MODULE_SHM_IDX, *disable_cgroups);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "mdflush",
                                     CONFIG_BOOLEAN_NO);
     if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_MDFLUSH_IDX, *disable_apps, *disable_cgroups);
-        started++;
-    }
-
-    if (!started){
-        ebpf_enable_all_charts(*disable_apps, *disable_cgroups);
-        // Read network viewer section
-        // This is kept here to keep backward compatibility
-        if (network_viewer_opt.enabled) {
-            parse_network_viewer_section(&collector_config);
-            parse_service_name_section(&collector_config);
-        }
+        ebpf_enable_chart(EBPF_MODULE_MDFLUSH_IDX, *disable_cgroups);
     }
 }
 
@@ -1999,13 +2038,12 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
  * Load collector config
  *
  * @param path             the path where the file ebpf.conf is stored.
- * @param disable_apps     variable to store the information about apps plugin status.
  * @param disable_cgroups  variable to store the information about cgroups plugin status.
  * @param update_every value to overwrite the update frequency set by the server.
  *
  * @return 0 on success and -1 otherwise.
  */
-static int load_collector_config(char *path, int *disable_apps, int *disable_cgroups, int update_every)
+static int ebpf_load_collector_config(char *path, int *disable_cgroups, int update_every)
 {
     char lpath[4096];
     netdata_ebpf_load_mode_t origin;
@@ -2020,7 +2058,7 @@ static int load_collector_config(char *path, int *disable_apps, int *disable_cgr
     } else
         origin = EBPF_LOADED_FROM_USER;
 
-    read_collector_values(disable_apps, disable_cgroups, update_every, origin);
+    read_collector_values(disable_cgroups, update_every, origin);
 
     return 0;
 }
@@ -2064,7 +2102,7 @@ void set_global_variables()
 static inline void ebpf_load_thread_config()
 {
     int i;
-    for (i = 0; ebpf_modules[i].thread_name; i++) {
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
         ebpf_update_module(&ebpf_modules[i], default_btf, running_on_kernel, isrh);
     }
 }
@@ -2119,7 +2157,6 @@ int ebpf_adjust_memory_limit()
  */
 static void ebpf_parse_args(int argc, char **argv)
 {
-    int disable_apps = 0;
     int disable_cgroups = 1;
     int freq = 0;
     int option_index = 0;
@@ -2166,11 +2203,11 @@ static void ebpf_parse_args(int argc, char **argv)
     if (!freq)
         freq = EBPF_DEFAULT_UPDATE_EVERY;
 
-    if (load_collector_config(ebpf_user_config_dir, &disable_apps, &disable_cgroups, freq)) {
+    if (ebpf_load_collector_config(ebpf_user_config_dir, &disable_cgroups, freq)) {
         netdata_log_info(
             "Does not have a configuration file inside `%s/ebpf.d.conf. It will try to load stock file.",
             ebpf_user_config_dir);
-        if (load_collector_config(ebpf_stock_config_dir, &disable_apps, &disable_cgroups, freq)) {
+        if (ebpf_load_collector_config(ebpf_stock_config_dir, &disable_cgroups, freq)) {
             netdata_log_info("Does not have a stock file. It is starting with default options.");
         }
     }
@@ -2296,7 +2333,7 @@ static void ebpf_parse_args(int argc, char **argv)
                 break;
             }
             case EBPF_OPTION_ALL_CHARTS: {
-                disable_apps = 0;
+                ebpf_set_apps_mode(NETDATA_EBPF_APPS_FLAG_YES);
                 disable_cgroups = 0;
 #ifdef NETDATA_INTERNAL_CHECKS
                 netdata_log_info("EBPF running with all chart groups, because it was started with the option \"[-]-all\".");
@@ -2312,7 +2349,6 @@ static void ebpf_parse_args(int argc, char **argv)
                 exit(0);
             }
             case EBPF_OPTION_GLOBAL_CHART: {
-                disable_apps = 1;
                 disable_cgroups = 1;
 #ifdef NETDATA_INTERNAL_CHECKS
                 netdata_log_info("EBPF running with global chart group, because it was started with the option  \"[-]-global\".");
@@ -2373,10 +2409,7 @@ unittest:
         }
     }
 
-    if (disable_apps || disable_cgroups) {
-        if (disable_apps)
-            ebpf_disable_apps();
-
+    if (disable_cgroups) {
         if (disable_cgroups)
             ebpf_disable_cgroups();
     }
@@ -2386,7 +2419,7 @@ unittest:
         uint64_t idx;
         for (idx = 0; idx < EBPF_OPTION_ALL_CHARTS; idx++) {
             if (select_threads & 1<<idx)
-                ebpf_enable_specific_chart(&ebpf_modules[idx], disable_apps, disable_cgroups);
+                ebpf_enable_specific_chart(&ebpf_modules[idx], disable_cgroups);
         }
     }
 
@@ -2403,6 +2436,280 @@ unittest:
         }
     } else
         netdata_log_info("Loaded config file '%s/apps_groups.conf'", ebpf_user_config_dir);
+}
+
+/*****************************************************************
+ *
+ *  Collector charts
+ *
+ *****************************************************************/
+
+static char *load_event_stat[NETDATA_EBPF_LOAD_STAT_END] = {"legacy", "co-re"};
+static char *memlock_stat = {"memory_locked"};
+static char *hash_table_stat = {"hash_table"};
+static char *hash_table_core[NETDATA_EBPF_LOAD_STAT_END] = {"per_core", "unique"};
+
+/**
+ * Send Statistic Data
+ *
+ * Send statistic information to netdata.
+ */
+void ebpf_send_statistic_data()
+{
+    if (!publish_internal_metrics)
+        return;
+
+    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_THREADS);
+    int i;
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
+        ebpf_module_t *wem = &ebpf_modules[i];
+        write_chart_dimension((char *)wem->thread_name, (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ? 1 : 0);
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_LIFE_TIME);
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX ; i++) {
+        ebpf_module_t *wem = &ebpf_modules[i];
+        // Threads like VFS is slow to load and this can create an invalid number, this is the motive
+        // we are also testing wem->lifetime value.
+        write_chart_dimension((char *)wem->thread_name,
+                              (wem->lifetime && wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ?
+                              (long long) (wem->lifetime - wem->running_time):
+                              0) ;
+    }
+    write_end_chart();
+
+    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_LOAD_METHOD);
+    write_chart_dimension(load_event_stat[NETDATA_EBPF_LOAD_STAT_LEGACY], (long long)plugin_statistics.legacy);
+    write_chart_dimension(load_event_stat[NETDATA_EBPF_LOAD_STAT_CORE], (long long)plugin_statistics.core);
+    write_end_chart();
+
+    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_KERNEL_MEMORY);
+    write_chart_dimension(memlock_stat, (long long)plugin_statistics.memlock_kern);
+    write_end_chart();
+
+    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_HASH_TABLES_LOADED);
+    write_chart_dimension(hash_table_stat, (long long)plugin_statistics.hash_tables);
+    write_end_chart();
+
+    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_HASH_TABLES_PER_CORE);
+    write_chart_dimension(hash_table_core[NETDATA_EBPF_THREAD_PER_CORE], (long long)plugin_statistics.hash_percpu);
+    write_chart_dimension(hash_table_core[NETDATA_EBPF_THREAD_UNIQUE], (long long)plugin_statistics.hash_unique);
+    write_end_chart();
+}
+
+/**
+ * Update Internal Metric variable
+ *
+ * By default eBPF.plugin sends internal metrics for netdata, but user can
+ * disable this.
+ *
+ * The function updates the variable used to send charts.
+ */
+static void update_internal_metric_variable()
+{
+    const char *s = getenv("NETDATA_INTERNALS_MONITORING");
+    if (s && *s && strcmp(s, "NO") == 0)
+        publish_internal_metrics = false;
+}
+
+/**
+ * Create chart for Statistic Thread
+ *
+ * Write to standard output current values for threads.
+ *
+ * @param update_every time used to update charts
+ */
+static inline void ebpf_create_statistic_thread_chart(int update_every)
+{
+    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
+                         NETDATA_EBPF_THREADS,
+                         "Threads running.",
+                         "boolean",
+                         NETDATA_EBPF_FAMILY,
+                         NETDATA_EBPF_CHART_TYPE_LINE,
+                         NULL,
+                         NETDATA_EBPF_ORDER_STAT_THREADS,
+                         update_every,
+                         NETDATA_EBPF_MODULE_NAME_PROCESS);
+
+    int i;
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
+        ebpf_write_global_dimension((char *)ebpf_modules[i].thread_name,
+                                    (char *)ebpf_modules[i].thread_name,
+                                    ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+    }
+}
+
+/**
+ * Create lifetime Thread Chart
+ *
+ * Write to standard output current values for threads lifetime.
+ *
+ * @param update_every time used to update charts
+ */
+static inline void ebpf_create_lifetime_thread_chart(int update_every)
+{
+    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
+                         NETDATA_EBPF_LIFE_TIME,
+                         "Threads running.",
+                         "seconds",
+                         NETDATA_EBPF_FAMILY,
+                         NETDATA_EBPF_CHART_TYPE_LINE,
+                         NULL,
+                         NETDATA_EBPF_ORDER_STAT_LIFE_TIME,
+                         update_every,
+                         NETDATA_EBPF_MODULE_NAME_PROCESS);
+
+    int i;
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
+        ebpf_write_global_dimension((char *)ebpf_modules[i].thread_name,
+                                    (char *)ebpf_modules[i].thread_name,
+                                    ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+    }
+}
+
+/**
+ * Create chart for Load Thread
+ *
+ * Write to standard output current values for load mode.
+ *
+ * @param update_every time used to update charts
+ */
+static inline void ebpf_create_statistic_load_chart(int update_every)
+{
+    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
+                         NETDATA_EBPF_LOAD_METHOD,
+                         "Load info.",
+                         "methods",
+                         NETDATA_EBPF_FAMILY,
+                         NETDATA_EBPF_CHART_TYPE_LINE,
+                         NULL,
+                         NETDATA_EBPF_ORDER_STAT_LOAD_METHOD,
+                         update_every,
+                         NETDATA_EBPF_MODULE_NAME_PROCESS);
+
+    ebpf_write_global_dimension(load_event_stat[NETDATA_EBPF_LOAD_STAT_LEGACY],
+                                load_event_stat[NETDATA_EBPF_LOAD_STAT_LEGACY],
+                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+
+    ebpf_write_global_dimension(load_event_stat[NETDATA_EBPF_LOAD_STAT_CORE],
+                                load_event_stat[NETDATA_EBPF_LOAD_STAT_CORE],
+                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+}
+
+/**
+ * Create chart for Kernel Memory
+ *
+ * Write to standard output current values for allocated memory.
+ *
+ * @param update_every time used to update charts
+ */
+static inline void ebpf_create_statistic_kernel_memory(int update_every)
+{
+    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
+                         NETDATA_EBPF_KERNEL_MEMORY,
+                         "Memory allocated for hash tables.",
+                         "bytes",
+                         NETDATA_EBPF_FAMILY,
+                         NETDATA_EBPF_CHART_TYPE_LINE,
+                         NULL,
+                         NETDATA_EBPF_ORDER_STAT_KERNEL_MEMORY,
+                         update_every,
+                         NETDATA_EBPF_MODULE_NAME_PROCESS);
+
+    ebpf_write_global_dimension(memlock_stat,
+                                memlock_stat,
+                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+}
+
+/**
+ * Create chart Hash Table
+ *
+ * Write to standard output number of hash tables used with this software.
+ *
+ * @param update_every time used to update charts
+ */
+static inline void ebpf_create_statistic_hash_tables(int update_every)
+{
+    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
+                         NETDATA_EBPF_HASH_TABLES_LOADED,
+                         "Number of hash tables loaded.",
+                         "hash tables",
+                         NETDATA_EBPF_FAMILY,
+                         NETDATA_EBPF_CHART_TYPE_LINE,
+                         NULL,
+                         NETDATA_EBPF_ORDER_STAT_HASH_TABLES,
+                         update_every,
+                         NETDATA_EBPF_MODULE_NAME_PROCESS);
+
+    ebpf_write_global_dimension(hash_table_stat,
+                                hash_table_stat,
+                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+}
+
+/**
+ * Create chart for percpu stats
+ *
+ * Write to standard output current values for threads.
+ *
+ * @param update_every time used to update charts
+ */
+static inline void ebpf_create_statistic_hash_per_core(int update_every)
+{
+    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
+                         NETDATA_EBPF_HASH_TABLES_PER_CORE,
+                         "How threads are loading hash/array tables.",
+                         "threads",
+                         NETDATA_EBPF_FAMILY,
+                         NETDATA_EBPF_CHART_TYPE_LINE,
+                         NULL,
+                         NETDATA_EBPF_ORDER_STAT_HASH_CORE,
+                         update_every,
+                         NETDATA_EBPF_MODULE_NAME_PROCESS);
+
+    ebpf_write_global_dimension(hash_table_core[NETDATA_EBPF_THREAD_PER_CORE],
+                                hash_table_core[NETDATA_EBPF_THREAD_PER_CORE],
+                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+
+    ebpf_write_global_dimension(hash_table_core[NETDATA_EBPF_THREAD_UNIQUE],
+                                hash_table_core[NETDATA_EBPF_THREAD_UNIQUE],
+                                ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+}
+
+
+/**
+ * Create Statistics Charts
+ *
+ * Create charts that will show statistics related to eBPF plugin.
+ *
+ * @param update_every time used to update charts
+ */
+static void ebpf_create_statistic_charts(int update_every)
+{
+    static char create_charts = 1;
+    update_internal_metric_variable();
+    if (!publish_internal_metrics)
+        return;
+
+    if (!create_charts)
+        return;
+
+    create_charts = 0;
+
+    ebpf_create_statistic_thread_chart(update_every);
+    EBPF_PLUGIN_FUNCTIONS(EBPF_FUNCTION_THREAD, EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
+
+    ebpf_create_lifetime_thread_chart(update_every);
+    EBPF_PLUGIN_FUNCTIONS(EBPF_FUNCTION_THREAD, EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
+
+    ebpf_create_statistic_load_chart(update_every);
+
+    ebpf_create_statistic_kernel_memory(update_every);
+
+    ebpf_create_statistic_hash_tables(update_every);
+
+    ebpf_create_statistic_hash_per_core(update_every);
 }
 
 /*****************************************************************
@@ -2637,11 +2944,11 @@ int main(int argc, char **argv)
 
         ebpf_module_t *em = &ebpf_modules[i];
         em->thread = st;
-        // We always initialize process, because it is responsible to take care of apps integration
-        if (em->enabled || !i) {
+        em->thread_id = i;
+        if (em->enabled) {
             st->thread = mallocz(sizeof(netdata_thread_t));
-            em->thread_id = i;
             em->enabled = NETDATA_THREAD_EBPF_RUNNING;
+            em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
             netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, em);
         } else {
             em->enabled = NETDATA_THREAD_EBPF_NOT_RUNNING;
@@ -2655,23 +2962,30 @@ int main(int argc, char **argv)
     int update_apps_list = update_apps_every - 1;
     int process_maps_per_core = ebpf_modules[EBPF_MODULE_PROCESS_IDX].maps_per_core;
     //Plugin will be killed when it receives a signal
-    while (!ebpf_exit_plugin) {
+    for ( ; !ebpf_exit_plugin ; global_iterations_counter++) {
         (void)heartbeat_next(&hb, step);
 
-        pthread_mutex_lock(&ebpf_exit_cleanup);
-        if (process_pid_fd != -1) {
-            pthread_mutex_lock(&collect_data_mutex);
-            if (++update_apps_list == update_apps_every) {
-                update_apps_list = 0;
-                cleanup_exited_pids();
-                collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
+        if (global_iterations_counter % EBPF_DEFAULT_UPDATE_EVERY == 0) {
+            pthread_mutex_lock(&lock);
+            ebpf_create_statistic_charts(EBPF_DEFAULT_UPDATE_EVERY);
 
-                pthread_mutex_lock(&lock);
-                ebpf_create_apps_charts(apps_groups_root_target);
-                pthread_mutex_unlock(&lock);
-            }
-            pthread_mutex_unlock(&collect_data_mutex);
+            ebpf_send_statistic_data();
+            pthread_mutex_unlock(&lock);
+            fflush(stdout);
         }
+
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        pthread_mutex_lock(&collect_data_mutex);
+        if (++update_apps_list == update_apps_every) {
+            update_apps_list = 0;
+            cleanup_exited_pids();
+            collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
+
+            pthread_mutex_lock(&lock);
+            ebpf_create_apps_charts(apps_groups_root_target);
+            pthread_mutex_unlock(&lock);
+        }
+        pthread_mutex_unlock(&collect_data_mutex);
         pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 
@@ -2679,4 +2993,3 @@ int main(int argc, char **argv)
 
     return 0;
 }
-

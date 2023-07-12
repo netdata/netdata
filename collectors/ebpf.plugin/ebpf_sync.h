@@ -7,8 +7,9 @@
 #include "includes/sync.skel.h"
 #endif
 
-// Module name
+// Module name & description
 #define NETDATA_EBPF_MODULE_NAME_SYNC "sync"
+#define NETDATA_EBPF_SYNC_MODULE_DESC "Monitor calls to syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2)."
 
 // charts
 #define NETDATA_EBPF_SYNC_CHART "sync"

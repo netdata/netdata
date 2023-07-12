@@ -3,8 +3,9 @@
 #ifndef NETDATA_EBPF_SHM_H
 #define NETDATA_EBPF_SHM_H 1
 
-// Module name
+// Module name & description
 #define NETDATA_EBPF_MODULE_NAME_SHM "shm"
+#define NETDATA_EBPF_SHM_MODULE_DESC "Show calls to syscalls shmget(2), shmat(2), shmdt(2) and shmctl(2). This thread is integrated with apps and cgroup."
 
 // charts
 #define NETDATA_SHM_GLOBAL_CHART "shared_memory_calls"

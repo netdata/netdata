@@ -118,6 +118,7 @@ enum ebpf_main_index {
     EBPF_MODULE_OOMKILL_IDX,
     EBPF_MODULE_SHM_IDX,
     EBPF_MODULE_MDFLUSH_IDX,
+    EBPF_MODULE_FUNCTION_IDX,
     /* THREADS MUST BE INCLUDED BEFORE THIS COMMENT */
     EBPF_OPTION_ALL_CHARTS,
     EBPF_OPTION_VERSION,
@@ -163,6 +164,7 @@ typedef struct ebpf_tracepoint {
 
 // Statistics charts
 #define NETDATA_EBPF_THREADS "ebpf_threads"
+#define NETDATA_EBPF_LIFE_TIME "ebpf_life_time"
 #define NETDATA_EBPF_LOAD_METHOD "ebpf_load_methods"
 #define NETDATA_EBPF_KERNEL_MEMORY "ebpf_kernel_memory"
 #define NETDATA_EBPF_HASH_TABLES_LOADED "ebpf_hash_tables_count"

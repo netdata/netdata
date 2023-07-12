@@ -21,6 +21,7 @@
 #include "ebpf_disk.h"
 #include "ebpf_fd.h"
 #include "ebpf_filesystem.h"
+#include "ebpf_functions.h"
 #include "ebpf_hardirq.h"
 #include "ebpf_cachestat.h"
 #include "ebpf_mdflush.h"

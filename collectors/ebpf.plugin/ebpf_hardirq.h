@@ -3,6 +3,9 @@
 #ifndef NETDATA_EBPF_HARDIRQ_H
 #define NETDATA_EBPF_HARDIRQ_H 1
 
+// Module description
+#define NETDATA_EBPF_HARDIRQ_MODULE_DESC "Show time spent servicing individual hardware interrupt requests (hard IRQs)."
+
 #include <stdint.h>
 #include "libnetdata/avl/avl.h"
 

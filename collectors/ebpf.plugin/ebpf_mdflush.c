@@ -130,6 +130,26 @@ static inline int ebpf_mdflush_load_and_attach(struct mdflush_bpf *obj, ebpf_mod
 #endif
 
 /**
+ * Obsolete global
+ *
+ * Obsolete global charts created by thread.
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
+static void ebpf_obsolete_mdflush_global(ebpf_module_t *em)
+{
+    ebpf_write_chart_obsolete("mdstat",
+                              "mdstat_flush",
+                              "MD flushes",
+                              "flushes",
+                              "flush (eBPF)",
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                              NULL,
+                              NETDATA_CHART_PRIO_MDSTAT_FLUSH,
+                              em->update_every);
+}
+
+/**
  * MDflush exit
  *
  * Cancel thread and exit.
@@ -140,11 +160,26 @@ static void mdflush_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    if (em->objects)
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        pthread_mutex_lock(&lock);
+
+        ebpf_obsolete_mdflush_global(em);
+
+        pthread_mutex_unlock(&lock);
+        fflush(stdout);
+    }
+
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
+
+    if (em->objects) {
         ebpf_unload_legacy_code(em->objects, em->probe_links);
+        em->objects = NULL;
+        em->probe_links = NULL;
+    }
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_update_stats(&plugin_statistics, em);
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -300,7 +335,7 @@ static void mdflush_collector(ebpf_module_t *em)
     pthread_mutex_lock(&lock);
     mdflush_create_charts(update_every);
     ebpf_update_stats(&plugin_statistics, em);
-    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
     pthread_mutex_unlock(&lock);
 
     // loop and read from published data until ebpf plugin is closed.
@@ -308,7 +343,9 @@ static void mdflush_collector(ebpf_module_t *em)
     heartbeat_init(&hb);
     int counter = update_every - 1;
     int maps_per_core = em->maps_per_core;
-    while (!ebpf_exit_plugin) {
+    uint32_t running_time = 0;
+    uint32_t lifetime = em->lifetime;
+    while (!ebpf_exit_plugin && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
 
         if (ebpf_exit_plugin || ++counter != update_every)
@@ -323,6 +360,15 @@ static void mdflush_collector(ebpf_module_t *em)
         write_end_chart();
 
         pthread_mutex_unlock(&lock);
+
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (running_time && !em->running_time)
+            running_time = update_every;
+        else
+            running_time += update_every;
+
+        em->running_time = running_time;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 

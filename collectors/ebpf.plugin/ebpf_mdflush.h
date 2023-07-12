@@ -3,8 +3,9 @@
 #ifndef NETDATA_EBPF_MDFLUSH_H
 #define NETDATA_EBPF_MDFLUSH_H 1
 
-// Module name
+// Module name & description
 #define NETDATA_EBPF_MODULE_NAME_MDFLUSH "mdflush"
+#define NETDATA_EBPF_MD_MODULE_DESC "Show information about multi-device software flushes."
 
 // charts
 #define NETDATA_MDFLUSH_GLOBAL_CHART "mdflush"

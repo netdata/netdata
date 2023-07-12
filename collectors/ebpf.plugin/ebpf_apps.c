@@ -1338,8 +1338,10 @@ void cleanup_exited_pids()
             p = p->next;
 
             // Clean process structure
-            ebpf_process_stat_release(global_process_stats[r]);
-            global_process_stats[r] = NULL;
+            if (global_process_stats) {
+                ebpf_process_stat_release(global_process_stats[r]);
+                global_process_stats[r] = NULL;
+            }
 
             cleanup_variables_from_other_threads(r);
 
@@ -1471,36 +1473,40 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
     uint32_t key;
     pids = ebpf_root_of_pids; // global list of all processes running
     // while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
-    size_t length =  sizeof(ebpf_process_stat_t);
-    if (maps_per_core)
-        length *= ebpf_nprocs;
 
-    while (pids) {
-        key = pids->pid;
-        ebpf_process_stat_t *w = global_process_stats[key];
-        if (!w) {
-            w = ebpf_process_stat_get();
-            global_process_stats[key] = w;
-        }
+    if (tbl_pid_stats_fd != -1) {
+        size_t length =  sizeof(ebpf_process_stat_t);
+        if (maps_per_core)
+            length *= ebpf_nprocs;
 
-        if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, process_stat_vector)) {
-            // Clean Process structures
-            ebpf_process_stat_release(w);
-            global_process_stats[key] = NULL;
+        while (pids) {
+            key = pids->pid;
 
-            cleanup_variables_from_other_threads(key);
+            ebpf_process_stat_t *w = global_process_stats[key];
+            if (!w) {
+                w = ebpf_process_stat_get();
+                global_process_stats[key] = w;
+            }
+
+            if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, process_stat_vector)) {
+                // Clean Process structures
+                ebpf_process_stat_release(w);
+                global_process_stats[key] = NULL;
+
+                cleanup_variables_from_other_threads(key);
+
+                pids = pids->next;
+                continue;
+            }
+
+            ebpf_process_apps_accumulator(process_stat_vector, maps_per_core);
+
+            memcpy(w, process_stat_vector, sizeof(ebpf_process_stat_t));
+
+            memset(process_stat_vector, 0, length);
 
             pids = pids->next;
-            continue;
         }
-
-        ebpf_process_apps_accumulator(process_stat_vector, maps_per_core);
-
-        memcpy(w, process_stat_vector, sizeof(ebpf_process_stat_t));
-
-        memset(process_stat_vector, 0, length);
-
-        pids = pids->next;
     }
 
     link_all_processes_to_their_parents();

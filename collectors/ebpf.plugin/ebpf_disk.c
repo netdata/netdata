@@ -448,6 +448,7 @@ static void ebpf_cleanup_plot_disks()
 
         move = next;
     }
+    plot_disks = NULL;
 }
 
 /**
@@ -465,6 +466,36 @@ static void ebpf_cleanup_disk_list()
 
         move = next;
     }
+    disk_list = NULL;
+}
+
+/**
+ * Obsolete global
+ *
+ * Obsolete global charts created by thread.
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
+static void ebpf_obsolete_disk_global(ebpf_module_t *em)
+{
+    ebpf_publish_disk_t *move = plot_disks;
+    while (move) {
+        netdata_ebpf_disks_t *ned = move->plot;
+        uint32_t flags = ned->flags;
+        if (flags & NETDATA_DISK_CHART_CREATED) {
+            ebpf_write_chart_obsolete(ned->histogram.name,
+                                      ned->family,
+                                      "Disk latency",
+                                      EBPF_COMMON_DIMENSION_CALL,
+                                      ned->family,
+                                      NETDATA_EBPF_CHART_TYPE_STACKED,
+                                      NULL,
+                                      ned->histogram.order,
+                                      em->update_every);
+        }
+
+        move = move->next;
+    }
 }
 
 /**
@@ -478,15 +509,29 @@ static void ebpf_disk_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    if (em->objects)
-        ebpf_unload_legacy_code(em->objects, em->probe_links);
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        pthread_mutex_lock(&lock);
 
+        ebpf_obsolete_disk_global(em);
+
+        pthread_mutex_unlock(&lock);
+        fflush(stdout);
+    }
     ebpf_disk_disable_tracepoints();
+
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, disk_maps, EBPF_ACTION_STAT_REMOVE);
+
+    if (em->objects) {
+        ebpf_unload_legacy_code(em->objects, em->probe_links);
+        em->objects = NULL;
+        em->probe_links = NULL;
+    }
 
     if (dimensions)
         ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);
 
     freez(disk_hash_values);
+    disk_hash_values = NULL;
     pthread_mutex_destroy(&plot_mutex);
 
     ebpf_cleanup_plot_disks();
@@ -494,6 +539,7 @@ static void ebpf_disk_exit(void *ptr)
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_update_stats(&plugin_statistics, em);
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -640,6 +686,8 @@ static void ebpf_create_hd_charts(netdata_ebpf_disks_t *w, int update_every)
     order++;
 
     w->flags |= NETDATA_DISK_CHART_CREATED;
+
+    fflush(stdout);
 }
 
 /**
@@ -728,7 +776,9 @@ static void disk_collector(ebpf_module_t *em)
     heartbeat_init(&hb);
     int counter = update_every - 1;
     int maps_per_core = em->maps_per_core;
-    while (!ebpf_exit_plugin) {
+    uint32_t running_time = 0;
+    uint32_t lifetime = em->lifetime;
+    while (!ebpf_exit_plugin && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
 
         if (ebpf_exit_plugin || ++counter != update_every)
@@ -743,6 +793,15 @@ static void disk_collector(ebpf_module_t *em)
         pthread_mutex_unlock(&lock);
 
         ebpf_update_disks(em);
+
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (running_time && !em->running_time)
+            running_time = update_every;
+        else
+            running_time += update_every;
+
+        em->running_time = running_time;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 
@@ -866,7 +925,7 @@ void *ebpf_disk_thread(void *ptr)
 
     pthread_mutex_lock(&lock);
     ebpf_update_stats(&plugin_statistics, em);
-    ebpf_update_kernel_memory_with_vector(&plugin_statistics, disk_maps);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, disk_maps, EBPF_ACTION_STAT_ADD);
     pthread_mutex_unlock(&lock);
 
     disk_collector(em);

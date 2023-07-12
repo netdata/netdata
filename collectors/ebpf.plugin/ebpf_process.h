@@ -3,8 +3,9 @@
 #ifndef NETDATA_EBPF_PROCESS_H
 #define NETDATA_EBPF_PROCESS_H 1
 
-// Module name
+// Module name & description
 #define NETDATA_EBPF_MODULE_NAME_PROCESS "process"
+#define NETDATA_EBPF_MODULE_PROCESS_DESC "Monitor information about process life. This thread is integrated with apps and cgroup."
 
 // Groups used on Dashboard
 #define NETDATA_PROCESS_GROUP "processes"
@@ -41,12 +42,13 @@
 
 #define NETDATA_EBPF_CGROUP_UPDATE 30
 
-// Statistical information
-enum netdata_ebpf_thread_stats{
-    NETDATA_EBPF_THREAD_STAT_TOTAL,
-    NETDATA_EBPF_THREAD_STAT_RUNNING,
-
-    NETDATA_EBPF_THREAD_STAT_END
+enum netdata_ebpf_stats_order {
+    NETDATA_EBPF_ORDER_STAT_THREADS = 140000,
+    NETDATA_EBPF_ORDER_STAT_LIFE_TIME,
+    NETDATA_EBPF_ORDER_STAT_LOAD_METHOD,
+    NETDATA_EBPF_ORDER_STAT_KERNEL_MEMORY,
+    NETDATA_EBPF_ORDER_STAT_HASH_TABLES,
+    NETDATA_EBPF_ORDER_STAT_HASH_CORE
 };
 
 enum netdata_ebpf_load_mode_stats{
