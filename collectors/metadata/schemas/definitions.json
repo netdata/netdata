@@ -1,5 +1,36 @@
 {
   "definitions": {
+    "monitored_instance": {
+      "type": "object",
+      "description": "Information about the monitored instance (metrics source).",
+      "properties": {
+        "name": {
+          "description": "Metrics source name (e.g. VerneMQ, Network interfaces, Files and directories). Use official spelling for applications.",
+          "type": "string"
+        },
+        "link": {
+          "description": "Link to the monitored instance official website if any.",
+          "type": "string"
+        },
+        "categories": {
+          "type": "array",
+          "description": "Categories this integration falls into.",
+          "items": {
+            "$ref": "#/definitions/category"
+          }
+        },
+        "icon_path": {
+          "type": "string",
+          "description": "Path to the integration's icon."
+        }
+      },
+      "required": [
+        "name",
+        "link",
+        "categories",
+        "icon_path"
+      ]
+    },
     "category": {
       "type": "object",
       "description": "Category and subcategory of the collector/monitored instance.",
