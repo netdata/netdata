@@ -52,6 +52,7 @@
           "oneOf": [
             {
               "enum": [
+                "most-popular",
                 "databases",
                 "web-servers",
                 "message-brokers",
