@@ -32,6 +32,8 @@ static inline void bash64_hash_keys_and_values(const char *src, char *out) {
 // ----------------------------------------------------------------------------
 
 typedef struct facet_value {
+    const char *name;
+
     bool selected;
 
     uint32_t rows_matching_facet_value;
@@ -39,6 +41,8 @@ typedef struct facet_value {
 } FACET_VALUE;
 
 typedef struct facet_key {
+    const char *name;
+
     DICTIONARY *values;
 
     // members about the current row
@@ -122,25 +126,34 @@ static void facet_value_insert_callback(const DICTIONARY_ITEM *item, void *value
     FACET_VALUE *v = value;
     FACET_KEY *k = data;
 
-    if(!k->selected_values_pattern || simple_pattern_matches(k->selected_values_pattern, dictionary_acquired_item_name(item)))
-        v->selected = true;
+    if(v->name) {
+        // an actual value, not a filter
+        v->name = strdupz(v->name);
+        facet_value_is_used(k, v);
+    }
     else
-        v->selected = false;
-
-    facet_value_is_used(k, v);
+        // filter inserted
+        v->selected = true;
 }
 
-static bool facet_value_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value __maybe_unused, void *data) {
+static bool facet_value_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data) {
     FACET_VALUE *v = old_value;
+    FACET_VALUE *nv = new_value;
     FACET_KEY *k = data;
 
-    facet_value_is_used(k, v);
+    if(!v->name && nv->name)
+        // an actual value, not a filter
+        v->name = strdupz(nv->name);
+
+    if(v->name)
+        facet_value_is_used(k, v);
+
     return false;
 }
 
 static void facet_value_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     FACET_VALUE *v = value;
-    (void)v;
+    freez(v->name);
 }
 
 // ----------------------------------------------------------------------------
@@ -149,6 +162,10 @@ static void facet_value_delete_callback(const DICTIONARY_ITEM *item __maybe_unus
 static void facet_key_insert_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
     FACET_KEY *k = value;
     FACETS *facets = data;
+
+    if(k->name)
+        // an actual value, not a filter
+        k->name = strdupz(k->name);
 
     k->current_value = buffer_create(0, NULL);
 
@@ -163,6 +180,13 @@ static void facet_key_insert_callback(const DICTIONARY_ITEM *item, void *value, 
 }
 
 static bool facet_key_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value __maybe_unused, void *new_value __maybe_unused, void *data __maybe_unused) {
+    FACET_KEY *k = old_value;
+    FACET_KEY *nk = new_value;
+
+    if(!k->name && nk->name)
+        // an actual value, not a filter
+        k->name = strdupz(nk->name);
+
     return false;
 }
 
@@ -170,6 +194,7 @@ static void facet_key_delete_callback(const DICTIONARY_ITEM *item __maybe_unused
     FACET_KEY *k = value;
     dictionary_destroy(k->values);
     buffer_free(k->current_value);
+    freez(k->name);
 }
 
 // ----------------------------------------------------------------------------
@@ -205,8 +230,14 @@ static inline void facets_check_value(FACETS *facets __maybe_unused, FACET_KEY *
     if(buffer_strlen(k->current_value) == 0)
         buffer_strcat(k->current_value, FACET_VALUE_UNSET);
 
-    if(k->values)
-        dictionary_set(k->values, buffer_tostring(k->current_value), NULL, sizeof(FACET_VALUE));
+    if(k->values) {
+        FACET_VALUE t = {
+            .name = buffer_tostring(k->current_value),
+        };
+        char hash[BASE64_STRING_HASH_SIZE];
+        bash64_hash_keys_and_values(t.name, hash);
+        dictionary_set(k->values, hash, &t, sizeof(t));
+    }
     else {
         k->key_found_in_row++;
         k->key_values_selected_in_row++;
@@ -214,7 +245,12 @@ static inline void facets_check_value(FACETS *facets __maybe_unused, FACET_KEY *
 }
 
 void facets_add_key_value(FACETS *facets, const char *key, const char *value) {
-    FACET_KEY *k = dictionary_set(facets->keys, key, NULL, sizeof(FACET_KEY));
+    FACET_KEY t = {
+            .name = key,
+    };
+    char hash[BASE64_STRING_HASH_SIZE];
+    bash64_hash_keys_and_values(t.name, hash);
+    FACET_KEY *k = dictionary_set(facets->keys, hash, &t, sizeof(t));
     buffer_flush(k->current_value);
     buffer_strcat(k->current_value, value);
 
@@ -222,7 +258,12 @@ void facets_add_key_value(FACETS *facets, const char *key, const char *value) {
 }
 
 void facets_add_key_value_length(FACETS *facets, const char *key, const char *value, size_t value_len) {
-    FACET_KEY *k = dictionary_set(facets->keys, key, NULL, sizeof(FACET_KEY));
+    FACET_KEY t = {
+            .name = key,
+    };
+    char hash[BASE64_STRING_HASH_SIZE];
+    bash64_hash_keys_and_values(t.name, hash);
+    FACET_KEY *k = dictionary_set(facets->keys, hash, &t, sizeof(t));
     buffer_flush(k->current_value);
     buffer_strncat(k->current_value, value, value_len);
 
@@ -287,7 +328,7 @@ static FACET_ROW *facets_row_create(FACETS *facets, usec_t usec, FACET_ROW *into
                 .tmp = buffer_strlen(k->current_value) ? buffer_tostring(k->current_value) : FACET_VALUE_UNSET,
                 .wb = NULL,
         };
-        dictionary_set(row->dict, k_dfe.name, &t, sizeof(t));
+        dictionary_set(row->dict, k->name, &t, sizeof(t));
     }
     dfe_done(k);
 
@@ -422,7 +463,9 @@ void facets_row_finished(FACETS *facets, usec_t usec) {
 
             if(counted_by == total_keys) {
                 if(k->values) {
-                    FACET_VALUE *v = dictionary_get(k->values, buffer_tostring(k->current_value));
+                    char hash[BASE64_STRING_HASH_SIZE];
+                    bash64_hash_keys_and_values(buffer_tostring(k->current_value), hash);
+                    FACET_VALUE *v = dictionary_get(k->values, hash);
                     v->final_facet_value_counter++;
                 }
 
