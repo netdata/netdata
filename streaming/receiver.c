@@ -363,7 +363,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
         }
     }
 
-    result = parser ? parser->user.data_collections_count : 0;
+    result = parser->user.data_collections_count;
 
     // free parser with the pop function
     netdata_thread_cleanup_pop(1);
