@@ -6,7 +6,7 @@ bool netdata_is_protected_by_bearer = false; // this is controlled by cloud, at 
 DICTIONARY *netdata_authorized_bearers = NULL;
 
 static bool web_client_check_acl_and_bearer(struct web_client *w, WEB_CLIENT_ACL endpoint_acl) {
-    if(endpoint_acl == WEB_CLIENT_ACL_NOCHECK)
+    if(endpoint_acl == WEB_CLIENT_ACL_NONE || (endpoint_acl & WEB_CLIENT_ACL_NOCHECK))
         // the endpoint is totally public
         return true;
 

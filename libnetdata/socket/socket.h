@@ -11,27 +11,27 @@
 
 typedef enum web_client_acl {
     WEB_CLIENT_ACL_NONE         = (0),
-    WEB_CLIENT_ACL_NOCHECK      = (0),          // Don't check anything - this should work on all channels
-    WEB_CLIENT_ACL_DASHBOARD    = (1 << 0),
-    WEB_CLIENT_ACL_REGISTRY     = (1 << 1),
-    WEB_CLIENT_ACL_BADGE        = (1 << 2),
-    WEB_CLIENT_ACL_MGMT         = (1 << 3),
-    WEB_CLIENT_ACL_STREAMING    = (1 << 4),
-    WEB_CLIENT_ACL_NETDATACONF  = (1 << 5),
-    WEB_CLIENT_ACL_SSL_OPTIONAL = (1 << 6),
-    WEB_CLIENT_ACL_SSL_FORCE    = (1 << 7),
-    WEB_CLIENT_ACL_SSL_DEFAULT  = (1 << 8),
-    WEB_CLIENT_ACL_ACLK         = (1 << 9),
-    WEB_CLIENT_ACL_WEBRTC       = (1 << 10),
-    WEB_CLIENT_ACL_BEARER_OPTIONAL = (1 << 11), // allow unprotected access if bearer is not enabled in netdata
-    WEB_CLIENT_ACL_BEARER_REQUIRED = (1 << 12), // allow access only if a valid bearer is used
+    WEB_CLIENT_ACL_NOCHECK      = (1 << 0),          // Don't check anything - this should work on all channels
+    WEB_CLIENT_ACL_DASHBOARD    = (1 << 1),
+    WEB_CLIENT_ACL_REGISTRY     = (1 << 2),
+    WEB_CLIENT_ACL_BADGE        = (1 << 3),
+    WEB_CLIENT_ACL_MGMT         = (1 << 4),
+    WEB_CLIENT_ACL_STREAMING    = (1 << 5),
+    WEB_CLIENT_ACL_NETDATACONF  = (1 << 6),
+    WEB_CLIENT_ACL_SSL_OPTIONAL = (1 << 7),
+    WEB_CLIENT_ACL_SSL_FORCE    = (1 << 8),
+    WEB_CLIENT_ACL_SSL_DEFAULT  = (1 << 9),
+    WEB_CLIENT_ACL_ACLK         = (1 << 10),
+    WEB_CLIENT_ACL_WEBRTC       = (1 << 11),
+    WEB_CLIENT_ACL_BEARER_OPTIONAL = (1 << 12), // allow unprotected access if bearer is not enabled in netdata
+    WEB_CLIENT_ACL_BEARER_REQUIRED = (1 << 13), // allow access only if a valid bearer is used
 } WEB_CLIENT_ACL;
 
 #define WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC (WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK | WEB_CLIENT_ACL_WEBRTC | WEB_CLIENT_ACL_BEARER_OPTIONAL)
 #define WEB_CLIENT_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER (WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK | WEB_CLIENT_ACL_WEBRTC | WEB_CLIENT_ACL_BEARER_REQUIRED)
 
 #ifdef NETDATA_DEV_MODE
-#define ACL_DEV_OPEN_ACCESS WEB_CLIENT_ACL_DASHBOARD
+#define ACL_DEV_OPEN_ACCESS WEB_CLIENT_ACL_NOCHECK
 #else
 #define ACL_DEV_OPEN_ACCESS 0
 #endif
