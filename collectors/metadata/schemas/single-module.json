@@ -13,7 +13,7 @@
     },
     "categories": {
       "type": "array",
-      "description": "An array defining the category the integration falls on.",
+      "description": "An array defining the categories the integration falls into.",
       "items": {
         "$ref": "#/$defs/_categories"
       }
@@ -35,7 +35,7 @@
           },
           "categories": {
             "type": "array",
-            "description": "An array defining the category the integration falls on.",
+            "description": "An array defining the categories the integration falls into.",
             "items": {
               "$ref": "#/$defs/_categories"
             }
