@@ -4,10 +4,19 @@ monitored_instance:
   name: ""
   link: ""
 alternative_monitored_instances:
-  - name: ""
-    link: ""
+  - monitored_instance:
+      name: ""
+      link: ""
+    categories:
+      - level0: data-collection
+        level1: containers-and-vms
+    icon_path: ""
 keywords:
   - ""
+categories:
+  - level0: data-collection
+    level1: databases
+icon_path: ""
 overview:
   data_collection:
     metrics_description: ""

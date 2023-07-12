@@ -11,13 +11,45 @@
       "type": "string",
       "description": "Module name (e.g. apache, /proc/stat, httpcheck). It usually has the same name as the module configuration file (external plugin) or the section name in netdata.conf (internal plugin)."
     },
+    "categories": {
+      "type": "array",
+      "description": "An array defining the categories the integration falls into.",
+      "items": {
+        "$ref": "./definitions.json#/definitions/category"
+      }
+    },
+    "icon_path": {
+      "type": "string",
+      "description": "path to the integration's icon"
+    },
     "monitored_instance": {
       "$ref": "#/$defs/_monitored_instance"
     },
     "alternative_monitored_instances": {
       "type": "array",
       "items": {
-        "$ref": "#/$defs/_monitored_instance"
+        "type": "object",
+        "properties": {
+          "monitored_instance": {
+            "$ref": "#/$defs/_monitored_instance"
+          },
+          "categories": {
+            "type": "array",
+            "description": "An array defining the categories the integration falls into.",
+            "items": {
+              "$ref": "./definitions.json#/definitions/category"
+            }
+          },
+          "icon_path": {
+            "type": "string",
+            "description": "path to the integration's icon"
+          }
+        },
+        "required": [
+          "monitored_instance",
+          "icon_path",
+          "categories"
+        ]
       }
     },
     "keywords": {
@@ -56,14 +88,16 @@
               "type": "array",
               "description": "Only supported OS/platforms. Platforms supported by Netdata will be ignored, only those listed are considered supported.",
               "items": {
-                "type": "string"
+                "type": "string",
+                "minLength": 2
               }
             },
             "exclude": {
               "type": "array",
               "description": "Unsupported OS/platforms. The result set is all platforms supported by Netdata except for those excluded.",
               "items": {
-                "type": "string"
+                "type": "string",
+                "minLength": 2
               }
             }
           },
@@ -408,6 +442,8 @@
   "required": [
     "plugin_name",
     "module_name",
+    "categories",
+    "icon_path",
     "monitored_instance",
     "alternative_monitored_instances",
     "keywords",
