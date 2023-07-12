@@ -11,7 +11,6 @@
 int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
 
-bool ieee754_doubles = false;
 time_t netdata_start_time = 0;
 struct netdata_static_thread *static_threads;
 
@@ -1896,7 +1895,7 @@ int main(int argc, char **argv) {
         // initialize the log files
         open_all_log_files();
 
-        ieee754_doubles = is_system_ieee754_double();
+        rrdb.ieee754_doubles = is_system_ieee754_double();
 
         aral_judy_init();
 

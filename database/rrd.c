@@ -129,4 +129,5 @@ struct rrdb rrdb = {
     .gap_when_lost_iterations_above = 1,
     .rrdset_free_obsolete_time_s = RRD_DEFAULT_HISTORY_ENTRIES,
     .libuv_worker_threads = MIN_LIBUV_WORKER_THREADS,
+    .ieee754_doubles = false,
 };

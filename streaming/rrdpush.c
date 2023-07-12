@@ -96,7 +96,7 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
             STREAM_CAP_BINARY |
             STREAM_CAP_INTERPOLATED |
             STREAM_HAS_COMPRESSION |
-            (ieee754_doubles ? STREAM_CAP_IEEE754 : 0) |
+            (rrdb.ieee754_doubles ? STREAM_CAP_IEEE754 : 0) |
             (ml_capability ? STREAM_CAP_DATA_WITH_ML : 0) |
             0;
 }

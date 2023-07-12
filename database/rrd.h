@@ -112,9 +112,6 @@ typedef enum __attribute__ ((__packed__)) {
 #define RESERVED_LIBUV_WORKER_THREADS 6
 #endif
 
-extern int libuv_worker_threads;
-extern bool ieee754_doubles;
-
 #define RRD_ID_LENGTH_MAX 1000
 
 typedef long long total_number;
@@ -1290,6 +1287,8 @@ struct rrdb {
     time_t rrdset_free_obsolete_time_s;
 
     int libuv_worker_threads;
+
+    bool ieee754_doubles;
 };
 
 extern struct rrdb rrdb;
