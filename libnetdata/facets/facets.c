@@ -478,6 +478,9 @@ void facets_report(FACETS *facets, BUFFER *wb) {
     }
     buffer_json_array_close(wb); // data
 
+    buffer_json_member_add_string(wb, "default_sort_column", "timestamp");
+
+
     buffer_json_member_add_object(wb, "items");
     {
         buffer_json_member_add_uint64(wb, "evaluated", facets->operations.evaluated);
