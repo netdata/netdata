@@ -4,13 +4,11 @@ typedef struct facet_value {
     bool selected;
 
     uint32_t rows_matching_facet_value;
+    uint32_t final_facet_value_counter;
 } FACET_VALUE;
 
 typedef struct facet_key {
     DICTIONARY *values;
-
-    // global statistics
-    uint32_t rows_matched;
 
     // members about the current row
     SIMPLE_PATTERN *selected_values_pattern;
@@ -36,23 +34,24 @@ struct facets {
     DICTIONARY *keys;
 
     usec_t anchor;
-    size_t having_rows;
     FACET_ROW *base;    // double linked list of the selected facets rows
 
     uint32_t items_to_return;
     uint32_t max_items_to_return;
-    uint32_t item_matched;
 
     struct {
         FACET_ROW *last_added;
+
+        size_t evaluated;
+        size_t matched;
 
         size_t first;
         size_t forwards;
         size_t backwards;
         size_t skips_before;
         size_t skips_after;
-        size_t prepend;
-        size_t append;
+        size_t prepends;
+        size_t appends;
         size_t shifts;
     } operations;
 };
@@ -114,15 +113,14 @@ static void facet_key_insert_callback(const DICTIONARY_ITEM *item, void *value, 
 
     k->current_value = buffer_create(0, NULL);
 
-    if(!facets_key_is_filterable(facets, dictionary_acquired_item_name(item))) {
-        k->values = NULL;
-        return;
+    if(facets_key_is_filterable(facets, dictionary_acquired_item_name(item))) {
+        k->values = dictionary_create_advanced(
+                DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                NULL, sizeof(FACET_VALUE));
+        dictionary_register_insert_callback(k->values, facet_value_insert_callback, k);
+        dictionary_register_conflict_callback(k->values, facet_value_conflict_callback, k);
+        dictionary_register_delete_callback(k->values, facet_value_delete_callback, k);
     }
-
-    k->values = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(FACET_VALUE));
-    dictionary_register_insert_callback(k->values, facet_value_insert_callback, k);
-    dictionary_register_conflict_callback(k->values, facet_value_conflict_callback, k);
-    dictionary_register_delete_callback(k->values, facet_value_delete_callback, k);
 }
 
 static bool facet_key_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value __maybe_unused, void *new_value __maybe_unused, void *data __maybe_unused) {
@@ -148,7 +146,7 @@ FACETS *facets_create(uint32_t items_to_return, usec_t anchor, const char *filte
     if(non_filtered_keys && *non_filtered_keys)
         facets->excluded_keys = simple_pattern_create(non_filtered_keys, "|", SIMPLE_PATTERN_EXACT, true);
 
-    facets->items_to_return = items_to_return;
+    facets->max_items_to_return = items_to_return;
     facets->anchor = anchor;
 
     return facets;
@@ -166,6 +164,10 @@ static inline void facets_check_value(FACETS *facets __maybe_unused, FACET_KEY *
 
     if(k->values)
         dictionary_set(k->values, buffer_tostring(k->current_value), NULL, sizeof(FACET_VALUE));
+    else {
+        k->key_found_in_row++;
+        k->key_values_selected_in_row++;
+    }
 }
 
 void facets_add_key_value(FACETS *facets, const char *key, const char *value) {
@@ -242,8 +244,11 @@ static FACET_ROW *facets_row_create(FACETS *facets, usec_t usec, FACET_ROW *into
 
     FACET_KEY *k;
     dfe_start_read(facets->keys, k) {
+//        if(!buffer_strlen(k->current_value))
+//            continue;
+
         FACET_ROW_KEY_VALUE t = {
-                .tmp = buffer_tostring(k->current_value),
+                .tmp = buffer_strlen(k->current_value) ? buffer_tostring(k->current_value) : "[UNSET]",
                 .wb = NULL,
         };
         dictionary_set(row->dict, k_dfe.name, &t, sizeof(t));
@@ -254,7 +259,7 @@ static FACET_ROW *facets_row_create(FACETS *facets, usec_t usec, FACET_ROW *into
 }
 
 static void facets_row_keep(FACETS *facets, usec_t usec) {
-    facets->item_matched++;
+    facets->operations.matched++;
 
     if(usec < facets->anchor) {
         facets->operations.skips_before++;
@@ -268,6 +273,9 @@ static void facets_row_keep(FACETS *facets, usec_t usec) {
         facets->operations.first++;
         return;
     }
+
+    if(likely(usec > facets->base->prev->usec))
+        facets->operations.last_added = facets->base->prev;
 
     FACET_ROW *last = facets->operations.last_added;
     while(last->prev != facets->base->prev && usec > last->prev->usec) {
@@ -298,12 +306,12 @@ static void facets_row_keep(FACETS *facets, usec_t usec) {
             facets->operations.last_added = facets_row_create(facets, usec, facets->operations.last_added);
         }
         DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(facets->base, facets->operations.last_added, prev, next);
-        facets->operations.prepend++;
+        facets->operations.prepends++;
     }
     else {
         facets->operations.last_added = facets_row_create(facets, usec, NULL);
         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(facets->base, facets->operations.last_added, prev, next);
-        facets->operations.append++;
+        facets->operations.appends++;
     }
 
     while(facets->items_to_return > facets->max_items_to_return) {
@@ -314,7 +322,7 @@ static void facets_row_keep(FACETS *facets, usec_t usec) {
         facets->items_to_return--;
 
         if(unlikely(facets->operations.last_added == tmp))
-            facets->operations.last_added = facets->base;
+            facets->operations.last_added = facets->base->prev;
 
         facets_row_free(facets, tmp);
         facets->operations.shifts++;
@@ -322,6 +330,8 @@ static void facets_row_keep(FACETS *facets, usec_t usec) {
 }
 
 void facets_row_finished(FACETS *facets, usec_t usec) {
+    facets->operations.evaluated++;
+
     uint32_t total_keys = 0;
     uint32_t selected_by = 0;
 
@@ -363,7 +373,11 @@ void facets_row_finished(FACETS *facets, usec_t usec) {
             }
 
             if(counted_by == total_keys) {
-                k->rows_matched++;
+                if(k->values) {
+                    FACET_VALUE *v = dictionary_get(k->values, buffer_tostring(k->current_value));
+                    v->final_facet_value_counter++;
+                }
+
                 found++;
             }
         }
@@ -379,3 +393,78 @@ void facets_row_finished(FACETS *facets, usec_t usec) {
     facets_rows_begin(facets);
 }
 
+void facets_report(FACETS *facets, BUFFER *wb) {
+    buffer_json_member_add_array(wb, "facets");
+    {
+        FACET_KEY *k;
+        dfe_start_read(facets->keys, k) {
+            if(!k->values)
+                continue;
+
+            buffer_json_add_array_item_object(wb); // key
+            {
+                buffer_json_member_add_string(wb, "id", k_dfe.name);
+                buffer_json_member_add_uint64(wb, "order", k_dfe.counter);
+                buffer_json_member_add_array(wb, "options");
+                {
+                    FACET_VALUE *v;
+                    dfe_start_read(k->values, v) {
+                        buffer_json_add_array_item_object(wb);
+                        {
+                            buffer_json_member_add_string(wb, "id", v_dfe.name);
+                            buffer_json_member_add_uint64(wb, "count", v->final_facet_value_counter);
+                        }
+                        buffer_json_object_close(wb);
+                    }
+                    dfe_done(v);
+                }
+                buffer_json_array_close(wb); // options
+            }
+            buffer_json_object_close(wb); // key
+        }
+        dfe_done(k);
+    }
+    buffer_json_array_close(wb); // facets
+
+    buffer_json_member_add_array(wb, "rows");
+    {
+        for(FACET_ROW *row = facets->base ; row ;row = row->next) {
+            buffer_json_add_array_item_object(wb); // row
+            {
+                buffer_json_member_add_uint64(wb, "anchor", row->usec);
+                FACET_ROW_KEY_VALUE *rkv;
+                dfe_start_read(row->dict, rkv) {
+                    buffer_json_member_add_string(wb, rkv_dfe.name, buffer_tostring(rkv->wb));
+                }
+                dfe_done(rkv);
+            }
+            buffer_json_object_close(wb); // row
+        }
+    }
+    buffer_json_array_close(wb); // rows
+
+    buffer_json_member_add_object(wb, "items");
+    {
+        buffer_json_member_add_uint64(wb, "evaluated", facets->operations.evaluated);
+        buffer_json_member_add_uint64(wb, "matched", facets->operations.matched);
+        buffer_json_member_add_uint64(wb, "returned", facets->items_to_return);
+        buffer_json_member_add_uint64(wb, "max_to_return", facets->max_items_to_return);
+        buffer_json_member_add_uint64(wb, "before", facets->operations.skips_before);
+        buffer_json_member_add_uint64(wb, "after", facets->operations.skips_after + facets->operations.shifts);
+    }
+    buffer_json_object_close(wb); // items
+
+    buffer_json_member_add_object(wb, "stats");
+    {
+        buffer_json_member_add_uint64(wb, "first", facets->operations.first);
+        buffer_json_member_add_uint64(wb, "forwards", facets->operations.forwards);
+        buffer_json_member_add_uint64(wb, "backwards", facets->operations.backwards);
+        buffer_json_member_add_uint64(wb, "skips_before", facets->operations.skips_before);
+        buffer_json_member_add_uint64(wb, "skips_after", facets->operations.skips_after);
+        buffer_json_member_add_uint64(wb, "prepends", facets->operations.prepends);
+        buffer_json_member_add_uint64(wb, "appends", facets->operations.appends);
+        buffer_json_member_add_uint64(wb, "shifts", facets->operations.shifts);
+    }
+    buffer_json_object_close(wb); // items
+
+}
