@@ -391,7 +391,7 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
 
         host->rrdpush_receiver_connection_counter++;
-        __atomic_add_fetch(&localhost->connected_children_count, 1, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&rrdb.localhost->connected_children_count, 1, __ATOMIC_RELAXED);
 
         host->receiver = rpt;
         rpt->host = host;
@@ -445,7 +445,7 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
 
         // Make sure that we detach this thread and don't kill a freshly arriving receiver
         if(host->receiver == rpt) {
-            __atomic_sub_fetch(&localhost->connected_children_count, 1, __ATOMIC_RELAXED);
+            __atomic_sub_fetch(&rrdb.localhost->connected_children_count, 1, __ATOMIC_RELAXED);
             rrdhost_flag_set(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
 
             host->trigger_chart_obsoletion_check = 0;

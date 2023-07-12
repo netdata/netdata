@@ -504,7 +504,7 @@ void aclk_send_alarm_configuration(char *config_hash)
     if (unlikely(!config_hash))
         return;
 
-    struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *) localhost->aclk_sync_host_config;
+    struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *) rrdb.localhost->aclk_sync_host_config;
 
     if (unlikely(!wc))
         return;

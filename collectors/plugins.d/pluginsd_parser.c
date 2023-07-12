@@ -431,7 +431,7 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
     char *guid = get_word(words, num_words, 1);
 
     if(!guid || !*guid || strcmp(guid, "localhost") == 0) {
-        parser->user.host = localhost;
+        parser->user.host = rrdb.localhost;
         return PARSER_RC_OK;
     }
 

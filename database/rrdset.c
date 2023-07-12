@@ -898,7 +898,7 @@ RRDSET *rrdset_create_custom(
         , STORAGE_ENGINE_ID storage_engine_id
         , long history_entries
 ) {
-    if (host != localhost)
+    if (host != rrdb.localhost)
         host->child_last_chart_command = now_realtime_sec();
 
     if(!type || !type[0])

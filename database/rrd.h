@@ -948,7 +948,41 @@ struct rrdhost {
     struct rrdhost *next;
     struct rrdhost *prev;
 };
-extern RRDHOST *localhost;
+
+// ----------------------------------------------------------------------------
+// RRDB 
+
+struct rrdb {
+    DICTIONARY *rrdhost_root_index;
+    DICTIONARY *rrdhost_root_index_hostname;
+
+    bool unittest_running;
+    bool dbengine_enabled;
+    size_t storage_tiers;
+    bool use_direct_io;
+
+    size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
+    RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS];
+
+    int default_rrd_update_every;
+    int default_rrd_history_entries;
+
+    int gap_when_lost_iterations_above;
+
+    time_t rrdset_free_obsolete_time_s;
+
+    int libuv_worker_threads;
+
+    bool ieee754_doubles;
+
+    time_t rrdhost_free_orphan_time_s;
+
+    netdata_rwlock_t rrd_rwlock;
+
+    RRDHOST *localhost;
+};
+
+extern struct rrdb rrdb;
 
 #define rrdhost_hostname(host) string2str((host)->hostname)
 #define rrdhost_registry_hostname(host) string2str((host)->registry_hostname)
@@ -972,7 +1006,7 @@ extern RRDHOST *localhost;
 #define rrdhost_sender_replicating_charts_minus_one(host) (__atomic_sub_fetch(&((host)->rrdpush_sender_replicating_charts), 1, __ATOMIC_RELAXED))
 #define rrdhost_sender_replicating_charts_zero(host) (__atomic_store_n(&((host)->rrdpush_sender_replicating_charts), 0, __ATOMIC_RELAXED))
 
-#define rrdhost_is_online(host) ((host) == localhost || rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST) || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED))
+#define rrdhost_is_online(host) ((host) == rrdb.localhost || rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST) || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED))
 bool rrdhost_matches_window(RRDHOST *host, time_t after, time_t before, time_t now);
 
 size_t rrdhost_hosts_available(void);
@@ -984,10 +1018,10 @@ void rrdhost_acquired_release(RRDHOST_ACQUIRED *rha);
 // ----------------------------------------------------------------------------
 
 #define rrdhost_foreach_read(var) \
-    for((var) = localhost; var ; (var) = (var)->next)
+    for((var) = rrdb.localhost; var ; (var) = (var)->next)
 
 #define rrdhost_foreach_write(var) \
-    for((var) = localhost; var ; (var) = (var)->next)
+    for((var) = rrdb.localhost; var ; (var) = (var)->next)
 
 
 // ----------------------------------------------------------------------------
@@ -1068,7 +1102,7 @@ RRDSET *rrdset_create_custom(RRDHOST *host
     rrdset_create_custom(host, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type, (host)->storage_engine_id, (host)->rrd_history_entries)
 
 #define rrdset_create_localhost(type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type) \
-    rrdset_create(localhost, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type)
+    rrdset_create(rrdb.localhost, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type)
 
 void rrdhost_free_all(void);
 void rrdhost_save_all(void);
@@ -1091,7 +1125,7 @@ RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id);
 RRDSET *rrdset_acquired_to_rrdset(RRDSET_ACQUIRED *rsa);
 void rrdset_acquired_release(RRDSET_ACQUIRED *rsa);
 
-#define rrdset_find_localhost(id) rrdset_find(localhost, id)
+#define rrdset_find_localhost(id) rrdset_find(rrdb.localhost, id)
 /* This will not return charts that are archived */
 static inline RRDSET *rrdset_find_active_localhost(const char *id)
 {
@@ -1102,7 +1136,7 @@ static inline RRDSET *rrdset_find_active_localhost(const char *id)
 }
 
 RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id);
-#define rrdset_find_bytype_localhost(type, id) rrdset_find_bytype(localhost, type, id)
+#define rrdset_find_bytype_localhost(type, id) rrdset_find_bytype(rrdb.localhost, type, id)
 /* This will not return charts that are archived */
 static inline RRDSET *rrdset_find_active_bytype_localhost(const char *type, const char *id)
 {
@@ -1113,7 +1147,7 @@ static inline RRDSET *rrdset_find_active_bytype_localhost(const char *type, cons
 }
 
 RRDSET *rrdset_find_byname(RRDHOST *host, const char *name);
-#define rrdset_find_byname_localhost(name)  rrdset_find_byname(localhost, name)
+#define rrdset_find_byname_localhost(name)  rrdset_find_byname(rrdb.localhost, name)
 /* This will not return charts that are archived */
 static inline RRDSET *rrdset_find_active_byname_localhost(const char *name)
 {
@@ -1260,39 +1294,6 @@ static inline void rrdhost_retention(RRDHOST *host, time_t now, bool online, tim
 #include "sqlite/sqlite_aclk_alert.h"
 #include "sqlite/sqlite_aclk_node.h"
 #include "sqlite/sqlite_health.h"
-
-// ----------------------------------------------------------------------------
-// RRDB 
-
-struct rrdb {
-    DICTIONARY *rrdhost_root_index;
-    DICTIONARY *rrdhost_root_index_hostname;
-
-    bool unittest_running;
-    bool dbengine_enabled;
-    size_t storage_tiers;
-    bool use_direct_io;
-
-    size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
-    RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS];
-
-    int default_rrd_update_every;
-    int default_rrd_history_entries;
-
-    int gap_when_lost_iterations_above;
-
-    time_t rrdset_free_obsolete_time_s;
-
-    int libuv_worker_threads;
-
-    bool ieee754_doubles;
-
-    time_t rrdhost_free_orphan_time_s;
-
-    netdata_rwlock_t rrd_rwlock;
-};
-
-extern struct rrdb rrdb;
 
 #ifdef __cplusplus
 }

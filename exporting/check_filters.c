@@ -25,7 +25,7 @@ int rrdhost_is_exportable(struct instance *instance, RRDHOST *host)
     RRDHOST_FLAGS *flags = &host->exporting_flags[instance->index];
 
     if (unlikely((*flags & (RRDHOST_FLAG_EXPORTING_SEND | RRDHOST_FLAG_EXPORTING_DONT_SEND)) == 0)) {
-        const char *host_name = (host == localhost) ? "localhost" : rrdhost_hostname(host);
+        const char *host_name = (host == rrdb.localhost) ? "localhost" : rrdhost_hostname(host);
 
         if (!instance->config.hosts_pattern || simple_pattern_matches(instance->config.hosts_pattern, host_name)) {
             *flags |= RRDHOST_FLAG_EXPORTING_SEND;

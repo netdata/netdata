@@ -1057,7 +1057,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         }
     }
 
-    if (strcmp(rpt->machine_guid, localhost->machine_guid) == 0) {
+    if (strcmp(rpt->machine_guid, rrdb.localhost->machine_guid) == 0) {
 
         rrdpush_receiver_takeover_web_connection(w, rpt);
 

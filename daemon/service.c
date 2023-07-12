@@ -196,7 +196,7 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
             svc_rrdhost_cleanup_obsolete_charts(host);
         }
 
-        if(host != localhost
+        if(host != rrdb.localhost
             && host->trigger_chart_obsoletion_check
             && (
                    (
@@ -297,7 +297,7 @@ void *service_main(void *ptr)
         heartbeat_next(&hb, step);
 
         svc_rrd_cleanup_obsolete_charts_from_all_hosts();
-        svc_rrdhost_cleanup_orphan_hosts(localhost);
+        svc_rrdhost_cleanup_orphan_hosts(rrdb.localhost);
     }
 
     netdata_thread_cleanup_pop(1);

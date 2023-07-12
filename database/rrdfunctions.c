@@ -816,7 +816,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
     wb->content_type = CT_APPLICATION_JSON;
     buffer_json_initialize(wb, "\"", "\"", 0, true, false);
 
-    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(localhost));
+    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(rrdb.localhost));
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", 1);

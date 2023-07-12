@@ -989,9 +989,9 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
     else
         buffer_json_member_add_object(wb, "agent");
 
-    buffer_json_member_add_string(wb, "mg", localhost->machine_guid);
-    buffer_json_member_add_uuid(wb, "nd", localhost->node_id);
-    buffer_json_member_add_string(wb, "nm", rrdhost_hostname(localhost));
+    buffer_json_member_add_string(wb, "mg", rrdb.localhost->machine_guid);
+    buffer_json_member_add_uuid(wb, "nd", rrdb.localhost->node_id);
+    buffer_json_member_add_string(wb, "nm", rrdhost_hostname(rrdb.localhost));
     buffer_json_member_add_time_t(wb, "now", now_s);
 
     if(array)
@@ -1006,12 +1006,12 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
 
         buffer_json_member_add_array(wb, "db_size");
         for (size_t tier = 0; tier < rrdb.storage_tiers; tier++) {
-            STORAGE_ENGINE_ID storage_engine_id = localhost->db[tier].id;
+            STORAGE_ENGINE_ID storage_engine_id = rrdb.localhost->db[tier].id;
 
-            size_t max = storage_engine_disk_space_max(storage_engine_id, localhost->db[tier].instance);
-            size_t used = storage_engine_disk_space_used(storage_engine_id, localhost->db[tier].instance);
-            time_t first_time_s = storage_engine_global_first_time_s(storage_engine_id, localhost->db[tier].instance);
-            size_t currently_collected_metrics = storage_engine_collected_metrics(storage_engine_id, localhost->db[tier].instance);
+            size_t max = storage_engine_disk_space_max(storage_engine_id, rrdb.localhost->db[tier].instance);
+            size_t used = storage_engine_disk_space_used(storage_engine_id, rrdb.localhost->db[tier].instance);
+            time_t first_time_s = storage_engine_global_first_time_s(storage_engine_id, rrdb.localhost->db[tier].instance);
+            size_t currently_collected_metrics = storage_engine_collected_metrics(storage_engine_id, rrdb.localhost->db[tier].instance);
 
             NETDATA_DOUBLE percent;
             if (used && max)
@@ -1257,7 +1257,7 @@ static void contexts_v2_alert_config_to_json_from_sql_alert_config_data(struct s
         {
             buffer_json_member_add_string(wb, "type", "agent");
             buffer_json_member_add_string(wb, "exec", t->notification.exec ? t->notification.exec : NULL);
-            buffer_json_member_add_string(wb, "to", t->notification.to_key ? t->notification.to_key : string2str(localhost->health.health_default_recipient));
+            buffer_json_member_add_string(wb, "to", t->notification.to_key ? t->notification.to_key : string2str(rrdb.localhost->health.health_default_recipient));
             buffer_json_member_add_string(wb, "delay", t->notification.delay);
             buffer_json_member_add_string(wb, "repeat", t->notification.repeat);
             buffer_json_member_add_string(wb, "options", t->notification.options);
@@ -1574,7 +1574,7 @@ static void contexts_v2_alert_transition_callback(struct sql_alert_transition_da
             [ATF_CLASS] = t->classification,
             [ATF_TYPE] = t->type,
             [ATF_COMPONENT] = t->component,
-            [ATF_ROLE] = t->recipient && *t->recipient ? t->recipient : string2str(localhost->health.health_default_recipient),
+            [ATF_ROLE] = t->recipient && *t->recipient ? t->recipient : string2str(rrdb.localhost->health.health_default_recipient),
             [ATF_NODE] = machine_guid,
             [ATF_ALERT_NAME] = t->alert_name,
             [ATF_CHART_NAME] = t->chart_name,
@@ -1744,9 +1744,9 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
                 buffer_json_member_add_time_t(wb, "delay", t->delay);
                 buffer_json_member_add_time_t(wb, "delay_up_to_time", t->delay_up_to_timestamp);
                 health_entry_flags_to_json_array(wb, "flags", t->flags);
-                buffer_json_member_add_string(wb, "exec", *t->exec ? t->exec : string2str(localhost->health.health_default_exec));
+                buffer_json_member_add_string(wb, "exec", *t->exec ? t->exec : string2str(rrdb.localhost->health.health_default_exec));
                 buffer_json_member_add_uint64(wb, "exec_code", t->exec_code);
-                buffer_json_member_add_string(wb, "to", *t->recipient ? t->recipient : string2str(localhost->health.health_default_recipient));
+                buffer_json_member_add_string(wb, "to", *t->recipient ? t->recipient : string2str(rrdb.localhost->health.health_default_recipient));
             }
             buffer_json_object_close(wb); // notification
         }

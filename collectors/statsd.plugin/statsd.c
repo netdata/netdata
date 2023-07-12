@@ -1296,8 +1296,8 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                 // a new app
                 app = callocz(sizeof(STATSD_APP), 1);
                 app->name = strdupz("unnamed");
-                app->storage_engine_id = localhost->storage_engine_id;
-                app->rrd_history_entries = localhost->rrd_history_entries;
+                app->storage_engine_id = rrdb.localhost->storage_engine_id;
+                app->rrd_history_entries = rrdb.localhost->rrd_history_entries;
 
                 app->next = statsd.apps;
                 statsd.apps = app;
@@ -1598,7 +1598,7 @@ static inline RRDSET *statsd_private_rrdset_create(
         statsd.private_charts++;
 
     RRDSET *st = rrdset_create_custom(
-            localhost         // host
+            rrdb.localhost    // host
             , type            // type
             , id              // id
             , name            // name
@@ -2203,7 +2203,7 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
 
     if(!chart->st) {
         chart->st = rrdset_create_custom(
-                localhost                   // host
+                rrdb.localhost              // host
                 , app->name                 // type
                 , chart->id                 // id
                 , chart->name               // name

@@ -132,4 +132,5 @@ struct rrdb rrdb = {
     .ieee754_doubles = false,
     .rrdhost_free_orphan_time_s = RRD_DEFAULT_HISTORY_ENTRIES,
     .rrd_rwlock = NETDATA_RWLOCK_INITIALIZER,
+    .localhost = NULL,
 };

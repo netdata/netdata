@@ -1276,7 +1276,7 @@ void web_client_build_http_header(struct web_client *w) {
     // set a proper expiration date, if not already set
     if(unlikely(!w->response.data->expires)) {
         if(w->response.data->options & WB_CONTENT_NO_CACHEABLE)
-            w->response.data->expires = w->response.data->date + localhost->rrd_update_every;
+            w->response.data->expires = w->response.data->date + rrdb.localhost->rrd_update_every;
         else
             w->response.data->expires = w->response.data->date + 86400;
     }
@@ -1461,7 +1461,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
         hash_localhost = simple_hash("localhost");
     }
 
-    if(host != localhost) {
+    if(host != rrdb.localhost) {
         buffer_flush(w->response.data);
         buffer_strcat(w->response.data, "Nesting of hosts is not allowed.");
         return HTTP_RESP_BAD_REQUEST;
@@ -1787,7 +1787,7 @@ void web_client_process_request(struct web_client *w) {
                         }
                     }
 
-                    w->response.code = (short)web_client_process_url(localhost, w, path);
+                    w->response.code = (short)web_client_process_url(rrdb.localhost, w, path);
                     break;
             }
             break;

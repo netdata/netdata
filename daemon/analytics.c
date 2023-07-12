@@ -215,7 +215,7 @@ void analytics_mirrored_hosts(void)
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))
             continue;
 
-        ((host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)) ? reachable++ : unreachable++);
+        ((host == rrdb.localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)) ? reachable++ : unreachable++);
 
         count++;
     }
@@ -272,7 +272,7 @@ void analytics_collectors(void)
     char name[500];
     BUFFER *bt = buffer_create(1000, NULL);
 
-    rrdset_foreach_read(st, localhost) {
+    rrdset_foreach_read(st, rrdb.localhost) {
         if(!rrdset_is_available_for_viewers(st))
             continue;
 
@@ -377,8 +377,8 @@ void analytics_https(void)
     analytics_exporting_connectors_ssl(b);
 
     buffer_strcat(b, netdata_ssl_streaming_sender_ctx &&
-                     rrdhost_flag_check(localhost, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED) &&
-                     SSL_connection(&localhost->sender->ssl) ? "streaming|" : "|");
+                     rrdhost_flag_check(rrdb.localhost, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED) &&
+                     SSL_connection(&rrdb.localhost->sender->ssl) ? "streaming|" : "|");
 
     buffer_strcat(b, netdata_ssl_web_server_ctx ? "web" : "");
 #else
@@ -394,7 +394,7 @@ void analytics_charts(void)
     RRDSET *st;
     size_t c = 0;
 
-    rrdset_foreach_read(st, localhost)
+    rrdset_foreach_read(st, rrdb.localhost)
         if(rrdset_is_available_for_viewers(st)) c++;
     rrdset_foreach_done(st);
 
@@ -410,7 +410,7 @@ void analytics_metrics(void)
 {
     RRDSET *st;
     size_t dimensions = 0;
-    rrdset_foreach_read(st, localhost) {
+    rrdset_foreach_read(st, rrdb.localhost) {
         if (rrdset_is_available_for_viewers(st)) {
             RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
@@ -436,7 +436,7 @@ void analytics_alarms(void)
     size_t alarm_warn = 0, alarm_crit = 0, alarm_normal = 0;
     char b[21];
     RRDCALC *rc;
-    foreach_rrdcalc_in_rrdhost_read(localhost, rc) {
+    foreach_rrdcalc_in_rrdhost_read(rrdb.localhost, rc) {
         if (unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 

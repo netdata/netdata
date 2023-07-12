@@ -21,19 +21,19 @@ const struct capability *aclk_get_agent_capas()
         { .name = NULL,          .version = 0, .enabled = 0 }
     };
     agent_capabilities[2].version = ml_capable() ? 1 : 0;
-    agent_capabilities[2].enabled = ml_enabled(localhost);
+    agent_capabilities[2].enabled = ml_enabled(rrdb.localhost);
 
     agent_capabilities[3].version = enable_metric_correlations ? metric_correlations_version : 0;
     agent_capabilities[3].enabled = enable_metric_correlations;
 
-    agent_capabilities[7].enabled = localhost->health.health_enabled;
+    agent_capabilities[7].enabled = rrdb.localhost->health.health_enabled;
 
     return agent_capabilities;
 }
 
 struct capability *aclk_get_node_instance_capas(RRDHOST *host)
 {
-    bool functions = (host == localhost || (host->receiver && stream_has_capability(host->receiver, STREAM_CAP_FUNCTIONS)));
+    bool functions = (host == rrdb.localhost || (host->receiver && stream_has_capability(host->receiver, STREAM_CAP_FUNCTIONS)));
 
     struct capability ni_caps[] = {
         { .name = "proto",       .version = 1,                     .enabled = 1 },

@@ -20,8 +20,6 @@ size_t get_tier_grouping(size_t tier) {
     return grouping;
 }
 
-RRDHOST *localhost = NULL;
-
 bool is_storage_engine_shared(STORAGE_INSTANCE *engine __maybe_unused) {
 #ifdef ENABLE_DBENGINE
     if(!rrdeng_is_legacy(engine))
@@ -123,7 +121,7 @@ static void rrdhost_index_del_by_guid(RRDHOST *host) {
 
 inline RRDHOST *rrdhost_find_by_hostname(const char *hostname) {
     if(unlikely(!strcmp(hostname, "localhost")))
-        return localhost;
+        return rrdb.localhost;
 
     return dictionary_get(rrdb.rrdhost_root_index_hostname, hostname);
 }
@@ -495,9 +493,9 @@ int is_legacy = 1;
     rrdhost_index_add_hostname(host);
 
     if(is_localhost)
-        DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(localhost, host, prev, next);
+        DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(rrdb.localhost, host, prev, next);
     else
-        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(localhost, host, prev, next);
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(rrdb.localhost, host, prev, next);
 
     rrd_unlock();
 
@@ -778,7 +776,7 @@ RRDHOST *rrdhost_find_or_create(
 
 inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now_s) {
     if(host != protected_host
-       && host != localhost
+       && host != rrdb.localhost
        && rrdhost_receiver_replicating_charts(host) == 0
        && rrdhost_sender_replicating_charts(host) == 0
        && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)
@@ -1008,7 +1006,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
         metadata_sync_init();
 
     netdata_log_debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
-    localhost = rrdhost_create(
+    rrdb.localhost = rrdhost_create(
             hostname
             , registry_get_this_machine_hostname()
             , registry_get_this_machine_guid()
@@ -1035,7 +1033,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
             , 0
     );
 
-    if (unlikely(!localhost)) {
+    if (unlikely(!rrdb.localhost)) {
         return 1;
     }
 
@@ -1043,17 +1041,17 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
     // we register this only on localhost
     // for the other nodes, the origin server should register it
     rrd_collector_started(); // this creates a collector that runs for as long as netdata runs
-    rrd_collector_add_function(localhost, NULL, "streaming", 10,
+    rrd_collector_add_function(rrdb.localhost, NULL, "streaming", 10,
                                RRDFUNCTIONS_STREAMING_HELP, true,
                                rrdhost_function_streaming, NULL);
 #endif
 
     if (likely(system_info)) {
-        migrate_localhost(&localhost->host_uuid);
+        migrate_localhost(&rrdb.localhost->host_uuid);
         sql_aclk_sync_init();
         web_client_api_v1_management_init();
     }
-    return localhost==NULL;
+    return rrdb.localhost == NULL;
 }
 
 // ----------------------------------------------------------------------------
@@ -1158,7 +1156,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
         rrdhost_index_del_by_guid(host);
 
         if (host->prev)
-            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(localhost, host, prev, next);
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(rrdb.localhost, host, prev, next);
     }
 
     // ------------------------------------------------------------------------
@@ -1241,7 +1239,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     rrdfamily_index_destroy(host);
     rrdfunctions_destroy(host);
     rrdvariables_destroy(host->rrdvars);
-    if (host == localhost)
+    if (host == rrdb.localhost)
         rrdvariables_destroy(health_rrdvars);
 
     rrdhost_destroy_rrdcontexts(host);
@@ -1255,11 +1253,11 @@ void rrdhost_free_all(void) {
     rrd_wrlock();
 
     /* Make sure child-hosts are released before the localhost. */
-    while(localhost && localhost->next)
-        rrdhost_free___while_having_rrd_wrlock(localhost->next, true);
+    while (rrdb.localhost && rrdb.localhost->next)
+        rrdhost_free___while_having_rrd_wrlock(rrdb.localhost->next, true);
 
-    if(localhost)
-        rrdhost_free___while_having_rrd_wrlock(localhost, true);
+    if (rrdb.localhost)
+        rrdhost_free___while_having_rrd_wrlock(rrdb.localhost, true);
 
     rrd_unlock();
 }
@@ -1318,86 +1316,86 @@ struct rrdhost_system_info *rrdhost_labels_to_system_info(DICTIONARY *labels) {
 }
 
 static void rrdhost_load_auto_labels(void) {
-    DICTIONARY *labels = localhost->rrdlabels;
+    DICTIONARY *labels = rrdb.localhost->rrdlabels;
 
-    if (localhost->system_info->cloud_provider_type)
-        rrdlabels_add(labels, "_cloud_provider_type", localhost->system_info->cloud_provider_type, RRDLABEL_SRC_AUTO);
+    if (rrdb.localhost->system_info->cloud_provider_type)
+        rrdlabels_add(labels, "_cloud_provider_type", rrdb.localhost->system_info->cloud_provider_type, RRDLABEL_SRC_AUTO);
 
-    if (localhost->system_info->cloud_instance_type)
-        rrdlabels_add(labels, "_cloud_instance_type", localhost->system_info->cloud_instance_type, RRDLABEL_SRC_AUTO);
+    if (rrdb.localhost->system_info->cloud_instance_type)
+        rrdlabels_add(labels, "_cloud_instance_type", rrdb.localhost->system_info->cloud_instance_type, RRDLABEL_SRC_AUTO);
 
-    if (localhost->system_info->cloud_instance_region)
-        rrdlabels_add(labels, "_cloud_instance_region", localhost->system_info->cloud_instance_region, RRDLABEL_SRC_AUTO);
+    if (rrdb.localhost->system_info->cloud_instance_region)
+        rrdlabels_add(labels, "_cloud_instance_region", rrdb.localhost->system_info->cloud_instance_region, RRDLABEL_SRC_AUTO);
 
-    if (localhost->system_info->host_os_name)
-        rrdlabels_add(labels, "_os_name", localhost->system_info->host_os_name, RRDLABEL_SRC_AUTO);
+    if (rrdb.localhost->system_info->host_os_name)
+        rrdlabels_add(labels, "_os_name", rrdb.localhost->system_info->host_os_name, RRDLABEL_SRC_AUTO);
 
-    if (localhost->system_info->host_os_version)
-        rrdlabels_add(labels, "_os_version", localhost->system_info->host_os_version, RRDLABEL_SRC_AUTO);
+    if (rrdb.localhost->system_info->host_os_version)
+        rrdlabels_add(labels, "_os_version", rrdb.localhost->system_info->host_os_version, RRDLABEL_SRC_AUTO);
 
-    if (localhost->system_info->kernel_version)
-        rrdlabels_add(labels, "_kernel_version", localhost->system_info->kernel_version, RRDLABEL_SRC_AUTO);
+    if (rrdb.localhost->system_info->kernel_version)
+        rrdlabels_add(labels, "_kernel_version", rrdb.localhost->system_info->kernel_version, RRDLABEL_SRC_AUTO);
 
-    if (localhost->system_info->host_cores)
-        rrdlabels_add(labels, "_system_cores", localhost->system_info->host_cores, RRDLABEL_SRC_AUTO);
+    if (rrdb.localhost->system_info->host_cores)
+        rrdlabels_add(labels, "_system_cores", rrdb.localhost->system_info->host_cores, RRDLABEL_SRC_AUTO);
 
-    if (localhost->system_info->host_cpu_freq)
-        rrdlabels_add(labels, "_system_cpu_freq", localhost->system_info->host_cpu_freq, RRDLABEL_SRC_AUTO);
+    if (rrdb.localhost->system_info->host_cpu_freq)
+        rrdlabels_add(labels, "_system_cpu_freq", rrdb.localhost->system_info->host_cpu_freq, RRDLABEL_SRC_AUTO);
 
-    if (localhost->system_info->host_ram_total)
-        rrdlabels_add(labels, "_system_ram_total", localhost->system_info->host_ram_total, RRDLABEL_SRC_AUTO);
+    if (rrdb.localhost->system_info->host_ram_total)
+        rrdlabels_add(labels, "_system_ram_total", rrdb.localhost->system_info->host_ram_total, RRDLABEL_SRC_AUTO);
 
-    if (localhost->system_info->host_disk_space)
-        rrdlabels_add(labels, "_system_disk_space", localhost->system_info->host_disk_space, RRDLABEL_SRC_AUTO);
+    if (rrdb.localhost->system_info->host_disk_space)
+        rrdlabels_add(labels, "_system_disk_space", rrdb.localhost->system_info->host_disk_space, RRDLABEL_SRC_AUTO);
 
-    if (localhost->system_info->architecture)
-        rrdlabels_add(labels, "_architecture", localhost->system_info->architecture, RRDLABEL_SRC_AUTO);
+    if (rrdb.localhost->system_info->architecture)
+        rrdlabels_add(labels, "_architecture", rrdb.localhost->system_info->architecture, RRDLABEL_SRC_AUTO);
 
-    if (localhost->system_info->virtualization)
-        rrdlabels_add(labels, "_virtualization", localhost->system_info->virtualization, RRDLABEL_SRC_AUTO);
+    if (rrdb.localhost->system_info->virtualization)
+        rrdlabels_add(labels, "_virtualization", rrdb.localhost->system_info->virtualization, RRDLABEL_SRC_AUTO);
 
-    if (localhost->system_info->container)
-        rrdlabels_add(labels, "_container", localhost->system_info->container, RRDLABEL_SRC_AUTO);
+    if (rrdb.localhost->system_info->container)
+        rrdlabels_add(labels, "_container", rrdb.localhost->system_info->container, RRDLABEL_SRC_AUTO);
 
-    if (localhost->system_info->container_detection)
-        rrdlabels_add(labels, "_container_detection", localhost->system_info->container_detection, RRDLABEL_SRC_AUTO);
+    if (rrdb.localhost->system_info->container_detection)
+        rrdlabels_add(labels, "_container_detection", rrdb.localhost->system_info->container_detection, RRDLABEL_SRC_AUTO);
 
-    if (localhost->system_info->virt_detection)
-        rrdlabels_add(labels, "_virt_detection", localhost->system_info->virt_detection, RRDLABEL_SRC_AUTO);
+    if (rrdb.localhost->system_info->virt_detection)
+        rrdlabels_add(labels, "_virt_detection", rrdb.localhost->system_info->virt_detection, RRDLABEL_SRC_AUTO);
 
-    if (localhost->system_info->is_k8s_node)
-        rrdlabels_add(labels, "_is_k8s_node", localhost->system_info->is_k8s_node, RRDLABEL_SRC_AUTO);
+    if (rrdb.localhost->system_info->is_k8s_node)
+        rrdlabels_add(labels, "_is_k8s_node", rrdb.localhost->system_info->is_k8s_node, RRDLABEL_SRC_AUTO);
 
-    if (localhost->system_info->install_type)
-        rrdlabels_add(labels, "_install_type", localhost->system_info->install_type, RRDLABEL_SRC_AUTO);
+    if (rrdb.localhost->system_info->install_type)
+        rrdlabels_add(labels, "_install_type", rrdb.localhost->system_info->install_type, RRDLABEL_SRC_AUTO);
 
-    if (localhost->system_info->prebuilt_arch)
-        rrdlabels_add(labels, "_prebuilt_arch", localhost->system_info->prebuilt_arch, RRDLABEL_SRC_AUTO);
+    if (rrdb.localhost->system_info->prebuilt_arch)
+        rrdlabels_add(labels, "_prebuilt_arch", rrdb.localhost->system_info->prebuilt_arch, RRDLABEL_SRC_AUTO);
 
-    if (localhost->system_info->prebuilt_dist)
-        rrdlabels_add(labels, "_prebuilt_dist", localhost->system_info->prebuilt_dist, RRDLABEL_SRC_AUTO);
+    if (rrdb.localhost->system_info->prebuilt_dist)
+        rrdlabels_add(labels, "_prebuilt_dist", rrdb.localhost->system_info->prebuilt_dist, RRDLABEL_SRC_AUTO);
 
     add_aclk_host_labels();
 
     health_add_host_labels();
 
-    rrdlabels_add(labels, "_is_parent", (localhost->connected_children_count > 0) ? "true" : "false", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_is_parent", (rrdb.localhost->connected_children_count > 0) ? "true" : "false", RRDLABEL_SRC_AUTO);
 
-    if (localhost->rrdpush_send_destination)
-        rrdlabels_add(labels, "_streams_to", localhost->rrdpush_send_destination, RRDLABEL_SRC_AUTO);
+    if (rrdb.localhost->rrdpush_send_destination)
+        rrdlabels_add(labels, "_streams_to", rrdb.localhost->rrdpush_send_destination, RRDLABEL_SRC_AUTO);
 }
 
 void rrdhost_set_is_parent_label(void) {
-    int count = __atomic_load_n(&localhost->connected_children_count, __ATOMIC_RELAXED);
+    int count = __atomic_load_n(&rrdb.localhost->connected_children_count, __ATOMIC_RELAXED);
 
     if (count == 0 || count == 1) {
-        DICTIONARY *labels = localhost->rrdlabels;
+        DICTIONARY *labels = rrdb.localhost->rrdlabels;
         rrdlabels_add(labels, "_is_parent", (count) ? "true" : "false", RRDLABEL_SRC_AUTO);
 
         //queue a node info
 #ifdef ENABLE_ACLK
         if (netdata_cloud_enabled) {
-            aclk_queue_node_info(localhost, false);
+            aclk_queue_node_info(rrdb.localhost, false);
         }
 #endif
     }
@@ -1415,7 +1413,7 @@ static void rrdhost_load_config_labels(void) {
         config_section_wrlock(co);
         struct config_option *cv;
         for(cv = co->values; cv ; cv = cv->next) {
-            rrdlabels_add(localhost->rrdlabels, cv->name, cv->value, RRDLABEL_SRC_CONFIG);
+            rrdlabels_add(rrdb.localhost->rrdlabels, cv->name, cv->value, RRDLABEL_SRC_CONFIG);
             cv->flags |= CONFIG_VALUE_USED;
         }
         config_section_unlock(co);
@@ -1440,7 +1438,7 @@ static void rrdhost_load_kubernetes_labels(void) {
 
     char buffer[1000 + 1];
     while (fgets(buffer, 1000, fp_child_output) != NULL)
-        rrdlabels_add_pair(localhost->rrdlabels, buffer, RRDLABEL_SRC_AUTO|RRDLABEL_SRC_K8S);
+        rrdlabels_add_pair(rrdb.localhost->rrdlabels, buffer, RRDLABEL_SRC_AUTO|RRDLABEL_SRC_K8S);
 
     // Non-zero exit code means that all the script output is error messages. We've shown already any message that didn't include a ':'
     // Here we'll inform with an ERROR that the script failed, show whatever (if anything) was added to the list of labels, free the memory and set the return to null
@@ -1450,19 +1448,19 @@ static void rrdhost_load_kubernetes_labels(void) {
 }
 
 void reload_host_labels(void) {
-    if(!localhost->rrdlabels)
-        localhost->rrdlabels = rrdlabels_create();
+    if(!rrdb.localhost->rrdlabels)
+        rrdb.localhost->rrdlabels = rrdlabels_create();
 
-    rrdlabels_unmark_all(localhost->rrdlabels);
+    rrdlabels_unmark_all(rrdb.localhost->rrdlabels);
 
     // priority is important here
     rrdhost_load_config_labels();
     rrdhost_load_kubernetes_labels();
     rrdhost_load_auto_labels();
 
-    rrdhost_flag_set(localhost,RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
+    rrdhost_flag_set(rrdb.localhost, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
 
-    rrdpush_send_host_labels(localhost);
+    rrdpush_send_host_labels(rrdb.localhost);
 }
 
 void rrdhost_finalize_collection(RRDHOST *host) {
@@ -1550,7 +1548,7 @@ void rrdhost_cleanup_all(void) {
 
     RRDHOST *host;
     rrdhost_foreach_read(host) {
-        if (host != localhost && rrdhost_option_check(host, RRDHOST_OPTION_DELETE_ORPHAN_HOST) && !host->receiver
+        if (host != rrdb.localhost && rrdhost_option_check(host, RRDHOST_OPTION_DELETE_ORPHAN_HOST) && !host->receiver
             /* don't delete multi-host DB host files */
             && !(host->storage_engine_id == STORAGE_ENGINE_DBENGINE && is_storage_engine_shared(host->db[0].instance))
         )
@@ -1757,7 +1755,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     s->ingest.reason = (online) ? STREAM_HANDSHAKE_NEVER : host->rrdpush_last_receiver_exit_reason;
 
     netdata_mutex_lock(&host->receiver_lock);
-    s->ingest.hops = (host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
+    s->ingest.hops = (host->system_info ? host->system_info->hops : (host == rrdb.localhost) ? 0 : 1);
     bool has_receiver = false;
     if (host->receiver) {
         has_receiver = true;
@@ -1777,7 +1775,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
         if(s->db.status == RRDHOST_DB_STATUS_INITIALIZING)
             s->ingest.status = RRDHOST_INGEST_STATUS_INITIALIZING;
 
-        else if (host == localhost || rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST)) {
+        else if (host == rrdb.localhost || rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST)) {
             s->ingest.status = RRDHOST_INGEST_STATUS_ONLINE;
             s->ingest.since = netdata_start_time;
         }
@@ -1798,7 +1796,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
             s->ingest.status = RRDHOST_INGEST_STATUS_OFFLINE;
     }
 
-    if(host == localhost)
+    if(host == rrdb.localhost)
         s->ingest.type = RRDHOST_INGEST_TYPE_LOCALHOST;
     else if(has_receiver || rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED))
         s->ingest.type = RRDHOST_INGEST_TYPE_CHILD;

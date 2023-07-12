@@ -35,9 +35,9 @@ static char *claiming_errors[] = {
 char *get_agent_claimid()
 {
     char *result;
-    rrdhost_aclk_state_lock(localhost);
-    result = (localhost->aclk_state.claimed_id == NULL) ? NULL : strdupz(localhost->aclk_state.claimed_id);
-    rrdhost_aclk_state_unlock(localhost);
+    rrdhost_aclk_state_lock(rrdb.localhost);
+    result = (rrdb.localhost->aclk_state.claimed_id == NULL) ? NULL : strdupz(rrdb.localhost->aclk_state.claimed_id);
+    rrdhost_aclk_state_unlock(rrdb.localhost);
     return result;
 }
 
@@ -81,7 +81,7 @@ CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, con
               "exec netdata-claim.sh %s -hostname=%s -id=%s -url=%s -noreload %s",
               proxy_flag,
               netdata_configured_hostname,
-              localhost->machine_guid,
+              rrdb.localhost->machine_guid,
               cloud_base_url,
               claiming_arguments);
 
@@ -312,7 +312,7 @@ void claim_reload_all(void) {
     error_log_limit_unlimited();
     load_claiming_state();
     registry_update_cloud_base_url();
-    rrdpush_send_claimed_id(localhost);
+    rrdpush_send_claimed_id(rrdb.localhost);
     error_log_limit_reset();
 }
 
