@@ -19,6 +19,9 @@ body {
   font-size: 14px;
   line-height: 20px;
 }
+iframe.hidden {
+  display: none;
+}
 #agent-splash-screen a:link,
 #agent-splash-screen a:visited,
 #agent-splash-screen a:active {
