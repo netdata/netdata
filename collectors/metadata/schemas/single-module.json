@@ -3,61 +3,95 @@
   "type": "object",
   "title": "Netdata collector single module meta",
   "properties": {
-    "plugin_name": {
-      "type": "string",
-      "description": "Plugin name (e.g. apps.plugin, proc.plugin, go.d.plugin). It must match the name of the executable file in the plugins.d directory."
-    },
-    "module_name": {
-      "type": "string",
-      "description": "Module name (e.g. apache, /proc/stat, httpcheck). It usually has the same name as the module configuration file (external plugin) or the section name in netdata.conf (internal plugin)."
-    },
-    "categories": {
-      "type": "array",
-      "description": "An array defining the categories the integration falls into.",
-      "items": {
-        "$ref": "./definitions.json#/definitions/category"
-      }
-    },
-    "icon_path": {
-      "type": "string",
-      "description": "path to the integration's icon"
-    },
-    "monitored_instance": {
-      "$ref": "#/$defs/_monitored_instance"
-    },
-    "alternative_monitored_instances": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "monitored_instance": {
-            "$ref": "#/$defs/_monitored_instance"
-          },
-          "categories": {
-            "type": "array",
-            "description": "An array defining the categories the integration falls into.",
-            "items": {
-              "$ref": "./definitions.json#/definitions/category"
-            }
-          },
-          "icon_path": {
-            "type": "string",
-            "description": "path to the integration's icon"
+    "meta": {
+      "type": "object",
+      "properties": {
+        "plugin_name": {
+          "type": "string",
+          "description": "Plugin name (e.g. apps.plugin, proc.plugin, go.d.plugin). It must match the name of the executable file in the plugins.d directory."
+        },
+        "module_name": {
+          "type": "string",
+          "description": "Module name (e.g. apache, /proc/stat, httpcheck). It usually has the same name as the module configuration file (external plugin) or the section name in netdata.conf (internal plugin)."
+        },
+        "monitored_instance": {
+          "$ref": "./definitions.json#/definitions/monitored_instance"
+        },
+        "alternative_monitored_instances": {
+          "type": "array",
+          "items": {
+            "$ref": "./definitions.json#/definitions/monitored_instance"
           }
         },
-        "required": [
-          "monitored_instance",
-          "icon_path",
-          "categories"
-        ]
-      }
-    },
-    "keywords": {
-      "type": "array",
-      "description": "An array of terms related to the integration.",
-      "items": {
-        "type": "string"
-      }
+        "keywords": {
+          "type": "array",
+          "description": "An array of terms related to the integration.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "related_resources": {
+          "type": "object",
+          "description": "Available related resources for the monitored instance.",
+          "properties": {
+            "integrations": {
+              "type": "object",
+              "description": "All collectors that provide additional metrics for the monitored instance. This may include generic collectors, e.g. 'httpcheck' for web servers to monitor specific endpoints.",
+              "properties": {
+                "list": {
+                  "type": "array",
+                  "description": "List of related integrations.",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "plugin_name": {
+                        "type": "string",
+                        "description": "Related integration plugin name."
+                      },
+                      "module_name": {
+                        "type": "string",
+                        "description": "Related integration module name."
+                      }
+                    },
+                    "required": [
+                      "plugin_name",
+                      "module_name"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "list"
+              ]
+            }
+          },
+          "required": [
+            "integrations"
+          ]
+        },
+        "info_provided_to_referring_integrations": {
+          "type": "object",
+          "description": "Information that this collector can provide about itself when other integrations mention it. This text will not be appear on this collector's page.",
+          "properties": {
+            "description": {
+              "type": "string",
+              "description": "TODO"
+            }
+          },
+          "required": [
+            "description"
+          ]
+        }
+      },
+      "required": [
+        "plugin_name",
+        "module_name",
+        "monitored_instance",
+        "alternative_monitored_instances",
+        "keywords",
+        "related_resources",
+        "info_provided_to_referring_integrations"
+      ]
     },
     "overview": {
       "type": "object",
@@ -380,58 +414,6 @@
         "problems"
       ]
     },
-    "related_resources": {
-      "type": "object",
-      "description": "Available related resources for the monitored instance.",
-      "properties": {
-        "integrations": {
-          "type": "object",
-          "description": "All collectors that provide additional metrics for the monitored instance. This may include generic collectors, e.g. 'httpcheck' for web servers to monitor specific endpoints.",
-          "properties": {
-            "list": {
-              "type": "array",
-              "description": "List of related integrations.",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "plugin_name": {
-                    "type": "string",
-                    "description": "Related integration plugin name."
-                  },
-                  "module_name": {
-                    "type": "string",
-                    "description": "Related integration module name."
-                  }
-                },
-                "required": [
-                  "plugin_name",
-                  "module_name"
-                ]
-              }
-            }
-          },
-          "required": [
-            "list"
-          ]
-        }
-      },
-      "required": [
-        "integrations"
-      ]
-    },
-    "info_provided_to_referring_integrations": {
-      "type": "object",
-      "description": "Information that this collector can provide about itself when other integrations mention it. This text will not be appear on this collector's page.",
-      "properties": {
-        "description": {
-          "type": "string",
-          "description": "TODO"
-        }
-      },
-      "required": [
-        "description"
-      ]
-    },
     "alerts": {
       "$ref": "./definitions.json#/definitions/alerts"
     },
@@ -440,39 +422,11 @@
     }
   },
   "required": [
-    "plugin_name",
-    "module_name",
-    "categories",
-    "icon_path",
-    "monitored_instance",
-    "alternative_monitored_instances",
-    "keywords",
+    "meta",
     "overview",
     "setup",
     "troubleshooting",
-    "related_resources",
-    "info_provided_to_referring_integrations",
     "alerts",
     "metrics"
-  ],
-  "$defs": {
-    "_monitored_instance": {
-      "type": "object",
-      "description": "Information about the monitored instance (metrics source).",
-      "properties": {
-        "name": {
-          "description": "Metrics source name (e.g. VerneMQ, Network interfaces, Files and directories). Use official spelling for applications.",
-          "type": "string"
-        },
-        "link": {
-          "description": "Link to the monitored instance official website if any.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "name",
-        "link"
-      ]
-    }
-  }
+  ]
 }

@@ -1,22 +1,29 @@
-plugin_name: ""
-module_name: ""
-monitored_instance:
-  name: ""
-  link: ""
-alternative_monitored_instances:
-  - monitored_instance:
-      name: ""
-      link: ""
+meta:
+  plugin_name: ""
+  module_name: ""
+  monitored_instance:
+    name: ""
+    link: ""
+    icon_path: ""
     categories:
       - level0: data-collection
-        level1: containers-and-vms
-    icon_path: ""
-keywords:
-  - ""
-categories:
-  - level0: data-collection
-    level1: databases
-icon_path: ""
+        level1: databases
+  alternative_monitored_instances:
+    - name: ""
+      link: ""
+      icon_path: ""
+      categories:
+        - level0: data-collection
+          level1: containers-and-vms
+  related_resources:
+    integrations:
+      list:
+        - plugin_name: ""
+          module_name: ""
+  info_provided_to_referring_integrations:
+    description: ""
+  keywords:
+    - ""
 overview:
   data_collection:
     metrics_description: ""
@@ -66,13 +73,6 @@ troubleshooting:
     list:
       - name: ""
         description: ""
-related_resources:
-  integrations:
-    list:
-      - plugin_name: ""
-        module_name: ""
-info_provided_to_referring_integrations:
-  description: ""
 alerts:
   - info: ""
     link: ""
@@ -101,4 +101,3 @@ metrics:
           chart_type: ""
           dimensions:
             - name: ""
-
