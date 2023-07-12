@@ -107,6 +107,14 @@ int format_netdata_info_labels_graphite(struct instance *instance, RRDHOST *host
                         exporting_labels_filter_callback, instance,
                         NULL, sanitize_graphite_label_value);
 
+    time_t ct = now_realtime_sec();
+    buffer_sprintf(instance->buffer,
+                   "%s.%s.netdata.info.internal%s 1.00000 %llu\n",
+                   instance->config.prefix,
+                   (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
+                   (host_labels) ? buffer_tostring(host_labels) : "",
+                   (unsigned long long)ct);
+
     return 0;
 }
 
