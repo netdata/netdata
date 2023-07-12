@@ -1288,6 +1288,8 @@ struct rrdb {
     int gap_when_lost_iterations_above;
 
     time_t rrdset_free_obsolete_time_s;
+
+    int libuv_worker_threads;
 };
 
 extern struct rrdb rrdb;

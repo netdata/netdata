@@ -1695,8 +1695,8 @@ static int replication_pipeline_execute_next(void) {
     if(unlikely(!rtp.rqs)) {
         rtp.max_requests_ahead = (int)get_netdata_cpus() / 2;
 
-        if(rtp.max_requests_ahead > libuv_worker_threads * 2)
-            rtp.max_requests_ahead = libuv_worker_threads * 2;
+        if(rtp.max_requests_ahead > rrdb.libuv_worker_threads * 2)
+            rtp.max_requests_ahead = rrdb.libuv_worker_threads * 2;
 
         if(rtp.max_requests_ahead < 2)
             rtp.max_requests_ahead = 2;

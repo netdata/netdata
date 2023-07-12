@@ -158,10 +158,10 @@ enum LIBUV_WORKERS_STATUS {
 static inline enum LIBUV_WORKERS_STATUS work_request_full(void) {
     size_t dispatched = __atomic_load_n(&rrdeng_main.work_cmd.atomics.dispatched, __ATOMIC_RELAXED);
 
-    if(dispatched >= (size_t)(libuv_worker_threads))
+    if(dispatched >= (size_t)(rrdb.libuv_worker_threads))
         return LIBUV_WORKERS_CRITICAL;
 
-    else if(dispatched >= (size_t)(libuv_worker_threads - RESERVED_LIBUV_WORKER_THREADS))
+    else if(dispatched >= (size_t)(rrdb.libuv_worker_threads - RESERVED_LIBUV_WORKER_THREADS))
         return LIBUV_WORKERS_STRESSED;
 
     return LIBUV_WORKERS_RELAXED;
@@ -1784,7 +1784,7 @@ void dbengine_event_loop(void* arg) {
                 }
 
                 case RRDENG_OPCODE_FLUSH_INIT: {
-                    if(rrdeng_main.flushes_running < (size_t)(libuv_worker_threads / 4)) {
+                    if(rrdeng_main.flushes_running < (size_t)(rrdb.libuv_worker_threads / 4)) {
                         rrdeng_main.flushes_running++;
                         work_dispatch(NULL, NULL, NULL, opcode, cache_flush_tp_worker, after_do_cache_flush);
                     }

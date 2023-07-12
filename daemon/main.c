@@ -11,7 +11,6 @@
 int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
 
-int libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
 bool ieee754_doubles = false;
 time_t netdata_start_time = 0;
 struct netdata_static_thread *static_threads;
@@ -1832,24 +1831,24 @@ int main(int argc, char **argv) {
 #endif
 
         // set libuv worker threads
-        libuv_worker_threads = (int)get_netdata_cpus() * 6;
+        rrdb.libuv_worker_threads = (int)get_netdata_cpus() * 6;
 
-        if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS)
-            libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
+        if(rrdb.libuv_worker_threads < MIN_LIBUV_WORKER_THREADS)
+            rrdb.libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
 
-        if(libuv_worker_threads > MAX_LIBUV_WORKER_THREADS)
-            libuv_worker_threads = MAX_LIBUV_WORKER_THREADS;
+        if(rrdb.libuv_worker_threads > MAX_LIBUV_WORKER_THREADS)
+            rrdb.libuv_worker_threads = MAX_LIBUV_WORKER_THREADS;
 
 
-        libuv_worker_threads = config_get_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", libuv_worker_threads);
-        if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS) {
-            libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
-            config_set_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", libuv_worker_threads);
+        rrdb.libuv_worker_threads = config_get_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", rrdb.libuv_worker_threads);
+        if(rrdb.libuv_worker_threads < MIN_LIBUV_WORKER_THREADS) {
+            rrdb.libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
+            config_set_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", rrdb.libuv_worker_threads);
         }
 
         {
             char buf[20 + 1];
-            snprintfz(buf, 20, "%d", libuv_worker_threads);
+            snprintfz(buf, 20, "%d", rrdb.libuv_worker_threads);
             setenv("UV_THREADPOOL_SIZE", buf, 1);
         }
 
