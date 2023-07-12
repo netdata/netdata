@@ -15,7 +15,7 @@
       "type": "array",
       "description": "An array defining the categories the integration falls into.",
       "items": {
-        "$ref": "#/$defs/_categories"
+        "$ref": "#/$defs/_category"
       }
     },
     "icon_path": {
@@ -37,7 +37,7 @@
             "type": "array",
             "description": "An array defining the categories the integration falls into.",
             "items": {
-              "$ref": "#/$defs/_categories"
+              "$ref": "#/$defs/_category"
             }
           },
           "icon_path": {
@@ -456,7 +456,7 @@
     "metrics"
   ],
   "$defs": {
-    "_categories": {
+    "_category": {
       "type": "object",
       "description": "Category object, with an entry per category depth.",
       "properties": {
