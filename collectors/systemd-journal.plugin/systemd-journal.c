@@ -12,14 +12,29 @@
 
 #define SYSTEMD_KEYS_EXCLUDED_FROM_FACETS \
     "*MESSAGE*"                           \
+    "|*CMDLINE*"                          \
     "|*TIMESTAMP*"                        \
     "|*INVOCATION*"                       \
-    "|*_ID"                               \
     "|*USAGE*"                            \
     "|*RLIMIT*"                           \
+    "|*_ID"                               \
     "|!*COREDUMP_SIGNAL_NAME|*COREDUMP*"  \
     "|*CODE_LINE*"                        \
-    "|_STREAM_ID||_CMDLINE|SYSLOG_RAW|_PID|_CAP_EFFECTIVE|_AUDIT_SESSION|_AUDIT_LOGINUID|_SYSTEMD_OWNER_UID|GLIB_OLD_LOG_API|SYSLOG_PID|TID|JOB_ID|_SYSTEMD_SESSION"
+    "|_STREAM_ID"                         \
+    "|SYSLOG_RAW"                         \
+    "|_PID"                               \
+    "|_CAP_EFFECTIVE"                     \
+    "|_AUDIT_SESSION"                     \
+    "|_AUDIT_LOGINUID"                    \
+    "|_SYSTEMD_OWNER_UID"                 \
+    "|GLIB_OLD_LOG_API"                   \
+    "|SYSLOG_PID"                         \
+    "|TID"                                \
+    "|JOB_ID"                             \
+    "|_SYSTEMD_SESSION"                   \
+    ""
+
+#define MAX_VALUE_LENGTH 4095
 
 struct systemd_journal_request {
     usec_t after_ut;
@@ -78,7 +93,7 @@ int systemd_journal_query(struct systemd_journal_request *c) {
                 key_copy[key_length - 1] = '\0';
 
                 size_t value_length = length - key_length; // without '\0'
-                facets_add_key_value_length(facets, key_copy, value, value_length);
+                facets_add_key_value_length(facets, key_copy, value, value_length <= MAX_VALUE_LENGTH ? value_length : MAX_VALUE_LENGTH);
             }
 
             facets_row_finished(facets, msg_ut);
@@ -87,7 +102,7 @@ int systemd_journal_query(struct systemd_journal_request *c) {
     sd_journal_close(j);
 
     buffer_flush(c->wb);
-    buffer_json_initialize(c->wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(c->wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT | BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAYS);
     facets_report(facets, c->wb);
     buffer_json_finalize(c->wb);
 

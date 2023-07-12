@@ -643,7 +643,7 @@ int webrtc_new_connection(const char *sdp, BUFFER *wb) {
     }
 
     buffer_flush(wb);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     wb->content_type = CT_APPLICATION_JSON;
 
     WEBRTC_CONN *conn = webrtc_create_connection();

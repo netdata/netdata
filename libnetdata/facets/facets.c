@@ -1,5 +1,7 @@
 #include "facets.h"
 
+#define FACET_VALUE_UNSET "[UNSET]"
+
 typedef struct facet_value {
     bool selected;
 
@@ -160,7 +162,7 @@ void facets_destroy(FACETS *facets) {
 
 static inline void facets_check_value(FACETS *facets __maybe_unused, FACET_KEY *k) {
     if(buffer_strlen(k->current_value) == 0)
-        buffer_strcat(k->current_value, "[UNSET]");
+        buffer_strcat(k->current_value, FACET_VALUE_UNSET);
 
     if(k->values)
         dictionary_set(k->values, buffer_tostring(k->current_value), NULL, sizeof(FACET_VALUE));
@@ -206,7 +208,7 @@ static void facet_row_key_value_insert_callback(const DICTIONARY_ITEM *item __ma
     FACET_ROW *row = data; (void)row;
 
     rkv->wb = buffer_create(0, NULL);
-    buffer_strcat(rkv->wb, rkv->tmp && *rkv->tmp ? rkv->tmp : "[UNSET]");
+    buffer_strcat(rkv->wb, rkv->tmp && *rkv->tmp ? rkv->tmp : FACET_VALUE_UNSET);
 }
 
 static bool facet_row_key_value_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data) {
@@ -215,7 +217,7 @@ static bool facet_row_key_value_conflict_callback(const DICTIONARY_ITEM *item __
     FACET_ROW *row = data; (void)row;
 
     buffer_flush(rkv->wb);
-    buffer_strcat(rkv->wb, n_rkv->tmp && *n_rkv->tmp ? n_rkv->tmp : "[UNSET]");
+    buffer_strcat(rkv->wb, n_rkv->tmp && *n_rkv->tmp ? n_rkv->tmp : FACET_VALUE_UNSET);
 
     return false;
 }
@@ -244,11 +246,8 @@ static FACET_ROW *facets_row_create(FACETS *facets, usec_t usec, FACET_ROW *into
 
     FACET_KEY *k;
     dfe_start_read(facets->keys, k) {
-//        if(!buffer_strlen(k->current_value))
-//            continue;
-
         FACET_ROW_KEY_VALUE t = {
-                .tmp = buffer_strlen(k->current_value) ? buffer_tostring(k->current_value) : "[UNSET]",
+                .tmp = buffer_strlen(k->current_value) ? buffer_tostring(k->current_value) : FACET_VALUE_UNSET,
                 .wb = NULL,
         };
         dictionary_set(row->dict, k_dfe.name, &t, sizeof(t));
@@ -339,7 +338,7 @@ void facets_row_finished(FACETS *facets, usec_t usec) {
     dfe_start_read(facets->keys, k) {
         if(!k->key_found_in_row) {
             internal_fatal(buffer_strlen(k->current_value), "key is not found in row but it has a current value");
-            // put the [UNSET] value into it
+            // put the FACET_VALUE_UNSET value into it
             facets_check_value(facets, k);
         }
 
@@ -426,22 +425,58 @@ void facets_report(FACETS *facets, BUFFER *wb) {
     }
     buffer_json_array_close(wb); // facets
 
-    buffer_json_member_add_array(wb, "rows");
+    buffer_json_member_add_array(wb, "columns");
+    {
+        size_t field_id = 0;
+        buffer_rrdf_table_add_field(
+                wb, field_id++,
+                "timestamp", "Timestamp",
+                RRDF_FIELD_TYPE_TIMESTAMP,
+                RRDF_FIELD_VISUAL_VALUE,
+                RRDF_FIELD_TRANSFORM_DATETIME, 0, NULL, NAN,
+                RRDF_FIELD_SORT_DESCENDING,
+                NULL,
+                RRDF_FIELD_SUMMARY_COUNT,
+                RRDF_FIELD_FILTER_RANGE,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY | RRDF_FIELD_OPTS_UNIQUE_KEY,
+                NULL);
+
+        FACET_KEY *k;
+        dfe_start_read(facets->keys, k) {
+            buffer_rrdf_table_add_field(
+                    wb, field_id++,
+                    k_dfe.name, k_dfe.name,
+                    RRDF_FIELD_TYPE_STRING,
+                    RRDF_FIELD_VISUAL_VALUE,
+                    RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
+                    RRDF_FIELD_SORT_ASCENDING,
+                    NULL,
+                    RRDF_FIELD_SUMMARY_COUNT,
+                    k->values ? RRDF_FIELD_FILTER_FACET : RRDF_FIELD_FILTER_NONE,
+                    k->values ? RRDF_FIELD_OPTS_VISIBLE : RRDF_FIELD_OPTS_NONE,
+                    FACET_VALUE_UNSET);
+        }
+        dfe_done(k);
+    }
+    buffer_json_array_close(wb); // columns
+
+    buffer_json_member_add_array(wb, "data");
     {
         for(FACET_ROW *row = facets->base ; row ;row = row->next) {
-            buffer_json_add_array_item_object(wb); // row
+            buffer_json_add_array_item_array(wb); // each row
+            buffer_json_add_array_item_uint64(wb, row->usec);
+
+            FACET_KEY *k;
+            dfe_start_read(facets->keys, k)
             {
-                buffer_json_member_add_uint64(wb, "anchor", row->usec);
-                FACET_ROW_KEY_VALUE *rkv;
-                dfe_start_read(row->dict, rkv) {
-                    buffer_json_member_add_string(wb, rkv_dfe.name, buffer_tostring(rkv->wb));
-                }
-                dfe_done(rkv);
+                FACET_ROW_KEY_VALUE *rkv = dictionary_get(row->dict, k_dfe.name);
+                buffer_json_add_array_item_string(wb, rkv ? buffer_tostring(rkv->wb) : FACET_VALUE_UNSET);
             }
-            buffer_json_object_close(wb); // row
+            dfe_done(k);
+            buffer_json_array_close(wb); // each row
         }
     }
-    buffer_json_array_close(wb); // rows
+    buffer_json_array_close(wb); // data
 
     buffer_json_member_add_object(wb, "items");
     {

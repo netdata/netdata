@@ -307,11 +307,11 @@ void buffer_increase(BUFFER *b, size_t free_size_required) {
 // ----------------------------------------------------------------------------
 
 void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value_quote, int depth,
-                       bool add_anonymous_object, bool minify) {
+                       bool add_anonymous_object, BUFFER_JSON_OPTIONS options) {
     strncpyz(wb->json.key_quote, key_quote, BUFFER_QUOTE_MAX_SIZE);
     strncpyz(wb->json.value_quote,  value_quote, BUFFER_QUOTE_MAX_SIZE);
 
-    wb->json.minify = minify;
+    wb->json.options = options;
     wb->json.depth = (int8_t)(depth - 1);
     _buffer_json_depth_push(wb, BUFFER_JSON_OBJECT);
 
@@ -339,7 +339,7 @@ void buffer_json_finalize(BUFFER *wb) {
         }
     }
 
-    if(!wb->json.minify)
+    if(!(wb->json.options & BUFFER_JSON_OPTIONS_MINIFY))
         buffer_fast_strcat(wb, "\n", 1);
 }
 
@@ -490,13 +490,13 @@ int buffer_unittest(void) {
 
     buffer_flush(wb);
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     buffer_json_finalize(wb);
     errors += buffer_expect(wb, "{\n}\n");
 
     buffer_flush(wb);
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     buffer_json_member_add_string(wb, "hello", "world");
     buffer_json_member_add_string(wb, "alpha", "this: \" is a double quote");
     buffer_json_member_add_object(wb, "object1");

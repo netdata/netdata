@@ -1297,7 +1297,7 @@ int contexts_v2_alert_config_to_json(struct web_client *w, const char *config_ha
 
     buffer_flush(w->response.data);
 
-    buffer_json_initialize(w->response.data, "\"", "\"", 0, true, false);
+    buffer_json_initialize(w->response.data, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
     int added = sql_get_alert_configuration(configs, contexts_v2_alert_config_to_json_from_sql_alert_config_data, &data, false);
     buffer_json_finalize(w->response.data);
@@ -1939,8 +1939,8 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     else
         ctl.now = now_realtime_sec();
 
-    buffer_json_initialize(wb, "\"", "\"", 0,
-                           true, (req->options & CONTEXT_V2_OPTION_MINIFY) && !(req->options & CONTEXT_V2_OPTION_DEBUG));
+    buffer_json_initialize(wb, "\"", "\"", 0, true,
+                           ((req->options & CONTEXT_V2_OPTION_MINIFY) && !(req->options & CONTEXT_V2_OPTION_DEBUG)) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
 
     buffer_json_member_add_uint64(wb, "api", 2);
 

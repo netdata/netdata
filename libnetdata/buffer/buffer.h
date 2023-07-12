@@ -68,6 +68,12 @@ typedef enum __attribute__ ((__packed__)) {
     CT_APPLICATION_ZIP,
 } HTTP_CONTENT_TYPE;
 
+typedef enum __attribute__ ((__packed__)) {
+    BUFFER_JSON_OPTIONS_DEFAULT = 0,
+    BUFFER_JSON_OPTIONS_MINIFY = (1 << 0),
+    BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAYS = (1 << 1),
+} BUFFER_JSON_OPTIONS;
+
 typedef struct web_buffer {
     size_t size;            // allocation size of buffer, in bytes
     size_t len;             // current data length in buffer, in bytes
@@ -82,7 +88,7 @@ typedef struct web_buffer {
         char key_quote[BUFFER_QUOTE_MAX_SIZE + 1];
         char value_quote[BUFFER_QUOTE_MAX_SIZE + 1];
         int8_t depth;
-        bool minify;
+        BUFFER_JSON_OPTIONS options;
         BUFFER_JSON_NODE stack[BUFFER_JSON_MAX_DEPTH];
     } json;
 } BUFFER;
@@ -148,7 +154,7 @@ static inline void buffer_need_bytes(BUFFER *buffer, size_t needed_free_size) {
 }
 
 void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value_quote, int depth,
-                            bool add_anonymous_object, bool minify);
+                            bool add_anonymous_object, BUFFER_JSON_OPTIONS options);
 
 void buffer_json_finalize(BUFFER *wb);
 
@@ -668,7 +674,8 @@ static inline void buffer_print_json_comma_newline_spacing(BUFFER *wb) {
     if(wb->json.stack[wb->json.depth].count)
         buffer_fast_strcat(wb, ",", 1);
 
-    if(wb->json.minify)
+    if((wb->json.options & BUFFER_JSON_OPTIONS_MINIFY) ||
+        (wb->json.stack[wb->json.depth].type == BUFFER_JSON_ARRAY && !(wb->json.options & BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAYS)))
         return;
 
     buffer_fast_strcat(wb, "\n", 1);
@@ -715,7 +722,7 @@ static inline void buffer_json_object_close(BUFFER *wb) {
     assert(wb->json.depth >= 0 && "BUFFER JSON: nothing is open to close it");
     assert(wb->json.stack[wb->json.depth].type == BUFFER_JSON_OBJECT && "BUFFER JSON: an object is not open to close it");
 #endif
-    if(!wb->json.minify) {
+    if(!(wb->json.options & BUFFER_JSON_OPTIONS_MINIFY)) {
         buffer_fast_strcat(wb, "\n", 1);
         buffer_print_spaces(wb, wb->json.depth);
     }
@@ -801,48 +808,42 @@ static inline void buffer_json_add_array_item_array(BUFFER *wb) {
 }
 
 static inline void buffer_json_add_array_item_string(BUFFER *wb, const char *value) {
-    if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",", 1);
+    buffer_print_json_comma_newline_spacing(wb);
 
     buffer_json_add_string_value(wb, value);
     wb->json.stack[wb->json.depth].count++;
 }
 
 static inline void buffer_json_add_array_item_double(BUFFER *wb, NETDATA_DOUBLE value) {
-    if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",", 1);
+    buffer_print_json_comma_newline_spacing(wb);
 
     buffer_print_netdata_double(wb, value);
     wb->json.stack[wb->json.depth].count++;
 }
 
 static inline void buffer_json_add_array_item_int64(BUFFER *wb, int64_t value) {
-    if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",", 1);
+    buffer_print_json_comma_newline_spacing(wb);
 
     buffer_print_int64(wb, value);
     wb->json.stack[wb->json.depth].count++;
 }
 
 static inline void buffer_json_add_array_item_uint64(BUFFER *wb, uint64_t value) {
-    if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",", 1);
+    buffer_print_json_comma_newline_spacing(wb);
 
     buffer_print_uint64(wb, value);
     wb->json.stack[wb->json.depth].count++;
 }
 
 static inline void buffer_json_add_array_item_time_t(BUFFER *wb, time_t value) {
-    if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",", 1);
+    buffer_print_json_comma_newline_spacing(wb);
 
     buffer_print_int64(wb, value);
     wb->json.stack[wb->json.depth].count++;
 }
 
 static inline void buffer_json_add_array_item_time_ms(BUFFER *wb, time_t value) {
-    if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",", 1);
+    buffer_print_json_comma_newline_spacing(wb);
 
     buffer_print_int64(wb, value);
     buffer_fast_strcat(wb, "000", 3);
@@ -850,8 +851,7 @@ static inline void buffer_json_add_array_item_time_ms(BUFFER *wb, time_t value) 
 }
 
 static inline void buffer_json_add_array_item_time_t2ms(BUFFER *wb, time_t value) {
-    if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",", 1);
+    buffer_print_json_comma_newline_spacing(wb);
 
     buffer_print_int64(wb, value);
     buffer_fast_strcat(wb, "000", 3);
@@ -859,8 +859,7 @@ static inline void buffer_json_add_array_item_time_t2ms(BUFFER *wb, time_t value
 }
 
 static inline void buffer_json_add_array_item_object(BUFFER *wb) {
-    if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",", 1);
+    buffer_print_json_comma_newline_spacing(wb);
 
     buffer_fast_strcat(wb, "{", 1);
     wb->json.stack[wb->json.depth].count++;
@@ -919,6 +918,11 @@ static inline void buffer_json_array_close(BUFFER *wb) {
     assert(wb->json.depth >= 0 && "BUFFER JSON: nothing is open to close it");
     assert(wb->json.stack[wb->json.depth].type == BUFFER_JSON_ARRAY && "BUFFER JSON: an array is not open to close it");
 #endif
+    if(wb->json.options & BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAYS) {
+        buffer_fast_strcat(wb, "\n", 1);
+        buffer_print_spaces(wb, wb->json.depth);
+    }
+
     buffer_fast_strcat(wb, "]", 1);
     _buffer_json_depth_pop(wb);
 }
@@ -1064,18 +1068,26 @@ static inline const char *rrdf_field_summary_to_string(RRDF_FIELD_SUMMARY summar
 }
 
 typedef enum __attribute__((packed)) {
+    RRDF_FIELD_FILTER_NONE,
     RRDF_FIELD_FILTER_RANGE,
     RRDF_FIELD_FILTER_MULTISELECT,
+    RRDF_FIELD_FILTER_FACET,
 } RRDF_FIELD_FILTER;
 
 static inline const char *rrdf_field_filter_to_string(RRDF_FIELD_FILTER filter) {
     switch(filter) {
-        default:
         case RRDF_FIELD_FILTER_RANGE:
             return "range";
 
         case RRDF_FIELD_FILTER_MULTISELECT:
             return "multiselect";
+
+        case RRDF_FIELD_FILTER_FACET:
+            return "facet";
+
+        default:
+        case RRDF_FIELD_FILTER_NONE:
+            return "none";
     }
 }
 

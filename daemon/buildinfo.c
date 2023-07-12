@@ -1469,7 +1469,7 @@ void print_build_info_json(void) {
     populate_directories();
 
     BUFFER *b = buffer_create(0, NULL);
-    buffer_json_initialize(b, "\"", "\"", 0, true, false);
+    buffer_json_initialize(b, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
     build_info_to_json_object(b);
 
