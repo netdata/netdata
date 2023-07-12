@@ -130,4 +130,5 @@ struct rrdb rrdb = {
     .rrdset_free_obsolete_time_s = RRD_DEFAULT_HISTORY_ENTRIES,
     .libuv_worker_threads = MIN_LIBUV_WORKER_THREADS,
     .ieee754_doubles = false,
+    .rrdhost_free_orphan_time_s = RRD_DEFAULT_HISTORY_ENTRIES,
 };

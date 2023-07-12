@@ -23,8 +23,6 @@ size_t get_tier_grouping(size_t tier) {
 RRDHOST *localhost = NULL;
 netdata_rwlock_t rrd_rwlock = NETDATA_RWLOCK_INITIALIZER;
 
-time_t rrdhost_free_orphan_time_s = 3600;
-
 bool is_storage_engine_shared(STORAGE_INSTANCE *engine __maybe_unused) {
 #ifdef ENABLE_DBENGINE
     if(!rrdeng_is_legacy(engine))
@@ -788,7 +786,7 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
        && !rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)
        && !host->receiver
        && host->child_disconnected_time
-       && host->child_disconnected_time + rrdhost_free_orphan_time_s < now_s)
+       && host->child_disconnected_time + rrdb.rrdhost_free_orphan_time_s < now_s)
         return 1;
 
     return 0;
