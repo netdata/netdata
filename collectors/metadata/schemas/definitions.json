@@ -2,10 +2,11 @@
   "definitions": {
     "category": {
       "type": "object",
-      "description": "Category object, with an entry per category depth.",
+      "description": "Category and subcategory of the collector/monitored instance.",
       "properties": {
-        "level_0": {
+        "level0": {
           "type": "string",
+          "description": "Category name",
           "oneOf": [
             {
               "enum": [
@@ -14,8 +15,9 @@
             }
           ]
         },
-        "level_1": {
+        "level1": {
           "type": "string",
+          "description": "Subcategory name",
           "oneOf": [
             {
               "enum": [
