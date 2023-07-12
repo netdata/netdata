@@ -52,64 +52,24 @@ dist_webv2staticimg_DATA = \\
     {3} \\
     $(NULL)
 
-webv2staticimgintegrationsdir=$(webv2staticimgdir)/integrations
-dist_webv2staticimgintegrations_DATA = \\
-    {4} \\
-    $(NULL)
-
 webv2staticimglogososdir=$(webv2staticimgdir)/logos/os
 dist_webv2staticimglogosos_DATA = \\
-    {5} \\
+    {4} \\
     $(NULL)
 
 webv2staticimglogosservicesdir=$(webv2staticimgdir)/logos/services
 dist_webv2staticimglogosservices_DATA = \\
-    {6} \\
+    {5} \\
     $(NULL)
 
 webv2staticimgmaildir=$(webv2staticimgdir)/mail
 dist_webv2staticimgmail_DATA = \\
-    {7} \\
-    $(NULL)
-
-webv2staticsitealarmsdir=$(webv2staticdir)/site/alarms
-dist_webv2staticsitealarms_DATA = \\
-    {8} \\
-    $(NULL)
-
-webv2staticsitepageserror404dir=$(webv2staticdir)/site/pages/error-404
-dist_webv2staticsitepageserror404_DATA = \\
-    {9} \\
-    $(NULL)
-
-webv2staticsitepageserror500dir=$(webv2staticdir)/site/pages/error-500
-dist_webv2staticsitepageserror500_DATA = \\
-    {10} \\
-    $(NULL)
-
-webv2staticsitepageserror501dir=$(webv2staticdir)/site/pages/error-501
-dist_webv2staticsitepageserror501_DATA = \\
-    {11} \\
-    $(NULL)
-
-webv2staticsitepageserror502dir=$(webv2staticdir)/site/pages/error-502
-dist_webv2staticsitepageserror502_DATA = \\
-    {12} \\
-    $(NULL)
-
-webv2staticsitepageserror503dir=$(webv2staticdir)/site/pages/error-503
-dist_webv2staticsitepageserror503_DATA = \\
-    {13} \\
-    $(NULL)
-
-webv2staticsitepageserror5xxdir=$(webv2staticdir)/site/pages/error-5xx
-dist_webv2staticsitepageserror5xx_DATA = \\
-    {14} \\
+    {6} \\
     $(NULL)
 
 webv2staticsitepagesholding503dir=$(webv2staticdir)/site/pages/holding-page-503
 dist_webv2staticsitepagesholding503_DATA = \\
-    {15} \\
+    {7} \\
     $(NULL)
 '''
 
@@ -126,9 +86,11 @@ def copy_dashboard():
     subprocess.check_call(f"tar -xvf agent.tar -C { TMPPATH } --strip-components=1 --exclude='*.br' --exclude='*.gz'", shell=True)
     print('::endgroup::')
     print('Copying files')
-    (TMPPATH / BASEDIR).rename(BASEPATH)
-    (TMPPATH / 'index.html').rename(Path('./v2live.html'))
-    shutil.copytree(TMPPATH / 'static', Path('./static'), dirs_exist_ok=True)
+    (TMPPATH / 'agent' / BASEDIR).rename(BASEPATH)
+    (TMPPATH / 'agent' / 'index.html').rename(Path('./v2live.html'))
+    (TMPPATH / 'agent' / 'registry-access.html').rename('./registry-access.html')
+    (TMPPATH / 'agent' / 'registry-alert-redirect.html').rename('./registry-alert-redirect.html')
+    shutil.copytree(TMPPATH / 'agent' / 'static', Path('./static'), dirs_exist_ok=True)
     shutil.rmtree(TMPPATH)
     print('Copying README.md')
     BASEPATH.joinpath('README.md').symlink_to('../.dashboard-v2-notice.md')
@@ -152,17 +114,9 @@ def write_makefile():
         genfilelist(BASEPATH.joinpath('static')),
         genfilelist(BASEPATH.joinpath('static', 'email', 'img')),
         genfilelist(BASEPATH.joinpath('static', 'img')),
-        genfilelist(BASEPATH.joinpath('static', 'img', 'integrations')),
         genfilelist(BASEPATH.joinpath('static', 'img', 'logos', 'os')),
         genfilelist(BASEPATH.joinpath('static', 'img', 'logos', 'services')),
         genfilelist(BASEPATH.joinpath('static', 'img', 'mail')),
-        genfilelist(BASEPATH.joinpath('static', 'site', 'alarms')),
-        genfilelist(BASEPATH.joinpath('static', 'site', 'pages', 'error-404')),
-        genfilelist(BASEPATH.joinpath('static', 'site', 'pages', 'error-500')),
-        genfilelist(BASEPATH.joinpath('static', 'site', 'pages', 'error-501')),
-        genfilelist(BASEPATH.joinpath('static', 'site', 'pages', 'error-502')),
-        genfilelist(BASEPATH.joinpath('static', 'site', 'pages', 'error-503')),
-        genfilelist(BASEPATH.joinpath('static', 'site', 'pages', 'error-5xx')),
         genfilelist(BASEPATH.joinpath('static', 'site', 'pages', 'holding-page-503')),
     )
 
