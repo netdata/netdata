@@ -431,11 +431,46 @@
         "link": {
           "description": "Link to the monitored instance official website if any.",
           "type": "string"
+        },
+        "categories": {
+          "type": "array",
+          "description": "An array defining the category the integration falls on.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path0": {
+                "type": "string",
+                "oneOf": [
+                  {
+                    "enum": [
+                      "data-collection"
+                    ]
+                  }
+                ]
+              },
+              "path1": {
+                "type": "string",
+                "oneOf": [
+                  {
+                    "enum": [
+                      "databases",
+                      "web-servers",
+                      "message-brokers",
+                      "hardware-and-sensors",
+                      "operating-systems",
+                      "containers-and-vms"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
         }
       },
       "required": [
         "name",
-        "link"
+        "link",
+        "categories"
       ]
     }
   }
