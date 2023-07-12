@@ -840,8 +840,6 @@ extern char *netdata_configured_host_prefix;
 // BEWARE: this exists in alarm-notify.sh
 #define DEFAULT_CLOUD_BASE_URL "https://app.netdata.cloud"
 
-#define RRD_STORAGE_TIERS 5
-
 static inline size_t struct_natural_alignment(size_t size) __attribute__((const));
 
 #define STRUCT_NATURAL_ALIGNMENT (sizeof(uintptr_t) * 2)

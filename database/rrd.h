@@ -41,6 +41,7 @@ typedef enum __attribute__ ((__packed__)) {
     QUERY_SOURCE_UNITTEST,
 } QUERY_SOURCE;
 
+#define RRD_STORAGE_TIERS 5
 
 // forward declarations
 struct rrddim_tier;
