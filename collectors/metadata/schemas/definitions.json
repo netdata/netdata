@@ -1,5 +1,36 @@
 {
   "definitions": {
+    "category": {
+      "type": "object",
+      "description": "Category object, with an entry per category depth.",
+      "properties": {
+        "level_0": {
+          "type": "string",
+          "oneOf": [
+            {
+              "enum": [
+                "data-collection"
+              ]
+            }
+          ]
+        },
+        "level_1": {
+          "type": "string",
+          "oneOf": [
+            {
+              "enum": [
+                "databases",
+                "web-servers",
+                "message-brokers",
+                "hardware-and-sensors",
+                "operating-systems",
+                "containers-and-vms"
+              ]
+            }
+          ]
+        }
+      }
+    },
     "alerts": {
       "type": "array",
       "description": "The list of configured alerts shipped with Netdata for this collector.",

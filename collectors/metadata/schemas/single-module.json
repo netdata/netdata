@@ -15,7 +15,7 @@
       "type": "array",
       "description": "An array defining the categories the integration falls into.",
       "items": {
-        "$ref": "#/$defs/_category"
+        "$ref": "./definitions.json#/definitions/category"
       }
     },
     "icon_path": {
@@ -37,7 +37,7 @@
             "type": "array",
             "description": "An array defining the categories the integration falls into.",
             "items": {
-              "$ref": "#/$defs/_category"
+              "$ref": "./definitions.json#/definitions/category"
             }
           },
           "icon_path": {
@@ -456,37 +456,6 @@
     "metrics"
   ],
   "$defs": {
-    "_category": {
-      "type": "object",
-      "description": "Category object, with an entry per category depth.",
-      "properties": {
-        "path0": {
-          "type": "string",
-          "oneOf": [
-            {
-              "enum": [
-                "data-collection"
-              ]
-            }
-          ]
-        },
-        "path1": {
-          "type": "string",
-          "oneOf": [
-            {
-              "enum": [
-                "databases",
-                "web-servers",
-                "message-brokers",
-                "hardware-and-sensors",
-                "operating-systems",
-                "containers-and-vms"
-              ]
-            }
-          ]
-        }
-      }
-    },
     "_monitored_instance": {
       "type": "object",
       "description": "Information about the monitored instance (metrics source).",
