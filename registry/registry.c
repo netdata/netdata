@@ -33,11 +33,13 @@ static void registry_set_cookie(struct web_client *w, const char *guid) {
     strftime(e_date, sizeof(e_date), "%a, %d %b %Y %H:%M:%S %Z", etm);
 
     buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s\r\n", guid, e_date);
+    buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; SameSite=Strict; Expires=%s\r\n", guid, e_date);
     if(registry.enable_cookies_samesite_secure)
         buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; SameSite=None; Secure\r\n", guid, e_date);
 
     if(registry.registry_domain && *registry.registry_domain) {
         buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; Domain=%s\r\n", guid, e_date, registry.registry_domain);
+        buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; Domain=%s; SameSite=Strict\r\n", guid, e_date, registry.registry_domain);
         if(registry.enable_cookies_samesite_secure)
             buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; Domain=%s; SameSite=None; Secure\r\n", guid, e_date, registry.registry_domain);
     }
@@ -166,16 +168,26 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w) {
     if(host->node_id)
         buffer_json_member_add_uuid(w->response.data, "node_id", host->node_id);
 
-    char *claim_id = get_agent_claimid();
-    if(claim_id) {
-        buffer_json_member_add_string(w->response.data, "claim_id", claim_id);
-        freez(claim_id);
+    buffer_json_member_add_object(w->response.data, "agent");
+    {
+        buffer_json_member_add_string(w->response.data, "machine_guid", localhost->machine_guid);
+
+        if(localhost->node_id)
+            buffer_json_member_add_uuid(w->response.data, "node_id", localhost->node_id);
+
+        char *claim_id = get_agent_claimid();
+        if (claim_id) {
+            buffer_json_member_add_string(w->response.data, "claim_id", claim_id);
+            freez(claim_id);
+        }
+
+        buffer_json_member_add_boolean(w->response.data, "bearer_protection", netdata_is_protected_by_bearer);
     }
+    buffer_json_object_close(w->response.data);
 
     buffer_json_member_add_string(w->response.data, "registry", registry.registry_to_announce);
     buffer_json_member_add_string(w->response.data, "cloud_base_url", registry.cloud_base_url);
     buffer_json_member_add_boolean(w->response.data, "anonymous_statistics", netdata_anonymous_statistics_enabled);
-    buffer_json_member_add_boolean(w->response.data, "bearer_protection", netdata_is_protected_by_bearer);
 
     buffer_json_member_add_array(w->response.data, "nodes");
     RRDHOST *h;
@@ -296,19 +308,19 @@ int registry_request_delete_json(RRDHOST *host, struct web_client *w, char *pers
 // public SEARCH request
 
 // the main method for searching the URLs of a netdata
-int registry_request_search_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url, char *request_machine, time_t when) {
+int registry_request_search_json(RRDHOST *host, struct web_client *w, char *person_guid, char *request_machine) {
     if(!registry.enabled)
         return registry_json_disabled(host, w, "search");
 
-    if(!registry_is_valid_url(url)) {
-        buffer_flush(w->response.data);
-        buffer_strcat(w->response.data, "Invalid URL given in the request");
-        return HTTP_RESP_BAD_REQUEST;
+    if(!person_guid || !person_guid[0]) {
+        registry_json_header(host, w, "search", REGISTRY_STATUS_FAILED);
+        registry_json_footer(w);
+        return HTTP_RESP_PRECOND_FAIL;
     }
 
     registry_lock();
 
-    REGISTRY_MACHINE *m = registry_request_machine(person_guid, machine_guid, url, request_machine, when);
+    REGISTRY_MACHINE *m = registry_request_machine(person_guid, request_machine);
     if(!m) {
         registry_json_header(host, w, "search", REGISTRY_STATUS_FAILED);
         registry_json_footer(w);
@@ -338,6 +350,12 @@ int registry_request_search_json(RRDHOST *host, struct web_client *w, char *pers
 int registry_request_switch_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url __maybe_unused, char *new_person_guid, time_t when __maybe_unused) {
     if(!registry.enabled)
         return registry_json_disabled(host, w, "switch");
+
+    if(!person_guid || !person_guid[0]) {
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "Who are you? Person GUID is missing");
+        return HTTP_RESP_PRECOND_FAIL;
+    }
 
     if(!registry_is_valid_url(url)) {
         buffer_flush(w->response.data);
@@ -494,16 +512,16 @@ void registry_statistics(void) {
     }
 
     struct aral_statistics *p_aral_stats = aral_statistics(registry.persons_aral);
-    rrddim_set(stm, "persons",       (collected_number)p_aral_stats->structures.allocated_bytes + (collected_number)p_aral_stats->malloc.allocated_bytes);
+    rrddim_set(stm, "persons",       (collected_number)p_aral_stats->structures.allocated_bytes + (collected_number)p_aral_stats->malloc.allocated_bytes + (collected_number)p_aral_stats->mmap.allocated_bytes);
 
     struct aral_statistics *m_aral_stats = aral_statistics(registry.machines_aral);
-    rrddim_set(stm, "machines",      (collected_number)m_aral_stats->structures.allocated_bytes + (collected_number)m_aral_stats->malloc.allocated_bytes);
+    rrddim_set(stm, "machines",      (collected_number)m_aral_stats->structures.allocated_bytes + (collected_number)m_aral_stats->malloc.allocated_bytes + (collected_number)m_aral_stats->mmap.allocated_bytes);
 
     struct aral_statistics *pu_aral_stats = aral_statistics(registry.person_urls_aral);
-    rrddim_set(stm, "persons_urls",  (collected_number)pu_aral_stats->structures.allocated_bytes + (collected_number)pu_aral_stats->malloc.allocated_bytes);
+    rrddim_set(stm, "persons_urls",  (collected_number)pu_aral_stats->structures.allocated_bytes + (collected_number)pu_aral_stats->malloc.allocated_bytes + (collected_number)pu_aral_stats->mmap.allocated_bytes);
 
     struct aral_statistics *mu_aral_stats = aral_statistics(registry.machine_urls_aral);
-    rrddim_set(stm, "machines_urls", (collected_number)mu_aral_stats->structures.allocated_bytes + (collected_number)mu_aral_stats->malloc.allocated_bytes);
+    rrddim_set(stm, "machines_urls", (collected_number)mu_aral_stats->structures.allocated_bytes + (collected_number)mu_aral_stats->malloc.allocated_bytes + (collected_number)mu_aral_stats->mmap.allocated_bytes);
 
     rrdset_done(stm);
 }

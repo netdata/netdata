@@ -81,8 +81,9 @@ static bool prepare_command(BUFFER *wb,
                             const char *crit_alarms,
                             const char *classification,
                             const char *edit_command,
-                            const char *machine_guid)
-{
+                            const char *machine_guid,
+                            uuid_t *transition_id
+) {
     char buf[8192];
     size_t n = 8192 - 1;
 
@@ -185,6 +186,12 @@ static bool prepare_command(BUFFER *wb,
     buffer_sprintf(wb, " '%s'", buf);
 
     if (!sanitize_command_argument_string(buf, machine_guid, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    char tr_id[UUID_STR_LEN];
+    uuid_unparse_lower(*transition_id, tr_id);
+    if (!sanitize_command_argument_string(buf, tr_id, n))
         return false;
     buffer_sprintf(wb, " '%s'", buf);
 
@@ -575,7 +582,8 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                               buffer_tostring(crit_alarms),
                               ae->classification?ae_classification(ae):"Unknown",
                               edit_command,
-                              host != localhost ? host->machine_guid:"");
+                              host->machine_guid,
+                              &ae->transition_id);
 
     const char *command_to_run = buffer_tostring(wb);
     if (ok) {

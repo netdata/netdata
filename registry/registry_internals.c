@@ -209,63 +209,38 @@ REGISTRY_PERSON *registry_request_delete(const char *person_guid, char *machine_
 }
 
 
-// a structure to pass to the dictionary_walkthrough_read() callback handler
-struct machine_request_callback_data {
-    REGISTRY_MACHINE *find_this_machine;
-    REGISTRY_PERSON_URL *result;
-};
-
-// the callback function
-// this will be run for every PERSON_URL of this PERSON
-static int machine_request_callback(void *entry, void *data) {
-    REGISTRY_PERSON_URL *mypu = (REGISTRY_PERSON_URL *)entry;
-    struct machine_request_callback_data *myrdata = (struct machine_request_callback_data *)data;
-
-    if(mypu->machine == myrdata->find_this_machine) {
-        myrdata->result = mypu;
-        return -1; // this will also stop the walk through
-    }
-
-    return 0; // continue
-}
-
-REGISTRY_MACHINE *registry_request_machine(const char *person_guid, char *machine_guid, char *url, char *request_machine, time_t when) {
-    (void)when;
-
+REGISTRY_MACHINE *registry_request_machine(const char *person_guid, char *request_machine) {
+    char pbuf[GUID_LEN + 1];
     char mbuf[GUID_LEN + 1];
 
-    REGISTRY_PERSON *p = NULL;
-    REGISTRY_MACHINE *m = NULL;
-    REGISTRY_PERSON_URL *pu = registry_verify_request(person_guid, machine_guid, url, &p, &m);
-    if(!pu || !p || !m) return NULL;
+    // make sure the person GUID is valid
+    if(regenerate_guid(person_guid, pbuf) == -1) {
+        netdata_log_info("REGISTRY: %s(): invalid person GUID '%s'", __FUNCTION__ , person_guid);
+        return NULL;
+    }
+    person_guid = pbuf;
 
-    // make sure the machine GUID is valid
+    // make sure the person GUID is valid
     if(regenerate_guid(request_machine, mbuf) == -1) {
-        netdata_log_info("Registry Machine URLs request: invalid machine GUID, person: '%s', machine '%s', url '%s', request machine '%s'", p->guid, m->guid, string2str(pu->url), request_machine);
+        netdata_log_info("REGISTRY: %s(): invalid search machine GUID '%s'", __FUNCTION__ , request_machine);
         return NULL;
     }
     request_machine = mbuf;
 
-    // make sure the machine exists
-    m = registry_machine_find(request_machine);
-    if(!m) {
-        netdata_log_info("Registry Machine URLs request: machine not found, person: '%s', machine '%s', url '%s', request machine '%s'", p->guid, machine_guid, string2str(pu->url), request_machine);
-        return NULL;
-    }
+    REGISTRY_PERSON *p = registry_person_find(person_guid);
+    if(!p) return NULL;
+
+    REGISTRY_MACHINE *m = registry_machine_find(request_machine);
+    if(!m) return NULL;
 
     // Verify the user has in the past accessed this machine
     // We will walk through the PERSON_URLs to find the machine
     // linking to our machine
 
-    // a structure to pass to the dictionary_walkthrough_read() callback handler
-    struct machine_request_callback_data rdata = { m, NULL };
-
-    // request a walk through on the dictionary
-    for(pu = p->person_urls; pu ;pu = pu->next)
-        machine_request_callback(pu, &rdata);
-
-    if(rdata.result)
-        return m;
+    // make sure the user has access
+    for(REGISTRY_PERSON_URL *pu = p->person_urls; pu ;pu = pu->next)
+        if(pu->machine == m)
+            return m;
 
     return NULL;
 }
