@@ -1169,7 +1169,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
             netdata_log_debug(D_LOGS_MANAG, "Item %d (type: TIME - 1st of 2 fields):%.*s", i, (int)field_size, field);
             #endif
 
-            // TODO: What if TIME equals = ??
+            // TODO: What if TIME is invalid?
             // if(field[0] ==  '-' && field_size == 1) { 
             //     log_line_parsed->timestamp = 0;
             //     log_line_parsed->parsing_errors++;
@@ -1187,41 +1187,39 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
             struct tm ltm = {0};
             char *second_part = strptime(datetime, "%d/%b/%Y:%H:%M:%S", &ltm);
             if(unlikely(second_part == NULL)){
-                printf("TIME datetime parsing failed\n");
+                collector_error("TIME datetime parsing failed");
                 log_line_parsed->timestamp = 0;
                 log_line_parsed->parsing_errors++;
-                // ++i;
                 goto next_item;
             }
 
-            /* Deal with 2nd part of datetime i.e. timezone
-             * TODO: Error handling in case the second part is not timezone?? */
+            /* Deal with 2nd part of datetime i.e. timezone */
 
             m_assert(*second_part == ' ', "Invalid TIME second_part");
             ++second_part;
             m_assert(*second_part == '+' || *second_part == '-', "Invalid TIME second_part");
+            char timezone_sign = *second_part;
 
             char *second_part_end = ++second_part;
-            while(  *second_part_end != ']' && 
-                    *second_part_end != ' ' && 
-                    *second_part != '\n' && 
-                    *second_part != '\r') {second_part_end++;};
+            while(*second_part_end != ']') second_part_end++;
             size_t second_part_size = second_part_end - second_part;
 
             // TODO: Get rid of strndup() - find alternative that doesn't require strtol()
-            second_part = strndup(second_part, second_part_size); 
+            second_part = strndup(second_part, second_part_end - second_part); 
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "TIME 2nd part: %.*s", (int)second_part_size, second_part);
+            netdata_log_debug(D_LOGS_MANAG, "TIME 2nd part: %.*s", (int)(second_part_end - second_part), second_part);
             #endif
             
             long int timezone = strtol(second_part, NULL, 10);
             long int timezone_h = timezone / 100;
             long int timezone_m = timezone % 100;
+            int64_t timezone_adj = (int64_t) timezone_h * 3600 + (int64_t) timezone_m * 60;
+            if(timezone_sign == '+') timezone_adj *= -1; // if timezone is positive, we need to subtract it to get GMT
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
             netdata_log_debug(D_LOGS_MANAG, "Timezone: int:%ld, hrs:%ld, mins:%ld", timezone, timezone_h, timezone_m);
             #endif
 
-            log_line_parsed->timestamp = (int64_t) mktime(&ltm) + (int64_t) timezone_h * 3600 + (int64_t) timezone_m * 60;
+            log_line_parsed->timestamp = mktime(&ltm) + timezone_adj;
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
             netdata_log_debug(D_LOGS_MANAG, "Extracted TIME:%ld", log_line_parsed->timestamp);
             #endif

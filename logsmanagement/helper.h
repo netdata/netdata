@@ -211,10 +211,7 @@ static inline char *read_last_line(const char *filename, int max_line_width){
         goto error;
     }
     
-    if(end_pos == 0){
-        m_assert(0, "end_pos == 0 during read_last_line()");
-        goto error;
-    } 
+    if(end_pos == 0) goto error; 
     start_pos = end_pos - max_line_width;
     if(start_pos < 0) start_pos = 0;
 
@@ -261,7 +258,6 @@ static inline char *read_last_line(const char *filename, int max_line_width){
     }
 
 error:
-    // Should not get here - error line too long
     if(buff) freez(buff);
     if(file_handle >= 0) uv_fs_close(NULL, &req, file_handle, NULL);
     return NULL;
