@@ -701,6 +701,9 @@ static void logs_management_init(uv_loop_t *main_loop,
         wblp_config->verify_parsed_logs = appconfig_get_boolean( &log_management_config, config_section->name, 
                                                                     "verify parsed logs", CONFIG_BOOLEAN_NO);
         collector_info("[%s]: verify parsed logs = %d", p_file_info->chart_name, wblp_config->verify_parsed_logs);
+
+        wblp_config->skip_timestamp_parsing = p_file_info->use_log_timestamp ? 0 : 1;
+        collector_info("[%s]: skip_timestamp_parsing = %d", p_file_info->chart_name, wblp_config->skip_timestamp_parsing);
         
         for(int j = 0; j < wblp_config->num_fields; j++){
             if((wblp_config->fields[j] == VHOST_WITH_PORT || wblp_config->fields[j] == VHOST) 

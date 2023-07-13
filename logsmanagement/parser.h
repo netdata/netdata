@@ -90,8 +90,6 @@ typedef struct log_parser_config{
 
 /* Web log configuration */
 #define ENABLE_PARSE_WEB_LOG_LINE_DEBUG 0
-#define MEASURE_WEB_LOG_PARSE_EXTRACT_TIME 0
-#define SKIP_WEB_LOG_TIME_PARSING 0
 
 #define LOG_PARSER_METRICS_VHOST_BUFFS_SCALE_FACTOR 1.5
 #define LOG_PARSER_METRICS_PORT_BUFFS_SCALE_FACTOR 8 // Unlike Vhosts, ports are stored as integers, so scale factor can be much bigger without significant waste of memory
@@ -124,6 +122,7 @@ typedef struct web_log_parser_config{
     int num_fields;             		/**< Number of strings in the fields array. **/
     char delimiter;       				/**< Delimiter that separates the fields in the log format. **/
     int verify_parsed_logs;				/**< Boolean whether to try and verify parsed log fields or not **/
+    int skip_timestamp_parsing;         /**< Boolean whether to skip parsing of timestamp fields **/
 } Web_log_parser_config_t;
 
 static const char *const req_method_str[] = {

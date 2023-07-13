@@ -4,7 +4,6 @@
  *  @brief API to parse and search logs
  */
 
-#if SKIP_WEB_LOG_TIME_PARSING == 0
 #if !defined(_XOPEN_SOURCE) && !defined(__DARWIN__) && !defined(__APPLE__) && !defined(__FreeBSD__)
 /* _XOPEN_SOURCE 700 required by strptime (POSIX 2004) and strndup (POSIX 2008)
  * Will need to find a cleaner way of doing this, as currently defining
@@ -17,7 +16,6 @@
 #define _DEFAULT_SOURCE 
 #include <time.h>
 #endif
-#endif // SKIP_WEB_LOG_TIME_PARSING
 
 #include "parser.h"
 #include "helper.h"
@@ -1159,12 +1157,13 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
 
         if(fields_format[i] == TIME){
 
-#if SKIP_WEB_LOG_TIME_PARSING
-            while(*offset != ']') {offset++;};
-            i++;
-            offset++;
-            goto next_item;
-#else
+            if(wblp_config->skip_timestamp_parsing){
+                while(*offset != ']') {offset++;};
+                i++;
+                offset++;
+                goto next_item;
+            }
+
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
             netdata_log_debug(D_LOGS_MANAG, "Item %d (type: TIME - 1st of 2 fields):%.*s", i, (int)field_size, field);
             #endif
@@ -1202,7 +1201,6 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
 
             char *second_part_end = ++second_part;
             while(*second_part_end != ']') second_part_end++;
-            size_t second_part_size = second_part_end - second_part;
 
             // TODO: Get rid of strndup() - find alternative that doesn't require strtol()
             second_part = strndup(second_part, second_part_end - second_part); 
@@ -1231,7 +1229,6 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
             ++i; // TIME takes up 2 fields_format[] spaces, so skip the next one
 
             goto next_item;
-#endif // SKIP_WEB_LOG_TIME_PARSING
         }
 
 next_item:
