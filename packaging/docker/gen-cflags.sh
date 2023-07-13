@@ -5,5 +5,5 @@ if [ -n "${CFLAGS}" ]; then
 elif [ -n "${DEBUG_BUILD}" ]; then
     echo "-Og -ggdb -pipe"
 else
-    echo "ffunction-sections -fdata-sections -O2 -pipe"
+    echo "-O2 -pipe"
 fi
