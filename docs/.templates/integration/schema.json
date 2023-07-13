@@ -17,17 +17,6 @@
                                 "type": "string",
                                 "description": "Name of the category. This is the actual name of the category or subcategory, (e.g. Web Servers, Operating Systems, Databases)."
                             },
-                            "limit_results": {
-                                "type": [
-                                    "null",
-                                    "integer"
-                                ],
-                                "description": "A value that if set to an integer will limit the amount of subitems that this category will display. Additional subcategories will be hidden behind a `Show more` field."
-                            },
-                            "icon_name": {
-                                "type": "string",
-                                "description": "The name of the icon from the Netdata UI."
-                            },
                             "description": {
                                 "type": "string",
                                 "description": "Text that will be presented below the category title."
@@ -37,13 +26,13 @@
                                 "description": "Priority of the category. A number expressing where the category should be in the menu. The smaller the number the higher the priority, so a category with priority 1 would be above a category with a priority of 50 in terms of menu ordering."
                             },
                             "id": {
-                                "type": "integer",
+                                "type": "string",
                                 "description": "ID of the category that will be used by integrations, this is a unique number for each category that will be used by its children to refer to it as their parent."
                             },
                             "parent_id": {
                                 "type": [
                                     "null",
-                                    "integer"
+                                    "string"
                                 ],
                                 "description": "The category's parent ID. If this category is a subcategory, then it needs to mention its parent, where it belongs to. Make it null if no parent and this is a top level category."
                             }
@@ -59,8 +48,8 @@
                 "type": "object",
                 "properties": {
                     "id": {
-                        "type": "integer",
-                        "description": "A unique numeric identifier for the integration."
+                        "type": "string",
+                        "description": "A unique string identifier for the integration."
                     },
                     "name": {
                         "type": "string"
@@ -72,7 +61,7 @@
                             "type": "object",
                             "properties": {
                                 "category_id": {
-                                    "type": "integer",
+                                    "type": "string",
                                     "description": "The category_ID for this integration."
                                 },
                                 "priority": {

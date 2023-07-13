@@ -1,20 +1,12 @@
 meta:
   plugin_name: ""
   module_name: ""
+  alternative_monitored_instances: []
   monitored_instance:
     name: ""
     link: ""
-    icon_path: ""
-    categories:
-      - level0: data-collection
-        level1: databases
-  alternative_monitored_instances:
-    - name: ""
-      link: ""
-      icon_path: ""
-      categories:
-        - level0: data-collection
-          level1: containers-and-vms
+    categories: []
+    icon_filename: ""
   related_resources:
     integrations:
       list:
@@ -22,8 +14,8 @@ meta:
           module_name: ""
   info_provided_to_referring_integrations:
     description: ""
-  keywords:
-    - ""
+  keywords: []
+  most_popular: false
 overview:
   data_collection:
     metrics_description: ""

@@ -19,51 +19,21 @@
             "$ref": "#/definitions/category"
           }
         },
-        "icon_path": {
+        "icon_filename": {
           "type": "string",
-          "description": "Path to the integration's icon."
+          "description": "The filename of the integration's icon, as sourced from https://github.com/netdata/website/tree/master/themes/tailwind/static/img."
         }
       },
       "required": [
         "name",
         "link",
         "categories",
-        "icon_path"
+        "icon_filename"
       ]
     },
     "category": {
-      "type": "object",
-      "description": "Category and subcategory of the collector/monitored instance.",
-      "properties": {
-        "level0": {
-          "type": "string",
-          "description": "Category name",
-          "oneOf": [
-            {
-              "enum": [
-                "data-collection"
-              ]
-            }
-          ]
-        },
-        "level1": {
-          "type": "string",
-          "description": "Subcategory name",
-          "oneOf": [
-            {
-              "enum": [
-                "most-popular",
-                "databases",
-                "web-servers",
-                "message-brokers",
-                "hardware-and-sensors",
-                "operating-systems",
-                "containers-and-vms"
-              ]
-            }
-          ]
-        }
-      }
+      "type": "string",
+      "description": "String defining integration category"
     },
     "alerts": {
       "type": "array",
