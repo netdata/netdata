@@ -993,8 +993,9 @@ static inline const char *rrdf_field_visual_to_string(RRDF_FIELD_VISUAL visual) 
 typedef enum __attribute__((packed)) {
     RRDF_FIELD_TRANSFORM_NONE,      // show the value as-is
     RRDF_FIELD_TRANSFORM_NUMBER,    // show the value repsecting the decimal_points
-    RRDF_FIELD_TRANSFORM_DURATION,  // transform as duration in second to a human readable duration
-    RRDF_FIELD_TRANSFORM_DATETIME,  // UNIX epoch timestamp in ms
+    RRDF_FIELD_TRANSFORM_DURATION_S,  // transform as duration in second to a human readable duration
+    RRDF_FIELD_TRANSFORM_DATETIME_MS,  // UNIX epoch timestamp in ms
+    RRDF_FIELD_TRANSFORM_DATETIME_USEC,  // UNIX epoch timestamp in usec
 } RRDF_FIELD_TRANSFORM;
 
 static inline const char *rrdf_field_transform_to_string(RRDF_FIELD_TRANSFORM transform) {
@@ -1006,11 +1007,14 @@ static inline const char *rrdf_field_transform_to_string(RRDF_FIELD_TRANSFORM tr
         case RRDF_FIELD_TRANSFORM_NUMBER:
             return "number";
 
-        case RRDF_FIELD_TRANSFORM_DURATION:
+        case RRDF_FIELD_TRANSFORM_DURATION_S:
             return "duration";
 
-        case RRDF_FIELD_TRANSFORM_DATETIME:
+        case RRDF_FIELD_TRANSFORM_DATETIME_MS:
             return "datetime";
+
+        case RRDF_FIELD_TRANSFORM_DATETIME_USEC:
+            return "datetime_usec";
     }
 }
 

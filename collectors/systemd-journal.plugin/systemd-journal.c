@@ -103,6 +103,11 @@ int systemd_journal_query(struct systemd_journal_request *c) {
                                    SYSTEMD_KEYS_INCLUDED_IN_FACETS,
                                    NULL);
 
+    facets_accepted_param(facets, "after");
+    facets_accepted_param(facets, "before");
+    facets_accepted_param(facets, "timeout");
+    facets_accepted_param(facets, "anchor");
+
     // FIXME initialize facets filters here
     facets_rows_begin(facets);
 
@@ -161,7 +166,7 @@ int systemd_journal_query(struct systemd_journal_request *c) {
     buffer_flush(c->wb);
     buffer_json_initialize(c->wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT | BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAYS);
     buffer_json_member_add_uint64(c->wb, "status", HTTP_RESP_OK);
-    buffer_json_member_add_boolean(c->wb, "timed_out", timed_out);
+    buffer_json_member_add_boolean(c->wb, "partial", timed_out);
     buffer_json_member_add_string(c->wb, "type", "table");
     buffer_json_member_add_time_t(c->wb, "update_every", 1);
     buffer_json_member_add_string(c->wb, "help", SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION);
@@ -283,9 +288,11 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     error_log_throttle_period = 3600;
 
 
-//    // debug
-//    function_systemd_journal("123", "", "", 0, 30);
-//    exit(1);
+    // debug
+    if(argc == 2 && strcmp(argv[1], "debug") == 0) {
+        function_systemd_journal("123", "", "", 0, 30);
+        exit(1);
+    }
 
     // ------------------------------------------------------------------------
 

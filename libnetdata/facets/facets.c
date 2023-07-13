@@ -66,6 +66,9 @@ struct facets {
     SIMPLE_PATTERN *visible_keys;
     SIMPLE_PATTERN *excluded_keys;
     SIMPLE_PATTERN *included_keys;
+
+    DICTIONARY *accepted_params;
+
     DICTIONARY *keys;
 
     usec_t anchor;
@@ -226,11 +229,19 @@ FACETS *facets_create(uint32_t items_to_return, usec_t anchor, const char *visib
 }
 
 void facets_destroy(FACETS *facets) {
+    dictionary_destroy(facets->accepted_params);
     dictionary_destroy(facets->keys);
     simple_pattern_free(facets->visible_keys);
     simple_pattern_free(facets->included_keys);
     simple_pattern_free(facets->excluded_keys);
     freez(facets);
+}
+
+void facets_accepted_param(FACETS *facets, const char *param) {
+    if(!facets->accepted_params)
+        facets->accepted_params = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE);
+
+    dictionary_set(facets->accepted_params, param, NULL, 0);
 }
 
 // ----------------------------------------------------------------------------
@@ -497,6 +508,34 @@ void facets_row_finished(FACETS *facets, usec_t usec) {
 // output
 
 void facets_report(FACETS *facets, BUFFER *wb) {
+    buffer_json_member_add_boolean(wb, "show_ids", false);
+
+    buffer_json_member_add_object(wb, "pagination");
+    buffer_json_member_add_boolean(wb, "enabled", true);
+    buffer_json_member_add_string(wb, "key", "anchor");
+    buffer_json_object_close(wb);
+
+    buffer_json_member_add_array(wb, "accepted_params");
+    {
+        if(facets->accepted_params) {
+            void *t;
+            dfe_start_read(facets->accepted_params, t) {
+                buffer_json_add_array_item_string(wb, t_dfe.name);
+            }
+            dfe_done(t);
+        }
+
+        FACET_KEY *k;
+        dfe_start_read(facets->keys, k) {
+            if(!k->values)
+                continue;
+
+            buffer_json_add_array_item_string(wb, k_dfe.name);
+        }
+        dfe_done(k);
+    }
+    buffer_json_array_close(wb); // accepted_params
+
     buffer_json_member_add_array(wb, "facets");
     {
         FACET_KEY *k;
@@ -539,7 +578,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
                 "timestamp", "Timestamp",
                 RRDF_FIELD_TYPE_TIMESTAMP,
                 RRDF_FIELD_VISUAL_VALUE,
-                RRDF_FIELD_TRANSFORM_DATETIME, 0, NULL, NAN,
+                RRDF_FIELD_TRANSFORM_DATETIME_USEC, 0, NULL, NAN,
                 RRDF_FIELD_SORT_DESCENDING,
                 NULL,
                 RRDF_FIELD_SUMMARY_COUNT,
@@ -577,7 +616,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
     {
         for(FACET_ROW *row = facets->base ; row ;row = row->next) {
             buffer_json_add_array_item_array(wb); // each row
-            buffer_json_add_array_item_time_t(wb, row->usec / USEC_PER_SEC);
+            buffer_json_add_array_item_uint64(wb, row->usec);
 
             FACET_KEY *k;
             dfe_start_read(facets->keys, k)
