@@ -17,10 +17,6 @@
                                 "type": "string",
                                 "description": "Name of the category. This is the actual name of the category or subcategory, (e.g. Web Servers, Operating Systems, Databases)."
                             },
-                            "icon_name": {
-                                "type": "string",
-                                "description": "The name of the icon from the Netdata UI."
-                            },
                             "description": {
                                 "type": "string",
                                 "description": "Text that will be presented below the category title."
