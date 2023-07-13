@@ -32,38 +32,8 @@
       ]
     },
     "category": {
-      "type": "object",
-      "description": "Category and subcategory of the collector/monitored instance.",
-      "properties": {
-        "level0": {
-          "type": "string",
-          "description": "Category name",
-          "oneOf": [
-            {
-              "enum": [
-                "data-collection"
-              ]
-            }
-          ]
-        },
-        "level1": {
-          "type": "string",
-          "description": "Subcategory name",
-          "oneOf": [
-            {
-              "enum": [
-                "most-popular",
-                "databases",
-                "web-servers",
-                "message-brokers",
-                "hardware-and-sensors",
-                "operating-systems",
-                "containers-and-vms"
-              ]
-            }
-          ]
-        }
-      }
+      "type": "string",
+      "description": "String defining integration category"
     },
     "alerts": {
       "type": "array",
