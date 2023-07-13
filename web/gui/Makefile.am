@@ -53,11 +53,15 @@ dist_noinst_DATA = \
 
 dist_web_DATA = \
     dashboard.js \
-    $(srcdir)/switch.html \
-    $(srcdir)/dashboard_info.js \
     $(srcdir)/dashboard_info_custom_example.js \
+    $(srcdir)/dashboard_info.js \
+    $(srcdir)/index.html \
     $(srcdir)/main.css \
     $(srcdir)/main.js \
+    $(srcdir)/registry-access.html \
+    $(srcdir)/registry-alert-redirect.html \
+    $(srcdir)/switch.html \
+    $(srcdir)/v2live.html \
     version.txt \
     $(NULL)
 
