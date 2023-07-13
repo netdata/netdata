@@ -1142,11 +1142,11 @@ static void get_netdata_configured_variables() {
         config_set_number(CONFIG_SECTION_DB, "dbengine disk space MB", rrdb.default_rrdeng_disk_quota_mb);
     }
 
-    default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", compute_multidb_diskspace());
-    if(default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
-        netdata_log_error("Invalid multidb disk space %d given. Defaulting to %d.", default_multidb_disk_quota_mb, rrdb.default_rrdeng_disk_quota_mb);
-        default_multidb_disk_quota_mb = rrdb.default_rrdeng_disk_quota_mb;
-        config_set_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", default_multidb_disk_quota_mb);
+    rrdb.default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", compute_multidb_diskspace());
+    if(rrdb.default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
+        netdata_log_error("Invalid multidb disk space %d given. Defaulting to %d.", rrdb.default_multidb_disk_quota_mb, rrdb.default_rrdeng_disk_quota_mb);
+        rrdb.default_multidb_disk_quota_mb = rrdb.default_rrdeng_disk_quota_mb;
+        config_set_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", rrdb.default_multidb_disk_quota_mb);
     }
 #else
     if (default_storage_engine == STORAGE_ENGINE_DBENGINE) {

@@ -35,8 +35,6 @@ __attribute__((constructor)) void initialize_multidb_ctx(void) {
     multidb_ctx[4] = &multidb_ctx_storage_tier4;
 }
 
-int default_multidb_disk_quota_mb = 256;
-
 // ----------------------------------------------------------------------------
 // metrics groups
 

@@ -856,7 +856,7 @@ void dbengine_init(char *hostname) {
         if(tier > 0)
             divisor *= 2;
 
-        int disk_space_mb = default_multidb_disk_quota_mb / divisor;
+        int disk_space_mb = rrdb.default_multidb_disk_quota_mb / divisor;
         size_t grouping_iterations = rrdb.storage_tiers_grouping_iterations[tier];
         RRD_BACKFILL backfill = rrdb.storage_tiers_backfill[tier];
 

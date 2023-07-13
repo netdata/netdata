@@ -989,6 +989,8 @@ struct rrdb {
     int db_engine_journal_check;
 
     int default_rrdeng_disk_quota_mb;
+
+    int default_multidb_disk_quota_mb;
 };
 
 extern struct rrdb rrdb;
