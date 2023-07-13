@@ -577,7 +577,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
     {
         for(FACET_ROW *row = facets->base ; row ;row = row->next) {
             buffer_json_add_array_item_array(wb); // each row
-            buffer_json_add_array_item_uint64(wb, row->usec);
+            buffer_json_add_array_item_time_t(wb, row->usec / USEC_PER_SEC);
 
             FACET_KEY *k;
             dfe_start_read(facets->keys, k)

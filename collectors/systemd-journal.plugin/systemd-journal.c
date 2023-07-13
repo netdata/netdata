@@ -17,6 +17,7 @@
 #define SYSTEMD_ALWAYS_VISIBLE_KEYS         \
     "timestamp"                             \
     "|MESSAGE"                              \
+    "|SYSLOG_IDENTIFIER"                    \
     "|UNIT"                                 \
     "|_PID"                                 \
     "|_COMM"                                \
