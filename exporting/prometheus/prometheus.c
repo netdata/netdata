@@ -342,8 +342,28 @@ static int format_prometheus_chart_label_callback(const char *name, const char *
 
     (void)ls;
 
-    if (name[0] == '_' )
-        return 1;
+    switch (name[0]) {
+        case '_':
+            return 1;
+        case 'c':
+            if (!strcmp(name, "chart"))
+                return 1;
+            break;
+        case 'd':
+            if (!strcmp(name, "dimension"))
+                return 1;
+            break;
+        case 'f':
+            if (!strcmp(name, "family"))
+                return 1;
+            break;
+        case 'i':
+            if (!strcmp(name, "instance"))
+                return 1;
+            break;
+        default:
+            break;
+    }
 
     char k[PROMETHEUS_ELEMENT_MAX + 1];
     char v[PROMETHEUS_ELEMENT_MAX + 1];
