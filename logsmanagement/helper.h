@@ -183,36 +183,38 @@ static inline str2xx_errno str2float(float *out, char *s) {
 
 /**
  * @brief Read last line of *filename, up to max_line_width characters.
- * @details This function should be used carefully as it is not the most
+ * @note This function should be used carefully as it is not the most
  * efficient one. But it is a quick-n-dirty way of reading the last line
  * of a file.
  * @param[in] filename File to be read.
- * @param[in] max_line_width Positive int indicating the max line width to be read. 
+ * @param[in] max_line_width Integer indicating the max line width to be read. 
  * If a line is longer than that, it will be truncated. If zero or negative, a
  * default value will be used instead.
  * @return Pointer to a string holding the line that was read, or NULL if error.
  */
 static inline char *read_last_line(const char *filename, int max_line_width){
-    const int default_max_line_width = 4 * 1024;
     uv_fs_t req;
     int64_t start_pos, end_pos;
     uv_file file_handle = -1;
     uv_buf_t uvBuf;
     char *buff = NULL;
-    int rc, line_pos, found_ln, bytes_read;
+    int rc, line_pos = -1, bytes_read;
 
-    if(max_line_width <= 0) max_line_width = default_max_line_width;
+    max_line_width = max_line_width > 0 ? max_line_width : 1024; // 1024 == default value
 
     rc = uv_fs_stat(NULL, &req, filename, NULL);
     end_pos = req.statbuf.st_size;
     uv_fs_req_cleanup(&req);
     if (unlikely(rc)) {
         collector_error("[%s]: uv_fs_stat() error: (%d) %s", filename, rc, uv_strerror(rc));
-        m_assert(!rc, "uv_fs_stat() failed during read_last_line()");
+        m_assert(0, "uv_fs_stat() failed during read_last_line()");
         goto error;
     }
     
-    if(end_pos == 0) goto error;
+    if(end_pos == 0){
+        m_assert(0, "end_pos == 0 during read_last_line()");
+        goto error;
+    } 
     start_pos = end_pos - max_line_width;
     if(start_pos < 0) start_pos = 0;
 
@@ -220,35 +222,34 @@ static inline char *read_last_line(const char *filename, int max_line_width){
     uv_fs_req_cleanup(&req);
     if (unlikely(rc < 0)) {
         collector_error("[%s]: uv_fs_open() error: (%d) %s",filename, rc, uv_strerror(rc));
+        m_assert(0, "uv_fs_open() failed during read_last_line()");
         goto error;
-    } else file_handle = rc;
+    } 
+    file_handle = rc;
 
     buff = callocz(1, (size_t) (end_pos - start_pos + 1) * sizeof(char));
-    uvBuf = uv_buf_init(buff, (unsigned int) (end_pos - start_pos + 1));
+    uvBuf = uv_buf_init(buff, (unsigned int) (end_pos - start_pos));
     rc = uv_fs_read(NULL, &req, file_handle, &uvBuf, 1, start_pos, NULL);
     uv_fs_req_cleanup(&req);
     if (unlikely(rc < 0)){ 
         collector_error("[%s]: uv_fs_read() error: (%d) %s", filename, rc, uv_strerror(rc));
+        m_assert(0, "uv_fs_read() failed during read_last_line()");
         goto error;
     }
-
-    buff[rc] = '\0';
-
     bytes_read = rc;
-    line_pos = found_ln = 0;
 
-    for(int i = bytes_read - 2; i >= 0; i--){
-        char ch = buff[i];
-        if (ch == '\n'){
-            found_ln = 1;
+    buff[bytes_read] = '\0';
+
+    for(int i = bytes_read - 2; i >= 0; i--){ // -2 because -1 could be '\n' 
+        if (buff[i] == '\n'){
             line_pos = i;
             break;
         }
     }
-    
-    if(found_ln){
-        char *line = callocz(1, (size_t) (bytes_read - line_pos - 1) * sizeof(char));
-        memcpy(line, &buff[line_pos + 1], (size_t) (bytes_read - line_pos - 2));
+
+    if(line_pos >= 0){
+        char *line = callocz(1, (size_t) (bytes_read - line_pos) * sizeof(char));
+        memcpy(line, &buff[line_pos + 1], (size_t) (bytes_read - line_pos));
         freez(buff);
         uv_fs_close(NULL, &req, file_handle, NULL);
         return line;
