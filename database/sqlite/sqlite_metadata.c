@@ -656,10 +656,10 @@ static bool dimension_can_be_deleted(uuid_t *dim_uuid __maybe_unused)
     if (rrdb.dbengine_enabled) {
         bool no_retention = true;
         for (size_t tier = 0; tier < rrdb.storage_tiers; tier++) {
-            if (!multidb_ctx[tier])
+            if (!rrdb.multidb_ctx[tier])
                 continue;
             time_t first_time_t = 0, last_time_t = 0;
-            if (rrdeng_metric_retention_by_uuid((void *) multidb_ctx[tier], dim_uuid, &first_time_t, &last_time_t)) {
+            if (rrdeng_metric_retention_by_uuid((void *) rrdb.multidb_ctx[tier], dim_uuid, &first_time_t, &last_time_t)) {
                 if (first_time_t > 0) {
                     no_retention = false;
                     break;

@@ -146,4 +146,12 @@ struct rrdb rrdb = {
 
     .default_rrdeng_disk_quota_mb = 256,
     .default_multidb_disk_quota_mb = 256,
+
+    .multidb_ctx = {
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+    },
 };

@@ -13,7 +13,6 @@ struct rrdengine_instance multidb_ctx_storage_tier4;
 #if RRD_STORAGE_TIERS != 5
 #error RRD_STORAGE_TIERS is not 5 - you need to add allocations here
 #endif
-struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
 uint8_t tier_page_type[RRD_STORAGE_TIERS] = {PAGE_METRICS, PAGE_TIER, PAGE_TIER, PAGE_TIER, PAGE_TIER};
 
 #if defined(ENV32BIT)
@@ -28,11 +27,11 @@ size_t tier_page_size[RRD_STORAGE_TIERS] = {4096, 2048, 384, 384, 384};
 size_t page_type_size[256] = {sizeof(storage_number), sizeof(storage_number_tier1_t)};
 
 __attribute__((constructor)) void initialize_multidb_ctx(void) {
-    multidb_ctx[0] = &multidb_ctx_storage_tier0;
-    multidb_ctx[1] = &multidb_ctx_storage_tier1;
-    multidb_ctx[2] = &multidb_ctx_storage_tier2;
-    multidb_ctx[3] = &multidb_ctx_storage_tier3;
-    multidb_ctx[4] = &multidb_ctx_storage_tier4;
+    rrdb.multidb_ctx[0] = &multidb_ctx_storage_tier0;
+    rrdb.multidb_ctx[1] = &multidb_ctx_storage_tier1;
+    rrdb.multidb_ctx[2] = &multidb_ctx_storage_tier2;
+    rrdb.multidb_ctx[3] = &multidb_ctx_storage_tier3;
+    rrdb.multidb_ctx[4] = &multidb_ctx_storage_tier4;
 }
 
 // ----------------------------------------------------------------------------
@@ -1156,7 +1155,7 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
     }
 
     if(NULL == ctxp) {
-        ctx = multidb_ctx[tier];
+        ctx = rrdb.multidb_ctx[tier];
         memset(ctx, 0, sizeof(*ctx));
         ctx->config.legacy = false;
     }

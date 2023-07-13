@@ -12,7 +12,6 @@
 
 #define RRDENG_FD_BUDGET_PER_INSTANCE (50)
 
-extern struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
 extern size_t page_type_size[];
 extern size_t tier_page_size[];
 

@@ -422,7 +422,7 @@ int is_legacy = 1;
 
                 for(size_t tier = 1; tier < rrdb.storage_tiers ; tier++) {
                     host->db[tier].id= STORAGE_ENGINE_DBENGINE;
-                    host->db[tier].instance = (STORAGE_INSTANCE *) multidb_ctx[tier];
+                    host->db[tier].instance = (STORAGE_INSTANCE *) rrdb.multidb_ctx[tier];
                     host->db[tier].tier_grouping = get_tier_grouping(tier);
                 }
             }
@@ -430,7 +430,7 @@ int is_legacy = 1;
         else {
             for(size_t tier = 0; tier < rrdb.storage_tiers ; tier++) {
                 host->db[tier].id = STORAGE_ENGINE_DBENGINE;
-                host->db[tier].instance = (STORAGE_INSTANCE *)multidb_ctx[tier];
+                host->db[tier].instance = (STORAGE_INSTANCE *) rrdb.multidb_ctx[tier];
                 host->db[tier].tier_grouping = get_tier_grouping(tier);
             }
         }
@@ -459,7 +459,7 @@ int is_legacy = 1;
         // the first tier is reserved for the non-dbengine modes
         for(size_t tier = 1; tier < rrdb.storage_tiers ; tier++) {
             host->db[tier].id = STORAGE_ENGINE_DBENGINE;
-            host->db[tier].instance = (STORAGE_INSTANCE *) multidb_ctx[tier];
+            host->db[tier].instance = (STORAGE_INSTANCE *) rrdb.multidb_ctx[tier];
             host->db[tier].tier_grouping = get_tier_grouping(tier);
         }
 #endif
@@ -943,7 +943,7 @@ void dbengine_init(char *hostname) {
         fatal("DBENGINE on '%s', failed to initialize databases at '%s'.", hostname, netdata_configured_cache_dir);
 
     for(size_t tier = 0; tier < rrdb.storage_tiers ;tier++)
-        rrdeng_readiness_wait(multidb_ctx[tier]);
+        rrdeng_readiness_wait(rrdb.multidb_ctx[tier]);
 
     rrdb.dbengine_enabled = true;
 #else
