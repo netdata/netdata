@@ -141,4 +141,6 @@ struct rrdb rrdb = {
     .default_rrdeng_page_cache_mb = 32,
     .default_rrdeng_extent_cache_mb = 0,
     #endif
+
+    .db_engine_journal_check = CONFIG_BOOLEAN_NO,
 };

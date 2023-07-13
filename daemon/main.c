@@ -1121,7 +1121,7 @@ static void get_netdata_configured_variables() {
 
     rrdb.default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page cache size MB", rrdb.default_rrdeng_page_cache_mb);
     rrdb.default_rrdeng_extent_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine extent cache size MB", rrdb.default_rrdeng_extent_cache_mb);
-    db_engine_journal_check = config_get_boolean(CONFIG_SECTION_DB, "dbengine enable journal integrity check", CONFIG_BOOLEAN_NO);
+    rrdb.db_engine_journal_check = config_get_boolean(CONFIG_SECTION_DB, "dbengine enable journal integrity check", CONFIG_BOOLEAN_NO);
 
     if(rrdb.default_rrdeng_extent_cache_mb < 0)
         rrdb.default_rrdeng_extent_cache_mb = 0;
