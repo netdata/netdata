@@ -143,4 +143,6 @@ struct rrdb rrdb = {
     #endif
 
     .db_engine_journal_check = CONFIG_BOOLEAN_NO,
+
+    .default_rrdeng_disk_quota_mb = 256,
 };

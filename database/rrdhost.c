@@ -411,7 +411,7 @@ int is_legacy = 1;
             ret = rrdeng_init(
                 (struct rrdengine_instance **)&host->db[0].instance,
                 dbenginepath,
-                default_rrdeng_disk_quota_mb,
+                rrdb.default_rrdeng_disk_quota_mb,
                 0); // may fail here for legacy dbengine initialization
 
             if(ret == 0) {
