@@ -136,9 +136,9 @@ struct rrdb rrdb = {
 
     #if defined(ENV32BIT)
     .default_rrdeng_page_cache_mb = 16,
-    // int default_rrdeng_extent_cache_mb = 0;
+    .default_rrdeng_extent_cache_mb = 0,
     #else
     .default_rrdeng_page_cache_mb = 32,
-    // int default_rrdeng_extent_cache_mb = 0;
+    .default_rrdeng_extent_cache_mb = 0,
     #endif
 };

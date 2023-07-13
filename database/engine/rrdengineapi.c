@@ -39,12 +39,6 @@ int db_engine_journal_check = 0;
 int default_rrdeng_disk_quota_mb = 256;
 int default_multidb_disk_quota_mb = 256;
 
-#if defined(ENV32BIT)
-int default_rrdeng_extent_cache_mb = 0;
-#else
-int default_rrdeng_extent_cache_mb = 0;
-#endif
-
 // ----------------------------------------------------------------------------
 // metrics groups
 

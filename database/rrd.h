@@ -983,6 +983,8 @@ struct rrdb {
     RRDHOST *localhost;
 
     int default_rrdeng_page_cache_mb;
+
+    int default_rrdeng_extent_cache_mb;
 };
 
 extern struct rrdb rrdb;

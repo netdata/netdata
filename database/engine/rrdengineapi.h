@@ -12,7 +12,6 @@
 
 #define RRDENG_FD_BUDGET_PER_INSTANCE (50)
 
-extern int default_rrdeng_extent_cache_mb;
 extern int db_engine_journal_check;
 extern int default_rrdeng_disk_quota_mb;
 extern int default_multidb_disk_quota_mb;
