@@ -353,8 +353,8 @@ int is_legacy = 1;
         case RRD_MEMORY_MODE_MAP:
         case RRD_MEMORY_MODE_SAVE:
         case RRD_MEMORY_MODE_RAM:
-            if(host->rrdpush_seconds_to_replicate > host->rrd_history_entries * host->rrd_update_every)
-                host->rrdpush_seconds_to_replicate = host->rrd_history_entries * host->rrd_update_every;
+            if(host->rrdpush_seconds_to_replicate > (time_t) host->rrd_history_entries * (time_t) host->rrd_update_every)
+                host->rrdpush_seconds_to_replicate = (time_t) host->rrd_history_entries * (time_t) host->rrd_update_every;
             break;
 
         case RRD_MEMORY_MODE_DBENGINE:
