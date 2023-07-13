@@ -154,4 +154,9 @@ struct rrdb rrdb = {
         NULL,
         NULL,
     },
+
+    .page_type_size = {
+        sizeof(storage_number),
+        sizeof(storage_number_tier1_t)
+    },
 };

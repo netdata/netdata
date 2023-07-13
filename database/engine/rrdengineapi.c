@@ -24,7 +24,6 @@ size_t tier_page_size[RRD_STORAGE_TIERS] = {4096, 2048, 384, 384, 384};
 #if PAGE_TYPE_MAX != 1
 #error PAGE_TYPE_MAX is not 1 - you need to add allocations here
 #endif
-size_t page_type_size[256] = {sizeof(storage_number), sizeof(storage_number_tier1_t)};
 
 __attribute__((constructor)) void initialize_multidb_ctx(void) {
     rrdb.multidb_ctx[0] = &multidb_ctx_storage_tier0;
@@ -1365,7 +1364,7 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
 //    stats.sizeof_metric = 0;
     stats.sizeof_datafile = struct_natural_alignment(sizeof(struct rrdengine_datafile)) + struct_natural_alignment(sizeof(struct rrdengine_journalfile));
     stats.sizeof_page_in_cache = 0; // struct_natural_alignment(sizeof(struct page_cache_descr));
-    stats.sizeof_point_data = page_type_size[ctx->config.page_type];
+    stats.sizeof_point_data = rrdb.page_type_size[ctx->config.page_type];
     stats.sizeof_page_data = tier_page_size[ctx->config.tier];
     stats.pages_per_extent = rrdeng_pages_per_extent;
 
