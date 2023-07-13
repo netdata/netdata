@@ -87,7 +87,7 @@ def copy_dashboard():
     print('::endgroup::')
     print('Copying files')
     (TMPPATH / 'agent' / BASEDIR).rename(BASEPATH)
-    (TMPPATH / 'agent' / 'index.html').rename(Path('./v2live.html'))
+    (TMPPATH / 'agent' / 'index.html').rename(Path('./index.html'))
     (TMPPATH / 'agent' / 'registry-access.html').rename('./registry-access.html')
     (TMPPATH / 'agent' / 'registry-alert-redirect.html').rename('./registry-alert-redirect.html')
     shutil.copytree(TMPPATH / 'agent' / 'static', Path('./static'), dirs_exist_ok=True)
