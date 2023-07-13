@@ -1,0 +1,5 @@
+|  Alert name  | On metric | Description |
+|:------------:|:---------:|:-----------:|
+[% for alert in entry.alerts %]
+| [[[ alert.name ]]]([[ alert.link ]]) | [[ alert.metric ]] | [[ alert.info ]] |
+[% endfor %]
