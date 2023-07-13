@@ -981,6 +981,8 @@ struct rrdb {
     netdata_rwlock_t rrd_rwlock;
 
     RRDHOST *localhost;
+
+    int default_rrdeng_page_cache_mb;
 };
 
 extern struct rrdb rrdb;

@@ -2337,7 +2337,7 @@ void generate_dbengine_dataset(unsigned history_seconds)
     time_t time_present;
 
     default_storage_engine_id = STORAGE_ENGINE_DBENGINE;
-    default_rrdeng_page_cache_mb = 128;
+    rrdb.default_rrdeng_page_cache_mb = 128;
     // Worst case for uncompressible data
     default_rrdeng_disk_quota_mb = (((uint64_t)DSET_DIMS * DSET_CHARTS) * sizeof(storage_number) * history_seconds) /
                                    (1024 * 1024);
@@ -2530,7 +2530,7 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
         PAGE_CACHE_MB = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
 
     default_storage_engine_id = STORAGE_ENGINE_DBENGINE;
-    default_rrdeng_page_cache_mb = PAGE_CACHE_MB;
+    rrdb.default_rrdeng_page_cache_mb = PAGE_CACHE_MB;
     if (DISK_SPACE_MB) {
         fprintf(stderr, "By setting disk space limit data are allowed to be deleted. "
                         "Data validation is turned off for this run.\n");

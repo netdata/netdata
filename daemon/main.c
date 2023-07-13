@@ -1119,17 +1119,17 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get default Database Engine page cache size in MiB
 
-    default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page cache size MB", default_rrdeng_page_cache_mb);
+    rrdb.default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page cache size MB", rrdb.default_rrdeng_page_cache_mb);
     default_rrdeng_extent_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine extent cache size MB", default_rrdeng_extent_cache_mb);
     db_engine_journal_check = config_get_boolean(CONFIG_SECTION_DB, "dbengine enable journal integrity check", CONFIG_BOOLEAN_NO);
 
     if(default_rrdeng_extent_cache_mb < 0)
         default_rrdeng_extent_cache_mb = 0;
 
-    if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
-        netdata_log_error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
-        default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
-        config_set_number(CONFIG_SECTION_DB, "dbengine page cache size MB", default_rrdeng_page_cache_mb);
+    if(rrdb.default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
+        netdata_log_error("Invalid page cache size %d given. Defaulting to %d.", rrdb.default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
+        rrdb.default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
+        config_set_number(CONFIG_SECTION_DB, "dbengine page cache size MB", rrdb.default_rrdeng_page_cache_mb);
     }
 
     // ------------------------------------------------------------------------

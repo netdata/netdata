@@ -1085,7 +1085,7 @@ void pgc_and_mrg_initialize(void)
 {
     main_mrg = mrg_create(0);
 
-    size_t target_cache_size = (size_t)default_rrdeng_page_cache_mb * 1024ULL * 1024ULL;
+    size_t target_cache_size = (size_t) rrdb.default_rrdeng_page_cache_mb * 1024ULL * 1024ULL;
     size_t main_cache_size = (target_cache_size / 100) * 95;
     size_t open_cache_size = 0;
     size_t extent_cache_size = (target_cache_size / 100) * 5;
