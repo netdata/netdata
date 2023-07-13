@@ -14,29 +14,61 @@
 #define SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION "View, search and analyze systemd journal entries."
 #define SYSTEMD_JOURNAL_DEFAULT_TIMEOUT 30
 
-#define SYSTEMD_KEYS_EXCLUDED_FROM_FACETS \
-    "*MESSAGE*"                           \
-    "|*CMDLINE*"                          \
-    "|*TIMESTAMP*"                        \
-    "|*INVOCATION*"                       \
-    "|*USAGE*"                            \
-    "|*RLIMIT*"                           \
-    "|*_ID"                               \
-    "|!*COREDUMP_SIGNAL_NAME|*COREDUMP*"  \
-    "|*CODE_LINE*"                        \
-    "|_STREAM_ID"                         \
-    "|SYSLOG_RAW"                         \
-    "|_PID"                               \
-    "|_CAP_EFFECTIVE"                     \
-    "|_AUDIT_SESSION"                     \
-    "|_AUDIT_LOGINUID"                    \
-    "|_SYSTEMD_OWNER_UID"                 \
-    "|GLIB_OLD_LOG_API"                   \
-    "|SYSLOG_PID"                         \
-    "|TID"                                \
-    "|JOB_ID"                             \
-    "|_SYSTEMD_SESSION"                   \
+#define SYSTEMD_ALWAYS_VISIBLE_KEYS         \
+    "timestamp"                             \
+    "|MESSAGE"                              \
+    "|UNIT"                                 \
+    "|_PID"                                 \
+    "|_COMM"                                \
+    "|_SYSTEMD_UNIT"                        \
+    "|_SYSTEMD_SLICE"                       \
     ""
+
+#define SYSTEMD_KEYS_INCLUDED_IN_FACETS     \
+    "_TRANSPORT"                            \
+    "|SYSLOG_IDENTIFIER"                    \
+    "|_HOSTNAME"                            \
+    "|_RUNTIME_SCOPE"                       \
+    "|_UID"                                 \
+    "|_GID"                                 \
+    "|_SYSTEMD_UNIT"                        \
+    "|_SYSTEMD_SLICE"                       \
+    "|_SYSTEMD_USER_SLICE"                  \
+    "|_COMM"                                \
+    "|_EXE"                                 \
+    "|_SYSTEMD_CGROUP"                      \
+    "|_SYSTEMD_USER_UNIT"                   \
+    "|USER_UNIT"                            \
+    "|UNIT"                                 \
+    ""
+
+//#define SYSTEMD_KEYS_EXCLUDED_FROM_FACETS \
+//    "*MESSAGE*"                           \
+//    "|*CMDLINE*"                          \
+//    "|*TIMESTAMP*"                        \
+//    "|*MONOTONIC*"                        \
+//    "|*REALTIME*"                         \
+//    "|*BOOTIME*"                          \
+//    "|*_USEC*"                            \
+//    "|*INVOCATION*"                       \
+//    "|*USAGE*"                            \
+//    "|*RLIMIT*"                           \
+//    "|*_ID"                               \
+//    "|!*COREDUMP_SIGNAL_NAME|*COREDUMP*"  \
+//    "|*CODE_LINE*"                        \
+//    "|_STREAM_ID"                         \
+//    "|SYSLOG_RAW"                         \
+//    "|_PID"                               \
+//    "|_CAP_EFFECTIVE"                     \
+//    "|_AUDIT_SESSION"                     \
+//    "|_AUDIT_LOGINUID"                    \
+//    "|_SYSTEMD_OWNER_UID"                 \
+//    "|GLIB_OLD_LOG_API"                   \
+//    "|SYSLOG_PID"                         \
+//    "|TID"                                \
+//    "|JOB_ID"                             \
+//    "|_SYSTEMD_SESSION"                   \
+//    ""
 
 #define FACET_MAX_VALUE_LENGTH 8192
 
@@ -65,7 +97,11 @@ int systemd_journal_query(struct systemd_journal_request *c) {
     if(!c->wb)
         return HTTP_RESP_BAD_REQUEST;
 
-    FACETS *facets = facets_create(c->items, c->anchor, NULL, SYSTEMD_KEYS_EXCLUDED_FROM_FACETS);
+    FACETS *facets = facets_create(c->items, c->anchor,
+                                   SYSTEMD_ALWAYS_VISIBLE_KEYS,
+                                   SYSTEMD_KEYS_INCLUDED_IN_FACETS,
+                                   NULL);
+
     // FIXME initialize facets filters here
     facets_rows_begin(facets);
 

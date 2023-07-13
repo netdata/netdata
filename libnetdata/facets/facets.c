@@ -63,6 +63,7 @@ typedef struct facet_row {
 } FACET_ROW;
 
 struct facets {
+    SIMPLE_PATTERN *visible_keys;
     SIMPLE_PATTERN *excluded_keys;
     SIMPLE_PATTERN *included_keys;
     DICTIONARY *keys;
@@ -202,18 +203,21 @@ static void facet_key_delete_callback(const DICTIONARY_ITEM *item __maybe_unused
 
 // ----------------------------------------------------------------------------
 
-FACETS *facets_create(uint32_t items_to_return, usec_t anchor, const char *filtered_keys, const char *non_filtered_keys) {
+FACETS *facets_create(uint32_t items_to_return, usec_t anchor, const char *visible_keys, const char *facet_keys, const char *non_facet_keys) {
     FACETS *facets = callocz(1, sizeof(FACETS));
     facets->keys = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE|DICT_OPTION_FIXED_SIZE, NULL, sizeof(FACET_KEY));
     dictionary_register_insert_callback(facets->keys, facet_key_insert_callback, facets);
     dictionary_register_conflict_callback(facets->keys, facet_key_conflict_callback, facets);
     dictionary_register_delete_callback(facets->keys, facet_key_delete_callback, facets);
 
-    if(filtered_keys && *filtered_keys)
-        facets->included_keys = simple_pattern_create(filtered_keys, "|", SIMPLE_PATTERN_EXACT, true);
+    if(facet_keys && *facet_keys)
+        facets->included_keys = simple_pattern_create(facet_keys, "|", SIMPLE_PATTERN_EXACT, true);
 
-    if(non_filtered_keys && *non_filtered_keys)
-        facets->excluded_keys = simple_pattern_create(non_filtered_keys, "|", SIMPLE_PATTERN_EXACT, true);
+    if(non_facet_keys && *non_facet_keys)
+        facets->excluded_keys = simple_pattern_create(non_facet_keys, "|", SIMPLE_PATTERN_EXACT, true);
+
+    if(visible_keys && *visible_keys)
+        facets->visible_keys = simple_pattern_create(visible_keys, "|", SIMPLE_PATTERN_EXACT, true);
 
     facets->max_items_to_return = items_to_return;
     facets->anchor = anchor;
@@ -223,6 +227,8 @@ FACETS *facets_create(uint32_t items_to_return, usec_t anchor, const char *filte
 
 void facets_destroy(FACETS *facets) {
     dictionary_destroy(facets->keys);
+    simple_pattern_free(facets->visible_keys);
+    simple_pattern_free(facets->included_keys);
     simple_pattern_free(facets->excluded_keys);
     freez(facets);
 }
@@ -543,6 +549,13 @@ void facets_report(FACETS *facets, BUFFER *wb) {
 
         FACET_KEY *k;
         dfe_start_read(facets->keys, k) {
+            bool visible = false;
+
+            if(!facets->visible_keys)
+                visible = k->values ? true : false;
+            else
+                visible = simple_pattern_matches(facets->visible_keys, k->name);
+
             buffer_rrdf_table_add_field(
                     wb, field_id++,
                     k_dfe.name, k->name ? k->name : k_dfe.name,
@@ -553,7 +566,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
                     NULL,
                     RRDF_FIELD_SUMMARY_COUNT,
                     k->values ? RRDF_FIELD_FILTER_FACET : RRDF_FIELD_FILTER_NONE,
-                    k->values ? RRDF_FIELD_OPTS_VISIBLE : RRDF_FIELD_OPTS_NONE,
+                    visible ? RRDF_FIELD_OPTS_VISIBLE : RRDF_FIELD_OPTS_NONE,
                     FACET_VALUE_UNSET);
         }
         dfe_done(k);
