@@ -580,7 +580,6 @@ void rrdset_memory_file_save(RRDSET *st);
 void rrdset_memory_file_free(RRDSET *st);
 void rrdset_memory_file_update(RRDSET *st);
 const char *rrdset_cache_filename(RRDSET *st);
-bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, STORAGE_ENGINE_ID storage_engine_id);
 
 #include "rrdfunctions.h"
 
