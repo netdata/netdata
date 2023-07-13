@@ -14,9 +14,7 @@ bool exporting_chart_labels_filter_callback(const char *name, const char *value,
     if (name[0] == '_' )
         return false;
 
-    (void)value;
-    struct instance *instance = (struct instance *)data;
-    return should_send_label(instance, ls);
+    return exporting_labels_filter_callback(name, value, ls, data);
 }
 
 /**
