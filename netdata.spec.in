@@ -230,6 +230,8 @@ queries, API calls, web site visitors, etc.
 so that you can get insights of what is happening now and what just
 happened, on your systems and applications.
 
+%debug_package
+
 %prep
 %setup -q -n %{name}-%{version}
 %if 0%{?_have_sentry}
