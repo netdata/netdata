@@ -1,6 +1,6 @@
 #include "facets.h"
 
-#define FACET_VALUE_UNSET "[UNSET]"
+#define FACET_VALUE_UNSET "-"
 
 // ----------------------------------------------------------------------------
 
