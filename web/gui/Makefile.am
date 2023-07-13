@@ -61,7 +61,6 @@ dist_web_DATA = \
     $(srcdir)/registry-access.html \
     $(srcdir)/registry-alert-redirect.html \
     $(srcdir)/switch.html \
-    $(srcdir)/v2live.html \
     version.txt \
     $(NULL)
 
