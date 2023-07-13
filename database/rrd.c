@@ -134,13 +134,13 @@ struct rrdb rrdb = {
     .rrd_rwlock = NETDATA_RWLOCK_INITIALIZER,
     .localhost = NULL,
 
-    #if defined(ENV32BIT)
+#if defined(ENV32BIT)
     .default_rrdeng_page_cache_mb = 16,
     .default_rrdeng_extent_cache_mb = 0,
-    #else
+#else
     .default_rrdeng_page_cache_mb = 32,
     .default_rrdeng_extent_cache_mb = 0,
-    #endif
+#endif
 
     .db_engine_journal_check = CONFIG_BOOLEAN_NO,
 
@@ -159,4 +159,22 @@ struct rrdb rrdb = {
         sizeof(storage_number),
         sizeof(storage_number_tier1_t)
     },
+
+#if defined(ENV32BIT)
+    .tier_page_size = {
+        2048,
+        1024,
+        192,
+        192,
+        192
+    },
+#else
+    .tier_page_size = {
+        4096,
+        2048,
+        384,
+        384,
+        384
+    },
+#endif
 };

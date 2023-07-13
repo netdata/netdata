@@ -583,7 +583,7 @@ struct {
 
 static inline ARAL *page_size_lookup(size_t size) {
     for (size_t tier = 0; tier < rrdb.storage_tiers ;tier++)
-        if(size == tier_page_size[tier])
+        if(size == rrdb.tier_page_size[tier])
             return dbengine_page_alloc_globals.aral[tier];
 
     return NULL;
@@ -598,9 +598,9 @@ static void dbengine_page_alloc_init(void) {
 
         dbengine_page_alloc_globals.aral[tier] = aral_create(
                 buf,
-                tier_page_size[tier],
+                rrdb.tier_page_size[tier],
                 64,
-                512 * tier_page_size[tier],
+                512 * rrdb.tier_page_size[tier],
                 pgc_aral_statistics(),
                 NULL, NULL, false, false);
     }

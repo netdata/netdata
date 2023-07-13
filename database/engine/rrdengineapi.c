@@ -15,12 +15,6 @@ struct rrdengine_instance multidb_ctx_storage_tier4;
 #endif
 uint8_t tier_page_type[RRD_STORAGE_TIERS] = {PAGE_METRICS, PAGE_TIER, PAGE_TIER, PAGE_TIER, PAGE_TIER};
 
-#if defined(ENV32BIT)
-size_t tier_page_size[RRD_STORAGE_TIERS] = {2048, 1024, 192, 192, 192};
-#else
-size_t tier_page_size[RRD_STORAGE_TIERS] = {4096, 2048, 384, 384, 384};
-#endif
-
 #if PAGE_TYPE_MAX != 1
 #error PAGE_TYPE_MAX is not 1 - you need to add allocations here
 #endif
@@ -429,7 +423,7 @@ static size_t aligned_allocation_entries(size_t max_slots, size_t target_slot, t
 static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, size_t *data_size, usec_t point_in_time_ut) {
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
-    size_t max_size = tier_page_size[ctx->config.tier];
+    size_t max_size = rrdb.tier_page_size[ctx->config.tier];
     size_t max_slots = max_size / CTX_POINT_SIZE_BYTES(ctx);
 
     size_t slots = aligned_allocation_entries(
@@ -449,7 +443,7 @@ static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, 
     // internal_error(true, "PAGE ALLOC %zu bytes (%zu max)", size, max_size);
 
     internal_fatal(slots < 3 || slots > max_slots, "ooops! wrong distribution of metrics across time");
-    internal_fatal(size > tier_page_size[ctx->config.tier] || size < CTX_POINT_SIZE_BYTES(ctx) * 2, "ooops! wrong page size");
+    internal_fatal(size > rrdb.tier_page_size[ctx->config.tier] || size < CTX_POINT_SIZE_BYTES(ctx) * 2, "ooops! wrong page size");
 
     *data_size = size;
     void *d = dbengine_page_alloc(size);
@@ -1365,7 +1359,7 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
     stats.sizeof_datafile = struct_natural_alignment(sizeof(struct rrdengine_datafile)) + struct_natural_alignment(sizeof(struct rrdengine_journalfile));
     stats.sizeof_page_in_cache = 0; // struct_natural_alignment(sizeof(struct page_cache_descr));
     stats.sizeof_point_data = rrdb.page_type_size[ctx->config.page_type];
-    stats.sizeof_page_data = tier_page_size[ctx->config.tier];
+    stats.sizeof_page_data = rrdb.tier_page_size[ctx->config.tier];
     stats.pages_per_extent = rrdeng_pages_per_extent;
 
 //    stats.sizeof_metric_in_index = 40;

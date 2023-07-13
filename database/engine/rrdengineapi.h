@@ -12,8 +12,6 @@
 
 #define RRDENG_FD_BUDGET_PER_INSTANCE (50)
 
-extern size_t tier_page_size[];
-
 #define CTX_POINT_SIZE_BYTES(ctx) rrdb.page_type_size[(ctx)->config.page_type]
 
 void rrdeng_generate_legacy_uuid(const char *dim_id, const char *chart_id, uuid_t *ret_uuid);
