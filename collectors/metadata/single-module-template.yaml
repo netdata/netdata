@@ -5,8 +5,8 @@ meta:
   monitored_instance:
     name: ""
     link: ""
-    icon_path: ""
     categories: []
+    icon_filename: ""
   related_resources:
     integrations:
       list:
@@ -15,6 +15,7 @@ meta:
   info_provided_to_referring_integrations:
     description: ""
   keywords: []
+  most_popular: false
 overview:
   data_collection:
     metrics_description: ""
