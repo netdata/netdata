@@ -10,62 +10,62 @@ dist_noinst_DATA = \
 webv2dir=$(webdir)/v2
 
 dist_webv2_DATA = \
-    $(srcdir)/102.4b6c7f79ebf12e33231d.chunk.js \
-    $(srcdir)/137.da33d788fb4759ec3bda.chunk.js \
-    $(srcdir)/193.e44ffb07b870a03047cd.chunk.js \
-    $(srcdir)/199.41c7466a7fec112c37bc.chunk.js \
-    $(srcdir)/20.257b8b1542f14719e53e.chunk.js \
-    $(srcdir)/202.581b44b32d3ff2638cd9.chunk.js \
-    $(srcdir)/241.6fcf9a1320a4b5591893.chunk.js \
-    $(srcdir)/252.e39b9a6dee3af3e87083.chunk.js \
-    $(srcdir)/282.ffea81703b5b193d456d.chunk.js \
-    $(srcdir)/296.ccbef0bcea53ed36f993.chunk.js \
-    $(srcdir)/324.878c1843f8e4a5be3011.chunk.js \
-    $(srcdir)/359.ef04c69f99777c06e338.chunk.js \
-    $(srcdir)/360.aff5c134e0ee2f12bb3e.chunk.js \
-    $(srcdir)/367.c55cee3687aefce37362.chunk.js \
-    $(srcdir)/379.260bf9f5fff09deedd9f.chunk.js \
+    $(srcdir)/102.4b40822ef781654ab761.chunk.js \
+    $(srcdir)/137.41824ed8769dfc6da3a9.chunk.js \
+    $(srcdir)/193.9407d8822c76849673ae.chunk.js \
+    $(srcdir)/199.68154909a2b26dcd717f.chunk.js \
+    $(srcdir)/20.e9c457f42d553a5c9d79.chunk.js \
+    $(srcdir)/202.d40b54bee639279fca5c.chunk.js \
+    $(srcdir)/241.65f337eb2536cfe3d3a6.chunk.js \
+    $(srcdir)/252.a7ec87b3793d3df8bf9b.chunk.js \
+    $(srcdir)/282.4ac03db6fc855421037a.chunk.js \
+    $(srcdir)/296.ed009a0fde9f56b30304.chunk.js \
+    $(srcdir)/324.972ca1dbc25795f6e8e7.chunk.js \
+    $(srcdir)/359.98588f86808dc68b2f60.chunk.js \
+    $(srcdir)/360.ff52bff27d405e85e347.chunk.js \
+    $(srcdir)/367.c784726d9d0411f0f2a1.chunk.js \
+    $(srcdir)/379.188f6d380088b115d25f.chunk.js \
     $(srcdir)/379.d4eaadf9a64c80cfb238.css \
-    $(srcdir)/380.71bc78c5e6f0b963439f.chunk.js \
+    $(srcdir)/380.4ea304fdba4a1fe144b6.chunk.js \
     $(srcdir)/380.ccb665950325037c0dda.css \
     $(srcdir)/3D_PARTY_LICENSES.txt \
-    $(srcdir)/424.31a8711ec89acad5aced.chunk.js \
-    $(srcdir)/43.11ec0852986d453e7970.chunk.js \
-    $(srcdir)/442.2b3ad47ad609e45753d8.chunk.js \
-    $(srcdir)/451.a6f7f9858e241afb005c.chunk.js \
-    $(srcdir)/493.fdd7dcd2a8ca36bb46bf.js \
-    $(srcdir)/510.30164fbb926087a73ff6.chunk.js \
-    $(srcdir)/514.3792b9ccbbfdff394ca6.chunk.js \
-    $(srcdir)/533.2c32bd0507867e8bcf7b.chunk.js \
-    $(srcdir)/564.c6a154d297c1f5069347.chunk.js \
-    $(srcdir)/575.6414124387db00b40432.chunk.js \
-    $(srcdir)/597.6acd103f4034e1a946a9.chunk.js \
-    $(srcdir)/610.9cc15f681e0f4731e4a3.chunk.js \
-    $(srcdir)/611.2509b5088f264f04045b.chunk.js \
-    $(srcdir)/663.8bae5d06ba89dfe8bf58.chunk.js \
-    $(srcdir)/722.64a122df9240ead2bdc3.chunk.js \
-    $(srcdir)/723.8bb028c29dd8c47b213e.chunk.js \
+    $(srcdir)/424.9be25968276c365dd814.chunk.js \
+    $(srcdir)/43.0c47acf35b82e823cdd4.chunk.js \
+    $(srcdir)/442.2a5e58b12a2f67f2ad1c.chunk.js \
+    $(srcdir)/451.2851a74c45d43d16e405.chunk.js \
+    $(srcdir)/493.5d3a64be7a1dc0a3b5ea.js \
+    $(srcdir)/510.bb3a08654a2a0a18fc10.chunk.js \
+    $(srcdir)/514.92256ad5a0fc192afa01.chunk.js \
+    $(srcdir)/533.7a111f1b0aecbf8e4806.chunk.js \
+    $(srcdir)/564.579c7baa8ada3dd1f73b.chunk.js \
+    $(srcdir)/575.6a4ce21f440efceff2c1.chunk.js \
+    $(srcdir)/597.c18749895f2200ce487f.chunk.js \
+    $(srcdir)/610.00359607b0905e75481a.chunk.js \
+    $(srcdir)/611.6148e09e1c0750e1cc90.chunk.js \
+    $(srcdir)/663.f3aabc39c5474b30d2e7.chunk.js \
+    $(srcdir)/722.99dae0439655beaba164.chunk.js \
+    $(srcdir)/723.056d78114049127efae5.chunk.js \
     $(srcdir)/723.cc9fa5f3bdc0bf3ab2fc.css \
-    $(srcdir)/734.7d62685a8aecc1985fbd.chunk.js \
-    $(srcdir)/817.eb9d4ffed516d67e9fdc.chunk.js \
-    $(srcdir)/837.0cd7218c461fd80a5335.chunk.js \
-    $(srcdir)/86.d780c616f305013a133e.chunk.js \
-    $(srcdir)/872.dceeb2e6e3ba6d23522c.chunk.js \
-    $(srcdir)/934.39b0a0a3ec2263142597.chunk.js \
-    $(srcdir)/969.688c09cd33ad6a9566d8.chunk.js \
+    $(srcdir)/734.ad0aae8f0ee7618b2c96.chunk.js \
+    $(srcdir)/817.3f3ab8355934c1d8568f.chunk.js \
+    $(srcdir)/837.f5e39fdd7d0fcc65a0bc.chunk.js \
+    $(srcdir)/86.70872ea6478e2c76c62e.chunk.js \
+    $(srcdir)/872.c431804363bcc4f14b5e.chunk.js \
+    $(srcdir)/934.0ec66eb98908cfe6f658.chunk.js \
+    $(srcdir)/969.6dc41d9b4b697aba7dd4.chunk.js \
     $(srcdir)/LISENCE.txt \
     $(srcdir)/agent.html \
     $(srcdir)/app.0917ff2bf5d3b8b0678d.css \
-    $(srcdir)/app.ac12dd21bb87b341fee6.js \
+    $(srcdir)/app.428ead32bb6efc4d4a9d.js \
     $(srcdir)/bundlesManifest.6.json \
-    $(srcdir)/editor.4b8d3daaa6973f27c0ea.chunk.js \
+    $(srcdir)/editor.bc0143f16d04dc82cf99.chunk.js \
     $(srcdir)/favicon.ico \
     $(srcdir)/index.html \
     $(srcdir)/local-agent.html \
-    $(srcdir)/npm.react.dom.1ffe59388e888b6afb99.js \
+    $(srcdir)/npm.react.dom.cb0e5595224409458752.js \
     $(srcdir)/registry-access.html \
     $(srcdir)/registry-alert-redirect.html \
-    $(srcdir)/runtime.2827e190d9690ef1bf80.js \
+    $(srcdir)/runtime.8e8f39ead75770600fae.js \
     $(srcdir)/sw.js \
     $(NULL)
 

@@ -3,12 +3,15 @@
         return window.location.origin + window.location.pathname.replace(pathRegex, "")
       }
 
-      window.addEventListener('message', function(event) {
-        const originUrl = event.data
+      var doneAccess = false
 
-        fetch(originUrl + "/api/v1/registry?action=hello", { cache: "no-cache", credentials: "include" })
-        .then(function(response) { return response.json() })
-        .then(function(data) {
+      function doRegistryAccess(parentHelloData, originUrl) {
+        const helloPromise = !parentHelloData
+          ? fetch(originUrl + "/api/v1/registry?action=hello", { cache: "no-cache", credentials: "include" })
+              .then(function(response) { return response.json() })
+          : Promise.resolve(parentHelloData)
+
+        helloPromise.then(function(data) {
           var retries = 3
           var nodes = data.nodes || []
 
@@ -35,8 +38,27 @@
                 }
               }
               window.parent.postMessage(data, "*");
+              doneAccess = true
             })
           }
           doAccess(data.machine_guid, data.hostname)
         })
+      }
+
+      try {
+        var searchParams = new URLSearchParams(location.search)
+        urlHelloData = searchParams.get("x")
+        var parentHelloData = JSON.parse(atob(urlHelloData))
+        doRegistryAccess(parentHelloData, searchParams.get("originUrl"))
+      } catch(e) {
+        // do nothing
+      }
+
+      window.addEventListener('message', function(event) {
+        if (doneAccess) return
+
+        var originUrl = Array.isArray(event.data) ? event.data[0] : event.data
+        var parentHelloData = Array.isArray(event.data) ? event.data[1] : null
+
+        doRegistryAccess(parentHelloData, originUrl)
       });</script></body></html>
