@@ -345,8 +345,6 @@ void rrddim_memory_file_update(RRDDIM *rd);
 // free the memory file structures for memory mode MAP and SAVE
 void rrddim_memory_file_free(RRDDIM *rd);
 
-bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, STORAGE_ENGINE_ID engine_id);
-
 // return the v019 header size of RRDDIM files
 size_t rrddim_memory_file_header_size(void);
 
@@ -1205,17 +1203,8 @@ void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_
 // ----------------------------------------------------------------------------
 // RRD DIMENSION functions
 
-RRDDIM *rrddim_add_custom(RRDSET *st
-                                 , const char *id
-                                 , const char *name
-                                 , collected_number multiplier
-                                 , collected_number divisor
-                                 , RRD_ALGORITHM algorithm
-                                 , STORAGE_ENGINE_ID storage_engine_id
-                                 );
-
-#define rrddim_add(st, id, name, multiplier, divisor, algorithm) \
-    rrddim_add_custom(st, id, name, multiplier, divisor, algorithm, (st)->storage_engine_id)
+RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name,
+                   collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm);
 
 int rrddim_reset_name(RRDSET *st, RRDDIM *rd, const char *name);
 int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm);
