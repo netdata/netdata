@@ -4,6 +4,13 @@
 
 
 bool exporting_labels_filter_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
+    (void)name;
+    (void)value;
+    struct instance *instance = (struct instance *)data;
+    return should_send_label(instance, ls);
+}
+
+bool exporting_chart_labels_filter_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
     if (name[0] == '_' )
         return false;
 

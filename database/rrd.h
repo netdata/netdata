@@ -318,6 +318,7 @@ int rrdlabels_unittest(void);
 
 // unfortunately this break when defined in exporting_engine.h
 bool exporting_labels_filter_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data);
+bool exporting_chart_labels_filter_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data);
 
 // ----------------------------------------------------------------------------
 // engine-specific iterator state for dimension data collection

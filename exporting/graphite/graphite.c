@@ -139,7 +139,7 @@ int format_chart_graphite_remote_write(struct instance *instance, RRDSET *st)
         return 0;
 
     rrdlabels_to_buffer(st->rrdlabels, instance->labels_buffer, ";", "=", "", "",
-                        exporting_labels_filter_callback, instance,
+                        exporting_chart_labels_filter_callback, instance,
                         NULL, sanitize_graphite_label_value);
 
     return 0;
