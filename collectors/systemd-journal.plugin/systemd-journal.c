@@ -245,6 +245,11 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
 
+
+//    // debug
+//    function_systemd_journal("123", "", "", 0, 30);
+//    exit(1);
+
     // ------------------------------------------------------------------------
 
     netdata_thread_t reader_thread;

@@ -4,20 +4,20 @@
 
 // ----------------------------------------------------------------------------
 
-#define BASE64_STRING_HASH_SIZE 19
+#define FACET_HASH_SIZE 19
 
 static inline void uint32_to_char(uint32_t num, char *out) {
-    static char id_encoding_characters[64 + 1] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    static char id_encoding_characters[64 + 1] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ.abcdefghijklmnopqrstuvwxyz_0123456789";
 
     int i;
     for(i = 5; i >= 0; --i) {
         out[i] = id_encoding_characters[num & 63];
-        num >> 6;
+        num >>= 6;
     }
     out[6] = '\0';
 }
 
-static inline void bash64_hash_keys_and_values(const char *src, char *out) {
+static inline void hash_keys_and_values(const char *src, char *out) {
     uint32_t hash1 = fnv1a_hash32(src);
     uint32_t hash2 = djb2_hash32(src);
     uint32_t hash3 = larson_hash32(src);
@@ -46,7 +46,6 @@ typedef struct facet_key {
     DICTIONARY *values;
 
     // members about the current row
-    SIMPLE_PATTERN *selected_values_pattern;
     uint32_t key_found_in_row;
     uint32_t key_values_selected_in_row;
     BUFFER *current_value;
@@ -122,7 +121,7 @@ static inline bool facets_key_is_filterable(FACETS *facets, const char *key) {
 // ----------------------------------------------------------------------------
 // FACET_VALUE dictionary hooks
 
-static void facet_value_insert_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
+static void facet_value_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
     FACET_VALUE *v = value;
     FACET_KEY *k = data;
 
@@ -131,9 +130,8 @@ static void facet_value_insert_callback(const DICTIONARY_ITEM *item, void *value
         v->name = strdupz(v->name);
         facet_value_is_used(k, v);
     }
-    else
-        // filter inserted
-        v->selected = true;
+
+    v->selected = true;
 }
 
 static bool facet_value_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data) {
@@ -153,23 +151,16 @@ static bool facet_value_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
 
 static void facet_value_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     FACET_VALUE *v = value;
-    freez(v->name);
+    freez((char *)v->name);
 }
 
 // ----------------------------------------------------------------------------
 // FACET_KEY dictionary hooks
 
-static void facet_key_insert_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
-    FACET_KEY *k = value;
-    FACETS *facets = data;
+static inline void facet_key_late_init(FACETS *facets, FACET_KEY *k, const char *name) {
+    k->name = strdupz(name);
 
-    if(k->name)
-        // an actual value, not a filter
-        k->name = strdupz(k->name);
-
-    k->current_value = buffer_create(0, NULL);
-
-    if(facets_key_is_filterable(facets, dictionary_acquired_item_name(item))) {
+    if(facets_key_is_filterable(facets, name)) {
         k->values = dictionary_create_advanced(
                 DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
                 NULL, sizeof(FACET_VALUE));
@@ -179,13 +170,25 @@ static void facet_key_insert_callback(const DICTIONARY_ITEM *item, void *value, 
     }
 }
 
-static bool facet_key_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value __maybe_unused, void *new_value __maybe_unused, void *data __maybe_unused) {
+static void facet_key_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
+    FACET_KEY *k = value;
+    FACETS *facets = data;
+
+    if(k->name)
+        // an actual value, not a filter
+        facet_key_late_init(facets, k, k->name);
+
+    k->current_value = buffer_create(0, NULL);
+}
+
+static bool facet_key_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data) {
     FACET_KEY *k = old_value;
     FACET_KEY *nk = new_value;
+    FACETS *facets = data;
 
     if(!k->name && nk->name)
         // an actual value, not a filter
-        k->name = strdupz(nk->name);
+        facet_key_late_init(facets, k, nk->name);
 
     return false;
 }
@@ -194,7 +197,7 @@ static void facet_key_delete_callback(const DICTIONARY_ITEM *item __maybe_unused
     FACET_KEY *k = value;
     dictionary_destroy(k->values);
     buffer_free(k->current_value);
-    freez(k->name);
+    freez((char *)k->name);
 }
 
 // ----------------------------------------------------------------------------
@@ -234,8 +237,8 @@ static inline void facets_check_value(FACETS *facets __maybe_unused, FACET_KEY *
         FACET_VALUE t = {
             .name = buffer_tostring(k->current_value),
         };
-        char hash[BASE64_STRING_HASH_SIZE];
-        bash64_hash_keys_and_values(t.name, hash);
+        char hash[FACET_HASH_SIZE];
+        hash_keys_and_values(t.name, hash);
         dictionary_set(k->values, hash, &t, sizeof(t));
     }
     else {
@@ -248,8 +251,8 @@ void facets_add_key_value(FACETS *facets, const char *key, const char *value) {
     FACET_KEY t = {
             .name = key,
     };
-    char hash[BASE64_STRING_HASH_SIZE];
-    bash64_hash_keys_and_values(t.name, hash);
+    char hash[FACET_HASH_SIZE];
+    hash_keys_and_values(t.name, hash);
     FACET_KEY *k = dictionary_set(facets->keys, hash, &t, sizeof(t));
     buffer_flush(k->current_value);
     buffer_strcat(k->current_value, value);
@@ -261,8 +264,8 @@ void facets_add_key_value_length(FACETS *facets, const char *key, const char *va
     FACET_KEY t = {
             .name = key,
     };
-    char hash[BASE64_STRING_HASH_SIZE];
-    bash64_hash_keys_and_values(t.name, hash);
+    char hash[FACET_HASH_SIZE];
+    hash_keys_and_values(t.name, hash);
     FACET_KEY *k = dictionary_set(facets->keys, hash, &t, sizeof(t));
     buffer_flush(k->current_value);
     buffer_strncat(k->current_value, value, value_len);
@@ -463,8 +466,8 @@ void facets_row_finished(FACETS *facets, usec_t usec) {
 
             if(counted_by == total_keys) {
                 if(k->values) {
-                    char hash[BASE64_STRING_HASH_SIZE];
-                    bash64_hash_keys_and_values(buffer_tostring(k->current_value), hash);
+                    char hash[FACET_HASH_SIZE];
+                    hash_keys_and_values(buffer_tostring(k->current_value), hash);
                     FACET_VALUE *v = dictionary_get(k->values, hash);
                     v->final_facet_value_counter++;
                 }
@@ -498,6 +501,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
             buffer_json_add_array_item_object(wb); // key
             {
                 buffer_json_member_add_string(wb, "id", k_dfe.name);
+                buffer_json_member_add_string(wb, "name", k->name);
                 buffer_json_member_add_uint64(wb, "order", k_dfe.counter);
                 buffer_json_member_add_array(wb, "options");
                 {
@@ -506,6 +510,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
                         buffer_json_add_array_item_object(wb);
                         {
                             buffer_json_member_add_string(wb, "id", v_dfe.name);
+                            buffer_json_member_add_string(wb, "name", v->name);
                             buffer_json_member_add_uint64(wb, "count", v->final_facet_value_counter);
                         }
                         buffer_json_object_close(wb);
@@ -540,7 +545,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
         dfe_start_read(facets->keys, k) {
             buffer_rrdf_table_add_field(
                     wb, field_id++,
-                    k_dfe.name, k_dfe.name,
+                    k_dfe.name, k->name ? k->name : k_dfe.name,
                     RRDF_FIELD_TYPE_STRING,
                     RRDF_FIELD_VISUAL_VALUE,
                     RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
@@ -564,7 +569,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
             FACET_KEY *k;
             dfe_start_read(facets->keys, k)
             {
-                FACET_ROW_KEY_VALUE *rkv = dictionary_get(row->dict, k_dfe.name);
+                FACET_ROW_KEY_VALUE *rkv = dictionary_get(row->dict, k->name);
                 buffer_json_add_array_item_string(wb, rkv ? buffer_tostring(rkv->wb) : FACET_VALUE_UNSET);
             }
             dfe_done(k);
