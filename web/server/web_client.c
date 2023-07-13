@@ -214,7 +214,7 @@ void web_client_request_done(struct web_client *w) {
         }
 
         // access log
-        log_access("%llu: %d '[%s]:%s' '%s' (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %d '%s'",
+        netdata_log_access("%llu: %d '[%s]:%s' '%s' (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %d '%s'",
                    w->id
                    , gettid()
                    , w->client_ip
