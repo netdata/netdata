@@ -49,4 +49,25 @@ int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *rrddim_ha
 void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrddim_handle);
 time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *rrddim_handle);
 
+// The following functions are dbengine-specific. Include them here until
+// we refactor the code so that, either we don't need them, or settle to a
+// common API.
+
+bool rrdeng_is_legacy(STORAGE_INSTANCE *db_instance);
+
+void rrdeng_get_37_statistics(STORAGE_INSTANCE *db_instance, unsigned long long *array);
+
+int rrdeng_init(STORAGE_INSTANCE **db_instance, const char *dbfiles_path,
+                       unsigned disk_space_mb, size_t tier);
+
+void rrdeng_readiness_wait(STORAGE_INSTANCE *db_instance);
+void rrdeng_exit_mode(STORAGE_INSTANCE *db_instance);
+
+int rrdeng_exit(STORAGE_INSTANCE *ctx);
+void rrdeng_prepare_exit(STORAGE_INSTANCE *ctx);
+
+size_t rrdeng_collectors_running(STORAGE_INSTANCE *db_instance);
+
+void rrdeng_size_statistics(STORAGE_INSTANCE *db_instance, BUFFER *wb);
+
 #endif /* NETDATA_RRDDIM_ENG_H */

@@ -408,21 +408,18 @@ int is_legacy = 1;
             host->db[0].id = STORAGE_ENGINE_DBENGINE;
             host->db[0].tier_grouping = get_tier_grouping(0);
 
-            ret = rrdeng_init(
-                (struct rrdengine_instance **)&host->db[0].instance,
-                dbenginepath,
-                rrdb.default_rrdeng_disk_quota_mb,
-                0); // may fail here for legacy dbengine initialization
+             // may fail here for legacy dbengine initialization
+            ret = rrdeng_init(&host->db[0].instance, dbenginepath, rrdb.default_rrdeng_disk_quota_mb, 0);
 
             if(ret == 0) {
-                rrdeng_readiness_wait((struct rrdengine_instance *)host->db[0].instance);
+                rrdeng_readiness_wait(host->db[0].instance);
 
                 // assign the rest of the shared storage instances to it
                 // to allow them collect its metrics too
 
                 for(size_t tier = 1; tier < rrdb.storage_tiers ; tier++) {
                     host->db[tier].id= STORAGE_ENGINE_DBENGINE;
-                    host->db[tier].instance = (STORAGE_INSTANCE *) rrdb.multidb_ctx[tier];
+                    host->db[tier].instance = rrdb.multidb_ctx[tier];
                     host->db[tier].tier_grouping = get_tier_grouping(tier);
                 }
             }
@@ -430,7 +427,7 @@ int is_legacy = 1;
         else {
             for(size_t tier = 0; tier < rrdb.storage_tiers ; tier++) {
                 host->db[tier].id = STORAGE_ENGINE_DBENGINE;
-                host->db[tier].instance = (STORAGE_INSTANCE *) rrdb.multidb_ctx[tier];
+                host->db[tier].instance = rrdb.multidb_ctx[tier];
                 host->db[tier].tier_grouping = get_tier_grouping(tier);
             }
         }
@@ -459,7 +456,7 @@ int is_legacy = 1;
         // the first tier is reserved for the non-dbengine modes
         for(size_t tier = 1; tier < rrdb.storage_tiers ; tier++) {
             host->db[tier].id = STORAGE_ENGINE_DBENGINE;
-            host->db[tier].instance = (STORAGE_INSTANCE *) rrdb.multidb_ctx[tier];
+            host->db[tier].instance = rrdb.multidb_ctx[tier];
             host->db[tier].tier_grouping = get_tier_grouping(tier);
         }
 #endif
@@ -1181,7 +1178,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
         if(host->db[tier].id == STORAGE_ENGINE_DBENGINE
             && host->db[tier].instance
             && !is_storage_engine_shared(host->db[tier].instance))
-            rrdeng_prepare_exit((struct rrdengine_instance *)host->db[tier].instance);
+            rrdeng_prepare_exit(host->db[tier].instance);
     }
 #endif
 
@@ -1202,7 +1199,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
         if(host->db[tier].id == STORAGE_ENGINE_DBENGINE
             && host->db[tier].instance
             && !is_storage_engine_shared(host->db[tier].instance))
-            rrdeng_exit((struct rrdengine_instance *)host->db[tier].instance);
+            rrdeng_exit(host->db[tier].instance);
     }
 #endif
 

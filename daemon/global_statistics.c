@@ -2484,7 +2484,7 @@ static void dbengine2_statistics_charts(void) {
                     }
 
                     ++dbengine_contexts;
-                    rrdeng_get_37_statistics((struct rrdengine_instance *)host->db[tier].instance, local_stats_array);
+                    rrdeng_get_37_statistics(host->db[tier].instance, local_stats_array);
                     for (i = 0; i < RRDENG_NR_STATS; ++i) {
                         /* aggregate statistics across hosts */
                         stats_array[i] += local_stats_array[i];

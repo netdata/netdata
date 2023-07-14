@@ -297,7 +297,7 @@ void journalfile_v2_data_unmount_cleanup(time_t now_s) {
     // DO NOT WAIT ON ANY LOCK!!!
 
     for (size_t tier = 0; tier < rrdb.storage_tiers; tier++) {
-        struct rrdengine_instance *ctx = rrdb.multidb_ctx[tier];
+        struct rrdengine_instance *ctx = (struct rrdengine_instance *) rrdb.multidb_ctx[tier];
         if(!ctx) continue;
 
         struct rrdengine_datafile *datafile;
