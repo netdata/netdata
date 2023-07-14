@@ -218,19 +218,19 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
         .capabilities = aclk_get_agent_capas()
     };
 
-    rrdhost_aclk_state_lock(localhost);
-    if (unlikely(!localhost->aclk_state.claimed_id)) {
+    rrdhost_aclk_state_lock(rrdb.localhost);
+    if (unlikely(!rrdb.localhost->aclk_state.claimed_id)) {
         netdata_log_error("Internal error. Should not come here if not claimed");
-        rrdhost_aclk_state_unlock(localhost);
+        rrdhost_aclk_state_unlock(rrdb.localhost);
         return 0;
     }
-    if (localhost->aclk_state.prev_claimed_id)
-        conn.claim_id = localhost->aclk_state.prev_claimed_id;
+    if (rrdb.localhost->aclk_state.prev_claimed_id)
+        conn.claim_id = rrdb.localhost->aclk_state.prev_claimed_id;
     else
-        conn.claim_id = localhost->aclk_state.claimed_id;
+        conn.claim_id = rrdb.localhost->aclk_state.claimed_id;
 
     char *msg = generate_update_agent_connection(&len, &conn);
-    rrdhost_aclk_state_unlock(localhost);
+    rrdhost_aclk_state_unlock(rrdb.localhost);
 
     if (!msg) {
         netdata_log_error("Error generating agent::v1::UpdateAgentConnection payload");
@@ -238,9 +238,9 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
     }
 
     pid = aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_AGENT_CONN, "UpdateAgentConnection");
-    if (localhost->aclk_state.prev_claimed_id) {
-        freez(localhost->aclk_state.prev_claimed_id);
-        localhost->aclk_state.prev_claimed_id = NULL;
+    if (rrdb.localhost->aclk_state.prev_claimed_id) {
+        freez(rrdb.localhost->aclk_state.prev_claimed_id);
+        rrdb.localhost->aclk_state.prev_claimed_id = NULL;
     }
     return pid;
 }
@@ -253,16 +253,16 @@ char *aclk_generate_lwt(size_t *size) {
         .capabilities = NULL
     };
 
-    rrdhost_aclk_state_lock(localhost);
-    if (unlikely(!localhost->aclk_state.claimed_id)) {
+    rrdhost_aclk_state_lock(rrdb.localhost);
+    if (unlikely(!rrdb.localhost->aclk_state.claimed_id)) {
         netdata_log_error("Internal error. Should not come here if not claimed");
-        rrdhost_aclk_state_unlock(localhost);
+        rrdhost_aclk_state_unlock(rrdb.localhost);
         return NULL;
     }
-    conn.claim_id = localhost->aclk_state.claimed_id;
+    conn.claim_id = rrdb.localhost->aclk_state.claimed_id;
 
     char *msg = generate_update_agent_connection(size, &conn);
-    rrdhost_aclk_state_unlock(localhost);
+    rrdhost_aclk_state_unlock(rrdb.localhost);
 
     if (!msg)
         netdata_log_error("Error generating agent::v1::UpdateAgentConnection payload for LWT");

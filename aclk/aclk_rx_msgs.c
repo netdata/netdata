@@ -279,7 +279,7 @@ int create_node_instance_result(const char *msg, size_t msg_len)
 
     RRDHOST *host = rrdhost_find_by_guid(res.machine_guid);
     if (likely(host)) {
-        if (host == localhost) {
+        if (host == rrdb.localhost) {
             node_state_update.live = 1;
             node_state_update.hops = 0;
         } else {
@@ -289,10 +289,10 @@ int create_node_instance_result(const char *msg, size_t msg_len)
         node_state_update.capabilities = aclk_get_node_instance_capas(host);
     }
 
-    rrdhost_aclk_state_lock(localhost);
-    node_state_update.claim_id = localhost->aclk_state.claimed_id;
+    rrdhost_aclk_state_lock(rrdb.localhost);
+    node_state_update.claim_id = rrdb.localhost->aclk_state.claimed_id;
     query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
-    rrdhost_aclk_state_unlock(localhost);
+    rrdhost_aclk_state_unlock(rrdb.localhost);
 
     freez((void *)node_state_update.capabilities);
 

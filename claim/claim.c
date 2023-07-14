@@ -142,6 +142,7 @@ void load_claiming_state(void)
 #if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
     netdata_cloud_enabled = false;
 #else
+    RRDHOST *localhost = rrdb.localhost;
     uuid_t uuid;
 
     // Propagate into aclk and registry. Be kind of atomic...
