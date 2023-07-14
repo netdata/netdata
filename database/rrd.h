@@ -46,10 +46,6 @@ typedef enum __attribute__ ((__packed__)) {
 // forward declarations
 struct rrddim_tier;
 
-#ifdef ENABLE_DBENGINE
-struct rrdengine_instance;
-#endif
-
 struct ml_metrics_statistics {
     size_t anomalous;
     size_t normal;
