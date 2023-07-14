@@ -332,6 +332,9 @@
               "type": "object",
               "description": "Configuration examples. The more examples the better!",
               "properties": {
+                "folding": {
+                  "$ref": "./definitions.json#/definitions/folding"
+                },
                 "list": {
                   "type": "array",
                   "description": "List of configuration examples.",
@@ -343,7 +346,7 @@
                         "description": "Example name."
                       },
                       "folding": {
-                        "$ref": "./definitions.json#/definitions/folding"
+                        "$ref": "./definitions.json#/definitions/folding_relaxed"
                       },
                       "description": {
                         "type": "string",
@@ -355,7 +358,6 @@
                       }
                     },
                     "required": [
-                      "folding",
                       "name",
                       "description",
                       "config"
@@ -364,6 +366,7 @@
                 }
               },
               "required": [
+                "folding",
                 "list"
               ]
             }

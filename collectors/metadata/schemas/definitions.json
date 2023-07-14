@@ -203,16 +203,33 @@
       "description": "Content folding settings.",
       "properties": {
         "title": {
-          "description": "Folded content summary title",
+          "description": "Folded content summary title.",
           "type": "string"
         },
         "enabled": {
-          "description": "Determines if this content should be folded",
+          "description": "Determines if this content should be folded.",
           "type": "boolean"
         }
       },
       "required": [
         "title",
+        "enabled"
+      ]
+    },
+    "folding_relaxed": {
+      "type": "object",
+      "description": "Content folding settings with optional title.",
+      "properties": {
+        "title": {
+          "description": "Folded content summary title.",
+          "type": "string"
+        },
+        "enabled": {
+          "description": "Determines if this content should be folded.",
+          "type": "boolean"
+        }
+      },
+      "required": [
         "enabled"
       ]
     },
