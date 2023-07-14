@@ -1904,6 +1904,8 @@ int main(int argc, char **argv) {
 
         get_system_timezone();
 
+        bearer_tokens_init();
+
         replication_initialize();
 
         // --------------------------------------------------------------------

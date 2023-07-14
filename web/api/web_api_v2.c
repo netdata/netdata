@@ -28,21 +28,13 @@ static void bearer_token_cleanup(void) {
     dictionary_garbage_collect(netdata_authorized_bearers);
 }
 
+void bearer_tokens_init(void) {
+    netdata_authorized_bearers = dictionary_create_advanced(
+            DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+            NULL, sizeof(struct bearer_token));
+}
+
 static time_t bearer_get_token(uuid_t *uuid) {
-    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
-    static bool initialized = false;
-
-    if(!initialized) {
-        spinlock_lock(&spinlock);
-        if (!netdata_authorized_bearers) {
-            netdata_authorized_bearers = dictionary_create_advanced(
-                    DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-                    NULL, sizeof(struct bearer_token));
-        }
-        spinlock_unlock(&spinlock);
-        initialized = true;
-    }
-
     char uuid_str[UUID_STR_LEN];
 
     uuid_generate_random(*uuid);
@@ -657,7 +649,7 @@ static struct web_api_command api_commands_v2[] = {
         {"nodes",               0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_nodes},
         {"node_instances",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_node_instances},
         {"versions",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_versions},
-        {"functions",           0, WEB_CLIENT_ACL_ACLK | WEB_CLIENT_ACL_BEARER_REQUIRED | ACL_DEV_OPEN_ACCESS, web_client_api_request_v2_functions},
+        {"functions",           0, WEB_CLIENT_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER | ACL_DEV_OPEN_ACCESS,     web_client_api_request_v2_functions},
         {"q",                   0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_q},
         {"alerts",              0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_alerts},
 
