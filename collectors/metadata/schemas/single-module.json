@@ -358,7 +358,6 @@
                       }
                     },
                     "required": [
-                      "folding",
                       "name",
                       "description",
                       "config"
