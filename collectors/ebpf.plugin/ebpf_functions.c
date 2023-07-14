@@ -152,10 +152,6 @@ static void ebpf_function_thread_manipulation(const char *transaction,
                 if (period <= 0)
                     period = EBPF_DEFAULT_LIFETIME;
 
-                // another request for thread that already ran, cleanup and restart
-                if (st->thread)
-                    freez(st->thread);
-
                 st->thread = mallocz(sizeof(netdata_thread_t));
                 lem->enabled = NETDATA_THREAD_EBPF_FUNCTION_RUNNING;
                 lem->lifetime = period;
@@ -256,31 +252,6 @@ static void ebpf_function_thread_manipulation(const char *transaction,
             buffer_json_add_array_item_string(wb, "Enabled/Disabled");
         }
 
-        // description
-        buffer_json_add_array_item_string(wb, wem->thread_description);
-
-        // Either it is not running or received a disabled signal and it is stopping.
-        if (wem->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING ||
-            (!wem->lifetime && (int)wem->running_time == wem->update_every)) {
-            // status
-            buffer_json_add_array_item_string(wb, EBPF_THREAD_STATUS_STOPPED);
-
-            // Time remaining
-            buffer_json_add_array_item_uint64(wb, 0);
-
-            // action
-            buffer_json_add_array_item_string(wb, "NULL");
-        } else {
-            // status
-            buffer_json_add_array_item_string(wb, EBPF_THREAD_STATUS_RUNNING);
-
-            // Time remaining
-            buffer_json_add_array_item_uint64(wb, (wem->lifetime - wem->running_time));
-
-            // action
-            buffer_json_add_array_item_string(wb, "Enabled/Disabled");
-        }
-
         buffer_json_array_close(wb);
     }
 
@@ -293,99 +264,6 @@ static void ebpf_function_thread_manipulation(const char *transaction,
         // IMPORTANT!
         // THE ORDER SHOULD BE THE SAME WITH THE VALUES!
         buffer_rrdf_table_add_field(wb, fields_id++, "Thread", "Thread Name", RRDF_FIELD_TYPE_STRING,
-                             RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                             RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                             RRDF_FIELD_FILTER_MULTISELECT,
-                             RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
-
-        buffer_rrdf_table_add_field(wb, fields_id++, "Description", "Thread Desc", RRDF_FIELD_TYPE_STRING,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
-
-        buffer_rrdf_table_add_field(wb, fields_id++, "Status", "Thread Status", RRDF_FIELD_TYPE_STRING,
-                             RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                             RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                             RRDF_FIELD_FILTER_MULTISELECT,
-                             RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
-
-        buffer_rrdf_table_add_field(wb, fields_id++, "Time", "Time Remaining", RRDF_FIELD_TYPE_INTEGER,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL,
-                                    NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-
-        buffer_rrdf_table_add_field(wb, fields_id++, "Action", "Thread Action", RRDF_FIELD_TYPE_STRING,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
-    }
-    buffer_json_object_close(wb); // columns
-
-    buffer_json_member_add_string(wb, "default_sort_column", "Thread");
-
-    buffer_json_member_add_object(wb, "charts");
-    {
-        // Threads
-        buffer_json_member_add_object(wb, "eBPFThreads");
-        {
-            buffer_json_member_add_string(wb, "name", "Threads");
-            buffer_json_member_add_string(wb, "type", "line");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "Threads");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        // Life Time
-        buffer_json_member_add_object(wb, "eBPFLifeTime");
-        {
-            buffer_json_member_add_string(wb, "name", "LifeTime");
-            buffer_json_member_add_string(wb, "type", "line");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "Threads");
-                buffer_json_add_array_item_string(wb, "Time");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-    }
-    buffer_json_object_close(wb); // charts
-
-    // Do we use only on fields that can be groupped?
-    buffer_json_member_add_object(wb, "group_by");
-    {
-        // group by Status
-        buffer_json_member_add_object(wb, "Status");
-        {
-            buffer_json_member_add_string(wb, "name", "Thread status");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "Status");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-    }
-    buffer_json_object_close(wb); // group_by
-
-    buffer_json_member_add_object(wb, "columns");
-    {
-        int fields_id = 0;
-
-        // IMPORTANT!
-        // THE ORDER SHOULD BE THE SAME WITH THE VALUES!
-        buffer_rrdf_table_add_field(wb, fields_id++, "Thread", "Thread Name", RRDF_FIELD_TYPE_STRING,
-                             RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                             RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                             RRDF_FIELD_FILTER_MULTISELECT,
-                             RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
-        buffer_rrdf_table_add_field(wb, fields_id++, "Status", "Thread Status", RRDF_FIELD_TYPE_STRING,
                              RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
                              RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                              RRDF_FIELD_FILTER_MULTISELECT,
