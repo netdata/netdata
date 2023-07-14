@@ -3407,28 +3407,8 @@ unittest:
         }
     }
 
-    // TODO: This loop must be removed with https://github.com/netdata/netdata/issues/14477
-    // it is added here for we merge eBPF with compatibility with new arguments.
-    int i;
-    for (i =0; i < argc; i++) {
-        if (strcmp(argv[i], long_options[EBPF_OPTION_SEVERITY_LEVEL].name))
-            continue;
-
-        if(argc <= i + 1) {
-            fprintf(stderr, "Parameter 'severity-level' requires a string ('info' or 'error') as argument.\n");
-            exit(1);
-        }
-        netdata_log_level_t slevel =  log_severity_string_to_severity_level(argv[i]);
-        log_collector_severity_level(slevel);
-        break;
-    }
-
-    if (disable_apps || disable_cgroups) {
-        if (disable_apps)
-            ebpf_disable_apps();
-
-        if (disable_cgroups)
-            ebpf_disable_cgroups();
+    if (disable_cgroups) {
+        ebpf_disable_cgroups();
     }
 
     if (select_threads) {
