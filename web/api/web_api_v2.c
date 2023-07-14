@@ -3,6 +3,8 @@
 #include "web_api_v2.h"
 #include "../rtc/webrtc.h"
 
+#define BEARER_TOKEN_EXPIRATION 86400
+
 struct bearer_token {
     time_t created_s;
     time_t expires_s;
@@ -26,7 +28,7 @@ static void bearer_token_cleanup(void) {
     dictionary_garbage_collect(netdata_authorized_bearers);
 }
 
-static void bearer_get_token(uuid_t *uuid) {
+static time_t bearer_get_token(uuid_t *uuid) {
     static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
     static bool initialized = false;
 
@@ -50,10 +52,12 @@ static void bearer_get_token(uuid_t *uuid) {
     z = dictionary_set(netdata_authorized_bearers, uuid_str, &t, sizeof(t));
     if(!z->created_s) {
         z->created_s = now_monotonic_sec();
-        z->expires_s = z->created_s + 86400;
+        z->expires_s = z->created_s + BEARER_TOKEN_EXPIRATION;
     }
 
     bearer_token_cleanup();
+
+    return now_realtime_sec() + BEARER_TOKEN_EXPIRATION;
 }
 
 #define HTTP_REQUEST_AUTHORIZATION_BEARER "\r\nAuthorization: Bearer "
@@ -192,7 +196,7 @@ int api_v2_bearer_token(RRDHOST *host __maybe_unused, struct web_client *w __may
     }
 
     uuid_t uuid;
-    bearer_get_token(&uuid);
+    time_t expires_s = bearer_get_token(&uuid);
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
@@ -200,6 +204,7 @@ int api_v2_bearer_token(RRDHOST *host __maybe_unused, struct web_client *w __may
     buffer_json_member_add_string(wb, "mg", localhost->machine_guid);
     buffer_json_member_add_boolean(wb, "bearer_protection", netdata_is_protected_by_bearer);
     buffer_json_member_add_uuid(wb, "token", &uuid);
+    buffer_json_member_add_time_t(wb, "expiration", expires_s);
     buffer_json_finalize(wb);
 
     return HTTP_RESP_OK;
