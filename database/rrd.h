@@ -1111,11 +1111,10 @@ RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id);
 RRDSET *rrdset_acquired_to_rrdset(RRDSET_ACQUIRED *rsa);
 void rrdset_acquired_release(RRDSET_ACQUIRED *rsa);
 
-#define rrdset_find_localhost(id) rrdset_find(rrdb.localhost, id)
 /* This will not return charts that are archived */
 static inline RRDSET *rrdset_find_active_localhost(const char *id)
 {
-    RRDSET *st = rrdset_find_localhost(id);
+    RRDSET *st = rrdset_find(rrdb.localhost, id);
     if (unlikely(st && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)))
         return NULL;
     return st;
