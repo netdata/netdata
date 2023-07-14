@@ -644,7 +644,7 @@
         },
         "categories": {
           "type": "array",
-          "description": "Categories this integration falls into.",
+          "description": "Category IDs that this integration falls into. IDs can be found in integrations/categories.yaml",
           "items": {
             "type": "string",
             "description": "String defining integration category"
