@@ -47,9 +47,7 @@ typedef enum __attribute__ ((__packed__)) {
 struct rrddim_tier;
 
 #ifdef ENABLE_DBENGINE
-struct rrdeng_page_descr;
 struct rrdengine_instance;
-struct pg_cache_page_index;
 #endif
 
 struct ml_metrics_statistics {
