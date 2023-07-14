@@ -1,7 +1,59 @@
 name: freeipmi.plugin
 modules:
-  - module_name: sel
-    plugin_name: freeipmi.plugin
+  - meta:
+      plugin_name: freeipmi.plugin
+      module_name: sel
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freeipmi sel
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -20,8 +72,60 @@ modules:
               chart_type: area
               dimensions:
                 - name: events
-  - module_name: sensors
-    plugin_name: freeipmi.plugin
+  - meta:
+      plugin_name: freeipmi.plugin
+      module_name: sensors
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freeipmi sensors
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: ipmi_sensor_state
         link: https://github.com/netdata/netdata/blob/master/health/health.d/ipmi.conf

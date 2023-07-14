@@ -1,7 +1,59 @@
 name: debugfs.plugin
 modules:
-  - module_name: /sys/kernel/debug/extfrag
-    plugin_name: debugfs.plugin
+  - meta:
+      plugin_name: debugfs.plugin
+      module_name: /sys/kernel/debug/extfrag
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: debugfs /sys/kernel/debug/extfrag
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -64,8 +116,60 @@ modules:
                 - name: order8
                 - name: order9
                 - name: order10
-  - module_name: /sys/kernel/debug/zswap
-    plugin_name: debugfs.plugin
+  - meta:
+      plugin_name: debugfs.plugin
+      module_name: /sys/kernel/debug/zswap
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: debugfs /sys/kernel/debug/zswap
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:

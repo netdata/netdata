@@ -1,7 +1,59 @@
 name: freebsd.plugin
 modules:
-  - module_name: vm.loadavg
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: vm.loadavg
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd vm.loadavg
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: load_cpu_number
         link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
@@ -37,8 +89,60 @@ modules:
                 - name: load1
                 - name: load5
                 - name: load15
-  - module_name: vm.vmtotal
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: vm.vmtotal
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd vm.vmtotal
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -70,8 +174,60 @@ modules:
               chart_type: area
               dimensions:
                 - name: used
-  - module_name: kern.cp_time
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: kern.cp_time
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd kern.cp_time
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: 10min_cpu_usage
         link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
@@ -124,8 +280,60 @@ modules:
                 - name: user
                 - name: interrupt
                 - name: idle
-  - module_name: dev.cpu.temperature
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: dev.cpu.temperature
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd dev.cpu.temperature
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -144,8 +352,60 @@ modules:
               chart_type: line
               dimensions:
                 - name: a dimension per core
-  - module_name: dev.cpu.0.freq
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: dev.cpu.0.freq
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd dev.cpu.0.freq
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -164,8 +424,60 @@ modules:
               chart_type: line
               dimensions:
                 - name: frequency
-  - module_name: hw.intrcnt
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: hw.intrcnt
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd hw.intrcnt
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -190,8 +502,60 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: a dimension per interrupt
-  - module_name: vm.stats.sys.v_intr
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: vm.stats.sys.v_intr
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd vm.stats.sys.v_intr
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -210,8 +574,60 @@ modules:
               chart_type: line
               dimensions:
                 - name: interrupts
-  - module_name: vm.stats.sys.v_soft
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: vm.stats.sys.v_soft
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd vm.stats.sys.v_soft
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -230,8 +646,60 @@ modules:
               chart_type: line
               dimensions:
                 - name: interrupts
-  - module_name: vm.stats.sys.v_swtch
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: vm.stats.sys.v_swtch
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd vm.stats.sys.v_swtch
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -256,8 +724,60 @@ modules:
               chart_type: line
               dimensions:
                 - name: started
-  - module_name: vm.swap_info
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: vm.swap_info
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd vm.swap_info
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -277,8 +797,60 @@ modules:
               dimensions:
                 - name: free
                 - name: used
-  - module_name: system.ram
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: system.ram
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd system.ram
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: ram_in_use
         link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
@@ -325,8 +897,60 @@ modules:
               chart_type: line
               dimensions:
                 - name: avail
-  - module_name: vm.stats.vm.v_swappgs
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: vm.stats.vm.v_swappgs
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd vm.stats.vm.v_swappgs
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: 30min_ram_swapped_out
         link: https://github.com/netdata/netdata/blob/master/health/health.d/swap.conf
@@ -351,8 +975,60 @@ modules:
               dimensions:
                 - name: io
                 - name: out
-  - module_name: vm.stats.vm.v_pgfaults
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: vm.stats.vm.v_pgfaults
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd vm.stats.vm.v_pgfaults
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -375,8 +1051,60 @@ modules:
                 - name: cow
                 - name: cow_optimized
                 - name: in_transit
-  - module_name: kern.ipc.sem
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: kern.ipc.sem
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd kern.ipc.sem
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: semaphores_used
         link: https://github.com/netdata/netdata/blob/master/health/health.d/ipc.conf
@@ -406,8 +1134,60 @@ modules:
               chart_type: area
               dimensions:
                 - name: arrays
-  - module_name: kern.ipc.shm
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: kern.ipc.shm
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd kern.ipc.shm
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -432,8 +1212,60 @@ modules:
               chart_type: area
               dimensions:
                 - name: allocated
-  - module_name: kern.ipc.msq
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: kern.ipc.msq
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd kern.ipc.msq
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -465,8 +1297,60 @@ modules:
               dimensions:
                 - name: allocated
                 - name: used
-  - module_name: uptime
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: uptime
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd uptime
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -485,8 +1369,60 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
-  - module_name: net.isr
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: net.isr
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd net.isr
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: 1min_netdev_backlog_exceeded
         link: https://github.com/netdata/netdata/blob/master/health/health.d/softnet.conf
@@ -534,8 +1470,60 @@ modules:
                 - name: hybrid_dispatched
                 - name: qdrops
                 - name: queued
-  - module_name: devstat
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: devstat
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd devstat
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: 10min_disk_utilization
         link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
@@ -626,8 +1614,60 @@ modules:
               chart_type: line
               dimensions:
                 - name: svctm
-  - module_name: net.inet.tcp.states
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: net.inet.tcp.states
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd net.inet.tcp.states
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -646,8 +1686,60 @@ modules:
               chart_type: line
               dimensions:
                 - name: connections
-  - module_name: net.inet.tcp.stats
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: net.inet.tcp.stats
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd net.inet.tcp.stats
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: 1m_ipv4_tcp_resets_sent
         link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
@@ -741,8 +1833,60 @@ modules:
                 - name: InECT1Pkts
                 - name: OutECT0Pkts
                 - name: OutECT1Pkts
-  - module_name: net.inet.udp.stats
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: net.inet.udp.stats
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd net.inet.udp.stats
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: 1m_ipv4_udp_receive_buffer_errors
         link: https://github.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf
@@ -777,8 +1921,60 @@ modules:
                 - name: RcvbufErrors
                 - name: InCsumErrors
                 - name: IgnoredMulti
-  - module_name: net.inet.icmp.stats
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: net.inet.icmp.stats
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd net.inet.icmp.stats
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -815,8 +2011,60 @@ modules:
                 - name: OutEchoReps
                 - name: InEchos
                 - name: OutEchos
-  - module_name: net.inet.ip.stats
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: net.inet.ip.stats
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd net.inet.ip.stats
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -865,8 +2113,60 @@ modules:
                 - name: OutNoRoutes
                 - name: InAddrErrors
                 - name: InUnknownProtos
-  - module_name: net.inet6.ip6.stats
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: net.inet6.ip6.stats
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd net.inet6.ip6.stats
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -917,8 +2217,60 @@ modules:
                 - name: InTruncatedPkts
                 - name: InNoRoutes
                 - name: OutNoRoutes
-  - module_name: net.inet6.icmp6.stats
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: net.inet6.icmp6.stats
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd net.inet6.icmp6.stats
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -1002,8 +2354,60 @@ modules:
                 - name: OutType133
                 - name: OutType135
                 - name: OutType143
-  - module_name: ipfw
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: ipfw
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd ipfw
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -1047,8 +2451,60 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: a dimension per dynamic rule
-  - module_name: getifaddrs
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: getifaddrs
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd getifaddrs
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: interface_speed
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
@@ -1202,8 +2658,60 @@ modules:
               chart_type: line
               dimensions:
                 - name: collisions
-  - module_name: getmntinfo
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: getmntinfo
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd getmntinfo
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: disk_space_usage
         link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
@@ -1242,8 +2750,60 @@ modules:
                 - name: avail
                 - name: used
                 - name: reserved_for_root
-  - module_name: zfs
-    plugin_name: freebsd.plugin
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: zfs
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: freebsd zfs
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: zfs_memory_throttle
         link: https://github.com/netdata/netdata/blob/master/health/health.d/zfs.conf

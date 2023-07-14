@@ -1,7 +1,59 @@
 name: proc.plugin
 modules:
-  - module_name: /proc/stat
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/stat
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/stat
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: 10min_cpu_usage
         link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
@@ -115,8 +167,60 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: a dimension per c-state
-  - module_name: /proc/sys/kernel/random/entropy_avail
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/sys/kernel/random/entropy_avail
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/sys/kernel/random/entropy_avail
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -135,8 +239,60 @@ modules:
               chart_type: line
               dimensions:
                 - name: entropy
-  - module_name: /proc/uptime
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/uptime
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/uptime
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -155,8 +311,60 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
-  - module_name: /proc/vmstat
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/vmstat
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/vmstat
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: 30min_ram_swapped_out
         link: https://github.com/netdata/netdata/blob/master/health/health.d/swap.conf
@@ -297,8 +505,60 @@ modules:
                 - name: hint_faults
                 - name: hint_faults_local
                 - name: pages_migrated
-  - module_name: /proc/interrupts
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/interrupts
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/interrupts
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -329,8 +589,60 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: a dimension per device
-  - module_name: /proc/loadavg
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/loadavg
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/loadavg
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: load_cpu_number
         link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
@@ -372,8 +684,60 @@ modules:
               chart_type: line
               dimensions:
                 - name: active
-  - module_name: /proc/pressure
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/pressure
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/pressure
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -470,8 +834,60 @@ modules:
               chart_type: line
               dimensions:
                 - name: time
-  - module_name: /proc/softirqs
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/softirqs
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/softirqs
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -502,8 +918,60 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: a dimension per softirq
-  - module_name: /proc/net/softnet_stat
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/softnet_stat
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/net/softnet_stat
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: 1min_netdev_backlog_exceeded
         link: https://github.com/netdata/netdata/blob/master/health/health.d/softnet.conf
@@ -553,8 +1021,60 @@ modules:
                 - name: squeezed
                 - name: received_rps
                 - name: flow_limit_count
-  - module_name: /proc/meminfo
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/meminfo
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/meminfo
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: ram_in_use
         link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
@@ -660,8 +1180,60 @@ modules:
               dimensions:
                 - name: anonymous
                 - name: shmem
-  - module_name: /proc/pagetypeinfo
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/pagetypeinfo
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/pagetypeinfo
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -696,8 +1268,60 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: a dimension per pagesize
-  - module_name: /sys/devices/system/edac/mc
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /sys/devices/system/edac/mc
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /sys/devices/system/edac/mc
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: 1hour_ecc_memory_correctable
         link: https://github.com/netdata/netdata/blob/master/health/health.d/memory.conf
@@ -732,8 +1356,60 @@ modules:
               chart_type: line
               dimensions:
                 - name: a dimension per mem controller
-  - module_name: /sys/devices/system/node
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /sys/devices/system/node
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /sys/devices/system/node
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -759,8 +1435,60 @@ modules:
                 - name: foreign
                 - name: interleave
                 - name: other
-  - module_name: /sys/kernel/mm/ksm
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /sys/kernel/mm/ksm
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /sys/kernel/mm/ksm
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -795,8 +1523,60 @@ modules:
               chart_type: line
               dimensions:
                 - name: savings
-  - module_name: /sys/block/zram
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /sys/block/zram
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /sys/block/zram
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -837,8 +1617,60 @@ modules:
               chart_type: line
               dimensions:
                 - name: percent
-  - module_name: ipc
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: ipc
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc ipc
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: semaphores_used
         link: https://github.com/netdata/netdata/blob/master/health/health.d/ipc.conf
@@ -892,8 +1724,60 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: bytes
-  - module_name: /proc/diskstats
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/diskstats
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/diskstats
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: 10min_disk_utilization
         link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
@@ -1108,8 +1992,60 @@ modules:
               dimensions:
                 - name: hits
                 - name: misses
-  - module_name: /proc/mdstat
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/mdstat
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/mdstat
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: mdstat_last_collected
         link: https://github.com/netdata/netdata/blob/master/health/health.d/mdstat.conf
@@ -1193,8 +2129,60 @@ modules:
               chart_type: line
               dimensions:
                 - name: available
-  - module_name: /proc/net/dev
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/dev
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/net/dev
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: interface_speed
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
@@ -1389,8 +2377,60 @@ modules:
                 - name: frames
                 - name: collisions
                 - name: carrier
-  - module_name: /proc/net/wireless
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/wireless
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/net/wireless
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -1449,8 +2489,60 @@ modules:
               chart_type: line
               dimensions:
                 - name: missed_beacons
-  - module_name: /sys/class/infiniband
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /sys/class/infiniband
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /sys/class/infiniband
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -1538,8 +2630,60 @@ modules:
                 - name: RoCE_slow_restart
                 - name: RoCE_slow_restart_congestion
                 - name: RoCE_slow_restart_count
-  - module_name: /proc/net/netstat
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/netstat
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/net/netstat
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: 1m_tcp_syn_queue_drops
         link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_listen.conf
@@ -2066,8 +3210,60 @@ modules:
                 - name: InECT1Pkts
                 - name: InECT0Pkts
                 - name: InCEPkts
-  - module_name: /proc/net/sockstat
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/sockstat
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/net/sockstat
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -2137,8 +3333,60 @@ modules:
               chart_type: area
               dimensions:
                 - name: mem
-  - module_name: /proc/net/sockstat6
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/sockstat6
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/net/sockstat6
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -2181,8 +3429,60 @@ modules:
               chart_type: line
               dimensions:
                 - name: inuse
-  - module_name: /proc/net/ip_vs_stats
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/ip_vs_stats
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/net/ip_vs_stats
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -2215,8 +3515,60 @@ modules:
               dimensions:
                 - name: received
                 - name: sent
-  - module_name: /proc/net/rpc/nfs
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/rpc/nfs
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/net/rpc/nfs
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -2262,8 +3614,60 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: a dimension per proc4 call
-  - module_name: /proc/net/rpc/nfsd
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/rpc/nfsd
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/net/rpc/nfsd
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -2342,8 +3746,60 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: a dimension per proc4 operation
-  - module_name: /proc/net/sctp/snmp
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/sctp/snmp
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/net/sctp/snmp
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -2392,8 +3848,60 @@ modules:
               dimensions:
                 - name: reassembled
                 - name: fragmented
-  - module_name: /proc/net/stat/nf_conntrack
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/stat/nf_conntrack
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/net/stat/nf_conntrack
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -2453,8 +3961,60 @@ modules:
                 - name: error_failed
                 - name: drop
                 - name: early_drop
-  - module_name: /proc/net/stat/synproxy
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/stat/synproxy
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/net/stat/synproxy
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
@@ -2487,8 +4047,60 @@ modules:
                 - name: valid
                 - name: invalid
                 - name: retransmits
-  - module_name: /proc/spl/kstat/zfs
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/spl/kstat/zfs
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/spl/kstat/zfs
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: zfs_pool_state_warn
         link: https://github.com/netdata/netdata/blob/master/health/health.d/zfs.conf
@@ -2520,8 +4132,60 @@ modules:
                 - name: removed
                 - name: unavail
                 - name: suspended
-  - module_name: /proc/spl/kstat/zfs/arcstats
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/spl/kstat/zfs/arcstats
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /proc/spl/kstat/zfs/arcstats
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: zfs_memory_throttle
         link: https://github.com/netdata/netdata/blob/master/health/health.d/zfs.conf
@@ -2731,8 +4395,60 @@ modules:
               dimensions:
                 - name: current
                 - name: max
-  - module_name: /sys/fs/btrfs
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /sys/fs/btrfs
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /sys/fs/btrfs
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts:
       - name: btrfs_allocated
         link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
@@ -2862,8 +4578,60 @@ modules:
                 - name: flush_errs
                 - name: corruption_errs
                 - name: generation_errs
-  - module_name: /sys/class/power_supply
-    plugin_name: proc.plugin
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /sys/class/power_supply
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: proc /sys/class/power_supply
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
     alerts: []
     metrics:
       folding:
