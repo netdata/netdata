@@ -14,7 +14,7 @@
         },
         "categories": {
           "type": "array",
-          "description": "Categories this integration falls into.",
+          "description": "Category IDs that this integration falls into. Category IDs can be found at integrations/categories.yaml.",
           "items": {
             "$ref": "#/definitions/category"
           }
