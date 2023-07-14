@@ -1065,12 +1065,14 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
         return 1;
     }
 
+#ifdef NETDATA_DEV_MODE
     // we register this only on localhost
     // for the other nodes, the origin server should register it
     rrd_collector_started(); // this creates a collector that runs for as long as netdata runs
     rrd_collector_add_function(localhost, NULL, "streaming", 10,
                                RRDFUNCTIONS_STREAMING_HELP, true,
                                rrdhost_function_streaming, NULL);
+#endif
 
     if (likely(system_info)) {
         migrate_localhost(&localhost->host_uuid);
