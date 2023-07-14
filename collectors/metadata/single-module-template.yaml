@@ -53,11 +53,13 @@ setup:
           description: ""
           required: false
     examples:
+      folding:
+        enabled: true
+        title: ""
       list:
         - name: ""
           folding:
-            enabled: true
-            title: ""
+            enabled: false
           description: ""
           config: ""
 troubleshooting:
