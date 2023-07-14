@@ -47,8 +47,6 @@ size_t rrdeng_currently_collected_metrics(STORAGE_INSTANCE *db_instance);
 time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
 time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
 
-
-
 int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *rrddim_handle);
 void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrddim_handle);
 time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *rrddim_handle);
