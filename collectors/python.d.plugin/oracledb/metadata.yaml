@@ -1,5 +1,72 @@
-module_name: oracledb
-plugin_name: python.d.plugin
+meta:
+  plugin_name: python.d.plugin
+  module_name: oracledb
+  alternative_monitored_instances: []
+  monitored_instance:
+    name: python.d oracledb
+    link: ''
+    categories: []
+    icon_filename: ''
+  related_resources:
+    integrations:
+      list:
+        - plugin_name: ''
+          module_name: ''
+  info_provided_to_referring_integrations:
+    description: ''
+  keywords: []
+  most_popular: false
+overview:
+  data_collection:
+    metrics_description: ''
+    method_description: ''
+  supported_platforms:
+    include: []
+    exclude: []
+  multi-instance: true
+  additional_permissions:
+    description: ''
+  default_behavior:
+    auto_detection:
+      description: ''
+    limits:
+      description: ''
+    performance_impact:
+      description: ''
+setup:
+  prerequisites:
+    list:
+      - title: ''
+        description: ''
+  configuration:
+    file:
+      name: ''
+      description: ''
+    options:
+      description: ''
+      folding:
+        title: ''
+        enabled: true
+      list:
+        - name: ''
+          default_value: ''
+          description: ''
+          required: false
+    examples:
+      folding:
+        enabled: true
+        title: ''
+      list:
+        - name: ''
+          folding:
+            enabled: false
+          description: ''
+          config: ''
+troubleshooting:
+  problems:
+    list:
+      - name: ''
+        description: ''
 alerts: []
 metrics:
   folding:
