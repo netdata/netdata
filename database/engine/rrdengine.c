@@ -157,11 +157,15 @@ enum LIBUV_WORKERS_STATUS {
 
 static inline enum LIBUV_WORKERS_STATUS work_request_full(void) {
     size_t dispatched = __atomic_load_n(&rrdeng_main.work_cmd.atomics.dispatched, __ATOMIC_RELAXED);
+    int reserved_libuv_worker_threads = 3;
+
+    internal_fatal(rrdb.libuv_worker_threads <= reserved_libuv_worker_threads,
+                   "libuv worker threads below minimum required");
 
     if(dispatched >= (size_t)(rrdb.libuv_worker_threads))
         return LIBUV_WORKERS_CRITICAL;
 
-    else if(dispatched >= (size_t)(rrdb.libuv_worker_threads - RESERVED_LIBUV_WORKER_THREADS))
+    else if(dispatched >= (size_t)(rrdb.libuv_worker_threads - reserved_libuv_worker_threads))
         return LIBUV_WORKERS_STRESSED;
 
     return LIBUV_WORKERS_RELAXED;

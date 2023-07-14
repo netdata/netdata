@@ -248,6 +248,7 @@ size_t judy_aral_structures(void);
 #define ABS(x) (((x) < 0)? (-(x)) : (x))
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
+#define CLAMP(value, min, max) MIN(MAX((value), (min)), (max))
 
 #define GUID_LEN 36
 

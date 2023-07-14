@@ -657,6 +657,26 @@ static void set_nofile_limit(struct rlimit *rl) {
         netdata_log_error("Number of open file descriptors allowed for this process is too low (RLIMIT_NOFILE=%zu)", (size_t)rl->rlim_cur);
 }
 
+static void set_libuv_worker_threads()
+{
+#if defined(ENV32BIT)
+    const int min_libuv_worker_threads = 8;
+    const int max_libuv_worker_threads = 128;
+#else
+    const int min_libuv_worker_threads = 16;
+    const int max_libuv_worker_threads = 1024;
+#endif
+
+    int n = (int) get_netdata_cpus() * 6;
+    n = CLAMP(n, min_libuv_worker_threads, max_libuv_worker_threads);
+
+    n = config_get_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", n);
+    n = MAX(n, min_libuv_worker_threads);
+    config_set_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", n);
+
+    rrdb.libuv_worker_threads = n;
+}
+
 void cancel_main_threads() {
     error_log_limit_unlimited();
 
@@ -1829,21 +1849,8 @@ int main(int argc, char **argv) {
 #endif
 #endif
 
-        // set libuv worker threads
-        rrdb.libuv_worker_threads = (int)get_netdata_cpus() * 6;
-
-        if(rrdb.libuv_worker_threads < MIN_LIBUV_WORKER_THREADS)
-            rrdb.libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
-
-        if(rrdb.libuv_worker_threads > MAX_LIBUV_WORKER_THREADS)
-            rrdb.libuv_worker_threads = MAX_LIBUV_WORKER_THREADS;
-
-
-        rrdb.libuv_worker_threads = config_get_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", rrdb.libuv_worker_threads);
-        if(rrdb.libuv_worker_threads < MIN_LIBUV_WORKER_THREADS) {
-            rrdb.libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
-            config_set_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", rrdb.libuv_worker_threads);
-        }
+        // decide how many libuv workers to have on 32 vs 64 bit platforms
+        set_libuv_worker_threads();
 
         {
             char buf[20 + 1];

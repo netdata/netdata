@@ -103,16 +103,6 @@ typedef enum __attribute__ ((__packed__)) {
 #define RRD_DEFAULT_HISTORY_ENTRIES 3600
 #define RRD_HISTORY_ENTRIES_MAX (86400*365)
 
-#if defined(ENV32BIT)
-#define MIN_LIBUV_WORKER_THREADS 8
-#define MAX_LIBUV_WORKER_THREADS 128
-#define RESERVED_LIBUV_WORKER_THREADS 3
-#else
-#define MIN_LIBUV_WORKER_THREADS 16
-#define MAX_LIBUV_WORKER_THREADS 1024
-#define RESERVED_LIBUV_WORKER_THREADS 6
-#endif
-
 #define RRD_ID_LENGTH_MAX 1000
 
 typedef long long total_number;
