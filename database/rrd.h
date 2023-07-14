@@ -70,7 +70,7 @@ struct ml_metrics_statistics {
 // ----------------------------------------------------------------------------
 // chart types
 
-typedef enum __attribute__ ((__packed__)) rrdset_type {
+typedef enum __attribute__ ((__packed__)) {
     RRDSET_TYPE_LINE    = 0,
     RRDSET_TYPE_AREA    = 1,
     RRDSET_TYPE_STACKED = 2,
@@ -102,7 +102,7 @@ typedef enum __attribute__ ((__packed__)) {
 // ----------------------------------------------------------------------------
 // algorithms types
 
-typedef enum __attribute__ ((__packed__)) rrd_algorithm {
+typedef enum __attribute__ ((__packed__)) {
     RRD_ALGORITHM_ABSOLUTE              = 0,
     RRD_ALGORITHM_INCREMENTAL           = 1,
     RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL = 2,
@@ -133,7 +133,7 @@ DICTIONARY *rrdfamily_rrdvars_dict(const RRDFAMILY_ACQUIRED *rf);
 // flags & options
 
 // options are permanent configuration options (no atomics to alter/access them)
-typedef enum __attribute__ ((__packed__)) rrddim_options {
+typedef enum __attribute__ ((__packed__)) {
     RRDDIM_OPTION_NONE                              = 0,
     RRDDIM_OPTION_HIDDEN                            = (1 << 0), // this dimension will not be offered to callers
     RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS   = (1 << 1), // do not offer RESET or OVERFLOW info to callers
@@ -149,7 +149,7 @@ typedef enum __attribute__ ((__packed__)) rrddim_options {
 #define rrddim_option_clear(rd, option) (rd)->collector.options &= ~(option)
 
 // flags are runtime changing status flags (atomics are required to alter/access them)
-typedef enum __attribute__ ((__packed__)) rrddim_flags {
+typedef enum __attribute__ ((__packed__)) {
     RRDDIM_FLAG_NONE                            = 0,
     RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION   = (1 << 0),
 
@@ -168,7 +168,7 @@ typedef enum __attribute__ ((__packed__)) rrddim_flags {
 #define rrddim_flag_set(rd, flag)   __atomic_or_fetch(&((rd)->flags), (flag), __ATOMIC_SEQ_CST)
 #define rrddim_flag_clear(rd, flag) __atomic_and_fetch(&((rd)->flags), ~(flag), __ATOMIC_SEQ_CST)
 
-typedef enum __attribute__ ((__packed__)) rrdlabel_source {
+typedef enum __attribute__ ((__packed__)) {
     RRDLABEL_SRC_AUTO       = (1 << 0), // set when Netdata found the label by some automation
     RRDLABEL_SRC_CONFIG     = (1 << 1), // set when the user configured the label
     RRDLABEL_SRC_K8S        = (1 << 2), // set when this label is found from k8s (RRDLABEL_SRC_AUTO should also be set)
@@ -353,7 +353,7 @@ void rrddim_memory_file_save(RRDDIM *rd);
 // flags are set/unset in a manner that is not thread safe
 // and may lead to missing information.
 
-typedef enum __attribute__ ((__packed__)) rrdset_flags {
+typedef enum __attribute__ ((__packed__)) {
     RRDSET_FLAG_DETAIL                           = (1 << 1),  // if set, the data set should be considered as a detail of another
                                                               // (the master data set should be the one that has the same family and is not detail)
     RRDSET_FLAG_DEBUG                            = (1 << 2),  // enables or disables debugging for a chart
@@ -570,7 +570,7 @@ const char *rrdset_cache_filename(RRDSET *st);
 // flags are set/unset in a manner that is not thread safe
 // and may lead to missing information.
 
-typedef enum __attribute__ ((__packed__)) rrdhost_flags {
+typedef enum __attribute__ ((__packed__)) {
 
     // Careful not to overlap with rrdhost_options to avoid bugs if
     // rrdhost_flags_xxx is used instead of rrdhost_option_xxx or vice-versa
