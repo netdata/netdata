@@ -23,10 +23,23 @@ static bool web_client_check_acl_and_bearer(struct web_client *w, WEB_CLIENT_ACL
         // endpoint does not require a bearer
         return true;
 
-    if((w->acl & (WEB_CLIENT_ACL_ACLK|WEB_CLIENT_ACL_WEBRTC)) || api_check_bearer_token(w))
+    if((w->acl & (WEB_CLIENT_ACL_ACLK|WEB_CLIENT_ACL_WEBRTC)))
         // the request is coming from ACLK or WEBRTC (authorized already),
-        // or we have a valid bearer on the request
         return true;
+
+    // at this point we need a bearer to serve the request
+    // either because:
+    //
+    // 1. WEB_CLIENT_ACL_BEARER_REQUIRED, or
+    // 2. netdata_is_protected_by_bearer == true
+    //
+
+    BEARER_STATUS t = api_check_bearer_token(w);
+    if(t == BEARER_STATUS_AVAILABLE_AND_VALIDATED)
+        // we have a valid bearer on the request
+        return true;
+
+    netdata_log_info("BEARER: bearer is required for request: code %d", t);
 
     return false;
 }

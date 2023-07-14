@@ -941,7 +941,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     char *cookie = strstr(w->response.data->buffer, NETDATA_REGISTRY_COOKIE_NAME "=");
     if(cookie)
         strncpyz(person_guid, &cookie[sizeof(NETDATA_REGISTRY_COOKIE_NAME)], UUID_STR_LEN - 1);
-    else if(!extract_bearer_token_from_request(w, person_guid, sizeof(person_guid)))
+    else if(extract_bearer_token_from_request(w, person_guid, sizeof(person_guid)) != BEARER_STATUS_EXTRACTED_FROM_HEADER)
         person_guid[0] = '\0';
 
     char action = '\0';
