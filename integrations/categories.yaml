@@ -1,267 +1,274 @@
-deploy:
-  - id: operating-systems
-    parent: deploy
-    name: Operating Systems
-    description: ""
-    most-popular: false
-  - id: docker-kubernetes
-    parent: deploy
-    name: Docker & Kubernetes
-    description: ""
-    most-popular: false
-  - id: provisioning-systems
-    parent: deploy
-    name: Provisioning Systems
-    description: ""
-    most-popular: false
-data-collection:
-  - id: containers-and-vms
-    parent: data-collection
-    name: Containers and VMs
-    description: ""
-    most-popular: false
-  - id: database-servers
-    parent: data-collection
-    name: Database Servers
-    description: ""
-    most-popular: false
-  - id: kubernetes
-    parent: data-collection
-    name: Kubernetes
-    description: ""
-    most-popular: false
-  - id: service-discovery-registry
-    parent: data-collection
-    name: Service Discovery / Registry
-    description: ""
-    most-popular: false
-  - id: web-servers-and-web-proxies
-    parent: data-collection
-    name: Web Servers and Web Proxies
-    description: ""
-    most-popular: false
-  - id: cloud-provider-managed
-    parent: data-collection
-    name: Cloud Provider Managed
-    description: ""
-    most-popular: false
-  - id: windows-systems
-    parent: data-collection
-    name: Windows Systems
-    description: ""
-    most-popular: false
-  - id: apm
-    parent: data-collection
-    name: APM
-    description: ""
-    most-popular: false
-  - id: hardware-devices-and-sensors
-    parent: data-collection
-    name: Hardware Devices and Sensors
-    description: ""
-    most-popular: false
-  - id: macos-systems
-    parent: data-collection
-    name: macOS Systems
-    description: ""
-    most-popular: false
-  - id: message-brokers
-    parent: data-collection
-    name: Message Brokers
-    description: ""
-    most-popular: false
-  - id: provisioning-systems
-    parent: data-collection
-    name: Provisioning Systems
-    description: ""
-    most-popular: false
-  - id: search-engines
-    parent: data-collection
-    name: Search Engines
-    description: ""
-    most-popular: false
-  - id: linux-systems
-    parent: data-collection
-    name: Linux Systems
-    description: ""
-    most-popular: false
-  - id: notifications
-    parent: data-collection
-    name: Notifications
-    description: ""
-    most-popular: false
-  - id: networking-stack-and-network-interfaces
-    parent: data-collection
-    name: Networking Stack and Network Interfaces
-    description: ""
-    most-popular: false
-  - id: cloud-provider
-    parent: data-collection
-    name: Cloud Provider
-    description: ""
-    most-popular: false
-  - id: synthetic-checks
-    parent: data-collection
-    name: Synthetic Checks
-    description: ""
-    most-popular: false
-  - id: storage-mount-points-and-filesystems
-    parent: data-collection
-    name: Storage Mount Points and Filesystems
-    description: ""
-    most-popular: false
-  - id: containers-vms
-    parent: data-collection
-    name: Containers & VMs
-    description: ""
-    most-popular: false
-  - id: ci-cd-systems
-    parent: data-collection
-    name: CI/CD Systems
-    description: ""
-    most-popular: false
-  - id: ups
-    parent: data-collection
-    name: UPS
-    description: ""
-    most-popular: false
-  - id: freebsd-systems
-    parent: data-collection
-    name: FreeBSD Systems
-    description: ""
-    most-popular: false
-  - id: logs-servers
-    parent: data-collection
-    name: Logs Servers
-    description: ""
-    most-popular: false
-  - id: security-systems
-    parent: data-collection
-    name: Security Systems
-    description: ""
-    most-popular: false
-  - id: observability
-    parent: data-collection
-    name: Observability
-    description: ""
-    most-popular: false
-  - id: gaming
-    parent: data-collection
-    name: Gaming
-    description: ""
-    most-popular: false
-  - id: iot-devices
-    parent: data-collection
-    name: IoT Devices
-    description: ""
-    most-popular: false
-  - id: media-streaming-servers
-    parent: data-collection
-    name: Media Streaming Servers
-    description: ""
-    most-popular: false
-  - id: authentication-and-authorization
-    parent: data-collection
-    name: Authentication and Authorization
-    description: ""
-    most-popular: false
-  - id: project-management
-    parent: data-collection
-    name: Project Management
-    description: ""
-    most-popular: false
-  - id: application-servers
-    parent: data-collection
-    name: Application Servers
-    description: ""
-    most-popular: false
-  - id: export
-    parent: data-collection
-    name: Export
-    description: ""
-    most-popular: false
-  - id: dns-and-dhcp-servers
-    parent: data-collection
-    name: DNS and DHCP Servers
-    description: ""
-    most-popular: false
-  - id: mail-servers
-    parent: data-collection
-    name: Mail Servers
-    description: ""
-    most-popular: false
-  - id: processes-and-system-services
-    parent: data-collection
-    name: Processes and System Services
-    description: ""
-    most-popular: false
-  - id: storage-mount-points-and-filesystems
-    parent: data-collection
-    name: Storage, Mount Points and Filesystems
-    description: ""
-    most-popular: false
-  - id: systemd
-    parent: data-collection
-    name: Systemd
-    description: ""
-    most-popular: false
-  - id: telephony-servers
-    parent: data-collection
-    name: Telephony Servers
-    description: ""
-    most-popular: false
-  - id: vpns
-    parent: data-collection
-    name: VPNs
-    description: ""
-    most-popular: false
-  - id: blockchain-servers
-    parent: data-collection
-    name: Blockchain Servers
-    description: ""
-    most-popular: false
-  - id: distributed-computing-systems
-    parent: data-collection
-    name: Distributed Computing Systems
-    description: ""
-    most-popular: false
-  - id: generic-data-collection
-    parent: data-collection
-    name: Generic Data Collection
-    description: ""
-    most-popular: false
-  - id: p2p
-    parent: data-collection
-    name: P2P
-    description: ""
-    most-popular: false
-  - id: snmp-and-networked-devices
-    parent: data-collection
-    name: SNMP and Networked Devices
-    description: ""
-    most-popular: false
-  - id: system-clock-and-ntp
-    parent: data-collection
-    name: System Clock and NTP
-    description: ""
-    most-popular: false
-  - id: nas
-    parent: data-collection
-    name: NAS
-    description: ""
-    most-popular: false
-  - id: api-gateways
-    parent: data-collection
-    name: API Gateways
-    description: ""
-    most-popular: false
-  - id: task-queues
-    parent: data-collection
-    name: Task Queues
-    description: ""
-    most-popular: false
-  - id: ftp-servers
-    parent: data-collection
-    name: FTP Servers
-    description: ""
-    most-popular: false
+- name: deploy
+  description: ""
+  most-popular: false
+  children:
+    - id: deploy_operating-systems
+      name: Operating Systems
+      description: ""
+      most-popular: false
+      children: []
+    - id: deploy_docker-kubernetes
+      name: Docker & Kubernetes
+      description: ""
+      most-popular: false
+      children: []
+    - id: deploy_provisioning-systems
+      parent: deploy
+      name: Provisioning Systems
+      description: ""
+      most-popular: false
+      children: []
+- name: data-collection
+  description: ""
+  most-popular: false
+  children:
+    - id: data-collection_containers-and-vms
+      name: Containers and VMs
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_database-servers
+      name: Database Servers
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_kubernetes
+      name: Kubernetes
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_service-discovery-registry
+      name: Service Discovery / Registry
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_web-servers-and-web-proxies
+      name: Web Servers and Web Proxies
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_cloud-provider-managed
+      name: Cloud Provider Managed
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_windows-systems
+      name: Windows Systems
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_apm
+      name: APM
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_hardware-devices-and-sensors
+      name: Hardware Devices and Sensors
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_macos-systems
+      name: macOS Systems
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_message-brokers
+      name: Message Brokers
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_provisioning-systems
+      name: Provisioning Systems
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_search-engines
+      name: Search Engines
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_linux-systems
+      name: Linux Systems
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_notifications
+      name: Notifications
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_networking-stack-and-network-interfaces
+      name: Networking Stack and Network Interfaces
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_cloud-provider
+      name: Cloud Provider
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_synthetic-checks
+      name: Synthetic Checks
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_storage-mount-points-and-filesystems
+      name: Storage Mount Points and Filesystems
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_containers-vms
+      name: Containers & VMs
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_ci-cd-systems
+      name: CI/CD Systems
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_ups
+      name: UPS
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_freebsd-systems
+      name: FreeBSD Systems
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_logs-servers
+      name: Logs Servers
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_security-systems
+      name: Security Systems
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_observability
+      name: Observability
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_gaming
+      name: Gaming
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_iot-devices
+      name: IoT Devices
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_media-streaming-servers
+      name: Media Streaming Servers
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_authentication-and-authorization
+      name: Authentication and Authorization
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_project-management
+      name: Project Management
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_application-servers
+      name: Application Servers
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_export
+      name: Export
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_dns-and-dhcp-servers
+      name: DNS and DHCP Servers
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_mail-servers
+      name: Mail Servers
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_processes-and-system-services
+      name: Processes and System Services
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_storage-mount-points-and-filesystems
+      name: Storage, Mount Points and Filesystems
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_systemd
+      name: Systemd
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_telephony-servers
+      name: Telephony Servers
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_vpns
+      name: VPNs
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_blockchain-servers
+      name: Blockchain Servers
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_distributed-computing-systems
+      name: Distributed Computing Systems
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_generic-data-collection
+      name: Generic Data Collection
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_p2p
+      name: P2P
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_snmp-and-networked-devices
+      name: SNMP and Networked Devices
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_system-clock-and-ntp
+      name: System Clock and NTP
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_nas
+      name: NAS
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_api-gateways
+      name: API Gateways
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_task-queues
+      name: Task Queues
+      description: ""
+      most-popular: false
+      children: []
+    - id: data-collection_ftp-servers
+      name: FTP Servers
+      description: ""
+      most-popular: false
+      children: []
