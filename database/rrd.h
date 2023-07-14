@@ -65,7 +65,6 @@ struct ml_metrics_statistics {
 #include "rrdcalctemplate.h"
 #include "streaming/rrdpush.h"
 #include "aclk/aclk_rrdhost_state.h"
-#include "sqlite/sqlite_health.h"
 
 // ----------------------------------------------------------------------------
 // chart types
