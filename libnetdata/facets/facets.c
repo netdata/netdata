@@ -69,16 +69,18 @@ typedef struct facet_value {
     uint32_t final_facet_value_counter;
 } FACET_VALUE;
 
-typedef struct facet_key {
+struct facet_key {
     const char *name;
 
     DICTIONARY *values;
+
+    FACET_KEY_OPTIONS options;
 
     // members about the current row
     uint32_t key_found_in_row;
     uint32_t key_values_selected_in_row;
     BUFFER *current_value;
-} FACET_KEY;
+};
 
 typedef struct facet_row_key_value {
     const char *tmp;
@@ -96,11 +98,12 @@ struct facets {
     SIMPLE_PATTERN *excluded_keys;
     SIMPLE_PATTERN *included_keys;
 
+    FACETS_OPTIONS options;
+    usec_t anchor;
+
     DICTIONARY *accepted_params;
 
     DICTIONARY *keys;
-
-    usec_t anchor;
     FACET_ROW *base;    // double linked list of the selected facets rows
 
     uint32_t items_to_return;
@@ -135,20 +138,40 @@ static inline void facet_value_is_used(FACET_KEY *k, FACET_VALUE *v) {
         k->key_values_selected_in_row++;
 }
 
-static inline bool facets_key_is_filterable(FACETS *facets, const char *key) {
+static inline bool facets_key_is_facet(FACETS *facets, FACET_KEY *k) {
     bool included = true, excluded = false;
 
-    if(facets->included_keys) {
-        if (!simple_pattern_matches(facets->included_keys, key))
+    if(k->options & (FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_NO_FACET)) {
+        if(k->options & FACET_KEY_OPTION_FACET) {
+            included = true;
+            excluded = false;
+        }
+        else if(k->options & FACET_KEY_OPTION_NO_FACET) {
             included = false;
-    }
-
-    if(facets->excluded_keys) {
-        if (simple_pattern_matches(facets->excluded_keys, key))
             excluded = true;
+        }
+    }
+    else {
+        if (facets->included_keys) {
+            if (!simple_pattern_matches(facets->included_keys, k->name))
+                included = false;
+        }
+
+        if (facets->excluded_keys) {
+            if (simple_pattern_matches(facets->excluded_keys, k->name))
+                excluded = true;
+        }
     }
 
-    return included && !excluded;
+    if(included && !excluded) {
+        k->options |= FACET_KEY_OPTION_FACET;
+        k->options &= ~FACET_KEY_OPTION_NO_FACET;
+        return true;
+    }
+
+    k->options |= FACET_KEY_OPTION_NO_FACET;
+    k->options &= ~FACET_KEY_OPTION_FACET;
+    return false;
 }
 
 // ----------------------------------------------------------------------------
@@ -193,7 +216,7 @@ static void facet_value_delete_callback(const DICTIONARY_ITEM *item __maybe_unus
 static inline void facet_key_late_init(FACETS *facets, FACET_KEY *k, const char *name) {
     k->name = strdupz(name);
 
-    if(facets_key_is_filterable(facets, name)) {
+    if(facets_key_is_facet(facets, k)) {
         k->values = dictionary_create_advanced(
                 DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
                 NULL, sizeof(FACET_VALUE));
@@ -235,8 +258,9 @@ static void facet_key_delete_callback(const DICTIONARY_ITEM *item __maybe_unused
 
 // ----------------------------------------------------------------------------
 
-FACETS *facets_create(uint32_t items_to_return, usec_t anchor, const char *visible_keys, const char *facet_keys, const char *non_facet_keys) {
+FACETS *facets_create(uint32_t items_to_return, usec_t anchor, FACETS_OPTIONS options, const char *visible_keys, const char *facet_keys, const char *non_facet_keys) {
     FACETS *facets = callocz(1, sizeof(FACETS));
+    facets->options = options;
     facets->keys = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE|DICT_OPTION_FIXED_SIZE, NULL, sizeof(FACET_KEY));
     dictionary_register_insert_callback(facets->keys, facet_key_insert_callback, facets);
     dictionary_register_conflict_callback(facets->keys, facet_key_conflict_callback, facets);
@@ -273,6 +297,16 @@ void facets_accepted_param(FACETS *facets, const char *param) {
     dictionary_set(facets->accepted_params, param, NULL, 0);
 }
 
+inline FACET_KEY *facets_register_key(FACETS *facets, const char *key, FACET_KEY_OPTIONS options) {
+    FACET_KEY t = {
+            .name = key,
+            .options = options,
+    };
+    char hash[FACET_HASH_SIZE];
+    hash_keys_and_values(t.name, hash);
+    return dictionary_set(facets->keys, hash, &t, sizeof(t));
+}
+
 // ----------------------------------------------------------------------------
 
 static inline void facets_check_value(FACETS *facets __maybe_unused, FACET_KEY *k) {
@@ -294,12 +328,7 @@ static inline void facets_check_value(FACETS *facets __maybe_unused, FACET_KEY *
 }
 
 void facets_add_key_value(FACETS *facets, const char *key, const char *value) {
-    FACET_KEY t = {
-            .name = key,
-    };
-    char hash[FACET_HASH_SIZE];
-    hash_keys_and_values(t.name, hash);
-    FACET_KEY *k = dictionary_set(facets->keys, hash, &t, sizeof(t));
+    FACET_KEY *k = facets_register_key(facets, key, 0);
     buffer_flush(k->current_value);
     buffer_strcat(k->current_value, value);
 
@@ -307,12 +336,7 @@ void facets_add_key_value(FACETS *facets, const char *key, const char *value) {
 }
 
 void facets_add_key_value_length(FACETS *facets, const char *key, const char *value, size_t value_len) {
-    FACET_KEY t = {
-            .name = key,
-    };
-    char hash[FACET_HASH_SIZE];
-    hash_keys_and_values(t.name, hash);
-    FACET_KEY *k = dictionary_set(facets->keys, hash, &t, sizeof(t));
+    FACET_KEY *k = facets_register_key(facets, key, 0);
     buffer_flush(k->current_value);
     buffer_strncat(k->current_value, value, value_len);
 
@@ -617,11 +641,12 @@ void facets_report(FACETS *facets, BUFFER *wb) {
 
         FACET_KEY *k;
         dfe_start_read(facets->keys, k) {
-            bool visible = false;
+            bool visible = k->options & (FACET_KEY_OPTION_VISIBLE|FACET_KEY_OPTION_STICKY);
 
-            if(!facets->visible_keys)
-                visible = k->values ? true : false;
-            else
+            if((facets->options & FACETS_OPTION_ALL_FACETS_VISIBLE && k->values))
+                visible = true;
+
+            if(!visible)
                 visible = simple_pattern_matches(facets->visible_keys, k->name);
 
             buffer_rrdf_table_add_field(

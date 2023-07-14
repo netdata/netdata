@@ -14,16 +14,7 @@
 #define SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION "View, search and analyze systemd journal entries."
 #define SYSTEMD_JOURNAL_DEFAULT_TIMEOUT 30
 
-#define SYSTEMD_ALWAYS_VISIBLE_KEYS         \
-    "timestamp"                             \
-    "|MESSAGE"                              \
-    "|SYSLOG_IDENTIFIER"                    \
-    "|UNIT"                                 \
-    "|_PID"                                 \
-    "|_COMM"                                \
-    "|_SYSTEMD_UNIT"                        \
-    "|_SYSTEMD_SLICE"                       \
-    ""
+#define SYSTEMD_ALWAYS_VISIBLE_KEYS         NULL
 
 #define SYSTEMD_KEYS_INCLUDED_IN_FACETS     \
     "_TRANSPORT"                            \
@@ -43,33 +34,7 @@
     "|UNIT"                                 \
     ""
 
-//#define SYSTEMD_KEYS_EXCLUDED_FROM_FACETS \
-//    "*MESSAGE*"                           \
-//    "|*CMDLINE*"                          \
-//    "|*TIMESTAMP*"                        \
-//    "|*MONOTONIC*"                        \
-//    "|*REALTIME*"                         \
-//    "|*BOOTIME*"                          \
-//    "|*_USEC*"                            \
-//    "|*INVOCATION*"                       \
-//    "|*USAGE*"                            \
-//    "|*RLIMIT*"                           \
-//    "|*_ID"                               \
-//    "|!*COREDUMP_SIGNAL_NAME|*COREDUMP*"  \
-//    "|*CODE_LINE*"                        \
-//    "|_STREAM_ID"                         \
-//    "|SYSLOG_RAW"                         \
-//    "|_PID"                               \
-//    "|_CAP_EFFECTIVE"                     \
-//    "|_AUDIT_SESSION"                     \
-//    "|_AUDIT_LOGINUID"                    \
-//    "|_SYSTEMD_OWNER_UID"                 \
-//    "|GLIB_OLD_LOG_API"                   \
-//    "|SYSLOG_PID"                         \
-//    "|TID"                                \
-//    "|JOB_ID"                             \
-//    "|_SYSTEMD_SESSION"                   \
-//    ""
+#define SYSTEMD_KEYS_EXCLUDED_FROM_FACETS   NULL
 
 #define FACET_MAX_VALUE_LENGTH 8192
 
@@ -98,15 +63,24 @@ int systemd_journal_query(struct systemd_journal_request *c) {
     if(!c->wb)
         return HTTP_RESP_BAD_REQUEST;
 
-    FACETS *facets = facets_create(c->items, c->anchor,
+    FACETS *facets = facets_create(c->items, c->anchor, 0,
                                    SYSTEMD_ALWAYS_VISIBLE_KEYS,
                                    SYSTEMD_KEYS_INCLUDED_IN_FACETS,
-                                   NULL);
+                                   SYSTEMD_KEYS_EXCLUDED_FROM_FACETS);
 
     facets_accepted_param(facets, "after");
     facets_accepted_param(facets, "before");
     facets_accepted_param(facets, "timeout");
     facets_accepted_param(facets, "anchor");
+    facets_accepted_param(facets, "last");
+
+    // register the fields in the order you want them on the dashboard
+    
+    facets_register_key(facets, "_COMM",
+                        FACET_KEY_OPTION_FACET|FACET_KEY_OPTION_VISIBLE);
+
+    facets_register_key(facets, "MESSAGE",
+                        FACET_KEY_OPTION_NO_FACET|FACET_KEY_OPTION_VISIBLE);
 
     // FIXME initialize facets filters here
     facets_rows_begin(facets);
