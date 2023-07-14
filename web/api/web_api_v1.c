@@ -1545,18 +1545,18 @@ static struct web_api_command api_commands_v1[] = {
         // { "ml_models",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_models          },
 #endif
 
-        {"manage/health", 0, WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_ACLK | WEB_CLIENT_ACL_BEARER_REQUIRED, web_client_api_request_v1_mgmt_health           },
+        {"manage/health",        0, WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER, web_client_api_request_v1_mgmt_health },
         { "aclk",                0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_aclk_state            },
         { "metric_correlations", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_metric_correlations   },
         { "weights",             0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_weights               },
 
-        {"function", 0, WEB_CLIENT_ACL_ACLK | WEB_CLIENT_ACL_BEARER_REQUIRED | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_function },
-        {"functions", 0, WEB_CLIENT_ACL_ACLK | WEB_CLIENT_ACL_BEARER_REQUIRED | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_functions },
+        {"function",             0, WEB_CLIENT_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_function },
+        {"functions",            0, WEB_CLIENT_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_functions },
 
         { "dbengine_stats",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_dbengine_stats },
 
         // terminator
-        { NULL,              0, WEB_CLIENT_ACL_NONE,      NULL },
+        { NULL,                  0, WEB_CLIENT_ACL_NONE,      NULL },
 };
 
 inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url_path_endpoint) {
