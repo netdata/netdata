@@ -1111,10 +1111,11 @@ RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id);
 RRDSET *rrdset_acquired_to_rrdset(RRDSET_ACQUIRED *rsa);
 void rrdset_acquired_release(RRDSET_ACQUIRED *rsa);
 
+#define rrdset_find_localhost(id) rrdset_find(rrdb.localhost, id)
 /* This will not return charts that are archived */
 static inline RRDSET *rrdset_find_active_localhost(const char *id)
 {
-    RRDSET *st = rrdset_find(rrdb.localhost, id);
+    RRDSET *st = rrdset_find_localhost(id);
     if (unlikely(st && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)))
         return NULL;
     return st;
@@ -1132,11 +1133,10 @@ static inline RRDSET *rrdset_find_active_bytype_localhost(const char *type, cons
 }
 
 RRDSET *rrdset_find_byname(RRDHOST *host, const char *name);
-#define rrdset_find_byname_localhost(name)  rrdset_find_byname(rrdb.localhost, name)
 /* This will not return charts that are archived */
 static inline RRDSET *rrdset_find_active_byname_localhost(const char *name)
 {
-    RRDSET *st = rrdset_find_byname_localhost(name);
+    RRDSET *st = rrdset_find_byname(rrdb.localhost, name);
     if (unlikely(st && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)))
         return NULL;
     return st;
