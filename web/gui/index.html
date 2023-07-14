@@ -1,4 +1,4 @@
-<!doctype html><html><head><title>Netdata Console</title><script>var pathsRegex = /\/(spaces|nodes|overview|alerts|dashboards|anomalies|events|cloud|v2)\/?.*/
+<!doctype html><html><head><title>Netdata Agent Console</title><script>var pathsRegex = /\/(spaces|nodes|overview|alerts|dashboards|anomalies|events|cloud|v2)\/?.*/
       var getBasename = function() {
         return window.location.origin + window.location.pathname.replace(pathsRegex, "")
       }
@@ -19,9 +19,11 @@
         apiUrl: "https://app.netdata.cloud",
         cloudUrl: "https://app.netdata.cloud",
         uiUrl: "https://app.netdata.cloud",
+        demoSlug: "netdata-demo",
+        demoFavourites: {"postgresql":["postgres"],"redis":["redis"],"dns-query":["dns_query"],"http-endpoints":["httpcheck"],"nginx":["web_log","nginx"],"apache":["apache"],"host-reachability":["ping"],"cassandra":["cassandra"],"coredns":["coredns"],"logind":["logind"],"iis":["iis"],"active-directory":["ad"],"windows":["windows","ad","iis","mssql","exchange","netframework"],"docker":["cgroup","docker"]},
         webpackPublicPath: "https://app.netdata.cloud",
         agentApiUrl: searchParams.get("agent") || getBasename(),
-        version: "6.20.5",
+        version: "6.20.6",
         tracking: false,
         cookieDomain: ".netdata.cloud",
       }
@@ -124,7 +126,9 @@
             registry: data.registry,
             isNetdataRegistry: data.registry === "https://registry.my-netdata.io",
             hostname: data.hostname,
-            mg: data.machine_guid
+            mg: data.agent.machine_guid,
+            nd: data.agent.node_id,
+            claimId: data.agent.claim_id
           }
 
           if (window.localNetdataRegistry.anonymousStatistics) {
@@ -163,8 +167,10 @@
               posthog.init("phc_hnhlqe6D2Q4IcQNrFItaqdXJAxQ8RcHkPAFAp74pubv", { api_host: "https://app.posthog.com", disable_session_recording: true, opt_in_site_apps: true } )
           }
 
+          var withoutNodes = JSON.parse(JSON.stringify(data))
+          withoutNodes.nodes = []
           var iframe = document.createElement('iframe');
-          iframe.src = data.registry + "/registry-access.html?x=" + btoa(JSON.stringify(data)) + "&originUrl=" + window.envSettings.agentApiUrl;
+          iframe.src = data.registry + "/registry-access.html?x=" + btoa(JSON.stringify(withoutNodes)) + "&originUrl=" + window.envSettings.agentApiUrl;
           iframe.style = { position: "absolute", left: "-99999999px" };
           iframe.width = 0 ;
           iframe.height = 0;
@@ -174,7 +180,7 @@
           document.body.appendChild(iframe);
 
           setTimeout(function () {
-            iframe.contentWindow.postMessage([window.envSettings.agentApiUrl, data], "*")
+            iframe.contentWindow.postMessage(["netdata-registry", window.envSettings.agentApiUrl, data], "*")
           }, 300);
 
           window.addEventListener('message', function(event) {

@@ -54,11 +54,25 @@
         // do nothing
       }
 
+      function isValidHttpUrl(string) {
+        var url;
+
+        try {
+          return true
+        } catch (_) {
+          return false;
+        }
+      }
+
       window.addEventListener('message', function(event) {
         if (doneAccess) return
 
-        var originUrl = Array.isArray(event.data) ? event.data[0] : event.data
-        var parentHelloData = Array.isArray(event.data) ? event.data[1] : null
+        var isNetdataMessage = Array.isArray(event.data) ? event.data.length === 3 ? event.data[0] === "netdata-registry" : isValidHttpUrl(event.data[0]) : true
+
+        if (!isNetdataMessage) return
+
+        var originUrl = Array.isArray(event.data) ? event.data.length === 3 ? event.data[1] : event.data[0] : event.data
+        var parentHelloData = Array.isArray(event.data) ? event.data.length === 3 ? event.data[2] : event.data[1] : null
 
         doRegistryAccess(parentHelloData, originUrl)
       });</script></body></html>
