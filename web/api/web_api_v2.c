@@ -28,21 +28,13 @@ static void bearer_token_cleanup(void) {
     dictionary_garbage_collect(netdata_authorized_bearers);
 }
 
+void bearer_tokens_init(void) {
+    netdata_authorized_bearers = dictionary_create_advanced(
+            DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+            NULL, sizeof(struct bearer_token));
+}
+
 static time_t bearer_get_token(uuid_t *uuid) {
-    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
-    static bool initialized = false;
-
-    if(!initialized) {
-        spinlock_lock(&spinlock);
-        if (!netdata_authorized_bearers) {
-            netdata_authorized_bearers = dictionary_create_advanced(
-                    DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-                    NULL, sizeof(struct bearer_token));
-        }
-        spinlock_unlock(&spinlock);
-        initialized = true;
-    }
-
     char uuid_str[UUID_STR_LEN];
 
     uuid_generate_random(*uuid);
