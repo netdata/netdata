@@ -203,23 +203,6 @@ static bool rrdhost_check_our_claim_id(const char *claim_id) {
     return (strcasecmp(claim_id, rrdb.localhost->aclk_state.claimed_id) == 0) ? true : false;
 }
 
-static RRDHOST *rrdhost_find_by_node_id(const char *node_id) {
-    uuid_t uuid;
-    if (uuid_parse(node_id, uuid))
-        return NULL;
-
-    RRDHOST *host = NULL;
-    dfe_start_read(rrdb.rrdhost_root_index, host) {
-        if(!host->node_id) continue;
-
-        if(uuid_memcmp(&uuid, host->node_id) == 0)
-            break;
-    }
-    dfe_done(host);
-
-    return host;
-}
-
 void rrdcontext_hub_checkpoint_command(void *ptr) {
     struct ctxs_checkpoint *cmd = ptr;
 

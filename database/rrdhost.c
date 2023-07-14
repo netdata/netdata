@@ -29,8 +29,7 @@ bool is_storage_engine_shared(STORAGE_INSTANCE *engine __maybe_unused) {
     return false;
 }
 
-RRDHOST *find_host_by_node_id(char *node_id) {
-
+RRDHOST *rrdhost_find_by_node_id(const char *node_id) {
     uuid_t node_uuid;
     if (unlikely(!node_id || uuid_parse(node_id, node_uuid)))
         return NULL;

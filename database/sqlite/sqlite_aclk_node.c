@@ -29,7 +29,7 @@ DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
 static void build_node_collectors(char *node_id __maybe_unused)
 {
 
-    RRDHOST *host = find_host_by_node_id(node_id);
+    RRDHOST *host = rrdhost_find_by_node_id(node_id);
 
     if (unlikely(!host))
         return;
@@ -59,7 +59,7 @@ static void build_node_info(char *node_id __maybe_unused)
 {
     struct update_node_info node_info;
 
-    RRDHOST *host = find_host_by_node_id(node_id);
+    RRDHOST *host = rrdhost_find_by_node_id(node_id);
 
     if (unlikely((!host))) {
         freez(node_id);

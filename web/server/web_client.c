@@ -1472,7 +1472,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
         netdata_log_debug(D_WEB_CLIENT, "%llu: Searching for host with name '%s'.", w->id, tok);
 
         if(nodeid) {
-            host = find_host_by_node_id(tok);
+            host = rrdhost_find_by_node_id(tok);
             if(!host) {
                 host = rrdhost_find_by_hostname(tok);
                 if (!host)
@@ -1484,7 +1484,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
             if(!host) {
                 host = rrdhost_find_by_guid(tok);
                 if (!host)
-                    host = find_host_by_node_id(tok);
+                    host = rrdhost_find_by_node_id(tok);
             }
         }
 
