@@ -388,7 +388,11 @@ struct netdata_static_thread ebpf_threads[] = {
         .config_section = NULL,
         .config_name = NULL,
         .env_name = NULL,
+#ifdef NETDATA_DEV_MODE
         .enabled = 1,
+#else
+        .enabled = 0,
+#endif
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = NULL
@@ -2698,10 +2702,14 @@ static void ebpf_create_statistic_charts(int update_every)
     create_charts = 0;
 
     ebpf_create_statistic_thread_chart(update_every);
+#ifdef NETDATA_DEV_MODE
     EBPF_PLUGIN_FUNCTIONS(EBPF_FUNCTION_THREAD, EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
+#endif
 
     ebpf_create_lifetime_thread_chart(update_every);
+#ifdef NETDATA_DEV_MODE
     EBPF_PLUGIN_FUNCTIONS(EBPF_FUNCTION_THREAD, EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
+#endif
 
     ebpf_create_statistic_load_chart(update_every);
 
