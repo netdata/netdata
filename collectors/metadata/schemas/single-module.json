@@ -15,12 +15,12 @@
           "description": "Module name (e.g. apache, /proc/stat, httpcheck). It usually has the same name as the module configuration file (external plugin) or the section name in netdata.conf (internal plugin)."
         },
         "monitored_instance": {
-          "$ref": "./definitions.json#/definitions/monitored_instance"
+          "$ref": "#/$defs/_monitored_instance"
         },
         "alternative_monitored_instances": {
           "type": "array",
           "items": {
-            "$ref": "./definitions.json#/definitions/monitored_instance"
+            "$ref": "#/$defs/_monitored_instance"
           }
         },
         "keywords": {
@@ -281,7 +281,7 @@
                   "description": "Optional common information about options."
                 },
                 "folding": {
-                  "$ref": "./definitions.json#/definitions/folding"
+                  "$ref": "#/$defs/_folding"
                 },
                 "list": {
                   "type": "array",
@@ -333,7 +333,7 @@
               "description": "Configuration examples. The more examples the better!",
               "properties": {
                 "folding": {
-                  "$ref": "./definitions.json#/definitions/folding"
+                  "$ref": "#/$defs/_folding"
                 },
                 "list": {
                   "type": "array",
@@ -346,7 +346,7 @@
                         "description": "Example name."
                       },
                       "folding": {
-                        "$ref": "./definitions.json#/definitions/folding_relaxed"
+                        "$ref": "#/$defs/_folding_relaxed"
                       },
                       "description": {
                         "type": "string",
@@ -423,10 +423,167 @@
       ]
     },
     "alerts": {
-      "$ref": "./definitions.json#/definitions/alerts"
+      "type": "array",
+      "description": "The list of configured alerts shipped with Netdata for this collector.",
+      "items": {
+        "type": "object",
+        "description": "Information about the configured alert.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Alert's 'alarm' or 'template' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-alarm-or-template)."
+          },
+          "link": {
+            "type": "string",
+            "description": "Link to github .conf file that this alert originates from"
+          },
+          "metric": {
+            "type": "string",
+            "description": "Alert's 'on' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-on)."
+          },
+          "info": {
+            "type": "string",
+            "description": "Alert's 'info' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-info)."
+          },
+          "os": {
+            "type": "string",
+            "description": "Alert's 'os' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-os)."
+          }
+        },
+        "required": [
+          "name",
+          "link",
+          "metric",
+          "info"
+        ]
+      }
     },
     "metrics": {
-      "$ref": "./definitions.json#/definitions/metrics"
+      "type": "object",
+      "description": "Collected metrics grouped by scope. The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.",
+      "properties": {
+        "folding": {
+          "$ref": "#/$defs/_folding"
+        },
+        "description": {
+          "type": "string",
+          "description": "General description of collected metrics/scopes."
+        },
+        "availability": {
+          "type": "array",
+          "description": "Metrics collection availability conditions. Some metrics are only available when certain conditions are met. For example, Apache exposes additional metrics when Extended status is configured, Consul exposes different set of metrics depends on its mode. This field should list the available conditions that will later be matched for each of the metrics.",
+          "items": {
+            "type": "string",
+            "description": "Availability condition name."
+          }
+        },
+        "scopes": {
+          "type": "array",
+          "description": "List of scopes and their metrics.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Scope name."
+              },
+              "description": {
+                "type": "string",
+                "description": "Scope description."
+              },
+              "labels": {
+                "type": "array",
+                "description": "Label set of the scope.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Label name."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "Label description."
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "description"
+                  ]
+                }
+              },
+              "metrics": {
+                "type": "array",
+                "description": "List of collected metrics (chart contexts) in the scope.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Metric name (chart context)."
+                    },
+                    "availability": {
+                      "type": "array",
+                      "description": "Metric collection availability conditions. An empty list means that it is available for all conditions defined in 'metrics.availability'.",
+                      "items": {
+                        "type": "string",
+                        "description": "Availability condition name."
+                      }
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "Metric description (chart title)."
+                    },
+                    "unit": {
+                      "type": "string",
+                      "description": "Metric description (chart unit)."
+                    },
+                    "chart_type": {
+                      "type": "string",
+                      "description": "Metric description (chart type)."
+                    },
+                    "dimensions": {
+                      "type": "array",
+                      "description": "",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "description": "Dimension name."
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "description",
+                    "unit",
+                    "chart_type",
+                    "dimensions"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "name",
+              "description",
+              "labels",
+              "metrics"
+            ]
+          }
+        }
+      },
+      "required": [
+        "folding",
+        "description",
+        "availability",
+        "scopes"
+      ]
     }
   },
   "required": [
@@ -436,5 +593,74 @@
     "troubleshooting",
     "alerts",
     "metrics"
-  ]
+  ],
+  "$defs": {
+    "_folding": {
+      "type": "object",
+      "description": "Content folding settings.",
+      "properties": {
+        "title": {
+          "description": "Folded content summary title.",
+          "type": "string"
+        },
+        "enabled": {
+          "description": "Determines if this content should be folded.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "title",
+        "enabled"
+      ]
+    },
+    "_folding_relaxed": {
+      "type": "object",
+      "description": "Content folding settings with optional title.",
+      "properties": {
+        "title": {
+          "description": "Folded content summary title.",
+          "type": "string"
+        },
+        "enabled": {
+          "description": "Determines if this content should be folded.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "_monitored_instance": {
+      "type": "object",
+      "description": "Information about the monitored instance (metrics source).",
+      "properties": {
+        "name": {
+          "description": "Metrics source name (e.g. VerneMQ, Network interfaces, Files and directories). Use official spelling for applications.",
+          "type": "string"
+        },
+        "link": {
+          "description": "Link to the monitored instance official website if any.",
+          "type": "string"
+        },
+        "categories": {
+          "type": "array",
+          "description": "Category IDs that this integration falls into. IDs can be found in integrations/categories.yaml",
+          "items": {
+            "type": "string",
+            "description": "String defining integration category"
+          }
+        },
+        "icon_filename": {
+          "type": "string",
+          "description": "The filename of the integration's icon, as sourced from https://github.com/netdata/website/tree/master/themes/tailwind/static/img."
+        }
+      },
+      "required": [
+        "name",
+        "link",
+        "categories",
+        "icon_filename"
+      ]
+    }
+  }
 }
