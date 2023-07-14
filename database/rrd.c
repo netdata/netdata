@@ -44,7 +44,7 @@ const char *rrd_algorithm_name(RRD_ALGORITHM algorithm) {
 // ----------------------------------------------------------------------------
 // RRD - chart types
 
-inline RRDSET_TYPE rrdset_type_id(const char *name) {
+RRDSET_TYPE rrdset_type_id(const char *name) {
     if(unlikely(strcmp(name, RRDSET_TYPE_AREA_NAME) == 0))
         return RRDSET_TYPE_AREA;
 
