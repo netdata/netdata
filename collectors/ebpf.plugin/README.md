@@ -1036,4 +1036,3 @@ You can check the results of having threads running on your environment in the N
 dashboard
 
 <img src="https://github.com/netdata/netdata/assets/49162938/91823573-114c-4c16-b634-cc46f7bb1bcf" alt="Threads running." />
-
