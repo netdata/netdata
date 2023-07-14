@@ -86,8 +86,9 @@ struct configurable_plugin {
     dyncfg_config_t config;
     dyncfg_config_t default_config;
 
+    dyncfg_config_t (*get_config_cb)(void *usr_ctx);
     set_config_cb_t set_config_cb;
-    void *set_config_cb_usr_ctx;
+    void *cb_usr_ctx; // context for all callbacks (split if needed in future)
 
     unsigned int plugins_d:1;
 };

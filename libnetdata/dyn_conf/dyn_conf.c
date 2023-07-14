@@ -242,7 +242,7 @@ static const char *set_plugin_config(struct configurable_plugin *plugin, dyncfg_
     memcpy(plugin->config.data, cfg.data, cfg.data_size);
     pthread_mutex_unlock(&plugin->lock);
 
-    if (plugin->set_config_cb != NULL && plugin->set_config_cb(plugin->set_config_cb_usr_ctx, &plugin->config)) {
+    if (plugin->set_config_cb != NULL && plugin->set_config_cb(plugin->cb_usr_ctx, &plugin->config)) {
         error_report("DYNCFG module \"%s\" set_config_cb failed", plugin->name);
         return "set_config_cb failed";
     }
@@ -416,6 +416,16 @@ int register_module(struct configurable_plugin *plugin, struct module *module)
     return 0;
 }
 
+static dyncfg_config_t get_plugin_config(struct configurable_plugin *plugin)
+{
+    if (plugin->plugins_d)
+        plugin->get_config_cb(plugin->cb_usr_ctx);
+    else
+
+    
+    return plugin->config;
+}
+
 struct uni_http_response dyn_conf_process_http_request(int method, const char *plugin, const char *module, const char *job_id, void *post_payload, size_t post_payload_size)
 {
     struct uni_http_response resp = {
@@ -452,12 +462,12 @@ struct uni_http_response dyn_conf_process_http_request(int method, const char *p
     }
     if (module == NULL) {
         if (method == HTTP_METHOD_GET) {
-            resp.content = mallocz(plug->config.data_size);
-            memcpy(resp.content, plug->config.data, plug->config.data_size);
+            dyncfg_config_t cfg = get_plugin_config(plug);
+            resp.content = mallocz(cfg.data_size);
+            memcpy(resp.content, cfg.data, cfg.data_size);
             resp.status = HTTP_RESP_OK;
-//          resp.content_type = CT_APPLICATION_JSON;
             resp.content_free = free;
-            resp.content_length = plug->config.data_size;
+            resp.content_length = cfg.data_size;
             return resp;
         } else if (method == HTTP_METHOD_PUT) {
             if (post_payload == NULL) {

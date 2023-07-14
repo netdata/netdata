@@ -1834,28 +1834,42 @@ static inline PARSER_RC pluginsd_exit(char **words __maybe_unused, size_t num_wo
     return PARSER_RC_STOP;
 }
 
-enum set_config_result _plugin_set_config_cb(void *usr_ctx, dyncfg_config_t *cfg)
+static enum set_config_result _plugin_set_config_cb(void *usr_ctx, dyncfg_config_t *cfg)
 {
 
 }
 
-static void set_cfg_data_cb(BUFFER *wb, int code, void *callback_data)
+struct mutex_cond {
+    pthread_mutex_t lock;
+    pthread_cond_t cond;
+};
+
+static void virt_fnc_got_data_cb(BUFFER *wb, int code, void *callback_data)
 {
-    PARSER *parser = callback_data;
+    struct mutex_cond *ctx = callback_data;
+    pthread_mutex_lock(&ctx->lock);
+    pthread_cond_broadcast(&ctx->cond);
+    pthread_mutex_unlock(&ctx->lock);
 }
 
-void call_virtual_function(PARSER *parser, const char *name) {
+#define VIRT_FNC_TIMEOUT 1
+dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name) {
     usec_t now = now_realtime_usec();
     BUFFER *wb = buffer_create(4096, NULL);
 
+    struct mutex_cond cond = {
+        .lock = PTHREAD_MUTEX_INITIALIZER,
+        .cond = PTHREAD_COND_INITIALIZER
+    };
+
     struct inflight_function tmp = {
         .started_ut = now,
-        .timeout_ut = now + 1 + USEC_PER_SEC,
+        .timeout_ut = now + VIRT_FNC_TIMEOUT + USEC_PER_SEC,
         .destination_wb = wb,
-        .timeout = 1,
+        .timeout = VIRT_FNC_TIMEOUT,
         .function = string_strdupz(name),
-        .callback = set_cfg_data_cb,
-        .callback_data = parser
+        .callback = virt_fnc_got_data_cb,
+        .callback_data = &cond
     };
 
     uuid_t uuid;
@@ -1878,6 +1892,31 @@ void call_virtual_function(PARSER *parser, const char *name) {
         inflight_functions_garbage_collect(parser, now);
 
     dictionary_write_unlock(parser->inflight.functions);
+
+    struct timespec tp;
+    clock_gettime(CLOCK_REALTIME, &tp);
+    tp.tv_sec += (time_t)VIRT_FNC_TIMEOUT;
+
+    pthread_mutex_lock(&cond.lock);
+
+    int rc = pthread_cond_timedwait(&cond.cond, &cond.lock, &tp);
+    if (rc == ETIMEDOUT)
+        netdata_log_error("PLUGINSD: DYNCFG virtual function %s timed out", name);
+
+    pthread_mutex_unlock(&cond.lock);
+
+    dyncfg_config_t cfg;
+    cfg.data = strdupz(buffer_tostring(wb));
+    cfg.data_size = strlen(cfg.data);
+
+    buffer_free(wb);
+    return cfg;
+}
+
+static dyncfg_config_t get_plugin_config_cb(void *usr_ctx)
+{
+    PARSER *parser = usr_ctx;
+    return call_virtual_function_blocking(parser, "get_plugin_config");
 }
 
 static inline PARSER_RC pluginsd_register_plugin(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser __maybe_unused) {
@@ -1890,10 +1929,10 @@ static inline PARSER_RC pluginsd_register_plugin(char **words __maybe_unused, si
     parser->user.cd->configuration = cfg;
 
     cfg->name = strdupz(words[1]);
-    cfg->set_config_cb = _plugin_set_config_cb;
     cfg->plugins_d = 1;
-    
-//    call_virtual_function(parser, "get_plugin_config");
+    cfg->set_config_cb = _plugin_set_config_cb;
+    cfg->get_config_cb = get_plugin_config_cb;
+    cfg->cb_usr_ctx = parser;
 
     register_plugin(parser->user.cd->configuration);
     return PARSER_RC_OK;
