@@ -1,3 +1,19 @@
+deploy:
+  - id: operating-systems
+    parent: deploy
+    name: Operating Systems
+    description: ""
+    most-popular: false
+  - id: docker-kubernetes
+    parent: deploy
+    name: Docker & Kubernetes
+    description: ""
+    most-popular: false
+  - id: provisioning-systems
+    parent: deploy
+    name: Provisioning Systems
+    description: ""
+    most-popular: false
 data-collection:
   - id: containers-and-vms
     parent: data-collection
