@@ -403,8 +403,6 @@ struct engine *read_exporting_config()
             else
                 tmp_instance->config.options |= EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
 
-        netdata_log_error("KILLME %u %u", tmp_instance->config.options & EXPORTING_OPTION_SEND_AUTOMATIC_LABELS, tmp_ci_list->exporting_type);
-
         if (exporter_get_boolean(instance_name, "send names instead of ids", CONFIG_BOOLEAN_YES))
             tmp_instance->config.options |= EXPORTING_OPTION_SEND_NAMES;
         else
