@@ -1862,8 +1862,8 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
     size_t dim_id;
     size_t dimensions = 0;
     struct rda_item *rda = rda_base;
-    total_number collected_total = 0;
-    total_number last_collected_total = 0;
+    collected_number collected_total = 0;
+    collected_number last_collected_total = 0;
     rrddim_foreach_read(rd, st) {
         if(rd_dfe.counter >= rda_slots)
             break;

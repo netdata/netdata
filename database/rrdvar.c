@@ -218,7 +218,7 @@ NETDATA_DOUBLE rrdvar2number(const RRDVAR_ACQUIRED *rva) {
         }
 
         case RRDVAR_TYPE_TOTAL: {
-            total_number *n = (total_number *)rv->value;
+            collected_number *n = (collected_number *)rv->value;
             return (NETDATA_DOUBLE)*n;
         }
 

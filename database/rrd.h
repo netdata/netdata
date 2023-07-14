@@ -99,9 +99,6 @@ typedef enum __attribute__ ((__packed__)) {
 
 #define RRD_ID_LENGTH_MAX 1000
 
-typedef long long total_number;
-#define TOTAL_NUMBER_FORMAT "%lld"
-
 // ----------------------------------------------------------------------------
 // algorithms types
 
