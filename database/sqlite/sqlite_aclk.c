@@ -104,7 +104,7 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
 
     sql_build_host_system_info((uuid_t *)argv[IDX_HOST_ID], system_info);
 
-    RRDHOST *host = rrdhost_find_or_create(
+    RRDHOST *host = rrdhost_get_or_create(
           (const char *) argv[IDX_HOSTNAME]
         , (const char *) argv[IDX_REGISTRY]
         , guid

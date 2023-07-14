@@ -643,7 +643,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
     // find the host for this receiver
     {
         // this will also update the host with our system_info
-        RRDHOST *host = rrdhost_find_or_create(
+        RRDHOST *host = rrdhost_get_or_create(
                 rpt->hostname
                 , rpt->registry_hostname
                 , rpt->machine_guid

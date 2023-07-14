@@ -379,7 +379,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
     if(!parser->user.host_define.parsing_host)
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_HOST_DEFINE_END, "missing initialization, send " PLUGINSD_KEYWORD_HOST_DEFINE " before this");
 
-    RRDHOST *host = rrdhost_find_or_create(
+    RRDHOST *host = rrdhost_get_or_create(
             string2str(parser->user.host_define.hostname),
             string2str(parser->user.host_define.hostname),
             parser->user.host_define.machine_guid_str,

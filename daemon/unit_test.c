@@ -1826,11 +1826,11 @@ static inline void rrddim_set_by_pointer_fake_time(RRDDIM *rd, collected_number 
     if(unlikely(v > rd->collector.collected_value_max)) rd->collector.collected_value_max = v;
 }
 
-static RRDHOST *dbengine_rrdhost_find_or_create(char *name)
+static RRDHOST *dbengine_rrdhost_get_or_create(char *name)
 {
     /* We don't want to drop metrics when generating load, we prefer to block data generation itself */
 
-    return rrdhost_find_or_create(
+    return rrdhost_get_or_create(
             name
             , name
             , name
@@ -2123,7 +2123,7 @@ int test_dbengine(void)
     default_storage_engine_id = STORAGE_ENGINE_DBENGINE;
 
     fprintf(stderr, "Initializing localhost with hostname 'unittest-dbengine'");
-    host = dbengine_rrdhost_find_or_create("unittest-dbengine");
+    host = dbengine_rrdhost_get_or_create("unittest-dbengine");
     if (NULL == host)
         return 1;
 
@@ -2346,7 +2346,7 @@ void generate_dbengine_dataset(unsigned history_seconds)
     error_log_limit_unlimited();
     fprintf(stderr, "Initializing localhost with hostname 'dbengine-dataset'");
 
-    host = dbengine_rrdhost_find_or_create("dbengine-dataset");
+    host = dbengine_rrdhost_get_or_create("dbengine-dataset");
     if (NULL == host)
         return;
 
@@ -2545,7 +2545,7 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     fprintf(stderr, "Initializing localhost with hostname 'dbengine-stress-test'\n");
 
     (void) sql_init_database(DB_CHECK_NONE, 1);
-    host = dbengine_rrdhost_find_or_create("dbengine-stress-test");
+    host = dbengine_rrdhost_get_or_create("dbengine-stress-test");
     if (NULL == host)
         return;
 

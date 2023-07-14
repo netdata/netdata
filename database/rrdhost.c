@@ -668,7 +668,7 @@ static void rrdhost_update(RRDHOST *host
     spinlock_unlock(&host->rrdhost_update_lock);
 }
 
-RRDHOST *rrdhost_find_or_create(
+RRDHOST *rrdhost_get_or_create(
           const char *hostname
         , const char *registry_hostname
         , const char *guid
