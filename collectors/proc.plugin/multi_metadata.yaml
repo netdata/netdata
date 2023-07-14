@@ -11,9 +11,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -37,9 +35,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -49,26 +45,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts:
       - name: 10min_cpu_usage
         link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
@@ -193,9 +178,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -219,9 +202,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -231,26 +212,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts: []
     metrics:
       folding:
@@ -280,9 +250,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -306,9 +274,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -318,26 +284,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts: []
     metrics:
       folding:
@@ -367,9 +322,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -393,9 +346,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -405,26 +356,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts:
       - name: 30min_ram_swapped_out
         link: https://github.com/netdata/netdata/blob/master/health/health.d/swap.conf
@@ -576,9 +516,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -602,9 +540,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -614,26 +550,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts: []
     metrics:
       folding:
@@ -675,9 +600,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -701,9 +624,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -713,26 +634,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts:
       - name: load_cpu_number
         link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
@@ -785,9 +695,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -811,9 +719,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -823,26 +729,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts: []
     metrics:
       folding:
@@ -950,9 +845,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -976,9 +869,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -988,26 +879,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts: []
     metrics:
       folding:
@@ -1049,9 +929,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -1075,9 +953,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -1087,26 +963,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts:
       - name: 1min_netdev_backlog_exceeded
         link: https://github.com/netdata/netdata/blob/master/health/health.d/softnet.conf
@@ -1167,9 +1032,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -1193,9 +1056,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -1205,26 +1066,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts:
       - name: ram_in_use
         link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
@@ -1341,9 +1191,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -1367,9 +1215,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -1379,26 +1225,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts: []
     metrics:
       folding:
@@ -1444,9 +1279,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -1470,9 +1303,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -1482,26 +1313,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts:
       - name: 1hour_ecc_memory_correctable
         link: https://github.com/netdata/netdata/blob/master/health/health.d/memory.conf
@@ -1547,9 +1367,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -1573,9 +1391,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -1585,26 +1401,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts: []
     metrics:
       folding:
@@ -1641,9 +1446,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -1667,9 +1470,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -1679,26 +1480,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts: []
     metrics:
       folding:
@@ -1744,9 +1534,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -1770,9 +1558,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -1782,26 +1568,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts: []
     metrics:
       folding:
@@ -1853,9 +1628,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -1879,9 +1652,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -1891,26 +1662,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts:
       - name: semaphores_used
         link: https://github.com/netdata/netdata/blob/master/health/health.d/ipc.conf
@@ -1975,9 +1735,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -2001,9 +1759,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -2013,26 +1769,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts:
       - name: 10min_disk_utilization
         link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
@@ -2258,9 +2003,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -2284,9 +2027,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -2296,26 +2037,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts:
       - name: mdstat_last_collected
         link: https://github.com/netdata/netdata/blob/master/health/health.d/mdstat.conf
@@ -2410,9 +2140,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -2436,9 +2164,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -2448,26 +2174,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts:
       - name: interface_speed
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
@@ -2673,9 +2388,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -2699,9 +2412,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -2711,26 +2422,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts: []
     metrics:
       folding:
@@ -2800,9 +2500,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -2826,9 +2524,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -2838,26 +2534,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts: []
     metrics:
       folding:
@@ -2956,9 +2641,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -2982,9 +2665,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -2994,26 +2675,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts:
       - name: 1m_tcp_syn_queue_drops
         link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_listen.conf
@@ -3551,9 +3221,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -3577,9 +3245,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -3589,26 +3255,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts: []
     metrics:
       folding:
@@ -3689,9 +3344,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -3715,9 +3368,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -3727,26 +3378,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts: []
     metrics:
       folding:
@@ -3800,9 +3440,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -3826,9 +3464,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -3838,26 +3474,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts: []
     metrics:
       folding:
@@ -3901,9 +3526,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -3927,9 +3550,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -3939,26 +3560,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts: []
     metrics:
       folding:
@@ -4015,9 +3625,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -4041,9 +3649,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -4053,26 +3659,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts: []
     metrics:
       folding:
@@ -4162,9 +3757,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -4188,9 +3781,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -4200,26 +3791,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts: []
     metrics:
       folding:
@@ -4279,9 +3859,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -4305,9 +3883,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -4317,26 +3893,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts: []
     metrics:
       folding:
@@ -4407,9 +3972,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -4433,9 +3996,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -4445,26 +4006,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts: []
     metrics:
       folding:
@@ -4508,9 +4058,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -4534,9 +4082,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -4546,26 +4092,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts:
       - name: zfs_pool_state_warn
         link: https://github.com/netdata/netdata/blob/master/health/health.d/zfs.conf
@@ -4608,9 +4143,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -4634,9 +4167,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -4646,26 +4177,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts:
       - name: zfs_memory_throttle
         link: https://github.com/netdata/netdata/blob/master/health/health.d/zfs.conf
@@ -4886,9 +4406,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -4912,9 +4430,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -4924,26 +4440,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts:
       - name: btrfs_allocated
         link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
@@ -5084,9 +4589,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -5110,9 +4613,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -5122,26 +4623,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts: []
     metrics:
       folding:

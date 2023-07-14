@@ -11,9 +11,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -37,9 +35,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -49,26 +45,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts:
       - name: cgroup_10min_cpu_usage
         link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
@@ -582,9 +567,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -608,9 +591,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -620,26 +601,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts:
       - name: cgroup_1m_received_packets_rate
         link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
@@ -872,9 +842,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -898,9 +866,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -910,26 +876,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts: []
     metrics:
       folding:

@@ -11,9 +11,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -37,9 +35,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -49,26 +45,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts: []
     metrics:
       folding:
@@ -98,9 +83,7 @@ modules:
         icon_filename: ''
       related_resources:
         integrations:
-          list:
-            - plugin_name: ''
-              module_name: ''
+          list: []
       info_provided_to_referring_integrations:
         description: ''
       keywords: []
@@ -124,9 +107,7 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list:
-          - title: ''
-            description: ''
+        list: []
       configuration:
         file:
           name: ''
@@ -136,26 +117,15 @@ modules:
           folding:
             title: ''
             enabled: true
-          list:
-            - name: ''
-              default_value: ''
-              description: ''
-              required: false
+          list: []
         examples:
           folding:
             enabled: true
             title: ''
-          list:
-            - name: ''
-              folding:
-                enabled: false
-              description: ''
-              config: ''
+          list: []
     troubleshooting:
       problems:
-        list:
-          - name: ''
-            description: ''
+        list: []
     alerts:
       - name: ipmi_sensor_state
         link: https://github.com/netdata/netdata/blob/master/health/health.d/ipmi.conf
