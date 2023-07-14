@@ -9,8 +9,7 @@ typedef enum rrdvar_type {
     RRDVAR_TYPE_CALCULATED              = 1,
     RRDVAR_TYPE_TIME_T                  = 2,
     RRDVAR_TYPE_COLLECTED               = 3,
-    RRDVAR_TYPE_TOTAL                   = 4,
-    RRDVAR_TYPE_INT                     = 5
+    RRDVAR_TYPE_INT                     = 4
 
     // this is 8 bit
     // to increase it you have to set change the bitfield in
