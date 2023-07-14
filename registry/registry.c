@@ -171,10 +171,10 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w) {
 
     buffer_json_member_add_object(w->response.data, "agent");
     {
-        buffer_json_member_add_string(w->response.data, "machine_guid", localhost->machine_guid);
+        buffer_json_member_add_string(w->response.data, "machine_guid", rrdb.localhost->machine_guid);
 
-        if(localhost->node_id)
-            buffer_json_member_add_uuid(w->response.data, "node_id", localhost->node_id);
+        if(rrdb.localhost->node_id)
+            buffer_json_member_add_uuid(w->response.data, "node_id", rrdb.localhost->node_id);
 
         char *claim_id = get_agent_claimid();
         if (claim_id) {
