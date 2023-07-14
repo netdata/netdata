@@ -1,6 +1,35 @@
 #include "facets.h"
 
 #define FACET_VALUE_UNSET "-"
+#define HISTOGRAM_COLUMNS 60
+
+// ----------------------------------------------------------------------------
+
+time_t calculate_bar_width(time_t before, time_t after) {
+    // Array of valid durations in seconds
+    static time_t valid_durations[] = {
+            1,
+            15,
+            30,
+            1 * 60, 2 * 60, 3 * 60, 5 * 60, 10 * 60, 15 * 60, 30 * 60,          // minutes
+            1 * 3600, 2 * 3600, 6 * 3600, 8 * 3600, 12 * 3600,                  // hours
+            1 * 86400, 2 * 86400, 3 * 86400, 5 * 86400, 7 * 86400, 14 * 86400,  // days
+            1 * (30*86400)                                                      // months
+    };
+    static int array_size = sizeof(valid_durations) / sizeof(valid_durations[0]);
+
+    time_t duration = before - after;
+    time_t bar_width = 1;
+
+    for (int i = array_size - 1; i >= 0; --i) {
+        if (duration / valid_durations[i] >= HISTOGRAM_COLUMNS) {
+            bar_width = valid_durations[i];
+            break;
+        }
+    }
+
+    return bar_width;
+}
 
 // ----------------------------------------------------------------------------
 
