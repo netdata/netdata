@@ -634,23 +634,6 @@ void rrdlabels_add_pair(DICTIONARY *dict, const char *string, RRDLABEL_SRC ls) {
     rrdlabels_add(dict, name, value, ls);
 }
 
-// ----------------------------------------------------------------------------
-// rrdlabels_get_value_to_buffer_or_null()
-
-void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const char *key, const char *quote, const char *null) {
-    if(!labels) return;
-
-    const DICTIONARY_ITEM *acquired_item = dictionary_get_and_acquire_item(labels, key);
-    RRDLABEL *lb = dictionary_acquired_item_value(acquired_item);
-
-    if(lb && lb->label_value)
-        buffer_sprintf(wb, "%s%s%s", quote, string2str(lb->label_value), quote);
-    else
-        buffer_strcat(wb, null);
-
-    dictionary_acquired_item_release(labels, acquired_item);
-}
-
 void rrdlabels_value_to_buffer_array_item_or_null(DICTIONARY *labels, BUFFER *wb, const char *key) {
     if(!labels) return;
 
