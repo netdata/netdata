@@ -63,6 +63,7 @@ struct ml_metrics_statistics {
 #include "rrddimvar.h"
 #include "rrdcalc.h"
 #include "rrdcalctemplate.h"
+#include "rrdfunctions.h"
 #include "streaming/rrdpush.h"
 #include "aclk/aclk_rrdhost_state.h"
 
@@ -560,8 +561,6 @@ void rrdset_memory_file_save(RRDSET *st);
 void rrdset_memory_file_free(RRDSET *st);
 void rrdset_memory_file_update(RRDSET *st);
 const char *rrdset_cache_filename(RRDSET *st);
-
-#include "rrdfunctions.h"
 
 // ----------------------------------------------------------------------------
 // RRDHOST flags
