@@ -6,13 +6,23 @@
 
 **Merged pull requests:**
 
+- dont add all nodes to registry action hello [\#15390](https://github.com/netdata/netdata/pull/15390) ([ktsaou](https://github.com/ktsaou))
+- Revert "dont add all nodes to registry action hello" [\#15389](https://github.com/netdata/netdata/pull/15389) ([ktsaou](https://github.com/ktsaou))
+- dont add all nodes to registry action hello [\#15388](https://github.com/netdata/netdata/pull/15388) ([ktsaou](https://github.com/ktsaou))
+- update bundled v2 dashboard; make v2 the default dashboard [\#15386](https://github.com/netdata/netdata/pull/15386) ([ilyam8](https://github.com/ilyam8))
+- Fix CodeQL alert  [\#15384](https://github.com/netdata/netdata/pull/15384) ([stelfrag](https://github.com/stelfrag))
+- Add missing files to web/gui/Makefile.am. [\#15383](https://github.com/netdata/netdata/pull/15383) ([Ferroin](https://github.com/Ferroin))
+- Updates on JSON schemas [\#15382](https://github.com/netdata/netdata/pull/15382) ([Ancairon](https://github.com/Ancairon))
+- update http response code descriptions [\#15379](https://github.com/netdata/netdata/pull/15379) ([ktsaou](https://github.com/ktsaou))
 - update bundled v2 dashboard [\#15377](https://github.com/netdata/netdata/pull/15377) ([ilyam8](https://github.com/ilyam8))
 - health: fix windows alarms for vnodes [\#15376](https://github.com/netdata/netdata/pull/15376) ([ilyam8](https://github.com/ilyam8))
 - Fix coverity issues [\#15375](https://github.com/netdata/netdata/pull/15375) ([stelfrag](https://github.com/stelfrag))
 - Update bundled v2 dashboard. [\#15374](https://github.com/netdata/netdata/pull/15374) ([Ferroin](https://github.com/Ferroin))
+- Update libbpf version \(1.2.2\) [\#15373](https://github.com/netdata/netdata/pull/15373) ([thiagoftsm](https://github.com/thiagoftsm))
 - simplify collector schema by moving some props under meta [\#15372](https://github.com/netdata/netdata/pull/15372) ([ilyam8](https://github.com/ilyam8))
 - dont log error on opening .environment [\#15371](https://github.com/netdata/netdata/pull/15371) ([ilyam8](https://github.com/ilyam8))
 - Add most-popular entry in oneOf of categories in definitions.json [\#15370](https://github.com/netdata/netdata/pull/15370) ([Ancairon](https://github.com/Ancairon))
+- Rename log\_access and log\_health [\#15368](https://github.com/netdata/netdata/pull/15368) ([MrZammler](https://github.com/MrZammler))
 - move not really related props single-module.json -\> definitions.json [\#15366](https://github.com/netdata/netdata/pull/15366) ([ilyam8](https://github.com/ilyam8))
 - Add keys to integrations schema, categories, icon path, plus some fixes [\#15365](https://github.com/netdata/netdata/pull/15365) ([Ancairon](https://github.com/Ancairon))
 - format the sdr cache filenames [\#15361](https://github.com/netdata/netdata/pull/15361) ([ktsaou](https://github.com/ktsaou))
@@ -404,14 +414,6 @@
 - Update change-metrics-storage.md [\#14742](https://github.com/netdata/netdata/pull/14742) ([cakrit](https://github.com/cakrit))
 - Add contexts to privacy doc. [\#14741](https://github.com/netdata/netdata/pull/14741) ([cakrit](https://github.com/cakrit))
 - Create pci-soc-hipaa.md [\#14740](https://github.com/netdata/netdata/pull/14740) ([cakrit](https://github.com/cakrit))
-- Update data-privacy.md [\#14739](https://github.com/netdata/netdata/pull/14739) ([cakrit](https://github.com/cakrit))
-- Update data-privacy.md [\#14738](https://github.com/netdata/netdata/pull/14738) ([cakrit](https://github.com/cakrit))
-- pandas collector replace `self.warn()` with `self.warning()` [\#14736](https://github.com/netdata/netdata/pull/14736) ([andrewm4894](https://github.com/andrewm4894))
-- Add CI support for Fedora 38 & Ubuntu 23.04 native packages [\#14735](https://github.com/netdata/netdata/pull/14735) ([tkatsoulas](https://github.com/tkatsoulas))
-- Update change-metrics-storage.md [\#14734](https://github.com/netdata/netdata/pull/14734) ([cakrit](https://github.com/cakrit))
-- Correct calc and explain how to get METRICS in RAM usage [\#14733](https://github.com/netdata/netdata/pull/14733) ([cakrit](https://github.com/cakrit))
-- Update dashboard to version v2.30.0. [\#14732](https://github.com/netdata/netdata/pull/14732) ([netdatabot](https://github.com/netdatabot))
-- remove ubuntu 18.04 from our CI [\#14731](https://github.com/netdata/netdata/pull/14731) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
