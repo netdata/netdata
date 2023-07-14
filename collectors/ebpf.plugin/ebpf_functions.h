@@ -27,4 +27,3 @@
 void *ebpf_function_thread(void *ptr);
 
 #endif
-
