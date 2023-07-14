@@ -375,6 +375,33 @@ static inline PARSER_RC pluginsd_host_labels(char **words, size_t num_words, PAR
                                     PLUGINSD_KEYWORD_HOST_LABEL);
 }
 
+static struct rrdhost_system_info *labels_to_system_info(DICTIONARY *labels) {
+    struct rrdhost_system_info *info = callocz(1, sizeof(struct rrdhost_system_info));
+    info->hops = 1;
+
+    rrdlabels_get_value_strdup_or_null(labels, &info->cloud_provider_type, "_cloud_provider_type");
+    rrdlabels_get_value_strdup_or_null(labels, &info->cloud_instance_type, "_cloud_instance_type");
+    rrdlabels_get_value_strdup_or_null(labels, &info->cloud_instance_region, "_cloud_instance_region");
+    rrdlabels_get_value_strdup_or_null(labels, &info->host_os_name, "_os_name");
+    rrdlabels_get_value_strdup_or_null(labels, &info->host_os_version, "_os_version");
+    rrdlabels_get_value_strdup_or_null(labels, &info->kernel_version, "_kernel_version");
+    rrdlabels_get_value_strdup_or_null(labels, &info->host_cores, "_system_cores");
+    rrdlabels_get_value_strdup_or_null(labels, &info->host_cpu_freq, "_system_cpu_freq");
+    rrdlabels_get_value_strdup_or_null(labels, &info->host_ram_total, "_system_ram_total");
+    rrdlabels_get_value_strdup_or_null(labels, &info->host_disk_space, "_system_disk_space");
+    rrdlabels_get_value_strdup_or_null(labels, &info->architecture, "_architecture");
+    rrdlabels_get_value_strdup_or_null(labels, &info->virtualization, "_virtualization");
+    rrdlabels_get_value_strdup_or_null(labels, &info->container, "_container");
+    rrdlabels_get_value_strdup_or_null(labels, &info->container_detection, "_container_detection");
+    rrdlabels_get_value_strdup_or_null(labels, &info->virt_detection, "_virt_detection");
+    rrdlabels_get_value_strdup_or_null(labels, &info->is_k8s_node, "_is_k8s_node");
+    rrdlabels_get_value_strdup_or_null(labels, &info->install_type, "_install_type");
+    rrdlabels_get_value_strdup_or_null(labels, &info->prebuilt_arch, "_prebuilt_arch");
+    rrdlabels_get_value_strdup_or_null(labels, &info->prebuilt_dist, "_prebuilt_dist");
+
+    return info;
+}
+
 static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser) {
     if(!parser->user.host_define.parsing_host)
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_HOST_DEFINE_END, "missing initialization, send " PLUGINSD_KEYWORD_HOST_DEFINE " before this");
@@ -401,7 +428,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
             default_rrdpush_enable_replication,
             default_rrdpush_seconds_to_replicate,
             default_rrdpush_replication_step,
-            rrdhost_labels_to_system_info(parser->user.host_define.rrdlabels),
+            labels_to_system_info(parser->user.host_define.rrdlabels),
             false
             );
 
