@@ -515,7 +515,7 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
     return false;
 }
 
-static bool rrdpush_sender_connect_ssl(struct sender_state *s) {
+static bool rrdpush_sender_connect_ssl(struct sender_state *s __maybe_unused) {
 #ifdef ENABLE_HTTPS
     RRDHOST *host = s->host;
     bool ssl_required = host->destination && host->destination->ssl;
@@ -1181,7 +1181,7 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     freez(s);
 }
 
-void rrdpush_initialize_ssl_ctx(RRDHOST *host) {
+void rrdpush_initialize_ssl_ctx(RRDHOST *host __maybe_unused) {
 #ifdef ENABLE_HTTPS
     static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
     spinlock_lock(&sp);
