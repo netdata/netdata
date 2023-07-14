@@ -14,8 +14,6 @@
 
 #define CTX_POINT_SIZE_BYTES(ctx) rrdb.page_type_size[(ctx)->config.page_type]
 
-void rrdeng_generate_legacy_uuid(const char *dim_id, const char *chart_id, uuid_t *ret_uuid);
-
 void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long *array);
 
 /* must call once before using anything */

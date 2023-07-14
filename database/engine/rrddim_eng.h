@@ -18,8 +18,6 @@ size_t rrdeng_disk_space_max(STORAGE_INSTANCE *db_instance);
 
 size_t rrdeng_disk_space_used(STORAGE_INSTANCE *db_instance);
 
-void rrdeng_generate_legacy_uuid(const char *dim_id, const char *chart_id, uuid_t *ret_uuid);
-
 STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *db_instance);
 STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
 void rrdeng_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle);

@@ -65,7 +65,7 @@ void rrdeng_metrics_group_release(STORAGE_INSTANCE *db_instance __maybe_unused, 
 // metric handle for legacy dbs
 
 /* This UUID is not unique across hosts */
-void rrdeng_generate_legacy_uuid(const char *dim_id, const char *chart_id, uuid_t *ret_uuid)
+static void rrdeng_generate_legacy_uuid(const char *dim_id, const char *chart_id, uuid_t *ret_uuid)
 {
     EVP_MD_CTX *evpctx;
     unsigned char hash_value[EVP_MAX_MD_SIZE];
