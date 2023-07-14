@@ -4,6 +4,15 @@
 #include "rrd.h"
 #include <sched.h>
 
+#ifdef NETDATA_INTERNAL_CHECKS
+#define rrdset_debug(st, fmt, args...) do { \
+    if(unlikely((debug_flags & D_RRD_STATS) && rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) \
+        debug_int(__FILE__, __FUNCTION__, __LINE__, "%s: " fmt, rrdset_name(st), ##args); \
+} while(0)
+#else
+#define rrdset_debug(st, fmt, args...) debug_dummy()
+#endif
+
 // ----------------------------------------------------------------------------
 // RRDSET - helpers for rrdset_create()
 
@@ -1594,11 +1603,8 @@ static inline size_t rrdset_done_interpolate(
                     new_value /= (NETDATA_DOUBLE)st->update_every;
 
                     if(unlikely(next_store_ut - last_stored_ut < update_every_ut)) {
-
                         rrdset_debug(st, "%s: COLLECTION POINT IS SHORT " NETDATA_DOUBLE_FORMAT " - EXTRAPOLATING",
-                                    rrddim_name(rd)
-                                  , (NETDATA_DOUBLE)(next_store_ut - last_stored_ut)
-                        );
+                                     rrddim_name(rd) , (NETDATA_DOUBLE)(next_store_ut - last_stored_ut));
 
                         new_value = new_value * (NETDATA_DOUBLE)(st->update_every * USEC_PER_SEC) / (NETDATA_DOUBLE)(next_store_ut - last_stored_ut);
                     }
@@ -2094,14 +2100,6 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
 
     // at this point we have all the calculated values ready
     // it is now time to interpolate values on a second boundary
-
-// #ifdef NETDATA_INTERNAL_CHECKS
-//     if(unlikely(now_collect_ut < next_store_ut && st->counter_done > 1)) {
-//         // this is collected in the same interpolation point
-//         rrdset_debug(st, "THIS IS IN THE SAME INTERPOLATION POINT");
-//         netdata_log_info("INTERNAL CHECK: host '%s', chart '%s' collection %zu is in the same interpolation point: short by %llu microseconds", st->rrdhost->hostname, rrdset_name(st), st->counter_done, next_store_ut - now_collect_ut);
-//     }
-// #endif
 
     rrdset_done_interpolate(
             &stream_buffer

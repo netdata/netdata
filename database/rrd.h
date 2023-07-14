@@ -617,13 +617,6 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
 #define rrdhost_flag_set(host, flag)   __atomic_or_fetch(&((host)->flags), flag, __ATOMIC_SEQ_CST)
 #define rrdhost_flag_clear(host, flag) __atomic_and_fetch(&((host)->flags), ~(flag), __ATOMIC_SEQ_CST)
 
-#ifdef NETDATA_INTERNAL_CHECKS
-#define rrdset_debug(st, fmt, args...) do { if(unlikely(debug_flags & D_RRD_STATS && rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) \
-            debug_int(__FILE__, __FUNCTION__, __LINE__, "%s: " fmt, rrdset_name(st), ##args); } while(0)
-#else
-#define rrdset_debug(st, fmt, args...) debug_dummy()
-#endif
-
 typedef enum __attribute__ ((__packed__)) {
     // Indexing
     RRDHOST_OPTION_INDEXED_MACHINE_GUID     = (1 << 0), // when set, we have indexed its machine guid
