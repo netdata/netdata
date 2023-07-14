@@ -712,7 +712,7 @@ static RRDSET *rrdset_index_find(RRDHOST *host, const char *id) {
 // ----------------------------------------------------------------------------
 // RRDSET - find charts
 
-inline RRDSET *rrdset_find(RRDHOST *host, const char *id) {
+inline RRDSET *rrdset_find_by_id(RRDHOST *host, const char *id) {
     netdata_log_debug(D_RRD_CALLS, "rrdset_find() for chart '%s' in host '%s'", id, rrdhost_hostname(host));
     RRDSET *st = rrdset_index_find(host, id);
 
@@ -722,7 +722,7 @@ inline RRDSET *rrdset_find(RRDHOST *host, const char *id) {
     return(st);
 }
 
-inline RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id) {
+inline RRDSET *rrdset_find_by_type(RRDHOST *host, const char *type, const char *id) {
     netdata_log_debug(D_RRD_CALLS, "rrdset_find_bytype() for chart '%s.%s' in host '%s'", type, id, rrdhost_hostname(host));
 
     char buf[RRD_ID_LENGTH_MAX + 1];
@@ -731,10 +731,10 @@ inline RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *i
     int len = (int) strlen(buf);
     strncpyz(&buf[len], id, (size_t) (RRD_ID_LENGTH_MAX - len));
 
-    return(rrdset_find(host, buf));
+    return(rrdset_find_by_id(host, buf));
 }
 
-inline RRDSET *rrdset_find_byname(RRDHOST *host, const char *name) {
+inline RRDSET *rrdset_find_by_name(RRDHOST *host, const char *name) {
     netdata_log_debug(D_RRD_CALLS, "rrdset_find_byname() for chart '%s' in host '%s'", name, rrdhost_hostname(host));
     RRDSET *st = rrdset_index_find_name(host, name);
     return(st);

@@ -204,7 +204,7 @@ static inline RRDSET *pluginsd_find_chart(RRDHOST *host, const char *chart, cons
         return NULL;
     }
 
-    RRDSET *st = rrdset_find(host, chart);
+    RRDSET *st = rrdset_find_by_id(host, chart);
     if (unlikely(!st))
         netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a %s but chart does not exist.",
                           rrdhost_hostname(host), chart, cmd);

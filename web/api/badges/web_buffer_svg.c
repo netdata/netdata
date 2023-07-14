@@ -961,8 +961,8 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
 
     int scale = (scale_str && *scale_str)?str2i(scale_str):100;
 
-    st = rrdset_find(host, chart);
-    if(!st) st = rrdset_find_byname(host, chart);
+    st = rrdset_find_by_id(host, chart);
+    if(!st) st = rrdset_find_by_name(host, chart);
     if(!st) {
         buffer_no_cacheable(w->response.data);
         buffer_svg(w->response.data, "chart not found", NAN, "", NULL, NULL, -1, scale, 0, -1, -1, NULL, NULL);

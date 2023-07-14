@@ -1406,7 +1406,7 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
         if(likely(workers))
             worker_is_busy(WORKER_JOB_FIND_CHART);
 
-        rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
+        rq->st = rrdset_find_by_id(rq->sender->host, string2str(rq->chart_id));
     }
 
     if(!rq->st) {
@@ -1722,7 +1722,7 @@ static int replication_pipeline_execute_next(void) {
         if(rq->found) {
             if (!rq->st) {
                 worker_is_busy(WORKER_JOB_FIND_CHART);
-                rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
+                rq->st = rrdset_find_by_id(rq->sender->host, string2str(rq->chart_id));
             }
 
             if (rq->st && !rq->q) {

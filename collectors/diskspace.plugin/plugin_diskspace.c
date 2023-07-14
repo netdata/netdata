@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../proc.plugin/plugin_proc.h"
+#include "collectors/proc.plugin/plugin_proc.h"
+#include "collectors/utils.h"
 
 #define PLUGIN_DISKSPACE_NAME "diskspace.plugin"
 

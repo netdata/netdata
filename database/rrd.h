@@ -1105,42 +1105,13 @@ void rrdset_update_heterogeneous_flag(RRDSET *st);
 
 time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s);
 
-RRDSET *rrdset_find(RRDHOST *host, const char *id);
+RRDSET *rrdset_find_by_id(RRDHOST *host, const char *id);
+RRDSET *rrdset_find_by_type(RRDHOST *host, const char *type, const char *id);
+RRDSET *rrdset_find_by_name(RRDHOST *host, const char *name);
 
 RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id);
 RRDSET *rrdset_acquired_to_rrdset(RRDSET_ACQUIRED *rsa);
 void rrdset_acquired_release(RRDSET_ACQUIRED *rsa);
-
-#define rrdset_find_localhost(id) rrdset_find(rrdb.localhost, id)
-/* This will not return charts that are archived */
-static inline RRDSET *rrdset_find_active_localhost(const char *id)
-{
-    RRDSET *st = rrdset_find_localhost(id);
-    if (unlikely(st && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)))
-        return NULL;
-    return st;
-}
-
-RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id);
-#define rrdset_find_bytype_localhost(type, id) rrdset_find_bytype(rrdb.localhost, type, id)
-/* This will not return charts that are archived */
-static inline RRDSET *rrdset_find_active_bytype_localhost(const char *type, const char *id)
-{
-    RRDSET *st = rrdset_find_bytype_localhost(type, id);
-    if (unlikely(st && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)))
-        return NULL;
-    return st;
-}
-
-RRDSET *rrdset_find_byname(RRDHOST *host, const char *name);
-/* This will not return charts that are archived */
-static inline RRDSET *rrdset_find_active_byname_localhost(const char *name)
-{
-    RRDSET *st = rrdset_find_byname(rrdb.localhost, name);
-    if (unlikely(st && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)))
-        return NULL;
-    return st;
-}
 
 void rrdset_next_usec_unfiltered(RRDSET *st, usec_t microseconds);
 void rrdset_next_usec(RRDSET *st, usec_t microseconds);
@@ -1181,11 +1152,11 @@ int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm);
 int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, int32_t multiplier);
 int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, int32_t divisor);
 
-RRDDIM *rrddim_find(RRDSET *st, const char *id);
+RRDDIM *rrddim_find_by_id(RRDSET *st, const char *id);
+
 RRDDIM_ACQUIRED *rrddim_find_and_acquire(RRDSET *st, const char *id);
 RRDDIM *rrddim_acquired_to_rrddim(RRDDIM_ACQUIRED *rda);
 void rrddim_acquired_release(RRDDIM_ACQUIRED *rda);
-RRDDIM *rrddim_find_active(RRDSET *st, const char *id);
 
 int rrddim_hide(RRDSET *st, const char *id);
 int rrddim_unhide(RRDSET *st, const char *id);

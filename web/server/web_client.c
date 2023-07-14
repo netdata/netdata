@@ -1663,8 +1663,8 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
                 netdata_log_debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
 
                 // do we have such a data set?
-                RRDSET *st = rrdset_find_byname(host, tok);
-                if(!st) st = rrdset_find(host, tok);
+                RRDSET *st = rrdset_find_by_name(host, tok);
+                if(!st) st = rrdset_find_by_id(host, tok);
                 if(!st) {
                     w->response.data->content_type = CT_TEXT_HTML;
                     buffer_strcat(w->response.data, "Chart is not found: ");

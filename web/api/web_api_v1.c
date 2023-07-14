@@ -494,8 +494,8 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
         goto cleanup;
     }
 
-    RRDSET *st = rrdset_find(host, chart);
-    if(!st) st = rrdset_find_byname(host, chart);
+    RRDSET *st = rrdset_find_by_id(host, chart);
+    if(!st) st = rrdset_find_by_name(host, chart);
     if(!st) {
         buffer_strcat(w->response.data, "Chart is not found: ");
         buffer_strcat_htmlescape(w->response.data, chart);
@@ -788,8 +788,8 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
 
     if(chart && !context) {
         // check if this is a specific chart
-        st = rrdset_find(host, chart);
-        if (!st) st = rrdset_find_byname(host, chart);
+        st = rrdset_find_by_id(host, chart);
+        if (!st) st = rrdset_find_by_name(host, chart);
     }
 
     long long before = (before_str && *before_str)?str2l(before_str):0;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "plugin_proc.h"
+#include "collectors/utils.h"
 
 #define PLUGIN_PROC_MODULE_NET_SOFTNET_NAME "/proc/net/softnet_stat"
 
