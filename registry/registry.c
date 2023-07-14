@@ -189,6 +189,7 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w) {
     buffer_json_member_add_string(w->response.data, "cloud_base_url", registry.cloud_base_url);
     buffer_json_member_add_boolean(w->response.data, "anonymous_statistics", netdata_anonymous_statistics_enabled);
 
+    buffer_json_member_add_array(w->response.data, "nodes");
     RRDHOST *h;
     dfe_start_read(rrdhost_root_index, h) {
         buffer_json_add_array_item_object(w->response.data);
@@ -201,7 +202,7 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w) {
         buffer_json_object_close(w->response.data);
     }
     dfe_done(h);
-    buffer_json_array_close(w->response.data);
+    buffer_json_array_close(w->response.data); // nodes
 
     registry_json_footer(w);
     return HTTP_RESP_OK;
