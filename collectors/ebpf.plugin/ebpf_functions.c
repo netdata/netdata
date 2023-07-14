@@ -224,10 +224,6 @@ static void ebpf_function_thread_manipulation(const char *transaction,
             continue;
 
         ebpf_module_t *wem = &ebpf_modules[i];
-        if (show_specific_thread && !(show_specific_thread & 1<<i))
-            continue;
-
-        ebpf_module_t *wem = &ebpf_modules[i];
         buffer_json_add_array_item_array(wb);
 
         // IMPORTANT!
@@ -265,7 +261,7 @@ static void ebpf_function_thread_manipulation(const char *transaction,
 
         // Either it is not running or received a disabled signal and it is stopping.
         if (wem->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING ||
-            (!wem->life_time && (int)wem->running_time == wem->update_every)) {
+            (!wem->lifetime && (int)wem->running_time == wem->update_every)) {
             // status
             buffer_json_add_array_item_string(wb, EBPF_THREAD_STATUS_STOPPED);
 

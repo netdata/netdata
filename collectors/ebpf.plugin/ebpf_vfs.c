@@ -983,7 +983,6 @@ static void ebpf_vfs_read_global_table(netdata_idx_t *stats, int maps_per_core)
                                  maps_per_core,
                                  NETDATA_CONTROLLER_PID_TABLE_ADD,
                                  NETDATA_CONTROLLER_END);
-    uint64_t idx;
 
     vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_UNLINK].ncall = res[NETDATA_KEY_CALLS_VFS_UNLINK];
     vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_READ].ncall = res[NETDATA_KEY_CALLS_VFS_READ] +
