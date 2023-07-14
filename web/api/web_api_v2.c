@@ -725,6 +725,7 @@ static struct web_api_command api_commands_v2[] = {
         {"bearer_protection",   0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, api_v2_bearer_protection, 0},
         {"bearer_get_token",    0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, api_v2_bearer_token, 0},
 
+        {"config", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_config, 1},
 
         // terminator
         {NULL,                  0, WEB_CLIENT_ACL_NONE,                 NULL, 0},

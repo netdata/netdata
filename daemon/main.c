@@ -2073,6 +2073,8 @@ int main(int argc, char **argv) {
         signals_block();
         signals_init(); // setup the signals we want to use
 
+        dyn_conf_init();
+
         // --------------------------------------------------------------------
         // check which threads are enabled and initialize them
 
