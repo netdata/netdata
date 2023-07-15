@@ -147,13 +147,17 @@ Netdata supports **tiering**, to downsample past data and save disk space. With 
   2. `tier 1`, mid-resolution, per minute, data.
   3. `tier 2`, low-resolution, per hour, data.
 
-All tiers are updated in parallel during data collection. Just increase the disk space you give to Netdata to get a longer history for your metrics.
+All tiers are updated in parallel during data collection. Just increase the disk space you give to Netdata to get a longer history for your metrics. And tiers are automatically chosen at query time depending on the time-frame and the resolution requested.
 
-### :rocket: Does it scale?
+### :rocket: Does it scale? I have really a lot of servers!
 
+Oh! Yes, it does!
 
+  - :airplane: Netdata Parents provide great vertical scalability, so you can have as big parents as the CPU, RAM and Disk resources you can dedicate to them. In our lab we constantly stress test Netdata Parents with about 2 million metrics collected per second.
+  - :rocket: On top of them, Netdata Cloud provides virtually unlimited horizontal scalability, "merging" at query time all the parents you have, into one huge uniform infrastructure. Netdata Cloud itself is probably the biggest single installation monitoring platform ever created, currently monitoring about 100k online servers with about 10k servers changing state (added/removed) per day!
 
 ### :cloud: Do I need Netdata Cloud?
+
 
 
 ## Menu
