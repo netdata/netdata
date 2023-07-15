@@ -972,14 +972,14 @@ static void ebpf_vfs_read_global_table(netdata_idx_t *stats, int maps_per_core)
     netdata_idx_t res[NETDATA_VFS_COUNTER];
     ebpf_read_global_table_stats(res,
                                  vfs_hash_values,
-                                 vfs_maps[NETDATA_CACHESTAT_GLOBAL_STATS].map_fd,
+                                 vfs_maps[NETDATA_VFS_ALL].map_fd,
                                  maps_per_core,
                                  NETDATA_KEY_CALLS_VFS_WRITE,
                                  NETDATA_VFS_COUNTER);
 
     ebpf_read_global_table_stats(stats,
                                  vfs_hash_values,
-                                 vfs_maps[NETDATA_CACHESTAT_CTRL].map_fd,
+                                 vfs_maps[NETDATA_VFS_CTRL].map_fd,
                                  maps_per_core,
                                  NETDATA_CONTROLLER_PID_TABLE_ADD,
                                  NETDATA_CONTROLLER_END);
