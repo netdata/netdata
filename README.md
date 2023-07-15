@@ -298,5 +298,5 @@ Yes.
 _When people first hear about a new product, they frequently ask if it is any good. A Hacker News user
 [remarked](https://news.ycombinator.com/item?id=3067434):_
 
-> Note to self: Starting immediately, all Raganwald projects will have a “Is it any good?” section in the readme, and
+> Note to self: Starting immediately, all raganwald projects will have a “Is it any good?” section in the readme, and
 > the answer shall be “yes.".
