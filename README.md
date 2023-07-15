@@ -228,7 +228,7 @@ We suggest the following:
 
 Using the above, the Netdata Agent on your production system will not need a disk.
 
-### How is Netdata different from a Prometheus and Grafana setup?
+### :raised_eyebrow: How is Netdata different from a Prometheus and Grafana setup?
 
 First we have to say that Prometheus as a time-series database and Grafana as a visualizer are excellent tools for what they do.
 
