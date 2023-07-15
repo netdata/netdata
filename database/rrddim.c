@@ -199,7 +199,7 @@ struct rrddim_constructor {
 
 // isolated call to appear
 // separate in statistics
-static void *rrddim_alloc_db(size_t entries) {
+static storage_number *rrddim_alloc_db(size_t entries) {
     return callocz(entries, sizeof(storage_number));
 }
 
