@@ -43,13 +43,14 @@ Netdata collects metrics per-second and presents them in beatiful low-latency da
   <img src="https://raw.githubusercontent.com/cncf/artwork/master/other/cncf/horizontal/white/cncf-white.svg" alt="CNCF" width="300">
   <br />
   Netdata actively supports and is a member of the Cloud Native Computing Foundation (CNCF)<br />
-  (and due to your love, it is the 3rd most starred project in the <a href="https://landscape.cncf.io/card-mode?grouping=no&sort=stars">CNCF landscape</a>)
+  &nbsp;<br/>
+  ...and due to your love :heart:, it is the 3rd most :star:'d project in the <a href="https://landscape.cncf.io/card-mode?grouping=no&sort=stars">CNCF landscape</a>!
 </p>
 
 <hr class="solid">
 
 > :bulb: **Important Note**<br/>
-> People get addicted to Netdata. Once you use it on your systems, there's no going back!<br/>
+> People get addicted to Netdata. **Once you use it on your systems, there's no going back!**<br/>
 > _You have been warned..._<br/>
 
 <hr class="solid">
@@ -121,21 +122,39 @@ We understand that Netdata is a software piece that is installed on millions of 
   - Netdata is a popular open source project and is frequently tested by many security analysts.
   - Check also our [security polices and advisories published so far](https://github.com/netdata/netdata/security).
 
-### :rocket: Will this consume a lot of resources on my servers?
+### :cyclone: Will this consume a lot of resources on my servers?
 
 No. It will not! We promise this will be fast!
 
-Although each Netdata Agent is a complete monitoring solution packed into a single application, and despite the fact that Netdata collects every metric every single second, you will find that Netdata has amazing performance! In many cases it outperforms other monitoring solutions that have singificantly less features or far smaller data collection rate.
+Although each Netdata Agent is a complete monitoring solution packed into a single application, and despite the fact that Netdata collects **every metric every single second** and trains **multiple ML models** per metric, you will find that Netdata has amazing performance! In many cases it outperforms other monitoring solutions that have singificantly less features or far smaller data collection rate.
 
 This is what you should expect:
 
   - For production systems, each Netdata Agent with default settings (everything enabled, ML, Health, DB) should consume about 5% CPU utilization of single core and about 150 MiB or RAM. By using a Netdata parent and streaming all metrics to that parent, you can disable ML, health and use an ephemeral DB mode (like `alloc`) on the children, leading to a utilization of about 1% CPU of a single core and 100 MiB of RAM. Of course, these depend on how many metrics are collected.
   - For Netdata Parents, for about 1 to 2 million metrics, all collected every second, we suggest a server with 16 cores and 32GB RAM. Less than half of it will be used for data collection and ML. The rest will be available for queries.
 
-Netdata has extensive internal instrumentation to help us reveal where the resources consumed are used. All these are available at the "Netdata Monitoring" section of the dashboard. Depending on your use case, there are many options to optimize resource consumption:
+Netdata has extensive internal instrumentation to help us reveal how the resources consumed are used. All these are available at the "Netdata Monitoring" section of the dashboard. Depending on your use case, there are many options to optimize resource consumption.
 
-  1. Lowering data collection rate, like going from 1s to 2s data collection will half CPU requirements and the dashboard will still be high-resolution.
-  2. 
+Even if you need to run Netdata on extremely weak embedded or IoT systems, you will find that Netdata can be tuned to be very performant.
+
+### :scroll: How much retention will I get?
+
+As much as you need!
+
+Netdata supports **tiering**, to downsample past data and save disk space. With default settings it has 3 tiers:
+
+  1. `tier 0`, with high resolution, per-second, data.
+  2. `tier 1`, mid-resolution, per minute, data.
+  3. `tier 2`, low-resolution, per hour, data.
+
+All tiers are updated in parallel during data collection. Just increase the disk space you give to Netdata to get a longer history for your metrics.
+
+### :rocket: Does it scale?
+
+
+
+### :cloud: Do I need Netdata Cloud?
+
 
 ## Menu
 
