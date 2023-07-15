@@ -1,6 +1,6 @@
 <p align="center"><a href="https://netdata.cloud"><img src="https://user-images.githubusercontent.com/1153921/95268672-a3665100-07ec-11eb-8078-db619486d6ad.png" alt="Netdata" width="300" /></a></p>
 
-<h3 align="center">Netdata is high-fidelity infrastructure monitoring and troubleshooting.<br />Open-source, free, preconfigured, opinionated, and always real-time.</h3>
+<h3 align="center">Monitor your servers, containers and applications, in high-resolution and in real-time.</h3>
 <br />
 <p align="center">
   <a href="https://github.com/netdata/netdata/"><img src="https://img.shields.io/github/stars/netdata/netdata?style=social" alt="GitHub Stars"></a>
@@ -15,19 +15,42 @@
 </p>
 <hr class="solid">
 
+Netdata collects metrics per-second and presents them in beatiful low-latency dashboards. It is designed to run on all your physical and virtual servers, cloud deployments, kubernetes clusters and edge/IoT devices, to monitor everything you run.
+
+- :star: **Collects metrics from 800+ integrations**<br/>
+  Operating system metrics, container metrics, virtual machines, hardware sensors, applications metrics, OpenMetrics exporters, StatsD and logs.
+  
+- :muscle: **Real-Time, Low-Latency, High-Resolution**<br/>
+  All metrics are collected per-second, and are on the dashboard immediately after data collection. Netdata is designed to be fast.
+
+- :metal: **Unsupervised Anomaly Detection**<br/>
+  Trains multiple ML models for each metric collected and detects anomalies based on the past behavior of each metric individually.
+
+- :fire: **Powerful Visualization**<br/>
+  Clear and precise visualuzation that allows you to slice and dice/filter the data directly on the dashboard, without the need to learn any query language.
+
+- :bell: **Out of box Alerts**<br/>
+  Comes with hundreds of alerts out of the box to detect common issues and pitfalls, revealing issues that can easily go unnoticed.
+
+- :sunglasses: **Low Maintenance**<br/>
+  Fully automated in every aspect: automated dashboards, out of the box alerts, auto-detection and auto-discovery of metrics, easy configuration.
+
+<hr class="solid">
+
 <p align="center">
-  Netdata is a member of the Cloud Native Computing Foundation (CNCF), and it is the 3rd most starred project in the <a href="https://landscape.cncf.io/card-mode?grouping=no&sort=stars">CNCF landscape</a>
-  <br />
   <img src="https://raw.githubusercontent.com/cncf/artwork/master/other/cncf/horizontal/white/cncf-white.svg" alt="CNCF" width="300">
+  <br />
+  Netdata is a member of the Cloud Native Computing Foundation (CNCF)<br />(and it is the 3rd most starred project in the <a href="https://landscape.cncf.io/card-mode?grouping=no&sort=stars">CNCF landscape</a>)
 </p>
 
-<img src="https://user-images.githubusercontent.com/1153921/95269366-1b814680-07ee-11eb-8ff4-c1b0b8758499.png" alt="---" style="max-width: 100%;" />
-
-Netdata is a distributed, highly scalable, real-time, performance and health monitoring platform for systems, containers, packaged and custom applications, collecting, storing and visualizing virtually unlimited metrics, in high-resolution. It runs permanently on all your physical and virtual servers, cloud deployments, kubernetes clusters and edge/IoT devices, and is perfectly ok to install it on your systems mid-incident without any preparation.
+<hr class="solid">
 
 > **Important Note**:<br/>
 > People get addicted to Netdata. Once you use it on your systems, there's no going back!<br/>
 > _You have been warned..._
+
+<img src="https://user-images.githubusercontent.com/1153921/95269366-1b814680-07ee-11eb-8ff4-c1b0b8758499.png" alt="---" style="max-width: 100%;" />
+
 
 Netdata is designed to be super easy to setup and use, high performant and real-time, low-maintenance and cost efficient. It makes ML-assisted, high resolution monitoring easy and affordable, bringing to everyone the value that enterprises pay millions for.
 
