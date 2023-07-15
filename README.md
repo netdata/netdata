@@ -172,7 +172,7 @@ When using Netdata Parents, all the functions of a Netdata Agent (except data co
 
 ### :shield: Is this secure?
 
-Of course it is! We give our best for it to be!
+Of course it is! We do our best to ensure it is!
 
 We understand that Netdata is a software piece that is installed on millions of production systems across the world. So, it is important for us, Netdata to be as secure as possible:
 
