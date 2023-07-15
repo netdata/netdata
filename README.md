@@ -206,7 +206,7 @@ All tiers are updated in parallel during data collection. Just increase the disk
 
 ### :rocket: Does it scale? I have really a lot of servers!
 
-Oh! Yes, it does!
+Yes, of course it does!
 
   - :airplane: Netdata Parents provide great vertical scalability, so you can have as big parents as the CPU, RAM and Disk resources you can dedicate to them. In our lab we constantly stress test Netdata Parents with about 2 million metrics collected per second.
   - :rocket: On top of them, Netdata Cloud provides virtually unlimited horizontal scalability, "merging" at query time all the parents you have, into one huge uniform infrastructure. Netdata Cloud itself is probably the biggest single installation monitoring platform ever created, currently monitoring about 100k online servers with about 10k servers changing state (added/removed) per day!
