@@ -49,6 +49,10 @@ Netdata collects metrics per-second and presents them in beatiful low-latency da
 
 <hr class="solid">
 
+![Netdata Agent](https://github.com/netdata/netdata/assets/2662304/af4caa23-19be-46ef-9779-8fdad8d99d2a)
+
+<hr class="solid">
+
 > :bulb: **Important Note**<br/>
 > People get addicted to Netdata. **Once you use it on your systems, there's no going back!**<br/>
 > _You have been warned..._<br/>
