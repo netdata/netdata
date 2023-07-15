@@ -24,7 +24,7 @@ Netdata collects metrics per-second and presents them in beatiful low-latency da
 - :muscle: **Real-Time, Low-Latency, High-Resolution**<br/>
   All metrics are collected per-second, and are on the dashboard immediately after data collection. Netdata is designed to be fast.
 
-- :face_in_clouds: **Unsupervised Anomaly Detection**<br/>
+- :face_in_clouds: **Unsupervised Anomaly Detection (ML)**<br/>
   Trains multiple ML models for each metric collected and detects anomalies based on the past behavior of each metric individually.
 
 - :fire: **Powerful Visualization**<br/>
@@ -56,6 +56,18 @@ Netdata collects metrics per-second and presents them in beatiful low-latency da
 <hr class="solid">
 
 ## Quick Start
+
+<p align="center">
+  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=M&value_color=blue&precision=2&divide=1000000&options=unaligned&v44" alt="User base"></a>
+  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=k&divide=1000&value_color=orange&precision=2&options=unaligned&v44" alt="Servers monitored"></a>
+  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=M&value_color=yellowgreen&precision=2&divide=1000000&options=unaligned&v44" alt="Sessions served"></a>
+  <a href="https://hub.docker.com/r/netdata/netdata"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=dockerhub.pulls_sum&divide=1000000&precision=1&units=M&label=docker+hub+pulls&options=unaligned&v44" alt="Docker Hub pulls"></a>
+  <br />
+  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0&options=unaligned&v44" alt="New users today"></a>
+  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0&v44" alt="New machines today"></a>
+  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0&v44" alt="Sessions today"></a>
+  <a href="https://hub.docker.com/r/netdata/netdata"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=dockerhub.pulls_sum&divide=1000&precision=1&units=k&label=docker+hub+pulls&after=-86400&group=incremental-sum&label=docker%20hub%20pulls%20today&options=unaligned&v44" alt="Docker Hub pulls today"></a>
+</p>
 
 ### 1. **Install Netdata Agents everywhere** :v:
    
@@ -109,6 +121,39 @@ Netdata collects metrics per-second and presents them in beatiful low-latency da
    :love_you_gesture: Netdata Cloud does not prevent you from using your Netdata Agents and Parents directly, and vice versa.<br/>
    :ok_hand: Your metrics are still stored in your network when you connect your Netdata Agents and Parent to Netdata Cloud.
 
+## How it works
+
+Netdata is built around a **modular metrics processing pipeline**.
+
+Each Netdata Agent can perform the following functions:
+
+1. **COLLECT**<br/>
+   Uses [internal](https://github.com/netdata/netdata/tree/master/collectors) and [external](https://github.com/netdata/go.d.plugin/tree/master/modules) plugins to collect data from their sources. Netdata can also scrape OpenMetrics sources and accept StatsD metrics.
+   
+2. **STORE**<br/>
+   Uses database engine plugins to store the collected data, either in memory and/or on disk. We have developed our own `dbengine` for storing the data in a very efficient manner, allowing Netdata to have less than 1 byte per sample on disk and amazingly fast queries.
+   
+3. **LEARN** (ML)<br/>
+   Trains multiple Machine-Learning (ML) models per metric to learn the behavior of each metric individually.
+   
+4. **DETECT** (ML)<br/>
+   Uses the trained machine learning (ML) models to detect outliers and mark collected samples as **anomalies**. Netdata stores anomaly information together with each sample and also streams it to Netdata Parents, so that the anomaly is also available at query time for the whole retention of each metric.
+
+5. **CHECK**<br/>
+   Uses its configured alerts to check the metrics for common issues and send alert notifications.
+
+6. **STREAM**<br/>
+   Push metrics in real-time to Netdata Parents.
+
+7. **ARCHIVE**<br/>
+   Export metrics to industry standard time-series databases, like `prometheus`, `influxdb`, `opentsdb`, `graphite`, etc.
+
+8. **QUERY**<br/>
+   Provide an API to query the data and present interactive dashboards to users.
+
+When using Netdata Parents, all the functions of a Netdata Agent (except data collection) can be delegated to Parents to offload production systems.
+
+
 ## FAQ
 
 ### :shield: Is this secure?
@@ -137,7 +182,7 @@ Netdata has extensive internal instrumentation to help us reveal how the resourc
 
 Even if you need to run Netdata on extremely weak embedded or IoT systems, you will find that Netdata can be tuned to be very performant.
 
-### :scroll: How much retention will I get?
+### :scroll: How much retention can I have?
 
 As much as you need!
 
@@ -147,7 +192,7 @@ Netdata supports **tiering**, to downsample past data and save disk space. With 
   2. `tier 1`, mid-resolution, per minute, data.
   3. `tier 2`, low-resolution, per hour, data.
 
-All tiers are updated in parallel during data collection. Just increase the disk space you give to Netdata to get a longer history for your metrics. And tiers are automatically chosen at query time depending on the time-frame and the resolution requested.
+All tiers are updated in parallel during data collection. Just increase the disk space you give to Netdata to get a longer history for your metrics. Tiers are automatically chosen at query time depending on the time-frame and the resolution requested.
 
 ### :rocket: Does it scale? I have really a lot of servers!
 
@@ -224,18 +269,6 @@ Netdata works with tons of applications, notifications platforms, and other time
 
 ## Get Netdata
 
-<p align="center">
-  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=M&value_color=blue&precision=2&divide=1000000&options=unaligned&v44" alt="User base"></a>
-  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=k&divide=1000&value_color=orange&precision=2&options=unaligned&v44" alt="Servers monitored"></a>
-  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=M&value_color=yellowgreen&precision=2&divide=1000000&options=unaligned&v44" alt="Sessions served"></a>
-  <a href="https://hub.docker.com/r/netdata/netdata"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=dockerhub.pulls_sum&divide=1000000&precision=1&units=M&label=docker+hub+pulls&options=unaligned&v44" alt="Docker Hub pulls"></a>
-  <br />
-  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0&options=unaligned&v44" alt="New users today"></a>
-  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0&v44" alt="New machines today"></a>
-  <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0&v44" alt="Sessions today"></a>
-  <a href="https://hub.docker.com/r/netdata/netdata"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=dockerhub.pulls_sum&divide=1000&precision=1&units=k&label=docker+hub+pulls&after=-86400&group=incremental-sum&label=docker%20hub%20pulls%20today&options=unaligned&v44" alt="Docker Hub pulls today"></a>
-</p>
-
 ### Infrastructure view
 
 Due to the distributed nature of the Netdata ecosystem, it is recommended to setup not only one Netdata Agent on your production system, but also an additional Netdata Agent acting as a [Parent](https://github.com/netdata/netdata/blob/master/streaming/README.md). A local Netdata Agent (child), without any database or alarms, collects metrics and sends them to another Netdata Agent (parent). The same parent can collect data for any number of child nodes and serves as a centralized health check engine for each child by triggering alerts on their behalf.
@@ -308,16 +341,6 @@ Or, skip straight to [configuring the Netdata Agent](https://github.com/netdata/
 Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
 solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
 external databases, and more.
-
-## How it works
-
-Netdata is a highly efficient, highly modular, metrics management engine. Its lockless design makes it ideal for
-concurrent operations on the metrics.
-
-![Diagram of Netdata's core
-functionality](https://user-images.githubusercontent.com/1153921/95367248-5f755980-0889-11eb-827f-9b7aa02a556e.png)
-
-The result is a highly efficient, low-latency system, supporting multiple readers and one writer on each metric.
 
 ## Infographic
 
