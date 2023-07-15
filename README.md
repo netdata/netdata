@@ -1,6 +1,6 @@
 <p align="center"><a href="https://netdata.cloud"><img src="https://user-images.githubusercontent.com/1153921/95268672-a3665100-07ec-11eb-8078-db619486d6ad.png" alt="Netdata" width="300" /></a></p>
 
-<h3 align="center">Monitor your servers, containers and applications, in high-resolution and in real-time.</h3>
+<h3 align="center">Monitor your servers, containers, and applications, in high-resolution and in real-time.</h3>
 
 <br />
 <p align="center">
@@ -56,47 +56,86 @@ Netdata collects metrics per-second and presents them in beatiful low-latency da
 
 ## Quick Start
 
-1. **[Install Netdata Agents everywhere](https://learn.netdata.cloud/docs/getting-started/install-netdata#install-on-linux-with-one-line-installer)**
+### 1. **Install Netdata Agents everywhere** :v:
    
-   Netdata runs on all Linux distributions (Ubuntu, Debian, CentOS, Arch, Alpine, Gentoo), container platforms (Kubernetes clusters, Docker, LXC/LXD), FreeBSD, pfSense and macOS.
+   Netdata can be installed on all Linux, MacOS and FreeBSD systems. We provide binary packages for the most popular operating systems and package managers.
 
-   - To install Netdata on Linux, FreeBSD and MacOS use 
-   - To monitor Windows servers and applications use [this guide](https://learn.netdata.cloud/docs/data-collection/monitor-anything/system-metrics/windows-machines).
+   - Install on [Ubuntu, Debiam CentOS, Arch, Alpine, Gentoo](https://learn.netdata.cloud/docs/installing/one-line-installer-for-all-linux-systems).
+   - Install with [Docker](https://learn.netdata.cloud/docs/installing/docker). Netdata is a [Verified Publisher on DockerHub](https://hub.docker.com/r/netdata/netdata) and our users enjoy free unlimited DockerHub pulls :heart_eyes:.
+   - Install on [MacOS](https://learn.netdata.cloud/docs/installing/macos) :metal:.
+   - Install on [FreeBSD](https://learn.netdata.cloud/docs/installing/freebsd) and [pfSense](https://learn.netdata.cloud/docs/installing/pfsense).
+   - Install [from source](https://learn.netdata.cloud/docs/installing/build-the-netdata-agent-yourself/compile-from-source-code)
    - For Kubernetes deployments [check here](https://learn.netdata.cloud/docs/installation/install-on-specific-environments/kubernetes/).
-   - To monitor SNMP devices check [this guide](https://learn.netdata.cloud/docs/data-collection/monitor-anything/networking/snmp).
+
+### 2. **Configure Collectors** :boom:
+
+   Netdata auto-detects and auto-discovers most operating system data sources and applications. However, many data sources require some manual configuration, usually to allow Netdata get access to the metrics.
+   
    - For a detailed list of all data collectors, check [this guide](https://learn.netdata.cloud/docs/data-collection/).
+   - To monitor Windows servers and applications use [this guide](https://learn.netdata.cloud/docs/data-collection/monitor-anything/system-metrics/windows-machines).
+   - To monitor SNMP devices check [this guide](https://learn.netdata.cloud/docs/data-collection/monitor-anything/networking/snmp).
 
-3. **[Configure Streaming and Replication](https://learn.netdata.cloud/docs/streaming/streaming-configuration-reference)**
+### 3. **Configure Netdata Parents** :family:
 
-   Appoint one or more Netdata Agents as centralization points (Parents) inside your network and [configure streaming](https://learn.netdata.cloud/docs/streaming/streaming-configuration-reference) on all your agents to replicate their metrics to these central (Parent) Netdata agents.
-
-   - When configuring streaming on your agents, even if you configure multiple parents, only 1 is used at any given time. This has been done to minimize overheads and bandwidth on your production systems.
-   - Parents can be standalone, or in clusters for high availability. Configure parents to stream to other parents in a circular manner (A->B, B->A or A->BC, B->AC, C->AB) and all them will end up having all data each one has.
-   - For multi-cloud/hybrid-cloud, configure at least 1 parent per cloud provider to save egress bandwidth.
-   - Parents scale vertically amazingly well. Expect ingestion rates of 1 million metrics per second, with ML and health enabled, on 8 core systems.
-
-4. **Use your Netdata Parents**
-
-   The parents you run provide:
+   A Netdata Parent is a Netdata Agent that has been configured to accept [streaming connections](https://learn.netdata.cloud/docs/streaming/streaming-configuration-reference) from other Netdata agents.
+   
+   Netdata Parents provide:
 
    - Infrastructure level dashboards, at `http://parent.server.ip:19999/`
-   - Retention for all metrics of all your nodes
+   - Increased retention for all metrics of all your nodes
    - Central configuration of alerts and dispatch of notifications
 
-5. **Connect your Parents to Netdata Cloud**
+   You can also use Netdata Parents to:
 
-   On top of what your agents and parents can do, claim your Netdata Parents to connect them to Netdata Cloud, to:
+   - Offload your production systems (the parents runs ML, alerts, queries, etc for all its children)
+   - Secure your production systems (the parents accept user connections, for all its children)
+
+### 4. **Connect your Parents to Netdata Cloud** :cloud:
+
+   Optionally, sign-up to Netdata Cloud and claim your Netdata Parents.
+   
+   When your parents are connected to Netdata Cloud, you can (on top of the above):
 
    - Organize your infra in spaces and rooms
-   - Invite your team and assigning role to them (Role Based Access Control - RBAC)
-   - Create and manage custom dashboards
-   - Access Netdata Functions
-   - Get infinite horizontal scalability (multiple independent parents are used as one infra)
+   - Create, manage and share **custom dashboards**
+   - Invite your team and assign roles to them (Role Based Access Control - RBAC)
+   - Access Netdata Functions (processes top from the UI and more)
+   - Get infinite horizontal scalability (multiple independent parents are viewed as one infra)
    - Centrally configure alerts (coming soon)
    - Centrally configure data collection (coming soon)
    - Netdata Mobile App notifications (coming soon)
 
-   💡 Netdata Cloud does not prevent you from using your Netdata Agents directly, and vice versa.
+   :love_you_gesture: Netdata Cloud does not prevent you from using your Netdata Agents and Parents directly, and vice versa.<br/>
+   :ok_hand: Your metrics are still stored in your network when you connect your Netdata Agents and Parent to Netdata Cloud.
+
+## FAQ
+
+### :shield: Is this secure?
+
+Of course it is! We give our best for it to be!
+
+We understand that Netdata is a software piece that is installed on millions of production systems across the world. So, it is important for us, Netdata to be as secure as possible:
+
+  - We follow the [Open Source Security Foundation](https://bestpractices.coreinfrastructure.org/en/projects/2231) best practices.
+  - We have given great attention to detail when it comes to security design. Check out our [security design](https://learn.netdata.cloud/docs/architecture/security-and-privacy-design).
+  - Netdata is a popular open source project and is frequently tested by many security analysts.
+  - Check also our [security polices and advisories published so far](https://github.com/netdata/netdata/security).
+
+### :rocket: Will this consume a lot of resources on my servers?
+
+No. It will not! We promise this will be fast!
+
+Although each Netdata Agent is a complete monitoring solution packed into a single application, and despite the fact that Netdata collects every metric every single second, you will find that Netdata has amazing performance! In many cases it outperforms other monitoring solutions that have singificantly less features or far smaller data collection rate.
+
+This is what you should expect:
+
+  - For production systems, each Netdata Agent with default settings (everything enabled, ML, Health, DB) should consume about 5% CPU utilization of single core and about 150 MiB or RAM. By using a Netdata parent and streaming all metrics to that parent, you can disable ML, health and use an ephemeral DB mode (like `alloc`) on the children, leading to a utilization of about 1% CPU of a single core and 100 MiB of RAM. Of course, these depend on how many metrics are collected.
+  - For Netdata Parents, for about 1 to 2 million metrics, all collected every second, we suggest a server with 16 cores and 32GB RAM. Less than half of it will be used for data collection and ML. The rest will be available for queries.
+
+Netdata has extensive internal instrumentation to help us reveal where the resources consumed are used. All these are available at the "Netdata Monitoring" section of the dashboard. Depending on your use case, there are many options to optimize resource consumption:
+
+  1. Lowering data collection rate, like going from 1s to 2s data collection will half CPU requirements and the dashboard will still be high-resolution.
+  2. 
 
 ## Menu
 
