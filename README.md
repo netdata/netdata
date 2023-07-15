@@ -228,6 +228,20 @@ We suggest the following:
 
 Using the above, the Netdata Agent on your production system will not need a disk.
 
+### :raised_eyebrow: How is Netdata different from a Prometheus and Grafana setup?
+
+First we have to say that Prometheus as a time-series database and Grafana as a visualizer are excellent tools for what they do.
+
+But we believe that such a setup is missing a key element: A Prometheus and Grafana setup assumes that you know everything about the metrics you collect and you understand deeply how they are structured, should be queried and visualized.
+
+In reality this setup has a lot of problems. The vast number of technologies, operating systems, and applications we use in our modern stacks, makes it impossible for any single person to know and understand everything about anything. We get testimonials regularly from Netdata users across the biggest enterprises, that Netdata manages to reveal issues, anomalies and problems they were not aware of and they didn't even have the means to find or troubleshoot.
+
+So, the biggest difference of Netdata to Prometheus and Grafana, is that we decided that the tool needs to have a much better understanding of the components, the applications and the metrics it monitors.
+
+  - When compared to Prometheus, Netdata needs for each metric much more than just a name, some labels and a value over time. A metric in Netdata is a structured entity that correlates with other metrics in a certain way, has specific attributes that depict how it should be organized, treated, queried and visualized. We call this the NIDL (Nodes, Instances, Dimensions, Labels) framework. To maintain such an index is a challenge: first because the raw metrics collected do not provide this information, so we have to add it, and second because we need to maintain this index for the lifetime of each metric, which with our current database retention, it is usually more than a year.
+
+  - When compared to Grafana, Netdata is fully automated. Grafana has more customization capabilities than Netdata, but Netdata presents fully functional dashboards by itself and most importantly it gives you the means to understand, analyze, filter, slice and dice the data without the need for you to edit queries or be aware of any peculiarities the underlying metrics may have. Furthermore, to help you when you need to find the needle in the haystack, Netdata has advanced troubleshooting tools provided by the Netdata metrics scoring engine, that allows it to score metrics based on their anomaly rate, their differences or similarities for any given time-frame.
+
 ### :cloud: Do I have to subscribe to Netdata Cloud?
 
 No. But we hope you will find it useful.
