@@ -16,13 +16,13 @@
 </p>
 <hr class="solid">
 
-Netdata collects metrics per-second and presents them in beautiful low-latency dashboards. It is designed to run on all your physical and virtual servers, cloud deployments, kubernetes clusters and edge/IoT devices, to monitor everything you run.
+Netdata collects metrics per second and presents them in beautiful low-latency dashboards. It is designed to run on all of your physical and virtual servers, cloud deployments, Kubernetes clusters, and edge/IoT devices, to monitor everything you run.
 
 - :boom: **Collects metrics from 800+ integrations**<br/>
-  Operating system metrics, container metrics, virtual machines, hardware sensors, applications metrics, OpenMetrics exporters, StatsD and logs.
+  Operating system metrics, container metrics, virtual machines, hardware sensors, applications metrics, OpenMetrics exporters, StatsD, and logs.
   
 - :muscle: **Real-Time, Low-Latency, High-Resolution**<br/>
-  All metrics are collected per-second, and are on the dashboard immediately after data collection. Netdata is designed to be fast.
+  All metrics are collected per second and are on the dashboard immediately after data collection. Netdata is designed to be fast.
 
 - :face_in_clouds: **Unsupervised Anomaly Detection (ML)**<br/>
   Trains multiple ML models for each metric collected and detects anomalies based on the past behavior of each metric individually.
@@ -34,7 +34,7 @@ Netdata collects metrics per-second and presents them in beautiful low-latency d
   Comes with hundreds of alerts out of the box to detect common issues and pitfalls, revealing issues that can easily go unnoticed.
 
 - :sunglasses: **Low Maintenance**<br/>
-  Fully automated in every aspect: automated dashboards, out-of-the-box alerts, auto-detection and auto-discovery of metrics, easy configuration.
+  Fully automated in every aspect: automated dashboards, out-of-the-box alerts, auto-detection, auto-discovery of metrics, and easily configurable.
 
 - :star: **Open and Extensible**<br/>
   Netdata is a modular platform that can be extended in all possible ways and it also integrates nicely with other monitoring solutions.
@@ -189,7 +189,7 @@ Although each Netdata Agent is a complete monitoring solution packed into a sing
 
 This is what you should expect:
 
-  - For production systems, each Netdata Agent with default settings (everything enabled, ML, Health, DB) should consume about 5% CPU utilization of one core and about 150 MiB or RAM. By using a Netdata parent and streaming all metrics to that parent, you can disable ML, health and use an ephemeral DB mode (like `alloc`) on the children, leading to utilization of about 1% CPU of a single core and 100 MiB of RAM. Of course, these depend on how many metrics are collected.
+  - For production systems, each Netdata Agent with default settings (everything enabled, ML, Health, DB) should consume about 5% CPU utilization of one core and about 150 MiB or RAM. By using a Netdata parent and streaming all metrics to that parent, you can disable ML & health and use an ephemeral DB mode (like `alloc`) on the children, leading to utilization of about 1% CPU of a single core and 100 MiB of RAM. Of course, these depend on how many metrics are collected.
   - For Netdata Parents, for about 1 to 2 million metrics, all collected every second, we suggest a server with 16 cores and 32GB RAM. Less than half of it will be used for data collection and ML. The rest will be available for queries.
 
 Netdata has extensive internal instrumentation to help us reveal how the resources consumed are used. All these are available in the "Netdata Monitoring" section of the dashboard. Depending on your use case, there are many options to optimize resource consumption.
