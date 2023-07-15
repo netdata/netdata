@@ -118,8 +118,8 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
    - Invite your team and assign roles to them (Role Based Access Control - RBAC)
    - Access Netdata Functions (processes top from the UI and more)
    - Get infinite horizontal scalability (multiple independent parents are viewed as one infra)
-   - Centrally configure alerts (coming soon)
-   - Centrally configure data collection (coming soon)
+   - Configure alerts from the UI (coming soon)
+   - Configure data collection from the UI (coming soon)
    - Netdata Mobile App notifications (coming soon)
 
    :love_you_gesture: Netdata Cloud does not prevent you from using your Netdata Agents and Parents directly, and vice versa.<br/>
@@ -242,6 +242,8 @@ So, the biggest difference of Netdata to Prometheus and Grafana, is that we deci
 
   - When compared to Grafana, Netdata is fully automated. Grafana has more customization capabilities than Netdata, but Netdata presents fully functional dashboards by itself and most importantly it gives you the means to understand, analyze, filter, slice and dice the data without the need for you to edit queries or be aware of any peculiarities the underlying metrics may have. Furthermore, to help you when you need to find the needle in the haystack, Netdata has advanced troubleshooting tools provided by the Netdata metrics scoring engine, that allows it to score metrics based on their anomaly rate, their differences or similarities for any given time-frame.
 
+Despite all these, Netdata integrates nicely with Prometheus and Grafana and we have reports from users who use Netdata with Prometheus and Grafana in production.
+
 ### :cloud: Do I have to subscribe to Netdata Cloud?
 
 No. But we hope you will find it useful.
@@ -249,7 +251,7 @@ No. But we hope you will find it useful.
 The Netdata Agent dashboard and the Netdata Cloud dashboard are the same. Still, Netdata Cloud provides additional features, that the Netdata Agent is not capable of. These include:
 
   1. Customizability (custom dashboards and other settings are persisted when you are signed in to Netdata Cloud)
-  2. Central Configuration of Alerts and Data Collection (coming soon)
+  2. Configuration of Alerts and Data Collection from the UI (coming soon)
   3. Security (role-based access control - RBAC).
   4. Horizontal Scalability ("blend" multiple independent parents in one uniform infrastructure)
   5. Central Dispatch of Alert Notifications (even when multiple independent parents are involved)
