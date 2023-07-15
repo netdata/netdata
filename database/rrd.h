@@ -1032,6 +1032,32 @@ RRDHOST *rrdhost_find_by_hostname(const char *hostname);
 RRDHOST *rrdhost_find_by_guid(const char *guid);
 RRDHOST *rrdhost_find_by_node_id(const char *node_id);
 
+RRDHOST *rrdhost_create(
+        const char *hostname,
+        const char *registry_hostname,
+        const char *guid,
+        const char *os,
+        const char *timezone,
+        const char *abbrev_timezone,
+        int32_t utc_offset,
+        const char *tags,
+        const char *program_name,
+        const char *program_version,
+        int update_every,
+        long entries,
+        STORAGE_ENGINE_ID storage_engine_id,
+        unsigned int health_enabled,
+        unsigned int rrdpush_enabled,
+        char *rrdpush_destination,
+        char *rrdpush_api_key,
+        char *rrdpush_send_charts_matching,
+        bool rrdpush_enable_replication,
+        time_t rrdpush_seconds_to_replicate,
+        time_t rrdpush_replication_step,
+        struct rrdhost_system_info *system_info,
+        int is_localhost,
+        bool archived);
+
 RRDHOST *rrdhost_get_or_create(
         const char *hostname
         , const char *registry_hostname
