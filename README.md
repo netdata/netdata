@@ -230,15 +230,20 @@ No. But we hope you will find it useful.
 
 The Netdata Agent dashboard and the Netdata Cloud dashboard are the same. Still Netdata Cloud provides additional features, that the Netdata Agent is not capable of. These include:
 
-  1. Customizability (mainly custom dashboards)
+  1. Customizability (custom dashboards and other settings are persisted when you are signed-in to Netdata Cloud)
   2. Central Configuration of Alerts and Data Collection (coming soon)
-  3. Security (role based access control)
+  3. Security (role based access control - RBAC).
   4. Horizontal Scalability ("blend" multiple independent parents in one uniform infrastructure)
   5. Central Dispatch of Alert Notifications (even when multiple independent parents are involved)
   6. Mobile App for Alert Notifications (coming soon)
 
 So, although it is not required, you can get the most out of your Netdata installation by using Netdata Cloud.
 
+### :office: Who uses Netdata?
+
+Netdata is a very popular project. By checking [the stargazers on github]([https://github.com/netdata/netdata/](https://github.com/netdata/netdata/stargazers)) we will see that there are people from quite popular companies using Netdata, including SAP, Qualcomm, IBM, Amazon, Intel, AMD, Unity, Baidu, Cisco, Samsung, Netflix, Facebook and hundreds more.
+
+Netdata is also popular in Universities, including New York University, Columbia University, New Jersey University, and dozens more.
 
 ## :book: Documentation
 
