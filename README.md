@@ -224,7 +224,7 @@ We suggest the following:
 
 Using the above, the Netdata Agent on your production system will not need a disk.
 
-### :cloud: Do I need Netdata Cloud?
+### :cloud: Do I have to subscribe to Netdata Cloud?
 
 No. But we hope you will find it useful.
 
