@@ -261,7 +261,7 @@ So, although it is not required, you can get the most out of your Netdata instal
 
 ### :office: Who uses Netdata?
 
-Netdata is a very popular project. By checking [the stargazers on github]([https://github.com/netdata/netdata/](https://github.com/netdata/netdata/stargazers)) you will find people from quite popular companies including: SAP, Qualcomm, IBM, Amazon, Intel, AMD, Unity, Baidu, Cisco, Samsung, Netflix, Facebook and hundreds more.
+Netdata is a popular project. Check its [stargazers on github](https://github.com/netdata/netdata/stargazers). You will find people from quite popular companies and enterprises, including: SAP, Qualcomm, IBM, Amazon, Intel, AMD, Unity, Baidu, Cisco, Samsung, Netflix, Facebook and hundreds more.
 
 Netdata is also popular in universities, including New York University, Columbia University, New Jersey University, and dozens more.
 
