@@ -6,7 +6,7 @@
 #define JSON_DATES_TIMESTAMP 2
 
 void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
-    //info("RRD2JSON(): %s: BEGIN", r->st->id);
+    //netdata_log_info("RRD2JSON(): %s: BEGIN", r->st->id);
     int row_annotations = 0, dates, dates_with_new = 0;
     char kq[2] = "",                        // key quote
             sq[2] = "",                     // string quote
@@ -159,7 +159,8 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
         if(dates == JSON_DATES_JS) {
             // generate the local date time
             struct tm tmbuf, *tm = localtime_r(&now, &tmbuf);
-            if(!tm) { error("localtime_r() failed."); continue; }
+            if(!tm) {
+                netdata_log_error("localtime_r() failed."); continue; }
 
             if(likely(i != start)) buffer_fast_strcat(wb, ",\n", 2);
             buffer_fast_strcat(wb, pre_date, pre_date_len);
@@ -241,15 +242,15 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
     }
 
     buffer_strcat(wb, finish);
-    //info("RRD2JSON(): %s: END", r->st->id);
+    //netdata_log_info("RRD2JSON(): %s: END", r->st->id);
 }
-
 
 void rrdr2json_v2(RRDR *r, BUFFER *wb) {
     QUERY_TARGET *qt = r->internal.qt;
     RRDR_OPTIONS options = qt->window.options;
 
-    bool expose_gbc = query_target_aggregatable(qt);
+    bool send_count = query_target_aggregatable(qt);
+    bool send_hidden = send_count && r->vh && query_has_group_by_aggregation_percentage(qt);
 
     buffer_json_member_add_object(wb, "result");
 
@@ -267,12 +268,17 @@ void rrdr2json_v2(RRDR *r, BUFFER *wb) {
     buffer_json_array_close(wb); // labels
 
     buffer_json_member_add_object(wb, "point");
-    buffer_json_member_add_uint64(wb, "value", 0);
-    buffer_json_member_add_uint64(wb, "arp", 1);
-    buffer_json_member_add_uint64(wb, "pa", 2);
-    if(expose_gbc)
-        buffer_json_member_add_uint64(wb, "count", 3);
-    buffer_json_object_close(wb);
+    {
+        size_t point_count = 0;
+        buffer_json_member_add_uint64(wb, "value", point_count++);
+        buffer_json_member_add_uint64(wb, "arp", point_count++);
+        buffer_json_member_add_uint64(wb, "pa", point_count++);
+        if (send_count)
+            buffer_json_member_add_uint64(wb, "count", point_count++);
+        if (send_hidden)
+            buffer_json_member_add_uint64(wb, "hidden", point_count++);
+    }
+    buffer_json_object_close(wb); // point
 
     buffer_json_member_add_array(wb, "data");
     if(i) {
@@ -286,6 +292,7 @@ void rrdr2json_v2(RRDR *r, BUFFER *wb) {
         // for each line in the array
         for (i = start; i != end; i += step) {
             NETDATA_DOUBLE *cn = &r->v[ i * r->d ];
+            NETDATA_DOUBLE *ch = send_hidden ? &r->vh[i * r->d ] : NULL;
             RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
             NETDATA_DOUBLE *ar = &r->ar[ i * r->d ];
             uint32_t *gbc = &r->gbc [ i * r->d ];
@@ -325,8 +332,10 @@ void rrdr2json_v2(RRDR *r, BUFFER *wb) {
                 buffer_json_add_array_item_uint64(wb, o);
 
                 // add the count
-                if(expose_gbc)
+                if(send_count)
                     buffer_json_add_array_item_uint64(wb, gbc[d]);
+                if(send_hidden)
+                    buffer_json_add_array_item_double(wb, ch[d]);
 
                 buffer_json_array_close(wb); // point
             }

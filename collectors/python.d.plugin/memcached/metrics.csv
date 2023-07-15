@@ -3,7 +3,7 @@ memcached.cache,,"available, used",MiB,Cache Size,stacked,,python.d.plugin,memca
 memcached.net,,"in, out",kilobits/s,Network,area,,python.d.plugin,memcached
 memcached.connections,,"current, rejected, total",connections/s,Connections,line,,python.d.plugin,memcached
 memcached.items,,"current,total",items,Items,line,,python.d.plugin,memcached
-memcached.evicted_reclaimed,,"reclaimed, evicted", items,Evicted and Reclaimed Items,line,,python.d.plugin,memcached
+memcached.evicted_reclaimed,,"reclaimed, evicted",items,Evicted and Reclaimed Items,line,,python.d.plugin,memcached
 memcached.get,,"hints, misses",requests,Get Requests,stacked,,python.d.plugin,memcached
 memcached.get_rate,,rate,requests/s,Get Request Rate,line,,python.d.plugin,memcached
 memcached.set_rate,,rate,requests/s,Set Request Rate,line,,python.d.plugin,memcached

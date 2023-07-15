@@ -3,7 +3,7 @@
 #include "sqlite_functions.h"
 #include "sqlite_db_migration.h"
 
-#define DB_METADATA_VERSION 7
+#define DB_METADATA_VERSION 10
 
 const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS host(host_id BLOB PRIMARY KEY, hostname TEXT NOT NULL, "
@@ -32,7 +32,9 @@ const char *database_config[] = {
     "every text, units text, calc text, families text, plugin text, module text, charts text, green text, "
     "red text, warn text, crit text, exec text, to_key text, info text, delay text, options text, "
     "repeat text, host_labels text, p_db_lookup_dimensions text, p_db_lookup_method text, p_db_lookup_options int, "
-    "p_db_lookup_after int, p_db_lookup_before int, p_update_every int);",
+    "p_db_lookup_after int, p_db_lookup_before int, p_update_every int, source text, chart_labels text);",
+
+    "CREATE INDEX IF NOT EXISTS alert_hash_index ON alert_hash (hash_id);",
 
     "CREATE TABLE IF NOT EXISTS host_info(host_id blob, system_key text NOT NULL, system_value text NOT NULL, "
     "date_created INT, PRIMARY KEY(host_id, system_key));",
@@ -42,6 +44,23 @@ const char *database_config[] = {
 
     "CREATE TRIGGER IF NOT EXISTS ins_host AFTER INSERT ON host BEGIN INSERT INTO node_instance (host_id, date_created)"
       " SELECT new.host_id, unixepoch() WHERE new.host_id NOT IN (SELECT host_id FROM node_instance); END;",
+
+    "CREATE TABLE IF NOT EXISTS health_log (health_log_id INTEGER PRIMARY KEY, host_id blob, alarm_id int, "
+    "config_hash_id blob, name text, chart text, family text, recipient text, units text, exec text, "
+    "chart_context text, last_transition_id blob, UNIQUE (host_id, alarm_id)) ;",
+
+    "CREATE INDEX IF NOT EXISTS health_log_ind_1 ON health_log (host_id);",
+
+    "CREATE TABLE IF NOT EXISTS health_log_detail (health_log_id int, unique_id int, alarm_id int, alarm_event_id int, "
+    "updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, "
+    "flags int, exec_run_timestamp int, delay_up_to_timestamp int, "
+    "info text, exec_code int, new_status real, old_status real, delay int, "
+    "new_value double, old_value double, last_repeat int, transition_id blob, global_id int);",
+
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_1 ON health_log_detail (unique_id);",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_2 ON health_log_detail (global_id);",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_3 ON health_log_detail (transition_id);",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_4 ON health_log_detail (health_log_id);",
 
     NULL
 };
@@ -128,9 +147,9 @@ static void add_stmt_to_list(sqlite3_stmt *res)
 
     if (unlikely(!res)) {
         if (idx)
-            info("Finilizing %d statements", idx);
+            netdata_log_info("Finilizing %d statements", idx);
         else
-            info("No statements pending to finalize");
+            netdata_log_info("No statements pending to finalize");
         while (idx > 0) {
             int rc;
             rc = sqlite3_finalize(statements[--idx]);
@@ -148,7 +167,7 @@ static void release_statement(void *statement)
 {
     int rc;
 #ifdef NETDATA_DEV_MODE
-    info("Thread %d: Cleaning prepared statement on %p", gettid(), statement);
+    netdata_log_info("Thread %d: Cleaning prepared statement on %p", gettid(), statement);
 #endif
     if (unlikely(rc = sqlite3_finalize((sqlite3_stmt *) statement) != SQLITE_OK))
         error_report("Failed to finalize statement, rc = %d", rc);
@@ -175,7 +194,7 @@ int prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **state
         if (likely(key)) {
             ret = pthread_setspecific(*key, *statement);
 #ifdef NETDATA_DEV_MODE
-            info("Thread %d: Using key %u on statement %p", gettid(), keys_used, *statement);
+            netdata_log_info("Thread %d: Using key %u on statement %p", gettid(), keys_used, *statement);
 #endif
         }
         if (ret)
@@ -189,7 +208,7 @@ static int check_table_integrity_cb(void *data, int argc, char **argv, char **co
     int *status = data;
     UNUSED(argc);
     UNUSED(column);
-    info("---> %s", argv[0]);
+    netdata_log_info("---> %s", argv[0]);
     *status = (strcmp(argv[0], "ok") != 0);
     return 0;
 }
@@ -202,11 +221,11 @@ static int check_table_integrity(char *table)
     char wstr[255];
 
     if (table) {
-        info("Checking table %s", table);
+        netdata_log_info("Checking table %s", table);
         snprintfz(wstr, 254, "PRAGMA integrity_check(%s);", table);
     }
     else {
-        info("Checking entire database");
+        netdata_log_info("Checking entire database");
         strcpy(wstr,"PRAGMA integrity_check;");
     }
 
@@ -240,9 +259,9 @@ static void rebuild_chart()
 {
     int rc;
     char *err_msg = NULL;
-    info("Rebuilding chart table");
+    netdata_log_info("Rebuilding chart table");
     for (int i = 0; rebuild_chart_commands[i]; i++) {
-        info("Executing %s", rebuild_chart_commands[i]);
+        netdata_log_info("Executing %s", rebuild_chart_commands[i]);
         rc = sqlite3_exec_monitored(db_meta, rebuild_chart_commands[i], 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
             error_report("SQLite error during database setup, rc = %d (%s)", rc, err_msg);
@@ -272,9 +291,9 @@ void rebuild_dimension()
     int rc;
     char *err_msg = NULL;
 
-    info("Rebuilding dimension table");
+    netdata_log_info("Rebuilding dimension table");
     for (int i = 0; rebuild_dimension_commands[i]; i++) {
-        info("Executing %s", rebuild_dimension_commands[i]);
+        netdata_log_info("Executing %s", rebuild_dimension_commands[i]);
         rc = sqlite3_exec_monitored(db_meta, rebuild_dimension_commands[i], 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
             error_report("SQLite error during database setup, rc = %d (%s)", rc, err_msg);
@@ -286,11 +305,11 @@ void rebuild_dimension()
 
 static int attempt_database_fix()
 {
-    info("Closing database and attempting to fix it");
+    netdata_log_info("Closing database and attempting to fix it");
     int rc = sqlite3_close(db_meta);
     if (rc != SQLITE_OK)
         error_report("Failed to close database, rc = %d", rc);
-    info("Attempting to fix database");
+    netdata_log_info("Attempting to fix database");
     db_meta = NULL;
     return sql_init_database(DB_CHECK_FIX_DB | DB_CHECK_CONT, 0);
 }
@@ -300,7 +319,7 @@ int init_database_batch(sqlite3 *database, int rebuild, int init_type, const cha
     int rc;
     char *err_msg = NULL;
     for (int i = 0; batch[i]; i++) {
-        debug(D_METADATALOG, "Executing %s", batch[i]);
+        netdata_log_debug(D_METADATALOG, "Executing %s", batch[i]);
         rc = sqlite3_exec_monitored(database, batch[i], 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
             error_report("SQLite error during database %s, rc = %d (%s)", init_type ? "cleanup" : "setup", rc, err_msg);
@@ -336,6 +355,30 @@ static void sqlite_uuid_parse(sqlite3_context *context, int argc, sqlite3_value 
     sqlite3_result_blob(context, &uuid, sizeof(uuid_t), SQLITE_TRANSIENT);
 }
 
+void sqlite_now_usec(sqlite3_context *context, int argc, sqlite3_value **argv)
+{
+    if (argc != 1 ){
+        sqlite3_result_null(context);
+        return ;
+    }
+
+    if (sqlite3_value_int(argv[0]) != 0) {
+        struct timespec req = {.tv_sec = 0, .tv_nsec = 1};
+        nanosleep(&req, NULL);
+    }
+
+    sqlite3_result_int64(context, (sqlite_int64) now_realtime_usec());
+}
+
+void sqlite_uuid_random(sqlite3_context *context, int argc, sqlite3_value **argv)
+{
+    (void)argc;
+    (void)argv;
+
+    uuid_t uuid;
+    uuid_generate_random(uuid);
+    sqlite3_result_blob(context, &uuid, sizeof(uuid_t), SQLITE_TRANSIENT);
+}
 
 /*
  * Initialize the SQLite database
@@ -363,7 +406,7 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     if (rebuild & (DB_CHECK_INTEGRITY | DB_CHECK_FIX_DB)) {
         int errors_detected = 0;
         if (!(rebuild & DB_CHECK_CONT))
-            info("Running database check on %s", sqlite_database);
+            netdata_log_info("Running database check on %s", sqlite_database);
 
         if (check_table_integrity("chart")) {
             errors_detected++;
@@ -389,7 +432,7 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
 
     if (rebuild & DB_CHECK_RECLAIM_SPACE) {
         if (!(rebuild & DB_CHECK_CONT))
-            info("Reclaiming space of %s", sqlite_database);
+            netdata_log_info("Reclaiming space of %s", sqlite_database);
         rc = sqlite3_exec_monitored(db_meta, "VACUUM;", 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
             error_report("Failed to execute VACUUM rc = %d (%s)", rc, err_msg);
@@ -400,10 +443,22 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     if (rebuild && !(rebuild & DB_CHECK_CONT))
         return 1;
 
-    info("SQLite database %s initialization", sqlite_database);
+    netdata_log_info("SQLite database %s initialization", sqlite_database);
 
     char buf[1024 + 1] = "";
     const char *list[2] = { buf, NULL };
+
+    rc = sqlite3_create_function(db_meta, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC, 0, sqlite_uuid_parse, 0, 0);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to register internal u2h function");
+
+    rc = sqlite3_create_function(db_meta, "now_usec", 1, SQLITE_ANY, 0, sqlite_now_usec, 0, 0);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to register internal now_usec function");
+
+    rc = sqlite3_create_function(db_meta, "uuid_random", 0, SQLITE_ANY, 0, sqlite_uuid_random, 0, 0);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to register internal uuid_random function");
 
     int target_version = DB_METADATA_VERSION;
 
@@ -450,13 +505,10 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     if (init_database_batch(db_meta, rebuild, 0, &database_cleanup[0]))
         return 1;
 
-    info("SQLite database initialization completed");
+    netdata_log_info("SQLite database initialization completed");
 
     initialize_thread_key_pool();
 
-    rc = sqlite3_create_function(db_meta, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC, 0, sqlite_uuid_parse, 0, 0);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to register internal u2h function");
     return 0;
 }
 
@@ -470,7 +522,7 @@ void sql_close_database(void)
     if (unlikely(!db_meta))
         return;
 
-    info("Closing SQLite database");
+    netdata_log_info("Closing SQLite database");
 
     add_stmt_to_list(NULL);
 
@@ -771,7 +823,7 @@ struct node_instance_list *get_node_list(void)
             uuid_unparse_lower(*host_id, host_guid);
             RRDHOST *host = rrdhost_find_by_guid(host_guid);
             if (rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)) {
-                info("ACLK: 'host:%s' skipping get node list because context is initializing", rrdhost_hostname(host));
+                netdata_log_info("ACLK: 'host:%s' skipping get node list because context is initializing", rrdhost_hostname(host));
                 continue;
             }
             uuid_copy(node_list[row].host_id, *host_id);
@@ -926,4 +978,20 @@ int sql_metadata_cache_stats(int op)
     sqlite3_db_status(db_meta, op, &count, &dummy, 0);
     netdata_thread_enable_cancelability();
     return count;
+}
+
+#define SQL_DROP_TABLE "DROP table %s;"
+
+void sql_drop_table(const char *table)
+{
+    if (!table)
+        return;
+
+    char wstr[255];
+    snprintfz(wstr, 254, SQL_DROP_TABLE, table);
+
+    int rc = sqlite3_exec_monitored(db_meta, wstr, 0, 0, NULL);
+    if (rc != SQLITE_OK) {
+        error_report("DES SQLite error during drop table operation for %s, rc = %d", table, rc);
+    }
 }

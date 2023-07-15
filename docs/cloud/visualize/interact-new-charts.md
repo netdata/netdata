@@ -251,7 +251,7 @@ Below each chart, there is an information ribbon. This ribbon currently shows 3 
    At least one of the dimensions in the chart has partial data, meaning that not all instances available contributed data to this point. This can happen when a container is stopped, or when a node is restarted. This indicator helps to gain confidence of the dataset, in situations when unusual spikes or dives appear due to infrastructure maintenance, or due to failures to part of the infrastructure.
 
 2. **[O]: Overflown**
-   At least one of the datasources included in the chart was a counter that has overflown that exactly that point.
+   At least one of the data sources included in the chart has a counter that has overflowed at this point.
 
 3. **[E]: Empty Data**
    At least one of the dimensions included in the chart has no data at all for the given points.

@@ -115,10 +115,9 @@ int init_prometheus_remote_write_instance(struct instance *instance)
     instance->connector_specific_data = simple_connector_data;
 
 #ifdef ENABLE_HTTPS
-    simple_connector_data->flags = NETDATA_SSL_START;
-    simple_connector_data->conn = NULL;
+    simple_connector_data->ssl = NETDATA_SSL_UNSET_CONNECTION;
     if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
-        security_start_ssl(NETDATA_SSL_CONTEXT_EXPORTING);
+        netdata_ssl_initialize_ctx(NETDATA_SSL_EXPORTING_CTX);
     }
 #endif
 
@@ -235,7 +234,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
     struct prometheus_remote_write_specific_data *connector_specific_data =
         (struct prometheus_remote_write_specific_data *)simple_connector_data->connector_specific_data;
 
-    if (rd->collections_counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
+    if (rd->collector.counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
         char name[PROMETHEUS_LABELS_MAX + 1];
         char dimension[PROMETHEUS_ELEMENT_MAX + 1];
         char *suffix = "";
@@ -244,14 +243,14 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
         if (as_collected) {
             // we need as-collected / raw data
 
-            if (unlikely(rd->last_collected_time.tv_sec < instance->after)) {
-                debug(
+            if (unlikely(rd->collector.last_collected_time.tv_sec < instance->after)) {
+                netdata_log_debug(
                     D_EXPORTING,
                     "EXPORTING: not sending dimension '%s' of chart '%s' from host '%s', "
                     "its last data collection (%lu) is not within our timeframe (%lu to %lu)",
                     rrddim_id(rd), rrdset_id(rd->rrdset),
                     (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
-                    (unsigned long)rd->last_collected_time.tv_sec,
+                    (unsigned long)rd->collector.last_collected_time.tv_sec,
                     (unsigned long)instance->after,
                     (unsigned long)instance->before);
                 return 0;
@@ -273,10 +272,10 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                 snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s", instance->config.prefix, context, suffix);
 
                 add_metric(
-                    connector_specific_data->write_request,
-                    name, chart, family, dimension,
+                        connector_specific_data->write_request,
+                        name, chart, family, dimension,
                     (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
-                    rd->last_collected_value, timeval_msec(&rd->last_collected_time));
+                        rd->collector.last_collected_value, timeval_msec(&rd->collector.last_collected_time));
             } else {
                 // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
                 // we create a metric per dimension
@@ -290,10 +289,10 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                     suffix);
 
                 add_metric(
-                    connector_specific_data->write_request,
-                    name, chart, family, NULL,
+                        connector_specific_data->write_request,
+                        name, chart, family, NULL,
                     (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
-                    rd->last_collected_value, timeval_msec(&rd->last_collected_time));
+                        rd->collector.last_collected_value, timeval_msec(&rd->collector.last_collected_time));
             }
         } else {
             // we need average or sum of the data
@@ -387,7 +386,7 @@ int format_batch_prometheus_remote_write(struct instance *instance)
     size_t data_size = get_write_request_size(connector_specific_data->write_request);
 
     if (unlikely(!data_size)) {
-        error("EXPORTING: write request size is out of range");
+        netdata_log_error("EXPORTING: write request size is out of range");
         return 1;
     }
 
@@ -395,7 +394,7 @@ int format_batch_prometheus_remote_write(struct instance *instance)
 
     buffer_need_bytes(buffer, data_size);
     if (unlikely(pack_and_clear_write_request(connector_specific_data->write_request, buffer->buffer, &data_size))) {
-        error("EXPORTING: cannot pack write request");
+        netdata_log_error("EXPORTING: cannot pack write request");
         return 1;
     }
     buffer->len = data_size;

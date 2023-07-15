@@ -4,8 +4,9 @@
 #include <stdint.h>
 #include "libnetdata/avl/avl.h"
 
-// Module name
+// Module name & description
 #define NETDATA_EBPF_MODULE_NAME_SOCKET "socket"
+#define NETDATA_EBPF_SOCKET_MODULE_DESC "Monitors TCP and UDP bandwidth. This thread is integrated with apps and cgroup."
 
 // Vector indexes
 #define NETDATA_UDP_START 3

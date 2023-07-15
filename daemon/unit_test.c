@@ -1325,7 +1325,7 @@ int run_test(struct test *test)
         // align the first entry to second boundary
         if(!c) {
             fprintf(stderr, "    > %s: fixing first collection time to be %llu microseconds to second boundary\n", test->name, test->feed[c].microseconds);
-            rd->last_collected_time.tv_usec = st->last_collected_time.tv_usec = st->last_updated.tv_usec = test->feed[c].microseconds;
+            rd->collector.last_collected_time.tv_usec = st->last_collected_time.tv_usec = st->last_updated.tv_usec = test->feed[c].microseconds;
             // time_start = st->last_collected_time.tv_sec;
         }
     }
@@ -1334,13 +1334,14 @@ int run_test(struct test *test)
     int errors = 0;
 
     if(st->counter != test->result_entries) {
-        fprintf(stderr, "    %s stored %zu entries, but we were expecting %lu, ### E R R O R ###\n", test->name, st->counter, test->result_entries);
+        fprintf(stderr, "    %s stored %u entries, but we were expecting %lu, ### E R R O R ###\n",
+                test->name, st->counter, test->result_entries);
         errors++;
     }
 
     unsigned long max = (st->counter < test->result_entries)?st->counter:test->result_entries;
     for(c = 0 ; c < max ; c++) {
-        NETDATA_DOUBLE v = unpack_storage_number(rd->db[c]);
+        NETDATA_DOUBLE v = unpack_storage_number(rd->db.data[c]);
         NETDATA_DOUBLE n = unpack_storage_number(pack_storage_number(test->results[c], SN_DEFAULT_FLAGS));
         int same = (roundndd(v * 10000000.0) == roundndd(n * 10000000.0))?1:0;
         fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
@@ -1352,7 +1353,7 @@ int run_test(struct test *test)
         if(!same) errors++;
 
         if(rd2) {
-            v = unpack_storage_number(rd2->db[c]);
+            v = unpack_storage_number(rd2->db.data[c]);
             n = test->results2[c];
             same = (roundndd(v * 10000000.0) == roundndd(n * 10000000.0))?1:0;
             fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
@@ -1584,7 +1585,7 @@ int unit_test(long delay, long shift)
 
         // prevent it from deleting the dimensions
         rrddim_foreach_read(rd, st) {
-            rd->last_collected_time.tv_sec = st->last_collected_time.tv_sec;
+            rd->collector.last_collected_time.tv_sec = st->last_collected_time.tv_sec;
         }
         rrddim_foreach_done(rd);
 
@@ -1602,7 +1603,7 @@ int unit_test(long delay, long shift)
         fprintf(stderr, "\nPOSITION: c = %lu, EXPECTED VALUE %lu\n", c, (oincrement + c * increment + increment * (1000000 - shift) / 1000000 )* 10);
 
         rrddim_foreach_read(rd, st) {
-            sn = rd->db[c];
+            sn = rd->db.data[c];
             cn = unpack_storage_number(sn);
             fprintf(stderr, "\t %s " NETDATA_DOUBLE_FORMAT " (PACKED AS " STORAGE_NUMBER_FORMAT ")   ->   ", rrddim_id(rd), cn, sn);
 
@@ -1661,6 +1662,18 @@ int test_sqlite(void) {
         return 1;
     }
 
+    rc = sqlite3_create_function(db_meta, "now_usec", 1, SQLITE_ANY, 0, sqlite_now_usec, 0, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        fprintf(stderr, "Failed to register internal now_usec function");
+        return 1;
+    }
+
+    rc = sqlite3_exec_monitored(db_meta, "UPDATE MINE SET id1=now_usec(0);", 0, 0, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr,"Failed to test SQLite: Update with now_usec() failed\n");
+        return 1;
+    }
+
     BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE, NULL);
     char *uuid_str = "0000_000";
 
@@ -1688,145 +1701,129 @@ error:
     return 1;
 }
 
-int unit_test_bitmap256(void) {
+static int bitmapX_test(BITMAPX *ptr, char *expected, const char *msg) {
+    int errors = 0;
+
+    for(uint32_t idx = 0; idx < ptr->bits ; idx++) {
+        bool found_set = bitmapX_get_bit(ptr, idx);
+        bool expected_set = expected[idx];
+
+        if(found_set != expected_set) {
+            fprintf(stderr, " >>> %s(): %s, bit %u is expected %s but found %s\n",
+                    __FUNCTION__, msg, idx, expected_set?"SET":"UNSET", found_set?"SET":"UNSET");
+            errors++;
+        }
+    }
+
+    if(errors)
+        fprintf(stderr,"%s(): %s, found %d errors\n",
+                __FUNCTION__, msg, errors);
+
+    return errors;
+}
+
+#define bitmapX_set_bit_and_track(ptr, bit, value, expected) do { \
+    bitmapX_set_bit(ptr, bit, value);                             \
+    (expected)[bit] = value;                                      \
+} while(0)
+
+int unit_test_bitmaps(void) {
     fprintf(stderr, "%s() running...\n", __FUNCTION__ );
 
-    BITMAP256 test_bitmap = {0};
+    int errors = 0;
 
-    bitmap256_set_bit(&test_bitmap, 0, 1);
-    bitmap256_set_bit(&test_bitmap, 64, 1);
-    bitmap256_set_bit(&test_bitmap, 128, 1);
-    bitmap256_set_bit(&test_bitmap, 192, 1);
-    if (test_bitmap.data[0] == 1)
-        fprintf(stderr, "%s() INDEX 1 is OK\n", __FUNCTION__ );
-    if (test_bitmap.data[1] == 1)
-        fprintf(stderr, "%s() INDEX 65 is OK\n", __FUNCTION__ );
-    if (test_bitmap.data[2] == 1)
-        fprintf(stderr, "%s() INDEX 129 is OK\n", __FUNCTION__ );
-    if (test_bitmap.data[3] == 1)
-        fprintf(stderr, "%s() INDEX 192 is OK\n", __FUNCTION__ );
+    char expected[8192];
 
-    uint8_t i=0;
-    int j = 0;
-    do {
-        bitmap256_set_bit(&test_bitmap, i++, 1);
-        j++;
-    } while (j < 256);
+    BITMAP256 bmp256 = BITMAP256_INITIALIZER;
+    BITMAP1024 bmp1024 = BITMAP1024_INITIALIZER;
+    BITMAPX *bmp = NULL;
 
-    if (test_bitmap.data[0] == 0xffffffffffffffff)
-        fprintf(stderr, "%s() INDEX 0 is fully set OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 0 is %"PRIu64" expected 0xffffffffffffffff\n", __FUNCTION__, test_bitmap.data[0]);
-        return 1;
+    for(int x = 0; x < 3 ; x++) {
+        char msg[100 + 1];
+
+        switch (x) {
+            default:
+            case 0:
+                bmp = (BITMAPX *) &bmp256;
+                break;
+
+            case 1:
+                bmp = (BITMAPX *) &bmp1024;
+                break;
+
+            case 2:
+                bmp = bitmapX_create(8192);
+                break;
+        }
+
+        // reset
+        memset(expected, 0, bmp->bits);
+        memset(bmp->data, 0, bmp->bits / 8);
+
+        snprintf(msg, 100, "TEST 1 BITMAP %u", bmp->bits);
+        bitmapX_set_bit_and_track(bmp, 0, true, expected);
+        errors += bitmapX_test(bmp, expected, msg);
+
+        snprintf(msg, 100, "TEST 2 BITMAP %u", bmp->bits);
+        bitmapX_set_bit_and_track(bmp, 64, true, expected);
+        errors += bitmapX_test(bmp, expected, msg);
+
+        snprintf(msg, 100, "TEST 3 BITMAP %u", bmp->bits);
+        bitmapX_set_bit_and_track(bmp, 128, true, expected);
+        errors += bitmapX_test(bmp, expected, msg);
+
+        snprintf(msg, 100, "TEST 4 BITMAP %u", bmp->bits);
+        bitmapX_set_bit_and_track(bmp, 192, true, expected);
+        errors += bitmapX_test(bmp, expected, msg);
+
+        for (uint32_t step = 1; step < 256; step++) {
+            snprintf(msg, 100, "TEST 5 (setting) BITMAP %u STEP %u", bmp->bits, step);
+
+            // reset
+            memset(expected, 0, bmp->bits);
+            memset(bmp->data, 0, bmp->bits / 8);
+
+            for (uint32_t i = 0; i < bmp->bits ; i += step)
+                bitmapX_set_bit_and_track(bmp, i, true, expected);
+
+            errors += bitmapX_test(bmp, expected, msg);
+        }
+
+        for (uint32_t step = 1; step < 256; step++) {
+            snprintf(msg, 100, "TEST 6 (clearing) BITMAP %u STEP %u", bmp->bits, step);
+
+            // reset
+            memset(expected, 0, bmp->bits);
+            memset(bmp->data, 0, bmp->bits / 8);
+
+            for (uint32_t i = 0; i < bmp->bits ; i++)
+                bitmapX_set_bit_and_track(bmp, i, true, expected);
+
+            for (uint32_t i = 0; i < bmp->bits ; i += step)
+                bitmapX_set_bit_and_track(bmp, i, false, expected);
+
+            errors += bitmapX_test(bmp, expected, msg);
+        }
     }
 
-    if (test_bitmap.data[1] == 0xffffffffffffffff)
-        fprintf(stderr, "%s() INDEX 1 is fully set OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 1 is %"PRIu64" expected 0xffffffffffffffff\n", __FUNCTION__, test_bitmap.data[0]);
-        return 1;
-    }
+    freez(bmp);
 
-    if (test_bitmap.data[2] == 0xffffffffffffffff)
-        fprintf(stderr, "%s() INDEX 2 is fully set OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 2 is %"PRIu64" expected 0xffffffffffffffff\n", __FUNCTION__, test_bitmap.data[0]);
-        return 1;
-    }
-
-    if (test_bitmap.data[3] == 0xffffffffffffffff)
-        fprintf(stderr, "%s() INDEX 3 is fully set OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 3 is %"PRIu64" expected 0xffffffffffffffff\n", __FUNCTION__, test_bitmap.data[0]);
-        return 1;
-    }
-
-    i = 0;
-    j = 0;
-    do {
-        bitmap256_set_bit(&test_bitmap, i++, 0);
-        j++;
-    } while (j < 256);
-
-    if (test_bitmap.data[0] == 0)
-        fprintf(stderr, "%s() INDEX 0 is reset OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 0 is not reset FAILED\n", __FUNCTION__);
-        return 1;
-    }
-    if (test_bitmap.data[1] == 0)
-        fprintf(stderr, "%s() INDEX 1 is reset OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 1 is not reset FAILED\n", __FUNCTION__);
-        return 1;
-    }
-
-    if (test_bitmap.data[2] == 0)
-        fprintf(stderr, "%s() INDEX 2 is reset OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 2 is not reset FAILED\n", __FUNCTION__);
-        return 1;
-    }
-
-    if (test_bitmap.data[3] == 0)
-        fprintf(stderr, "%s() INDEX 3 is reset OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 3 is not reset FAILED\n", __FUNCTION__);
-        return 1;
-    }
-
-    i=0;
-    j = 0;
-    do {
-        bitmap256_set_bit(&test_bitmap, i, 1);
-        i += 4;
-        j += 4;
-    } while (j < 256);
-
-    if (test_bitmap.data[0] == 0x1111111111111111)
-        fprintf(stderr, "%s() INDEX 0 is 0x1111111111111111 set OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 0 is %"PRIu64" expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[0]);
-        return 1;
-    }
-
-    if (test_bitmap.data[1] == 0x1111111111111111)
-        fprintf(stderr, "%s() INDEX 1 is 0x1111111111111111 set OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 1 is %"PRIu64" expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[1]);
-        return 1;
-    }
-
-    if (test_bitmap.data[2] == 0x1111111111111111)
-        fprintf(stderr, "%s() INDEX 2 is 0x1111111111111111 set OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 2 is %"PRIu64" expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[2]);
-        return 1;
-    }
-
-    if (test_bitmap.data[3] == 0x1111111111111111)
-        fprintf(stderr, "%s() INDEX 3 is 0x1111111111111111 set OK\n", __FUNCTION__);
-    else {
-        fprintf(stderr, "%s() INDEX 3 is %"PRIu64" expected 0x1111111111111111\n", __FUNCTION__, test_bitmap.data[3]);
-        return 1;
-    }
-
-    fprintf(stderr, "%s() tests passed\n", __FUNCTION__);
-    return 0;
+    fprintf(stderr, "%s() %d errors\n", __FUNCTION__, errors);
+    return errors;
 }
 
 #ifdef ENABLE_DBENGINE
 static inline void rrddim_set_by_pointer_fake_time(RRDDIM *rd, collected_number value, time_t now)
 {
-    rd->last_collected_time.tv_sec = now;
-    rd->last_collected_time.tv_usec = 0;
-    rd->collected_value = value;
-    rd->updated = 1;
+    rd->collector.last_collected_time.tv_sec = now;
+    rd->collector.last_collected_time.tv_usec = 0;
+    rd->collector.collected_value = value;
+    rrddim_set_updated(rd);
 
-    rd->collections_counter++;
+    rd->collector.counter++;
 
     collected_number v = (value >= 0) ? value : -value;
-    if(unlikely(v > rd->collected_value_max)) rd->collected_value_max = v;
+    if(unlikely(v > rd->collector.collected_value_max)) rd->collector.collected_value_max = v;
 }
 
 static RRDHOST *dbengine_rrdhost_find_or_create(char *name)
@@ -1898,9 +1895,9 @@ static void test_dbengine_create_charts(RRDHOST *host, RRDSET *st[CHARTS], RRDDI
     // Initialize DB with the very first entries
     for (i = 0 ; i < CHARTS ; ++i) {
         for (j = 0 ; j < DIMS ; ++j) {
-            rd[i][j]->last_collected_time.tv_sec =
+            rd[i][j]->collector.last_collected_time.tv_sec =
             st[i]->last_collected_time.tv_sec = st[i]->last_updated.tv_sec = 2 * API_RELATIVE_TIME_MAX - 1;
-            rd[i][j]->last_collected_time.tv_usec =
+            rd[i][j]->collector.last_collected_time.tv_usec =
             st[i]->last_collected_time.tv_usec = st[i]->last_updated.tv_usec = 0;
         }
     }
@@ -1939,9 +1936,9 @@ static time_t test_dbengine_create_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS
         for (j = 0 ; j < DIMS ; ++j) {
             storage_engine_store_change_collection_frequency(rd[i][j]->tiers[0].db_collection_handle, update_every);
 
-            rd[i][j]->last_collected_time.tv_sec =
+            rd[i][j]->collector.last_collected_time.tv_sec =
             st[i]->last_collected_time.tv_sec = st[i]->last_updated.tv_sec = time_now;
-            rd[i][j]->last_collected_time.tv_usec =
+            rd[i][j]->collector.last_collected_time.tv_usec =
             st[i]->last_collected_time.tv_usec = st[i]->last_updated.tv_usec = 0;
         }
     }
@@ -2305,9 +2302,9 @@ static void generate_dbengine_chart(void *arg)
     // feed it with the test data
     time_current = time_present - history_seconds;
     for (j = 0 ; j < DSET_DIMS ; ++j) {
-        rd[j]->last_collected_time.tv_sec =
+        rd[j]->collector.last_collected_time.tv_sec =
         st->last_collected_time.tv_sec = st->last_updated.tv_sec = time_current - update_every;
-        rd[j]->last_collected_time.tv_usec =
+        rd[j]->collector.last_collected_time.tv_usec =
         st->last_collected_time.tv_usec = st->last_updated.tv_usec = 0;
     }
     for( ; !thread_info->done && time_current < time_present ; time_current += update_every) {

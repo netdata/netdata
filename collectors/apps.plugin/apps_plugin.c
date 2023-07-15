@@ -106,6 +106,7 @@ static int
         enable_file_charts = 1,
         max_fds_cache_seconds = 60,
 #endif
+        enable_function_cmdline = 0,
         enable_detailed_uptime_charts = 0,
         enable_users_charts = 1,
         enable_groups_charts = 1,
@@ -665,7 +666,7 @@ int read_user_or_group_ids(struct user_or_group_ids *ids, struct timespec *last_
         }
         else {
             if(unlikely(avl_insert(&ids->index, (avl_t *) user_or_group_id) != (void *) user_or_group_id)) {
-                error("INTERNAL ERROR: duplicate indexing of id during realloc");
+                netdata_log_error("INTERNAL ERROR: duplicate indexing of id during realloc");
             };
 
             user_or_group_id->next = ids->root;
@@ -681,7 +682,7 @@ int read_user_or_group_ids(struct user_or_group_ids *ids, struct timespec *last_
     while(user_or_group_id) {
         if(unlikely(!user_or_group_id->updated)) {
             if(unlikely((struct user_or_group_id *)avl_remove(&ids->index, (avl_t *) user_or_group_id) != user_or_group_id))
-                error("INTERNAL ERROR: removal of unused id from index, removed a different id");
+                netdata_log_error("INTERNAL ERROR: removal of unused id from index, removed a different id");
 
             if(prev_user_id)
                 prev_user_id->next = user_or_group_id->next;
@@ -946,7 +947,7 @@ static int read_apps_groups_conf(const char *path, const char *file)
             // add this target
             struct target *n = get_apps_groups_target(s, w, name);
             if(!n) {
-                error("Cannot create target '%s' (line %zu, word %zu)", s, line, word);
+                netdata_log_error("Cannot create target '%s' (line %zu, word %zu)", s, line, word);
                 continue;
             }
 
@@ -996,7 +997,7 @@ static inline void del_pid_entry(pid_t pid) {
     struct pid_stat *p = all_pids[pid];
 
     if(unlikely(!p)) {
-        error("attempted to free pid %d that is not allocated.", pid);
+        netdata_log_error("attempted to free pid %d that is not allocated.", pid);
         return;
     }
 
@@ -1034,7 +1035,7 @@ static inline void del_pid_entry(pid_t pid) {
 
 static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
     if(unlikely(!status)) {
-        // error("command failed log %u, errno %d", log, errno);
+        // netdata_log_error("command failed log %u, errno %d", log, errno);
 
         if(unlikely(debug_enabled || errno != ENOENT)) {
             if(unlikely(debug_enabled || !(p->log_thrown & log))) {
@@ -1042,33 +1043,33 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
                 switch(log) {
                     case PID_LOG_IO:
                         #ifdef __FreeBSD__
-                        error("Cannot fetch process %d I/O info (command '%s')", p->pid, p->comm);
+                        netdata_log_error("Cannot fetch process %d I/O info (command '%s')", p->pid, p->comm);
                         #else
-                        error("Cannot process %s/proc/%d/io (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
+                        netdata_log_error("Cannot process %s/proc/%d/io (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
                         #endif
                         break;
 
                     case PID_LOG_STATUS:
                         #ifdef __FreeBSD__
-                        error("Cannot fetch process %d status info (command '%s')", p->pid, p->comm);
+                        netdata_log_error("Cannot fetch process %d status info (command '%s')", p->pid, p->comm);
                         #else
-                        error("Cannot process %s/proc/%d/status (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
+                        netdata_log_error("Cannot process %s/proc/%d/status (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
                         #endif
                         break;
 
                     case PID_LOG_CMDLINE:
                         #ifdef __FreeBSD__
-                        error("Cannot fetch process %d command line (command '%s')", p->pid, p->comm);
+                        netdata_log_error("Cannot fetch process %d command line (command '%s')", p->pid, p->comm);
                         #else
-                        error("Cannot process %s/proc/%d/cmdline (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
+                        netdata_log_error("Cannot process %s/proc/%d/cmdline (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
                         #endif
                         break;
 
                     case PID_LOG_FDS:
                         #ifdef __FreeBSD__
-                        error("Cannot fetch process %d files (command '%s')", p->pid, p->comm);
+                        netdata_log_error("Cannot fetch process %d files (command '%s')", p->pid, p->comm);
                         #else
-                        error("Cannot process entries in %s/proc/%d/fd (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
+                        netdata_log_error("Cannot process entries in %s/proc/%d/fd (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
                         #endif
                         break;
 
@@ -1076,7 +1077,7 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
                         break;
 
                     default:
-                        error("unhandled error for pid %d, command '%s'", p->pid, p->comm);
+                        netdata_log_error("unhandled error for pid %d, command '%s'", p->pid, p->comm);
                         break;
                 }
             }
@@ -1084,7 +1085,7 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
         errno = 0;
     }
     else if(unlikely(p->log_thrown & log)) {
-        // error("unsetting log %u on pid %d", log, p->pid);
+        // netdata_log_error("unsetting log %u on pid %d", log, p->pid);
         p->log_thrown &= ~log;
     }
 
@@ -1470,7 +1471,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
 
     if(enable_guest_charts) {
         enable_guest_charts = 0;
-        info("Guest charts aren't supported by FreeBSD");
+        netdata_log_info("Guest charts aren't supported by FreeBSD");
     }
 #else
     pid_incremental_rate(stat, p->minflt,  str2kernel_uint_t(procfile_lineword(ff, 0,  9)));
@@ -1732,7 +1733,7 @@ cleanup:
 int file_descriptor_compare(void* a, void* b) {
 #ifdef NETDATA_INTERNAL_CHECKS
     if(((struct file_descriptor *)a)->magic != 0x0BADCAFE || ((struct file_descriptor *)b)->magic != 0x0BADCAFE)
-        error("Corrupted index data detected. Please report this.");
+        netdata_log_error("Corrupted index data detected. Please report this.");
 #endif /* NETDATA_INTERNAL_CHECKS */
 
     if(((struct file_descriptor *)a)->hash < ((struct file_descriptor *)b)->hash)
@@ -1776,7 +1777,7 @@ static inline void file_descriptor_not_used(int id)
 
 #ifdef NETDATA_INTERNAL_CHECKS
         if(all_files[id].magic != 0x0BADCAFE) {
-            error("Ignoring request to remove empty file id %d.", id);
+            netdata_log_error("Ignoring request to remove empty file id %d.", id);
             return;
         }
 #endif /* NETDATA_INTERNAL_CHECKS */
@@ -1790,7 +1791,7 @@ static inline void file_descriptor_not_used(int id)
                 debug_log("  >> slot %d is empty.", id);
 
                 if(unlikely(file_descriptor_remove(&all_files[id]) != (void *)&all_files[id]))
-                    error("INTERNAL ERROR: removal of unused fd from index, removed a different fd");
+                    netdata_log_error("INTERNAL ERROR: removal of unused fd from index, removed a different fd");
 
 #ifdef NETDATA_INTERNAL_CHECKS
                 all_files[id].magic = 0x00000000;
@@ -1799,9 +1800,14 @@ static inline void file_descriptor_not_used(int id)
             }
         }
         else
-            error("Request to decrease counter of fd %d (%s), while the use counter is 0", id, all_files[id].name);
+            netdata_log_error("Request to decrease counter of fd %d (%s), while the use counter is 0",
+                              id,
+                              all_files[id].name);
     }
-    else    error("Request to decrease counter of fd %d, which is outside the array size (1 to %d)", id, all_files_size);
+    else
+        netdata_log_error("Request to decrease counter of fd %d, which is outside the array size (1 to %d)",
+                          id,
+                          all_files_size);
 }
 
 static inline void all_files_grow() {
@@ -1823,7 +1829,7 @@ static inline void all_files_grow() {
         for(i = 0; i < all_files_size; i++) {
             if(!all_files[i].count) continue;
             if(unlikely(file_descriptor_add(&all_files[i]) != (void *)&all_files[i]))
-                error("INTERNAL ERROR: duplicate indexing of fd during realloc.");
+                netdata_log_error("INTERNAL ERROR: duplicate indexing of fd during realloc.");
         }
 
         debug_log("  >> re-indexing done.");
@@ -1864,7 +1870,7 @@ static inline int file_descriptor_set_on_empty_slot(const char *name, uint32_t h
 
 #ifdef NETDATA_INTERNAL_CHECKS
             if(all_files[c].magic == 0x0BADCAFE && all_files[c].name && file_descriptor_find(all_files[c].name, all_files[c].hash))
-                error("fd on position %d is not cleared properly. It still has %s in it.", c, all_files[c].name);
+                netdata_log_error("fd on position %d is not cleared properly. It still has %s in it.", c, all_files[c].name);
 #endif /* NETDATA_INTERNAL_CHECKS */
 
             debug_log("  >> %s fd position %d for %s (last name: %s)", all_files[c].name?"re-using":"using", c, name, all_files[c].name);
@@ -1895,7 +1901,7 @@ static inline int file_descriptor_set_on_empty_slot(const char *name, uint32_t h
     all_files[c].magic = 0x0BADCAFE;
 #endif /* NETDATA_INTERNAL_CHECKS */
     if(unlikely(file_descriptor_add(&all_files[c]) != (void *)&all_files[c]))
-        error("INTERNAL ERROR: duplicate indexing of fd.");
+        netdata_log_error("INTERNAL ERROR: duplicate indexing of fd.");
 
     debug_log("using fd position %d (name: %s)", c, all_files[c].name);
 
@@ -2013,13 +2019,13 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
     mib[3] = p->pid;
 
     if (unlikely(sysctl(mib, 4, NULL, &size, NULL, 0))) {
-        error("sysctl error: Can't get file descriptors data size for pid %d", p->pid);
+        netdata_log_error("sysctl error: Can't get file descriptors data size for pid %d", p->pid);
         return 0;
     }
     if (likely(size > 0))
         fdsbuf = reallocz(fdsbuf, size);
     if (unlikely(sysctl(mib, 4, fdsbuf, &size, NULL, 0))) {
-        error("sysctl error: Can't get file descriptors data for pid %d", p->pid);
+        netdata_log_error("sysctl error: Can't get file descriptors data for pid %d", p->pid);
         return 0;
     }
 
@@ -2192,7 +2198,7 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
             // cannot read the link
 
             if(debug_enabled || (p->target && p->target->debug_enabled))
-                error("Cannot read link %s", p->fds[fdid].filename);
+                netdata_log_error("Cannot read link %s", p->fds[fdid].filename);
 
             if(unlikely(p->fds[fdid].fd < 0)) {
                 file_descriptor_not_used(-p->fds[fdid].fd);
@@ -2523,7 +2529,7 @@ static inline void link_all_processes_to_their_parents(void) {
         }
         else {
             p->parent = NULL;
-            error("pid %d %s states parent %d, but the later does not exist.", p->pid, p->comm, p->ppid);
+            netdata_log_error("pid %d %s states parent %d, but the later does not exist.", p->pid, p->comm, p->ppid);
         }
     }
 }
@@ -2561,7 +2567,7 @@ static int compar_pid(const void *pid1, const void *pid2) {
 
 static inline int collect_data_for_pid(pid_t pid, void *ptr) {
     if(unlikely(pid < 0 || pid > pid_max)) {
-        error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, 0, pid_max);
+        netdata_log_error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, 0, pid_max);
         return 0;
     }
 
@@ -2580,7 +2586,7 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
 
     // check its parent pid
     if(unlikely(p->ppid < 0 || p->ppid > pid_max)) {
-        error("Pid %d (command '%s') states invalid parent pid %d. Using 0.", pid, p->comm, p->ppid);
+        netdata_log_error("Pid %d (command '%s') states invalid parent pid %d. Using 0.", pid, p->comm, p->ppid);
         p->ppid = 0;
     }
 
@@ -2632,7 +2638,7 @@ static int collect_data_for_all_processes(void) {
 
     int mib[3] = { CTL_KERN, KERN_PROC, KERN_PROC_PROC };
     if (unlikely(sysctl(mib, 3, NULL, &new_procbase_size, NULL, 0))) {
-        error("sysctl error: Can't get processes data size");
+        netdata_log_error("sysctl error: Can't get processes data size");
         return 0;
     }
 
@@ -2652,7 +2658,7 @@ static int collect_data_for_all_processes(void) {
 
     // get the processes from the system
     if (unlikely(sysctl(mib, 3, procbase, &new_procbase_size, NULL, 0))) {
-        error("sysctl error: Can't get processes data");
+        netdata_log_error("sysctl error: Can't get processes data");
         return 0;
     }
 
@@ -2680,7 +2686,7 @@ static int collect_data_for_all_processes(void) {
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
         if(unlikely(slc != all_pids_count)) {
-            error("Internal error: I was thinking I had %zu processes in my arrays, but it seems there are %zu.", all_pids_count, slc);
+            netdata_log_error("Internal error: I was thinking I had %zu processes in my arrays, but it seems there are %zu.", all_pids_count, slc);
             all_pids_count = slc;
         }
 
@@ -3104,7 +3110,7 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
     }
 
     if(unlikely(!w)) {
-        error("pid %d %s was left without a target!", p->pid, p->comm);
+        netdata_log_error("pid %d %s was left without a target!", p->pid, p->comm);
         return;
     }
 
@@ -4122,6 +4128,10 @@ static void parse_args(int argc, char **argv)
             enable_detailed_uptime_charts = 1;
             continue;
         }
+        if(strcmp("with-function-cmdline", argv[i]) == 0) {
+            enable_function_cmdline = 1;
+            continue;
+        }
 
         if(strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {
             fprintf(stderr,
@@ -4138,6 +4148,11 @@ static void parse_args(int argc, char **argv)
                     " SECONDS                set the data collection frequency\n"
                     "\n"
                     " debug                  enable debugging (lot of output)\n"
+                    "\n"
+                    " with-function-cmdline  enable reporting the complete command line for processes\n"
+                    "                        it includes the command and passed arguments\n"
+                    "                        it may include sensitive data such as passwords and tokens\n"
+                    "                        enabling this could be a security risk\n"
                     "\n"
                     " with-childs\n"
                     " without-childs         enable / disable aggregating exited\n"
@@ -4177,35 +4192,35 @@ static void parse_args(int argc, char **argv)
             exit(1);
         }
 
-        error("Cannot understand option %s", argv[i]);
+        netdata_log_error("Cannot understand option %s", argv[i]);
         exit(1);
     }
 
     if(freq > 0) update_every = freq;
 
     if(read_apps_groups_conf(user_config_dir, "groups")) {
-        info("Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'", user_config_dir, stock_config_dir);
+        netdata_log_info("Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'", user_config_dir, stock_config_dir);
 
         if(read_apps_groups_conf(stock_config_dir, "groups")) {
-            error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.", stock_config_dir);
+            netdata_log_error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.", stock_config_dir);
             exit(1);
         }
         else
-            info("Loaded config file '%s/apps_groups.conf'", stock_config_dir);
+            netdata_log_info("Loaded config file '%s/apps_groups.conf'", stock_config_dir);
     }
     else
-        info("Loaded config file '%s/apps_groups.conf'", user_config_dir);
+        netdata_log_info("Loaded config file '%s/apps_groups.conf'", user_config_dir);
 }
 
 static int am_i_running_as_root() {
     uid_t uid = getuid(), euid = geteuid();
 
     if(uid == 0 || euid == 0) {
-        if(debug_enabled) info("I am running with escalated privileges, uid = %u, euid = %u.", uid, euid);
+        if(debug_enabled) netdata_log_info("I am running with escalated privileges, uid = %u, euid = %u.", uid, euid);
         return 1;
     }
 
-    if(debug_enabled) info("I am not running with escalated privileges, uid = %u, euid = %u.", uid, euid);
+    if(debug_enabled) netdata_log_info("I am not running with escalated privileges, uid = %u, euid = %u.", uid, euid);
     return 0;
 }
 
@@ -4213,40 +4228,40 @@ static int am_i_running_as_root() {
 static int check_capabilities() {
     cap_t caps = cap_get_proc();
     if(!caps) {
-        error("Cannot get current capabilities.");
+        netdata_log_error("Cannot get current capabilities.");
         return 0;
     }
     else if(debug_enabled)
-        info("Received my capabilities from the system.");
+        netdata_log_info("Received my capabilities from the system.");
 
     int ret = 1;
 
     cap_flag_value_t cfv = CAP_CLEAR;
     if(cap_get_flag(caps, CAP_DAC_READ_SEARCH, CAP_EFFECTIVE, &cfv) == -1) {
-        error("Cannot find if CAP_DAC_READ_SEARCH is effective.");
+        netdata_log_error("Cannot find if CAP_DAC_READ_SEARCH is effective.");
         ret = 0;
     }
     else {
         if(cfv != CAP_SET) {
-            error("apps.plugin should run with CAP_DAC_READ_SEARCH.");
+            netdata_log_error("apps.plugin should run with CAP_DAC_READ_SEARCH.");
             ret = 0;
         }
         else if(debug_enabled)
-            info("apps.plugin runs with CAP_DAC_READ_SEARCH.");
+            netdata_log_info("apps.plugin runs with CAP_DAC_READ_SEARCH.");
     }
 
     cfv = CAP_CLEAR;
     if(cap_get_flag(caps, CAP_SYS_PTRACE, CAP_EFFECTIVE, &cfv) == -1) {
-        error("Cannot find if CAP_SYS_PTRACE is effective.");
+        netdata_log_error("Cannot find if CAP_SYS_PTRACE is effective.");
         ret = 0;
     }
     else {
         if(cfv != CAP_SET) {
-            error("apps.plugin should run with CAP_SYS_PTRACE.");
+            netdata_log_error("apps.plugin should run with CAP_SYS_PTRACE.");
             ret = 0;
         }
         else if(debug_enabled)
-            info("apps.plugin runs with CAP_SYS_PTRACE.");
+            netdata_log_info("apps.plugin runs with CAP_SYS_PTRACE.");
     }
 
     cap_free(caps);
@@ -4356,32 +4371,6 @@ static void apps_plugin_function_processes_help(const char *transaction) {
     pluginsd_function_result_end_to_stdout();
 }
 
-#define add_table_field(wb, key, name, visible, type, visualization, transform, decimal_points, units, max, sort, sortable, sticky, unique_key, pointer_to, summary, range) do { \
-    buffer_json_member_add_object(wb, key);                                                                     \
-    buffer_json_member_add_uint64(wb, "index", fields_added);                                                   \
-    buffer_json_member_add_boolean(wb, "unique_key", unique_key);                                               \
-    buffer_json_member_add_string(wb, "name", name);                                                            \
-    buffer_json_member_add_boolean(wb, "visible", visible);                                                     \
-    buffer_json_member_add_string(wb, "type", type);                                                            \
-    buffer_json_member_add_string_or_omit(wb, "units", (char*)(units));                                         \
-    buffer_json_member_add_string(wb, "visualization", visualization);                                          \
-    buffer_json_member_add_object(wb, "value_options");                                                         \
-    buffer_json_member_add_string_or_omit(wb, "units", (char*)(units));                                         \
-    buffer_json_member_add_string(wb, "transform", transform);                                                  \
-    buffer_json_member_add_uint64(wb, "decimal_points", decimal_points);                                        \
-    buffer_json_object_close(wb);                                                                               \
-    if(!isnan((NETDATA_DOUBLE)(max)))                                                                           \
-       buffer_json_member_add_double(wb, "max", (NETDATA_DOUBLE)(max));                                         \
-    buffer_json_member_add_string_or_omit(wb, "pointer_to", (char *)(pointer_to));                              \
-    buffer_json_member_add_string(wb, "sort", sort);                                                            \
-    buffer_json_member_add_boolean(wb, "sortable", sortable);                                                   \
-    buffer_json_member_add_boolean(wb, "sticky", sticky);                                                       \
-    buffer_json_member_add_string(wb, "summary", summary);                                                      \
-    buffer_json_member_add_string(wb, "filter", (range)?"range":"multiselect");                                 \
-    buffer_json_object_close(wb);                                                                               \
-    fields_added++;                                                                                             \
-} while(0)
-
 #define add_value_field_llu_with_max(wb, key, value) do {                                                       \
     unsigned long long _tmp = (value);                                                                          \
     key ## _max = (rows == 0) ? (_tmp) : MAX(key ## _max, _tmp);                                                \
@@ -4398,7 +4387,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
     struct pid_stat *p;
 
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
-    size_t num_words = pluginsd_split_words(function, words, PLUGINSD_MAX_WORDS);
+    size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
 
     struct target *category = NULL, *user = NULL, *group = NULL;
     const char *process_name = NULL;
@@ -4553,7 +4542,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
 
         rows++;
 
-        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_array(wb); // for each pid
 
         // IMPORTANT!
         // THE ORDER SHOULD BE THE SAME WITH THE FIELDS!
@@ -4564,10 +4553,10 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         // cmd
         buffer_json_add_array_item_string(wb, p->comm);
 
-#ifdef NETDATA_DEV_MODE
         // cmdline
-        buffer_json_add_array_item_string(wb, (p->cmdline && *p->cmdline) ? p->cmdline : p->comm);
-#endif
+        if (enable_function_cmdline) {
+            buffer_json_add_array_item_string(wb, (p->cmdline && *p->cmdline) ? p->cmdline : p->comm);
+        }
 
         // ppid
         buffer_json_add_array_item_uint64(wb, p->ppid);
@@ -4649,94 +4638,300 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         add_value_field_llu_with_max(wb, Threads, p->num_threads);
         add_value_field_llu_with_max(wb, Uptime, p->uptime);
 
-        buffer_json_array_close(wb);
+        buffer_json_array_close(wb); // for each pid
     }
 
-    buffer_json_array_close(wb);
+    buffer_json_array_close(wb); // data
     buffer_json_member_add_object(wb, "columns");
 
     {
-        int fields_added = 0;
+        int field_id = 0;
 
         // IMPORTANT!
         // THE ORDER SHOULD BE THE SAME WITH THE VALUES!
-        add_table_field(wb, "PID", "Process ID", true, "integer", "value", "number", 0, NULL, NAN, "ascending", true, true, true, NULL, "count_unique", false);
-        add_table_field(wb, "Cmd", "Process Name", true, "string", "value", "none", 0, NULL, NAN, "ascending", true, true, false, NULL, "count_unique", false);
+        // wb, key, name, visible, type, visualization, transform, decimal_points, units, max, sort, sortable, sticky, unique_key, pointer_to, summary, range
+        buffer_rrdf_table_add_field(wb, field_id++, "PID", "Process ID", RRDF_FIELD_TYPE_INTEGER,
+                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY |
+                                    RRDF_FIELD_OPTS_UNIQUE_KEY, NULL);
 
-#ifdef NETDATA_DEV_MODE
-        add_table_field(wb, "CmdLine", "Command Line", false, "detail-string:Cmd", "value", "none", 0, NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
-#endif
-        add_table_field(wb, "PPID", "Parent Process ID", false, "integer", "value", "number", 0, NULL, NAN, "ascending", true, false, false, "PID", "count_unique", false);
-        add_table_field(wb, "Category", "Category (apps_groups.conf)", true, "string", "value", "none", 0, NULL, NAN, "ascending", true, true, false, NULL, "count_unique", false);
-        add_table_field(wb, "User", "User Owner", true, "string", "value", "none", 0, NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
-        add_table_field(wb, "Uid", "User ID", false, "integer", "value", "number", 0, NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
-        add_table_field(wb, "Group", "Group Owner", false, "string", "value", "none", 0, NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
-        add_table_field(wb, "Gid", "Group ID", false, "integer", "value", "number", 0, NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
+        buffer_rrdf_table_add_field(wb, field_id++, "Cmd", "Process Name", RRDF_FIELD_TYPE_STRING,
+                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
+
+        if (enable_function_cmdline) {
+            buffer_rrdf_table_add_field(wb, field_id++, "CmdLine", "Command Line", RRDF_FIELD_TYPE_STRING,
+                                        RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0,
+                                        NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                        RRDF_FIELD_FILTER_MULTISELECT,
+                                        RRDF_FIELD_OPTS_NONE, NULL);
+        }
+
+        buffer_rrdf_table_add_field(wb, field_id++, "PPID", "Parent Process ID", RRDF_FIELD_TYPE_INTEGER,
+                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL,
+                                    NAN, RRDF_FIELD_SORT_ASCENDING, "PID", RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Category", "Category (apps_groups.conf)", RRDF_FIELD_TYPE_STRING,
+                                    RRDF_FIELD_VISUAL_VALUE,
+                                    RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "User", "User Owner", RRDF_FIELD_TYPE_STRING,
+                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Uid", "User ID", RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Group", "Group Owner", RRDF_FIELD_TYPE_STRING,
+                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Gid", "Group ID", RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
 
         // CPU utilization
-        add_table_field(wb, "CPU", "Total CPU Time (100% = 1 core)", true, "bar-with-integer", "bar", "number", 2, "%", CPU_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "UserCPU", "User CPU time (100% = 1 core)", false, "bar-with-integer", "bar", "number", 2, "%", UserCPU_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "SysCPU", "System CPU Time (100% = 1 core)", false, "bar-with-integer", "bar", "number", 2, "%", SysCPU_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "GuestCPU", "Guest CPU Time (100% = 1 core)", false, "bar-with-integer", "bar", "number", 2, "%", GuestCPU_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "CUserCPU", "Children User CPU Time (100% = 1 core)", false, "bar-with-integer", "bar", "number", 2, "%", CUserCPU_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "CSysCPU", "Children System CPU Time (100% = 1 core)", false, "bar-with-integer", "bar", "number", 2, "%", CSysCPU_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "CGuestCPU", "Children Guest CPU Time (100% = 1 core)", false, "bar-with-integer", "bar", "number", 2, "%", CGuestCPU_max, "descending", true, false, false, NULL, "sum", true);
+        buffer_rrdf_table_add_field(wb, field_id++, "CPU", "Total CPU Time (100% = 1 core)",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", CPU_max, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "UserCPU", "User CPU time (100% = 1 core)",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", UserCPU_max,
+                                    RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "SysCPU", "System CPU Time (100% = 1 core)",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", SysCPU_max,
+                                    RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "GuestCPU", "Guest CPU Time (100% = 1 core)",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", GuestCPU_max,
+                                    RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "CUserCPU", "Children User CPU Time (100% = 1 core)",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", CUserCPU_max, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "CSysCPU", "Children System CPU Time (100% = 1 core)",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", CSysCPU_max, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "CGuestCPU", "Children Guest CPU Time (100% = 1 core)",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", CGuestCPU_max, RRDF_FIELD_SORT_DESCENDING,
+                                    NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_NONE, NULL);
 
         // CPU context switches
-        add_table_field(wb, "vCtxSwitch", "Voluntary Context Switches", false, "bar-with-integer", "bar", "number", 2, "switches/s", VoluntaryCtxtSwitches_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "iCtxSwitch", "Involuntary Context Switches", false, "bar-with-integer", "bar", "number", 2, "switches/s", NonVoluntaryCtxtSwitches_max, "descending", true, false, false, NULL, "sum", true);
+        buffer_rrdf_table_add_field(wb, field_id++, "vCtxSwitch", "Voluntary Context Switches",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2, "switches/s",
+                                    VoluntaryCtxtSwitches_max, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "iCtxSwitch", "Involuntary Context Switches",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2, "switches/s",
+                                    NonVoluntaryCtxtSwitches_max, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_NONE, NULL);
 
         // memory
-        if(MemTotal)
-            add_table_field(wb, "Memory", "Memory Percentage", true, "bar-with-integer", "bar", "number", 2, "%", 100.0, "descending", true, false, false, NULL, "sum", true);
+        if (MemTotal)
+            buffer_rrdf_table_add_field(wb, field_id++, "Memory", "Memory Percentage", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                        RRDF_FIELD_VISUAL_BAR,
+                                        RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", 100.0, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_VISIBLE, NULL);
 
-        add_table_field(wb, "Resident", "Resident Set Size", true, "bar-with-integer", "bar", "number", 2, "MiB", RSS_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "Shared", "Shared Pages", true, "bar-with-integer", "bar", "number", 2, "MiB", Shared_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "Virtual", "Virtual Memory Size", true, "bar-with-integer", "bar", "number", 2, "MiB", VMSize_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "Swap", "Swap Memory", false, "bar-with-integer", "bar", "number", 2, "MiB", Swap_max, "descending", true, false, false, NULL, "sum", true);
+        buffer_rrdf_table_add_field(wb, field_id++, "Resident", "Resident Set Size", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "MiB", RSS_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Shared", "Shared Pages", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2,
+                                    "MiB", Shared_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Virtual", "Virtual Memory Size", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "MiB", VMSize_max, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Swap", "Swap Memory", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2,
+                                    "MiB",
+                                    Swap_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
 
         // Physical I/O
-        add_table_field(wb, "PReads", "Physical I/O Reads", true, "bar-with-integer", "bar", "number", 2, "KiB/s", PReads_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "PWrites", "Physical I/O Writes", true, "bar-with-integer", "bar", "number", 2, "KiB/s", PWrites_max, "descending", true, false, false, NULL, "sum", true);
+        buffer_rrdf_table_add_field(wb, field_id++, "PReads", "Physical I/O Reads", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "KiB/s", PReads_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "PWrites", "Physical I/O Writes", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "KiB/s", PWrites_max, RRDF_FIELD_SORT_DESCENDING,
+                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         // Logical I/O
 #ifndef __FreeBSD__
-        add_table_field(wb, "LReads", "Logical I/O Reads", true, "bar-with-integer", "bar", "number", 2, "KiB/s", LReads_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "LWrites", "Logical I/O Writes", true, "bar-with-integer", "bar", "number", 2, "KiB/s", LWrites_max, "descending", true, false, false, NULL, "sum", true);
+        buffer_rrdf_table_add_field(wb, field_id++, "LReads", "Logical I/O Reads", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "KiB/s", LReads_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "LWrites", "Logical I/O Writes", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "KiB/s", LWrites_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
 #endif
 
         // I/O calls
-        add_table_field(wb, "RCalls", "I/O Read Calls", true, "bar-with-integer", "bar", "number", 2, "calls/s", RCalls_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "WCalls", "I/O Write Calls", true, "bar-with-integer", "bar", "number", 2, "calls/s", WCalls_max, "descending", true, false, false, NULL, "sum", true);
+        buffer_rrdf_table_add_field(wb, field_id++, "RCalls", "I/O Read Calls", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2,
+                                    "calls/s", RCalls_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "WCalls", "I/O Write Calls", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2,
+                                    "calls/s", WCalls_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         // minor page faults
-        add_table_field(wb, "MinFlt", "Minor Page Faults/s", false, "bar-with-integer", "bar", "number", 2, "pgflts/s", MinFlt_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "CMinFlt", "Children Minor Page Faults/s", false, "bar-with-integer", "bar", "number", 2, "pgflts/s", CMinFlt_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "TMinFlt", "Total Minor Page Faults/s", false, "bar-with-integer", "bar", "number", 2, "pgflts/s", TMinFlt_max, "descending", true, false, false, NULL, "sum", true);
+        buffer_rrdf_table_add_field(wb, field_id++, "MinFlt", "Minor Page Faults/s", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "pgflts/s", MinFlt_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "CMinFlt", "Children Minor Page Faults/s",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "pgflts/s", CMinFlt_max, RRDF_FIELD_SORT_DESCENDING,
+                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "TMinFlt", "Total Minor Page Faults/s",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "pgflts/s", TMinFlt_max, RRDF_FIELD_SORT_DESCENDING,
+                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
 
         // major page faults
-        add_table_field(wb, "MajFlt", "Major Page Faults/s", false, "bar-with-integer", "bar", "number", 2, "pgflts/s", MajFlt_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "CMajFlt", "Children Major Page Faults/s", false, "bar-with-integer", "bar", "number", 2, "pgflts/s", CMajFlt_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "TMajFlt", "Total Major Page Faults/s", true, "bar-with-integer", "bar", "number", 2, "pgflts/s", TMajFlt_max, "descending", true, false, false, NULL, "sum", true);
+        buffer_rrdf_table_add_field(wb, field_id++, "MajFlt", "Major Page Faults/s", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER,
+                                    2, "pgflts/s", MajFlt_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "CMajFlt", "Children Major Page Faults/s",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "pgflts/s", CMajFlt_max, RRDF_FIELD_SORT_DESCENDING,
+                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "TMajFlt", "Total Major Page Faults/s",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 2, "pgflts/s", TMajFlt_max, RRDF_FIELD_SORT_DESCENDING,
+                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         // open file descriptors
-        add_table_field(wb, "FDs", "All Open File Descriptors", true, "bar-with-integer", "bar", "number", 0, "fds", FDs_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "Files", "Open Files", true, "bar-with-integer", "bar", "number", 0, "fds", Files_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "Pipes", "Open Pipes", true, "bar-with-integer", "bar", "number", 0, "fds", Pipes_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "Sockets", "Open Sockets", true, "bar-with-integer", "bar", "number", 0, "fds", Sockets_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "iNotiFDs", "Open iNotify Descriptors", false, "bar-with-integer", "bar", "number", 0, "fds", iNotiFDs_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "EventFDs", "Open Event Descriptors", false, "bar-with-integer", "bar", "number", 0, "fds", EventFDs_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "TimerFDs", "Open Timer Descriptors", false, "bar-with-integer", "bar", "number", 0, "fds", TimerFDs_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "SigFDs", "Open Signal Descriptors", false, "bar-with-integer", "bar", "number", 0, "fds", SigFDs_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "EvPollFDs", "Open Event Poll Descriptors", false, "bar-with-integer", "bar", "number", 0, "fds", EvPollFDs_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "OtherFDs", "Other Open Descriptors", false, "bar-with-integer", "bar", "number", 0, "fds", OtherFDs_max, "descending", true, false, false, NULL, "sum", true);
+        buffer_rrdf_table_add_field(wb, field_id++, "FDs", "All Open File Descriptors",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", FDs_max, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Files", "Open Files", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
+                                    "fds",
+                                    Files_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Pipes", "Open Pipes", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
+                                    "fds",
+                                    Pipes_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Sockets", "Open Sockets", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
+                                    "fds", Sockets_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "iNotiFDs", "Open iNotify Descriptors",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", iNotiFDs_max, RRDF_FIELD_SORT_DESCENDING,
+                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "EventFDs", "Open Event Descriptors",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", EventFDs_max, RRDF_FIELD_SORT_DESCENDING,
+                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "TimerFDs", "Open Timer Descriptors",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", TimerFDs_max, RRDF_FIELD_SORT_DESCENDING,
+                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "SigFDs", "Open Signal Descriptors",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", SigFDs_max, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "EvPollFDs", "Open Event Poll Descriptors",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", EvPollFDs_max,
+                                    RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "OtherFDs", "Other Open Descriptors",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", OtherFDs_max, RRDF_FIELD_SORT_DESCENDING,
+                                    NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
 
         // processes, threads, uptime
-        add_table_field(wb, "Processes", "Processes", true, "bar-with-integer", "bar", "number", 0, "processes", Processes_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "Threads", "Threads", true, "bar-with-integer", "bar", "number", 0, "threads", Threads_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "Uptime", "Uptime in seconds", true, "duration", "bar", "duration", 2, "seconds", Uptime_max, "descending", true, false, false, NULL, "max", true);
+        buffer_rrdf_table_add_field(wb, field_id++, "Processes", "Processes", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
+                                    "processes", Processes_max, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Threads", "Threads", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
+                                    "threads", Threads_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Uptime", "Uptime in seconds", RRDF_FIELD_TYPE_DURATION,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_DURATION, 2,
+                                    "seconds", Uptime_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_MAX,
+                                    RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
     }
-    buffer_json_object_close(wb);
+    buffer_json_object_close(wb); // columns
 
     buffer_json_member_add_string(wb, "default_sort_column", "CPU");
 
@@ -4953,6 +5148,20 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
     }
     buffer_json_object_close(wb); // charts
 
+    buffer_json_member_add_array(wb, "default_charts");
+    {
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "CPU");
+        buffer_json_add_array_item_string(wb, "Category");
+        buffer_json_array_close(wb);
+
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "Memory");
+        buffer_json_add_array_item_string(wb, "Category");
+        buffer_json_array_close(wb);
+    }
+    buffer_json_array_close(wb);
+
     buffer_json_member_add_object(wb, "group_by");
     {
         // group by PID
@@ -5026,7 +5235,7 @@ void *reader_main(void *arg __maybe_unused) {
     while(!apps_plugin_exit && (s = fgets(buffer, PLUGINSD_LINE_MAX, stdin))) {
 
         char *words[PLUGINSD_MAX_WORDS] = { NULL };
-        size_t num_words = pluginsd_split_words(buffer, words, PLUGINSD_MAX_WORDS);
+        size_t num_words = quoted_strings_splitter_pluginsd(buffer, words, PLUGINSD_MAX_WORDS);
 
         const char *keyword = get_word(words, num_words, 0);
 
@@ -5036,7 +5245,7 @@ void *reader_main(void *arg __maybe_unused) {
             char *function = get_word(words, num_words, 3);
 
             if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
-                error("Received incomplete %s (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
+                netdata_log_error("Received incomplete %s (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
                       keyword,
                       transaction?transaction:"(unset)",
                       timeout_s?timeout_s:"(unset)",
@@ -5062,12 +5271,12 @@ void *reader_main(void *arg __maybe_unused) {
             }
         }
         else
-            error("Received unknown command: %s", keyword?keyword:"(unset)");
+            netdata_log_error("Received unknown command: %s", keyword?keyword:"(unset)");
     }
 
     if(!s || feof(stdin) || ferror(stdin)) {
         apps_plugin_exit = true;
-        error("Received error on stdin.");
+        netdata_log_error("Received error on stdin.");
     }
 
     exit(1);
@@ -5107,23 +5316,23 @@ int main(int argc, char **argv) {
 
     user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
     if(user_config_dir == NULL) {
-        // info("NETDATA_CONFIG_DIR is not passed from netdata");
+        // netdata_log_info("NETDATA_CONFIG_DIR is not passed from netdata");
         user_config_dir = CONFIG_DIR;
     }
-    // else info("Found NETDATA_USER_CONFIG_DIR='%s'", user_config_dir);
+    // else netdata_log_info("Found NETDATA_USER_CONFIG_DIR='%s'", user_config_dir);
 
     stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
     if(stock_config_dir == NULL) {
-        // info("NETDATA_CONFIG_DIR is not passed from netdata");
+        // netdata_log_info("NETDATA_CONFIG_DIR is not passed from netdata");
         stock_config_dir = LIBCONFIG_DIR;
     }
-    // else info("Found NETDATA_USER_CONFIG_DIR='%s'", user_config_dir);
+    // else netdata_log_info("Found NETDATA_USER_CONFIG_DIR='%s'", user_config_dir);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {
         struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
         if(setrlimit(RLIMIT_CORE, &rl) != 0)
-            info("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
+            netdata_log_info("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
 #ifdef HAVE_SYS_PRCTL_H
         prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
 #endif
@@ -5147,14 +5356,14 @@ int main(int argc, char **argv) {
     if(!check_capabilities() && !am_i_running_as_root() && !check_proc_1_io()) {
         uid_t uid = getuid(), euid = geteuid();
 #ifdef HAVE_CAPABILITY
-        error("apps.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
+        netdata_log_error("apps.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
                       "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
                       "To enable capabilities run: sudo setcap cap_dac_read_search,cap_sys_ptrace+ep %s; "
                       "To enable setuid to root run: sudo chown root:netdata %s; sudo chmod 4750 %s; "
               , uid, euid, argv[0], argv[0], argv[0]
         );
 #else
-        error("apps.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
+        netdata_log_error("apps.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
                       "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
                       "Your system does not support capabilities. "
                       "To enable setuid to root run: sudo chown root:netdata %s; sudo chmod 4750 %s; "
@@ -5163,7 +5372,7 @@ int main(int argc, char **argv) {
 #endif
     }
 
-    info("started on pid %d", getpid());
+    netdata_log_info("started on pid %d", getpid());
 
     snprintfz(all_user_ids.filename, FILENAME_MAX, "%s/etc/passwd", netdata_configured_host_prefix);
     debug_log("passwd file: '%s'", all_user_ids.filename);
@@ -5215,7 +5424,7 @@ int main(int argc, char **argv) {
             get_MemTotal();
 
         if(!collect_data_for_all_processes()) {
-            error("Cannot collect /proc data for running processes. Disabling apps.plugin...");
+            netdata_log_error("Cannot collect /proc data for running processes. Disabling apps.plugin...");
             printf("DISABLE\n");
             netdata_mutex_unlock(&mutex);
             netdata_thread_cancel(reader_thread);

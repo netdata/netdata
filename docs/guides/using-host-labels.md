@@ -5,7 +5,7 @@ Netdata allows to organize your observability infrastructure with spaces, war ro
 
 ## Spaces and war rooms
 
-[Spaces](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md) are used for organization-level or infrastructure-level 
+[Spaces](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-spaces) are used for organization-level or infrastructure-level 
 grouping of nodes and people. A node can only appear in a single space, while people can have access to multiple spaces.
 
 The [war rooms](https://github.com/netdata/netdata/edit/master/docs/cloud/war-rooms.md) in a space bring together nodes and people in 

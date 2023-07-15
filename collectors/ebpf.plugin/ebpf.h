@@ -39,7 +39,10 @@
 #ifdef LIBBPF_MAJOR_VERSION // BTF code
 #include "includes/cachestat.skel.h"
 #include "includes/dc.skel.h"
+#include "includes/disk.skel.h"
 #include "includes/fd.skel.h"
+#include "includes/hardirq.skel.h"
+#include "includes/mdflush.skel.h"
 #include "includes/mount.skel.h"
 #include "includes/shm.skel.h"
 #include "includes/socket.skel.h"
@@ -48,8 +51,11 @@
 
 extern struct cachestat_bpf *cachestat_bpf_obj;
 extern struct dc_bpf *dc_bpf_obj;
+extern struct disk_bpf *disk_bpf_obj;
 extern struct fd_bpf *fd_bpf_obj;
+extern struct hardirq_bpf *hardirq_bpf_obj;
 extern struct mount_bpf *mount_bpf_obj;
+extern struct mdflush_bpf *mdflush_bpf_obj;
 extern struct shm_bpf *shm_bpf_obj;
 extern struct socket_bpf *socket_bpf_obj;
 extern struct swap_bpf *bpf_obj;
@@ -112,6 +118,7 @@ enum ebpf_main_index {
     EBPF_MODULE_OOMKILL_IDX,
     EBPF_MODULE_SHM_IDX,
     EBPF_MODULE_MDFLUSH_IDX,
+    EBPF_MODULE_FUNCTION_IDX,
     /* THREADS MUST BE INCLUDED BEFORE THIS COMMENT */
     EBPF_OPTION_ALL_CHARTS,
     EBPF_OPTION_VERSION,
@@ -119,7 +126,8 @@ enum ebpf_main_index {
     EBPF_OPTION_GLOBAL_CHART,
     EBPF_OPTION_RETURN_MODE,
     EBPF_OPTION_LEGACY,
-    EBPF_OPTION_CORE
+    EBPF_OPTION_CORE,
+    EBPF_OPTION_UNITTEST
 };
 
 typedef struct ebpf_tracepoint {
@@ -156,9 +164,11 @@ typedef struct ebpf_tracepoint {
 
 // Statistics charts
 #define NETDATA_EBPF_THREADS "ebpf_threads"
+#define NETDATA_EBPF_LIFE_TIME "ebpf_life_time"
 #define NETDATA_EBPF_LOAD_METHOD "ebpf_load_methods"
 #define NETDATA_EBPF_KERNEL_MEMORY "ebpf_kernel_memory"
 #define NETDATA_EBPF_HASH_TABLES_LOADED "ebpf_hash_tables_count"
+#define NETDATA_EBPF_HASH_TABLES_PER_CORE "ebpf_hash_tables_per_core"
 
 // Log file
 #define NETDATA_DEVELOPER_LOG_FILE "developer.log"
@@ -307,6 +317,8 @@ void ebpf_write_chart_obsolete(char *type, char *id, char *title, char *units, c
 void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, char **dimensions, uint32_t end);
 void ebpf_update_disabled_plugin_stats(ebpf_module_t *em);
 ARAL *ebpf_allocate_pid_aral(char *name, size_t size);
+void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe_links);
+
 extern ebpf_filesystem_partitions_t localfs[];
 extern ebpf_sync_syscalls_t local_syscalls[];
 extern int ebpf_exit_plugin;

@@ -1,0 +1,12 @@
+metric,scode,dimensions,unit,description,chart_type,labels,plugin,module
+mem.fragmentation_index_dma,node,"order0, order1, order2, order3, order4, order5, order6, order7, order8, order9, order10",index,Memory fragmentation index for each order,line,numa_node,debugfs.plugin,/sys/kernel/debug/extfrag
+mem.fragmentation_index_dma32,node,"order0, order1, order2, order3, order4, order5, order6, order7, order8, order9, order10",index,Memory fragmentation index for each order,line,numa_node,debugfs.plugin,/sys/kernel/debug/extfrag
+mem.fragmentation_index_normal,node,"order0, order1, order2, order3, order4, order5, order6, order7, order8, order9, order10",index,Memory fragmentation index for each order,line,numa_node,debugfs.plugin,/sys/kernel/debug/extfrag
+system.zswap_pool_compression_ratio,,compression_ratio,ratio,Zswap compression ratio,line,,debugfs.plugin,/sys/kernel/debug/zswap
+system.zswap_pool_compressed_size,,compressed_size,bytes,Zswap compressed bytes currently stored,area,,debugfs.plugin,/sys/kernel/debug/zswap
+system.zswap_pool_raw_size,,uncompressed_size,bytes,Zswap uncompressed bytes currently stored,area,,debugfs.plugin,/sys/kernel/debug/zswap
+system.zswap_rejections,,"compress_poor, kmemcache_fail, alloc_fail, reclaim_fail",rejections/s,Zswap rejections,stacked,,debugfs.plugin,/sys/kernel/debug/zswap
+system.zswap_pool_limit_hit,,limit,events/s,Zswap pool limit was reached,line,,debugfs.plugin,/sys/kernel/debug/zswap
+system.zswap_written_back_raw_bytes,,written_back,bytes/s,Zswap uncomressed bytes written back when pool limit was reached,area,,debugfs.plugin,/sys/kernel/debug/zswap
+system.zswap_same_filled_raw_size,,same_filled,bytes,Zswap same-value filled uncompressed bytes currently stored,area,,debugfs.plugin,/sys/kernel/debug/zswap
+system.zswap_duplicate_entry,,duplicate,entries/s,Zswap duplicate store was encountered,line,,debugfs.plugin,/sys/kernel/debug/zswap

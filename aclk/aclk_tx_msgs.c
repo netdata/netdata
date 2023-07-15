@@ -32,7 +32,7 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
     const char *topic = aclk_get_topic(subtopic);
 
     if (unlikely(!topic)) {
-        error("Couldn't get topic. Aborting message send.");
+        netdata_log_error("Couldn't get topic. Aborting message send.");
         return 0;
     }
 
@@ -51,13 +51,6 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
     return packet_id;
 }
 
-// json_object_put returns int unfortunately :D
-// we need void(*fnc)(void *);
-static void json_object_put_wrapper(void *jsonobj)
-{
-    json_object_put(jsonobj);
-}
-
 #define TOPIC_MAX_LEN 512
 #define V2_BIN_PAYLOAD_SEPARATOR "\x0D\x0A\x0D\x0A"
 static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_object *msg, const char *topic, const void *payload, size_t payload_len)
@@ -68,7 +61,7 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
     int len;
 
     if (unlikely(!topic || topic[0] != '/')) {
-        error ("Full topic required!");
+        netdata_log_error("Full topic required!");
         json_object_put(msg);
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
@@ -76,19 +69,24 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
     str = json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN);
     len = strlen(str);
 
-    if (payload_len) {
-        full_msg = mallocz(len + strlen(V2_BIN_PAYLOAD_SEPARATOR) + payload_len);
+    size_t full_msg_len = len;
+    if (payload_len)
+        full_msg_len += strlen(V2_BIN_PAYLOAD_SEPARATOR) + payload_len;
 
-        memcpy(full_msg, str, len);
-        json_object_put(msg);
-        msg = NULL;
+    full_msg = mallocz(full_msg_len);
+    memcpy(full_msg, str, len);
+    json_object_put(msg);
+
+    if (payload_len) {
         memcpy(&full_msg[len], V2_BIN_PAYLOAD_SEPARATOR, strlen(V2_BIN_PAYLOAD_SEPARATOR));
         len += strlen(V2_BIN_PAYLOAD_SEPARATOR);
         memcpy(&full_msg[len], payload, payload_len);
-        len += payload_len;
     }
 
-    mqtt_wss_publish5(client, (char*)topic, NULL, (char*)(payload_len ? full_msg : str), (payload_len ? &freez_aclk_publish5b : &json_object_put_wrapper), len, MQTT_WSS_PUB_QOS1, &packet_id);
+    int rc = mqtt_wss_publish5(client, (char*)topic, NULL, full_msg, &freez_aclk_publish5b, full_msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
+
+    if (rc == MQTT_WSS_ERR_TOO_BIG_FOR_SERVER)
+        return HTTP_RESP_FORBIDDEN;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_published(packet_id);
@@ -174,11 +172,11 @@ void aclk_http_msg_v2_err(mqtt_wss_client client, const char *topic, const char 
     json_object_object_add(msg, "error-description", tmp);
 
     if (aclk_send_message_with_bin_payload(client, msg, topic, payload, payload_len)) {
-        error("Failed to send cancelation message for http reply");
+        netdata_log_error("Failed to send cancellation message for http reply %zu %s", payload_len, payload);
     }
 }
 
-void aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg_id, usec_t t_exec, usec_t created, int http_code, const char *payload, size_t payload_len)
+int aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg_id, usec_t t_exec, usec_t created, int http_code, const char *payload, size_t payload_len)
 {
     json_object *tmp, *msg;
 
@@ -197,7 +195,7 @@ void aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg
 
     switch (rc) {
     case HTTP_RESP_FORBIDDEN:
-        aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, payload, payload_len);
+        aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, NULL, 0);
         break;
     case HTTP_RESP_INTERNAL_SERVER_ERROR:
         aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_FAIL_TOPIC, CLOUD_EMSG_FAIL_TOPIC, payload, payload_len);
@@ -206,6 +204,7 @@ void aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg
         aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, payload, payload_len);
         break;
     }
+    return rc ? rc : http_code;
 }
 
 uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable) {
@@ -221,7 +220,7 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
 
     rrdhost_aclk_state_lock(localhost);
     if (unlikely(!localhost->aclk_state.claimed_id)) {
-        error("Internal error. Should not come here if not claimed");
+        netdata_log_error("Internal error. Should not come here if not claimed");
         rrdhost_aclk_state_unlock(localhost);
         return 0;
     }
@@ -234,7 +233,7 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
     rrdhost_aclk_state_unlock(localhost);
 
     if (!msg) {
-        error("Error generating agent::v1::UpdateAgentConnection payload");
+        netdata_log_error("Error generating agent::v1::UpdateAgentConnection payload");
         return 0;
     }
 
@@ -256,7 +255,7 @@ char *aclk_generate_lwt(size_t *size) {
 
     rrdhost_aclk_state_lock(localhost);
     if (unlikely(!localhost->aclk_state.claimed_id)) {
-        error("Internal error. Should not come here if not claimed");
+        netdata_log_error("Internal error. Should not come here if not claimed");
         rrdhost_aclk_state_unlock(localhost);
         return NULL;
     }
@@ -266,7 +265,7 @@ char *aclk_generate_lwt(size_t *size) {
     rrdhost_aclk_state_unlock(localhost);
 
     if (!msg)
-        error("Error generating agent::v1::UpdateAgentConnection payload for LWT");
+        netdata_log_error("Error generating agent::v1::UpdateAgentConnection payload for LWT");
 
     return msg;
 }

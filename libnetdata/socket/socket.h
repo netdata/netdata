@@ -11,7 +11,7 @@
 
 typedef enum web_client_acl {
     WEB_CLIENT_ACL_NONE         = (0),
-    WEB_CLIENT_ACL_NOCHECK      = (0),
+    WEB_CLIENT_ACL_NOCHECK      = (0),          // Don't check anything - this should work on all channels
     WEB_CLIENT_ACL_DASHBOARD    = (1 << 0),
     WEB_CLIENT_ACL_REGISTRY     = (1 << 1),
     WEB_CLIENT_ACL_BADGE        = (1 << 2),
@@ -23,9 +23,18 @@ typedef enum web_client_acl {
     WEB_CLIENT_ACL_SSL_DEFAULT  = (1 << 8),
     WEB_CLIENT_ACL_ACLK         = (1 << 9),
     WEB_CLIENT_ACL_WEBRTC       = (1 << 10),
+    WEB_CLIENT_ACL_BEARER_OPTIONAL = (1 << 11), // allow unprotected access if bearer is not enabled in netdata
+    WEB_CLIENT_ACL_BEARER_REQUIRED = (1 << 12), // allow access only if a valid bearer is used
 } WEB_CLIENT_ACL;
 
-#define WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC (WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK | WEB_CLIENT_ACL_WEBRTC)
+#define WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC (WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK | WEB_CLIENT_ACL_WEBRTC | WEB_CLIENT_ACL_BEARER_OPTIONAL)
+#define WEB_CLIENT_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER (WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK | WEB_CLIENT_ACL_WEBRTC | WEB_CLIENT_ACL_BEARER_REQUIRED)
+
+#ifdef NETDATA_DEV_MODE
+#define ACL_DEV_OPEN_ACCESS WEB_CLIENT_ACL_DASHBOARD
+#else
+#define ACL_DEV_OPEN_ACCESS 0
+#endif
 
 #define WEB_CLIENT_ACL_ALL 0xFFFF
 
@@ -68,10 +77,8 @@ int connect_to_one_of_urls(const char *destination, int default_port, struct tim
 
 
 #ifdef ENABLE_HTTPS
-ssize_t recv_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
-ssize_t send_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
-ssize_t netdata_ssl_read(SSL *ssl, void *buf, size_t num);
-ssize_t netdata_ssl_write(SSL *ssl, const void *buf, size_t num);
+ssize_t recv_timeout(NETDATA_SSL *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
+ssize_t send_timeout(NETDATA_SSL *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
 #else
 ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
 ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
@@ -218,5 +225,23 @@ void poll_events(LISTEN_SOCKETS *sockets
         , void *timer_data
         , size_t max_tcp_sockets
 );
+
+#ifndef INET6_ADDRSTRLEN
+#define INET6_ADDRSTRLEN 46
+#endif
+
+typedef struct socket_peers {
+    struct {
+        char ip[INET6_ADDRSTRLEN];
+        int port;
+    } local;
+
+    struct {
+        char ip[INET6_ADDRSTRLEN];
+        int port;
+    } peer;
+} SOCKET_PEERS;
+
+SOCKET_PEERS socket_peers(int sock_fd);
 
 #endif //NETDATA_SOCKET_H

@@ -8,6 +8,29 @@ on:
       - reopened
       - labeled
       - synchronize
+    paths: # This MUST be kept in-sync with the paths-ignore key for the packaging-dummy.yml workflow.
+      - '**.c'
+      - '**.cc'
+      - '**.h'
+      - '**.hh'
+      - '**.in'
+      - 'netdata.spec.in'
+      - 'configure.ac'
+      - '**/Makefile*'
+      - 'Makefile*'
+      - '.github/workflows/packaging.yml'
+      - '.github/scripts/gen-matrix-packaging.py'
+      - '.github/scripts/pkg-test.sh'
+      - 'build/**'
+      - 'packaging/*.sh'
+      - 'packaging/*.checksums'
+      - 'packaging/*.version'
+      - 'contrib/debian/**'
+      - 'aclk/aclk-schemas/'
+      - 'ml/dlib/'
+      - 'mqtt_websockets'
+      - 'web/server/h2o/libh2o'
+      - '!**.md'
     branches:
       - master
   push:

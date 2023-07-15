@@ -28,13 +28,6 @@ int netdata_popene_variadic_internal_dont_use_directly(volatile pid_t *pidptr, c
 int netdata_pclose(FILE *fp_child_input, FILE *fp_child_output, pid_t pid);
 
 int netdata_spawn(const char *command, volatile pid_t *pidptr);
-int netdata_spawn_waitpid(pid_t pid);
-
-void netdata_popen_tracking_init(void);
-void netdata_popen_tracking_cleanup(void);
-int netdata_popen_tracking_pid_shoud_be_reaped(pid_t pid);
-
-void signals_unblock(void);
-void signals_reset(void);
+int netdata_waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options);
 
 #endif /* NETDATA_POPEN_H */

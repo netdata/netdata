@@ -1,0 +1,109 @@
+meta:
+  plugin_name: python.d.plugin
+  module_name: go_expvar
+  alternative_monitored_instances: []
+  monitored_instance:
+    name: python.d go_expvar
+    link: ''
+    categories: []
+    icon_filename: ''
+  related_resources:
+    integrations:
+      list: []
+  info_provided_to_referring_integrations:
+    description: ''
+  keywords: []
+  most_popular: false
+overview:
+  data_collection:
+    metrics_description: ''
+    method_description: ''
+  supported_platforms:
+    include: []
+    exclude: []
+  multi-instance: true
+  additional_permissions:
+    description: ''
+  default_behavior:
+    auto_detection:
+      description: ''
+    limits:
+      description: ''
+    performance_impact:
+      description: ''
+setup:
+  prerequisites:
+    list: []
+  configuration:
+    file:
+      name: ''
+      description: ''
+    options:
+      description: ''
+      folding:
+        title: ''
+        enabled: true
+      list: []
+    examples:
+      folding:
+        enabled: true
+        title: ''
+      list: []
+troubleshooting:
+  problems:
+    list: []
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: expvar.memstats.heap
+          description: 'memory: size of heap memory structures'
+          unit: "KiB"
+          chart_type: line
+          dimensions:
+            - name: alloc
+            - name: inuse
+        - name: expvar.memstats.stack
+          description: 'memory: size of stack memory structures'
+          unit: "KiB"
+          chart_type: line
+          dimensions:
+            - name: inuse
+        - name: expvar.memstats.mspan
+          description: 'memory: size of mspan memory structures'
+          unit: "KiB"
+          chart_type: line
+          dimensions:
+            - name: inuse
+        - name: expvar.memstats.mcache
+          description: 'memory: size of mcache memory structures'
+          unit: "KiB"
+          chart_type: line
+          dimensions:
+            - name: inuse
+        - name: expvar.memstats.live_objects
+          description: 'memory: number of live objects'
+          unit: "objects"
+          chart_type: line
+          dimensions:
+            - name: live
+        - name: expvar.memstats.sys
+          description: 'memory: size of reserved virtual address space'
+          unit: "KiB"
+          chart_type: line
+          dimensions:
+            - name: sys
+        - name: expvar.memstats.gc_pauses
+          description: 'memory: average duration of GC pauses'
+          unit: "ns"
+          chart_type: line
+          dimensions:
+            - name: avg

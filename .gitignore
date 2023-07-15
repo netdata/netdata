@@ -69,10 +69,16 @@ slabinfo.plugin
 cgroup-network
 !cgroup-network/
 
+local-listeners
+!local-listeners/
+
 ebpf.plugin
 collectors/ebpf.plugin/reset_netdata_trace.sh
 !ebpf.plugin/
 collectors/ebpf.plugin/includes/
+
+debugfs.plugin
+!debugfs.plugin/
 
 # protoc generated files
 *.pb.cc
@@ -85,9 +91,6 @@ packaging/installer/.environment.sh
 
 # netdata makeself downloads
 packaging/makeself/tmp/
-
-# Libbpf is always overwritten depending of kernel version
-packaging/libbpf.*
 
 # coverity
 cov-int/
@@ -193,6 +196,7 @@ tests/acls/acl.sh
 tests/urls/request.sh
 tests/alarm_repetition/alarm.sh
 tests/template_dimension/template_dim.sh
+tests/ebpf/ebpf_thread_function.sh
 aclk/legacy/tests/install-fake-charts.d.sh
 
 # tests and temp files
@@ -229,10 +233,11 @@ Session.*.vim
 # Jupyter notebook checkpoints
 .ipynb_checkpoints
 
-# Judy stuff
-JudyLTables.c
-judyltablesgen
-
 # m4 generated ksys
 database/engine/journalfile_v2.ksy
 database/engine/journalfile_v2_virtmemb.ksy
+
+# gorilla benchmark & fuzz binaries
+libnetdata/gorilla/gorilla_benchmark
+libnetdata/gorilla/gorilla_fuzzer
+libnetdata/gorilla/fuzz-*.log

@@ -1,0 +1,129 @@
+meta:
+  plugin_name: python.d.plugin
+  module_name: tomcat
+  alternative_monitored_instances: []
+  monitored_instance:
+    name: python.d tomcat
+    link: ''
+    categories: []
+    icon_filename: ''
+  related_resources:
+    integrations:
+      list: []
+  info_provided_to_referring_integrations:
+    description: ''
+  keywords: []
+  most_popular: false
+overview:
+  data_collection:
+    metrics_description: ''
+    method_description: ''
+  supported_platforms:
+    include: []
+    exclude: []
+  multi-instance: true
+  additional_permissions:
+    description: ''
+  default_behavior:
+    auto_detection:
+      description: ''
+    limits:
+      description: ''
+    performance_impact:
+      description: ''
+setup:
+  prerequisites:
+    list: []
+  configuration:
+    file:
+      name: ''
+      description: ''
+    options:
+      description: ''
+      folding:
+        title: ''
+        enabled: true
+      list: []
+    examples:
+      folding:
+        enabled: true
+        title: ''
+      list: []
+troubleshooting:
+  problems:
+    list: []
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: tomcat.accesses
+          description: Requests
+          unit: "requests/s"
+          chart_type: area
+          dimensions:
+            - name: accesses
+            - name: errors
+        - name: tomcat.bandwidth
+          description: Bandwidth
+          unit: "KiB/s"
+          chart_type: area
+          dimensions:
+            - name: sent
+            - name: received
+        - name: tomcat.processing_time
+          description: processing time
+          unit: "seconds"
+          chart_type: area
+          dimensions:
+            - name: processing time
+        - name: tomcat.threads
+          description: Threads
+          unit: "current threads"
+          chart_type: area
+          dimensions:
+            - name: current
+            - name: busy
+        - name: tomcat.jvm
+          description: JVM Memory Pool Usage
+          unit: "MiB"
+          chart_type: stacked
+          dimensions:
+            - name: free
+            - name: eden
+            - name: survivor
+            - name: tenured
+            - name: code cache
+            - name: compressed
+            - name: metaspace
+        - name: tomcat.jvm_eden
+          description: Eden Memory Usage
+          unit: "MiB"
+          chart_type: area
+          dimensions:
+            - name: used
+            - name: committed
+            - name: max
+        - name: tomcat.jvm_survivor
+          description: Survivor Memory Usage
+          unit: "MiB"
+          chart_type: area
+          dimensions:
+            - name: used
+            - name: committed
+            - name: max
+        - name: tomcat.jvm_tenured
+          description: Tenured Memory Usage
+          unit: "MiB"
+          chart_type: area
+          dimensions:
+            - name: used
+            - name: committed
+            - name: max

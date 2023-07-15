@@ -250,6 +250,8 @@ typedef struct rrdcontext {
     uint32_t priority;
     RRDSET_TYPE chart_type;
 
+    SPINLOCK spinlock;
+
     RRD_FLAGS flags;
     time_t first_time_s;
     time_t last_time_s;
@@ -275,7 +277,9 @@ typedef struct rrdcontext {
         size_t dispatches;              // the number of times this has been dispatched to hub
     } queue;
 
-    netdata_mutex_t mutex;
+    struct {
+        uint32_t metrics;               // the number of metrics in this context
+    } stats;
 } RRDCONTEXT;
 
 
@@ -352,8 +356,8 @@ static inline void rrdcontext_release(RRDCONTEXT_ACQUIRED *rca) {
 void rrdcontext_recalculate_context_retention(RRDCONTEXT *rc, RRD_FLAGS reason, bool worker_jobs);
 void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, bool worker_jobs);
 
-#define rrdcontext_lock(rc) netdata_mutex_lock(&((rc)->mutex))
-#define rrdcontext_unlock(rc) netdata_mutex_unlock(&((rc)->mutex))
+#define rrdcontext_lock(rc) spinlock_lock(&((rc)->spinlock))
+#define rrdcontext_unlock(rc) spinlock_unlock(&((rc)->spinlock))
 
 void rrdinstance_trigger_updates(RRDINSTANCE *ri, const char *function);
 void rrdcontext_trigger_updates(RRDCONTEXT *rc, const char *function);

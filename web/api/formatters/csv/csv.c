@@ -4,7 +4,7 @@
 #include "csv.h"
 
 void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const char *startline, const char *separator, const char *endline, const char *betweenlines) {
-    //info("RRD2CSV(): %s: BEGIN", r->st->id);
+    //netdata_log_info("RRD2CSV(): %s: BEGIN", r->st->id);
     long c, i;
     const long used = (long)r->d;
 
@@ -79,7 +79,8 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
         else {
             // generate the local date time
             struct tm tmbuf, *tm = localtime_r(&now, &tmbuf);
-            if(!tm) { error("localtime() failed."); continue; }
+            if(!tm) {
+                netdata_log_error("localtime() failed."); continue; }
             buffer_date(wb, tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
         }
 
@@ -104,5 +105,5 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
 
         buffer_strcat(wb, endline);
     }
-    //info("RRD2CSV(): %s: END", r->st->id);
+    //netdata_log_info("RRD2CSV(): %s: END", r->st->id);
 }

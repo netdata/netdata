@@ -1,0 +1,114 @@
+meta:
+  plugin_name: python.d.plugin
+  module_name: uwsgi
+  alternative_monitored_instances: []
+  monitored_instance:
+    name: python.d uwsgi
+    link: ''
+    categories: []
+    icon_filename: ''
+  related_resources:
+    integrations:
+      list: []
+  info_provided_to_referring_integrations:
+    description: ''
+  keywords: []
+  most_popular: false
+overview:
+  data_collection:
+    metrics_description: ''
+    method_description: ''
+  supported_platforms:
+    include: []
+    exclude: []
+  multi-instance: true
+  additional_permissions:
+    description: ''
+  default_behavior:
+    auto_detection:
+      description: ''
+    limits:
+      description: ''
+    performance_impact:
+      description: ''
+setup:
+  prerequisites:
+    list: []
+  configuration:
+    file:
+      name: ''
+      description: ''
+    options:
+      description: ''
+      folding:
+        title: ''
+        enabled: true
+      list: []
+    examples:
+      folding:
+        enabled: true
+        title: ''
+      list: []
+troubleshooting:
+  problems:
+    list: []
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: uwsgi.requests
+          description: Requests
+          unit: "requests/s"
+          chart_type: stacked
+          dimensions:
+            - name: a dimension per worker
+        - name: uwsgi.tx
+          description: Transmitted data
+          unit: "KiB/s"
+          chart_type: stacked
+          dimensions:
+            - name: a dimension per worker
+        - name: uwsgi.avg_rt
+          description: Average request time
+          unit: "milliseconds"
+          chart_type: line
+          dimensions:
+            - name: a dimension per worker
+        - name: uwsgi.memory_rss
+          description: RSS (Resident Set Size)
+          unit: "MiB"
+          chart_type: stacked
+          dimensions:
+            - name: a dimension per worker
+        - name: uwsgi.memory_vsz
+          description: VSZ (Virtual Memory Size)
+          unit: "MiB"
+          chart_type: stacked
+          dimensions:
+            - name: a dimension per worker
+        - name: uwsgi.exceptions
+          description: Exceptions
+          unit: "exceptions"
+          chart_type: line
+          dimensions:
+            - name: exceptions
+        - name: uwsgi.harakiris
+          description: Harakiris
+          unit: "harakiris"
+          chart_type: line
+          dimensions:
+            - name: harakiris
+        - name: uwsgi.respawns
+          description: Respawns
+          unit: "respawns"
+          chart_type: line
+          dimensions:
+            - name: respawns

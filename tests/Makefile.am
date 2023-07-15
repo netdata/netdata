@@ -9,6 +9,7 @@ CLEANFILES = \
     $(srcdir)/urls/request.sh \
     $(srcdir)/alarm_repetition/alarm.sh \
     $(srcdir)/template_dimension/template_dim.sh \
+    $(srcdir)/ebpf/ebpf_thread_function.sh \
     $(NULL)
 
 include $(top_srcdir)/build/subst.inc
@@ -20,6 +21,7 @@ dist_noinst_DATA = \
     $(srcdir)/urls/request.sh.in \
     $(srcdir)/alarm_repetition/alarm.sh.in \
     $(srcdir)/template_dimension/template_dim.sh.in \
+    $(srcdir)/ebpf/ebpf_thread_function.sh.in \
     $(NULL)
 
 dist_plugins_SCRIPTS = \
@@ -28,6 +30,7 @@ dist_plugins_SCRIPTS = \
     $(srcdir)/urls/request.sh \
     $(srcdir)/alarm_repetition/alarm.sh \
     $(srcdir)/template_dimension/template_dim.sh \
+    $(srcdir)/ebpf/ebpf_thread_function.sh \
     $(NULL)
 
 dist_noinst_SCRIPTS = \

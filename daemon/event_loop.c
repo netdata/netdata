@@ -56,5 +56,10 @@ void register_libuv_worker_jobs() {
     // netdatacli
     worker_register_job_name(UV_EVENT_SCHEDULE_CMD, "schedule command");
 
-    uv_thread_set_name_np(pthread_self(), "LIBUV_WORKER");
+    static int workers = 0;
+    int worker_id = __atomic_add_fetch(&workers, 1, __ATOMIC_RELAXED);
+
+    char buf[NETDATA_THREAD_TAG_MAX + 1];
+    snprintfz(buf, NETDATA_THREAD_TAG_MAX, "UV_WORKER[%d]", worker_id);
+    uv_thread_set_name_np(pthread_self(), buf);
 }

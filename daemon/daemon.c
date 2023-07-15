@@ -20,7 +20,7 @@ void get_netdata_execution_path(void)
     exepath_size = sizeof(exepath) - 1;
     ret = uv_exepath(exepath, &exepath_size);
     if (0 != ret) {
-        error("uv_exepath(\"%s\", %u) (user: %s) failed (%s).", exepath, (unsigned)exepath_size, user,
+        netdata_log_error("uv_exepath(\"%s\", %u) (user: %s) failed (%s).", exepath, (unsigned)exepath_size, user,
               uv_strerror(ret));
         fatal("Cannot start netdata without getting execution path.");
     }
@@ -33,29 +33,49 @@ static void chown_open_file(int fd, uid_t uid, gid_t gid) {
     struct stat buf;
 
     if(fstat(fd, &buf) == -1) {
-        error("Cannot fstat() fd %d", fd);
+        netdata_log_error("Cannot fstat() fd %d", fd);
         return;
     }
 
     if((buf.st_uid != uid || buf.st_gid != gid) && S_ISREG(buf.st_mode)) {
         if(fchown(fd, uid, gid) == -1)
-            error("Cannot fchown() fd %d.", fd);
+            netdata_log_error("Cannot fchown() fd %d.", fd);
     }
 }
 
-void create_needed_dir(const char *dir, uid_t uid, gid_t gid)
+static void fix_directory_file_permissions(const char *dirname, uid_t uid, gid_t gid, bool recursive)
 {
-    // attempt to create the directory
-    if(mkdir(dir, 0755) == 0) {
-        // we created it
+    char filename[FILENAME_MAX + 1];
 
-        // chown it to match the required user
-        if(chown(dir, uid, gid) == -1)
-            error("Cannot chown directory '%s' to %u:%u", dir, (unsigned int)uid, (unsigned int)gid);
+    DIR *dir = opendir(dirname);
+    if (!dir)
+        return;
+
+    struct dirent *de = NULL;
+
+    while ((de = readdir(dir))) {
+        if (de->d_type == DT_DIR && (!strcmp(de->d_name, ".") || !strcmp(de->d_name, "..")))
+            continue;
+
+        (void) snprintfz(filename, FILENAME_MAX, "%s/%s", dirname, de->d_name);
+        if (de->d_type == DT_REG || recursive) {
+            if (chown(filename, uid, gid) == -1)
+                netdata_log_error("Cannot chown %s '%s' to %u:%u", de->d_type == DT_DIR ? "directory" : "file", filename, (unsigned int)uid, (unsigned int)gid);
+        }
+
+        if (de->d_type == DT_DIR && recursive)
+            fix_directory_file_permissions(filename, uid, gid, recursive);
     }
-    else if(errno != EEXIST)
-        // log an error only if the directory does not exist
-        error("Cannot create directory '%s'", dir);
+
+    closedir(dir);
+}
+
+void change_dir_ownership(const char *dir, uid_t uid, gid_t gid, bool recursive)
+{
+    if (chown(dir, uid, gid) == -1)
+        netdata_log_error("Cannot chown directory '%s' to %u:%u", dir, (unsigned int)uid, (unsigned int)gid);
+
+    fix_directory_file_permissions(dir, uid, gid, recursive);
 }
 
 void clean_directory(char *dirname)
@@ -69,9 +89,23 @@ void clean_directory(char *dirname)
     while((de = readdir(dir)))
         if(de->d_type == DT_REG)
             if (unlinkat(dir_fd, de->d_name, 0))
-                error("Cannot delete %s/%s", dirname, de->d_name);
+                netdata_log_error("Cannot delete %s/%s", dirname, de->d_name);
 
     closedir(dir);
+}
+
+void prepare_required_directories(uid_t uid, gid_t gid) {
+    change_dir_ownership(netdata_configured_cache_dir, uid, gid, true);
+    change_dir_ownership(netdata_configured_varlib_dir, uid, gid, false);
+    change_dir_ownership(netdata_configured_lock_dir, uid, gid, false);
+    change_dir_ownership(netdata_configured_log_dir, uid, gid, false);
+    change_dir_ownership(claimingdirectory, uid, gid, false);
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/registry", netdata_configured_varlib_dir);
+    change_dir_ownership(filename, uid, gid, false);
+
+    clean_directory(netdata_configured_lock_dir);
 }
 
 int become_user(const char *username, int pid_fd) {
@@ -79,23 +113,21 @@ int become_user(const char *username, int pid_fd) {
 
     struct passwd *pw = getpwnam(username);
     if(!pw) {
-        error("User %s is not present.", username);
+        netdata_log_error("User %s is not present.", username);
         return -1;
     }
 
     uid_t uid = pw->pw_uid;
     gid_t gid = pw->pw_gid;
 
-    create_needed_dir(netdata_configured_cache_dir, uid, gid);
-    create_needed_dir(netdata_configured_varlib_dir, uid, gid);
-    create_needed_dir(netdata_configured_lock_dir, uid, gid);
-    create_needed_dir(claimingdirectory, uid, gid);
+    if (am_i_root)
+        netdata_log_info("I am root, so checking permissions");
 
-    clean_directory(netdata_configured_lock_dir);
+    prepare_required_directories(uid, gid);
 
     if(pidfile[0]) {
         if(chown(pidfile, uid, gid) == -1)
-            error("Cannot chown '%s' to %u:%u", pidfile, (unsigned int)uid, (unsigned int)gid);
+            netdata_log_error("Cannot chown '%s' to %u:%u", pidfile, (unsigned int)uid, (unsigned int)gid);
     }
 
     int ngroups = (int)sysconf(_SC_NGROUPS_MAX);
@@ -108,7 +140,7 @@ int become_user(const char *username, int pid_fd) {
         if(getgrouplist(username, gid, supplementary_groups, &ngroups) == -1) {
 #endif /* __APPLE__ */
             if(am_i_root)
-                error("Cannot get supplementary groups of user '%s'.", username);
+                netdata_log_error("Cannot get supplementary groups of user '%s'.", username);
 
             ngroups = 0;
         }
@@ -122,7 +154,7 @@ int become_user(const char *username, int pid_fd) {
     if(supplementary_groups && ngroups > 0) {
         if(setgroups((size_t)ngroups, supplementary_groups) == -1) {
             if(am_i_root)
-                error("Cannot set supplementary groups for user '%s'", username);
+                netdata_log_error("Cannot set supplementary groups for user '%s'", username);
         }
         ngroups = 0;
     }
@@ -135,7 +167,7 @@ int become_user(const char *username, int pid_fd) {
 #else
     if(setresgid(gid, gid, gid) != 0) {
 #endif /* __APPLE__ */
-        error("Cannot switch to user's %s group (gid: %u).", username, gid);
+        netdata_log_error("Cannot switch to user's %s group (gid: %u).", username, gid);
         return -1;
     }
 
@@ -144,24 +176,24 @@ int become_user(const char *username, int pid_fd) {
 #else
     if(setresuid(uid, uid, uid) != 0) {
 #endif /* __APPLE__ */
-        error("Cannot switch to user %s (uid: %u).", username, uid);
+        netdata_log_error("Cannot switch to user %s (uid: %u).", username, uid);
         return -1;
     }
 
     if(setgid(gid) != 0) {
-        error("Cannot switch to user's %s group (gid: %u).", username, gid);
+        netdata_log_error("Cannot switch to user's %s group (gid: %u).", username, gid);
         return -1;
     }
     if(setegid(gid) != 0) {
-        error("Cannot effectively switch to user's %s group (gid: %u).", username, gid);
+        netdata_log_error("Cannot effectively switch to user's %s group (gid: %u).", username, gid);
         return -1;
     }
     if(setuid(uid) != 0) {
-        error("Cannot switch to user %s (uid: %u).", username, uid);
+        netdata_log_error("Cannot switch to user %s (uid: %u).", username, uid);
         return -1;
     }
     if(seteuid(uid) != 0) {
-        error("Cannot effectively switch to user %s (uid: %u).", username, uid);
+        netdata_log_error("Cannot effectively switch to user %s (uid: %u).", username, uid);
         return -1;
     }
 
@@ -181,7 +213,7 @@ static void oom_score_adj(void) {
 
     // read the existing score
     if(read_single_signed_number_file("/proc/self/oom_score_adj", &old_score)) {
-        error("Out-Of-Memory (OOM) score setting is not supported on this system.");
+        netdata_log_error("Out-Of-Memory (OOM) score setting is not supported on this system.");
         return;
     }
 
@@ -202,26 +234,26 @@ static void oom_score_adj(void) {
     if(s && *s && (isdigit(*s) || *s == '-' || *s == '+'))
         wanted_score = atoll(s);
     else if(s && !strcmp(s, "keep")) {
-        info("Out-Of-Memory (OOM) kept as-is (running with %d)", (int) old_score);
+        netdata_log_info("Out-Of-Memory (OOM) kept as-is (running with %d)", (int) old_score);
         return;
     }
     else {
-        info("Out-Of-Memory (OOM) score not changed due to non-numeric setting: '%s' (running with %d)", s, (int)old_score);
+        netdata_log_info("Out-Of-Memory (OOM) score not changed due to non-numeric setting: '%s' (running with %d)", s, (int)old_score);
         return;
     }
 
     if(wanted_score < OOM_SCORE_ADJ_MIN) {
-        error("Wanted Out-Of-Memory (OOM) score %d is too small. Using %d", (int)wanted_score, (int)OOM_SCORE_ADJ_MIN);
+        netdata_log_error("Wanted Out-Of-Memory (OOM) score %d is too small. Using %d", (int)wanted_score, (int)OOM_SCORE_ADJ_MIN);
         wanted_score = OOM_SCORE_ADJ_MIN;
     }
 
     if(wanted_score > OOM_SCORE_ADJ_MAX) {
-        error("Wanted Out-Of-Memory (OOM) score %d is too big. Using %d", (int)wanted_score, (int)OOM_SCORE_ADJ_MAX);
+        netdata_log_error("Wanted Out-Of-Memory (OOM) score %d is too big. Using %d", (int)wanted_score, (int)OOM_SCORE_ADJ_MAX);
         wanted_score = OOM_SCORE_ADJ_MAX;
     }
 
     if(old_score == wanted_score) {
-        info("Out-Of-Memory (OOM) score is already set to the wanted value %d", (int)old_score);
+        netdata_log_info("Out-Of-Memory (OOM) score is already set to the wanted value %d", (int)old_score);
         return;
     }
 
@@ -235,25 +267,27 @@ static void oom_score_adj(void) {
 
         if(written) {
             if(read_single_signed_number_file("/proc/self/oom_score_adj", &final_score))
-                error("Adjusted my Out-Of-Memory (OOM) score to %d, but cannot verify it.", (int)wanted_score);
+                netdata_log_error("Adjusted my Out-Of-Memory (OOM) score to %d, but cannot verify it.", (int)wanted_score);
             else if(final_score == wanted_score)
-                info("Adjusted my Out-Of-Memory (OOM) score from %d to %d.", (int)old_score, (int)final_score);
+                netdata_log_info("Adjusted my Out-Of-Memory (OOM) score from %d to %d.", (int)old_score, (int)final_score);
             else
-                error("Adjusted my Out-Of-Memory (OOM) score from %d to %d, but it has been set to %d.", (int)old_score, (int)wanted_score, (int)final_score);
+                netdata_log_error("Adjusted my Out-Of-Memory (OOM) score from %d to %d, but it has been set to %d.", (int)old_score, (int)wanted_score, (int)final_score);
             analytics_report_oom_score(final_score);
         }
         else
-            error("Failed to adjust my Out-Of-Memory (OOM) score to %d. Running with %d. (systemd systems may change it via netdata.service)", (int)wanted_score, (int)old_score);
+            netdata_log_error("Failed to adjust my Out-Of-Memory (OOM) score to %d. Running with %d. (systemd systems may change it via netdata.service)", (int)wanted_score, (int)old_score);
     }
     else
-        error("Failed to adjust my Out-Of-Memory (OOM) score. Cannot open /proc/self/oom_score_adj for writing.");
+        netdata_log_error("Failed to adjust my Out-Of-Memory (OOM) score. Cannot open /proc/self/oom_score_adj for writing.");
 }
 
 static void process_nice_level(void) {
 #ifdef HAVE_NICE
     int nice_level = (int)config_get_number(CONFIG_SECTION_GLOBAL, "process nice level", 19);
-    if(nice(nice_level) == -1) error("Cannot set netdata CPU nice level to %d.", nice_level);
-    else debug(D_SYSTEM, "Set netdata nice level to %d.", nice_level);
+    if(nice(nice_level) == -1)
+        netdata_log_error("Cannot set netdata CPU nice level to %d.", nice_level);
+    else
+        netdata_log_debug(D_SYSTEM, "Set netdata nice level to %d.", nice_level);
 #endif // HAVE_NICE
 };
 
@@ -309,7 +343,7 @@ struct sched_def {
 static void sched_getscheduler_report(void) {
     int sched = sched_getscheduler(0);
     if(sched == -1) {
-        error("Cannot get my current process scheduling policy.");
+        netdata_log_error("Cannot get my current process scheduling policy.");
         return;
     }
     else {
@@ -319,23 +353,23 @@ static void sched_getscheduler_report(void) {
                 if(scheduler_defaults[i].flags & SCHED_FLAG_PRIORITY_CONFIGURABLE) {
                     struct sched_param param;
                     if(sched_getparam(0, &param) == -1) {
-                        error("Cannot get the process scheduling priority for my policy '%s'", scheduler_defaults[i].name);
+                        netdata_log_error("Cannot get the process scheduling priority for my policy '%s'", scheduler_defaults[i].name);
                         return;
                     }
                     else {
-                        info("Running with process scheduling policy '%s', priority %d", scheduler_defaults[i].name, param.sched_priority);
+                        netdata_log_info("Running with process scheduling policy '%s', priority %d", scheduler_defaults[i].name, param.sched_priority);
                     }
                 }
                 else if(scheduler_defaults[i].flags & SCHED_FLAG_USE_NICE) {
                     #ifdef HAVE_GETPRIORITY
                     int n = getpriority(PRIO_PROCESS, 0);
-                    info("Running with process scheduling policy '%s', nice level %d", scheduler_defaults[i].name, n);
+                    netdata_log_info("Running with process scheduling policy '%s', nice level %d", scheduler_defaults[i].name, n);
                     #else // !HAVE_GETPRIORITY
-                    info("Running with process scheduling policy '%s'", scheduler_defaults[i].name);
+                    netdata_log_info("Running with process scheduling policy '%s'", scheduler_defaults[i].name);
                     #endif // !HAVE_GETPRIORITY
                 }
                 else {
-                    info("Running with process scheduling policy '%s'", scheduler_defaults[i].name);
+                    netdata_log_info("Running with process scheduling policy '%s'", scheduler_defaults[i].name);
                 }
 
                 return;
@@ -374,14 +408,14 @@ static void sched_setscheduler_set(void) {
 #ifdef HAVE_SCHED_GET_PRIORITY_MIN
                 errno = 0;
                 if(priority < sched_get_priority_min(policy)) {
-                    error("scheduler %s (%d) priority %d is below the minimum %d. Using the minimum.", name, policy, priority, sched_get_priority_min(policy));
+                    netdata_log_error("scheduler %s (%d) priority %d is below the minimum %d. Using the minimum.", name, policy, priority, sched_get_priority_min(policy));
                     priority = sched_get_priority_min(policy);
                 }
 #endif
 #ifdef HAVE_SCHED_GET_PRIORITY_MAX
                 errno = 0;
                 if(priority > sched_get_priority_max(policy)) {
-                    error("scheduler %s (%d) priority %d is above the maximum %d. Using the maximum.", name, policy, priority, sched_get_priority_max(policy));
+                    netdata_log_error("scheduler %s (%d) priority %d is above the maximum %d. Using the maximum.", name, policy, priority, sched_get_priority_max(policy));
                     priority = sched_get_priority_max(policy);
                 }
 #endif
@@ -390,7 +424,7 @@ static void sched_setscheduler_set(void) {
         }
 
         if(!found) {
-            error("Unknown scheduling policy '%s' - falling back to nice", name);
+            netdata_log_error("Unknown scheduling policy '%s' - falling back to nice", name);
             goto fallback;
         }
 
@@ -401,10 +435,13 @@ static void sched_setscheduler_set(void) {
         errno = 0;
         i = sched_setscheduler(0, policy, &param);
         if(i != 0) {
-            error("Cannot adjust netdata scheduling policy to %s (%d), with priority %d. Falling back to nice.", name, policy, priority);
+            netdata_log_error("Cannot adjust netdata scheduling policy to %s (%d), with priority %d. Falling back to nice.",
+                              name,
+                              policy,
+                              priority);
         }
         else {
-            info("Adjusted netdata scheduling policy to %s (%d), with priority %d.", name, policy, priority);
+            netdata_log_info("Adjusted netdata scheduling policy to %s (%d), with priority %d.", name, policy, priority);
             if(!(flags & SCHED_FLAG_USE_NICE))
                 goto report;
         }
@@ -457,15 +494,16 @@ int become_daemon(int dont_fork, const char *user)
         pidfd = open(pidfile, O_WRONLY | O_CREAT, 0644);
         if(pidfd >= 0) {
             if(ftruncate(pidfd, 0) != 0)
-                error("Cannot truncate pidfile '%s'.", pidfile);
+                netdata_log_error("Cannot truncate pidfile '%s'.", pidfile);
 
             char b[100];
             sprintf(b, "%d\n", getpid());
             ssize_t i = write(pidfd, b, strlen(b));
             if(i <= 0)
-                error("Cannot write pidfile '%s'.", pidfile);
+                netdata_log_error("Cannot write pidfile '%s'.", pidfile);
         }
-        else error("Failed to open pidfile '%s'.", pidfile);
+        else
+            netdata_log_error("Failed to open pidfile '%s'.", pidfile);
     }
 
     // Set new file permissions
@@ -482,17 +520,13 @@ int become_daemon(int dont_fork, const char *user)
 
     if(user && *user) {
         if(become_user(user, pidfd) != 0) {
-            error("Cannot become user '%s'. Continuing as we are.", user);
+            netdata_log_error("Cannot become user '%s'. Continuing as we are.", user);
         }
-        else debug(D_SYSTEM, "Successfully became user '%s'.", user);
+        else
+            netdata_log_debug(D_SYSTEM, "Successfully became user '%s'.", user);
     }
     else {
-        create_needed_dir(netdata_configured_cache_dir, getuid(), getgid());
-        create_needed_dir(netdata_configured_varlib_dir, getuid(), getgid());
-        create_needed_dir(netdata_configured_lock_dir, getuid(), getgid());
-        create_needed_dir(claimingdirectory, getuid(), getgid());
-
-        clean_directory(netdata_configured_lock_dir);
+        prepare_required_directories(getuid(), getgid());
     }
 
     if(pidfd != -1)

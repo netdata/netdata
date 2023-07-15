@@ -9,22 +9,26 @@ struct config hardirq_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
 
-#define HARDIRQ_MAP_LATENCY 0
-#define HARDIRQ_MAP_LATENCY_STATIC 1
 static ebpf_local_maps_t hardirq_maps[] = {
     {
         .name = "tbl_hardirq",
         .internal_input = NETDATA_HARDIRQ_MAX_IRQS,
         .user_input = 0,
         .type = NETDATA_EBPF_MAP_STATIC,
-        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED
+        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+        .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
     },
     {
         .name = "tbl_hardirq_static",
         .internal_input = HARDIRQ_EBPF_STATIC_END,
         .user_input = 0,
         .type = NETDATA_EBPF_MAP_STATIC,
-        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED
+        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+        .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
     },
     /* end */
     {
@@ -32,7 +36,10 @@ static ebpf_local_maps_t hardirq_maps[] = {
         .internal_input = 0,
         .user_input = 0,
         .type = NETDATA_EBPF_MAP_CONTROLLER,
-        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED
+        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+        .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
     }
 };
 
@@ -129,6 +136,36 @@ static hardirq_static_val_t hardirq_static_vals[] = {
 // thread will write to netdata agent.
 static avl_tree_lock hardirq_pub;
 
+#ifdef LIBBPF_MAJOR_VERSION
+/**
+ * Set hash table
+ *
+ * Set the values for maps according the value given by kernel.
+ *
+ * @param obj is the main structure for bpf objects.
+ */
+static inline void ebpf_hardirq_set_hash_table(struct hardirq_bpf *obj)
+{
+    hardirq_maps[HARDIRQ_MAP_LATENCY].map_fd = bpf_map__fd(obj->maps.tbl_hardirq);
+    hardirq_maps[HARDIRQ_MAP_LATENCY_STATIC].map_fd = bpf_map__fd(obj->maps.tbl_hardirq_static);
+}
+
+/**
+ * Load and Attach
+ *
+ * Load and attach bpf software.
+ */
+static inline int ebpf_hardirq_load_and_attach(struct hardirq_bpf *obj)
+{
+    int ret = hardirq_bpf__load(obj);
+    if (ret) {
+        return -1;
+    }
+
+    return hardirq_bpf__attach(obj);
+}
+#endif
+
 /*****************************************************************
  *
  *  ARAL SECTION
@@ -179,20 +216,24 @@ void ebpf_hardirq_release(hardirq_val_t *stat)
  *****************************************************************/
 
 /**
- * Hardirq Free
+ * Obsolete global
  *
- * Cleanup variables after child threads to stop
+ * Obsolete global charts created by thread.
  *
- * @param ptr thread data.
+ * @param em a pointer to `struct ebpf_module`
  */
-static void ebpf_hardirq_free(ebpf_module_t *em)
+static void ebpf_obsolete_hardirq_global(ebpf_module_t *em)
 {
-    for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
-        ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
-    }
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
+    ebpf_write_chart_obsolete(NETDATA_EBPF_SYSTEM_GROUP,
+                              "hardirq_latency",
+                              "Hardware IRQ latency",
+                              EBPF_COMMON_DIMENSION_MILLISECONDS,
+                              "interrupts",
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                              NULL,
+                              NETDATA_CHART_PRIO_HARDIRQ_LATENCY,
+                              em->update_every
+    );
 }
 
 /**
@@ -205,7 +246,32 @@ static void ebpf_hardirq_free(ebpf_module_t *em)
 static void hardirq_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    ebpf_hardirq_free(em);
+
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        pthread_mutex_lock(&lock);
+
+        ebpf_obsolete_hardirq_global(em);
+
+        pthread_mutex_unlock(&lock);
+        fflush(stdout);
+    }
+
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
+
+    if (em->objects) {
+        ebpf_unload_legacy_code(em->objects, em->probe_links);
+        em->objects = NULL;
+        em->probe_links = NULL;
+    }
+
+    for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
+        ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
+    }
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_update_stats(&plugin_statistics, em);
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************
@@ -376,7 +442,7 @@ static int hardirq_read_latency_map(int mapfd)
 
             avl_t *check = avl_insert_lock(&hardirq_pub, (avl_t *)v);
             if (check != (avl_t *)v) {
-                error("Internal error, cannot insert the AVL tree.");
+                netdata_log_error("Internal error, cannot insert the AVL tree.");
             }
         }
 
@@ -503,7 +569,7 @@ static void hardirq_collector(ebpf_module_t *em)
     hardirq_create_charts(em->update_every);
     hardirq_create_static_dims();
     ebpf_update_stats(&plugin_statistics, em);
-    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
     pthread_mutex_unlock(&lock);
 
     // loop and read from published data until ebpf plugin is closed.
@@ -512,7 +578,9 @@ static void hardirq_collector(ebpf_module_t *em)
     int update_every = em->update_every;
     int counter = update_every - 1;
     //This will be cancelled by its parent
-    while (!ebpf_exit_plugin) {
+    uint32_t running_time = 0;
+    uint32_t lifetime = em->lifetime;
+    while (!ebpf_exit_plugin && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
 
         if (ebpf_exit_plugin || ++counter != update_every)
@@ -531,12 +599,55 @@ static void hardirq_collector(ebpf_module_t *em)
         write_end_chart();
 
         pthread_mutex_unlock(&lock);
+
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (running_time && !em->running_time)
+            running_time = update_every;
+        else
+            running_time += update_every;
+
+        em->running_time = running_time;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 
 /*****************************************************************
  *  EBPF HARDIRQ THREAD
  *****************************************************************/
+
+/*
+ * Load BPF
+ *
+ * Load BPF files.
+ *
+ * @param em the structure with configuration
+ *
+ * @return It returns 0 on success and -1 otherwise.
+ */
+static int ebpf_hardirq_load_bpf(ebpf_module_t *em)
+{
+    int ret = 0;
+    if (em->load & EBPF_LOAD_LEGACY) {
+        em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+        if (!em->probe_links) {
+            ret = -1;
+        }
+    }
+#ifdef LIBBPF_MAJOR_VERSION
+    else {
+        hardirq_bpf_obj = hardirq_bpf__open();
+        if (!hardirq_bpf_obj)
+            ret = -1;
+        else {
+            ret = ebpf_hardirq_load_and_attach(hardirq_bpf_obj);
+            if (!ret)
+                ebpf_hardirq_set_hash_table(hardirq_bpf_obj);
+        }
+    }
+#endif
+
+    return ret;
+}
 
 /**
  * Hard IRQ latency thread.
@@ -555,8 +666,11 @@ void *ebpf_hardirq_thread(void *ptr)
         goto endhardirq;
     }
 
-    em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
-    if (!em->probe_links) {
+#ifdef LIBBPF_MAJOR_VERSION
+    ebpf_define_map_type(em->maps, em->maps_per_core, running_on_kernel);
+    ebpf_adjust_thread_load(em, default_btf);
+#endif
+    if (ebpf_hardirq_load_bpf(em)) {
         goto endhardirq;
     }
 

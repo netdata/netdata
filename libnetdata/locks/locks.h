@@ -20,10 +20,26 @@ typedef struct netdata_spinlock {
 #define NETDATA_SPINLOCK_INITIALIZER \
     { .locked = false }
 
-void netdata_spinlock_init(SPINLOCK *spinlock);
-void netdata_spinlock_lock(SPINLOCK *spinlock);
-void netdata_spinlock_unlock(SPINLOCK *spinlock);
-bool netdata_spinlock_trylock(SPINLOCK *spinlock);
+void spinlock_init(SPINLOCK *spinlock);
+void spinlock_lock(SPINLOCK *spinlock);
+void spinlock_unlock(SPINLOCK *spinlock);
+bool spinlock_trylock(SPINLOCK *spinlock);
+
+typedef struct netdata_rw_spinlock {
+    int32_t readers;
+    SPINLOCK spinlock;
+} RW_SPINLOCK;
+
+#define NETDATA_RW_SPINLOCK_INITIALIZER \
+    { .readers = 0, .spinlock = NETDATA_SPINLOCK_INITIALIZER }
+
+void rw_spinlock_init(RW_SPINLOCK *rw_spinlock);
+void rw_spinlock_read_lock(RW_SPINLOCK *rw_spinlock);
+void rw_spinlock_read_unlock(RW_SPINLOCK *rw_spinlock);
+void rw_spinlock_write_lock(RW_SPINLOCK *rw_spinlock);
+void rw_spinlock_write_unlock(RW_SPINLOCK *rw_spinlock);
+bool rw_spinlock_tryread_lock(RW_SPINLOCK *rw_spinlock);
+bool rw_spinlock_trywrite_lock(RW_SPINLOCK *rw_spinlock);
 
 #ifdef NETDATA_TRACE_RWLOCKS
 

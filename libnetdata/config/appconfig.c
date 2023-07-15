@@ -62,7 +62,7 @@ int is_valid_connector(char *type, int check_reserved)
     }
 //    else {
 //        if (unlikely(is_valid_connector(type,1))) {
-//            error("Section %s invalid -- reserved name", type);
+//            netdata_log_error("Section %s invalid -- reserved name", type);
 //            return 0;
 //        }
 //    }
@@ -164,7 +164,7 @@ static inline struct section *appconfig_section_find(struct config *root, const 
 }
 
 static inline struct section *appconfig_section_create(struct config *root, const char *section) {
-    debug(D_CONFIG, "Creating section '%s'.", section);
+    netdata_log_debug(D_CONFIG, "Creating section '%s'.", section);
 
     struct section *co = callocz(1, sizeof(struct section));
     co->name = strdupz(section);
@@ -174,7 +174,7 @@ static inline struct section *appconfig_section_create(struct config *root, cons
     avl_init_lock(&co->values_index, appconfig_option_compare);
 
     if(unlikely(appconfig_index_add(root, co) != co))
-        error("INTERNAL ERROR: indexing of section '%s', already exists.", co->name);
+        netdata_log_error("INTERNAL ERROR: indexing of section '%s', already exists.", co->name);
 
     appconfig_wrlock(root);
     struct section *co2 = root->last_section;
@@ -194,11 +194,11 @@ void appconfig_section_destroy_non_loaded(struct config *root, const char *secti
     struct section *co;
     struct config_option *cv, *cv_next;
 
-    debug(D_CONFIG, "Destroying section '%s'.", section);
+    netdata_log_debug(D_CONFIG, "Destroying section '%s'.", section);
 
     co = appconfig_section_find(root, section);
     if(!co) {
-        error("Could not destroy section '%s'. Not found.", section);
+        netdata_log_error("Could not destroy section '%s'. Not found.", section);
         return;
     }
 
@@ -213,7 +213,7 @@ void appconfig_section_destroy_non_loaded(struct config *root, const char *secti
     for(cv = co->values ; cv ; cv = cv_next) {
         cv_next = cv->next;
         if(unlikely(!appconfig_option_index_del(co, cv)))
-            error("Cannot remove config option '%s' from section '%s'.", cv->name, co->name);
+            netdata_log_error("Cannot remove config option '%s' from section '%s'.", cv->name, co->name);
         freez(cv->value);
         freez(cv->name);
         freez(cv);
@@ -222,7 +222,7 @@ void appconfig_section_destroy_non_loaded(struct config *root, const char *secti
     config_section_unlock(co);
 
     if (unlikely(!appconfig_index_del(root, co))) {
-        error("Cannot remove section '%s' from config.", section);
+        netdata_log_error("Cannot remove section '%s' from config.", section);
         return;
     }
     
@@ -259,12 +259,12 @@ void appconfig_section_destroy_non_loaded(struct config *root, const char *secti
 
 void appconfig_section_option_destroy_non_loaded(struct config *root, const char *section, const char *name)
 {
-    debug(D_CONFIG, "Destroying section option '%s -> %s'.", section, name);
+    netdata_log_debug(D_CONFIG, "Destroying section option '%s -> %s'.", section, name);
 
     struct section *co;
     co = appconfig_section_find(root, section);
     if (!co) {
-        error("Could not destroy section option '%s -> %s'. The section not found.", section, name);
+        netdata_log_error("Could not destroy section option '%s -> %s'. The section not found.", section, name);
         return;
     }
 
@@ -281,7 +281,7 @@ void appconfig_section_option_destroy_non_loaded(struct config *root, const char
 
     if (unlikely(!(cv && appconfig_option_index_del(co, cv)))) {
         config_section_unlock(co);
-        error("Could not destroy section option '%s -> %s'. The option not found.", section, name);
+        netdata_log_error("Could not destroy section option '%s -> %s'. The option not found.", section, name);
         return;
     }
 
@@ -310,7 +310,7 @@ void appconfig_section_option_destroy_non_loaded(struct config *root, const char
 // config name-value methods
 
 static inline struct config_option *appconfig_value_create(struct section *co, const char *name, const char *value) {
-    debug(D_CONFIG, "Creating config entry for name '%s', value '%s', in section '%s'.", name, value, co->name);
+    netdata_log_debug(D_CONFIG, "Creating config entry for name '%s', value '%s', in section '%s'.", name, value, co->name);
 
     struct config_option *cv = callocz(1, sizeof(struct config_option));
     cv->name = strdupz(name);
@@ -319,7 +319,7 @@ static inline struct config_option *appconfig_value_create(struct section *co, c
 
     struct config_option *found = appconfig_option_index_add(co, cv);
     if(found != cv) {
-        error("indexing of config '%s' in section '%s': already exists - using the existing one.", cv->name, co->name);
+        netdata_log_error("indexing of config '%s' in section '%s': already exists - using the existing one.", cv->name, co->name);
         freez(cv->value);
         freez(cv->name);
         freez(cv);
@@ -341,7 +341,7 @@ static inline struct config_option *appconfig_value_create(struct section *co, c
 int appconfig_exists(struct config *root, const char *section, const char *name) {
     struct config_option *cv;
 
-    debug(D_CONFIG, "request to get config in section '%s', name '%s'", section, name);
+    netdata_log_debug(D_CONFIG, "request to get config in section '%s', name '%s'", section, name);
 
     struct section *co = appconfig_section_find(root, section);
     if(!co) return 0;
@@ -356,7 +356,7 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
     struct config_option *cv_old, *cv_new;
     int ret = -1;
 
-    debug(D_CONFIG, "request to rename config in section '%s', old name '%s', to section '%s', new name '%s'", section_old, name_old, section_new, name_new);
+    netdata_log_debug(D_CONFIG, "request to rename config in section '%s', old name '%s', to section '%s', new name '%s'", section_old, name_old, section_new, name_new);
 
     struct section *co_old = appconfig_section_find(root, section_old);
     if(!co_old) return ret;
@@ -375,7 +375,7 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
     if(cv_new) goto cleanup;
 
     if(unlikely(appconfig_option_index_del(co_old, cv_old) != cv_old))
-        error("INTERNAL ERROR: deletion of config '%s' from section '%s', deleted the wrong config entry.", cv_old->name, co_old->name);
+        netdata_log_error("INTERNAL ERROR: deletion of config '%s' from section '%s', deleted the wrong config entry.", cv_old->name, co_old->name);
 
     if(co_old->values == cv_old) {
         co_old->values = cv_old->next;
@@ -384,7 +384,7 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
         struct config_option *t;
         for(t = co_old->values; t && t->next != cv_old ;t = t->next) ;
         if(!t || t->next != cv_old)
-            error("INTERNAL ERROR: cannot find variable '%s' in section '%s' of the config - but it should be there.", cv_old->name, co_old->name);
+            netdata_log_error("INTERNAL ERROR: cannot find variable '%s' in section '%s' of the config - but it should be there.", cv_old->name, co_old->name);
         else
             t->next = cv_old->next;
     }
@@ -398,7 +398,7 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
     co_new->values = cv_new;
 
     if(unlikely(appconfig_option_index_add(co_new, cv_old) != cv_old))
-        error("INTERNAL ERROR: re-indexing of config '%s' in section '%s', already exists.", cv_old->name, co_new->name);
+        netdata_log_error("INTERNAL ERROR: re-indexing of config '%s' in section '%s', already exists.", cv_old->name, co_new->name);
 
     ret = 0;
 
@@ -439,9 +439,9 @@ char *appconfig_get_by_section(struct section *co, const char *name, const char 
 char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value)
 {
     if (default_value == NULL)
-        debug(D_CONFIG, "request to get config in section '%s', name '%s' or fail", section, name);
+        netdata_log_debug(D_CONFIG, "request to get config in section '%s', name '%s' or fail", section, name);
     else
-        debug(D_CONFIG, "request to get config in section '%s', name '%s', default_value '%s'", section, name, default_value);
+        netdata_log_debug(D_CONFIG, "request to get config in section '%s', name '%s', default_value '%s'", section, name, default_value);
 
     struct section *co = appconfig_section_find(root, section);
     if (!co && !default_value)
@@ -518,9 +518,9 @@ int appconfig_get_boolean_ondemand(struct config *root, const char *section, con
     s = appconfig_get(root, section, name, s);
     if(!s) return value;
 
-    if(!strcmp(s, "yes"))
+    if(!strcmp(s, "yes") || !strcmp(s, "true") || !strcmp(s, "on"))
         return CONFIG_BOOLEAN_YES;
-    else if(!strcmp(s, "no"))
+    else if(!strcmp(s, "no") || !strcmp(s, "false") || !strcmp(s, "off"))
         return CONFIG_BOOLEAN_NO;
     else if(!strcmp(s, "auto") || !strcmp(s, "on demand"))
         return CONFIG_BOOLEAN_AUTO;
@@ -532,7 +532,7 @@ const char *appconfig_set_default(struct config *root, const char *section, cons
 {
     struct config_option *cv;
 
-    debug(D_CONFIG, "request to set default config in section '%s', name '%s', value '%s'", section, name, value);
+    netdata_log_debug(D_CONFIG, "request to set default config in section '%s', name '%s', value '%s'", section, name, value);
 
     struct section *co = appconfig_section_find(root, section);
     if(!co) return appconfig_set(root, section, name, value);
@@ -559,7 +559,7 @@ const char *appconfig_set(struct config *root, const char *section, const char *
 {
     struct config_option *cv;
 
-    debug(D_CONFIG, "request to set config in section '%s', name '%s', value '%s'", section, name, value);
+    netdata_log_debug(D_CONFIG, "request to set config in section '%s', name '%s', value '%s'", section, name, value);
 
     struct section *co = appconfig_section_find(root, section);
     if(!co) co = appconfig_section_create(root, section);
@@ -618,7 +618,7 @@ int appconfig_get_duration(struct config *root, const char *section, const char 
     if(!s) goto fallback;
 
     if(!config_parse_duration(s, &result)) {
-        error("config option '[%s].%s = %s' is configured with an valid duration", section, name, s);
+        netdata_log_error("config option '[%s].%s = %s' is configured with an valid duration", section, name, s);
         goto fallback;
     }
 
@@ -626,7 +626,7 @@ int appconfig_get_duration(struct config *root, const char *section, const char 
 
     fallback:
     if(!config_parse_duration(value, &result))
-        error("INTERNAL ERROR: default duration supplied for option '[%s].%s = %s' is not a valid duration", section, name, value);
+        netdata_log_error("INTERNAL ERROR: default duration supplied for option '[%s].%s = %s' is not a valid duration", section, name, value);
 
     return result;
 }
@@ -649,11 +649,11 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
 
     if(!filename) filename = CONFIG_DIR "/" CONFIG_FILENAME;
 
-    debug(D_CONFIG, "CONFIG: opening config file '%s'", filename);
+    netdata_log_debug(D_CONFIG, "CONFIG: opening config file '%s'", filename);
 
     FILE *fp = fopen(filename, "r");
     if(!fp) {
-        // info("CONFIG: cannot open file '%s'. Using internal defaults.", filename);
+        // netdata_log_info("CONFIG: cannot open file '%s'. Using internal defaults.", filename);
         return 0;
     }
 
@@ -669,7 +669,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
 
         s = trim(buffer);
         if(!s || *s == '#') {
-            debug(D_CONFIG, "CONFIG: ignoring line %d of file '%s', it is empty.", line, filename);
+            netdata_log_debug(D_CONFIG, "CONFIG: ignoring line %d of file '%s', it is empty.", line, filename);
             continue;
         }
 
@@ -696,13 +696,13 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
                         strncpyz(working_instance, s, CONFIG_MAX_NAME);
                         working_connector_section = NULL;
                         if (unlikely(appconfig_section_find(root, working_instance))) {
-                            error("Instance (%s) already exists", working_instance);
+                            netdata_log_error("Instance (%s) already exists", working_instance);
                             co = NULL;
                             continue;
                         }
                     } else {
                         co = NULL;
-                        error("Section (%s) does not specify a valid connector", s);
+                        netdata_log_error("Section (%s) does not specify a valid connector", s);
                         continue;
                     }
                 }
@@ -718,7 +718,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
                     struct config_option *save = cv2->next;
                     struct config_option *found = appconfig_option_index_del(co, cv2);
                     if(found != cv2)
-                        error("INTERNAL ERROR: Cannot remove '%s' from  section '%s', it was not inserted before.",
+                        netdata_log_error("INTERNAL ERROR: Cannot remove '%s' from  section '%s', it was not inserted before.",
                                cv2->name, co->name);
 
                     freez(cv2->name);
@@ -735,7 +735,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
 
         if(!co) {
             // line outside a section
-            error("CONFIG: ignoring line %d ('%s') of file '%s', it is outside all sections.", line, s, filename);
+            netdata_log_error("CONFIG: ignoring line %d ('%s') of file '%s', it is outside all sections.", line, s, filename);
             continue;
         }
 
@@ -746,7 +746,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
         char *name = s;
         char *value = strchr(s, '=');
         if(!value) {
-            error("CONFIG: ignoring line %d ('%s') of file '%s', there is no = in it.", line, s, filename);
+            netdata_log_error("CONFIG: ignoring line %d ('%s') of file '%s', there is no = in it.", line, s, filename);
             continue;
         }
         *value = '\0';
@@ -756,7 +756,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
         value = trim(value);
 
         if(!name || *name == '#') {
-            error("CONFIG: ignoring line %d of file '%s', name is empty.", line, filename);
+            netdata_log_error("CONFIG: ignoring line %d of file '%s', name is empty.", line, filename);
             continue;
         }
 
@@ -778,12 +778,12 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
             }
         } else {
             if (((cv->flags & CONFIG_VALUE_USED) && overwrite_used) || !(cv->flags & CONFIG_VALUE_USED)) {
-                debug(
+                netdata_log_debug(
                     D_CONFIG, "CONFIG: line %d of file '%s', overwriting '%s/%s'.", line, filename, co->name, cv->name);
                 freez(cv->value);
                 cv->value = strdupz(value);
             } else
-                debug(
+                netdata_log_debug(
                     D_CONFIG,
                     "CONFIG: ignoring line %d of file '%s', '%s/%s' is already present and used.",
                     line,

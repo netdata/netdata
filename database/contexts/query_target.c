@@ -131,10 +131,10 @@ void query_target_release(QUERY_TARGET *qt) {
 
     qt->id[0] = '\0';
 
-    netdata_spinlock_lock(&query_target_base.used.spinlock);
+    spinlock_lock(&query_target_base.used.spinlock);
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(query_target_base.used.base, qt, internal.prev, internal.next);
     query_target_base.used.count--;
-    netdata_spinlock_unlock(&query_target_base.used.spinlock);
+    spinlock_unlock(&query_target_base.used.spinlock);
 
     qt->internal.used = false;
     thread_qt = NULL;
@@ -143,29 +143,29 @@ void query_target_release(QUERY_TARGET *qt) {
         query_target_destroy(qt);
     }
     else {
-        netdata_spinlock_lock(&query_target_base.available.spinlock);
+        spinlock_lock(&query_target_base.available.spinlock);
         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(query_target_base.available.base, qt, internal.prev, internal.next);
         query_target_base.available.count++;
-        netdata_spinlock_unlock(&query_target_base.available.spinlock);
+        spinlock_unlock(&query_target_base.available.spinlock);
     }
 }
 
 static QUERY_TARGET *query_target_get(void) {
-    netdata_spinlock_lock(&query_target_base.available.spinlock);
+    spinlock_lock(&query_target_base.available.spinlock);
     QUERY_TARGET *qt = query_target_base.available.base;
     if (qt) {
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(query_target_base.available.base, qt, internal.prev, internal.next);
         query_target_base.available.count--;
     }
-    netdata_spinlock_unlock(&query_target_base.available.spinlock);
+    spinlock_unlock(&query_target_base.available.spinlock);
 
     if(unlikely(!qt))
         qt = callocz(1, sizeof(*qt));
 
-    netdata_spinlock_lock(&query_target_base.used.spinlock);
+    spinlock_lock(&query_target_base.used.spinlock);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(query_target_base.used.base, qt, internal.prev, internal.next);
     query_target_base.used.count++;
-    netdata_spinlock_unlock(&query_target_base.used.spinlock);
+    spinlock_unlock(&query_target_base.used.spinlock);
 
     qt->internal.used = true;
     qt->internal.queries++;
@@ -579,7 +579,7 @@ static void query_target_eval_instance_rrdcalc(QUERY_TARGET_LOCALS *qtl __maybe_
                                                QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi) {
     RRDSET *st = rrdinstance_acquired_rrdset(qi->ria);
     if (st) {
-        netdata_rwlock_rdlock(&st->alerts.rwlock);
+        rw_spinlock_read_lock(&st->alerts.spinlock);
         for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
             switch(rc->status) {
                 case RRDCALC_STATUS_CLEAR:
@@ -610,7 +610,7 @@ static void query_target_eval_instance_rrdcalc(QUERY_TARGET_LOCALS *qtl __maybe_
                     break;
             }
         }
-        netdata_rwlock_unlock(&st->alerts.rwlock);
+        rw_spinlock_read_unlock(&st->alerts.spinlock);
     }
 }
 
@@ -624,7 +624,7 @@ static bool query_target_match_alert_pattern(RRDINSTANCE_ACQUIRED *ria, SIMPLE_P
 
     BUFFER *wb = NULL;
     bool matched = false;
-    netdata_rwlock_rdlock(&st->alerts.rwlock);
+    rw_spinlock_read_lock(&st->alerts.spinlock);
     if (st->alerts.base) {
         for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
             SIMPLE_PATTERN_RESULT ret = simple_pattern_matches_string_extract(pattern, rc->name, NULL, 0);
@@ -655,7 +655,7 @@ static bool query_target_match_alert_pattern(RRDINSTANCE_ACQUIRED *ria, SIMPLE_P
                 break;
         }
     }
-    netdata_rwlock_unlock(&st->alerts.rwlock);
+    rw_spinlock_read_unlock(&st->alerts.spinlock);
 
     buffer_free(wb);
     return matched;
@@ -895,12 +895,12 @@ static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
 
     // is the chart given valid?
     if(unlikely(qtl->st && (!qtl->st->rrdinstance || !qtl->st->rrdcontext))) {
-        error("QUERY TARGET: RRDSET '%s' given, but it is not linked to rrdcontext structures. Linking it now.", rrdset_name(qtl->st));
+        netdata_log_error("QUERY TARGET: RRDSET '%s' given, but it is not linked to rrdcontext structures. Linking it now.", rrdset_name(qtl->st));
         rrdinstance_from_rrdset(qtl->st);
 
         if(unlikely(qtl->st && (!qtl->st->rrdinstance || !qtl->st->rrdcontext))) {
-            error("QUERY TARGET: RRDSET '%s' given, but failed to be linked to rrdcontext structures. Switching to context query.",
-                  rrdset_name(qtl->st));
+            netdata_log_error("QUERY TARGET: RRDSET '%s' given, but failed to be linked to rrdcontext structures. Switching to context query.",
+                              rrdset_name(qtl->st));
 
             if (!is_valid_sp(qtl->instances))
                 qtl->instances = rrdset_name(qtl->st);
@@ -1049,7 +1049,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     qt->window.before = qt->request.before;
 
     qt->window.options = qt->request.options;
-    if(query_target_has_percentage_of_instance(qt))
+    if(query_target_has_percentage_of_group(qt))
         qt->window.options &= ~RRDR_OPTION_PERCENTAGE;
 
     rrdr_relative_window_to_absolute(&qt->window.after, &qt->window.before, &qt->window.now);
@@ -1098,7 +1098,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
         }
         else if (unlikely(host != qtl.st->rrdhost)) {
             // Oops! A different host!
-            error("QUERY TARGET: RRDSET '%s' given does not belong to host '%s'. Switching query host to '%s'",
+            netdata_log_error("QUERY TARGET: RRDSET '%s' given does not belong to host '%s'. Switching query host to '%s'",
                   rrdset_name(qtl.st), rrdhost_hostname(host), rrdhost_hostname(qtl.st->rrdhost));
             host = qtl.st->rrdhost;
         }

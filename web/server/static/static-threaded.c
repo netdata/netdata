@@ -41,11 +41,11 @@ static struct web_client *web_client_create_on_fd(POLLINFO *pi) {
 
     int flag = 1;
     if(unlikely(web_client_check_tcp(w) && setsockopt(w->ifd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0))
-        debug(D_WEB_CLIENT, "%llu: failed to enable TCP_NODELAY on socket fd %d.", w->id, w->ifd);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: failed to enable TCP_NODELAY on socket fd %d.", w->id, w->ifd);
 
     flag = 1;
     if(unlikely(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0))
-        debug(D_WEB_CLIENT, "%llu: failed to enable SO_KEEPALIVE on socket fd %d.", w->id, w->ifd);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: failed to enable SO_KEEPALIVE on socket fd %d.", w->id, w->ifd);
 
     web_client_update_acl_matches(w);
     web_client_enable_wait_receive(w);
@@ -101,7 +101,7 @@ static void *web_server_file_add_callback(POLLINFO *pi, short int *events, void 
 
     worker_private->files_read++;
 
-    debug(D_WEB_CLIENT, "%llu: ADDED FILE READ ON FD %d", w->id, pi->fd);
+    netdata_log_debug(D_WEB_CLIENT, "%llu: ADDED FILE READ ON FD %d", w->id, pi->fd);
     *events = POLLIN;
     pi->data = w;
 
@@ -111,14 +111,14 @@ static void *web_server_file_add_callback(POLLINFO *pi, short int *events, void 
 
 static void web_server_file_del_callback(POLLINFO *pi) {
     struct web_client *w = (struct web_client *)pi->data;
-    debug(D_WEB_CLIENT, "%llu: RELEASE FILE READ ON FD %d", w->id, pi->fd);
+    netdata_log_debug(D_WEB_CLIENT, "%llu: RELEASE FILE READ ON FD %d", w->id, pi->fd);
 
     worker_is_busy(WORKER_JOB_DEL_FILE);
 
     w->pollinfo_filecopy_slot = 0;
 
     if(unlikely(!w->pollinfo_slot)) {
-        debug(D_WEB_CLIENT, "%llu: CROSS WEB CLIENT CLEANUP (iFD %d, oFD %d)", w->id, pi->fd, w->ofd);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: CROSS WEB CLIENT CLEANUP (iFD %d, oFD %d)", w->id, pi->fd, w->ofd);
         web_server_log_connection(w, "DISCONNECTED");
         web_client_request_done(w);
         web_client_release_to_cache(w);
@@ -137,18 +137,18 @@ static int web_server_file_read_callback(POLLINFO *pi, short int *events) {
     // if there is no POLLINFO linked to this, it means the client disconnected
     // stop the file reading too
     if(unlikely(!w->pollinfo_slot)) {
-        debug(D_WEB_CLIENT, "%llu: PREVENTED ATTEMPT TO READ FILE ON FD %d, ON CLOSED WEB CLIENT", w->id, pi->fd);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: PREVENTED ATTEMPT TO READ FILE ON FD %d, ON CLOSED WEB CLIENT", w->id, pi->fd);
         retval = -1;
         goto cleanup;
     }
 
     if(unlikely(w->mode != WEB_CLIENT_MODE_FILECOPY || w->ifd == w->ofd)) {
-        debug(D_WEB_CLIENT, "%llu: PREVENTED ATTEMPT TO READ FILE ON FD %d, ON NON-FILECOPY WEB CLIENT", w->id, pi->fd);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: PREVENTED ATTEMPT TO READ FILE ON FD %d, ON NON-FILECOPY WEB CLIENT", w->id, pi->fd);
         retval = -1;
         goto cleanup;
     }
 
-    debug(D_WEB_CLIENT, "%llu: READING FILE ON FD %d", w->id, pi->fd);
+    netdata_log_debug(D_WEB_CLIENT, "%llu: READING FILE ON FD %d", w->id, pi->fd);
 
     worker_private->file_reads++;
     ssize_t ret = unlikely(web_client_read_file(w));
@@ -157,12 +157,12 @@ static int web_server_file_read_callback(POLLINFO *pi, short int *events) {
         POLLJOB *p = pi->p;                                        // our POLLJOB
         POLLINFO *wpi = pollinfo_from_slot(p, w->pollinfo_slot);  // POLLINFO of the client socket
 
-        debug(D_WEB_CLIENT, "%llu: SIGNALING W TO SEND (iFD %d, oFD %d)", w->id, pi->fd, wpi->fd);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: SIGNALING W TO SEND (iFD %d, oFD %d)", w->id, pi->fd, wpi->fd);
         p->fds[wpi->slot].events |= POLLOUT;
     }
 
     if(unlikely(ret <= 0 || w->ifd == w->ofd)) {
-        debug(D_WEB_CLIENT, "%llu: DONE READING FILE ON FD %d", w->id, pi->fd);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: DONE READING FILE ON FD %d", w->id, pi->fd);
         retval = -1;
         goto cleanup;
     }
@@ -180,7 +180,7 @@ static int web_server_file_write_callback(POLLINFO *pi, short int *events) {
     (void)events;
 
     worker_is_busy(WORKER_JOB_WRITE_FILE);
-    error("Writing to web files is not supported!");
+    netdata_log_error("Writing to web files is not supported!");
     worker_is_idle();
 
     return -1;
@@ -201,7 +201,7 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
 
     *events = POLLIN;
 
-    debug(D_WEB_CLIENT_ACCESS, "LISTENER on %d: new connection.", pi->fd);
+    netdata_log_debug(D_WEB_CLIENT_ACCESS, "LISTENER on %d: new connection.", pi->fd);
     struct web_client *w = web_client_create_on_fd(pi);
 
     if (!strncmp(pi->client_port, "UNIX", 4)) {
@@ -211,62 +211,36 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
     }
 
 #ifdef ENABLE_HTTPS
-    if ((!web_client_check_unix(w)) && (netdata_ssl_srv_ctx)) {
-        if( sock_delnonblock(w->ifd) < 0 ){
-            error("Web server cannot remove the non-blocking flag from socket %d",w->ifd);
-        }
+    if ((!web_client_check_unix(w)) && (netdata_ssl_web_server_ctx)) {
+        sock_delnonblock(w->ifd);
 
         //Read the first 7 bytes from the message, but the message
         //is not removed from the queue, because we are using MSG_PEEK
         char test[8];
-        if ( recv(w->ifd,test, 7,MSG_PEEK) == 7 ) {
-            test[7] = 0x00;
+        if ( recv(w->ifd,test, 7, MSG_PEEK) == 7 ) {
+            test[7] = '\0';
         }
         else {
-            //Case I do not have success to read 7 bytes,
-            //this means that the mensage was not completely read, so
-            //I cannot identify it yet.
+            // we couldn't read 7 bytes
             sock_setnonblock(w->ifd);
             goto cleanup;
         }
 
-        //The next two ifs are not together because I am reusing SSL structure
-        if (!w->ssl.conn)
-        {
-            w->ssl.conn = SSL_new(netdata_ssl_srv_ctx);
-            if ( w->ssl.conn ) {
-                SSL_set_accept_state(w->ssl.conn);
-            } else {
-                error("Failed to create SSL context on socket fd %d.", w->ifd);
-                if (test[0] < 0x18){
-                    WEB_CLIENT_IS_DEAD(w);
-                    sock_setnonblock(w->ifd);
-                    goto cleanup;
-                }
-            }
+        if(test[0] > 0x17) {
+            // no SSL
+            netdata_ssl_close(&w->ssl); // free any previous SSL data
         }
-
-        if (w->ssl.conn) {
-            if (SSL_set_fd(w->ssl.conn, w->ifd) != 1) {
-                error("Failed to set the socket to the SSL on socket fd %d.", w->ifd);
-                //The client is not set dead, because I received a normal HTTP request
-                //instead a Client Hello(HTTPS).
-                if ( test[0] < 0x18 ){
-                    WEB_CLIENT_IS_DEAD(w);
-                }
-            }
-            else{
-                w->ssl.flags = security_process_accept(w->ssl.conn, (int)test[0]);
-            }
+        else {
+            // SSL
+            if(!netdata_ssl_open(&w->ssl, netdata_ssl_web_server_ctx, w->ifd) || !netdata_ssl_accept(&w->ssl))
+                WEB_CLIENT_IS_DEAD(w);
         }
 
         sock_setnonblock(w->ifd);
-    } else{
-        w->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
     }
 #endif
 
-    debug(D_WEB_CLIENT, "%llu: ADDED CLIENT FD %d", w->id, pi->fd);
+    netdata_log_debug(D_WEB_CLIENT, "%llu: ADDED CLIENT FD %d", w->id, pi->fd);
 
 cleanup:
     worker_is_idle();
@@ -286,13 +260,13 @@ static void web_server_del_callback(POLLINFO *pi) {
         POLLINFO *fpi = pollinfo_from_slot(pi->p, w->pollinfo_filecopy_slot);  // POLLINFO of the client socket
         (void)fpi;
 
-        debug(D_WEB_CLIENT, "%llu: THE CLIENT WILL BE FRED BY READING FILE JOB ON FD %d", w->id, fpi->fd);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: THE CLIENT WILL BE FRED BY READING FILE JOB ON FD %d", w->id, fpi->fd);
     }
     else {
         if(web_client_flag_check(w, WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET))
             pi->flags |= POLLINFO_FLAG_DONT_CLOSE;
 
-        debug(D_WEB_CLIENT, "%llu: CLOSING CLIENT FD %d", w->id, pi->fd);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: CLOSING CLIENT FD %d", w->id, pi->fd);
         web_server_log_connection(w, "DISCONNECTED");
         web_client_request_done(w);
         web_client_release_to_cache(w);
@@ -315,7 +289,7 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
     bytes = web_client_receive(w);
 
     if (likely(bytes > 0)) {
-        debug(D_WEB_CLIENT, "%llu: processing received data on fd %d.", w->id, fd);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: processing received data on fd %d.", w->id, fd);
         worker_is_idle();
         worker_is_busy(WORKER_JOB_PROCESS);
         web_client_process_request(w);
@@ -326,11 +300,11 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
 
         else if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
             if(w->pollinfo_filecopy_slot == 0) {
-                debug(D_WEB_CLIENT, "%llu: FILECOPY DETECTED ON FD %d", w->id, pi->fd);
+                netdata_log_debug(D_WEB_CLIENT, "%llu: FILECOPY DETECTED ON FD %d", w->id, pi->fd);
 
                 if (unlikely(w->ifd != -1 && w->ifd != w->ofd && w->ifd != fd)) {
                     // add a new socket to poll_events, with the same
-                    debug(D_WEB_CLIENT, "%llu: CREATING FILECOPY SLOT ON FD %d", w->id, pi->fd);
+                    netdata_log_debug(D_WEB_CLIENT, "%llu: CREATING FILECOPY SLOT ON FD %d", w->id, pi->fd);
 
                     POLLINFO *fpi = poll_add_fd(
                                                 pi->p
@@ -351,7 +325,7 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
                     if(fpi)
                         w->pollinfo_filecopy_slot = fpi->slot;
                     else {
-                        error("Failed to add filecopy fd. Closing client.");
+                        netdata_log_error("Failed to add filecopy fd. Closing client.");
                         ret = -1;
                         goto cleanup;
                     }
@@ -392,7 +366,7 @@ static int web_server_snd_callback(POLLINFO *pi, short int *events) {
     struct web_client *w = (struct web_client *)pi->data;
     int fd = pi->fd;
 
-    debug(D_WEB_CLIENT, "%llu: sending data on fd %d.", w->id, fd);
+    netdata_log_debug(D_WEB_CLIENT, "%llu: sending data on fd %d.", w->id, fd);
 
     int ret = web_client_send(w);
 
@@ -420,7 +394,7 @@ cleanup:
 static void socket_listen_main_static_threaded_worker_cleanup(void *ptr) {
     worker_private = (struct web_server_static_threaded_worker *)ptr;
 
-    info("stopped after %zu connects, %zu disconnects (max concurrent %zu), %zu receptions and %zu sends",
+    netdata_log_info("stopped after %zu connects, %zu disconnects (max concurrent %zu), %zu receptions and %zu sends",
             worker_private->connected,
             worker_private->disconnected,
             worker_private->max_concurrent,
@@ -488,16 +462,16 @@ static void socket_listen_main_static_threaded_cleanup(void *ptr) {
 //    for(i = 1; i < static_threaded_workers_count; i++) {
 //        if(static_workers_private_data[i].running) {
 //            found++;
-//            info("stopping worker %d", i + 1);
+//            netdata_log_info("stopping worker %d", i + 1);
 //            netdata_thread_cancel(static_workers_private_data[i].thread);
 //        }
 //        else
-//            info("found stopped worker %d", i + 1);
+//            netdata_log_info("found stopped worker %d", i + 1);
 //    }
 //
 //    while(found && max > 0) {
 //        max -= step;
-//        info("Waiting %d static web threads to finish...", found);
+//        netdata_log_info("Waiting %d static web threads to finish...", found);
 //        sleep_usec(step);
 //        found = 0;
 //
@@ -509,12 +483,12 @@ static void socket_listen_main_static_threaded_cleanup(void *ptr) {
 //    }
 //
 //    if(found)
-//        error("%d static web threads are taking too long to finish. Giving up.", found);
+//        netdata_log_error("%d static web threads are taking too long to finish. Giving up.", found);
 
-    info("closing all web server sockets...");
+    netdata_log_info("closing all web server sockets...");
     listen_sockets_close(&api_sockets);
 
-    info("all static web threads stopped.");
+    netdata_log_info("all static web threads stopped.");
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
@@ -525,27 +499,34 @@ void *socket_listen_main_static_threaded(void *ptr) {
     if(!api_sockets.opened)
         fatal("LISTENER: no listen sockets available.");
 
+    netdata_ssl_validate_certificate = !config_get_boolean(CONFIG_SECTION_WEB, "ssl skip certificate verification", !netdata_ssl_validate_certificate);
+
+    if(!netdata_ssl_validate_certificate_sender)
+        netdata_log_info("SSL: web server will skip SSL certificates verification.");
+
 #ifdef ENABLE_HTTPS
-    security_start_ssl(NETDATA_SSL_CONTEXT_SERVER);
+    netdata_ssl_initialize_ctx(NETDATA_SSL_WEB_SERVER_CTX);
 #endif
+
     // 6 threads is the optimal value
     // since 6 are the parallel connections browsers will do
     // so, if the machine has more CPUs, avoid using resources unnecessarily
     int def_thread_count = MIN(get_netdata_cpus(), 6);
 
     if (!strcmp(config_get(CONFIG_SECTION_WEB, "mode", ""),"single-threaded")) {
-                info("Running web server with one thread, because mode is single-threaded");
+                netdata_log_info("Running web server with one thread, because mode is single-threaded");
                 config_set(CONFIG_SECTION_WEB, "mode", "static-threaded");
                 def_thread_count = 1;
     }
     static_threaded_workers_count = config_get_number(CONFIG_SECTION_WEB, "web server threads", def_thread_count);
 
     if (static_threaded_workers_count < 1) static_threaded_workers_count = 1;
+
 #ifdef ENABLE_HTTPS
     // See https://github.com/netdata/netdata/issues/11081#issuecomment-831998240 for more details
     if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110) {
         static_threaded_workers_count = 1;
-        info("You are running an OpenSSL older than 1.1.0, web server will not enable multithreading.");
+        netdata_log_info("You are running an OpenSSL older than 1.1.0, web server will not enable multithreading.");
     }
 #endif
 
@@ -565,7 +546,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
         char tag[50 + 1];
         snprintfz(tag, 50, "WEB[%d]", i+1);
 
-        info("starting worker %d", i+1);
+        netdata_log_info("starting worker %d", i+1);
         netdata_thread_create(&static_workers_private_data[i].thread, tag, NETDATA_THREAD_OPTION_DEFAULT,
                               socket_listen_main_static_threaded_worker, (void *)&static_workers_private_data[i]);
     }

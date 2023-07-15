@@ -26,6 +26,7 @@ dist_config_SCRIPTS = \
 
 dist_config_DATA = \
     .install-type \
+    netdata-updater.conf \
     $(NULL)
 
 libconfigvnodesdir=$(libconfigdir)/vnodes

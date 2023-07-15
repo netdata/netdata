@@ -250,7 +250,7 @@ static void query_target_summary_nodes_v2(BUFFER *wb, QUERY_TARGET *qt, const ch
         QUERY_NODE *qn = query_node(qt, c);
         RRDHOST *host = qn->rrdhost;
         buffer_json_add_array_item_object(wb);
-        buffer_json_node_add_v2(wb, host, qn->slot, qn->duration_ut);
+        buffer_json_node_add_v2(wb, host, qn->slot, qn->duration_ut, true);
         query_target_instance_counts(wb, &qn->instances);
         query_target_metric_counts(wb, &qn->metrics);
         query_target_alerts_counts(wb, &qn->alerts, NULL, false);
@@ -615,7 +615,7 @@ static void query_target_summary_alerts_v2(BUFFER *wb, QUERY_TARGET *qt, const c
         QUERY_INSTANCE *qi = query_instance(qt, c);
         RRDSET *st = rrdinstance_acquired_rrdset(qi->ria);
         if (st) {
-            netdata_rwlock_rdlock(&st->alerts.rwlock);
+            rw_spinlock_read_lock(&st->alerts.spinlock);
             if (st->alerts.base) {
                 for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
                     z = dictionary_set(dict, string2str(rc->name), NULL, sizeof(*z));
@@ -642,7 +642,7 @@ static void query_target_summary_alerts_v2(BUFFER *wb, QUERY_TARGET *qt, const c
                     }
                 }
             }
-            netdata_rwlock_unlock(&st->alerts.rwlock);
+            rw_spinlock_read_unlock(&st->alerts.spinlock);
         }
     }
     dfe_start_read(dict, z)
@@ -665,7 +665,7 @@ static inline void query_target_functions(BUFFER *wb, const char *key, RRDR *r) 
             continue;
 
         ria = qi->ria;
-        chart_functions_to_dict(rrdinstance_acquired_functions(ria), funcs);
+        chart_functions_to_dict(rrdinstance_acquired_functions(ria), funcs, NULL, 0);
     }
 
     buffer_json_member_add_array(wb, key);
@@ -931,7 +931,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb) {
 static void rrdset_rrdcalc_entries_v2(BUFFER *wb, RRDINSTANCE_ACQUIRED *ria) {
     RRDSET *st = rrdinstance_acquired_rrdset(ria);
     if(st) {
-        netdata_rwlock_rdlock(&st->alerts.rwlock);
+        rw_spinlock_read_lock(&st->alerts.spinlock);
         if(st->alerts.base) {
             buffer_json_member_add_object(wb, "alerts");
             for(RRDCALC *rc = st->alerts.base; rc ;rc = rc->next) {
@@ -946,7 +946,7 @@ static void rrdset_rrdcalc_entries_v2(BUFFER *wb, RRDINSTANCE_ACQUIRED *ria) {
             }
             buffer_json_object_close(wb);
         }
-        netdata_rwlock_unlock(&st->alerts.rwlock);
+        rw_spinlock_read_unlock(&st->alerts.spinlock);
     }
 }
 
@@ -1268,6 +1268,7 @@ static void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS
 
 void version_hashes_api_v2(BUFFER *wb, struct query_versions *versions) {
     buffer_json_member_add_object(wb, "versions");
+    buffer_json_member_add_uint64(wb, "routing_hard_hash", 1);
     buffer_json_member_add_uint64(wb, "nodes_hard_hash", dictionary_version(rrdhost_root_index));
     buffer_json_member_add_uint64(wb, "contexts_hard_hash", versions->contexts_hard_hash);
     buffer_json_member_add_uint64(wb, "contexts_soft_hash", versions->contexts_soft_hash);
@@ -1569,7 +1570,7 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
     }
     buffer_json_object_close(wb); // view
 
-    buffer_json_agents_array_v2(wb, &r->internal.qt->timings, 0);
+    buffer_json_agents_v2(wb, &r->internal.qt->timings, 0, false, true);
     buffer_json_cloud_timings(wb, "timings", &r->internal.qt->timings);
     buffer_json_finalize(wb);
 }

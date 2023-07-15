@@ -20,10 +20,9 @@ int init_graphite_instance(struct instance *instance)
     instance->connector_specific_data = connector_specific_data;
 
 #ifdef ENABLE_HTTPS
-    connector_specific_data->flags = NETDATA_SSL_START;
-    connector_specific_data->conn = NULL;
+    connector_specific_data->ssl = NETDATA_SSL_UNSET_CONNECTION;
     if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
-        security_start_ssl(NETDATA_SSL_CONTEXT_EXPORTING);
+        netdata_ssl_initialize_ctx(NETDATA_SSL_EXPORTING_CTX);
     }
 #endif
 
@@ -50,7 +49,7 @@ int init_graphite_instance(struct instance *instance)
 
     instance->buffer = (void *)buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
     if (!instance->buffer) {
-        error("EXPORTING: cannot create buffer for graphite exporting connector instance %s", instance->config.name);
+        netdata_log_error("EXPORTING: cannot create buffer for graphite exporting connector instance %s", instance->config.name);
         return 1;
     }
 
@@ -142,8 +141,8 @@ int format_dimension_collected_graphite_plaintext(struct instance *instance, RRD
         (host->tags) ? ";" : "",
         (host->tags) ? rrdhost_tags(host) : "",
         (instance->labels_buffer) ? buffer_tostring(instance->labels_buffer) : "",
-        rd->last_collected_value,
-        (unsigned long long)rd->last_collected_time.tv_sec);
+        rd->collector.last_collected_value,
+        (unsigned long long)rd->collector.last_collected_time.tv_sec);
 
     return 0;
 }

@@ -51,6 +51,11 @@ bool rrdcalctemplate_check_rrdset_conditions(RRDCALCTEMPLATE *rt, RRDSET *st, RR
                                                                                             '=', NULL))
         return false;
 
+    if(st->rrdlabels && rt->chart_labels_pattern && !rrdlabels_match_simple_pattern_parsed(st->rrdlabels,
+                                                                                            rt->chart_labels_pattern,
+                                                                                            '=', NULL))
+        return false;
+
     return true;
 }
 
@@ -120,8 +125,10 @@ static void rrdcalctemplate_free_internals(RRDCALCTEMPLATE *rt) {
     string_freez(rt->dimensions);
     string_freez(rt->foreach_dimension);
     string_freez(rt->host_labels);
+    string_freez(rt->chart_labels);
     simple_pattern_free(rt->foreach_dimension_pattern);
     simple_pattern_free(rt->host_labels_pattern);
+    simple_pattern_free(rt->chart_labels_pattern);
 }
 
 void rrdcalctemplate_free_unused_rrdcalctemplate_loaded_from_config(RRDCALCTEMPLATE *rt) {
@@ -136,7 +143,7 @@ static void rrdcalctemplate_insert_callback(const DICTIONARY_ITEM *item __maybe_
     bool *added = added_bool;
     *added = true;
 
-    debug(D_HEALTH, "Health configuration adding template '%s'"
+    netdata_log_debug(D_HEALTH, "Health configuration adding template '%s'"
                     ": context '%s'"
                     ", exec '%s'"
                     ", recipient '%s'"
@@ -216,17 +223,17 @@ static size_t rrdcalctemplate_key(char *dst, size_t dst_len, const char *name, c
 
 void rrdcalctemplate_add_from_config(RRDHOST *host, RRDCALCTEMPLATE *rt) {
     if(unlikely(!rt->context)) {
-        error("Health configuration for template '%s' does not have a context", rrdcalctemplate_name(rt));
+        netdata_log_error("Health configuration for template '%s' does not have a context", rrdcalctemplate_name(rt));
         return;
     }
 
     if(unlikely(!rt->update_every)) {
-        error("Health configuration for template '%s' has no frequency (parameter 'every'). Ignoring it.", rrdcalctemplate_name(rt));
+        netdata_log_error("Health configuration for template '%s' has no frequency (parameter 'every'). Ignoring it.", rrdcalctemplate_name(rt));
         return;
     }
 
     if(unlikely(!RRDCALCTEMPLATE_HAS_DB_LOOKUP(rt) && !rt->calculation && !rt->warning && !rt->critical)) {
-        error("Health configuration for template '%s' is useless (no calculation, no warning and no critical evaluation)", rrdcalctemplate_name(rt));
+        netdata_log_error("Health configuration for template '%s' is useless (no calculation, no warning and no critical evaluation)", rrdcalctemplate_name(rt));
         return;
     }
 
@@ -239,7 +246,7 @@ void rrdcalctemplate_add_from_config(RRDHOST *host, RRDCALCTEMPLATE *rt) {
     if(added)
         freez(rt);
     else {
-        info("Health configuration template '%s' already exists for host '%s'.", rrdcalctemplate_name(rt), rrdhost_hostname(host));
+        netdata_log_info("Health configuration template '%s' already exists for host '%s'.", rrdcalctemplate_name(rt), rrdhost_hostname(host));
         rrdcalctemplate_free_unused_rrdcalctemplate_loaded_from_config(rt);
     }
 }

@@ -21,9 +21,29 @@ At a high-level view, these are the domains from which the Events feed will prov
 
 | **Domains of events** | **Community** | **Pro** | **Business** |
 | :-- | :-- | :-- | :-- |
-| **Auditing events** - COMING SOON<br/>Events related to actions done on your Space, e.g. invite user, change user role or change plan.| 4 hours | 7 days | 90 days |
+| **[Auditing events](#auditing-events)** - <br/>Events related to actions done on your Space, e.g. invite user, change user role or change plan.| 4 hours | 7 days | 90 days |
 | **[Topology events](#topology-events)**<br/>Node state transition events, e.g. live or offline.| 4 hours | 7 days | 14 days |
 | **[Alert events](#alert-events)**<br/>Alert state transition events, can be seen as an alert history log.| 4 hours | 7 days | 90 days |
+
+### Auditing events
+
+| **Event name** | **Description** |  **Example** |
+| :-- | :-- | :-- |
+| Space Created | The space was created.| Space `Acme Space` was **created** |
+| Room Created | A room was created on the Space.| 	Room `DB Servers` was **created** by `John Doe` |
+| Room Deleted | A room was deleted from the Space. | Room `DB servers` was **deleted** by `John Doe` |
+| User Invited to Space | A user was invited to join the Space.| User `John Smith` was **invited** to this space by `Alan Doe` |
+| User Uninvited from Space | An invitation for a user to join the space was revoked.| User `John Smith` was **uninvited** from this space |
+| User Added to Space | A user was added to the Space from an invitation (user accepted the invitation).| User `John Smith` was **added** to this space by invite of `Alan Doe` |
+| User Removed from Space | A user was added to the Space from an invitation. | User `John Smith` was **removed** from this space by `Alan Doe` |
+| User Added to Room | A user was added to a room on the Space. | User `John Smith` was **added** to room `DB servers` |
+| User Removed from Room | A user was removed from a room on the Space. | User `John Smith` was **removed** from room `DB Servers` by `Alan Doe` |
+| User Space Properties Changed | The properties of a user on the Space have changed, e.g. change user role | User role for `John Smith` was **changed** to `troubleshooter` by `Alan Doe` |
+| Node Added To Room | The node was added to a room on the Space. | Node `ip-xyz.ec2.internal` was **added** to room `DB Servers` by `John Doe` |
+| Node Removed To Room | The node was removed from a room on the Space. | Node `ip-xyz.ec2.internal` was **removed** from room `DB Servers` by `John Doe` |
+| Silencing Rule Created | A new alert notification silencing rule was created on the Space. | Silencing rule `DB Servers schedule silencing` on rooms `All nodes` and `DB Servers` was **created** by `John Smith` |
+| Silencing Rule Changed | An existing alert notification silencing rule was modified on the Space. | Silencing rule `DB Servers schedule silencing` on rooms `All nodes` and `DB Servers` was **changed** by `John Doe` |
+| Silencing Rule Deleted | An existing alert notifications silencing rule was removed from the Space. | Silencing rule `DB Servers schedule silencing` on rooms `All nodes` and `DB Servers` was **changed** by `Alan Smith` |
 
 ### Topology events
 

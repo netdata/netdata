@@ -1,0 +1,101 @@
+meta:
+  plugin_name: python.d.plugin
+  module_name: bind_rndc
+  alternative_monitored_instances: []
+  monitored_instance:
+    name: python.d bind_rndc
+    link: ''
+    categories: []
+    icon_filename: ''
+  related_resources:
+    integrations:
+      list: []
+  info_provided_to_referring_integrations:
+    description: ''
+  keywords: []
+  most_popular: false
+overview:
+  data_collection:
+    metrics_description: ''
+    method_description: ''
+  supported_platforms:
+    include: []
+    exclude: []
+  multi-instance: true
+  additional_permissions:
+    description: ''
+  default_behavior:
+    auto_detection:
+      description: ''
+    limits:
+      description: ''
+    performance_impact:
+      description: ''
+setup:
+  prerequisites:
+    list: []
+  configuration:
+    file:
+      name: ''
+      description: ''
+    options:
+      description: ''
+      folding:
+        title: ''
+        enabled: true
+      list: []
+    examples:
+      folding:
+        enabled: true
+        title: ''
+      list: []
+troubleshooting:
+  problems:
+    list: []
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: bind_rndc.name_server_statistics
+          description: Name Server Statistics
+          unit: "stats"
+          chart_type: line
+          dimensions:
+            - name: requests
+            - name: rejected_queries
+            - name: success
+            - name: failure
+            - name: responses
+            - name: duplicate
+            - name: recursion
+            - name: nxrrset
+            - name: nxdomain
+            - name: non_auth_answer
+            - name: auth_answer
+            - name: dropped_queries
+        - name: bind_rndc.incoming_queries
+          description: Incoming queries
+          unit: "queries"
+          chart_type: line
+          dimensions:
+            - name: a dimension per incoming query type
+        - name: bind_rndc.outgoing_queries
+          description: Outgoing queries
+          unit: "queries"
+          chart_type: line
+          dimensions:
+            - name: a dimension per outgoing query type
+        - name: bind_rndc.stats_size
+          description: Named Stats File Size
+          unit: "MiB"
+          chart_type: line
+          dimensions:
+            - name: stats_size

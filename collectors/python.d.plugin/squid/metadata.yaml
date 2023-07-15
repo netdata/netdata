@@ -1,0 +1,96 @@
+meta:
+  plugin_name: python.d.plugin
+  module_name: squid
+  alternative_monitored_instances: []
+  monitored_instance:
+    name: python.d squid
+    link: ''
+    categories: []
+    icon_filename: ''
+  related_resources:
+    integrations:
+      list: []
+  info_provided_to_referring_integrations:
+    description: ''
+  keywords: []
+  most_popular: false
+overview:
+  data_collection:
+    metrics_description: ''
+    method_description: ''
+  supported_platforms:
+    include: []
+    exclude: []
+  multi-instance: true
+  additional_permissions:
+    description: ''
+  default_behavior:
+    auto_detection:
+      description: ''
+    limits:
+      description: ''
+    performance_impact:
+      description: ''
+setup:
+  prerequisites:
+    list: []
+  configuration:
+    file:
+      name: ''
+      description: ''
+    options:
+      description: ''
+      folding:
+        title: ''
+        enabled: true
+      list: []
+    examples:
+      folding:
+        enabled: true
+        title: ''
+      list: []
+troubleshooting:
+  problems:
+    list: []
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: squid instance
+      description: ""
+      labels: []
+      metrics:
+        - name: squid.clients_net
+          description: Squid Client Bandwidth
+          unit: "kilobits/s"
+          chart_type: area
+          dimensions:
+            - name: in
+            - name: out
+            - name: hits
+        - name: squid.clients_requests
+          description: Squid Client Requests
+          unit: "requests/s"
+          chart_type: line
+          dimensions:
+            - name: requests
+            - name: hits
+            - name: errors
+        - name: squid.servers_net
+          description: Squid Server Bandwidth
+          unit: "kilobits/s"
+          chart_type: area
+          dimensions:
+            - name: in
+            - name: out
+        - name: squid.servers_requests
+          description: Squid Server Requests
+          unit: "requests/s"
+          chart_type: line
+          dimensions:
+            - name: requests
+            - name: errors

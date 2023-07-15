@@ -33,7 +33,7 @@ inline NETDATA_DOUBLE rrdmetric_acquired_last_stored_value(RRDMETRIC_ACQUIRED *r
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
 
     if(rm->rrddim)
-        return rm->rrddim->last_stored_value;
+        return rm->rrddim->collector.last_stored_value;
 
     return NAN;
 }
@@ -263,13 +263,13 @@ void rrdmetric_from_rrddim(RRDDIM *rd) {
 #define rrddim_get_rrdmetric(rd) rrddim_get_rrdmetric_with_trace(rd, __FUNCTION__)
 static inline RRDMETRIC *rrddim_get_rrdmetric_with_trace(RRDDIM *rd, const char *function) {
     if(unlikely(!rd->rrdmetric)) {
-        error("RRDMETRIC: RRDDIM '%s' is not linked to an RRDMETRIC at %s()", rrddim_id(rd), function);
+        netdata_log_error("RRDMETRIC: RRDDIM '%s' is not linked to an RRDMETRIC at %s()", rrddim_id(rd), function);
         return NULL;
     }
 
     RRDMETRIC *rm = rrdmetric_acquired_value(rd->rrdmetric);
     if(unlikely(!rm)) {
-        error("RRDMETRIC: RRDDIM '%s' lost the link to its RRDMETRIC at %s()", rrddim_id(rd), function);
+        netdata_log_error("RRDMETRIC: RRDDIM '%s' lost the link to its RRDMETRIC at %s()", rrddim_id(rd), function);
         return NULL;
     }
 

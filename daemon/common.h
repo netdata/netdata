@@ -42,8 +42,8 @@
 #include "web/server/web_server.h"
 
 // the new h2o based netdata webserver
-#ifdef ENABLE_HTTPD
-#include "httpd/http_server.h"
+#ifdef ENABLE_H2O
+#include "web/server/h2o/http_server.h"
 #endif
 
 // streaming metrics between netdata servers
@@ -89,6 +89,7 @@
 #include "static_threads.h"
 #include "signals.h"
 #include "commands.h"
+#include "pipename.h"
 #include "analytics.h"
 
 // global netdata daemon variables
@@ -109,9 +110,29 @@ extern int32_t netdata_configured_utc_offset;
 extern int netdata_zero_metrics_enabled;
 extern int netdata_anonymous_statistics_enabled;
 
-extern int netdata_ready;
-extern int netdata_cloud_setting;
+extern bool netdata_ready;
+extern int netdata_cloud_enabled;
+
+extern time_t netdata_start_time;
 
 long get_netdata_cpus(void);
+
+typedef enum __attribute__((packed)) {
+    CLOUD_STATUS_UNAVAILABLE = 0,   // cloud and aclk functionality is not available on this agent
+    CLOUD_STATUS_AVAILABLE,         // cloud and aclk functionality is available, but the agent is not claimed
+    CLOUD_STATUS_DISABLED,          // cloud and aclk functionality is available, but it is disabled
+    CLOUD_STATUS_BANNED,            // the agent has been banned from cloud
+    CLOUD_STATUS_OFFLINE,           // the agent tries to connect to cloud, but cannot do it
+    CLOUD_STATUS_ONLINE,            // the agent is connected to cloud
+} CLOUD_STATUS;
+
+const char *cloud_status_to_string(CLOUD_STATUS status);
+CLOUD_STATUS cloud_status(void);
+time_t cloud_last_change(void);
+time_t cloud_next_connection_attempt(void);
+size_t cloud_connection_id(void);
+const char *cloud_offline_reason(void);
+const char *cloud_base_url(void);
+CLOUD_STATUS buffer_json_cloud_status(BUFFER *wb, time_t now_s);
 
 #endif /* NETDATA_COMMON_H */

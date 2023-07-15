@@ -147,14 +147,14 @@ struct dictionary {
 
     struct {                            // support for multiple indexing engines
         Pvoid_t JudyHSArray;            // the hash table
-        netdata_rwlock_t rwlock;        // protect the index
+        RW_SPINLOCK rw_spinlock;        // protect the index
     } index;
 
     struct {
         DICTIONARY_ITEM *list;          // the double linked list of all items in the dictionary
-        netdata_rwlock_t rwlock;        // protect the linked-list
+        RW_SPINLOCK rw_spinlock;        // protect the linked-list
         pid_t writer_pid;               // the gettid() of the writer
-        size_t writer_depth;            // nesting of write locks
+        uint32_t writer_depth;          // nesting of write locks
     } items;
 
     struct dictionary_hooks *hooks;     // pointer to external function callbacks to be called at certain points
@@ -163,7 +163,7 @@ struct dictionary {
     DICTIONARY *master;                 // the master dictionary
     DICTIONARY *next;                   // linked list for delayed destruction (garbage collection of whole dictionaries)
 
-    size_t version;                     // the current version of the dictionary
+    uint32_t version;                   // the current version of the dictionary
                                         // it is incremented when:
                                         //   - item added
                                         //   - item removed
@@ -171,9 +171,9 @@ struct dictionary {
                                         //   - conflict callback returns true
                                         //   - function dictionary_version_increment() is called
 
-    long int entries;                   // how many items are currently in the index (the linked list may have more)
-    long int referenced_items;          // how many items of the dictionary are currently being used by 3rd parties
-    long int pending_deletion_items;    // how many items of the dictionary have been deleted, but have not been removed yet
+    int32_t entries;                   // how many items are currently in the index (the linked list may have more)
+    int32_t referenced_items;          // how many items of the dictionary are currently being used by 3rd parties
+    int32_t pending_deletion_items;    // how many items of the dictionary have been deleted, but have not been removed yet
 
 #ifdef NETDATA_DICTIONARY_VALIDATE_POINTERS
     netdata_mutex_t global_pointer_registry_mutex;
@@ -369,10 +369,6 @@ size_t dictionary_referenced_items(DICTIONARY *dict) {
     return referenced_items;
 }
 
-long int dictionary_stats_for_registry(DICTIONARY *dict) {
-    if(unlikely(!dict)) return 0;
-    return (dict->stats->memory.index + dict->stats->memory.dict);
-}
 void dictionary_version_increment(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->version, 1, __ATOMIC_RELAXED);
 }
@@ -632,19 +628,14 @@ static void dictionary_execute_delete_callback(DICTIONARY *dict, DICTIONARY_ITEM
 
 static inline size_t dictionary_locks_init(DICTIONARY *dict) {
     if(likely(!is_dictionary_single_threaded(dict))) {
-        netdata_rwlock_init(&dict->index.rwlock);
-        netdata_rwlock_init(&dict->items.rwlock);
+        rw_spinlock_init(&dict->index.rw_spinlock);
+        rw_spinlock_init(&dict->items.rw_spinlock);
     }
 
     return 0;
 }
 
-static inline size_t dictionary_locks_destroy(DICTIONARY *dict) {
-    if(likely(!is_dictionary_single_threaded(dict))) {
-        netdata_rwlock_destroy(&dict->index.rwlock);
-        netdata_rwlock_destroy(&dict->items.rwlock);
-    }
-
+static inline size_t dictionary_locks_destroy(DICTIONARY *dict __maybe_unused) {
     return 0;
 }
 
@@ -676,11 +667,11 @@ static inline void ll_recursive_lock(DICTIONARY *dict, char rw) {
 
     if(rw == DICTIONARY_LOCK_READ || rw == DICTIONARY_LOCK_REENTRANT || rw == 'R') {
         // read lock
-        netdata_rwlock_rdlock(&dict->items.rwlock);
+        rw_spinlock_read_lock(&dict->items.rw_spinlock);
     }
     else {
         // write lock
-        netdata_rwlock_wrlock(&dict->items.rwlock);
+        rw_spinlock_write_lock(&dict->items.rw_spinlock);
         ll_recursive_lock_set_thread_as_writer(dict);
     }
 }
@@ -697,14 +688,14 @@ static inline void ll_recursive_unlock(DICTIONARY *dict, char rw) {
     if(rw == DICTIONARY_LOCK_READ || rw == DICTIONARY_LOCK_REENTRANT || rw == 'R') {
         // read unlock
 
-        netdata_rwlock_unlock(&dict->items.rwlock);
+        rw_spinlock_read_unlock(&dict->items.rw_spinlock);
     }
     else {
         // write unlock
 
         ll_recursive_unlock_unset_thread_writer(dict);
 
-        netdata_rwlock_unlock(&dict->items.rwlock);
+        rw_spinlock_write_unlock(&dict->items.rw_spinlock);
     }
 }
 
@@ -719,27 +710,27 @@ static inline void dictionary_index_lock_rdlock(DICTIONARY *dict) {
     if(unlikely(is_dictionary_single_threaded(dict)))
         return;
 
-    netdata_rwlock_rdlock(&dict->index.rwlock);
+    rw_spinlock_read_lock(&dict->index.rw_spinlock);
 }
 
 static inline void dictionary_index_rdlock_unlock(DICTIONARY *dict) {
     if(unlikely(is_dictionary_single_threaded(dict)))
         return;
 
-    netdata_rwlock_unlock(&dict->index.rwlock);
+    rw_spinlock_read_unlock(&dict->index.rw_spinlock);
 }
 
 static inline void dictionary_index_lock_wrlock(DICTIONARY *dict) {
     if(unlikely(is_dictionary_single_threaded(dict)))
         return;
 
-    netdata_rwlock_wrlock(&dict->index.rwlock);
+    rw_spinlock_write_lock(&dict->index.rw_spinlock);
 }
 static inline void dictionary_index_wrlock_unlock(DICTIONARY *dict) {
     if(unlikely(is_dictionary_single_threaded(dict)))
         return;
 
-    netdata_rwlock_unlock(&dict->index.rwlock);
+    rw_spinlock_write_unlock(&dict->index.rw_spinlock);
 }
 
 // ----------------------------------------------------------------------------
@@ -957,7 +948,7 @@ static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *it
             if (having_index_lock) {
                 // delete it from the hashtable
                 if(hashtable_delete_unsafe(dict, item_get_name(item), item->key_len, item) == 0)
-                    error("DICTIONARY: INTERNAL ERROR VIEW: tried to delete item with name '%s', name_len %u that is not in the index", item_get_name(item), (KEY_LEN_TYPE)(item->key_len - 1));
+                    netdata_log_error("DICTIONARY: INTERNAL ERROR VIEW: tried to delete item with name '%s', name_len %u that is not in the index", item_get_name(item), (KEY_LEN_TYPE)(item->key_len - 1));
                 else
                     pointer_del(dict, item);
 
@@ -1070,11 +1061,11 @@ static size_t hashtable_destroy_unsafe(DICTIONARY *dict) {
     JError_t J_Error;
     Word_t ret = JudyHSFreeArray(&dict->index.JudyHSArray, &J_Error);
     if(unlikely(ret == (Word_t) JERR)) {
-        error("DICTIONARY: Cannot destroy JudyHS, JU_ERRNO_* == %u, ID == %d",
-              JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+        netdata_log_error("DICTIONARY: Cannot destroy JudyHS, JU_ERRNO_* == %u, ID == %d",
+                          JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
     }
 
-    debug(D_DICTIONARY, "Dictionary: hash table freed %lu bytes", ret);
+    netdata_log_debug(D_DICTIONARY, "Dictionary: hash table freed %lu bytes", ret);
 
     dict->index.JudyHSArray = NULL;
     return (size_t)ret;
@@ -1084,8 +1075,8 @@ static inline void **hashtable_insert_unsafe(DICTIONARY *dict, const char *name,
     JError_t J_Error;
     Pvoid_t *Rc = JudyHSIns(&dict->index.JudyHSArray, (void *)name, name_len, &J_Error);
     if (unlikely(Rc == PJERR)) {
-        error("DICTIONARY: Cannot insert entry with name '%s' to JudyHS, JU_ERRNO_* == %u, ID == %d",
-              name, JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+        netdata_log_error("DICTIONARY: Cannot insert entry with name '%s' to JudyHS, JU_ERRNO_* == %u, ID == %d",
+                          name, JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
     }
 
     // if *Rc == 0, new item added to the array
@@ -1105,8 +1096,9 @@ static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, si
     JError_t J_Error;
     int ret = JudyHSDel(&dict->index.JudyHSArray, (void *)name, name_len, &J_Error);
     if(unlikely(ret == JERR)) {
-        error("DICTIONARY: Cannot delete entry with name '%s' from JudyHS, JU_ERRNO_* == %u, ID == %d", name,
-              JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+        netdata_log_error("DICTIONARY: Cannot delete entry with name '%s' from JudyHS, JU_ERRNO_* == %u, ID == %d",
+                          name,
+                          JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
         return 0;
     }
 
@@ -1232,7 +1224,7 @@ void dictionary_static_items_aral_init(void) {
     static SPINLOCK spinlock;
 
     if(unlikely(!dict_items_aral || !dict_shared_items_aral)) {
-        netdata_spinlock_lock(&spinlock);
+        spinlock_lock(&spinlock);
 
         // we have to check again
         if(!dict_items_aral)
@@ -1254,7 +1246,7 @@ void dictionary_static_items_aral_init(void) {
                     aral_by_size_statistics(),
                     NULL, NULL, false, false);
 
-        netdata_spinlock_unlock(&spinlock);
+        spinlock_unlock(&spinlock);
     }
 }
 
@@ -1384,7 +1376,7 @@ static void dict_item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *
     if(unlikely(is_view_dictionary(dict)))
         fatal("DICTIONARY: %s() should never be called on views.", __FUNCTION__ );
 
-    debug(D_DICTIONARY, "Dictionary entry with name '%s' found. Changing its value.", item_get_name(item));
+    netdata_log_debug(D_DICTIONARY, "Dictionary entry with name '%s' found. Changing its value.", item_get_name(item));
 
     DICTIONARY_VALUE_RESETS_PLUS1(dict);
 
@@ -1396,12 +1388,12 @@ static void dict_item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *
     dictionary_execute_delete_callback(dict, item);
 
     if(likely(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE)) {
-        debug(D_DICTIONARY, "Dictionary: linking value to '%s'", item_get_name(item));
+        netdata_log_debug(D_DICTIONARY, "Dictionary: linking value to '%s'", item_get_name(item));
         item->shared->value = value;
         item->shared->value_len = value_len;
     }
     else {
-        debug(D_DICTIONARY, "Dictionary: cloning value to '%s'", item_get_name(item));
+        netdata_log_debug(D_DICTIONARY, "Dictionary: cloning value to '%s'", item_get_name(item));
 
         void *old_value = item->shared->value;
         void *new_value = NULL;
@@ -1413,7 +1405,7 @@ static void dict_item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *
         item->shared->value = new_value;
         item->shared->value_len = value_len;
 
-        debug(D_DICTIONARY, "Dictionary: freeing old value of '%s'", item_get_name(item));
+        netdata_log_debug(D_DICTIONARY, "Dictionary: freeing old value of '%s'", item_get_name(item));
         dict_item_value_freez(dict, old_value);
     }
 
@@ -1421,7 +1413,7 @@ static void dict_item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *
 }
 
 static size_t dict_item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item) {
-    debug(D_DICTIONARY, "Destroying name value entry for name '%s'.", item_get_name(item));
+    netdata_log_debug(D_DICTIONARY, "Destroying name value entry for name '%s'.", item_get_name(item));
 
     if(!item_flag_check(item, ITEM_FLAG_DELETED))
         DICTIONARY_ENTRIES_MINUS1(dict);
@@ -1436,7 +1428,7 @@ static size_t dict_item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item)
         dictionary_execute_delete_callback(dict, item);
 
         if(unlikely(!(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE))) {
-            debug(D_DICTIONARY, "Dictionary freeing value of '%s'", item_get_name(item));
+            netdata_log_debug(D_DICTIONARY, "Dictionary freeing value of '%s'", item_get_name(item));
             dict_item_value_freez(dict, item->shared->value);
             item->shared->value = NULL;
         }
@@ -1562,7 +1554,7 @@ static bool dict_item_del(DICTIONARY *dict, const char *name, ssize_t name_len) 
     if(name_len == -1)
         name_len = (ssize_t)strlen(name) + 1; // we need the terminating null too
 
-    debug(D_DICTIONARY, "DEL dictionary entry with name '%s'.", name);
+    netdata_log_debug(D_DICTIONARY, "DEL dictionary entry with name '%s'.", name);
 
     // Unfortunately, the JudyHSDel() does not return the value of the
     // item that was deleted, so we have to find it before we delete it,
@@ -1578,7 +1570,9 @@ static bool dict_item_del(DICTIONARY *dict, const char *name, ssize_t name_len) 
     }
     else {
         if(hashtable_delete_unsafe(dict, name, name_len, item) == 0)
-            error("DICTIONARY: INTERNAL ERROR: tried to delete item with name '%s', name_len %zd that is not in the index", name, name_len - 1);
+            netdata_log_error("DICTIONARY: INTERNAL ERROR: tried to delete item with name '%s', name_len %zd that is not in the index",
+                              name,
+                              name_len - 1);
         else
             pointer_del(dict, item);
 
@@ -1611,7 +1605,7 @@ static DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONARY *dic
     if(name_len == -1)
         name_len = (ssize_t)strlen(name) + 1; // we need the terminating null too
 
-    debug(D_DICTIONARY, "SET dictionary entry with name '%s'.", name);
+    netdata_log_debug(D_DICTIONARY, "SET dictionary entry with name '%s'.", name);
 
     // DISCUSSION:
     // Is it better to gain a read-lock and do a hashtable_get_unsafe()
@@ -1673,7 +1667,7 @@ static DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONARY *dic
                 // view dictionary
                 // the item is already there and can be used
                 if(item->shared != master_item->shared)
-                    error("DICTIONARY: changing the master item on a view is not supported. The previous item will remain. To change the key of an item in a view, delete it and add it again.");
+                    netdata_log_error("DICTIONARY: changing the master item on a view is not supported. The previous item will remain. To change the key of an item in a view, delete it and add it again.");
             }
             else {
                 // master dictionary
@@ -1730,7 +1724,7 @@ static DICTIONARY_ITEM *dict_item_find_and_acquire(DICTIONARY *dict, const char 
     if(name_len == -1)
         name_len = (ssize_t)strlen(name) + 1; // we need the terminating null too
 
-    debug(D_DICTIONARY, "GET dictionary entry with name '%s'.", name);
+    netdata_log_debug(D_DICTIONARY, "GET dictionary entry with name '%s'.", name);
 
     dictionary_index_lock_rdlock(dict);
 
@@ -2096,7 +2090,7 @@ size_t dictionary_destroy(DICTIONARY *dict) {
 
         internal_error(
             true,
-            "DICTIONARY: delaying destruction of dictionary created from %s() %zu@%s, because it has %ld referenced items in it (%ld total).",
+            "DICTIONARY: delaying destruction of dictionary created from %s() %zu@%s, because it has %d referenced items in it (%d total).",
             dict->creation_function,
             dict->creation_line,
             dict->creation_file,
@@ -2560,8 +2554,8 @@ void thread_cache_destroy(void) {
     JError_t J_Error;
     Word_t ret = JudyHSFreeArray(&thread_cache_judy_array, &J_Error);
     if(unlikely(ret == (Word_t) JERR)) {
-        error("THREAD_CACHE: Cannot destroy JudyHS, JU_ERRNO_* == %u, ID == %d",
-              JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+        netdata_log_error("THREAD_CACHE: Cannot destroy JudyHS, JU_ERRNO_* == %u, ID == %d",
+                          JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
     }
 
     internal_error(true, "THREAD_CACHE: hash table freed %lu bytes", ret);
@@ -2842,7 +2836,7 @@ static usec_t dictionary_unittest_run_and_measure_time(DICTIONARY *dict, char *m
         }
     }
 
-    fprintf(stderr, " %zu errors, %ld (found %ld) items in dictionary, %ld (found %ld) referenced, %ld (found %ld) deleted, %llu usec \n",
+    fprintf(stderr, " %zu errors, %d (found %ld) items in dictionary, %d (found %ld) referenced, %d (found %ld) deleted, %llu usec \n",
             errs, dict?dict->entries:0, found_ok, dict?dict->referenced_items:0, found_referenced, dict?dict->pending_deletion_items:0, found_deleted, dt);
     *errors += errs;
     return dt;
@@ -2984,7 +2978,7 @@ static size_t unittest_check_dictionary(const char *label, DICTIONARY *dict, siz
             referenced++;
     }
 
-    fprintf(stderr, "DICT %-20s: dictionary active items reported %ld, counted %zu, expected %zu...\t\t\t",
+    fprintf(stderr, "DICT %-20s: dictionary active items reported %d, counted %zu, expected %zu...\t\t\t",
             label, dict->entries, active, active_items);
     if(active != active_items || active != (size_t)dict->entries) {
         fprintf(stderr, "FAILED\n");
@@ -3002,7 +2996,7 @@ static size_t unittest_check_dictionary(const char *label, DICTIONARY *dict, siz
     else
         fprintf(stderr, "OK\n");
 
-    fprintf(stderr, "DICT %-20s: dictionary referenced items reported %ld, counted %zu, expected %zu...\t\t",
+    fprintf(stderr, "DICT %-20s: dictionary referenced items reported %d, counted %zu, expected %zu...\t\t",
             label, dict->referenced_items, referenced, referenced_items);
     if(referenced != referenced_items || dict->referenced_items != (long int)referenced) {
         fprintf(stderr, "FAILED\n");
@@ -3011,7 +3005,7 @@ static size_t unittest_check_dictionary(const char *label, DICTIONARY *dict, siz
     else
         fprintf(stderr, "OK\n");
 
-    fprintf(stderr, "DICT %-20s: dictionary pending deletion items reported %ld, counted %zu, expected %zu...\t",
+    fprintf(stderr, "DICT %-20s: dictionary pending deletion items reported %d, counted %zu, expected %zu...\t",
             label, dict->pending_deletion_items, pending, pending_deletion);
     if(pending != pending_deletion || pending != (size_t)dict->pending_deletion_items) {
         fprintf(stderr, "FAILED\n");
@@ -3257,9 +3251,9 @@ static int dictionary_unittest_threads() {
             ", searches %zu"
             ", resets %zu"
             ", flushes %zu"
-            ", entries %ld"
-            ", referenced_items %ld"
-            ", pending deletions %ld"
+            ", entries %d"
+            ", referenced_items %d"
+            ", pending deletions %d"
             ", check spins %zu"
             ", insert spins %zu"
             ", delete spins %zu"
@@ -3418,9 +3412,9 @@ static int dictionary_unittest_view_threads() {
             ", deletes %zu"
             ", searches %zu"
             ", resets %zu"
-            ", entries %ld"
-            ", referenced_items %ld"
-            ", pending deletions %ld"
+            ", entries %d"
+            ", referenced_items %d"
+            ", pending deletions %d"
             ", check spins %zu"
             ", insert spins %zu"
             ", delete spins %zu"
@@ -3443,9 +3437,9 @@ static int dictionary_unittest_view_threads() {
             ", deletes %zu"
             ", searches %zu"
             ", resets %zu"
-            ", entries %ld"
-            ", referenced_items %ld"
-            ", pending deletions %ld"
+            ", entries %d"
+            ", referenced_items %d"
+            ", pending deletions %d"
             ", check spins %zu"
             ", insert spins %zu"
             ", delete spins %zu"

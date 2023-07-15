@@ -153,9 +153,9 @@ static unsigned char label_values_char_map[256] = {
     [88] = 'X', // X keep
     [89] = 'Y', // Y keep
     [90] = 'Z', // Z keep
-    [91] = '_', // [
+    [91] = '[', // [ keep
     [92] = '/', // backslash convert \ to /
-    [93] = '_', // ]
+    [93] = ']', // ] keep
     [94] = '_', // ^
     [95] = '_', // _ keep
     [96] = '_', // `
@@ -571,7 +571,7 @@ static void labels_add_already_sanitized(DICTIONARY *dict, const char *key, cons
 
 void rrdlabels_add(DICTIONARY *dict, const char *name, const char *value, RRDLABEL_SRC ls) {
     if(!dict) {
-        error("%s(): called with NULL dictionary.", __FUNCTION__ );
+        netdata_log_error("%s(): called with NULL dictionary.", __FUNCTION__ );
         return;
     }
 
@@ -580,7 +580,7 @@ void rrdlabels_add(DICTIONARY *dict, const char *name, const char *value, RRDLAB
     rrdlabels_sanitize_value(v, value, RRDLABELS_MAX_VALUE_LENGTH);
 
     if(!*n) {
-        error("%s: cannot add name '%s' (value '%s') which is sanitized as empty string", __FUNCTION__, name, value);
+        netdata_log_error("%s: cannot add name '%s' (value '%s') which is sanitized as empty string", __FUNCTION__, name, value);
         return;
     }
 
@@ -621,7 +621,7 @@ static const char *get_quoted_string_up_to(char *dst, size_t dst_size, const cha
 
 void rrdlabels_add_pair(DICTIONARY *dict, const char *string, RRDLABEL_SRC ls) {
     if(!dict) {
-        error("%s(): called with NULL dictionary.", __FUNCTION__ );
+        netdata_log_error("%s(): called with NULL dictionary.", __FUNCTION__ );
         return;
     }
 
@@ -1223,6 +1223,7 @@ int rrdlabels_unittest_sanitization() {
     errors += rrdlabels_unittest_sanitize_value("", "[none]");
     errors += rrdlabels_unittest_sanitize_value("1", "1");
     errors += rrdlabels_unittest_sanitize_value("  hello   world   ", "hello world");
+    errors += rrdlabels_unittest_sanitize_value("[none]", "[none]");
 
     // 2-byte UTF-8
     errors += rrdlabels_unittest_sanitize_value(" Ελλάδα ", "Ελλάδα");

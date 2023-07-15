@@ -816,17 +816,6 @@ detect_libc() {
   return 0
 }
 
-rename_libbpf_packaging() {
-  if [ "$(get_kernel_version)" -ge "004014000" ]; then
-    cp packaging/current_libbpf.checksums packaging/libbpf.checksums
-    cp packaging/current_libbpf.version packaging/libbpf.version
-  else
-    cp packaging/libbpf_0_0_9.checksums packaging/libbpf.checksums
-    cp packaging/libbpf_0_0_9.version packaging/libbpf.version
-  fi
-}
-
-
 build_libbpf() {
   cd "${1}/src" > /dev/null || return 1
   mkdir root build
@@ -866,16 +855,20 @@ bundle_libbpf() {
 
   [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling libbpf."
 
-  rename_libbpf_packaging
-
   progress "Prepare libbpf"
 
-  LIBBPF_PACKAGE_VERSION="$(cat packaging/libbpf.version)"
+  if [ "$(get_kernel_version)" -ge "004014000" ]; then
+    LIBBPF_PACKAGE_VERSION="$(cat packaging/current_libbpf.version)"
+    LIBBPF_PACKAGE_COMPONENT="current_libbpf"
+  else
+    LIBBPF_PACKAGE_VERSION="$(cat packaging/libbpf_0_0_9.version)"
+    LIBBPF_PACKAGE_COMPONENT="libbpf_0_0_9"
+  fi
 
   tmp="$(mktemp -d -t netdata-libbpf-XXXXXX)"
   LIBBPF_PACKAGE_BASENAME="v${LIBBPF_PACKAGE_VERSION}.tar.gz"
 
-  if fetch_and_verify "libbpf" \
+  if fetch_and_verify "${LIBBPF_PACKAGE_COMPONENT}" \
     "https://github.com/netdata/libbpf/archive/${LIBBPF_PACKAGE_BASENAME}" \
     "${LIBBPF_PACKAGE_BASENAME}" \
     "${tmp}" \
@@ -1057,64 +1050,6 @@ fi
 [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Installing Netdata."
 
 # -----------------------------------------------------------------------------
-
-# shellcheck disable=SC2230
-md5sum="$(command -v md5sum 2> /dev/null || command -v md5 2> /dev/null)"
-
-deleted_stock_configs=0
-if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done" ]; then
-
-  progress "Backup existing netdata configuration before installing it"
-
-  config_signature_matches() {
-    md5="${1}"
-    file="${2}"
-
-    if [ -f "configs.signatures" ]; then
-      grep "\['${md5}'\]='${file}'" "configs.signatures" > /dev/null
-      return $?
-    fi
-
-    return 1
-  }
-
-  # clean up stock config files from the user configuration directory
-  (find -L "${NETDATA_PREFIX}/etc/netdata" -type f -not -path '*/\.*' -not -path "${NETDATA_PREFIX}/etc/netdata/orig/*" \( -name '*.conf.old' -o -name '*.conf' -o -name '*.conf.orig' -o -name '*.conf.installer_backup.*' \)) | while IFS= read -r  x; do
-    if [ -f "${x}" ]; then
-      # find it relative filename
-      p="$(echo "${NETDATA_PREFIX}/etc/netdata" | sed -e 's/\//\\\//')"
-      f="$(echo "${x}" | sed -e "s/${p}//")"
-
-      # find the stock filename
-      t="$(echo "${f}" | sed -e 's/\.conf\.installer_backup\..*/\.conf/')"
-      t="$(echo "${t}" | sed -e 's/\.conf\.old/\.conf/')"
-      t="$(echo "${t}" | sed -e 's/\.conf\.orig/\.conf/')"
-      t="$(echo "${t}" | sed -e 's/orig//')"
-
-      if [ -z "${md5sum}" ] || [ ! -x "${md5sum}" ]; then
-        # we don't have md5sum - keep it
-        echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED}is not known to distribution${TPUT_RESET}. Keeping it."
-      else
-        # find its checksum
-        md5="$(${md5sum} < "${x}" | cut -d ' ' -f 1)"
-
-        if config_signature_matches "${md5}" "${t}"; then
-	  # it is a stock version - remove it
-          echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' is stock version of '${t}'."
-          run rm -f "${x}"
-	  # shellcheck disable=SC2030
-          deleted_stock_configs=$((deleted_stock_configs + 1))
-        else
-          # edited by user - keep it
-          echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED} does not match stock of${TPUT_RESET} ${TPUT_CYAN}'${t}'${TPUT_RESET}. Keeping it."
-        fi
-      fi
-    fi
-  done
-fi
-touch "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done"
-
-# -----------------------------------------------------------------------------
 progress "Install netdata"
 
 if ! run $make install; then
@@ -1212,16 +1147,8 @@ fi
 # --- stock conf dir ----
 
 [ ! -d "${NETDATA_STOCK_CONFIG_DIR}" ] && mkdir -p "${NETDATA_STOCK_CONFIG_DIR}"
-
-helplink="000.-.USE.THE.orig.LINK.TO.COPY.AND.EDIT.STOCK.CONFIG.FILES"
-# shellcheck disable=SC2031
-[ ${deleted_stock_configs} -eq 0 ] && helplink=""
-for link in "orig" "${helplink}"; do
-  if [ -n "${link}" ]; then
-    [ -L "${NETDATA_USER_CONFIG_DIR}/${link}" ] && run rm -f "${NETDATA_USER_CONFIG_DIR}/${link}"
-    run ln -s "${NETDATA_STOCK_CONFIG_DIR}" "${NETDATA_USER_CONFIG_DIR}/${link}"
-  fi
-done
+[ -L "${NETDATA_USER_CONFIG_DIR}/orig" ] && run rm -f "${NETDATA_USER_CONFIG_DIR}/orig"
+run ln -s "${NETDATA_STOCK_CONFIG_DIR}" "${NETDATA_USER_CONFIG_DIR}/orig"
 
 # --- web dir ----
 
@@ -1295,6 +1222,23 @@ if [ "$(id -u)" -eq 0 ]; then
     fi
   fi
 
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin"
+    capabilities=0
+    if ! iscontainer && command -v setcap 1> /dev/null 2>&1; then
+      run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin"
+      if run setcap cap_dac_read_search+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin"; then
+        # if we managed to setcap, but we fail to execute debugfs.plugin setuid to root
+        "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin" -t > /dev/null 2>&1 && capabilities=1 || capabilities=0
+      fi
+    fi
+
+    if [ $capabilities -eq 0 ]; then
+      # fix debugfs.plugin to be setuid to root
+      run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/debugfs.plugin"
+    fi
+  fi
+
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/freeipmi.plugin" ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/freeipmi.plugin"
     run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/freeipmi.plugin"
@@ -1340,6 +1284,11 @@ if [ "$(id -u)" -eq 0 ]; then
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network-helper.sh" ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network-helper.sh"
     run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network-helper.sh"
+  fi
+
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/local-listeners" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/local-listeners"
+    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/local-listeners"
   fi
 else
   # non-privileged user installation

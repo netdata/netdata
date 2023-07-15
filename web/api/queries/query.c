@@ -883,6 +883,9 @@ RRDR_GROUP_BY_FUNCTION group_by_aggregate_function_parse(const char *s) {
     if(strcmp(s, "sum") == 0)
         return RRDR_GROUP_BY_FUNCTION_SUM;
 
+    if(strcmp(s, "percentage") == 0)
+        return RRDR_GROUP_BY_FUNCTION_PERCENTAGE;
+
     return RRDR_GROUP_BY_FUNCTION_AVERAGE;
 }
 
@@ -900,6 +903,9 @@ const char *group_by_aggregate_function_to_string(RRDR_GROUP_BY_FUNCTION group_b
 
         case RRDR_GROUP_BY_FUNCTION_SUM:
             return "sum";
+
+        case RRDR_GROUP_BY_FUNCTION_PERCENTAGE:
+            return "percentage";
     }
 }
 
@@ -1621,7 +1627,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                 new_point.sp.start_time_s = last1_point.sp.end_time_s;
                 new_point.sp.end_time_s   = now_end_time;
 //
-//                if(debug_this) info("QUERY: is finished() returned true");
+//                if(debug_this) netdata_log_info("QUERY: is finished() returned true");
 //
                 break;
             }
@@ -1681,7 +1687,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                 query_point_set_id(new_point, ops->db_total_points_read);
 
 //                if(debug_this)
-//                    info("QUERY: got point %zu, from time %ld to %ld   //   now from %ld to %ld   //   query from %ld to %ld",
+//                    netdata_log_info("QUERY: got point %zu, from time %ld to %ld   //   now from %ld to %ld   //   query from %ld to %ld",
 //                         new_point.id, new_point.start_time, new_point.end_time, now_start_time, now_end_time, after_wanted, before_wanted);
 //
                 // get the right value from the point we got
@@ -1946,7 +1952,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
     if(unlikely(!t)) return;
 
     time_t latest_time_s = storage_engine_latest_time_s(t->backend, t->db_metric_handle);
-    time_t granularity = (time_t)t->tier_grouping * (time_t)rd->update_every;
+    time_t granularity = (time_t)t->tier_grouping * (time_t)rd->rrdset->update_every;
     time_t time_diff   = now_s - latest_time_s;
 
     // if the user wants only NEW backfilling, and we don't have any data
@@ -2152,7 +2158,7 @@ bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t *now
 #define query_debug_log_init() BUFFER *debug_log = buffer_create(1000)
 #define query_debug_log(args...) buffer_sprintf(debug_log, ##args)
 #define query_debug_log_fin() { \
-        info("QUERY: '%s', after:%ld, before:%ld, duration:%ld, points:%zu, res:%ld - wanted => after:%ld, before:%ld, points:%zu, group:%zu, granularity:%ld, resgroup:%ld, resdiv:" NETDATA_DOUBLE_FORMAT_AUTO " %s", qt->id, after_requested, before_requested, before_requested - after_requested, points_requested, resampling_time_requested, after_wanted, before_wanted, points_wanted, group, query_granularity, resampling_group, resampling_divisor, buffer_tostring(debug_log)); \
+        netdata_log_info("QUERY: '%s', after:%ld, before:%ld, duration:%ld, points:%zu, res:%ld - wanted => after:%ld, before:%ld, points:%zu, group:%zu, granularity:%ld, resgroup:%ld, resdiv:" NETDATA_DOUBLE_FORMAT_AUTO " %s", qt->id, after_requested, before_requested, before_requested - after_requested, points_requested, resampling_time_requested, after_wanted, before_wanted, points_wanted, group, query_granularity, resampling_group, resampling_divisor, buffer_tostring(debug_log)); \
         buffer_free(debug_log); \
         debug_log = NULL; \
     }
@@ -2510,13 +2516,6 @@ void rrdr_json_group_by_labels(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTION
     buffer_json_object_close(wb); // key
 }
 
-static int group_by_label_is_space(char c) {
-    if(c == ',' || c == '|')
-        return 1;
-
-    return 0;
-}
-
 static void rrd2rrdr_set_timestamps(RRDR *r) {
     QUERY_TARGET *qt = r->internal.qt;
 
@@ -2555,9 +2554,9 @@ static void rrd2rrdr_set_timestamps(RRDR *r) {
                    before_wanted, r->t[points_wanted - 1]);
 }
 
-static void query_group_by_make_dimension_key(BUFFER *key, RRDR_GROUP_BY group_by, size_t group_by_id, QUERY_TARGET *qt, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi, QUERY_DIMENSION *qd __maybe_unused, QUERY_METRIC *qm, bool query_has_percentage_of_instance) {
+static void query_group_by_make_dimension_key(BUFFER *key, RRDR_GROUP_BY group_by, size_t group_by_id, QUERY_TARGET *qt, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi, QUERY_DIMENSION *qd __maybe_unused, QUERY_METRIC *qm, bool query_has_percentage_of_group) {
     buffer_flush(key);
-    if(unlikely(!query_has_percentage_of_instance && qm->status & RRDR_DIMENSION_HIDDEN)) {
+    if(unlikely(!query_has_percentage_of_group && qm->status & RRDR_DIMENSION_HIDDEN)) {
         buffer_strcat(key, "__hidden_dimensions__");
     }
     else if(unlikely(group_by & RRDR_GROUP_BY_SELECTED)) {
@@ -2599,9 +2598,9 @@ static void query_group_by_make_dimension_key(BUFFER *key, RRDR_GROUP_BY group_b
     }
 }
 
-static void query_group_by_make_dimension_id(BUFFER *key, RRDR_GROUP_BY group_by, size_t group_by_id, QUERY_TARGET *qt, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi, QUERY_DIMENSION *qd __maybe_unused, QUERY_METRIC *qm, bool query_has_percentage_of_instance) {
+static void query_group_by_make_dimension_id(BUFFER *key, RRDR_GROUP_BY group_by, size_t group_by_id, QUERY_TARGET *qt, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi, QUERY_DIMENSION *qd __maybe_unused, QUERY_METRIC *qm, bool query_has_percentage_of_group) {
     buffer_flush(key);
-    if(unlikely(!query_has_percentage_of_instance && qm->status & RRDR_DIMENSION_HIDDEN)) {
+    if(unlikely(!query_has_percentage_of_group && qm->status & RRDR_DIMENSION_HIDDEN)) {
         buffer_strcat(key, "__hidden_dimensions__");
     }
     else if(unlikely(group_by & RRDR_GROUP_BY_SELECTED)) {
@@ -2654,9 +2653,9 @@ static void query_group_by_make_dimension_id(BUFFER *key, RRDR_GROUP_BY group_by
     }
 }
 
-static void query_group_by_make_dimension_name(BUFFER *key, RRDR_GROUP_BY group_by, size_t group_by_id, QUERY_TARGET *qt, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi, QUERY_DIMENSION *qd __maybe_unused, QUERY_METRIC *qm, bool query_has_percentage_of_instance) {
+static void query_group_by_make_dimension_name(BUFFER *key, RRDR_GROUP_BY group_by, size_t group_by_id, QUERY_TARGET *qt, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi, QUERY_DIMENSION *qd __maybe_unused, QUERY_METRIC *qm, bool query_has_percentage_of_group) {
     buffer_flush(key);
-    if(unlikely(!query_has_percentage_of_instance && qm->status & RRDR_DIMENSION_HIDDEN)) {
+    if(unlikely(!query_has_percentage_of_group && qm->status & RRDR_DIMENSION_HIDDEN)) {
         buffer_strcat(key, "__hidden_dimensions__");
     }
     else if(unlikely(group_by & RRDR_GROUP_BY_SELECTED)) {
@@ -2749,25 +2748,25 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
         if (qt->request.group_by[g].group_by & RRDR_GROUP_BY_LABEL &&
             qt->request.group_by[g].group_by_label && *qt->request.group_by[g].group_by_label)
-            qt->group_by[g].used = quoted_strings_splitter(
+            qt->group_by[g].used = quoted_strings_splitter_query_group_by_label(
                     qt->request.group_by[g].group_by_label, qt->group_by[g].label_keys,
-                    GROUP_BY_MAX_LABEL_KEYS, group_by_label_is_space);
+                    GROUP_BY_MAX_LABEL_KEYS);
 
         if (!qt->group_by[g].used)
             qt->request.group_by[g].group_by &= ~RRDR_GROUP_BY_LABEL;
     }
 
     // make sure there are valid group-by methods
-    bool query_has_percentage_of_instance = false;
-    for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES - 1 ;g++) {
+    for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
         if(!(qt->request.group_by[g].group_by & SUPPORTED_GROUP_BY_METHODS))
             qt->request.group_by[g].group_by = (g == 0) ? RRDR_GROUP_BY_DIMENSION : RRDR_GROUP_BY_NONE;
-
-        if(qt->request.group_by[g].group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE)
-            query_has_percentage_of_instance = true;
     }
 
-    // merge all group-by options to upper levels
+    bool query_has_percentage_of_group = query_target_has_percentage_of_group(qt);
+
+    // merge all group-by options to upper levels,
+    // so that the top level has all the groupings of the inner levels,
+    // and each subsequent level has all the groupings of its inner levels.
     for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES - 1 ;g++) {
         if(qt->request.group_by[g].group_by == RRDR_GROUP_BY_NONE)
             continue;
@@ -2815,6 +2814,7 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
     for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
         RRDR_GROUP_BY group_by = qt->request.group_by[g].group_by;
+        RRDR_GROUP_BY_FUNCTION aggregation_method = qt->request.group_by[g].aggregation;
 
         if(group_by == RRDR_GROUP_BY_NONE)
             break;
@@ -2855,7 +2855,7 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             // --------------------------------------------------------------------
             // generate the group by key
 
-            query_group_by_make_dimension_key(key, group_by, g, qt, qn, qc, qi, qd, qm, query_has_percentage_of_instance);
+            query_group_by_make_dimension_key(key, group_by, g, qt, qn, qc, qi, qd, qm, query_has_percentage_of_group);
 
             // lookup the key in the dictionary
 
@@ -2869,13 +2869,13 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                 // ----------------------------------------------------------------
                 // generate the dimension id
 
-                query_group_by_make_dimension_id(key, group_by, g, qt, qn, qc, qi, qd, qm, query_has_percentage_of_instance);
+                query_group_by_make_dimension_id(key, group_by, g, qt, qn, qc, qi, qd, qm, query_has_percentage_of_group);
                 entries[pos].id = string_strdupz(buffer_tostring(key));
 
                 // ----------------------------------------------------------------
                 // generate the dimension name
 
-                query_group_by_make_dimension_name(key, group_by, g, qt, qn, qc, qi, qd, qm, query_has_percentage_of_instance);
+                query_group_by_make_dimension_name(key, group_by, g, qt, qn, qc, qi, qd, qm, query_has_percentage_of_group);
                 entries[pos].name = string_strdupz(buffer_tostring(key));
 
                 // add the rest of the info
@@ -2914,9 +2914,9 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             // the query target adds to it the non-zero flag
             qm->status |= RRDR_DIMENSION_GROUPED;
 
-            if(query_has_percentage_of_instance)
-                // when the query has percentage of instance
-                // there will be no hidden dimensions in the final query
+            if(query_has_percentage_of_group)
+                // when the query has percentage of group
+                // there will be no hidden dimensions in the final query,
                 // so we have to remove the hidden flag from all dimensions
                 entries[pos].od |= qm->status & ~RRDR_DIMENSION_HIDDEN;
             else
@@ -2934,12 +2934,10 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                            qt->id, qt->window.after, qt->window.before, added, qt->window.points);
             goto cleanup;
         }
-
-        bool hidden_dimension_on_percentage_of_instance = hidden_dimensions && (group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE);
-
-        // prevent double cleanup in case of error
+        // prevent double free at cleanup in case of error
         added = 0;
 
+        // link this RRDR
         if(!last_r)
             first_r = last_r = r;
         else
@@ -2954,7 +2952,7 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         r->gbc = onewayalloc_callocz(owa, r->n * r->d, sizeof(*r->gbc));
         r->dqp = onewayalloc_callocz(owa, r->d, sizeof(STORAGE_POINT));
 
-        if(hidden_dimension_on_percentage_of_instance)
+        if(hidden_dimensions && ((group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE) || (aggregation_method == RRDR_GROUP_BY_FUNCTION_PERCENTAGE)))
             // this is where we are going to group the hidden dimensions
             r->vh = onewayalloc_mallocz(owa, r->n * r->d * sizeof(*r->vh));
 
@@ -2987,7 +2985,7 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         // initialize partial trimming
         r->partial_data_trimming.max_update_every = update_every_max;
         r->partial_data_trimming.expected_after =
-                (!(qt->window.options & RRDR_OPTION_RETURN_RAW) &&
+                (!query_target_aggregatable(qt) &&
                  qt->window.before >= qt->window.now - update_every_max) ?
                 qt->window.before - update_every_max :
                 qt->window.before;
@@ -3006,7 +3004,7 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                 co[d] = RRDR_VALUE_EMPTY;
 
                 if(vh)
-                    *vh = NAN;
+                    vh[d] = NAN;
             }
         }
     }
@@ -3073,9 +3071,9 @@ static void rrd2rrdr_group_by_add_metric(RRDR *r_dst, size_t d_dst, RRDR *r_tmp,
     internal_fatal(!r_dst->dqp, "QUERY: group-by destination is not properly prepared (missing dqp array)");
     internal_fatal(!r_dst->gbc, "QUERY: group-by destination is not properly prepared (missing gbc array)");
 
-    bool hidden_dimension_on_percentage_of_instance = (r_tmp->od[d_tmp] & RRDR_DIMENSION_HIDDEN) && r_dst->vh;
+    bool hidden_dimension_on_percentage_of_group = (r_tmp->od[d_tmp] & RRDR_DIMENSION_HIDDEN) && r_dst->vh;
 
-    if(!hidden_dimension_on_percentage_of_instance) {
+    if(!hidden_dimension_on_percentage_of_group) {
         r_dst->od[d_dst] |= r_tmp->od[d_tmp];
         storage_point_merge_to(r_dst->dqp[d_dst], *query_points);
     }
@@ -3092,7 +3090,7 @@ static void rrd2rrdr_group_by_add_metric(RRDR *r_dst, size_t d_dst, RRDR *r_tmp,
             continue;
 
         size_t idx_dst = i * r_dst->d + d_dst;
-        NETDATA_DOUBLE *cn = (hidden_dimension_on_percentage_of_instance) ? &r_dst->vh[ idx_dst ] : &r_dst->v[ idx_dst ];
+        NETDATA_DOUBLE *cn = (hidden_dimension_on_percentage_of_group) ? &r_dst->vh[ idx_dst ] : &r_dst->v[ idx_dst ];
         RRDR_VALUE_FLAGS *co = &r_dst->o[ idx_dst ];
         NETDATA_DOUBLE *ar = &r_dst->ar[ idx_dst ];
         uint32_t *gbc = &r_dst->gbc[ idx_dst ];
@@ -3101,6 +3099,7 @@ static void rrd2rrdr_group_by_add_metric(RRDR *r_dst, size_t d_dst, RRDR *r_tmp,
             default:
             case RRDR_GROUP_BY_FUNCTION_AVERAGE:
             case RRDR_GROUP_BY_FUNCTION_SUM:
+            case RRDR_GROUP_BY_FUNCTION_PERCENTAGE:
                 if(isnan(*cn))
                     *cn = n_tmp;
                 else
@@ -3118,7 +3117,7 @@ static void rrd2rrdr_group_by_add_metric(RRDR *r_dst, size_t d_dst, RRDR *r_tmp,
                 break;
         }
 
-        if(!hidden_dimension_on_percentage_of_instance) {
+        if(!hidden_dimension_on_percentage_of_group) {
             *co &= ~RRDR_VALUE_EMPTY;
             *co |= (o_tmp & (RRDR_VALUE_RESET | RRDR_VALUE_PARTIAL));
             *ar += ar_tmp;
@@ -3161,8 +3160,11 @@ static void rrdr2rrdr_group_by_partial_trimming(RRDR *r) {
     }
 }
 
-static void rrdr2rrdr_group_by_calculate_percentage_of_instance(RRDR *r) {
+static void rrdr2rrdr_group_by_calculate_percentage_of_group(RRDR *r) {
     if(!r->vh)
+        return;
+
+    if(query_target_aggregatable(r->internal.qt) && query_has_group_by_aggregation_percentage(r->internal.qt))
         return;
 
     for(size_t i = 0; i < r->n ;i++) {
@@ -3185,7 +3187,10 @@ static void rrdr2rrdr_group_by_calculate_percentage_of_instance(RRDR *r) {
     }
 }
 
-static void rrd2rrdr_convert_to_percentage(RRDR *r) {
+static void rrd2rrdr_convert_values_to_percentage_of_total(RRDR *r) {
+    if(!(r->internal.qt->window.options & RRDR_OPTION_PERCENTAGE) || query_target_aggregatable(r->internal.qt))
+        return;
+
     size_t global_min_max_values = 0;
     NETDATA_DOUBLE global_min = NAN, global_max = NAN;
 
@@ -3279,19 +3284,17 @@ static void rrd2rrdr_convert_to_percentage(RRDR *r) {
 
 static RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
     QUERY_TARGET *qt = r_tmp->internal.qt;
-    RRDR_OPTIONS options = qt->window.options;
 
     if(!r_tmp->group_by.r) {
         // v1 query
-        if(options & RRDR_OPTION_PERCENTAGE)
-            rrd2rrdr_convert_to_percentage(r_tmp);
+        rrd2rrdr_convert_values_to_percentage_of_total(r_tmp);
         return r_tmp;
     }
     // v2 query
 
     // do the additional passes on RRDRs
     RRDR *last_r = r_tmp->group_by.r;
-    rrdr2rrdr_group_by_calculate_percentage_of_instance(last_r);
+    rrdr2rrdr_group_by_calculate_percentage_of_group(last_r);
 
     RRDR *r = last_r->group_by.r;
     size_t pass = 0;
@@ -3302,7 +3305,7 @@ static RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
                                          qt->request.group_by[pass].aggregation,
                                          &last_r->dqp[d], pass);
         }
-        rrdr2rrdr_group_by_calculate_percentage_of_instance(r);
+        rrdr2rrdr_group_by_calculate_percentage_of_group(r);
 
         last_r = r;
         r = last_r->group_by.r;
@@ -3324,7 +3327,7 @@ static RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
         if(qt->request.group_by[g].group_by != RRDR_GROUP_BY_NONE)
             aggregation = qt->request.group_by[g].aggregation;
 
-    if(!(options & RRDR_OPTION_RETURN_RAW) && r->partial_data_trimming.expected_after < qt->window.before)
+    if(!query_target_aggregatable(qt) && r->partial_data_trimming.expected_after < qt->window.before)
         rrdr2rrdr_group_by_partial_trimming(r);
 
     // apply averaging, remove RRDR_VALUE_EMPTY, find the non-zero dimensions, min and max
@@ -3416,8 +3419,7 @@ static RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
         qt->window.options &= ~RRDR_OPTION_NONZERO;
     }
 
-    if(options & RRDR_OPTION_PERCENTAGE && !(options & RRDR_OPTION_RETURN_RAW))
-        rrd2rrdr_convert_to_percentage(r);
+    rrd2rrdr_convert_values_to_percentage_of_total(r);
 
     // update query instance counts in query host and query context
     {
@@ -3683,12 +3685,12 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         bool cancel = false;
         if (qt->request.interrupt_callback && qt->request.interrupt_callback(qt->request.interrupt_callback_data)) {
             cancel = true;
-            log_access("QUERY INTERRUPTED");
+            netdata_log_access("QUERY INTERRUPTED");
         }
 
         if (qt->request.timeout_ms && ((NETDATA_DOUBLE)(now_ut - qt->timings.received_ut) / 1000.0) > (NETDATA_DOUBLE)qt->request.timeout_ms) {
             cancel = true;
-            log_access("QUERY CANCELED RUNTIME EXCEEDED %0.2f ms (LIMIT %lld ms)",
+            netdata_log_access("QUERY CANCELED RUNTIME EXCEEDED %0.2f ms (LIMIT %lld ms)",
                        (NETDATA_DOUBLE)(now_ut - qt->timings.received_ut) / 1000.0, (long long)qt->request.timeout_ms);
         }
 

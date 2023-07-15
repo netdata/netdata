@@ -67,7 +67,7 @@ static void aclk_database_enq_cmd(struct aclk_database_cmd *cmd)
     /* wake up event loop */
     int rc = uv_async_send(&aclk_sync_config.async);
     if (unlikely(rc))
-        debug(D_ACLK_SYNC, "Failed to wake up event loop");
+        netdata_log_debug(D_ACLK_SYNC, "Failed to wake up event loop");
 }
 
 enum {
@@ -226,14 +226,14 @@ static void sql_delete_aclk_table_list(char *host_guid)
     uuid_unparse_lower(host_uuid, host_str);
     uuid_unparse_lower_fix(&host_uuid, uuid_str);
 
-    debug(D_ACLK_SYNC, "Checking if I should delete aclk tables for node %s", host_str);
+    netdata_log_debug(D_ACLK_SYNC, "Checking if I should delete aclk tables for node %s", host_str);
 
     if (is_host_available(&host_uuid)) {
-        debug(D_ACLK_SYNC, "Host %s exists, not deleting aclk sync tables", host_str);
+        netdata_log_debug(D_ACLK_SYNC, "Host %s exists, not deleting aclk sync tables", host_str);
         return;
     }
 
-    debug(D_ACLK_SYNC, "Host %s does NOT exist, can delete aclk sync tables", host_str);
+    netdata_log_debug(D_ACLK_SYNC, "Host %s does NOT exist, can delete aclk sync tables", host_str);
 
     sqlite3_stmt *res = NULL;
     BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE, &netdata_buffers_statistics.buffers_sqlite);
@@ -257,7 +257,7 @@ static void sql_delete_aclk_table_list(char *host_guid)
 
     rc = db_execute(db_meta, buffer_tostring(sql));
     if (unlikely(rc))
-        error("Failed to drop unused ACLK tables");
+        netdata_log_error("Failed to drop unused ACLK tables");
 
 fail:
     buffer_free(sql);
@@ -265,7 +265,7 @@ fail:
 
 static int sql_check_aclk_table(void *data __maybe_unused, int argc __maybe_unused, char **argv __maybe_unused, char **column __maybe_unused)
 {
-    debug(D_ACLK_SYNC,"Scheduling aclk sync table check for node %s", (char *) argv[0]);
+    netdata_log_debug(D_ACLK_SYNC,"Scheduling aclk sync table check for node %s", (char *) argv[0]);
     struct aclk_database_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
     cmd.opcode = ACLK_DATABASE_DELETE_HOST;
@@ -280,7 +280,7 @@ static int sql_check_aclk_table(void *data __maybe_unused, int argc __maybe_unus
 static void sql_check_aclk_table_list(void)
 {
     char *err_msg = NULL;
-    debug(D_ACLK_SYNC,"Cleaning tables for nodes that do not exist");
+    netdata_log_debug(D_ACLK_SYNC,"Cleaning tables for nodes that do not exist");
     int rc = sqlite3_exec_monitored(db_meta, SQL_SELECT_ACLK_ACTIVE_LIST, sql_check_aclk_table, NULL, &err_msg);
     if (rc != SQLITE_OK) {
         error_report("Query failed when trying to check for obsolete ACLK sync tables, %s", err_msg);
@@ -305,7 +305,7 @@ static int sql_maint_aclk_sync_database(void *data __maybe_unused, int argc __ma
 static void sql_maint_aclk_sync_database_all(void)
 {
     char *err_msg = NULL;
-    debug(D_ACLK_SYNC,"Cleaning tables for nodes that do not exist");
+    netdata_log_debug(D_ACLK_SYNC,"Cleaning tables for nodes that do not exist");
     int rc = sqlite3_exec_monitored(db_meta, SQL_SELECT_ACLK_ALERT_LIST, sql_maint_aclk_sync_database, NULL, &err_msg);
     if (rc != SQLITE_OK) {
         error_report("Query failed when trying to check for obsolete ACLK sync tables, %s", err_msg);
@@ -385,7 +385,7 @@ static void aclk_synchronization(void *arg __maybe_unused)
     config->timer_req.data = config;
     fatal_assert(0 == uv_timer_start(&config->timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
 
-    info("Starting ACLK synchronization thread");
+    netdata_log_info("Starting ACLK synchronization thread");
 
     config->cleanup_after = now_realtime_sec() + ACLK_DATABASE_CLEANUP_FIRST;
     config->initialized = true;
@@ -444,7 +444,7 @@ static void aclk_synchronization(void *arg __maybe_unused)
                     sql_process_queue_removed_alerts_to_aclk(cmd.param[0]);
                     break;
                 default:
-                    debug(D_ACLK_SYNC, "%s: default.", __func__);
+                    netdata_log_debug(D_ACLK_SYNC, "%s: default.", __func__);
                     break;
             }
             if (cmd.completion)
@@ -462,7 +462,7 @@ static void aclk_synchronization(void *arg __maybe_unused)
 
     worker_unregister();
     service_exits();
-    info("ACLK SYNC: Shutting down ACLK synchronization event loop");
+    netdata_log_info("ACLK SYNC: Shutting down ACLK synchronization event loop");
 }
 
 static void aclk_synchronization_init(void)
@@ -543,7 +543,7 @@ void sql_aclk_sync_init(void)
         return;
     }
 
-    info("Creating archived hosts");
+    netdata_log_info("Creating archived hosts");
     int number_of_children = 0;
     rc = sqlite3_exec_monitored(db_meta, SQL_FETCH_ALL_HOSTS, create_host_callback, &number_of_children, &err_msg);
 
@@ -552,7 +552,7 @@ void sql_aclk_sync_init(void)
         sqlite3_free(err_msg);
     }
 
-    info("Created %d archived hosts", number_of_children);
+    netdata_log_info("Created %d archived hosts", number_of_children);
     // Trigger host context load for hosts that have been created
     metadata_queue_load_host_context(NULL);
 
@@ -568,7 +568,7 @@ void sql_aclk_sync_init(void)
     }
     aclk_synchronization_init();
 
-    info("ACLK sync initialization completed");
+    netdata_log_info("ACLK sync initialization completed");
 #endif
 }
 

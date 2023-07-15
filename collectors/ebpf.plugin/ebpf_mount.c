@@ -5,10 +5,18 @@
 
 static ebpf_local_maps_t mount_maps[] = {{.name = "tbl_mount", .internal_input = NETDATA_MOUNT_END,
                                           .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
-                                          .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+                                          .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                          .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                         },
                                          {.name = NULL, .internal_input = 0, .user_input = 0,
                                           .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                          .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
+                                          .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                          .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                         }};
 
 static char *mount_dimension_name[NETDATA_EBPF_MOUNT_SYSCALL] = { "mount", "umount" };
 static netdata_syscall_stat_t mount_aggregated_data[NETDATA_EBPF_MOUNT_SYSCALL];
@@ -192,6 +200,8 @@ static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_
         ebpf_mount_disable_trampoline(obj);
     }
 
+    ebpf_update_map_type(obj->maps.tbl_mount, &mount_maps[NETDATA_KEY_MOUNT_TABLE]);
+
     int ret = mount_bpf__load(obj);
     if (!ret) {
         if (test != EBPF_LOAD_PROBE && test != EBPF_LOAD_RETPROBE )
@@ -213,17 +223,33 @@ static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_
  *****************************************************************/
 
 /**
- * Mount Free
+ * Obsolete global
  *
- * Cleanup variables after child threads to stop
+ * Obsolete global charts created by thread.
  *
- * @param ptr thread data.
+ * @param em a pointer to `struct ebpf_module`
  */
-static void ebpf_mount_free(ebpf_module_t *em)
+static void ebpf_obsolete_mount_global(ebpf_module_t *em)
 {
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
+    ebpf_write_chart_obsolete(NETDATA_EBPF_MOUNT_GLOBAL_FAMILY,
+                              NETDATA_EBPF_MOUNT_CALLS,
+                              "Calls to mount and umount syscalls",
+                              EBPF_COMMON_DIMENSION_CALL,
+                              NETDATA_EBPF_MOUNT_FAMILY,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NULL,
+                              NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_EBPF_MOUNT_GLOBAL_FAMILY,
+                              NETDATA_EBPF_MOUNT_ERRORS,
+                              "Errors to mount and umount file systems",
+                              EBPF_COMMON_DIMENSION_CALL,
+                              NETDATA_EBPF_MOUNT_FAMILY,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NULL,
+                              NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS + 1,
+                              em->update_every);
 }
 
 /**
@@ -236,7 +262,34 @@ static void ebpf_mount_free(ebpf_module_t *em)
 static void ebpf_mount_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    ebpf_mount_free(em);
+
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        pthread_mutex_lock(&lock);
+
+        ebpf_obsolete_mount_global(em);
+
+        fflush(stdout);
+        pthread_mutex_unlock(&lock);
+    }
+
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
+
+#ifdef LIBBPF_MAJOR_VERSION
+    if (mount_bpf_obj) {
+        mount_bpf__destroy(mount_bpf_obj);
+        mount_bpf_obj = NULL;
+    }
+#endif
+    if (em->objects) {
+        ebpf_unload_legacy_code(em->objects, em->probe_links);
+        em->objects = NULL;
+        em->probe_links = NULL;
+    }
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_update_stats(&plugin_statistics, em);
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************
@@ -249,8 +302,10 @@ static void ebpf_mount_exit(void *ptr)
  * Read global table
  *
  * Read the table with number of calls for all functions
+ *
+ * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_mount_read_global_table()
+static void ebpf_mount_read_global_table(int maps_per_core)
 {
     static netdata_idx_t *mount_values = NULL;
     if (!mount_values)
@@ -259,17 +314,22 @@ static void ebpf_mount_read_global_table()
     uint32_t idx;
     netdata_idx_t *val = mount_hash_values;
     netdata_idx_t *stored = mount_values;
+    size_t length = sizeof(netdata_idx_t);
+    if (maps_per_core)
+        length *= ebpf_nprocs;
+
     int fd = mount_maps[NETDATA_KEY_MOUNT_TABLE].map_fd;
 
     for (idx = NETDATA_KEY_MOUNT_CALL; idx < NETDATA_MOUNT_END; idx++) {
         if (!bpf_map_lookup_elem(fd, &idx, stored)) {
             int i;
-            int end = ebpf_nprocs;
+            int end = (maps_per_core) ? ebpf_nprocs : 1;
             netdata_idx_t total = 0;
             for (i = 0; i < end; i++)
                 total += stored[i];
 
             val[idx] = total;
+            memset(stored, 0, length);
         }
     }
 }
@@ -304,18 +364,30 @@ static void mount_collector(ebpf_module_t *em)
     heartbeat_init(&hb);
     int update_every = em->update_every;
     int counter = update_every - 1;
-    while (!ebpf_exit_plugin) {
+    int maps_per_core = em->maps_per_core;
+    uint32_t running_time = 0;
+    uint32_t lifetime = em->lifetime;
+    while (!ebpf_exit_plugin && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_exit_plugin || ++counter != update_every)
             continue;
 
         counter = 0;
-        ebpf_mount_read_global_table();
+        ebpf_mount_read_global_table(maps_per_core);
         pthread_mutex_lock(&lock);
 
         ebpf_mount_send_data();
 
         pthread_mutex_unlock(&lock);
+
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (running_time && !em->running_time)
+            running_time = update_every;
+        else
+            running_time += update_every;
+
+        em->running_time = running_time;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 
@@ -372,6 +444,10 @@ static void ebpf_create_mount_charts(int update_every)
  */
 static int ebpf_mount_load_bpf(ebpf_module_t *em)
 {
+#ifdef LIBBPF_MAJOR_VERSION
+    ebpf_define_map_type(em->maps, em->maps_per_core, running_on_kernel);
+#endif
+
     int ret = 0;
     if (em->load & EBPF_LOAD_LEGACY) {
         em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
@@ -390,7 +466,7 @@ static int ebpf_mount_load_bpf(ebpf_module_t *em)
 #endif
 
     if (ret)
-        error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
+        netdata_log_error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
 
     return ret;
 }
@@ -426,7 +502,7 @@ void *ebpf_mount_thread(void *ptr)
     pthread_mutex_lock(&lock);
     ebpf_create_mount_charts(em->update_every);
     ebpf_update_stats(&plugin_statistics, em);
-    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
     pthread_mutex_unlock(&lock);
 
     mount_collector(em);

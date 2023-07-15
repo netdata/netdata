@@ -19,7 +19,7 @@ The plan is an attribute that is directly attached to your space(s) and that dic
 
 Netdata Cloud plans, with the exception of Community, work as subscriptions and overall consist of two pricing components:
 
-* A flat fee component, that is a price per space, and
+* A flat fee component, that is applied on yearly subscriptions for the [comitted-nodes](#committed-nodes) charte (space subscription fee has been waived off)
 * An on-demand metered component, that is related to your usage of Netdata which directly links to the [number of nodes you have running](#running-nodes-and-billing)
 
 Netdata provides two billing frequency options:
@@ -101,13 +101,19 @@ The plan on your space will determine what type of notifications methods will be
 * **Pro** - Email, Discord and webhook
 * **Business** - Unlimited, this includes Slack, PagerDuty, Opsgenie etc.
 
-For mode details check the documentation under [Alert Notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md).
+For more details check the documentation under [Alert Notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#alert-notifications).
+
+##### Alert notification silencing rules
+
+The plan on your space will determine if you are able to add alert notification silencing rules since this feature will only be available for paid plans: **Pro** or **Business**.
+
+For more details check the documentation under [Alert Notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#silencing-alert-notifications).
 
 ### Related Topics
 
 #### **Related Concepts**
 
-* [Spaces](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md)
+* [Spaces](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-spaces)
 * [Alert Notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md)
 * [Events feed](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md)
 * [Role-Based Access model](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md)

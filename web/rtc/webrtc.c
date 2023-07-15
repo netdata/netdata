@@ -21,11 +21,11 @@ static void webrtc_log(rtcLogLevel level, const char *message) {
         case RTC_LOG_WARNING:
         case RTC_LOG_ERROR:
         case RTC_LOG_FATAL:
-            error("WEBRTC: %s", message);
+            netdata_log_error("WEBRTC: %s", message);
             break;
 
         case RTC_LOG_INFO:
-            info("WEBRTC: %s", message);
+            netdata_log_info("WEBRTC: %s", message);
             break;
 
         default:
@@ -263,7 +263,7 @@ static size_t webrtc_send_in_chunks(WEBRTC_DC *chan, const char *data, size_t si
             total_message_size = -total_message_size;
 
         if(rtcSendMessage(chan->dc, send_buffer, total_message_size) != RTC_ERR_SUCCESS)
-            error("WEBRTC[%d],DC[%d]: failed to send LZ4 chunk %zu of %zu", chan->conn->pc, chan->dc, chunk, total_chunks);
+            netdata_log_error("WEBRTC[%d],DC[%d]: failed to send LZ4 chunk %zu of %zu", chan->conn->pc, chan->dc, chunk, total_chunks);
         else
             internal_error(true, "WEBRTC[%d],DC[%d]: sent chunk %zu of %zu, size %zu (total %d)",
                            chan->conn->pc, chan->dc, chunk, total_chunks, message_size, total_message_size);
@@ -304,7 +304,7 @@ static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, siz
     web_client_timeout_checkpoint_set(w, 0);
     web_client_decode_path_and_query_string(w, path);
     path = (char *)buffer_tostring(w->url_path_decoded);
-    w->response.code = web_client_api_request_with_node_selection(localhost, w, path);
+    w->response.code = (short)web_client_api_request_with_node_selection(localhost, w, path);
     web_client_timeout_checkpoint_response_ready(w, NULL);
 
     size_t sent_bytes = 0;
@@ -322,7 +322,7 @@ static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, siz
                        chan->conn->pc, chan->dc, w->response.code, response_size);
     }
 
-#if defined(ENABLE_COMPRESSION)
+#if defined(ENABLE_LZ4)
     int max_compressed_size = LZ4_compressBound((int)response_size);
     char *compressed = mallocz(max_compressed_size);
 
@@ -347,7 +347,7 @@ static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, siz
 
 cleanup:
     now_monotonic_high_precision_timeval(&tv);
-    log_access("%llu: %d '[RTC]:%d:%d' '%s' (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %d '%s'",
+    netdata_log_access("%llu: %d '[RTC]:%d:%d' '%s' (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %d '%s'",
                w->id
             , gettid()
             , chan->conn->pc, chan->dc
@@ -367,18 +367,18 @@ cleanup:
 // ----------------------------------------------------------------------------
 // webrtc data channel
 
-static void myOpenCallback(int id, void *user_ptr) {
+static void myOpenCallback(int id __maybe_unused, void *user_ptr) {
     webrtc_set_thread_name();
 
     WEBRTC_DC *chan = user_ptr;
     internal_fatal(chan->dc != id, "WEBRTC[%d],DC[%d]: dc mismatch, expected %d, got %d", chan->conn->pc, chan->dc, chan->dc, id);
 
-    log_access("WEBRTC[%d],DC[%d]: %d DATA CHANNEL '%s' OPEN", chan->conn->pc, chan->dc, gettid(), chan->label);
+    netdata_log_access("WEBRTC[%d],DC[%d]: %d DATA CHANNEL '%s' OPEN", chan->conn->pc, chan->dc, gettid(), chan->label);
     internal_error(true, "WEBRTC[%d],DC[%d]: data channel opened.", chan->conn->pc, chan->dc);
     chan->open = true;
 }
 
-static void myClosedCallback(int id, void *user_ptr) {
+static void myClosedCallback(int id __maybe_unused, void *user_ptr) {
     webrtc_set_thread_name();
 
     WEBRTC_DC *chan = user_ptr;
@@ -387,26 +387,26 @@ static void myClosedCallback(int id, void *user_ptr) {
     __atomic_store_n(&chan->open, false, __ATOMIC_RELAXED);
     internal_error(true, "WEBRTC[%d],DC[%d]: data channel closed.", chan->conn->pc, chan->dc);
 
-    netdata_spinlock_lock(&chan->conn->channels.spinlock);
+    spinlock_lock(&chan->conn->channels.spinlock);
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(chan->conn->channels.head, chan, link.prev, link.next);
-    netdata_spinlock_unlock(&chan->conn->channels.spinlock);
+    spinlock_unlock(&chan->conn->channels.spinlock);
 
-    log_access("WEBRTC[%d],DC[%d]: %d DATA CHANNEL '%s' CLOSED", chan->conn->pc, chan->dc, gettid(), chan->label);
+    netdata_log_access("WEBRTC[%d],DC[%d]: %d DATA CHANNEL '%s' CLOSED", chan->conn->pc, chan->dc, gettid(), chan->label);
 
     freez(chan->label);
     freez(chan);
 }
 
-static void myErrorCallback(int id, const char *error, void *user_ptr) {
+static void myErrorCallback(int id __maybe_unused, const char *error, void *user_ptr) {
     webrtc_set_thread_name();
 
     WEBRTC_DC *chan = user_ptr;
     internal_fatal(chan->dc != id, "WEBRTC[%d],DC[%d]: dc mismatch, expected %d, got %d", chan->conn->pc, chan->dc, chan->dc, id);
 
-    error("WEBRTC[%d],DC[%d]: ERROR: '%s'", chan->conn->pc, chan->dc, error);
+    netdata_log_error("WEBRTC[%d],DC[%d]: ERROR: '%s'", chan->conn->pc, chan->dc, error);
 }
 
-static void myMessageCallback(int id, const char *message, int size, void *user_ptr) {
+static void myMessageCallback(int id __maybe_unused, const char *message, int size, void *user_ptr) {
     webrtc_set_thread_name();
 
     WEBRTC_DC *chan = user_ptr;
@@ -441,7 +441,7 @@ static void myMessageCallback(int id, const char *message, int size, void *user_
 //    }
 //}
 
-static void myDataChannelCallback(int pc, int dc, void *user_ptr) {
+static void myDataChannelCallback(int pc __maybe_unused, int dc, void *user_ptr) {
     webrtc_set_thread_name();
 
     WEBRTC_CONN *conn = user_ptr;
@@ -451,9 +451,9 @@ static void myDataChannelCallback(int pc, int dc, void *user_ptr) {
     chan->dc = dc;
     chan->conn = conn;
 
-    netdata_spinlock_lock(&conn->channels.spinlock);
+    spinlock_lock(&conn->channels.spinlock);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(conn->channels.head, chan, link.prev, link.next);
-    netdata_spinlock_unlock(&conn->channels.spinlock);
+    spinlock_unlock(&conn->channels.spinlock);
 
     rtcSetUserPointer(dc, chan);
 
@@ -464,19 +464,19 @@ static void myDataChannelCallback(int pc, int dc, void *user_ptr) {
     chan->label = strdupz(label);
 
     if(rtcSetOpenCallback(dc, myOpenCallback) != RTC_ERR_SUCCESS)
-        error("WEBRTC[%d],DC[%d]: rtcSetOpenCallback() failed.", conn->pc, chan->dc);
+        netdata_log_error("WEBRTC[%d],DC[%d]: rtcSetOpenCallback() failed.", conn->pc, chan->dc);
 
     if(rtcSetClosedCallback(dc, myClosedCallback) != RTC_ERR_SUCCESS)
-        error("WEBRTC[%d],DC[%d]: rtcSetClosedCallback() failed.", conn->pc, chan->dc);
+        netdata_log_error("WEBRTC[%d],DC[%d]: rtcSetClosedCallback() failed.", conn->pc, chan->dc);
 
     if(rtcSetErrorCallback(dc, myErrorCallback) != RTC_ERR_SUCCESS)
-        error("WEBRTC[%d],DC[%d]: rtcSetErrorCallback() failed.", conn->pc, chan->dc);
+        netdata_log_error("WEBRTC[%d],DC[%d]: rtcSetErrorCallback() failed.", conn->pc, chan->dc);
 
     if(rtcSetMessageCallback(dc, myMessageCallback) != RTC_ERR_SUCCESS)
-        error("WEBRTC[%d],DC[%d]: rtcSetMessageCallback() failed.", conn->pc, chan->dc);
+        netdata_log_error("WEBRTC[%d],DC[%d]: rtcSetMessageCallback() failed.", conn->pc, chan->dc);
 
 //    if(rtcSetAvailableCallback(dc, myAvailableCallback) != RTC_ERR_SUCCESS)
-//        error("WEBRTC[%d],DC[%d]: rtcSetAvailableCallback() failed.", conn->pc, chan->dc);
+//        netdata_log_error("WEBRTC[%d],DC[%d]: rtcSetAvailableCallback() failed.", conn->pc, chan->dc);
 
     internal_error(true, "WEBRTC[%d],DC[%d]: new data channel with label '%s'", chan->conn->pc, chan->dc, chan->label);
 }
@@ -486,9 +486,9 @@ static void myDataChannelCallback(int pc, int dc, void *user_ptr) {
 
 static inline void webrtc_destroy_connection_unsafe(WEBRTC_CONN *conn) {
     if(conn->state == RTC_CLOSED) {
-        netdata_spinlock_lock(&conn->channels.spinlock);
+        spinlock_lock(&conn->channels.spinlock);
         WEBRTC_DC *chan = conn->channels.head;
-        netdata_spinlock_unlock(&conn->channels.spinlock);
+        spinlock_unlock(&conn->channels.spinlock);
 
         if(!chan) {
             internal_error(true, "WEBRTC[%d]: destroying connection", conn->pc);
@@ -502,25 +502,25 @@ static inline void webrtc_destroy_connection_unsafe(WEBRTC_CONN *conn) {
 }
 
 static void cleanupConnections() {
-    netdata_spinlock_lock(&webrtc_base.unsafe.spinlock);
+    spinlock_lock(&webrtc_base.unsafe.spinlock);
     WEBRTC_CONN *conn = webrtc_base.unsafe.head;
     while(conn) {
         WEBRTC_CONN *conn_next = conn->link.next;
         webrtc_destroy_connection_unsafe(conn);
         conn = conn_next;
     }
-    netdata_spinlock_unlock(&webrtc_base.unsafe.spinlock);
+    spinlock_unlock(&webrtc_base.unsafe.spinlock);
 }
 
 static WEBRTC_CONN *webrtc_create_connection(void) {
     WEBRTC_CONN *conn = callocz(1, sizeof(WEBRTC_CONN));
 
-    netdata_spinlock_init(&conn->response.spinlock);
-    netdata_spinlock_init(&conn->channels.spinlock);
+    spinlock_init(&conn->response.spinlock);
+    spinlock_init(&conn->channels.spinlock);
 
-    netdata_spinlock_lock(&webrtc_base.unsafe.spinlock);
+    spinlock_lock(&webrtc_base.unsafe.spinlock);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(webrtc_base.unsafe.head, conn, link.prev, link.next);
-    netdata_spinlock_unlock(&webrtc_base.unsafe.spinlock);
+    spinlock_unlock(&webrtc_base.unsafe.spinlock);
     return conn;
 }
 
@@ -531,13 +531,13 @@ static void myDescriptionCallback(int pc __maybe_unused, const char *sdp, const 
     internal_fatal(conn->pc != pc, "WEBRTC[%d]: pc mismatch, expected %d, got %d", conn->pc, conn->pc, pc);
 
     internal_error(true, "WEBRTC[%d]: local description type '%s': %s", conn->pc, type, sdp);
-    netdata_spinlock_lock(&conn->response.spinlock);
+    spinlock_lock(&conn->response.spinlock);
     if(!conn->response.candidates) {
         buffer_json_member_add_string(conn->response.wb, "sdp", sdp);
         buffer_json_member_add_string(conn->response.wb, "type", type);
         conn->response.sdp = true;
     }
-    netdata_spinlock_unlock(&conn->response.spinlock);
+    spinlock_unlock(&conn->response.spinlock);
 
     conn->local_max_message_size = find_max_message_size_in_sdp(sdp);
 }
@@ -548,7 +548,7 @@ static void myCandidateCallback(int pc __maybe_unused, const char *cand, const c
     WEBRTC_CONN *conn = user_ptr;
     internal_fatal(conn->pc != pc, "WEBRTC[%d]: pc mismatch, expected %d, got %d", conn->pc, conn->pc, pc);
 
-    netdata_spinlock_lock(&conn->response.spinlock);
+    spinlock_lock(&conn->response.spinlock);
     if(!conn->response.candidates) {
         buffer_json_member_add_array(conn->response.wb, "candidates");
         conn->response.candidates = true;
@@ -556,7 +556,7 @@ static void myCandidateCallback(int pc __maybe_unused, const char *cand, const c
 
     internal_error(true, "WEBRTC[%d]: local candidate '%s', mid '%s'", conn->pc, cand, mid);
     buffer_json_add_array_item_string(conn->response.wb, cand);
-    netdata_spinlock_unlock(&conn->response.spinlock);
+    spinlock_unlock(&conn->response.spinlock);
 }
 
 static void myStateChangeCallback(int pc __maybe_unused, rtcState state, void *user_ptr) {
@@ -573,31 +573,31 @@ static void myStateChangeCallback(int pc __maybe_unused, rtcState state, void *u
             break;
 
         case RTC_CONNECTING:
-            log_access("WEBRTC[%d]: %d CONNECTING", conn->pc, gettid());
+            netdata_log_access("WEBRTC[%d]: %d CONNECTING", conn->pc, gettid());
             internal_error(true, "WEBRTC[%d]: connecting...", conn->pc);
             break;
 
         case RTC_CONNECTED:
-            log_access("WEBRTC[%d]: %d CONNECTED", conn->pc, gettid());
+            netdata_log_access("WEBRTC[%d]: %d CONNECTED", conn->pc, gettid());
             internal_error(true, "WEBRTC[%d]: connected!", conn->pc);
             break;
 
         case RTC_DISCONNECTED:
-            log_access("WEBRTC[%d]: %d DISCONNECTED", conn->pc, gettid());
+            netdata_log_access("WEBRTC[%d]: %d DISCONNECTED", conn->pc, gettid());
             internal_error(true, "WEBRTC[%d]: disconnected.", conn->pc);
             break;
 
         case RTC_FAILED:
-            log_access("WEBRTC[%d]: %d CONNECTION FAILED", conn->pc, gettid());
+            netdata_log_access("WEBRTC[%d]: %d CONNECTION FAILED", conn->pc, gettid());
             internal_error(true, "WEBRTC[%d]: failed.", conn->pc);
             break;
 
         case RTC_CLOSED:
-            log_access("WEBRTC[%d]: %d CONNECTION CLOSED", conn->pc, gettid());
+            netdata_log_access("WEBRTC[%d]: %d CONNECTION CLOSED", conn->pc, gettid());
             internal_error(true, "WEBRTC[%d]: closed.", conn->pc);
-            netdata_spinlock_lock(&webrtc_base.unsafe.spinlock);
+            spinlock_lock(&webrtc_base.unsafe.spinlock);
             webrtc_destroy_connection_unsafe(conn);
-            netdata_spinlock_unlock(&webrtc_base.unsafe.spinlock);
+            spinlock_unlock(&webrtc_base.unsafe.spinlock);
             break;
     }
 }
@@ -671,29 +671,29 @@ int webrtc_new_connection(const char *sdp, BUFFER *wb) {
     rtcSetUserPointer(conn->pc, conn);
 
     if(rtcSetLocalDescriptionCallback(conn->pc, myDescriptionCallback) != RTC_ERR_SUCCESS)
-        error("WEBRTC[%d]: rtcSetLocalDescriptionCallback() failed", conn->pc);
+        netdata_log_error("WEBRTC[%d]: rtcSetLocalDescriptionCallback() failed", conn->pc);
 
     if(rtcSetLocalCandidateCallback(conn->pc, myCandidateCallback) != RTC_ERR_SUCCESS)
-        error("WEBRTC[%d]: rtcSetLocalCandidateCallback() failed", conn->pc);
+        netdata_log_error("WEBRTC[%d]: rtcSetLocalCandidateCallback() failed", conn->pc);
 
     if(rtcSetStateChangeCallback(conn->pc, myStateChangeCallback) != RTC_ERR_SUCCESS)
-        error("WEBRTC[%d]: rtcSetStateChangeCallback() failed", conn->pc);
+        netdata_log_error("WEBRTC[%d]: rtcSetStateChangeCallback() failed", conn->pc);
 
     if(rtcSetGatheringStateChangeCallback(conn->pc, myGatheringStateCallback) != RTC_ERR_SUCCESS)
-        error("WEBRTC[%d]: rtcSetGatheringStateChangeCallback() failed", conn->pc);
+        netdata_log_error("WEBRTC[%d]: rtcSetGatheringStateChangeCallback() failed", conn->pc);
 
     if(rtcSetDataChannelCallback(conn->pc, myDataChannelCallback) != RTC_ERR_SUCCESS)
-        error("WEBRTC[%d]: rtcSetDataChannelCallback() failed", conn->pc);
+        netdata_log_error("WEBRTC[%d]: rtcSetDataChannelCallback() failed", conn->pc);
 
     // initialize the handshake
     internal_error(true, "WEBRTC[%d]: setting remote sdp: %s", conn->pc, sdp);
     if(rtcSetRemoteDescription(conn->pc, sdp, "offer") != RTC_ERR_SUCCESS)
-        error("WEBRTC[%d]: rtcSetRemoteDescription() failed", conn->pc);
+        netdata_log_error("WEBRTC[%d]: rtcSetRemoteDescription() failed", conn->pc);
 
     // initiate the handshake process
     if(conn->config.disableAutoNegotiation) {
         if(rtcSetLocalDescription(conn->pc, NULL) != RTC_ERR_SUCCESS)
-            error("WEBRTC[%d]: rtcSetLocalDescription() failed", conn->pc);
+            netdata_log_error("WEBRTC[%d]: rtcSetLocalDescription() failed", conn->pc);
     }
 
     bool logged = false;

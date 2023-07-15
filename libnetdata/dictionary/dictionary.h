@@ -46,7 +46,7 @@
 typedef struct dictionary DICTIONARY;
 typedef struct dictionary_item DICTIONARY_ITEM;
 
-typedef enum dictionary_options {
+typedef enum __attribute__((packed)) dictionary_options {
     DICT_OPTION_NONE                    = 0,        // the default is the opposite of all below
     DICT_OPTION_SINGLE_THREADED         = (1 << 0), // don't use any locks (default: use locks)
     DICT_OPTION_VALUE_LINK_DONT_CLONE   = (1 << 1), // don't copy the value, just point to the one provided (default: copy)
@@ -310,7 +310,6 @@ void  dictionary_foreach_unlock(DICTFE *dfe);
 size_t dictionary_version(DICTIONARY *dict);
 size_t dictionary_entries(DICTIONARY *dict);
 size_t dictionary_referenced_items(DICTIONARY *dict);
-long int dictionary_stats_for_registry(DICTIONARY *dict);
 
 // for all cases that the caller does not provide a stats structure, this is where they are accumulated.
 extern struct dictionary_stats dictionary_stats_category_other;

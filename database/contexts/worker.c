@@ -167,6 +167,27 @@ uint64_t rrdcontext_version_hash_with_callback(
 // ----------------------------------------------------------------------------
 // retention recalculation
 
+static void rrdhost_update_cached_retention(RRDHOST *host, time_t first_time_s, time_t last_time_s, bool global) {
+    if(unlikely(!host))
+        return;
+
+    spinlock_lock(&host->retention.spinlock);
+
+    if(global) {
+        host->retention.first_time_s = first_time_s;
+        host->retention.last_time_s = last_time_s;
+    }
+    else {
+        if(!host->retention.first_time_s || first_time_s < host->retention.first_time_s)
+            host->retention.first_time_s = first_time_s;
+
+        if(!host->retention.last_time_s || last_time_s > host->retention.last_time_s)
+            host->retention.last_time_s = last_time_s;
+    }
+
+    spinlock_unlock(&host->retention.spinlock);
+}
+
 void rrdcontext_recalculate_context_retention(RRDCONTEXT *rc, RRD_FLAGS reason, bool worker_jobs) {
     rrdcontext_post_process_updates(rc, true, reason, worker_jobs);
 }
@@ -174,11 +195,22 @@ void rrdcontext_recalculate_context_retention(RRDCONTEXT *rc, RRD_FLAGS reason, 
 void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, bool worker_jobs) {
     if(unlikely(!host || !host->rrdctx.contexts)) return;
 
+    time_t first_time_s = 0;
+    time_t last_time_s = 0;
+
     RRDCONTEXT *rc;
     dfe_start_read(host->rrdctx.contexts, rc) {
-                rrdcontext_recalculate_context_retention(rc, reason, worker_jobs);
-            }
+        rrdcontext_recalculate_context_retention(rc, reason, worker_jobs);
+
+        if(!first_time_s || rc->first_time_s < first_time_s)
+            first_time_s = rc->first_time_s;
+
+        if(!last_time_s || rc->last_time_s > last_time_s)
+            last_time_s = rc->last_time_s;
+    }
     dfe_done(rc);
+
+    rrdhost_update_cached_retention(host, first_time_s, last_time_s, true);
 }
 
 static void rrdcontext_recalculate_retention_all_hosts(void) {
@@ -318,7 +350,8 @@ void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc) {
 
     // delete it from SQL
     if(ctx_delete_context(&rc->rrdhost->host_uuid, &rc->hub) != 0)
-        error("RRDCONTEXT: failed to delete context '%s' version %"PRIu64" from SQL.", rc->hub.id, rc->hub.version);
+        netdata_log_error("RRDCONTEXT: failed to delete context '%s' version %"PRIu64" from SQL.",
+                          rc->hub.id, rc->hub.version);
 }
 
 static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jobs) {
@@ -342,11 +375,11 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jo
                                         if(rrdmetric_should_be_deleted(rm)) {
                                             if(worker_jobs) worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
                                             if(!dictionary_del(ri->rrdmetrics, string2str(rm->id)))
-                                                error("RRDCONTEXT: metric '%s' of instance '%s' of context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
-                                                      string2str(rm->id),
-                                                      string2str(ri->id),
-                                                      string2str(rc->id),
-                                                      rrdhost_hostname(host));
+                                                netdata_log_error("RRDCONTEXT: metric '%s' of instance '%s' of context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
+                                                                  string2str(rm->id),
+                                                                  string2str(ri->id),
+                                                                  string2str(rc->id),
+                                                                  rrdhost_hostname(host));
                                             else
                                                 internal_error(
                                                         true,
@@ -362,10 +395,10 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jo
                             if(rrdinstance_should_be_deleted(ri)) {
                                 if(worker_jobs) worker_is_busy(WORKER_JOB_CLEANUP_DELETE);
                                 if(!dictionary_del(rc->rrdinstances, string2str(ri->id)))
-                                    error("RRDCONTEXT: instance '%s' of context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
-                                          string2str(ri->id),
-                                          string2str(rc->id),
-                                          rrdhost_hostname(host));
+                                    netdata_log_error("RRDCONTEXT: instance '%s' of context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
+                                                      string2str(ri->id),
+                                                      string2str(rc->id),
+                                                      rrdhost_hostname(host));
                                 else
                                     internal_error(
                                             true,
@@ -383,7 +416,7 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jo
                     rrdcontext_delete_from_sql_unsafe(rc);
 
                     if(!dictionary_del(host->rrdctx.contexts, string2str(rc->id)))
-                        error("RRDCONTEXT: context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
+                        netdata_log_error("RRDCONTEXT: context '%s' of host '%s', failed to be deleted from rrdmetrics dictionary.",
                               string2str(rc->id),
                               rrdhost_hostname(host));
                     else
@@ -554,7 +587,7 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
     size_t min_priority_not_collected = LONG_MAX;
     size_t min_priority = LONG_MAX;
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
-    size_t instances_active = 0, instances_deleted = 0;
+    size_t instances_active = 0, instances_deleted = 0, metrics = 0;
     bool live_retention = true, currently_collected = false, hidden = true;
     if(dictionary_entries(rc->rrdinstances) > 0) {
         RRDINSTANCE *ri;
@@ -587,6 +620,7 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
                                    string2str(rc->units), string2str(ri->units));
 
                     instances_active++;
+                    metrics += dictionary_entries(ri->rrdmetrics);
 
                     if (ri->priority >= RRDCONTEXT_MINIMUM_ALLOWED_PRIORITY) {
                         if(rrd_flag_check(ri, RRD_FLAG_COLLECTED)) {
@@ -606,6 +640,8 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
                         max_last_time_t = ri->last_time_s;
                 }
         dfe_done(ri);
+
+        rc->stats.metrics = metrics;
 
         if(min_priority_collected != LONG_MAX)
             // use the collected priority
@@ -809,7 +845,7 @@ void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe_unused
         rrdcontext_delete_from_sql_unsafe(rc);
 
     else if (ctx_store_context(&rc->rrdhost->host_uuid, &rc->hub) != 0)
-        error("RRDCONTEXT: failed to save context '%s' version %"PRIu64" to SQL.", rc->hub.id, rc->hub.version);
+        netdata_log_error("RRDCONTEXT: failed to save context '%s' version %"PRIu64" to SQL.", rc->hub.id, rc->hub.version);
 }
 
 static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending __maybe_unused) {
@@ -872,8 +908,13 @@ static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending _
                        sending ? (rc->queue.scheduled_dispatch_ut - rc->queue.queued_ut) / USEC_PER_MS : 0
         );
 
+        rrdhost_update_cached_retention(rc->rrdhost, rc->first_time_s, rc->last_time_s, false);
+
         return true;
     }
+
+    if(!(flags & RRD_FLAG_COLLECTED))
+        rrdhost_update_cached_retention(rc->rrdhost, rc->first_time_s, rc->last_time_s, false);
 
     return false;
 }
@@ -981,8 +1022,8 @@ static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now
 
                         // delete it from the master dictionary
                         if(!dictionary_del(host->rrdctx.contexts, string2str(rc->id)))
-                            error("RRDCONTEXT: '%s' of host '%s' failed to be deleted from rrdcontext dictionary.",
-                                  string2str(id), rrdhost_hostname(host));
+                            netdata_log_error("RRDCONTEXT: '%s' of host '%s' failed to be deleted from rrdcontext dictionary.",
+                                              string2str(id), rrdhost_hostname(host));
 
                         string_freez(id);
                     }
@@ -1082,6 +1123,17 @@ void *rrdcontext_main(void *ptr) {
 
                     if (host->rrdctx.contexts)
                         dictionary_garbage_collect(host->rrdctx.contexts);
+
+                    // calculate the number of metrics and instances in the host
+                    RRDCONTEXT *rc;
+                    uint32_t metrics = 0, instances = 0;
+                    dfe_start_read(host->rrdctx.contexts, rc) {
+                        metrics += rc->stats.metrics;
+                        instances += dictionary_entries(rc->rrdinstances);
+                    }
+                    dfe_done(rc);
+                    host->rrdctx.metrics = metrics;
+                    host->rrdctx.instances = instances;
                 }
                 dfe_done(host);
 

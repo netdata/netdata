@@ -19,19 +19,35 @@ struct config dcstat_config = { .first_section = NULL,
         .rwlock = AVL_LOCK_INITIALIZER } };
 
 ebpf_local_maps_t dcstat_maps[] = {{.name = "dcstat_global", .internal_input = NETDATA_DIRECTORY_CACHE_END,
-                                           .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
-                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
-                                          {.name = "dcstat_pid", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
-                                           .user_input = 0,
-                                           .type = NETDATA_EBPF_MAP_RESIZABLE | NETDATA_EBPF_MAP_PID,
-                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
-                                          {.name = "dcstat_ctrl", .internal_input = NETDATA_CONTROLLER_END,
-                                           .user_input = 0,
-                                           .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
-                                          {.name = NULL, .internal_input = 0, .user_input = 0,
-                                           .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
+                                    .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
+                                    .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                    .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                   },
+                                   {.name = "dcstat_pid", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
+                                    .user_input = 0,
+                                    .type = NETDATA_EBPF_MAP_RESIZABLE | NETDATA_EBPF_MAP_PID,
+                                    .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                    .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+                                   },
+                                   {.name = "dcstat_ctrl", .internal_input = NETDATA_CONTROLLER_END,
+                                    .user_input = 0,
+                                    .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                    .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                    .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                   },
+                                   {.name = NULL, .internal_input = 0, .user_input = 0,
+                                    .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                    .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                    .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                    }};
 
 static ebpf_specify_name_t dc_optional_name[] = { {.program_name = "netdata_lookup_fast",
                                                    .function_to_attach = "lookup_fast",
@@ -42,6 +58,10 @@ static ebpf_specify_name_t dc_optional_name[] = { {.program_name = "netdata_look
 netdata_ebpf_targets_t dc_targets[] = { {.name = "lookup_fast", .mode = EBPF_LOAD_TRAMPOLINE},
                                         {.name = "d_lookup", .mode = EBPF_LOAD_TRAMPOLINE},
                                         {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+
+#ifdef NETDATA_DEV_MODE
+int dcstat_disable_priority;
+#endif
 
 #ifdef LIBBPF_MAJOR_VERSION
 /**
@@ -138,10 +158,14 @@ static int ebpf_dc_attach_probes(struct dc_bpf *obj)
  * @param obj is the main structure for bpf objects.
  * @param em  structure with configuration
  */
-static void ebpf_dc_adjust_map_size(struct dc_bpf *obj, ebpf_module_t *em)
+static void ebpf_dc_adjust_map(struct dc_bpf *obj, ebpf_module_t *em)
 {
     ebpf_update_map_size(obj->maps.dcstat_pid, &dcstat_maps[NETDATA_DCSTAT_PID_STATS],
                          em, bpf_map__name(obj->maps.dcstat_pid));
+
+    ebpf_update_map_type(obj->maps.dcstat_global, &dcstat_maps[NETDATA_DCSTAT_GLOBAL_STATS]);
+    ebpf_update_map_type(obj->maps.dcstat_pid, &dcstat_maps[NETDATA_DCSTAT_PID_STATS]);
+    ebpf_update_map_type(obj->maps.dcstat_ctrl, &dcstat_maps[NETDATA_DCSTAT_CTRL]);
 }
 
 /**
@@ -175,7 +199,7 @@ netdata_ebpf_program_loaded_t ebpf_dc_update_load(ebpf_module_t *em)
         return EBPF_LOAD_TRAMPOLINE;
 
     if (em->targets[NETDATA_DC_TARGET_LOOKUP_FAST].mode != EBPF_LOAD_RETPROBE)
-        info("When your kernel was compiled the symbol %s was modified, instead to use `trampoline`, the plugin will use `probes`.",
+        netdata_log_info("When your kernel was compiled the symbol %s was modified, instead to use `trampoline`, the plugin will use `probes`.",
              dc_optional_name[NETDATA_DC_TARGET_LOOKUP_FAST].function_to_attach);
 
     return EBPF_LOAD_RETPROBE;
@@ -215,7 +239,7 @@ static inline int ebpf_dc_load_and_attach(struct dc_bpf *obj, ebpf_module_t *em)
         ebpf_dc_disable_trampoline(obj);
     }
 
-    ebpf_dc_adjust_map_size(obj, em);
+    ebpf_dc_adjust_map(obj, em);
 
     if (!em->apps_charts && !em->cgroup_charts)
         ebpf_dc_disable_release_task(obj);
@@ -265,41 +289,158 @@ void dcstat_update_publish(netdata_publish_dcstat_t *out, uint64_t cache_access,
  *
  *****************************************************************/
 
+static void ebpf_obsolete_specific_dc_charts(char *type, int update_every);
+
 /**
- *  Clean names
+ * Obsolete services
  *
- *  Clean the optional names allocated during startup.
+ * Obsolete all service charts created
+ *
+ * @param em a pointer to `struct ebpf_module`
  */
-void ebpf_dcstat_clean_names()
+static void ebpf_obsolete_dc_services(ebpf_module_t *em)
 {
-    size_t i = 0;
-    while (dc_optional_name[i].program_name) {
-        freez(dc_optional_name[i].optional);
-        i++;
-    }
+    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              NETDATA_DC_HIT_CHART,
+                              "Percentage of files inside directory cache",
+                              EBPF_COMMON_DIMENSION_PERCENTAGE,
+                              NETDATA_DIRECTORY_CACHE_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NETDATA_SYSTEMD_DC_HIT_RATIO_CONTEXT,
+                              21200,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              NETDATA_DC_REFERENCE_CHART,
+                              "Count file access",
+                              EBPF_COMMON_DIMENSION_FILES,
+                              NETDATA_DIRECTORY_CACHE_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NETDATA_SYSTEMD_DC_REFERENCE_CONTEXT,
+                              21201,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              NETDATA_DC_REQUEST_NOT_CACHE_CHART,
+                              "Files not present inside directory cache",
+                              EBPF_COMMON_DIMENSION_FILES,
+                              NETDATA_DIRECTORY_CACHE_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NETDATA_SYSTEMD_DC_NOT_CACHE_CONTEXT,
+                              21202,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              NETDATA_DC_REQUEST_NOT_FOUND_CHART,
+                              "Files not found",
+                              EBPF_COMMON_DIMENSION_FILES,
+                              NETDATA_DIRECTORY_CACHE_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NETDATA_SYSTEMD_DC_NOT_FOUND_CONTEXT,
+                              21202,
+                              em->update_every);
 }
 
 /**
- * DCstat Free
+ * Obsolete cgroup chart
  *
- * Cleanup variables after child threads to stop
+ * Send obsolete for all charts created before to close.
  *
- * @param ptr thread data.
+ * @param em a pointer to `struct ebpf_module`
  */
-static void ebpf_dcstat_free(ebpf_module_t *em )
+static inline void ebpf_obsolete_dc_cgroup_charts(ebpf_module_t *em) {
+    pthread_mutex_lock(&mutex_cgroup_shm);
+
+    ebpf_obsolete_dc_services(em);
+
+    ebpf_cgroup_target_t *ect;
+    for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
+        if (ect->systemd)
+            continue;
+
+        ebpf_obsolete_specific_dc_charts(ect->name, em->update_every);
+    }
+    pthread_mutex_unlock(&mutex_cgroup_shm);
+}
+
+/**
+ * Obsolette apps charts
+ *
+ * Obsolete apps charts.
+ *
+ * @param em a pointer to the structure with the default values.
+ */
+void ebpf_obsolete_dc_apps_charts(struct ebpf_module *em)
 {
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPING;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
+    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
+                              NETDATA_DC_HIT_CHART,
+                              "Percentage of files inside directory cache",
+                              EBPF_COMMON_DIMENSION_PERCENTAGE,
+                              NETDATA_DIRECTORY_CACHE_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NULL,
+                              20100,
+                              em->update_every);
 
-    freez(dcstat_vector);
-    freez(dcstat_values);
+    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
+                              NETDATA_DC_REFERENCE_CHART,
+                              "Count file access",
+                              EBPF_COMMON_DIMENSION_FILES,
+                              NETDATA_DIRECTORY_CACHE_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                              NULL,
+                               20101,
+                               em->update_every);
 
-    ebpf_dcstat_clean_names();
+    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
+                              NETDATA_DC_REQUEST_NOT_CACHE_CHART,
+                              "Files not present inside directory cache",
+                              EBPF_COMMON_DIMENSION_FILES,
+                              NETDATA_DIRECTORY_CACHE_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                              NULL,
+                              20102,
+                              em->update_every);
 
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
+    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
+                              NETDATA_DC_REQUEST_NOT_FOUND_CHART,
+                              "Files not found",
+                              EBPF_COMMON_DIMENSION_FILES,
+                              NETDATA_DIRECTORY_CACHE_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                              NULL,
+                              20103,
+                               em->update_every);
+}
+
+/**
+ * Obsolete global
+ *
+ * Obsolete global charts created by thread.
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
+static void ebpf_obsolete_dc_global(ebpf_module_t *em)
+{
+    ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
+                              NETDATA_DC_HIT_CHART,
+                              "Percentage of files inside directory cache",
+                              EBPF_COMMON_DIMENSION_PERCENTAGE,
+                              NETDATA_DIRECTORY_CACHE_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NULL,
+                              21200,
+                              em->update_every);
+
+    ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
+                              NETDATA_DC_REFERENCE_CHART,
+                              "Variables used to calculate hit ratio.",
+                              EBPF_COMMON_DIMENSION_FILES,
+                              NETDATA_DIRECTORY_CACHE_SUBMENU,
+                              NETDATA_EBPF_CHART_TYPE_LINE,
+                              NULL,
+                              21201,
+                              em->update_every);
 }
 
 /**
@@ -312,7 +453,48 @@ static void ebpf_dcstat_free(ebpf_module_t *em )
 static void ebpf_dcstat_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    ebpf_dcstat_free(em);
+
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        pthread_mutex_lock(&lock);
+        if (em->cgroup_charts) {
+            ebpf_obsolete_dc_cgroup_charts(em);
+            fflush(stdout);
+        }
+
+        if (em->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
+            ebpf_obsolete_dc_apps_charts(em);
+        }
+
+        ebpf_obsolete_dc_global(em);
+
+#ifdef NETDATA_DEV_MODE
+        if (ebpf_aral_dcstat_pid)
+            ebpf_statistic_obsolete_aral_chart(em, dcstat_disable_priority);
+#endif
+
+        fflush(stdout);
+        pthread_mutex_unlock(&lock);
+    }
+
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
+
+#ifdef LIBBPF_MAJOR_VERSION
+    if (dc_bpf_obj) {
+        dc_bpf__destroy(dc_bpf_obj);
+        dc_bpf_obj = NULL;
+    }
+#endif
+
+    if (em->objects){
+        ebpf_unload_legacy_code(em->objects, em->probe_links);
+        em->objects = NULL;
+        em->probe_links = NULL;
+    }
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_update_stats(&plugin_statistics, em);
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************
@@ -382,10 +564,11 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
  * Sum all values read from kernel and store in the first address.
  *
  * @param out the vector with read values.
+ * @param maps_per_core do I need to read all cores?
  */
-static void dcstat_apps_accumulator(netdata_dcstat_pid_t *out)
+static void dcstat_apps_accumulator(netdata_dcstat_pid_t *out, int maps_per_core)
 {
-    int i, end = (running_on_kernel >= NETDATA_KERNEL_V4_15) ? ebpf_nprocs : 1;
+    int i, end = (maps_per_core) ? ebpf_nprocs : 1;
     netdata_dcstat_pid_t *total = &out[0];
     for (i = 1; i < end; i++) {
         netdata_dcstat_pid_t *w = &out[i];
@@ -428,17 +611,22 @@ static void dcstat_fill_pid(uint32_t current_pid, netdata_dcstat_pid_t *publish)
 }
 
 /**
- * Read APPS table
+ * Read Directory Cache APPS table
  *
  * Read the apps table and store data inside the structure.
+ *
+ * @param maps_per_core do I need to read all cores?
  */
-static void read_apps_table()
+static void read_dc_apps_table(int maps_per_core)
 {
     netdata_dcstat_pid_t *cv = dcstat_vector;
     uint32_t key;
     struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     int fd = dcstat_maps[NETDATA_DCSTAT_PID_STATS].map_fd;
-    size_t length = sizeof(netdata_dcstat_pid_t)*ebpf_nprocs;
+    size_t length = sizeof(netdata_dcstat_pid_t);
+    if (maps_per_core)
+        length *= ebpf_nprocs;
+
     while (pids) {
         key = pids->pid;
 
@@ -447,7 +635,7 @@ static void read_apps_table()
             continue;
         }
 
-        dcstat_apps_accumulator(cv);
+        dcstat_apps_accumulator(cv, maps_per_core);
 
         dcstat_fill_pid(key, cv);
 
@@ -461,9 +649,11 @@ static void read_apps_table()
 /**
  * Update cgroup
  *
- * Update cgroup data based in
+ * Update cgroup data based in collected PID.
+ *
+ * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_update_dc_cgroup()
+static void ebpf_update_dc_cgroup(int maps_per_core)
 {
     netdata_dcstat_pid_t *cv = dcstat_vector;
     int fd = dcstat_maps[NETDATA_DCSTAT_PID_STATS].map_fd;
@@ -486,7 +676,7 @@ static void ebpf_update_dc_cgroup()
                     continue;
                 }
 
-                dcstat_apps_accumulator(cv);
+                dcstat_apps_accumulator(cv, maps_per_core);
 
                 memcpy(out, cv, sizeof(netdata_dcstat_pid_t));
             }
@@ -499,8 +689,10 @@ static void ebpf_update_dc_cgroup()
  * Read global table
  *
  * Read the table with number of calls for all functions
+ *
+ * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_dc_read_global_table()
+static void ebpf_dc_read_global_table(int maps_per_core)
 {
     uint32_t idx;
     netdata_idx_t *val = dcstat_hash_values;
@@ -510,7 +702,7 @@ static void ebpf_dc_read_global_table()
     for (idx = NETDATA_KEY_DC_REFERENCE; idx < NETDATA_DIRECTORY_CACHE_END; idx++) {
         if (!bpf_map_lookup_elem(fd, &idx, stored)) {
             int i;
-            int end = ebpf_nprocs;
+            int end = (maps_per_core) ? ebpf_nprocs: 1;
             netdata_idx_t total = 0;
             for (i = 0; i < end; i++)
                 total += stored[i];
@@ -974,7 +1166,10 @@ static void dcstat_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     int counter = update_every - 1;
-    while (!ebpf_exit_plugin) {
+    int maps_per_core = em->maps_per_core;
+    uint32_t running_time = 0;
+    uint32_t lifetime = em->lifetime;
+    while (!ebpf_exit_plugin && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
 
         if (ebpf_exit_plugin || ++counter != update_every)
@@ -982,13 +1177,13 @@ static void dcstat_collector(ebpf_module_t *em)
 
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
-        ebpf_dc_read_global_table();
+        ebpf_dc_read_global_table(maps_per_core);
         pthread_mutex_lock(&collect_data_mutex);
         if (apps)
-            read_apps_table();
+            read_dc_apps_table(maps_per_core);
 
         if (cgroups)
-            ebpf_update_dc_cgroup();
+            ebpf_update_dc_cgroup(maps_per_core);
 
         pthread_mutex_lock(&lock);
 
@@ -1007,6 +1202,15 @@ static void dcstat_collector(ebpf_module_t *em)
 
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
+
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (running_time && !em->running_time)
+            running_time = update_every;
+        else
+            running_time += update_every;
+
+        em->running_time = running_time;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 
@@ -1023,7 +1227,7 @@ static void dcstat_collector(ebpf_module_t *em)
  *
  * @param update_every value to overwrite the update frequency set by the server.
  */
-static void ebpf_create_filesystem_charts(int update_every)
+static void ebpf_create_dc_global_charts(int update_every)
 {
     ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, NETDATA_DC_HIT_CHART,
                       "Percentage of files inside directory cache",
@@ -1084,6 +1288,10 @@ static void ebpf_dcstat_allocate_global_vectors(int apps)
  */
 static int ebpf_dcstat_load_bpf(ebpf_module_t *em)
 {
+#ifdef LIBBPF_MAJOR_VERSION
+    ebpf_define_map_type(dcstat_maps, em->maps_per_core, running_on_kernel);
+#endif
+
     int ret = 0;
     ebpf_adjust_apps_cgroup(em, em->targets[NETDATA_DC_TARGET_LOOKUP_FAST].mode);
     if (em->load & EBPF_LOAD_LEGACY) {
@@ -1103,7 +1311,7 @@ static int ebpf_dcstat_load_bpf(ebpf_module_t *em)
 #endif
 
     if (ret)
-        error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
+        netdata_log_error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
 
     return ret;
 }
@@ -1147,12 +1355,12 @@ void *ebpf_dcstat_thread(void *ptr)
                        algorithms, NETDATA_DCSTAT_IDX_END);
 
     pthread_mutex_lock(&lock);
-    ebpf_create_filesystem_charts(em->update_every);
+    ebpf_create_dc_global_charts(em->update_every);
     ebpf_update_stats(&plugin_statistics, em);
-    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
 #ifdef NETDATA_DEV_MODE
     if (ebpf_aral_dcstat_pid)
-        ebpf_statistic_create_aral_chart(NETDATA_EBPF_DCSTAT_ARAL_NAME, em);
+        dcstat_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_DCSTAT_ARAL_NAME, em);
 #endif
 
     pthread_mutex_unlock(&lock);

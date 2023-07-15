@@ -62,45 +62,6 @@ if [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
   REINSTALL_OPTIONS="${REINSTALL_OPTIONS} --disable-telemetry"
 fi
 
-deleted_stock_configs=0
-if [ ! -f "etc/netdata/.installer-cleanup-of-stock-configs-done" ]; then
-
-  # -----------------------------------------------------------------------------
-  progress "Deleting stock configuration files from user configuration directory"
-
-  declare -A configs_signatures=()
-  source "system/configs.signatures"
-
-  if [ ! -d etc/netdata ]; then
-    run mkdir -p etc/netdata
-  fi
-
-  md5sum="$(command -v md5sum 2> /dev/null || command -v md5 2> /dev/null)"
-  while IFS= read -r -d '' x; do
-    # find it relative filename
-    f="${x/etc\/netdata\//}"
-
-    # find the stock filename
-    t="${f/.conf.old/.conf}"
-    t="${t/.conf.orig/.conf}"
-
-    if [ -n "${md5sum}" ]; then
-      # find the checksum of the existing file
-      md5="$(${md5sum} < "${x}" | cut -d ' ' -f 1)"
-      #echo >&2 "md5: ${md5}"
-
-      # check if it matches
-      if [ "${configs_signatures[${md5}]}" = "${t}" ]; then
-        # it matches the default
-        run rm -f "${x}"
-        deleted_stock_configs=$((deleted_stock_configs + 1))
-      fi
-    fi
-  done < <(find etc -type f)
-
-  touch "etc/netdata/.installer-cleanup-of-stock-configs-done"
-fi
-
 # -----------------------------------------------------------------------------
 progress "Attempt to create user/group netdata/netadata"
 
@@ -196,23 +157,32 @@ dir_should_be_link . var/log/netdata netdata-logs
 
 dir_should_be_link etc/netdata ../../usr/lib/netdata/conf.d orig
 
-if [ ${deleted_stock_configs} -gt 0 ]; then
-  dir_should_be_link etc/netdata ../../usr/lib/netdata/conf.d "000.-.USE.THE.orig.LINK.TO.COPY.AND.EDIT.STOCK.CONFIG.FILES"
-fi
-
 # -----------------------------------------------------------------------------
 progress "fix permissions"
 
 run chmod g+rx,o+rx /opt
-run chown -R ${NETDATA_USER}:${NETDATA_GROUP} /opt/netdata
+run find /opt/netdata -type d -exec chmod go+rx '{}' \+
+run chown -R ${NETDATA_USER}:${NETDATA_GROUP} /opt/netdata/var
+
+if [ -d /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d ]; then
+  run chown -R root:${NETDATA_GROUP} /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d
+fi
 
 # -----------------------------------------------------------------------------
 
 progress "changing plugins ownership and permissions"
 
+for x in apps.plugin perf.plugin slabinfo.plugin debugfs.plugin freeipmi.plugin ioping cgroup-network local-listeners ebpf.plugin nfacct.plugin xenstat.plugin python.d.plugin charts.d.plugin go.d.plugin ioping.plugin cgroup-network-helper.sh; do
+  f="usr/libexec/netdata/plugins.d/${x}"
+  if [ -f "${f}" ]; then
+    run chown root:${NETDATA_GROUP} "${f}"
+  fi
+done
+
 if command -v setcap >/dev/null 2>&1; then
     run setcap "cap_dac_read_search,cap_sys_ptrace=ep" "usr/libexec/netdata/plugins.d/apps.plugin"
     run setcap "cap_dac_read_search=ep" "usr/libexec/netdata/plugins.d/slabinfo.plugin"
+    run setcap "cap_dac_read_search=ep" "usr/libexec/netdata/plugins.d/debugfs.plugin"
 
     if command -v capsh >/dev/null 2>&1 && capsh --supports=cap_perfmon 2>/dev/null ; then
         run setcap "cap_perfmon=ep" "usr/libexec/netdata/plugins.d/perf.plugin"
@@ -222,18 +192,16 @@ if command -v setcap >/dev/null 2>&1; then
 
     run setcap "cap_net_admin,cap_net_raw=eip" "usr/libexec/netdata/plugins.d/go.d.plugin"
 else
-  for x in apps.plugin perf.plugin slabinfo.plugin; do
+  for x in apps.plugin perf.plugin slabinfo.plugin debugfs.plugin; do
     f="usr/libexec/netdata/plugins.d/${x}"
-    run chown root:${NETDATA_GROUP} "${f}"
     run chmod 4750 "${f}"
   done
 fi
 
-for x in freeipmi.plugin ioping cgroup-network ebpf.plugin nfacct.plugin xenstat.plugin; do
+for x in freeipmi.plugin ioping cgroup-network local-listeners ebpf.plugin nfacct.plugin xenstat.plugin; do
   f="usr/libexec/netdata/plugins.d/${x}"
 
   if [ -f "${f}" ]; then
-    run chown root:${NETDATA_GROUP} "${f}"
     run chmod 4750 "${f}"
   fi
 done

@@ -126,8 +126,7 @@ struct simple_connector_data {
     struct simple_connector_buffer *last_buffer;
 
 #ifdef ENABLE_HTTPS
-    SSL *conn; //SSL connection
-    int flags; //The flags for SSL connection
+    NETDATA_SSL ssl;
 #endif
 };
 
@@ -308,7 +307,7 @@ static inline void disable_instance(struct instance *instance)
     instance->disabled = 1;
     instance->scheduled = 0;
     uv_mutex_unlock(&instance->mutex);
-    error("EXPORTING: Instance %s disabled", instance->config.name);
+    netdata_log_error("EXPORTING: Instance %s disabled", instance->config.name);
 }
 
 #include "exporting/prometheus/prometheus.h"
