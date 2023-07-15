@@ -6,10 +6,19 @@
 
 **Merged pull requests:**
 
+- Pre release fixes [\#15405](https://github.com/netdata/netdata/pull/15405) ([ktsaou](https://github.com/ktsaou))
+- Hide eBPF functions [\#15404](https://github.com/netdata/netdata/pull/15404) ([thiagoftsm](https://github.com/thiagoftsm))
+- remove collector meta definitions [\#15403](https://github.com/netdata/netdata/pull/15403) ([ilyam8](https://github.com/ilyam8))
+- bump v2 dashboard to latest prod [\#15402](https://github.com/netdata/netdata/pull/15402) ([ilyam8](https://github.com/ilyam8))
+- Make yamls pass the schema, and use decided temporary naming scheme [\#15401](https://github.com/netdata/netdata/pull/15401) ([Ancairon](https://github.com/Ancairon))
+- collector meta schema: global config examples folding + per example [\#15398](https://github.com/netdata/netdata/pull/15398) ([ilyam8](https://github.com/ilyam8))
+- packaging: fix arch detection in update\_static [\#15396](https://github.com/netdata/netdata/pull/15396) ([ilyam8](https://github.com/ilyam8))
+- add expiration to bearer token response [\#15392](https://github.com/netdata/netdata/pull/15392) ([ktsaou](https://github.com/ktsaou))
 - dont add all nodes to registry action hello [\#15390](https://github.com/netdata/netdata/pull/15390) ([ktsaou](https://github.com/ktsaou))
 - Revert "dont add all nodes to registry action hello" [\#15389](https://github.com/netdata/netdata/pull/15389) ([ktsaou](https://github.com/ktsaou))
 - dont add all nodes to registry action hello [\#15388](https://github.com/netdata/netdata/pull/15388) ([ktsaou](https://github.com/ktsaou))
 - update bundled v2 dashboard; make v2 the default dashboard [\#15386](https://github.com/netdata/netdata/pull/15386) ([ilyam8](https://github.com/ilyam8))
+- Create categories.yaml [\#15385](https://github.com/netdata/netdata/pull/15385) ([Ancairon](https://github.com/Ancairon))
 - Fix CodeQL alert  [\#15384](https://github.com/netdata/netdata/pull/15384) ([stelfrag](https://github.com/stelfrag))
 - Add missing files to web/gui/Makefile.am. [\#15383](https://github.com/netdata/netdata/pull/15383) ([Ferroin](https://github.com/Ferroin))
 - Updates on JSON schemas [\#15382](https://github.com/netdata/netdata/pull/15382) ([Ancairon](https://github.com/Ancairon))
@@ -236,7 +245,6 @@
 - make zlib compulsory dep [\#14928](https://github.com/netdata/netdata/pull/14928) ([underhood](https://github.com/underhood))
 - Try to detect bind mounts [\#14831](https://github.com/netdata/netdata/pull/14831) ([MrZammler](https://github.com/MrZammler))
 - Remove old logic for handling of legacy stock config files. [\#14829](https://github.com/netdata/netdata/pull/14829) ([Ferroin](https://github.com/Ferroin))
-- fix infiniband bytes counters multiplier and divisor [\#14748](https://github.com/netdata/netdata/pull/14748) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.39.1](https://github.com/netdata/netdata/tree/v1.39.1) (2023-05-18)
 
@@ -405,15 +413,6 @@
 - fix /sys/block/zram in docker [\#14759](https://github.com/netdata/netdata/pull/14759) ([ilyam8](https://github.com/ilyam8))
 - bump go.d.plugin to v0.51.4 [\#14756](https://github.com/netdata/netdata/pull/14756) ([ilyam8](https://github.com/ilyam8))
 - Add ethtool in third party collectors [\#14753](https://github.com/netdata/netdata/pull/14753) ([ghanapunq](https://github.com/ghanapunq))
-- Update sign-in.md [\#14751](https://github.com/netdata/netdata/pull/14751) ([cakrit](https://github.com/cakrit))
-- Update journal v2 [\#14750](https://github.com/netdata/netdata/pull/14750) ([stelfrag](https://github.com/stelfrag))
-- Update edit-config documentation [\#14749](https://github.com/netdata/netdata/pull/14749) ([cakrit](https://github.com/cakrit))
-- bump go.d.plugin version to v0.51.3 [\#14745](https://github.com/netdata/netdata/pull/14745) ([ilyam8](https://github.com/ilyam8))
-- increase RRD\_ID\_LENGTH\_MAX to 1000 [\#14744](https://github.com/netdata/netdata/pull/14744) ([ilyam8](https://github.com/ilyam8))
-- Update Performance Optimization Options [\#14743](https://github.com/netdata/netdata/pull/14743) ([cakrit](https://github.com/cakrit))
-- Update change-metrics-storage.md [\#14742](https://github.com/netdata/netdata/pull/14742) ([cakrit](https://github.com/cakrit))
-- Add contexts to privacy doc. [\#14741](https://github.com/netdata/netdata/pull/14741) ([cakrit](https://github.com/cakrit))
-- Create pci-soc-hipaa.md [\#14740](https://github.com/netdata/netdata/pull/14740) ([cakrit](https://github.com/cakrit))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
