@@ -16,28 +16,28 @@
 </p>
 <hr class="solid">
 
-Netdata collects metrics per-second and presents them in beatiful low-latency dashboards. It is designed to run on all your physical and virtual servers, cloud deployments, kubernetes clusters and edge/IoT devices, to monitor everything you run.
+Netdata collects metrics per second and presents them in beautiful low-latency dashboards. It is designed to run on all of your physical and virtual servers, cloud deployments, Kubernetes clusters, and edge/IoT devices, to monitor everything you run.
 
 - :boom: **Collects metrics from 800+ integrations**<br/>
-  Operating system metrics, container metrics, virtual machines, hardware sensors, applications metrics, OpenMetrics exporters, StatsD and logs.
+  Operating system metrics, container metrics, virtual machines, hardware sensors, applications metrics, OpenMetrics exporters, StatsD, and logs.
   
 - :muscle: **Real-Time, Low-Latency, High-Resolution**<br/>
-  All metrics are collected per-second, and are on the dashboard immediately after data collection. Netdata is designed to be fast.
+  All metrics are collected per second and are on the dashboard immediately after data collection. Netdata is designed to be fast.
 
 - :face_in_clouds: **Unsupervised Anomaly Detection (ML)**<br/>
   Trains multiple ML models for each metric collected and detects anomalies based on the past behavior of each metric individually.
 
 - :fire: **Powerful Visualization**<br/>
-  Clear and precise visualuzation that allows you to quickly understand any dataset, but also to filter, slice and dice the data directly on the dashboard, without the need to learn any query language.
+  Clear and precise visualization that allows you to quickly understand any dataset, but also to filter, slice and dice the data directly on the dashboard, without the need to learn any query language.
 
 - :bell: **Out of box Alerts**<br/>
   Comes with hundreds of alerts out of the box to detect common issues and pitfalls, revealing issues that can easily go unnoticed.
 
 - :sunglasses: **Low Maintenance**<br/>
-  Fully automated in every aspect: automated dashboards, out of the box alerts, auto-detection and auto-discovery of metrics, easy configuration.
+  Fully automated in every aspect: automated dashboards, out-of-the-box alerts, auto-detection, auto-discovery of metrics, and easily configurable.
 
 - :star: **Open and Extensible**<br/>
-  Netdata is a modular platform that can be extented in all possible ways and it also integrates nicely with other monitoring solutions.
+  Netdata is a modular platform that can be extended in all possible ways and it also integrates nicely with other monitoring solutions.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/cncf/artwork/master/other/cncf/horizontal/white/cncf-white.svg" alt="CNCF" width="300">
@@ -75,9 +75,9 @@ Netdata collects metrics per-second and presents them in beatiful low-latency da
 
 ### 1. **Install Netdata Agents everywhere** :v:
    
-   Netdata can be installed on all Linux, MacOS and FreeBSD systems. We provide binary packages for the most popular operating systems and package managers.
+   Netdata can be installed on all Linux, MacOS, and FreeBSD systems. We provide binary packages for the most popular operating systems and package managers.
 
-   - Install on [Ubuntu, Debiam CentOS, Arch, Alpine, Gentoo](https://learn.netdata.cloud/docs/installing/one-line-installer-for-all-linux-systems).
+   - Install on [Ubuntu, Debian CentOS, Arch, Alpine, Gentoo](https://learn.netdata.cloud/docs/installing/one-line-installer-for-all-linux-systems).
    - Install with [Docker](https://learn.netdata.cloud/docs/installing/docker). Netdata is a [Verified Publisher on DockerHub](https://hub.docker.com/r/netdata/netdata) and our users enjoy free unlimited DockerHub pulls :heart_eyes:.
    - Install on [MacOS](https://learn.netdata.cloud/docs/installing/macos) :metal:.
    - Install on [FreeBSD](https://learn.netdata.cloud/docs/installing/freebsd) and [pfSense](https://learn.netdata.cloud/docs/installing/pfsense).
@@ -114,7 +114,7 @@ Netdata collects metrics per-second and presents them in beatiful low-latency da
    When your parents are connected to Netdata Cloud, you can (on top of the above):
 
    - Organize your infra in spaces and rooms
-   - Create, manage and share **custom dashboards**
+   - Create, manage, and share **custom dashboards**
    - Invite your team and assign roles to them (Role Based Access Control - RBAC)
    - Access Netdata Functions (processes top from the UI and more)
    - Get infinite horizontal scalability (multiple independent parents are viewed as one infra)
@@ -123,7 +123,7 @@ Netdata collects metrics per-second and presents them in beatiful low-latency da
    - Netdata Mobile App notifications (coming soon)
 
    :love_you_gesture: Netdata Cloud does not prevent you from using your Netdata Agents and Parents directly, and vice versa.<br/>
-   :ok_hand: Your metrics are still stored in your network when you connect your Netdata Agents and Parent to Netdata Cloud.
+   :ok_hand: Your metrics are still stored in your network when you connect your Netdata Agents and Parents to Netdata Cloud.
 
 ## How it works
 
@@ -136,7 +136,7 @@ Each Netdata Agent can perform the following functions:
 
    Netdata auto-detects and collects almost everything from the operating system: including CPU, Interrupts, Memory, Disks, Mount Points, Filesystems, Network Stack, Network Interfaces, Containers, VMs, Processes, SystemD Units, Linux Performance Metrics, Linux eBPF, Hardware Sensors, IPMI, and more.
 
-   It collects application metrics from applications: postgresql, mysql/mariadb, redis, mongodb, nginx, apache, and hundreds more.
+   It collects application metrics from applications: PostgreSQL, MySQL/MariaDB, Redis, MongoDB, Nginx, Apache, and hundreds more.
 
    Netdata also collects your custom application metrics by scraping OpenMetrics exporters, or via StatsD.
 
@@ -151,7 +151,7 @@ Each Netdata Agent can perform the following functions:
    Trains multiple Machine-Learning (ML) models per metric to learn the behavior of each metric individually.
    
 5. **DETECT** (ML)<br/>
-   Uses the trained machine learning (ML) models to detect outliers and mark collected samples as **anomalies**. Netdata stores anomaly information together with each sample and also streams it to Netdata Parents, so that the anomaly is also available at query time for the whole retention of each metric.
+   Uses the trained machine learning (ML) models to detect outliers and mark collected samples as **anomalies**. Netdata stores anomaly information together with each sample and also streams it to Netdata Parents so that the anomaly is also available at query time for the whole retention of each metric.
 
 6. **CHECK**<br/>
    Uses its configured alerts to check the metrics for common issues and send alert notifications.
@@ -160,7 +160,7 @@ Each Netdata Agent can perform the following functions:
    Push metrics in real-time to Netdata Parents.
 
 8. **ARCHIVE**<br/>
-   Export metrics to industry standard time-series databases, like `prometheus`, `influxdb`, `opentsdb`, `graphite`, etc.
+   Export metrics to industry standard time-series databases, like `Prometheus`, `InfluxDB`, `OpenTSDB`, `Graphite`, etc.
 
 9. **QUERY**<br/>
    Provide an API to query the data and present interactive dashboards to users.
@@ -178,21 +178,21 @@ We understand that Netdata is a software piece that is installed on millions of 
 
   - We follow the [Open Source Security Foundation](https://bestpractices.coreinfrastructure.org/en/projects/2231) best practices.
   - We have given great attention to detail when it comes to security design. Check out our [security design](https://learn.netdata.cloud/docs/architecture/security-and-privacy-design).
-  - Netdata is a popular open source project and is frequently tested by many security analysts.
-  - Check also our [security polices and advisories published so far](https://github.com/netdata/netdata/security).
+  - Netdata is a popular open-source project and is frequently tested by many security analysts.
+  - Check also our [security policies and advisories published so far](https://github.com/netdata/netdata/security).
 
 ### :cyclone: Will this consume a lot of resources on my servers?
 
 No. It will not! We promise this will be fast!
 
-Although each Netdata Agent is a complete monitoring solution packed into a single application, and despite the fact that Netdata collects **every metric every single second** and trains **multiple ML models** per metric, you will find that Netdata has amazing performance! In many cases it outperforms other monitoring solutions that have singificantly less features or far smaller data collection rate.
+Although each Netdata Agent is a complete monitoring solution packed into a single application, and despite the fact that Netdata collects **every metric every single second** and trains **multiple ML models** per metric, you will find that Netdata has amazing performance! In many cases, it outperforms other monitoring solutions that have significantly fewer features or far smaller data collection rates.
 
 This is what you should expect:
 
-  - For production systems, each Netdata Agent with default settings (everything enabled, ML, Health, DB) should consume about 5% CPU utilization of single core and about 150 MiB or RAM. By using a Netdata parent and streaming all metrics to that parent, you can disable ML, health and use an ephemeral DB mode (like `alloc`) on the children, leading to a utilization of about 1% CPU of a single core and 100 MiB of RAM. Of course, these depend on how many metrics are collected.
+  - For production systems, each Netdata Agent with default settings (everything enabled, ML, Health, DB) should consume about 5% CPU utilization of one core and about 150 MiB or RAM. By using a Netdata parent and streaming all metrics to that parent, you can disable ML & health and use an ephemeral DB mode (like `alloc`) on the children, leading to utilization of about 1% CPU of a single core and 100 MiB of RAM. Of course, these depend on how many metrics are collected.
   - For Netdata Parents, for about 1 to 2 million metrics, all collected every second, we suggest a server with 16 cores and 32GB RAM. Less than half of it will be used for data collection and ML. The rest will be available for queries.
 
-Netdata has extensive internal instrumentation to help us reveal how the resources consumed are used. All these are available at the "Netdata Monitoring" section of the dashboard. Depending on your use case, there are many options to optimize resource consumption.
+Netdata has extensive internal instrumentation to help us reveal how the resources consumed are used. All these are available in the "Netdata Monitoring" section of the dashboard. Depending on your use case, there are many options to optimize resource consumption.
 
 Even if you need to run Netdata on extremely weak embedded or IoT systems, you will find that Netdata can be tuned to be very performant.
 
@@ -200,13 +200,13 @@ Even if you need to run Netdata on extremely weak embedded or IoT systems, you w
 
 As much as you need!
 
-Netdata supports **tiering**, to downsample past data and save disk space. With default settings it has 3 tiers:
+Netdata supports **tiering**, to downsample past data and save disk space. With default settings, it has 3 tiers:
 
   1. `tier 0`, with high resolution, per-second, data.
   2. `tier 1`, mid-resolution, per minute, data.
   3. `tier 2`, low-resolution, per hour, data.
 
-All tiers are updated in parallel during data collection. Just increase the disk space you give to Netdata to get a longer history for your metrics. Tiers are automatically chosen at query time depending on the time-frame and the resolution requested.
+All tiers are updated in parallel during data collection. Just increase the disk space you give to Netdata to get a longer history for your metrics. Tiers are automatically chosen at query time depending on the time frame and the resolution requested.
 
 ### :rocket: Does it scale? I have really a lot of servers!
 
@@ -232,11 +232,11 @@ Using the above, the Netdata Agent on your production system will not need a dis
 
 No. But we hope you will find it useful.
 
-The Netdata Agent dashboard and the Netdata Cloud dashboard are the same. Still Netdata Cloud provides additional features, that the Netdata Agent is not capable of. These include:
+The Netdata Agent dashboard and the Netdata Cloud dashboard are the same. Still, Netdata Cloud provides additional features, that the Netdata Agent is not capable of. These include:
 
-  1. Customizability (custom dashboards and other settings are persisted when you are signed-in to Netdata Cloud)
+  1. Customizability (custom dashboards and other settings are persisted when you are signed in to Netdata Cloud)
   2. Central Configuration of Alerts and Data Collection (coming soon)
-  3. Security (role based access control - RBAC).
+  3. Security (role-based access control - RBAC).
   4. Horizontal Scalability ("blend" multiple independent parents in one uniform infrastructure)
   5. Central Dispatch of Alert Notifications (even when multiple independent parents are involved)
   6. Mobile App for Alert Notifications (coming soon)
@@ -284,7 +284,7 @@ Contributions are the lifeblood of open-source projects. While we continue to in
 - View our [Security Policy](https://github.com/netdata/netdata/security/policy).
 
 Package maintainers should read the guide on [building Netdata from source](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/source.md) for
-instructions on building each Netdata component from source and preparing a package.
+instructions on building each Netdata component from the source and preparing a package.
 
 ## License
 
