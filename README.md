@@ -24,8 +24,8 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
 - :muscle: **Real-Time, Low-Latency, High-Resolution**<br/>
   All metrics are collected per second and are on the dashboard immediately after data collection. Netdata is designed to be fast.
 
-- :face_in_clouds: **Unsupervised Anomaly Detection (ML)**<br/>
-  Trains multiple ML models for each metric collected and detects anomalies based on the past behavior of each metric individually.
+- :face_in_clouds: **Unsupervised Anomaly Detection**<br/>
+  Trains multiple Machine-Learning (ML) models for each metric collected and detects anomalies based on the past behavior of each metric individually.
 
 - :fire: **Powerful Visualization**<br/>
   Clear and precise visualization that allows you to quickly understand any dataset, but also to filter, slice and dice the data directly on the dashboard, without the need to learn any query language.
@@ -213,7 +213,7 @@ All tiers are updated in parallel during data collection. Just increase the disk
 Yes, of course it does!
 
   - :airplane: Netdata Parents provide great vertical scalability, so you can have as big parents as the CPU, RAM and Disk resources you can dedicate to them. In our lab we constantly stress test Netdata Parents with about 2 million metrics collected per second.
-  - :rocket: On top of them, Netdata Cloud provides virtually unlimited horizontal scalability, "merging" at query time all the parents you have, into one huge uniform infrastructure. Netdata Cloud itself is probably the biggest single installation monitoring platform ever created, currently monitoring about 100k online servers with about 10k servers changing state (added/removed) per day!
+  - :rocket: In addition, Netdata Cloud provides virtually unlimited horizontal scalability. It "merges" all the Netdata parents you have into one unified infrastructure at query time. Netdata Cloud itself is probably the biggest single installation monitoring platform ever created, currently monitoring about 100k online servers with about 10k servers changing state (added/removed) per day!
 
 ### :floppy_disk: My production servers are very sensitive in disk I/O. Can I use Netdata?
 
@@ -232,7 +232,7 @@ Using the above, the Netdata Agent on your production system will not need a dis
 
 First we have to say that Prometheus as a time-series database and Grafana as a visualizer are excellent tools for what they do.
 
-But we believe that such a setup is missing a key element: A Prometheus and Grafana setup assumes that you know everything about the metrics you collect and you understand deeply how they are structured, should be queried and visualized.
+However, we believe that such a setup is missing a key element: A Prometheus and Grafana setup assumes that you know everything about the metrics you collect and you understand deeply how they are structured, they should be queried and visualized.
 
 In reality this setup has a lot of problems. The vast number of technologies, operating systems, and applications we use in our modern stacks, makes it impossible for any single person to know and understand everything about anything. We get testimonials regularly from Netdata users across the biggest enterprises, that Netdata manages to reveal issues, anomalies and problems they were not aware of and they didn't even have the means to find or troubleshoot.
 
@@ -290,7 +290,7 @@ You can also find Netdata on:
 
 ## Contribute
 
-Contributions are the lifeblood of open-source projects. While we continue to invest in and improve Netdata, we need help to democratize monitoring!
+Contributions are essential to the success of open-source projects. While we continue to invest in and improve Netdata, we need your help!
 
 - Read our [Contributing Guide](https://github.com/netdata/.github/blob/main/CONTRIBUTING.md), which contains all the information you need to contribute to Netdata, such as improving our documentation, engaging in the community, and developing new features. We've made it as frictionless as possible, but if you need help, just ping us on our community forums!
 - We have a whole category dedicated to contributing and extending Netdata on our [community forums](https://community.netdata.cloud/c/agent-development/9)
@@ -304,13 +304,3 @@ instructions on building each Netdata component from the source and preparing a 
 
 The Netdata Agent is [GPLv3+](https://github.com/netdata/netdata/blob/master/LICENSE). Netdata re-distributes other open-source tools and libraries. Please check the
 [third party licenses](https://github.com/netdata/netdata/blob/master/REDISTRIBUTED.md).
-
-## Is it any good?
-
-Yes.
-
-_When people first hear about a new product, they frequently ask if it is any good. A Hacker News user
-[remarked](https://news.ycombinator.com/item?id=3067434):_
-
-> Note to self: Starting immediately, all raganwald projects will have a “Is it any good?” section in the readme, and
-> the answer shall be “yes.".
