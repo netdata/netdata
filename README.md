@@ -136,7 +136,7 @@ Each Netdata Agent can perform the following functions:
 
    Netdata auto-detects and collects almost everything from the operating system: including CPU, Interrupts, Memory, Disks, Mount Points, Filesystems, Network Stack, Network Interfaces, Containers, VMs, Processes, SystemD Units, Linux Performance Metrics, Linux eBPF, Hardware Sensors, IPMI, and more.
 
-   It collects application metrics from applications: PostgreSQL, MySQL/MariaDB, Redis, MongoDB, Nginx, Apache, and hundreds more.
+   It collects application metrics from applications: [PostgreSQL](https://learn.netdata.cloud/docs/data-collection/database-servers/postgressql), [MySQL/MariaDB](https://learn.netdata.cloud/docs/data-collection/database-servers/mysql-and-mariadb), [Redis](https://learn.netdata.cloud/docs/data-collection/database-servers/redis), [MongoDB](https://learn.netdata.cloud/docs/data-collection/database-servers/mongodb), [Nginx](https://learn.netdata.cloud/docs/data-collection/web-servers-and-web-proxies/nginx), [Apache](https://learn.netdata.cloud/docs/data-collection/web-servers-and-web-proxies/apache), and [hundreds more](https://www.netdata.cloud/integrations/).
 
    Netdata also collects your custom application metrics by scraping OpenMetrics exporters, or via StatsD.
 
