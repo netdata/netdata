@@ -138,7 +138,7 @@ Each Netdata Agent can perform the following functions:
 
    It collects application metrics from applications: [PostgreSQL](https://learn.netdata.cloud/docs/data-collection/database-servers/postgressql), [MySQL/MariaDB](https://learn.netdata.cloud/docs/data-collection/database-servers/mysql-and-mariadb), [Redis](https://learn.netdata.cloud/docs/data-collection/database-servers/redis), [MongoDB](https://learn.netdata.cloud/docs/data-collection/database-servers/mongodb), [Nginx](https://learn.netdata.cloud/docs/data-collection/web-servers-and-web-proxies/nginx), [Apache](https://learn.netdata.cloud/docs/data-collection/web-servers-and-web-proxies/apache), and [hundreds more](https://www.netdata.cloud/integrations/).
 
-   Netdata also collects your custom application metrics by scraping OpenMetrics exporters (like [Prometheus](https://learn.netdata.cloud/docs/data-collection/apm/openmetrics-endpoints)), or via [StatsD](https://learn.netdata.cloud/docs/data-collection/apm/statsd).
+   Netdata also collects your custom [application metrics](https://learn.netdata.cloud/docs/data-collection/monitor-anything#apm-application-performance-monitoring) by scraping OpenMetrics exporters (like [Prometheus](https://learn.netdata.cloud/docs/data-collection/apm/openmetrics-endpoints)), or via [StatsD](https://learn.netdata.cloud/docs/data-collection/apm/statsd).
 
    It can convert [web server log files](https://learn.netdata.cloud/docs/data-collection/web-servers-and-web-proxies/web-logs/apache-nginx-microsoft-iis) to metrics and apply ML and alerts to them, in real-time.
 
