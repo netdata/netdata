@@ -98,7 +98,7 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
    
    Netdata Parents provide:
 
-   - Infrastructure level dashboards, at `http://parent.server.ip:19999/`
+   - Infrastructure level dashboards, at `http://parent.server.ip:19999/` ([here](https://sanfrancisco.my-netdata.io/) is an example parent node with some children streaming to it)
    - Increased retention for all metrics of all your nodes
    - Central configuration of alerts and dispatch of notifications
 
