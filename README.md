@@ -175,6 +175,7 @@ When using Netdata Parents, all the functions of a Netdata Agent (except data co
 <details>
 <summary>:shield: Is this secure?</summary>
 
+
 Of course it is! We do our best to ensure it is!
 
 
@@ -188,6 +189,7 @@ We understand that Netdata is a software piece that is installed on millions of 
 
 <details>
 <summary>:cyclone: Will this consume a lot of resources on my servers?</summary>
+
 
 No. It will not! We promise this will be fast!
 
@@ -206,6 +208,7 @@ Even if you need to run Netdata on extremely weak embedded or IoT systems, you w
 <details>
 <summary>:scroll: How much retention can I have?</summary>
 
+
 As much as you need!
 
 Netdata supports **tiering**, to downsample past data and save disk space. With default settings, it has 3 tiers:
@@ -221,6 +224,7 @@ All tiers are updated in parallel during data collection. Just increase the disk
 <details>
 <summary>:rocket: Does it scale? I have really a lot of servers!</summary>
 
+
 Yes, of course it does!
 
   - :airplane: Netdata Parents provide great vertical scalability, so you can have as big parents as the CPU, RAM and Disk resources you can dedicate to them. In our lab we constantly stress test Netdata Parents with about 2 million metrics collected per second.
@@ -230,6 +234,7 @@ Yes, of course it does!
 
 <details>
 <summary>:floppy_disk: My production servers are very sensitive in disk I/O. Can I use Netdata?</summary>
+
 
 Yes, you can!
 
@@ -246,6 +251,7 @@ Using the above, the Netdata Agent on your production system will not need a dis
 
 <details>
 <summary>:raised_eyebrow: How is Netdata different from a Prometheus and Grafana setup?</summary>
+
 
 First we have to say that Prometheus as a time-series database and Grafana as a visualizer are excellent tools for what they do.
 
@@ -266,6 +272,7 @@ Still, if you are already familiar with Prometheus and Grafana, Netdata integrat
 <details>
 <summary>:cloud: Do I have to subscribe to Netdata Cloud?</summary>
 
+
 No. But we hope you will find it useful.
 
 The Netdata Agent dashboard and the Netdata Cloud dashboard are the same. Still, Netdata Cloud provides additional features, that the Netdata Agent is not capable of. These include:
@@ -283,6 +290,7 @@ So, although it is not required, you can get the most out of your Netdata instal
 
 <details>
 <summary>:office: Who uses Netdata?</summary>
+
 
 Netdata is a popular project. Check its [stargazers on github](https://github.com/netdata/netdata/stargazers). You will find people from quite popular companies and enterprises, including: SAP, Qualcomm, IBM, Amazon, Intel, AMD, Unity, Baidu, Cisco, Samsung, Netflix, Facebook and hundreds more.
 
