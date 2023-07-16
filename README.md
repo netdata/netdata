@@ -172,6 +172,18 @@ When using Netdata Parents, all the functions of a Netdata Agent (except data co
 
 ## FAQ
 
+<details>
+ <summary>:shield: Is this secure?</summary>
+ Of course it is! We do our best to ensure it is!
+
+We understand that Netdata is a software piece that is installed on millions of production systems across the world. So, it is important for us, Netdata to be as secure as possible:
+
+  - We follow the [Open Source Security Foundation](https://bestpractices.coreinfrastructure.org/en/projects/2231) best practices.
+  - We have given great attention to detail when it comes to security design. Check out our [security design](https://learn.netdata.cloud/docs/architecture/security-and-privacy-design).
+  - Netdata is a popular open-source project and is frequently tested by many security analysts.
+  - Check also our [security policies and advisories published so far](https://github.com/netdata/netdata/security).
+</details>
+
 ### :shield: Is this secure?
 
 Of course it is! We do our best to ensure it is!
