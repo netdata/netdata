@@ -131,7 +131,7 @@ Netdata is built around a **modular metrics processing pipeline**.
 
 Each Netdata Agent can perform the following functions:
 
-1. **`COLLECT` metrics from their sources**<br/>
+### 1. **`COLLECT` metrics from their sources**<br/>
    Uses [internal](https://github.com/netdata/netdata/tree/master/collectors) and [external](https://github.com/netdata/go.d.plugin/tree/master/modules) plugins to collect data from their sources.
 
    Netdata auto-detects and collects almost everything from the operating system: including CPU, Interrupts, Memory, Disks, Mount Points, Filesystems, Network Stack, Network Interfaces, Containers, VMs, Processes, SystemD Units, Linux Performance Metrics, Linux eBPF, Hardware Sensors, IPMI, and more.
@@ -144,32 +144,31 @@ Each Netdata Agent can perform the following functions:
 
    And it also supports synthetic tests / white box tests, so you can ping servers, check API responses, or even check filesystem files and directories to generate metrics, train ML and run alerts and notifications on their status.
 
-2. **`STORE` metrics to a database**<br/>
+### 2. **`STORE` metrics to a database**<br/>
    Uses database engine plugins to store the collected data, either in memory and/or on disk. We have developed our own [`dbengine`](https://github.com/netdata/netdata/tree/master/database/engine#readme) for storing the data in a very efficient manner, allowing Netdata to have less than 1 byte per sample on disk and amazingly fast queries.
 
-3. **`LEARN` the behavior of metrics** (ML)<br/>
+### 3. **`LEARN` the behavior of metrics** (ML)<br/>
    Trains multiple Machine-Learning (ML) models per metric to learn the behavior of each metric individually.
 
-4. **`DETECT` anomalies in metrics** (ML)<br/>
+### 4. **`DETECT` anomalies in metrics** (ML)<br/>
    Uses the trained machine learning (ML) models to detect outliers and mark collected samples as **anomalies**. Netdata stores anomaly information together with each sample and also streams it to Netdata Parents so that the anomaly is also available at query time for the whole retention of each metric.
 
-5. **`CHECK` metrics and trigger alert notifications**<br/>
+### 5. **`CHECK` metrics and trigger alert notifications**<br/>
    Uses its configured alerts to check the metrics for common issues and send alert notifications.
 
-6. **`STREAM` metrics to other Netdata Agents**<br/>
+### 6. **`STREAM` metrics to other Netdata Agents**<br/>
    Push metrics in real-time to Netdata Parents.
 
-7. **`ARCHIVE` metrics to 3rd party databases**<br/>
+### 7. **`ARCHIVE` metrics to 3rd party databases**<br/>
    Export metrics to industry standard time-series databases, like `Prometheus`, `InfluxDB`, `OpenTSDB`, `Graphite`, etc.
 
-8. **`QUERY` metrics and present dashboards**<br/>
+### 8. **`QUERY` metrics and present dashboards**<br/>
    Provide an API to query the data and present interactive dashboards to users.
 
-9. **`SCORE` metrics to reveal similarities and patterns**<br/>
+### 9. **`SCORE` metrics to reveal similarities and patterns**<br/>
    Score the metrics according to given criteria, to find the needle in the haystack.
 
 When using Netdata Parents, all the functions of a Netdata Agent (except data collection) can be delegated to Parents to offload production systems.
-
 
 ## FAQ
 
