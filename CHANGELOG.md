@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Update README.md [\#15416](https://github.com/netdata/netdata/pull/15416) ([ktsaou](https://github.com/ktsaou))
+- Update README.md [\#15414](https://github.com/netdata/netdata/pull/15414) ([ktsaou](https://github.com/ktsaou))
+- Update README.md [\#15412](https://github.com/netdata/netdata/pull/15412) ([tkatsoulas](https://github.com/tkatsoulas))
+- add reference to cncf [\#15408](https://github.com/netdata/netdata/pull/15408) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Pre release fixes [\#15405](https://github.com/netdata/netdata/pull/15405) ([ktsaou](https://github.com/ktsaou))
 - Hide eBPF functions [\#15404](https://github.com/netdata/netdata/pull/15404) ([thiagoftsm](https://github.com/thiagoftsm))
 - remove collector meta definitions [\#15403](https://github.com/netdata/netdata/pull/15403) ([ilyam8](https://github.com/ilyam8))
@@ -143,6 +147,7 @@
 - fix\(alerting\): removing some of criticals [\#15124](https://github.com/netdata/netdata/pull/15124) ([M4itee](https://github.com/M4itee))
 - Add hardening options to CFLAGS by default if they are available. [\#15087](https://github.com/netdata/netdata/pull/15087) ([Ferroin](https://github.com/Ferroin))
 - Additional CO-RE code \(eBPF.plugin\) [\#15078](https://github.com/netdata/netdata/pull/15078) ([thiagoftsm](https://github.com/thiagoftsm))
+- Update README.md [\#15044](https://github.com/netdata/netdata/pull/15044) ([ktsaou](https://github.com/ktsaou))
 - Consistently start the agent as root and rely on it to drop privileges properly. [\#14890](https://github.com/netdata/netdata/pull/14890) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
@@ -411,8 +416,6 @@
 - Skip alert template variables from alert snapshots [\#14763](https://github.com/netdata/netdata/pull/14763) ([MrZammler](https://github.com/MrZammler))
 - Accept all=true for alarms api v1 call [\#14762](https://github.com/netdata/netdata/pull/14762) ([MrZammler](https://github.com/MrZammler))
 - fix /sys/block/zram in docker [\#14759](https://github.com/netdata/netdata/pull/14759) ([ilyam8](https://github.com/ilyam8))
-- bump go.d.plugin to v0.51.4 [\#14756](https://github.com/netdata/netdata/pull/14756) ([ilyam8](https://github.com/ilyam8))
-- Add ethtool in third party collectors [\#14753](https://github.com/netdata/netdata/pull/14753) ([ghanapunq](https://github.com/ghanapunq))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
