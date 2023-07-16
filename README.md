@@ -148,7 +148,7 @@ Each Netdata Agent can perform the following functions:
    Uses database engine plugins to store the collected data, either in memory and/or on disk. We have developed our own [`dbengine`](https://github.com/netdata/netdata/tree/master/database/engine#readme) for storing the data in a very efficient manner, allowing Netdata to have less than 1 byte per sample on disk and amazingly fast queries.
 
 ### 3. **`LEARN` the behavior of metrics** (ML)<br/>
-   Trains multiple Machine-Learning (ML) models per metric to learn the behavior of each metric individually.
+   Trains multiple Machine-Learning (ML) models per metric to learn the behavior of each metric individually. [Here](https://blog.netdata.cloud/how-netdatas-ml-based-anomaly-detection-works/) is a blog post on how this all works if you are curious.
 
 ### 4. **`DETECT` anomalies in metrics** (ML)<br/>
    Uses the trained machine learning (ML) models to detect outliers and mark collected samples as **anomalies**. Netdata stores anomaly information together with each sample and also streams it to Netdata Parents so that the anomaly is also available at query time for the whole retention of each metric.
