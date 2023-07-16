@@ -140,10 +140,10 @@ Each Netdata Agent can perform the following functions:
 
    Netdata also collects your custom application metrics by scraping OpenMetrics exporters (like [Prometheus](https://learn.netdata.cloud/docs/data-collection/apm/openmetrics-endpoints)), or via [StatsD](https://learn.netdata.cloud/docs/data-collection/apm/statsd).
 
-   It can convert web server log files to metrics and apply ML and alerts to them, in real-time.
+   It can convert [web server log files](https://learn.netdata.cloud/docs/data-collection/web-servers-and-web-proxies/web-logs/apache-nginx-microsoft-iis) to metrics and apply ML and alerts to them, in real-time.
 
    And it also supports synthetic tests / white box tests, so you can ping servers, check API responses, or even check filesystem files and directories to generate metrics, train ML and run alerts and notifications on their status.
-   
+
 2. **`STORE` metrics to a database**<br/>
    Uses database engine plugins to store the collected data, either in memory and/or on disk. We have developed our own [`dbengine`](https://github.com/netdata/netdata/tree/master/database/engine#readme) for storing the data in a very efficient manner, allowing Netdata to have less than 1 byte per sample on disk and amazingly fast queries.
    
