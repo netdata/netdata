@@ -166,7 +166,7 @@ Each Netdata Agent can perform the following functions:
    Provide an API to query the data and present interactive dashboards to users.
 
 ### 9. **`SCORE` metrics to reveal similarities and patterns**<br/>
-   Score the metrics according to given criteria, to find the needle in the haystack.
+   Score the metrics according to given criteria, to find the needle in the haystack. For example use [Metric Correlations](https://learn.netdata.cloud/docs/ml-and-troubleshooting/metric-correlations) to quickly find what's changed the most, or [Anomaly Advisor](https://learn.netdata.cloud/docs/ml-and-troubleshooting/anomaly-advisor) to see which metrics were most anomalous in a given time-frame.
 
 When using Netdata Parents, all the functions of a Netdata Agent (except data collection) can be delegated to Parents to offload production systems.
 
