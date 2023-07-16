@@ -114,7 +114,7 @@ void analytics_free_data(void)
 /*
  * Set a numeric/boolean data with a value
  */
-void analytics_set_data(char **name, char *value)
+static void analytics_set_data(char **name, const char *value)
 {
     if (*name) {
         analytics_data.data_length -= strlen(*name);
@@ -127,7 +127,7 @@ void analytics_set_data(char **name, char *value)
 /*
  * Set a string data with a value
  */
-void analytics_set_data_str(char **name, char *value)
+static void analytics_set_data_str(char **name, const char *value)
 {
     size_t value_string_len;
     if (*name) {
@@ -235,7 +235,7 @@ void analytics_exporters(void)
     //decide if something else is more suitable (but probably not null)
     BUFFER *bi = buffer_create(1000, NULL);
     analytics_exporting_connectors(bi);
-    analytics_set_data_str(&analytics_data.netdata_exporting_connectors, (char *)buffer_tostring(bi));
+    analytics_set_data_str(&analytics_data.netdata_exporting_connectors, buffer_tostring(bi));
     buffer_free(bi);
 }
 
@@ -349,7 +349,7 @@ void analytics_alarms_notifications(void)
     }
     freez(script);
 
-    analytics_set_data_str(&analytics_data.netdata_notification_methods, (char *)buffer_tostring(b));
+    analytics_set_data_str(&analytics_data.netdata_notification_methods, buffer_tostring(b));
 
     buffer_free(b);
 }
@@ -385,7 +385,7 @@ void analytics_https(void)
     buffer_strcat(b, "||");
 #endif
 
-    analytics_set_data_str(&analytics_data.netdata_config_https_available, (char *)buffer_tostring(b));
+    analytics_set_data_str(&analytics_data.netdata_config_https_available, buffer_tostring(b));
     buffer_free(b);
 }
 
@@ -650,7 +650,7 @@ static const char *verify_or_create_required_directory(const char *dir) {
 void set_late_global_environment(struct rrdhost_system_info *system_info)
 {
     analytics_set_data(&analytics_data.netdata_config_stream_enabled, default_rrdpush_enabled ? "true" : "false");
-    analytics_set_data_str(&analytics_data.netdata_config_storage_engine_name, (char *)storage_engine_name(default_storage_engine_id));
+    analytics_set_data_str(&analytics_data.netdata_config_storage_engine_name, storage_engine_name(default_storage_engine_id));
 
 #ifdef DISABLE_CLOUD
     analytics_set_data(&analytics_data.netdata_host_cloud_enabled, "false");
@@ -682,12 +682,12 @@ void set_late_global_environment(struct rrdhost_system_info *system_info)
     else
         analytics_set_data(&analytics_data.netdata_config_web_enabled, "true");
 
-    analytics_set_data_str(&analytics_data.netdata_config_release_channel, (char *)get_release_channel());
+    analytics_set_data_str(&analytics_data.netdata_config_release_channel, get_release_channel());
 
     {
         BUFFER *bi = buffer_create(1000, NULL);
         analytics_build_info(bi);
-        analytics_set_data_str(&analytics_data.netdata_buildinfo, (char *)buffer_tostring(bi));
+        analytics_set_data_str(&analytics_data.netdata_buildinfo, buffer_tostring(bi));
         buffer_free(bi);
     }
 
