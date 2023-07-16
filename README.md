@@ -109,7 +109,7 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
 
 ### 4. **Connect your Parents to [Netdata Cloud](http://app.netdata.cloud/)** :cloud:
 
-   Optionally, sign-up to Netdata Cloud and claim your Netdata Parents.
+   Optionally, sign-up to Netdata Cloud and claim your Netdata Parents (check out the [Netdata Cloud demo space](https://app.netdata.cloud/spaces/netdata-demo) - no login/sign-up required).
    
    When your parents are connected to Netdata Cloud, you can (on top of the above):
 
