@@ -212,9 +212,9 @@ As much as you need!
 Netdata supports **tiering**, to downsample past data and save disk space. With default settings, it has 3 tiers:
 <br><br>
 <ol>
-  <li>`tier 0`, with high resolution, per-second, data.</li>
-  <li>`tier 1`, mid-resolution, per minute, data.</li>
-  <li>`tier 2`, low-resolution, per hour, data.</li>
+  <li><code>tier 0</code>, with high resolution, per-second, data.</li>
+  <li><code>tier 1</code>, mid-resolution, per minute, data.</li>
+  <li><code>tier 2</code>, low-resolution, per hour, data.</li>
 </ol>
 <br>
 All tiers are updated in parallel during data collection. Just increase the disk space you give to Netdata to get a longer history for your metrics. Tiers are automatically chosen at query time depending on the time frame and the resolution requested.
@@ -223,30 +223,32 @@ All tiers are updated in parallel during data collection. Just increase the disk
 
 <details>
 <summary>:rocket: Does it scale? I have really a lot of servers!</summary>
-
-
+<br>
 Yes, of course it does!
-
-  - :airplane: Netdata Parents provide great vertical scalability, so you can have as big parents as the CPU, RAM and Disk resources you can dedicate to them. In our lab we constantly stress test Netdata Parents with about 2 million metrics collected per second.
-  - :rocket: In addition, Netdata Cloud provides virtually unlimited horizontal scalability. It "merges" all the Netdata parents you have into one unified infrastructure at query time. Netdata Cloud itself is probably the biggest single installation monitoring platform ever created, currently monitoring about 100k online servers with about 10k servers changing state (added/removed) per day!
-
+<br><br>
+<ul>
+  <li>:airplane: Netdata Parents provide great vertical scalability, so you can have as big parents as the CPU, RAM and Disk resources you can dedicate to them. In our lab we constantly stress test Netdata Parents with about 2 million metrics collected per second.</li>
+  <li>:rocket: In addition, Netdata Cloud provides virtually unlimited horizontal scalability. It "merges" all the Netdata parents you have into one unified infrastructure at query time. Netdata Cloud itself is probably the biggest single installation monitoring platform ever created, currently monitoring about 100k online servers with about 10k servers changing state (added/removed) per day!</li>
+</ul>
+<br>
 </details>
 
 <details>
 <summary>:floppy_disk: My production servers are very sensitive in disk I/O. Can I use Netdata?</summary>
-
-
+<br>
 Yes, you can!
-
+<br><br>
 We suggest the following:
-
-  1. Use database mode `alloc` or `ram` to disable writing metric data to disk.
-  2. Configure streaming to push in real-time all metrics to a Netdata Parent. The Netdata Parent will maintain metrics on disk for this node.
-  3. Disable ML and health on this node. The Netdata Parent will do them for this node.
-  4. Use the Netdata Parent to access the dashboard.
-
+<br><br>
+<ol>
+  <li>Use database mode <code>alloc</code> or <code>ram</code> to disable writing metric data to disk.</li>
+  <li>Configure streaming to push in real-time all metrics to a Netdata Parent. The Netdata Parent will maintain metrics on disk for this node.</li>
+  <li>Disable ML and health on this node. The Netdata Parent will do them for this node.</li>
+  <li>Use the Netdata Parent to access the dashboard.</li>
+</ol>
+<br><br>
 Using the above, the Netdata Agent on your production system will not need a disk.
-
+<br>
 </details>
 
 <details>
