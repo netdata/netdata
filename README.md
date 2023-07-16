@@ -179,44 +179,46 @@ Of course it is! We do our best to ensure it is!
 <br><br>
 We understand that Netdata is a software piece that is installed on millions of production systems across the world. So, it is important for us, Netdata to be as secure as possible:
 <br><br>
-  - We follow the [Open Source Security Foundation](https://bestpractices.coreinfrastructure.org/en/projects/2231) best practices.
-  - We have given great attention to detail when it comes to security design. Check out our [security design](https://learn.netdata.cloud/docs/architecture/security-and-privacy-design).
+  - We follow the <a href="https://bestpractices.coreinfrastructure.org/en/projects/2231">Open Source Security Foundation</a> best practices.
+  - We have given great attention to detail when it comes to security design. Check out our <a href="https://learn.netdata.cloud/docs/architecture/security-and-privacy-design">security design</a>.
   - Netdata is a popular open-source project and is frequently tested by many security analysts.
-  - Check also our [security policies and advisories published so far](https://github.com/netdata/netdata/security).
+  - Check also our <a href="https://github.com/netdata/netdata/security">security policies and advisories published so far</a>.
+<br><br>
 </details>
 
 <details>
 <summary>:cyclone: Will this consume a lot of resources on my servers?</summary>
-
-
+<br>
 No. It will not! We promise this will be fast!
-
+<br><br>
 Although each Netdata Agent is a complete monitoring solution packed into a single application, and despite the fact that Netdata collects **every metric every single second** and trains **multiple ML models** per metric, you will find that Netdata has amazing performance! In many cases, it outperforms other monitoring solutions that have significantly fewer features or far smaller data collection rates.
-
+<br><br>
 This is what you should expect:
-
+<br><br>
   - For production systems, each Netdata Agent with default settings (everything enabled, ML, Health, DB) should consume about 5% CPU utilization of one core and about 150 MiB or RAM. By using a Netdata parent and streaming all metrics to that parent, you can disable ML & health and use an ephemeral DB mode (like `alloc`) on the children, leading to utilization of about 1% CPU of a single core and 100 MiB of RAM. Of course, these depend on how many metrics are collected.
   - For Netdata Parents, for about 1 to 2 million metrics, all collected every second, we suggest a server with 16 cores and 32GB RAM. Less than half of it will be used for data collection and ML. The rest will be available for queries.
-
+<br><br>
 Netdata has extensive internal instrumentation to help us reveal how the resources consumed are used. All these are available in the "Netdata Monitoring" section of the dashboard. Depending on your use case, there are many options to optimize resource consumption.
-
+<br><br>
 Even if you need to run Netdata on extremely weak embedded or IoT systems, you will find that Netdata can be tuned to be very performant.
+<br><br>
 </details>
 
 <details>
 <summary>:scroll: How much retention can I have?</summary>
-
-
+<br>
 As much as you need!
-
+<br><br>
 Netdata supports **tiering**, to downsample past data and save disk space. With default settings, it has 3 tiers:
-
-  1. `tier 0`, with high resolution, per-second, data.
-  2. `tier 1`, mid-resolution, per minute, data.
-  3. `tier 2`, low-resolution, per hour, data.
-
+<br><br>
+<ol>
+  <li>`tier 0`, with high resolution, per-second, data.</li>
+  <li>`tier 1`, mid-resolution, per minute, data.</li>
+  <li>`tier 2`, low-resolution, per hour, data.</li>
+</ol>
+<br>
 All tiers are updated in parallel during data collection. Just increase the disk space you give to Netdata to get a longer history for your metrics. Tiers are automatically chosen at query time depending on the time frame and the resolution requested.
-
+<br><br>
 </details>
 
 <details>
