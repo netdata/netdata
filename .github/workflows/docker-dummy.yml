@@ -1,0 +1,51 @@
+---
+name: Docker
+on:
+  pull_request:
+    paths-ignore: # This MUST be kept in-sync with the paths key for the dummy.yml workflow.
+      - '**.c'
+      - '**.cc'
+      - '**.h'
+      - '**.hh'
+      - '**.in'
+      - '!netdata.spec.in'
+      - '.dockerignore'
+      - 'configure.ac'
+      - 'netdata-installer.sh'
+      - '**/Makefile*'
+      - 'Makefile*'
+      - '.github/workflows/docker.yml'
+      - '.github/scripts/docker-test.sh'
+      - 'build/**'
+      - 'packaging/docker/**'
+      - 'packaging/installer/**'
+      - 'aclk/aclk-schemas/'
+      - 'ml/dlib/'
+      - 'mqtt_websockets'
+      - 'web/server/h2o/libh2o'
+      - '!**.md'
+env:
+  DISABLE_TELEMETRY: 1
+concurrency:
+  group: docker-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+jobs:
+  docker-test:
+    name: Docker Runtime Test
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'NOT REQUIRED'
+
+  docker-ci:
+    name: Docker Alt Arch Builds
+    needs: docker-test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platforms:
+          - linux/i386
+          - linux/arm/v7
+          - linux/arm64
+          - linux/ppc64le
+    steps:
+      - run: echo 'NOT REQUIRED'

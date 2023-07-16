@@ -130,6 +130,10 @@ struct netdata_static_thread socket_threads = {
     .start_routine = NULL
 };
 
+#ifdef NETDATA_DEV_MODE
+int socket_disable_priority;
+#endif
+
 #ifdef LIBBPF_MAJOR_VERSION
 /**
  * Disable Probe
@@ -646,6 +650,8 @@ static void ebpf_socket_free(ebpf_module_t *em )
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_update_stats(&plugin_statistics, em);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -1217,6 +1223,8 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF],
                           2, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
     }
+
+    fflush(stdout);
 }
 
 /**
@@ -1844,7 +1852,7 @@ static void fill_last_nv_dimension(netdata_socket_plot_t *ptr, int is_outbound)
     fill_resolved_name(ptr, hostname,  10 + NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH, service_name, is_outbound);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("Last %s dimension added: ID = %u, IP = OTHER, NAME = %s, DIM1 = %s, DIM2 = %s, DIM3 = %s",
+    netdata_log_info("Last %s dimension added: ID = %u, IP = OTHER, NAME = %s, DIM1 = %s, DIM2 = %s, DIM3 = %s",
          (is_outbound)?"outbound":"inbound", network_viewer_opt.max_dim - 1, ptr->resolved_name,
          ptr->dimension_recv, ptr->dimension_sent, ptr->dimension_retransmit);
 #endif
@@ -1927,12 +1935,12 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
         netdata_socket_plot_t *check ;
         check = (netdata_socket_plot_t *) avl_insert_lock(&out->tree, (avl_t *)w);
         if (check != w)
-            error("Internal error, cannot insert the AVL tree.");
+            netdata_log_error("Internal error, cannot insert the AVL tree.");
 
 #ifdef NETDATA_INTERNAL_CHECKS
         char iptext[INET6_ADDRSTRLEN];
         if (inet_ntop(family, &w->index.daddr.addr8, iptext, sizeof(iptext)))
-            info("New %s dimension added: ID = %u, IP = %s, NAME = %s, DIM1 = %s, DIM2 = %s, DIM3 = %s",
+            netdata_log_info("New %s dimension added: ID = %u, IP = %s, NAME = %s, DIM1 = %s, DIM2 = %s, DIM3 = %s",
                  (out == &inbound_vectors)?"inbound":"outbound", curr, iptext, w->resolved_name,
                  w->dimension_recv, w->dimension_sent, w->dimension_retransmit);
 #endif
@@ -2120,7 +2128,7 @@ void update_listen_table(uint16_t value, uint16_t proto, netdata_passive_connect
     fill_nv_port_list(w, value, proto, in);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("The network viewer is monitoring inbound connections for port %u", ntohs(value));
+    netdata_log_info("The network viewer is monitoring inbound connections for port %u", ntohs(value));
 #endif
 }
 
@@ -2177,7 +2185,9 @@ void *ebpf_socket_read_hash(void *ptr)
     int fd_ipv6 = socket_maps[NETDATA_SOCKET_TABLE_IPV6].map_fd;
     int maps_per_core = em->maps_per_core;
     // This thread is cancelled from another thread
-    for (;;) {
+    uint32_t running_time;
+    uint32_t lifetime = em->lifetime;
+    for (running_time = 0;!ebpf_exit_plugin && running_time < lifetime; running_time++) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_exit_plugin)
            break;
@@ -2918,7 +2928,9 @@ static void socket_collector(ebpf_module_t *em)
     int update_every = em->update_every;
     int maps_per_core = em->maps_per_core;
     int counter = update_every - 1;
-    while (!ebpf_exit_plugin) {
+    uint32_t running_time = 0;
+    uint32_t lifetime = em->lifetime;
+    while (!ebpf_exit_plugin && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_exit_plugin || ++counter != update_every)
             continue;
@@ -2973,6 +2985,15 @@ static void socket_collector(ebpf_module_t *em)
         }
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
+
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (running_time && !em->running_time)
+            running_time = update_every;
+        else
+            running_time += update_every;
+
+        em->running_time = running_time;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 
@@ -3044,14 +3065,14 @@ static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, ebpf_ne
             uint16_t cmp_last = ntohs(move->last);
             if (cmp_first <= first && first <= cmp_last  &&
                 cmp_first <= last && last <= cmp_last ) {
-                info("The range/value (%u, %u) is inside the range/value (%u, %u) already inserted, it will be ignored.",
+                netdata_log_info("The range/value (%u, %u) is inside the range/value (%u, %u) already inserted, it will be ignored.",
                      first, last, cmp_first, cmp_last);
                 freez(in->value);
                 freez(in);
                 return;
             } else if (first <= cmp_first && cmp_first <= last  &&
                        first <= cmp_last && cmp_last <= last) {
-                info("The range (%u, %u) is bigger than previous range (%u, %u) already inserted, the previous will be ignored.",
+                netdata_log_info("The range (%u, %u) is bigger than previous range (%u, %u) already inserted, the previous will be ignored.",
                      first, last, cmp_first, cmp_last);
                 freez(move->value);
                 move->value = in->value;
@@ -3071,7 +3092,7 @@ static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, ebpf_ne
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("Adding values %s( %u, %u) to %s port list used on network viewer",
+    netdata_log_info("Adding values %s( %u, %u) to %s port list used on network viewer",
          in->value, ntohs(in->first), ntohs(in->last),
          (*out == network_viewer_opt.included_port)?"included":"excluded");
 #endif
@@ -3091,7 +3112,7 @@ static void parse_service_list(void **out, char *service)
         serv = getservbyname((const char *)service, "udp");
 
     if (!serv) {
-        info("Cannot resolv the service '%s' with protocols TCP and UDP, it will be ignored", service);
+        netdata_log_info("Cannot resolv the service '%s' with protocols TCP and UDP, it will be ignored", service);
         return;
     }
 
@@ -3165,7 +3186,7 @@ static inline in_addr_t ipv4_network(in_addr_t addr, int prefix)
 static inline int ip2nl(uint8_t *dst, char *ip, int domain, char *source)
 {
     if (inet_pton(domain, ip, dst) <= 0) {
-        error("The address specified (%s) is invalid ", source);
+        netdata_log_error("The address specified (%s) is invalid ", source);
         return -1;
     }
 
@@ -3301,7 +3322,7 @@ void ebpf_fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_
         while (move) {
             if (in->ver == move->ver &&
                 ebpf_is_ip_inside_range(&move->first, &move->last, &in->first, &in->last, in->ver)) {
-                info("The range/value (%s) is inside the range/value (%s) already inserted, it will be ignored.",
+                netdata_log_info("The range/value (%s) is inside the range/value (%s) already inserted, it will be ignored.",
                      in->value, move->value);
                 freez(in->value);
                 freez(in);
@@ -3319,14 +3340,14 @@ void ebpf_fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_
 #ifdef NETDATA_INTERNAL_CHECKS
     char first[256], last[512];
     if (in->ver == AF_INET) {
-        info("Adding values %s: (%u - %u) to %s IP list \"%s\" used on network viewer",
+        netdata_log_info("Adding values %s: (%u - %u) to %s IP list \"%s\" used on network viewer",
              in->value, in->first.addr32[0], in->last.addr32[0],
              (*out == network_viewer_opt.included_ips)?"included":"excluded",
              table);
     } else {
         if (inet_ntop(AF_INET6, in->first.addr8, first, INET6_ADDRSTRLEN) &&
             inet_ntop(AF_INET6, in->last.addr8, last, INET6_ADDRSTRLEN))
-            info("Adding values %s - %s to %s IP list \"%s\" used on network viewer",
+            netdata_log_info("Adding values %s - %s to %s IP list \"%s\" used on network viewer",
                  first, last,
                  (*out == network_viewer_opt.included_ips)?"included":"excluded",
                  table);
@@ -3373,7 +3394,7 @@ static void ebpf_parse_ip_list(void **out, char *ip)
         select = (*end == '/') ? 0 : 1;
         *end++ = '\0';
         if (*end == '!') {
-            info("The exclusion cannot be in the second part of the range %s, it will be ignored.", ipdup);
+            netdata_log_info("The exclusion cannot be in the second part of the range %s, it will be ignored.", ipdup);
             goto cleanipdup;
         }
 
@@ -3384,7 +3405,7 @@ static void ebpf_parse_ip_list(void **out, char *ip)
 
             select = (int) str2i(end);
             if (select < NETDATA_MINIMUM_IPV4_CIDR || select > NETDATA_MAXIMUM_IPV4_CIDR) {
-                info("The specified CIDR %s is not valid, the IP %s will be ignored.", end, ip);
+                netdata_log_info("The specified CIDR %s is not valid, the IP %s will be ignored.", end, ip);
                 goto cleanipdup;
             }
 
@@ -3400,7 +3421,7 @@ static void ebpf_parse_ip_list(void **out, char *ip)
                 ipv4_convert.s_addr = ipv4_test;
                 char ipv4_msg[INET_ADDRSTRLEN];
                 if(inet_ntop(AF_INET, &ipv4_convert, ipv4_msg, INET_ADDRSTRLEN))
-                    info("The network value of CIDR %s was updated for %s .", ipdup, ipv4_msg);
+                    netdata_log_info("The network value of CIDR %s was updated for %s .", ipdup, ipv4_msg);
             }
         } else { // Range
             select = ip2nl(first.addr8, ip, AF_INET, ipdup);
@@ -3413,7 +3434,7 @@ static void ebpf_parse_ip_list(void **out, char *ip)
         }
 
         if (htonl(first.addr32[0]) > htonl(last.addr32[0])) {
-            info("The specified range %s is invalid, the second address is smallest than the first, it will be ignored.",
+            netdata_log_info("The specified range %s is invalid, the second address is smallest than the first, it will be ignored.",
                  ipdup);
             goto cleanipdup;
         }
@@ -3427,7 +3448,7 @@ static void ebpf_parse_ip_list(void **out, char *ip)
         } else if (*end == '-') {
             *end++ = 0x00;
             if (*end == '!') {
-                info("The exclusion cannot be in the second part of the range %s, it will be ignored.", ipdup);
+                netdata_log_info("The exclusion cannot be in the second part of the range %s, it will be ignored.", ipdup);
                 goto cleanipdup;
             }
 
@@ -3441,13 +3462,13 @@ static void ebpf_parse_ip_list(void **out, char *ip)
         } else { // CIDR
             *end++ = 0x00;
             if (*end == '!') {
-                info("The exclusion cannot be in the second part of the range %s, it will be ignored.", ipdup);
+                netdata_log_info("The exclusion cannot be in the second part of the range %s, it will be ignored.", ipdup);
                 goto cleanipdup;
             }
 
             select = str2i(end);
             if (select < 0 || select > 128) {
-                info("The CIDR %s is not valid, the address %s will be ignored.", end, ip);
+                netdata_log_info("The CIDR %s is not valid, the address %s will be ignored.", end, ip);
                 goto cleanipdup;
             }
 
@@ -3469,14 +3490,14 @@ static void ebpf_parse_ip_list(void **out, char *ip)
 
                 char ipv6_msg[INET6_ADDRSTRLEN];
                 if(inet_ntop(AF_INET6, &ipv6_convert, ipv6_msg, INET6_ADDRSTRLEN))
-                    info("The network value of CIDR %s was updated for %s .", ipdup, ipv6_msg);
+                    netdata_log_info("The network value of CIDR %s was updated for %s .", ipdup, ipv6_msg);
             }
         }
 
         if ((be64toh(*(uint64_t *)&first.addr32[2]) > be64toh(*(uint64_t *)&last.addr32[2]) &&
              !memcmp(first.addr32, last.addr32, 2*sizeof(uint32_t))) ||
             (be64toh(*(uint64_t *)&first.addr32) > be64toh(*(uint64_t *)&last.addr32)) ) {
-            info("The specified range %s is invalid, the second address is smallest than the first, it will be ignored.",
+            netdata_log_info("The specified range %s is invalid, the second address is smallest than the first, it will be ignored.",
                  ipdup);
             goto cleanipdup;
         }
@@ -3580,7 +3601,7 @@ static void parse_port_list(void **out, char *range)
     if (likely(*end)) {
         *end++ = '\0';
         if (*end == '!') {
-            info("The exclusion cannot be in the second part of the range, the range %s will be ignored.", copied);
+            netdata_log_info("The exclusion cannot be in the second part of the range, the range %s will be ignored.", copied);
             freez(copied);
             return;
         }
@@ -3591,7 +3612,7 @@ static void parse_port_list(void **out, char *range)
 
     first = str2i((const char *)range);
     if (first < NETDATA_MINIMUM_PORT_VALUE || first > NETDATA_MAXIMUM_PORT_VALUE) {
-        info("The first port %d of the range \"%s\" is invalid and it will be ignored!", first, copied);
+        netdata_log_info("The first port %d of the range \"%s\" is invalid and it will be ignored!", first, copied);
         freez(copied);
         return;
     }
@@ -3600,13 +3621,13 @@ static void parse_port_list(void **out, char *range)
         last = first;
 
     if (last < NETDATA_MINIMUM_PORT_VALUE || last > NETDATA_MAXIMUM_PORT_VALUE) {
-        info("The second port %d of the range \"%s\" is invalid and the whole range will be ignored!", last, copied);
+        netdata_log_info("The second port %d of the range \"%s\" is invalid and the whole range will be ignored!", last, copied);
         freez(copied);
         return;
     }
 
     if (first > last) {
-        info("The specified order %s is wrong, the smallest value is always the first, it will be ignored!", copied);
+        netdata_log_info("The specified order %s is wrong, the smallest value is always the first, it will be ignored!", copied);
         freez(copied);
         return;
     }
@@ -3639,14 +3660,14 @@ static void read_max_dimension(struct config *cfg)
                                         EBPF_MAXIMUM_DIMENSIONS,
                                         NETDATA_NV_CAP_VALUE);
     if (maxdim < 0) {
-        error("'maximum dimensions = %d' must be a positive number, Netdata will change for default value %ld.",
+        netdata_log_error("'maximum dimensions = %d' must be a positive number, Netdata will change for default value %ld.",
               maxdim, NETDATA_NV_CAP_VALUE);
         maxdim = NETDATA_NV_CAP_VALUE;
     }
 
     maxdim /= 2;
     if (!maxdim) {
-        info("The number of dimensions is too small (%u), we are setting it to minimum 2", network_viewer_opt.max_dim);
+        netdata_log_info("The number of dimensions is too small (%u), we are setting it to minimum 2", network_viewer_opt.max_dim);
         network_viewer_opt.max_dim = 1;
         return;
     }
@@ -3714,7 +3735,7 @@ static void link_hostname(ebpf_network_viewer_hostname_list_t **out, ebpf_networ
         ebpf_network_viewer_hostname_list_t *move = *out;
         for (; move->next ; move = move->next ) {
             if (move->hash == in->hash && !strcmp(move->value, in->value)) {
-                info("The hostname %s was already inserted, it will be ignored.", in->value);
+                netdata_log_info("The hostname %s was already inserted, it will be ignored.", in->value);
                 freez(in->value);
                 simple_pattern_free(in->value_pattern);
                 freez(in);
@@ -3727,7 +3748,7 @@ static void link_hostname(ebpf_network_viewer_hostname_list_t **out, ebpf_networ
         *out = in;
     }
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("Adding value %s to %s hostname list used on network viewer",
+    netdata_log_info("Adding value %s to %s hostname list used on network viewer",
          in->value,
          (*out == network_viewer_opt.included_hostnames)?"included":"excluded");
 #endif
@@ -3806,7 +3827,7 @@ void parse_network_viewer_section(struct config *cfg)
         value = appconfig_get(cfg, EBPF_NETWORK_VIEWER_SECTION, EBPF_CONFIG_HOSTNAMES, NULL);
         link_hostnames(value);
     } else {
-        info("Name resolution is disabled, collector will not parser \"hostnames\" list.");
+        netdata_log_info("Name resolution is disabled, collector will not parser \"hostnames\" list.");
     }
 
     value = appconfig_get(cfg, EBPF_NETWORK_VIEWER_SECTION,
@@ -3827,7 +3848,7 @@ static void link_dimension_name(char *port, uint32_t hash, char *value)
 {
     int test = str2i(port);
     if (test < NETDATA_MINIMUM_PORT_VALUE || test > NETDATA_MAXIMUM_PORT_VALUE){
-        error("The dimension given (%s = %s) has an invalid value and it will be ignored.", port, value);
+        netdata_log_error("The dimension given (%s = %s) has an invalid value and it will be ignored.", port, value);
         return;
     }
 
@@ -3845,7 +3866,7 @@ static void link_dimension_name(char *port, uint32_t hash, char *value)
     } else {
         for (; names->next; names = names->next) {
             if (names->port == w->port) {
-                info("Duplicated definition for a service, the name %s will be ignored. ", names->name);
+                netdata_log_info("Duplicated definition for a service, the name %s will be ignored. ", names->name);
                 freez(names->name);
                 names->name = w->name;
                 names->hash = w->hash;
@@ -3857,7 +3878,7 @@ static void link_dimension_name(char *port, uint32_t hash, char *value)
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("Adding values %s( %u) to dimension name list used on network viewer", w->name, htons(w->port));
+    netdata_log_info("Adding values %s( %u) to dimension name list used on network viewer", w->name, htons(w->port));
 #endif
 }
 
@@ -3950,7 +3971,7 @@ static int ebpf_socket_load_bpf(ebpf_module_t *em)
 #endif
 
     if (ret) {
-        error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
+        netdata_log_error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->thread_name);
     }
 
     return ret;
@@ -3975,7 +3996,7 @@ void *ebpf_socket_thread(void *ptr)
     parse_table_size_options(&socket_config);
 
     if (pthread_mutex_init(&nv_mutex, NULL)) {
-        error("Cannot initialize local mutex");
+        netdata_log_error("Cannot initialize local mutex");
         goto endsocket;
     }
 
@@ -4015,11 +4036,11 @@ void *ebpf_socket_thread(void *ptr)
     ebpf_create_global_charts(em);
 
     ebpf_update_stats(&plugin_statistics, em);
-    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
 
 #ifdef NETDATA_DEV_MODE
     if (ebpf_aral_socket_pid)
-        ebpf_statistic_create_aral_chart(NETDATA_EBPF_SOCKET_ARAL_NAME, em);
+        socket_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_SOCKET_ARAL_NAME, em);
 #endif
 
     pthread_mutex_unlock(&lock);

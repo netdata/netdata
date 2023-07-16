@@ -1,0 +1,121 @@
+meta:
+  plugin_name: python.d.plugin
+  module_name: rethinkdbs
+  alternative_monitored_instances: []
+  monitored_instance:
+    name: python.d rethinkdbs
+    link: ''
+    categories: []
+    icon_filename: ''
+  related_resources:
+    integrations:
+      list: []
+  info_provided_to_referring_integrations:
+    description: ''
+  keywords: []
+  most_popular: false
+overview:
+  data_collection:
+    metrics_description: ''
+    method_description: ''
+  supported_platforms:
+    include: []
+    exclude: []
+  multi-instance: true
+  additional_permissions:
+    description: ''
+  default_behavior:
+    auto_detection:
+      description: ''
+    limits:
+      description: ''
+    performance_impact:
+      description: ''
+setup:
+  prerequisites:
+    list: []
+  configuration:
+    file:
+      name: ''
+      description: ''
+    options:
+      description: ''
+      folding:
+        title: ''
+        enabled: true
+      list: []
+    examples:
+      folding:
+        enabled: true
+        title: ''
+      list: []
+troubleshooting:
+  problems:
+    list: []
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: rethinkdb.cluster_connected_servers
+          description: Connected Servers
+          unit: "servers"
+          chart_type: stacked
+          dimensions:
+            - name: connected
+            - name: missing
+        - name: rethinkdb.cluster_clients_active
+          description: Active Clients
+          unit: "clients"
+          chart_type: line
+          dimensions:
+            - name: active
+        - name: rethinkdb.cluster_queries
+          description: Queries
+          unit: "queries/s"
+          chart_type: line
+          dimensions:
+            - name: queries
+        - name: rethinkdb.cluster_documents
+          description: Documents
+          unit: "documents/s"
+          chart_type: line
+          dimensions:
+            - name: reads
+            - name: writes
+    - name: database server
+      description: ""
+      labels: []
+      metrics:
+        - name: rethinkdb.client_connections
+          description: Client Connections
+          unit: "connections"
+          chart_type: line
+          dimensions:
+            - name: connections
+        - name: rethinkdb.clients_active
+          description: Active Clients
+          unit: "clients"
+          chart_type: line
+          dimensions:
+            - name: active
+        - name: rethinkdb.queries
+          description: Queries
+          unit: "queries/s"
+          chart_type: line
+          dimensions:
+            - name: queries
+        - name: rethinkdb.documents
+          description: Documents
+          unit: "documents/s"
+          chart_type: line
+          dimensions:
+            - name: reads
+            - name: writes

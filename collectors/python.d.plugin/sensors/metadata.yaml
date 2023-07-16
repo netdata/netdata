@@ -1,0 +1,108 @@
+meta:
+  plugin_name: python.d.plugin
+  module_name: sensors
+  alternative_monitored_instances: []
+  monitored_instance:
+    name: python.d sensors
+    link: ''
+    categories: []
+    icon_filename: ''
+  related_resources:
+    integrations:
+      list: []
+  info_provided_to_referring_integrations:
+    description: ''
+  keywords: []
+  most_popular: false
+overview:
+  data_collection:
+    metrics_description: ''
+    method_description: ''
+  supported_platforms:
+    include: []
+    exclude: []
+  multi-instance: true
+  additional_permissions:
+    description: ''
+  default_behavior:
+    auto_detection:
+      description: ''
+    limits:
+      description: ''
+    performance_impact:
+      description: ''
+setup:
+  prerequisites:
+    list: []
+  configuration:
+    file:
+      name: ''
+      description: ''
+    options:
+      description: ''
+      folding:
+        title: ''
+        enabled: true
+      list: []
+    examples:
+      folding:
+        enabled: true
+        title: ''
+      list: []
+troubleshooting:
+  problems:
+    list: []
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: chip
+      description: ""
+      labels: []
+      metrics:
+        - name: sensors.temperature
+          description: Temperature
+          unit: "Celsius"
+          chart_type: line
+          dimensions:
+            - name: a dimension per sensor
+        - name: sensors.voltage
+          description: Voltage
+          unit: "Volts"
+          chart_type: line
+          dimensions:
+            - name: a dimension per sensor
+        - name: sensors.current
+          description: Current
+          unit: "Ampere"
+          chart_type: line
+          dimensions:
+            - name: a dimension per sensor
+        - name: sensors.power
+          description: Power
+          unit: "Watt"
+          chart_type: line
+          dimensions:
+            - name: a dimension per sensor
+        - name: sensors.fan
+          description: Fans speed
+          unit: "Rotations/min"
+          chart_type: line
+          dimensions:
+            - name: a dimension per sensor
+        - name: sensors.energy
+          description: Energy
+          unit: "Joule"
+          chart_type: line
+          dimensions:
+            - name: a dimension per sensor
+        - name: sensors.humidity
+          description: Humidity
+          unit: "Percent"
+          chart_type: line
+          dimensions:
+            - name: a dimension per sensor

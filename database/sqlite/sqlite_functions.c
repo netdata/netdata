@@ -3,7 +3,7 @@
 #include "sqlite_functions.h"
 #include "sqlite_db_migration.h"
 
-#define DB_METADATA_VERSION 9
+#define DB_METADATA_VERSION 10
 
 const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS host(host_id BLOB PRIMARY KEY, hostname TEXT NOT NULL, "
@@ -32,7 +32,7 @@ const char *database_config[] = {
     "every text, units text, calc text, families text, plugin text, module text, charts text, green text, "
     "red text, warn text, crit text, exec text, to_key text, info text, delay text, options text, "
     "repeat text, host_labels text, p_db_lookup_dimensions text, p_db_lookup_method text, p_db_lookup_options int, "
-    "p_db_lookup_after int, p_db_lookup_before int, p_update_every int, source text);",
+    "p_db_lookup_after int, p_db_lookup_before int, p_update_every int, source text, chart_labels text);",
 
     "CREATE INDEX IF NOT EXISTS alert_hash_index ON alert_hash (hash_id);",
 
@@ -49,7 +49,6 @@ const char *database_config[] = {
     "config_hash_id blob, name text, chart text, family text, recipient text, units text, exec text, "
     "chart_context text, last_transition_id blob, UNIQUE (host_id, alarm_id)) ;",
 
-    //TODO indexes
     "CREATE INDEX IF NOT EXISTS health_log_ind_1 ON health_log (host_id);",
 
     "CREATE TABLE IF NOT EXISTS health_log_detail (health_log_id int, unique_id int, alarm_id int, alarm_event_id int, "
@@ -62,7 +61,6 @@ const char *database_config[] = {
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_2 ON health_log_detail (global_id);",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_3 ON health_log_detail (transition_id);",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_4 ON health_log_detail (health_log_id);",
-    //TODO more indexes
 
     NULL
 };
@@ -149,9 +147,9 @@ static void add_stmt_to_list(sqlite3_stmt *res)
 
     if (unlikely(!res)) {
         if (idx)
-            info("Finilizing %d statements", idx);
+            netdata_log_info("Finilizing %d statements", idx);
         else
-            info("No statements pending to finalize");
+            netdata_log_info("No statements pending to finalize");
         while (idx > 0) {
             int rc;
             rc = sqlite3_finalize(statements[--idx]);
@@ -169,7 +167,7 @@ static void release_statement(void *statement)
 {
     int rc;
 #ifdef NETDATA_DEV_MODE
-    info("Thread %d: Cleaning prepared statement on %p", gettid(), statement);
+    netdata_log_info("Thread %d: Cleaning prepared statement on %p", gettid(), statement);
 #endif
     if (unlikely(rc = sqlite3_finalize((sqlite3_stmt *) statement) != SQLITE_OK))
         error_report("Failed to finalize statement, rc = %d", rc);
@@ -196,7 +194,7 @@ int prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **state
         if (likely(key)) {
             ret = pthread_setspecific(*key, *statement);
 #ifdef NETDATA_DEV_MODE
-            info("Thread %d: Using key %u on statement %p", gettid(), keys_used, *statement);
+            netdata_log_info("Thread %d: Using key %u on statement %p", gettid(), keys_used, *statement);
 #endif
         }
         if (ret)
@@ -210,7 +208,7 @@ static int check_table_integrity_cb(void *data, int argc, char **argv, char **co
     int *status = data;
     UNUSED(argc);
     UNUSED(column);
-    info("---> %s", argv[0]);
+    netdata_log_info("---> %s", argv[0]);
     *status = (strcmp(argv[0], "ok") != 0);
     return 0;
 }
@@ -223,11 +221,11 @@ static int check_table_integrity(char *table)
     char wstr[255];
 
     if (table) {
-        info("Checking table %s", table);
+        netdata_log_info("Checking table %s", table);
         snprintfz(wstr, 254, "PRAGMA integrity_check(%s);", table);
     }
     else {
-        info("Checking entire database");
+        netdata_log_info("Checking entire database");
         strcpy(wstr,"PRAGMA integrity_check;");
     }
 
@@ -261,9 +259,9 @@ static void rebuild_chart()
 {
     int rc;
     char *err_msg = NULL;
-    info("Rebuilding chart table");
+    netdata_log_info("Rebuilding chart table");
     for (int i = 0; rebuild_chart_commands[i]; i++) {
-        info("Executing %s", rebuild_chart_commands[i]);
+        netdata_log_info("Executing %s", rebuild_chart_commands[i]);
         rc = sqlite3_exec_monitored(db_meta, rebuild_chart_commands[i], 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
             error_report("SQLite error during database setup, rc = %d (%s)", rc, err_msg);
@@ -293,9 +291,9 @@ void rebuild_dimension()
     int rc;
     char *err_msg = NULL;
 
-    info("Rebuilding dimension table");
+    netdata_log_info("Rebuilding dimension table");
     for (int i = 0; rebuild_dimension_commands[i]; i++) {
-        info("Executing %s", rebuild_dimension_commands[i]);
+        netdata_log_info("Executing %s", rebuild_dimension_commands[i]);
         rc = sqlite3_exec_monitored(db_meta, rebuild_dimension_commands[i], 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
             error_report("SQLite error during database setup, rc = %d (%s)", rc, err_msg);
@@ -307,11 +305,11 @@ void rebuild_dimension()
 
 static int attempt_database_fix()
 {
-    info("Closing database and attempting to fix it");
+    netdata_log_info("Closing database and attempting to fix it");
     int rc = sqlite3_close(db_meta);
     if (rc != SQLITE_OK)
         error_report("Failed to close database, rc = %d", rc);
-    info("Attempting to fix database");
+    netdata_log_info("Attempting to fix database");
     db_meta = NULL;
     return sql_init_database(DB_CHECK_FIX_DB | DB_CHECK_CONT, 0);
 }
@@ -321,7 +319,7 @@ int init_database_batch(sqlite3 *database, int rebuild, int init_type, const cha
     int rc;
     char *err_msg = NULL;
     for (int i = 0; batch[i]; i++) {
-        debug(D_METADATALOG, "Executing %s", batch[i]);
+        netdata_log_debug(D_METADATALOG, "Executing %s", batch[i]);
         rc = sqlite3_exec_monitored(database, batch[i], 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
             error_report("SQLite error during database %s, rc = %d (%s)", init_type ? "cleanup" : "setup", rc, err_msg);
@@ -408,7 +406,7 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     if (rebuild & (DB_CHECK_INTEGRITY | DB_CHECK_FIX_DB)) {
         int errors_detected = 0;
         if (!(rebuild & DB_CHECK_CONT))
-            info("Running database check on %s", sqlite_database);
+            netdata_log_info("Running database check on %s", sqlite_database);
 
         if (check_table_integrity("chart")) {
             errors_detected++;
@@ -434,7 +432,7 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
 
     if (rebuild & DB_CHECK_RECLAIM_SPACE) {
         if (!(rebuild & DB_CHECK_CONT))
-            info("Reclaiming space of %s", sqlite_database);
+            netdata_log_info("Reclaiming space of %s", sqlite_database);
         rc = sqlite3_exec_monitored(db_meta, "VACUUM;", 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
             error_report("Failed to execute VACUUM rc = %d (%s)", rc, err_msg);
@@ -445,7 +443,7 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     if (rebuild && !(rebuild & DB_CHECK_CONT))
         return 1;
 
-    info("SQLite database %s initialization", sqlite_database);
+    netdata_log_info("SQLite database %s initialization", sqlite_database);
 
     char buf[1024 + 1] = "";
     const char *list[2] = { buf, NULL };
@@ -507,7 +505,7 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     if (init_database_batch(db_meta, rebuild, 0, &database_cleanup[0]))
         return 1;
 
-    info("SQLite database initialization completed");
+    netdata_log_info("SQLite database initialization completed");
 
     initialize_thread_key_pool();
 
@@ -524,7 +522,7 @@ void sql_close_database(void)
     if (unlikely(!db_meta))
         return;
 
-    info("Closing SQLite database");
+    netdata_log_info("Closing SQLite database");
 
     add_stmt_to_list(NULL);
 
@@ -825,7 +823,7 @@ struct node_instance_list *get_node_list(void)
             uuid_unparse_lower(*host_id, host_guid);
             RRDHOST *host = rrdhost_find_by_guid(host_guid);
             if (rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)) {
-                info("ACLK: 'host:%s' skipping get node list because context is initializing", rrdhost_hostname(host));
+                netdata_log_info("ACLK: 'host:%s' skipping get node list because context is initializing", rrdhost_hostname(host));
                 continue;
             }
             uuid_copy(node_list[row].host_id, *host_id);

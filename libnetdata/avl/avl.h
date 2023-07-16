@@ -24,6 +24,11 @@ typedef struct avl_element {
     signed char avl_balance;       /* Balance factor. */
 } avl_t;
 
+typedef struct __attribute__((packed)) avl_element_packed {
+    struct avl_element *avl_link[2];  /* Subtrees. */
+    signed char avl_balance;       /* Balance factor. */
+} avl_t_packed;
+
 /* An AVL tree */
 typedef struct avl_tree_type {
     avl_t *root;

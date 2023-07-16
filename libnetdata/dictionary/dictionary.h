@@ -310,7 +310,6 @@ void  dictionary_foreach_unlock(DICTFE *dfe);
 size_t dictionary_version(DICTIONARY *dict);
 size_t dictionary_entries(DICTIONARY *dict);
 size_t dictionary_referenced_items(DICTIONARY *dict);
-long int dictionary_stats_for_registry(DICTIONARY *dict);
 
 // for all cases that the caller does not provide a stats structure, this is where they are accumulated.
 extern struct dictionary_stats dictionary_stats_category_other;

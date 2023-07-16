@@ -6,7 +6,7 @@
 #define JSON_DATES_TIMESTAMP 2
 
 void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
-    //info("RRD2JSON(): %s: BEGIN", r->st->id);
+    //netdata_log_info("RRD2JSON(): %s: BEGIN", r->st->id);
     int row_annotations = 0, dates, dates_with_new = 0;
     char kq[2] = "",                        // key quote
             sq[2] = "",                     // string quote
@@ -159,7 +159,8 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
         if(dates == JSON_DATES_JS) {
             // generate the local date time
             struct tm tmbuf, *tm = localtime_r(&now, &tmbuf);
-            if(!tm) { error("localtime_r() failed."); continue; }
+            if(!tm) {
+                netdata_log_error("localtime_r() failed."); continue; }
 
             if(likely(i != start)) buffer_fast_strcat(wb, ",\n", 2);
             buffer_fast_strcat(wb, pre_date, pre_date_len);
@@ -241,7 +242,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
     }
 
     buffer_strcat(wb, finish);
-    //info("RRD2JSON(): %s: END", r->st->id);
+    //netdata_log_info("RRD2JSON(): %s: END", r->st->id);
 }
 
 void rrdr2json_v2(RRDR *r, BUFFER *wb) {

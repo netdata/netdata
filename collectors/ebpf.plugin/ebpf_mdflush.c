@@ -31,12 +31,123 @@ static ebpf_local_maps_t mdflush_maps[] = {
     }
 };
 
+netdata_ebpf_targets_t mdflush_targets[] = { {.name = "md_flush_request", .mode = EBPF_LOAD_TRAMPOLINE},
+                                           {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+
+
 // store for "published" data from the reader thread, which the collector
 // thread will write to netdata agent.
 static avl_tree_lock mdflush_pub;
 
 // tmp store for mdflush values we get from a per-CPU eBPF map.
 static mdflush_ebpf_val_t *mdflush_ebpf_vals = NULL;
+
+#ifdef LIBBPF_MAJOR_VERSION
+/**
+ * Disable probes
+ *
+ * Disable probes to use trampolines.
+ *
+ * @param obj the loaded object structure.
+ */
+static inline void ebpf_disable_probes(struct mdflush_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_md_flush_request_kprobe, false);
+}
+
+/**
+ * Disable trampolines
+ *
+ * Disable trampoliness to use probes.
+ *
+ * @param obj the loaded object structure.
+ */
+static inline void ebpf_disable_trampoline(struct mdflush_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_md_flush_request_fentry, false);
+}
+
+/**
+ * Set Trampoline
+ *
+ * Define target to attach trampoline
+ *
+ * @param obj the loaded object structure.
+ */
+static void ebpf_set_trampoline_target(struct mdflush_bpf *obj)
+{
+    bpf_program__set_attach_target(obj->progs.netdata_md_flush_request_fentry, 0,
+                                   mdflush_targets[NETDATA_MD_FLUSH_REQUEST].name);
+}
+
+/**
+ * Load probe
+ *
+ * Load probe to monitor internal function.
+ *
+ * @param obj the loaded object structure.
+ */
+static inline int ebpf_load_probes(struct mdflush_bpf *obj)
+{
+    obj->links.netdata_md_flush_request_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_md_flush_request_kprobe,
+                                                                            false,
+                                                                            mdflush_targets[NETDATA_MD_FLUSH_REQUEST].name);
+    return libbpf_get_error(obj->links.netdata_md_flush_request_kprobe);
+}
+
+/**
+ * Load and Attach
+ *
+ * Load and attach bpf codes according user selection.
+ *
+ * @param obj the loaded object structure.
+ * @param em the structure with configuration
+ */
+static inline int ebpf_mdflush_load_and_attach(struct mdflush_bpf *obj, ebpf_module_t *em)
+{
+    int mode = em->targets[NETDATA_MD_FLUSH_REQUEST].mode;
+    if (mode == EBPF_LOAD_TRAMPOLINE) { // trampoline
+        ebpf_disable_probes(obj);
+
+        ebpf_set_trampoline_target(obj);
+    } else // kprobe
+        ebpf_disable_trampoline(obj);
+
+    int ret = mdflush_bpf__load(obj);
+    if (ret) {
+        fprintf(stderr, "failed to load BPF object: %d\n", ret);
+        return -1;
+    }
+
+    if (mode == EBPF_LOAD_TRAMPOLINE)
+        ret = mdflush_bpf__attach(obj);
+    else
+        ret = ebpf_load_probes(obj);
+
+    return ret;
+}
+
+#endif
+
+/**
+ * Obsolete global
+ *
+ * Obsolete global charts created by thread.
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
+static void ebpf_obsolete_mdflush_global(ebpf_module_t *em)
+{
+    ebpf_write_chart_obsolete("mdstat",
+                              "mdstat_flush",
+                              "MD flushes",
+                              "flushes",
+                              "flush (eBPF)",
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                              NULL,
+                              NETDATA_CHART_PRIO_MDSTAT_FLUSH,
+                              em->update_every);
+}
 
 /**
  * MDflush exit
@@ -49,11 +160,26 @@ static void mdflush_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    if (em->objects)
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        pthread_mutex_lock(&lock);
+
+        ebpf_obsolete_mdflush_global(em);
+
+        pthread_mutex_unlock(&lock);
+        fflush(stdout);
+    }
+
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
+
+    if (em->objects) {
         ebpf_unload_legacy_code(em->objects, em->probe_links);
+        em->objects = NULL;
+        em->probe_links = NULL;
+    }
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_update_stats(&plugin_statistics, em);
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -150,7 +276,7 @@ static void mdflush_read_count_map(int maps_per_core)
         if (v_is_new) {
             avl_t *check = avl_insert_lock(&mdflush_pub, (avl_t *)v);
             if (check != (avl_t *)v) {
-                error("Internal error, cannot insert the AVL tree.");
+                netdata_log_error("Internal error, cannot insert the AVL tree.");
             }
         }
     }
@@ -209,7 +335,7 @@ static void mdflush_collector(ebpf_module_t *em)
     pthread_mutex_lock(&lock);
     mdflush_create_charts(update_every);
     ebpf_update_stats(&plugin_statistics, em);
-    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
     pthread_mutex_unlock(&lock);
 
     // loop and read from published data until ebpf plugin is closed.
@@ -217,7 +343,9 @@ static void mdflush_collector(ebpf_module_t *em)
     heartbeat_init(&hb);
     int counter = update_every - 1;
     int maps_per_core = em->maps_per_core;
-    while (!ebpf_exit_plugin) {
+    uint32_t running_time = 0;
+    uint32_t lifetime = em->lifetime;
+    while (!ebpf_exit_plugin && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
 
         if (ebpf_exit_plugin || ++counter != update_every)
@@ -232,8 +360,60 @@ static void mdflush_collector(ebpf_module_t *em)
         write_end_chart();
 
         pthread_mutex_unlock(&lock);
+
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (running_time && !em->running_time)
+            running_time = update_every;
+        else
+            running_time += update_every;
+
+        em->running_time = running_time;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
+
+/*
+ * Load BPF
+ *
+ * Load BPF files.
+ *
+ * @param em the structure with configuration
+ *
+ * @return It returns 0 on success and -1 otherwise.
+ */
+static int ebpf_mdflush_load_bpf(ebpf_module_t *em)
+{
+    int ret = 0;
+    if (em->load & EBPF_LOAD_LEGACY) {
+        em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+        if (!em->probe_links) {
+            ret = -1;
+        }
+    }
+#ifdef LIBBPF_MAJOR_VERSION
+    else {
+        mdflush_bpf_obj = mdflush_bpf__open();
+        if (!mdflush_bpf_obj)
+            ret = -1;
+        else {
+            ret = ebpf_mdflush_load_and_attach(mdflush_bpf_obj, em);
+            if (ret && em->targets[NETDATA_MD_FLUSH_REQUEST].mode == EBPF_LOAD_TRAMPOLINE) {
+                mdflush_bpf__destroy(mdflush_bpf_obj);
+                mdflush_bpf_obj = mdflush_bpf__open();
+                if (!mdflush_bpf_obj)
+                    ret = -1;
+                else {
+                    em->targets[NETDATA_MD_FLUSH_REQUEST].mode = EBPF_LOAD_PROBE;
+                    ret = ebpf_mdflush_load_and_attach(mdflush_bpf_obj, em);
+                }
+            }
+        }
+    }
+#endif
+
+    return ret;
+}
+
 
 /**
  * mdflush thread.
@@ -250,15 +430,16 @@ void *ebpf_mdflush_thread(void *ptr)
 
     char *md_flush_request = ebpf_find_symbol("md_flush_request");
     if (!md_flush_request) {
-        error("Cannot monitor MD devices, because md is not loaded.");
+        netdata_log_error("Cannot monitor MD devices, because md is not loaded.");
         goto endmdflush;
     }
 
 #ifdef LIBBPF_MAJOR_VERSION
     ebpf_define_map_type(em->maps, em->maps_per_core, running_on_kernel);
+    ebpf_adjust_thread_load(em, default_btf);
 #endif
-    em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
-    if (!em->probe_links) {
+    if (ebpf_mdflush_load_bpf(em)) {
+        netdata_log_error("Cannot load eBPF software.");
         goto endmdflush;
     }
 

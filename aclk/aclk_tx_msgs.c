@@ -32,7 +32,7 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
     const char *topic = aclk_get_topic(subtopic);
 
     if (unlikely(!topic)) {
-        error("Couldn't get topic. Aborting message send.");
+        netdata_log_error("Couldn't get topic. Aborting message send.");
         return 0;
     }
 
@@ -61,7 +61,7 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
     int len;
 
     if (unlikely(!topic || topic[0] != '/')) {
-        error ("Full topic required!");
+        netdata_log_error("Full topic required!");
         json_object_put(msg);
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
@@ -172,7 +172,7 @@ void aclk_http_msg_v2_err(mqtt_wss_client client, const char *topic, const char 
     json_object_object_add(msg, "error-description", tmp);
 
     if (aclk_send_message_with_bin_payload(client, msg, topic, payload, payload_len)) {
-        error("Failed to send cancellation message for http reply %zu %s", payload_len, payload);
+        netdata_log_error("Failed to send cancellation message for http reply %zu %s", payload_len, payload);
     }
 }
 
@@ -220,7 +220,7 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
 
     rrdhost_aclk_state_lock(localhost);
     if (unlikely(!localhost->aclk_state.claimed_id)) {
-        error("Internal error. Should not come here if not claimed");
+        netdata_log_error("Internal error. Should not come here if not claimed");
         rrdhost_aclk_state_unlock(localhost);
         return 0;
     }
@@ -233,7 +233,7 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
     rrdhost_aclk_state_unlock(localhost);
 
     if (!msg) {
-        error("Error generating agent::v1::UpdateAgentConnection payload");
+        netdata_log_error("Error generating agent::v1::UpdateAgentConnection payload");
         return 0;
     }
 
@@ -255,7 +255,7 @@ char *aclk_generate_lwt(size_t *size) {
 
     rrdhost_aclk_state_lock(localhost);
     if (unlikely(!localhost->aclk_state.claimed_id)) {
-        error("Internal error. Should not come here if not claimed");
+        netdata_log_error("Internal error. Should not come here if not claimed");
         rrdhost_aclk_state_unlock(localhost);
         return NULL;
     }
@@ -265,7 +265,7 @@ char *aclk_generate_lwt(size_t *size) {
     rrdhost_aclk_state_unlock(localhost);
 
     if (!msg)
-        error("Error generating agent::v1::UpdateAgentConnection payload for LWT");
+        netdata_log_error("Error generating agent::v1::UpdateAgentConnection payload for LWT");
 
     return msg;
 }

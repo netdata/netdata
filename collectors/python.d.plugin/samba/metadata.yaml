@@ -1,0 +1,123 @@
+meta:
+  plugin_name: python.d.plugin
+  module_name: samba
+  alternative_monitored_instances: []
+  monitored_instance:
+    name: python.d samba
+    link: ''
+    categories: []
+    icon_filename: ''
+  related_resources:
+    integrations:
+      list: []
+  info_provided_to_referring_integrations:
+    description: ''
+  keywords: []
+  most_popular: false
+overview:
+  data_collection:
+    metrics_description: ''
+    method_description: ''
+  supported_platforms:
+    include: []
+    exclude: []
+  multi-instance: true
+  additional_permissions:
+    description: ''
+  default_behavior:
+    auto_detection:
+      description: ''
+    limits:
+      description: ''
+    performance_impact:
+      description: ''
+setup:
+  prerequisites:
+    list: []
+  configuration:
+    file:
+      name: ''
+      description: ''
+    options:
+      description: ''
+      folding:
+        title: ''
+        enabled: true
+      list: []
+    examples:
+      folding:
+        enabled: true
+        title: ''
+      list: []
+troubleshooting:
+  problems:
+    list: []
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: syscall.rw
+          description: R/Ws
+          unit: "KiB/s"
+          chart_type: area
+          dimensions:
+            - name: sendfile
+            - name: recvfile
+        - name: smb2.rw
+          description: R/Ws
+          unit: "KiB/s"
+          chart_type: area
+          dimensions:
+            - name: readout
+            - name: writein
+            - name: readin
+            - name: writeout
+        - name: smb2.create_close
+          description: Create/Close
+          unit: "operations/s"
+          chart_type: line
+          dimensions:
+            - name: create
+            - name: close
+        - name: smb2.get_set_info
+          description: Info
+          unit: "operations/s"
+          chart_type: line
+          dimensions:
+            - name: getinfo
+            - name: setinfo
+        - name: smb2.find
+          description: Find
+          unit: "operations/s"
+          chart_type: line
+          dimensions:
+            - name: find
+        - name: smb2.notify
+          description: Notify
+          unit: "operations/s"
+          chart_type: line
+          dimensions:
+            - name: notify
+        - name: smb2.sm_counters
+          description: Lesser Ops
+          unit: "count"
+          chart_type: stacked
+          dimensions:
+            - name: tcon
+            - name: negprot
+            - name: tdis
+            - name: cancel
+            - name: logoff
+            - name: flush
+            - name: lock
+            - name: keepalive
+            - name: break
+            - name: sessetup

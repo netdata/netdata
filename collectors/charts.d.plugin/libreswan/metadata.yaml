@@ -1,0 +1,79 @@
+meta:
+  plugin_name: charts.d.plugin
+  module_name: libreswan
+  alternative_monitored_instances: []
+  monitored_instance:
+    name: charts.d libreswan
+    link: ''
+    categories: []
+    icon_filename: ''
+  related_resources:
+    integrations:
+      list: []
+  info_provided_to_referring_integrations:
+    description: ''
+  keywords: []
+  most_popular: false
+overview:
+  data_collection:
+    metrics_description: ''
+    method_description: ''
+  supported_platforms:
+    include: []
+    exclude: []
+  multi-instance: true
+  additional_permissions:
+    description: ''
+  default_behavior:
+    auto_detection:
+      description: ''
+    limits:
+      description: ''
+    performance_impact:
+      description: ''
+setup:
+  prerequisites:
+    list: []
+  configuration:
+    file:
+      name: ''
+      description: ''
+    options:
+      description: ''
+      folding:
+        title: ''
+        enabled: true
+      list: []
+    examples:
+      folding:
+        enabled: true
+        title: ''
+      list: []
+troubleshooting:
+  problems:
+    list: []
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: IPSEC tunnel
+      description: ""
+      labels: []
+      metrics:
+        - name: libreswan.net
+          description: LibreSWAN Tunnel ${name} Traffic
+          unit: "kilobits/s"
+          chart_type: area
+          dimensions:
+            - name: in
+            - name: out
+        - name: libreswan.uptime
+          description: LibreSWAN Tunnel ${name} Uptime
+          unit: "seconds"
+          chart_type: line
+          dimensions:
+            - name: uptime

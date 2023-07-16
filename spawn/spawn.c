@@ -219,7 +219,7 @@ int create_spawn_server(uv_loop_t *loop, uv_pipe_t *spawn_channel, uv_process_t 
 
     ret = uv_spawn(loop, process, &options); /* execute the netdata binary again as the netdata user */
     if (0 != ret) {
-        error("uv_spawn (process: \"%s\") (user: %s) failed (%s).", exepath, user, uv_strerror(ret));
+        netdata_log_error("uv_spawn (process: \"%s\") (user: %s) failed (%s).", exepath, user, uv_strerror(ret));
         fatal("Cannot start netdata without the spawn server.");
     }
 
@@ -235,14 +235,14 @@ void spawn_init(void)
     struct completion completion;
     int error;
 
-    info("Initializing spawn client.");
+    netdata_log_info("Initializing spawn client.");
 
     init_spawn_cmd_queue();
 
     completion_init(&completion);
     error = uv_thread_create(&thread, spawn_client, &completion);
     if (error) {
-        error("uv_thread_create(): %s", uv_strerror(error));
+        netdata_log_error("uv_thread_create(): %s", uv_strerror(error));
         goto after_error;
     }
     /* wait for spawn client thread to initialize */
@@ -253,7 +253,7 @@ void spawn_init(void)
     if (spawn_thread_error) {
         error = uv_thread_join(&thread);
         if (error) {
-            error("uv_thread_create(): %s", uv_strerror(error));
+            netdata_log_error("uv_thread_create(): %s", uv_strerror(error));
         }
         goto after_error;
     }
@@ -268,15 +268,15 @@ void spawn_init(void)
             char cmd[64];
             sprintf(cmd, "echo CONCURRENT_STRESS_TEST %d 1>&2", j * CONCURRENT_SPAWNS + i + 1);
             serial[i] = spawn_enq_cmd(cmd);
-            info("Queued command %s for spawning.", cmd);
+            netdata_log_info("Queued command %s for spawning.", cmd);
         }
         int exit_status;
         time_t exec_run_timestamp;
         for (int i = 0; i < CONCURRENT_SPAWNS; ++i) {
-            info("Started waiting for serial %llu exit status %d run timestamp %llu.", serial[i], exit_status,
+            netdata_log_info("Started waiting for serial %llu exit status %d run timestamp %llu.", serial[i], exit_status,
                  exec_run_timestamp);
             spawn_wait_cmd(serial[i], &exit_status, &exec_run_timestamp);
-            info("Finished waiting for serial %llu exit status %d run timestamp %llu.", serial[i], exit_status,
+            netdata_log_info("Finished waiting for serial %llu exit status %d run timestamp %llu.", serial[i], exit_status,
                  exec_run_timestamp);
         }
     }
@@ -285,5 +285,5 @@ void spawn_init(void)
     return;
 
     after_error:
-    error("Failed to initialize spawn service. The alarms notifications will not be spawned.");
+        netdata_log_error("Failed to initialize spawn service. The alarms notifications will not be spawned.");
 }

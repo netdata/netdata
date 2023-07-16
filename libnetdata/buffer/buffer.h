@@ -6,7 +6,7 @@
 #include "../string/utf8.h"
 #include "../libnetdata.h"
 
-#ifdef ENABLE_HTTPD
+#ifdef ENABLE_H2O
 #include "h2o/memory.h"
 #endif
 
@@ -61,6 +61,11 @@ typedef enum __attribute__ ((__packed__)) {
     CT_IMAGE_ICNS,
     CT_IMAGE_BMP,
     CT_PROMETHEUS,
+    CT_AUDIO_MPEG,
+    CT_AUDIO_OGG,
+    CT_VIDEO_MP4,
+    CT_APPLICATION_PDF,
+    CT_APPLICATION_ZIP,
 } HTTP_CONTENT_TYPE;
 
 typedef struct web_buffer {
@@ -133,7 +138,7 @@ void buffer_char_replace(BUFFER *wb, char from, char to);
 
 void buffer_print_sn_flags(BUFFER *wb, SN_FLAGS flags, bool send_anomaly_bit);
 
-#ifdef ENABLE_HTTPD
+#ifdef ENABLE_H2O
 h2o_iovec_t buffer_to_h2o_iovec(BUFFER *wb);
 #endif
 
@@ -757,7 +762,7 @@ static inline void buffer_json_member_add_uuid(BUFFER *wb, const char *key, uuid
     buffer_print_json_key(wb, key);
     buffer_fast_strcat(wb, ":", 1);
 
-    if(value) {
+    if(value && !uuid_is_null(*value)) {
         char uuid[GUID_LEN + 1];
         uuid_unparse_lower(*value, uuid);
         buffer_json_add_string_value(wb, uuid);

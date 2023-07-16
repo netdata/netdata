@@ -39,7 +39,10 @@
 #ifdef LIBBPF_MAJOR_VERSION // BTF code
 #include "includes/cachestat.skel.h"
 #include "includes/dc.skel.h"
+#include "includes/disk.skel.h"
 #include "includes/fd.skel.h"
+#include "includes/hardirq.skel.h"
+#include "includes/mdflush.skel.h"
 #include "includes/mount.skel.h"
 #include "includes/shm.skel.h"
 #include "includes/socket.skel.h"
@@ -48,8 +51,11 @@
 
 extern struct cachestat_bpf *cachestat_bpf_obj;
 extern struct dc_bpf *dc_bpf_obj;
+extern struct disk_bpf *disk_bpf_obj;
 extern struct fd_bpf *fd_bpf_obj;
+extern struct hardirq_bpf *hardirq_bpf_obj;
 extern struct mount_bpf *mount_bpf_obj;
+extern struct mdflush_bpf *mdflush_bpf_obj;
 extern struct shm_bpf *shm_bpf_obj;
 extern struct socket_bpf *socket_bpf_obj;
 extern struct swap_bpf *bpf_obj;
@@ -112,6 +118,7 @@ enum ebpf_main_index {
     EBPF_MODULE_OOMKILL_IDX,
     EBPF_MODULE_SHM_IDX,
     EBPF_MODULE_MDFLUSH_IDX,
+    EBPF_MODULE_FUNCTION_IDX,
     /* THREADS MUST BE INCLUDED BEFORE THIS COMMENT */
     EBPF_OPTION_ALL_CHARTS,
     EBPF_OPTION_VERSION,
@@ -157,6 +164,7 @@ typedef struct ebpf_tracepoint {
 
 // Statistics charts
 #define NETDATA_EBPF_THREADS "ebpf_threads"
+#define NETDATA_EBPF_LIFE_TIME "ebpf_life_time"
 #define NETDATA_EBPF_LOAD_METHOD "ebpf_load_methods"
 #define NETDATA_EBPF_KERNEL_MEMORY "ebpf_kernel_memory"
 #define NETDATA_EBPF_HASH_TABLES_LOADED "ebpf_hash_tables_count"

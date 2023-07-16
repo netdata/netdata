@@ -10,7 +10,7 @@ const char* get_release_channel() {
     if (use_stable == -1) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/.environment", netdata_configured_user_config_dir);
-        procfile *ff = procfile_open(filename, "=", PROCFILE_FLAG_ERROR_ON_ERROR_LOG);
+        procfile *ff = procfile_open(filename, "=", PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
         if (ff) {
             procfile_set_quotes(ff, "'\"");
             ff = procfile_readall(ff);

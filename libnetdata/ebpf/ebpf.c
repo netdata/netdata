@@ -44,7 +44,6 @@ static int clean_kprobe_event(FILE *out, char *filename, char *father_pid, netda
 
 int clean_kprobe_events(FILE *out, int pid, netdata_ebpf_events_t *ptr)
 {
-    debug(D_EXIT, "Cleaning parent process events.");
     char filename[FILENAME_MAX + 1];
     snprintf(filename, FILENAME_MAX, "%s%s", NETDATA_DEBUGFS, "kprobe_events");
 
@@ -183,7 +182,7 @@ static int kernel_is_rejected()
         if (read_file("/proc/version", version_string, VERSION_STRING_LEN)) {
             struct utsname uname_buf;
             if (!uname(&uname_buf)) {
-                info("Cannot check kernel version");
+                netdata_log_info("Cannot check kernel version");
                 return 0;
             }
             version_string_len =
@@ -230,7 +229,7 @@ static int kernel_is_rejected()
     while ((reject_string_len = getline(&reject_string, &buf_len, kernel_reject_list) - 1) > 0) {
         if (version_string_len >= reject_string_len) {
             if (!strncmp(version_string, reject_string, reject_string_len)) {
-                info("A buggy kernel is detected");
+                netdata_log_info("A buggy kernel is detected");
                 fclose(kernel_reject_list);
                 freez(reject_string);
                 return 1;
@@ -392,9 +391,10 @@ static void ebpf_mount_name(char *out, size_t len, char *path, uint32_t kver, co
  * Count the information from targets.
  *
  * @param report  the output structure
- * @param targets  vector with information about the eBPF plugin.
+ * @param targets vector with information about the eBPF plugin.
+ * @param value    factor used to update calculation
  */
-static void ebpf_stats_targets(ebpf_plugin_stats_t *report, netdata_ebpf_targets_t *targets)
+static void ebpf_stats_targets(ebpf_plugin_stats_t *report, netdata_ebpf_targets_t *targets, int value)
 {
     if (!targets) {
         report->probes = report->tracepoints = report->trampolines = 0;
@@ -405,19 +405,19 @@ static void ebpf_stats_targets(ebpf_plugin_stats_t *report, netdata_ebpf_targets
     while (targets[i].name) {
         switch (targets[i].mode) {
             case EBPF_LOAD_PROBE: {
-                report->probes++;
+                report->probes += value;
                 break;
             }
             case EBPF_LOAD_RETPROBE: {
-                report->retprobes++;
+                report->retprobes += value;
                 break;
             }
             case EBPF_LOAD_TRACEPOINT: {
-                report->tracepoints++;
+                report->tracepoints += value;
                 break;
             }
             case EBPF_LOAD_TRAMPOLINE: {
-                report->trampolines++;
+                report->trampolines += value;
                 break;
             }
         }
@@ -438,27 +438,30 @@ static void ebpf_stats_targets(ebpf_plugin_stats_t *report, netdata_ebpf_targets
  */
 void ebpf_update_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em)
 {
-    report->threads++;
+    int value;
 
     // It is not necessary to report more information.
-    if (em->enabled != NETDATA_THREAD_EBPF_RUNNING)
-        return;
+    if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING)
+        value = -1;
+    else
+        value = 1;
 
-    report->running++;
+    report->threads += value;
+    report->running += value;
 
     // In theory the `else if` is useless, because when this function is called, the module should not stay in
     // EBPF_LOAD_PLAY_DICE. We have this additional condition to detect errors from developers.
     if (em->load & EBPF_LOAD_LEGACY)
-        report->legacy++;
+        report->legacy += value;
     else if (em->load & EBPF_LOAD_CORE)
-        report->core++;
+        report->core += value;
 
     if (em->maps_per_core)
-        report->hash_percpu++;
+        report->hash_percpu += value;
     else
-        report->hash_unique++;
+        report->hash_unique += value;
 
-    ebpf_stats_targets(report, em->targets);
+    ebpf_stats_targets(report, em->targets, value);
 }
 
 /**
@@ -477,7 +480,7 @@ void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *m
     snprintfz(filename, FILENAME_MAX, "/proc/self/fdinfo/%d", map->map_fd);
     procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
     if(unlikely(!ff)) {
-        error("Cannot open %s", filename);
+        netdata_log_error("Cannot open %s", filename);
         return;
     }
 
@@ -496,7 +499,7 @@ void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *m
                     report->memlock_kern += memsize;
                     report->hash_tables += 1;
 #ifdef NETDATA_DEV_MODE
-                    info("Hash table %u: %s (FD = %d) is consuming %lu bytes totalizing %lu bytes",
+                    netdata_log_info("Hash table %u: %s (FD = %d) is consuming %lu bytes totalizing %lu bytes",
                          report->hash_tables, map->name, map->map_fd, memsize, report->memlock_kern);
 #endif
                     break;
@@ -505,7 +508,7 @@ void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *m
                     report->memlock_kern -= memsize;
                     report->hash_tables -= 1;
 #ifdef NETDATA_DEV_MODE
-                    info("Hash table %s (FD = %d) was removed releasing %lu bytes, now we have %u tables loaded totalizing %lu bytes.",
+                    netdata_log_info("Hash table %s (FD = %d) was removed releasing %lu bytes, now we have %u tables loaded totalizing %lu bytes.",
                          map->name, map->map_fd, memsize, report->hash_tables, report->memlock_kern);
 #endif
                     break;
@@ -529,8 +532,11 @@ void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *m
  *
  * @param report  the output structure
  * @param map     pointer to a map. Last map must fish with name = NULL
+ * @param action  should plugin add or remove values from amount.
  */
-void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report, ebpf_local_maps_t *maps)
+void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report,
+                                           ebpf_local_maps_t *maps,
+                                           ebpf_stats_action_t action)
 {
     if (!maps)
         return;
@@ -542,7 +548,7 @@ void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report, ebpf_loc
         if (fd == ND_EBPF_MAP_FD_NOT_INITIALIZED)
             continue;
 
-        ebpf_update_kernel_memory(report, map, EBPF_ACTION_STAT_ADD);
+        ebpf_update_kernel_memory(report, map, action);
     }
 }
 
@@ -570,7 +576,7 @@ void ebpf_update_map_size(struct bpf_map *map, ebpf_local_maps_t *lmap, ebpf_mod
     if (lmap->user_input && lmap->user_input != lmap->internal_input) {
         define_size = lmap->internal_input;
 #ifdef NETDATA_INTERNAL_CHECKS
-        info("Changing map %s from size %u to %u ", map_name, lmap->internal_input, lmap->user_input);
+        netdata_log_info("Changing map %s from size %u to %u ", map_name, lmap->internal_input, lmap->user_input);
 #endif
     } else if (((lmap->type & apps_type) == apps_type) && (!em->apps_charts) && (!em->cgroup_charts)) {
         lmap->user_input = ND_EBPF_DEFAULT_MIN_PID;
@@ -613,7 +619,7 @@ void ebpf_update_map_size(struct bpf_map *map, ebpf_local_maps_t *lmap, ebpf_mod
 void ebpf_update_map_type(struct bpf_map *map, ebpf_local_maps_t *w)
 {
     if (bpf_map__set_type(map, w->map_type)) {
-        error("Cannot modify map type for %s", w->name);
+        netdata_log_error("Cannot modify map type for %s", w->name);
     }
 }
 
@@ -794,7 +800,7 @@ void ebpf_update_controller(int fd, ebpf_module_t *em)
     for (key = NETDATA_CONTROLLER_APPS_ENABLED; key < end; key++) {
         int ret = bpf_map_update_elem(fd, &key, &values[key], 0);
         if (ret)
-            error("Add key(%u) for controller table failed.", key);
+            netdata_log_error("Add key(%u) for controller table failed.", key);
     }
 }
 
@@ -867,7 +873,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
     ebpf_update_legacy_map(*obj, em);
 
     if (bpf_object__load(*obj)) {
-        error("ERROR: loading BPF object file failed %s\n", lpath);
+        netdata_log_error("ERROR: loading BPF object file failed %s\n", lpath);
         bpf_object__close(*obj);
         return NULL;
     }
@@ -878,7 +884,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
     size_t count_programs =  ebpf_count_programs(*obj);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("eBPF program %s loaded with success!", lpath);
+    netdata_log_info("eBPF program %s loaded with success!", lpath);
 #endif
 
     return ebpf_attach_programs(*obj, count_programs, em->names);
@@ -891,7 +897,7 @@ char *ebpf_find_symbol(char *search)
     snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, NETDATA_KALLSYMS);
     procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
     if(unlikely(!ff)) {
-        error("Cannot open %s%s", netdata_configured_host_prefix, NETDATA_KALLSYMS);
+        netdata_log_error("Cannot open %s%s", netdata_configured_host_prefix, NETDATA_KALLSYMS);
         return ret;
     }
 
@@ -1107,7 +1113,7 @@ struct btf *ebpf_load_btf_file(char *path, char *filename)
     snprintfz(fullpath, PATH_MAX, "%s/%s", path, filename);
     struct btf *ret = ebpf_parse_btf_file(fullpath);
     if (!ret)
-        info("Your environment does not have BTF file %s/%s. The plugin will work with 'legacy' code.",
+        netdata_log_info("Your environment does not have BTF file %s/%s. The plugin will work with 'legacy' code.",
              path, filename);
 
     return ret;
@@ -1239,6 +1245,9 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_m
     modules->pid_map_size = (uint32_t)appconfig_get_number(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_PID_SIZE,
                                                            modules->pid_map_size);
 
+    modules->lifetime = (uint32_t) appconfig_get_number(modules->cfg, EBPF_GLOBAL_SECTION,
+                                                        EBPF_CFG_LIFETIME, EBPF_DEFAULT_LIFETIME);
+
     char *value = ebpf_convert_load_mode_to_string(modules->load & NETDATA_EBPF_LOAD_METHODS);
     char *type_format = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_TYPE_FORMAT, value);
     netdata_ebpf_load_mode_t load = epbf_convert_string_to_load_mode(type_format);
@@ -1259,7 +1268,7 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_m
         modules->maps_per_core = CONFIG_BOOLEAN_NO;
 
 #ifdef NETDATA_DEV_MODE
-    info("The thread %s was configured with: mode = %s; update every = %d; apps = %s; cgroup = %s; ebpf type format = %s; ebpf co-re tracing = %s; collect pid = %s; maps per core = %s",
+    netdata_log_info("The thread %s was configured with: mode = %s; update every = %d; apps = %s; cgroup = %s; ebpf type format = %s; ebpf co-re tracing = %s; collect pid = %s; maps per core = %s, lifetime=%u",
          modules->thread_name,
          load_mode,
          modules->update_every,
@@ -1268,7 +1277,8 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_m
          type_format,
          core_attach,
          collect_pid,
-         (modules->maps_per_core)?"enabled":"disabled"
+         (modules->maps_per_core)?"enabled":"disabled",
+         modules->lifetime
          );
 #endif
 }
@@ -1295,7 +1305,7 @@ void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file, int kver, int i
     if (!ebpf_load_config(em->cfg, filename)) {
         ebpf_mount_config_name(filename, FILENAME_MAX, ebpf_stock_config_dir, em->config_file);
         if (!ebpf_load_config(em->cfg, filename)) {
-            error("Cannot load the ebpf configuration file %s", em->config_file);
+            netdata_log_error("Cannot load the ebpf configuration file %s", em->config_file);
             return;
         }
         // If user defined data globally, we will have here EBPF_LOADED_FROM_USER, we need to consider this, to avoid
@@ -1512,7 +1522,7 @@ int ebpf_is_tracepoint_enabled(char *subsys, char *eventname)
 static int ebpf_change_tracing_values(char *subsys, char *eventname, char *value)
 {
     if (strcmp("0", value) && strcmp("1", value)) {
-        error("Invalid value given to either enable or disable a tracepoint.");
+        netdata_log_error("Invalid value given to either enable or disable a tracepoint.");
         return -1;
     }
 

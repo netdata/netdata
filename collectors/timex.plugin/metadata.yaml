@@ -1,0 +1,85 @@
+meta:
+  plugin_name: timex.plugin
+  module_name: timex.plugin
+  alternative_monitored_instances: []
+  monitored_instance:
+    name: timex
+    link: ''
+    categories: []
+    icon_filename: ''
+  related_resources:
+    integrations:
+      list: []
+  info_provided_to_referring_integrations:
+    description: ''
+  keywords: []
+  most_popular: false
+overview:
+  data_collection:
+    metrics_description: ''
+    method_description: ''
+  supported_platforms:
+    include: []
+    exclude: []
+  multi-instance: true
+  additional_permissions:
+    description: ''
+  default_behavior:
+    auto_detection:
+      description: ''
+    limits:
+      description: ''
+    performance_impact:
+      description: ''
+setup:
+  prerequisites:
+    list: []
+  configuration:
+    file:
+      name: ''
+      description: ''
+    options:
+      description: ''
+      folding:
+        title: ''
+        enabled: true
+      list: []
+    examples:
+      folding:
+        enabled: true
+        title: ''
+      list: []
+troubleshooting:
+  problems:
+    list: []
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: system.clock_sync_state
+          description: System Clock Synchronization State
+          unit: "state"
+          chart_type: line
+          dimensions:
+            - name: state
+        - name: system.clock_status
+          description: System Clock Status
+          unit: "status"
+          chart_type: line
+          dimensions:
+            - name: unsync
+            - name: clockerr
+        - name: system.clock_sync_offset
+          description: Computed Time Offset Between Local System and Reference Clock
+          unit: "milliseconds"
+          chart_type: line
+          dimensions:
+            - name: offset

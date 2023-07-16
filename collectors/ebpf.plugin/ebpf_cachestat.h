@@ -3,8 +3,9 @@
 #ifndef NETDATA_EBPF_CACHESTAT_H
 #define NETDATA_EBPF_CACHESTAT_H 1
 
-// Module name
+// Module name & description
 #define NETDATA_EBPF_MODULE_NAME_CACHESTAT "cachestat"
+#define NETDATA_EBPF_CACHESTAT_MODULE_DESC "Monitor Linux page cache internal functions. This thread is integrated with apps and cgroup."
 
 // charts
 #define NETDATA_CACHESTAT_HIT_RATIO_CHART "cachestat_ratio"

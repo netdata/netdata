@@ -222,7 +222,7 @@ void rrdsetvar_add_and_leave_released(RRDSET *st, const char *name, RRDVAR_TYPE 
 }
 
 void rrdsetvar_rename_all(RRDSET *st) {
-    debug(D_VARIABLES, "RRDSETVAR rename for chart id '%s' name '%s'", rrdset_id(st), rrdset_name(st));
+    netdata_log_debug(D_VARIABLES, "RRDSETVAR rename for chart id '%s' name '%s'", rrdset_id(st), rrdset_name(st));
 
     RRDSETVAR *rs;
     dfe_start_write(st->rrdsetvar_root_index, rs) {
@@ -262,8 +262,13 @@ void rrdsetvar_custom_chart_variable_set(RRDSET *st, const RRDSETVAR_ACQUIRED *r
     RRDSETVAR *rs = dictionary_acquired_item_value((const DICTIONARY_ITEM *)rsa);
 
     if(rs->type != RRDVAR_TYPE_CALCULATED || !(rs->flags & RRDVAR_FLAG_CUSTOM_CHART_VAR) || !(rs->flags & RRDVAR_FLAG_ALLOCATED)) {
-        error("RRDSETVAR: requested to set variable '%s' of chart '%s' on host '%s' to value " NETDATA_DOUBLE_FORMAT
-            " but the variable is not a custom chart one (it has options 0x%x, value pointer %p). Ignoring request.", string2str(rs->name), rrdset_id(st), rrdhost_hostname(st->rrdhost), value, (uint32_t)rs->flags, rs->value);
+        netdata_log_error("RRDSETVAR: requested to set variable '%s' of chart '%s' on host '%s' to value " NETDATA_DOUBLE_FORMAT
+                          " but the variable is not a custom chart one (it has options 0x%x, value pointer %p). Ignoring request.",
+                          string2str(rs->name),
+                          rrdset_id(st),
+                          rrdhost_hostname(st->rrdhost),
+                          value,
+                          (uint32_t)rs->flags, rs->value);
     }
     else {
         NETDATA_DOUBLE *v = rs->value;

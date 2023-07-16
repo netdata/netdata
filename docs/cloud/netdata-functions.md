@@ -33,6 +33,7 @@ functions - [plugins.d](https://github.com/netdata/netdata/blob/master/collector
 | Function | Description | plugin - module |
 | :-- | :-- | :-- |
 | processes | Detailed information on the currently running processes on the node. | [apps.plugin](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md) |
+| ebpf_thread | Controller for eBPF threads. | [ebpf.plugin](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md) |
 
 If you have ideas or requests for other functions:
 * open a [Feature request](https://github.com/netdata/netdata-cloud/issues/new?assignees=&labels=feature+request%2Cneeds+triage&template=FEAT_REQUEST.yml&title=%5BFeat%5D%3A+) on Netdata Cloud repo

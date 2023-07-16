@@ -32,7 +32,7 @@ void *callocz_int(size_t nmemb, size_t size, const char *file __maybe_unused, co
 {
     void *p = calloc(nmemb, size);
     if (unlikely(!p)) {
-        error("Cannot allocate %zu bytes of memory.", nmemb * size);
+        netdata_log_error("Cannot allocate %zu bytes of memory.", nmemb * size);
         exit(1);
     }
     return p;
@@ -42,7 +42,7 @@ void *mallocz_int(size_t size, const char *file __maybe_unused, const char *func
 {
     void *p = malloc(size);
     if (unlikely(!p)) {
-        error("Cannot allocate %zu bytes of memory.", size);
+        netdata_log_error("Cannot allocate %zu bytes of memory.", size);
         exit(1);
     }
     return p;
@@ -52,7 +52,7 @@ void *reallocz_int(void *ptr, size_t size, const char *file __maybe_unused, cons
 {
     void *p = realloc(ptr, size);
     if (unlikely(!p)) {
-        error("Cannot allocate %zu bytes of memory.", size);
+        netdata_log_error("Cannot allocate %zu bytes of memory.", size);
         exit(1);
     }
     return p;
@@ -70,7 +70,7 @@ void freez(void *ptr) {
 void *mallocz(size_t size) {
     void *p = malloc(size);
     if (unlikely(!p)) {
-        error("Cannot allocate %zu bytes of memory.", size);
+        netdata_log_error("Cannot allocate %zu bytes of memory.", size);
         exit(1);
     }
     return p;
@@ -79,7 +79,7 @@ void *mallocz(size_t size) {
 void *callocz(size_t nmemb, size_t size) {
     void *p = calloc(nmemb, size);
     if (unlikely(!p)) {
-        error("Cannot allocate %zu bytes of memory.", nmemb * size);
+        netdata_log_error("Cannot allocate %zu bytes of memory.", nmemb * size);
         exit(1);
     }
     return p;
@@ -88,7 +88,7 @@ void *callocz(size_t nmemb, size_t size) {
 void *reallocz(void *ptr, size_t size) {
     void *p = realloc(ptr, size);
     if (unlikely(!p)) {
-        error("Cannot allocate %zu bytes of memory.", size);
+        netdata_log_error("Cannot allocate %zu bytes of memory.", size);
         exit(1);
     }
     return p;

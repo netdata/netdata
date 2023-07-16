@@ -69,6 +69,9 @@ slabinfo.plugin
 cgroup-network
 !cgroup-network/
 
+local-listeners
+!local-listeners/
+
 ebpf.plugin
 collectors/ebpf.plugin/reset_netdata_trace.sh
 !ebpf.plugin/
@@ -193,6 +196,7 @@ tests/acls/acl.sh
 tests/urls/request.sh
 tests/alarm_repetition/alarm.sh
 tests/template_dimension/template_dim.sh
+tests/ebpf/ebpf_thread_function.sh
 aclk/legacy/tests/install-fake-charts.d.sh
 
 # tests and temp files

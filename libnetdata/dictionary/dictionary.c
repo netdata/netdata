@@ -369,10 +369,6 @@ size_t dictionary_referenced_items(DICTIONARY *dict) {
     return referenced_items;
 }
 
-long int dictionary_stats_for_registry(DICTIONARY *dict) {
-    if(unlikely(!dict)) return 0;
-    return (dict->stats->memory.index + dict->stats->memory.dict);
-}
 void dictionary_version_increment(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->version, 1, __ATOMIC_RELAXED);
 }
@@ -952,7 +948,7 @@ static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *it
             if (having_index_lock) {
                 // delete it from the hashtable
                 if(hashtable_delete_unsafe(dict, item_get_name(item), item->key_len, item) == 0)
-                    error("DICTIONARY: INTERNAL ERROR VIEW: tried to delete item with name '%s', name_len %u that is not in the index", item_get_name(item), (KEY_LEN_TYPE)(item->key_len - 1));
+                    netdata_log_error("DICTIONARY: INTERNAL ERROR VIEW: tried to delete item with name '%s', name_len %u that is not in the index", item_get_name(item), (KEY_LEN_TYPE)(item->key_len - 1));
                 else
                     pointer_del(dict, item);
 
@@ -1065,11 +1061,11 @@ static size_t hashtable_destroy_unsafe(DICTIONARY *dict) {
     JError_t J_Error;
     Word_t ret = JudyHSFreeArray(&dict->index.JudyHSArray, &J_Error);
     if(unlikely(ret == (Word_t) JERR)) {
-        error("DICTIONARY: Cannot destroy JudyHS, JU_ERRNO_* == %u, ID == %d",
-              JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+        netdata_log_error("DICTIONARY: Cannot destroy JudyHS, JU_ERRNO_* == %u, ID == %d",
+                          JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
     }
 
-    debug(D_DICTIONARY, "Dictionary: hash table freed %lu bytes", ret);
+    netdata_log_debug(D_DICTIONARY, "Dictionary: hash table freed %lu bytes", ret);
 
     dict->index.JudyHSArray = NULL;
     return (size_t)ret;
@@ -1079,8 +1075,8 @@ static inline void **hashtable_insert_unsafe(DICTIONARY *dict, const char *name,
     JError_t J_Error;
     Pvoid_t *Rc = JudyHSIns(&dict->index.JudyHSArray, (void *)name, name_len, &J_Error);
     if (unlikely(Rc == PJERR)) {
-        error("DICTIONARY: Cannot insert entry with name '%s' to JudyHS, JU_ERRNO_* == %u, ID == %d",
-              name, JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+        netdata_log_error("DICTIONARY: Cannot insert entry with name '%s' to JudyHS, JU_ERRNO_* == %u, ID == %d",
+                          name, JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
     }
 
     // if *Rc == 0, new item added to the array
@@ -1100,8 +1096,9 @@ static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, si
     JError_t J_Error;
     int ret = JudyHSDel(&dict->index.JudyHSArray, (void *)name, name_len, &J_Error);
     if(unlikely(ret == JERR)) {
-        error("DICTIONARY: Cannot delete entry with name '%s' from JudyHS, JU_ERRNO_* == %u, ID == %d", name,
-              JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+        netdata_log_error("DICTIONARY: Cannot delete entry with name '%s' from JudyHS, JU_ERRNO_* == %u, ID == %d",
+                          name,
+                          JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
         return 0;
     }
 
@@ -1379,7 +1376,7 @@ static void dict_item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *
     if(unlikely(is_view_dictionary(dict)))
         fatal("DICTIONARY: %s() should never be called on views.", __FUNCTION__ );
 
-    debug(D_DICTIONARY, "Dictionary entry with name '%s' found. Changing its value.", item_get_name(item));
+    netdata_log_debug(D_DICTIONARY, "Dictionary entry with name '%s' found. Changing its value.", item_get_name(item));
 
     DICTIONARY_VALUE_RESETS_PLUS1(dict);
 
@@ -1391,12 +1388,12 @@ static void dict_item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *
     dictionary_execute_delete_callback(dict, item);
 
     if(likely(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE)) {
-        debug(D_DICTIONARY, "Dictionary: linking value to '%s'", item_get_name(item));
+        netdata_log_debug(D_DICTIONARY, "Dictionary: linking value to '%s'", item_get_name(item));
         item->shared->value = value;
         item->shared->value_len = value_len;
     }
     else {
-        debug(D_DICTIONARY, "Dictionary: cloning value to '%s'", item_get_name(item));
+        netdata_log_debug(D_DICTIONARY, "Dictionary: cloning value to '%s'", item_get_name(item));
 
         void *old_value = item->shared->value;
         void *new_value = NULL;
@@ -1408,7 +1405,7 @@ static void dict_item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *
         item->shared->value = new_value;
         item->shared->value_len = value_len;
 
-        debug(D_DICTIONARY, "Dictionary: freeing old value of '%s'", item_get_name(item));
+        netdata_log_debug(D_DICTIONARY, "Dictionary: freeing old value of '%s'", item_get_name(item));
         dict_item_value_freez(dict, old_value);
     }
 
@@ -1416,7 +1413,7 @@ static void dict_item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *
 }
 
 static size_t dict_item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item) {
-    debug(D_DICTIONARY, "Destroying name value entry for name '%s'.", item_get_name(item));
+    netdata_log_debug(D_DICTIONARY, "Destroying name value entry for name '%s'.", item_get_name(item));
 
     if(!item_flag_check(item, ITEM_FLAG_DELETED))
         DICTIONARY_ENTRIES_MINUS1(dict);
@@ -1431,7 +1428,7 @@ static size_t dict_item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item)
         dictionary_execute_delete_callback(dict, item);
 
         if(unlikely(!(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE))) {
-            debug(D_DICTIONARY, "Dictionary freeing value of '%s'", item_get_name(item));
+            netdata_log_debug(D_DICTIONARY, "Dictionary freeing value of '%s'", item_get_name(item));
             dict_item_value_freez(dict, item->shared->value);
             item->shared->value = NULL;
         }
@@ -1557,7 +1554,7 @@ static bool dict_item_del(DICTIONARY *dict, const char *name, ssize_t name_len) 
     if(name_len == -1)
         name_len = (ssize_t)strlen(name) + 1; // we need the terminating null too
 
-    debug(D_DICTIONARY, "DEL dictionary entry with name '%s'.", name);
+    netdata_log_debug(D_DICTIONARY, "DEL dictionary entry with name '%s'.", name);
 
     // Unfortunately, the JudyHSDel() does not return the value of the
     // item that was deleted, so we have to find it before we delete it,
@@ -1573,7 +1570,9 @@ static bool dict_item_del(DICTIONARY *dict, const char *name, ssize_t name_len) 
     }
     else {
         if(hashtable_delete_unsafe(dict, name, name_len, item) == 0)
-            error("DICTIONARY: INTERNAL ERROR: tried to delete item with name '%s', name_len %zd that is not in the index", name, name_len - 1);
+            netdata_log_error("DICTIONARY: INTERNAL ERROR: tried to delete item with name '%s', name_len %zd that is not in the index",
+                              name,
+                              name_len - 1);
         else
             pointer_del(dict, item);
 
@@ -1606,7 +1605,7 @@ static DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONARY *dic
     if(name_len == -1)
         name_len = (ssize_t)strlen(name) + 1; // we need the terminating null too
 
-    debug(D_DICTIONARY, "SET dictionary entry with name '%s'.", name);
+    netdata_log_debug(D_DICTIONARY, "SET dictionary entry with name '%s'.", name);
 
     // DISCUSSION:
     // Is it better to gain a read-lock and do a hashtable_get_unsafe()
@@ -1668,7 +1667,7 @@ static DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONARY *dic
                 // view dictionary
                 // the item is already there and can be used
                 if(item->shared != master_item->shared)
-                    error("DICTIONARY: changing the master item on a view is not supported. The previous item will remain. To change the key of an item in a view, delete it and add it again.");
+                    netdata_log_error("DICTIONARY: changing the master item on a view is not supported. The previous item will remain. To change the key of an item in a view, delete it and add it again.");
             }
             else {
                 // master dictionary
@@ -1725,7 +1724,7 @@ static DICTIONARY_ITEM *dict_item_find_and_acquire(DICTIONARY *dict, const char 
     if(name_len == -1)
         name_len = (ssize_t)strlen(name) + 1; // we need the terminating null too
 
-    debug(D_DICTIONARY, "GET dictionary entry with name '%s'.", name);
+    netdata_log_debug(D_DICTIONARY, "GET dictionary entry with name '%s'.", name);
 
     dictionary_index_lock_rdlock(dict);
 
@@ -2555,8 +2554,8 @@ void thread_cache_destroy(void) {
     JError_t J_Error;
     Word_t ret = JudyHSFreeArray(&thread_cache_judy_array, &J_Error);
     if(unlikely(ret == (Word_t) JERR)) {
-        error("THREAD_CACHE: Cannot destroy JudyHS, JU_ERRNO_* == %u, ID == %d",
-              JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+        netdata_log_error("THREAD_CACHE: Cannot destroy JudyHS, JU_ERRNO_* == %u, ID == %d",
+                          JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
     }
 
     internal_error(true, "THREAD_CACHE: hash table freed %lu bytes", ret);

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # netdata
 # real-time performance and health monitoring, done right!
-# (C) 2017 Costa Tsaousis <costa@tsaousis.gr>
+# (C) 2023 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # Exit code: 0 - Success
@@ -194,24 +194,37 @@ if [ -r "${CLAIMING_DIR}/rooms" ]; then
         ROOMS="$(cat "${CLAIMING_DIR}/rooms")"
 fi
 
+variable_to_set=
 for arg in "$@"
 do
-        case $arg in
-                -token=*) TOKEN=${arg:7} ;;
-                -url=*) [ -n "${arg:5}" ] && URL_BASE=${arg:5} ;;
-                -id=*) ID=$(echo "${arg:4}" | tr '[:upper:]' '[:lower:]');;
-                -rooms=*) ROOMS=${arg:7} ;;
-                -hostname=*) HOSTNAME=${arg:10} ;;
-                -verbose) VERBOSE=1 ;;
-                -insecure) INSECURE=1 ;;
-                -proxy=*) PROXY=${arg:7} ;;
-                -noproxy) NOPROXY=yes ;;
-                -noreload) RELOAD=0 ;;
-                -user=*) NETDATA_USER=${arg:6} ;;
-                -daemon-not-running) NETDATA_RUNNING=0 ;;
-                *)  echo >&2 "Unknown argument ${arg}"
-                    exit 1 ;;
-        esac
+        if [ -z "$variable_to_set" ]; then
+              case $arg in
+                      --claim-token) variable_to_set="TOKEN" ;;
+                      --claim-rooms) variable_to_set="ROOMS" ;;
+                      --claim-url) variable_to_set="URL_BASE" ;;
+                      -token=*) TOKEN=${arg:7} ;;
+                      -url=*) [ -n "${arg:5}" ] && URL_BASE=${arg:5} ;;
+                      -id=*) ID=$(echo "${arg:4}" | tr '[:upper:]' '[:lower:]');;
+                      -rooms=*) ROOMS=${arg:7} ;;
+                      -hostname=*) HOSTNAME=${arg:10} ;;
+                      -verbose) VERBOSE=1 ;;
+                      -insecure) INSECURE=1 ;;
+                      -proxy=*) PROXY=${arg:7} ;;
+                      -noproxy) NOPROXY=yes ;;
+                      -noreload) RELOAD=0 ;;
+                      -user=*) NETDATA_USER=${arg:6} ;;
+                      -daemon-not-running) NETDATA_RUNNING=0 ;;
+                      *)  echo >&2 "Unknown argument ${arg}"
+                          exit 1 ;;
+              esac
+        else
+              case "$variable_to_set" in
+                      TOKEN) TOKEN="$arg" ;;
+                      ROOMS) ROOMS="$arg" ;;
+                      URL_BASE) URL_BASE="$arg" ;;
+              esac
+              variable_to_set=
+        fi
         shift 1
 done
 
@@ -402,7 +415,7 @@ if [ "${HTTP_STATUS_CODE}" = "204" ] || [ "${ERROR_KEY}" = "ErrAlreadyClaimed" ]
   cloud base url = $URL_BASE
 HERE_DOC
         if [ "$EUID" == "0" ]; then
-            chown -R "${NETDATA_USER}:${NETDATA_USER}" ${CLAIMING_DIR} || (echo >&2 "Claiming failed"; set -e; exit 2)
+            chown -R "${NETDATA_USER}:${NETDATA_USER}" "${CLAIMING_DIR}" || (echo >&2 "Claiming failed"; set -e; exit 2)
         fi
         if [ "${RELOAD}" == "0" ] ; then
             exit $EXIT_CODE

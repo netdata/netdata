@@ -11,6 +11,21 @@ extern "C" {
 #include <config.h>
 #endif
 
+#ifdef ENABLE_LZ4
+#define ENABLE_RRDPUSH_COMPRESSION 1
+#endif
+
+#ifdef ENABLE_OPENSSL
+#define ENABLE_HTTPS 1
+#endif
+
+#ifdef HAVE_LIBDATACHANNEL
+#define ENABLE_WEBRTC 1
+#endif
+
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
 #define JUDYHS_INDEX_SIZE_ESTIMATE(key_bytes) (((key_bytes) + sizeof(Word_t) - 1) / sizeof(Word_t) * 4)
 
 #if defined(NETDATA_DEV_MODE) && !defined(NETDATA_INTERNAL_CHECKS)
@@ -586,38 +601,86 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 #define UNUSED_FUNCTION(x) UNUSED_##x
 #endif
 
-#define error_report(x, args...) do { errno = 0; error(x, ##args); } while(0)
+#define error_report(x, args...) do { errno = 0; netdata_log_error(x, ##args); } while(0)
 
 // Taken from linux kernel
 #define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
 
 #ifdef ENV32BIT
+
+typedef struct bitmapX {
+    uint32_t bits;
+    uint32_t data[];
+} BITMAPX;
+
 typedef struct bitmap256 {
-    uint32_t data[8];
+    uint32_t bits;
+    uint32_t data[256 / 32];
 } BITMAP256;
 
-#define bitmap256_get_bit(ptr, idx) (((ptr)->data[(idx) >> 5] & (1ULL << ((idx) & 31))) != 0)
-static inline void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value) {
-    uint32_t mask = 1U << (idx & 31);
-    if (value)
-        ptr->data[idx >> 5] |= mask;
-    else
-        ptr->data[idx >> 5] &= ~mask;
+typedef struct bitmap1024 {
+    uint32_t bits;
+    uint32_t data[1024 / 32];
+} BITMAP1024;
+
+static inline BITMAPX *bitmapX_create(uint32_t bits) {
+    BITMAPX *bmp = (BITMAPX *)callocz(1, sizeof(BITMAPX) + sizeof(uint32_t) * ((bits + 31) / 32));
+    uint32_t *p = (uint32_t *)&bmp->bits;
+    *p = bits;
+    return bmp;
 }
-#else // 64bit
+
+#define bitmapX_get_bit(ptr, idx) ((ptr)->data[(idx) >> 5] & (1U << ((idx) & 31)))
+#define bitmapX_set_bit(ptr, idx, value) do {           \
+    register uint32_t _bitmask = 1U << ((idx) & 31);    \
+    if (value)                                          \
+        (ptr)->data[(idx) >> 5] |= _bitmask;            \
+    else                                                \
+        (ptr)->data[(idx) >> 5] &= ~_bitmask;           \
+} while(0)
+
+#else // 64bit version of bitmaps
+
+typedef struct bitmapX {
+    uint32_t bits;
+    uint64_t data[];
+} BITMAPX;
+
 typedef struct bitmap256 {
-    uint64_t data[4];
+    uint32_t bits;
+    uint64_t data[256 / 64];
 } BITMAP256;
 
-#define bitmap256_get_bit(ptr, idx) ((ptr)->data[(idx) >> 6] & (1ULL << ((idx) & 63)))
-static inline void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value) {
-    uint64_t mask = 1ULL << (idx & 63);
-    if (value)
-        ptr->data[idx >> 6] |= mask;
-    else
-        ptr->data[idx >> 6] &= ~mask;
+typedef struct bitmap1024 {
+    uint32_t bits;
+    uint64_t data[1024 / 64];
+} BITMAP1024;
+
+static inline BITMAPX *bitmapX_create(uint32_t bits) {
+    BITMAPX *bmp = (BITMAPX *)callocz(1, sizeof(BITMAPX) + sizeof(uint64_t) * ((bits + 63) / 64));
+    bmp->bits = bits;
+    return bmp;
 }
-#endif // 64bit
+
+#define bitmapX_get_bit(ptr, idx) ((ptr)->data[(idx) >> 6] & (1ULL << ((idx) & 63)))
+#define bitmapX_set_bit(ptr, idx, value) do {           \
+    register uint64_t _bitmask = 1ULL << ((idx) & 63);  \
+    if (value)                                          \
+        (ptr)->data[(idx) >> 6] |= _bitmask;            \
+    else                                                \
+        (ptr)->data[(idx) >> 6] &= ~_bitmask;           \
+} while(0)
+
+#endif // 64bit version of bitmaps
+
+#define BITMAPX_INITIALIZER(wanted_bits) { .bits = (wanted_bits), .data = {0} }
+#define BITMAP256_INITIALIZER (BITMAP256)BITMAPX_INITIALIZER(256)
+#define BITMAP1024_INITIALIZER (BITMAP1024)BITMAPX_INITIALIZER(1024)
+#define bitmap256_get_bit(ptr, idx) bitmapX_get_bit((BITMAPX *)ptr, idx)
+#define bitmap256_set_bit(ptr, idx, value) bitmapX_set_bit((BITMAPX *)ptr, idx, value)
+#define bitmap1024_get_bit(ptr, idx) bitmapX_get_bit((BITMAPX *)ptr, idx)
+#define bitmap1024_set_bit(ptr, idx, value) bitmapX_set_bit((BITMAPX *)ptr, idx, value)
+
 
 #define COMPRESSION_MAX_MSG_SIZE 0x4000
 #define PLUGINSD_LINE_MAX (COMPRESSION_MAX_MSG_SIZE - 1024)
@@ -866,6 +929,32 @@ typedef enum {
     TIMING_STEP_END2_RRDSET,
     TIMING_STEP_END2_PROPAGATE,
     TIMING_STEP_END2_STORE,
+
+    TIMING_STEP_FREEIPMI_CTX_CREATE,
+    TIMING_STEP_FREEIPMI_DSR_CACHE_DIR,
+    TIMING_STEP_FREEIPMI_SENSOR_CONFIG_FILE,
+    TIMING_STEP_FREEIPMI_SENSOR_READINGS_BY_X,
+    TIMING_STEP_FREEIPMI_READ_record_id,
+    TIMING_STEP_FREEIPMI_READ_sensor_number,
+    TIMING_STEP_FREEIPMI_READ_sensor_type,
+    TIMING_STEP_FREEIPMI_READ_sensor_name,
+    TIMING_STEP_FREEIPMI_READ_sensor_state,
+    TIMING_STEP_FREEIPMI_READ_sensor_units,
+    TIMING_STEP_FREEIPMI_READ_sensor_bitmask_type,
+    TIMING_STEP_FREEIPMI_READ_sensor_bitmask,
+    TIMING_STEP_FREEIPMI_READ_sensor_bitmask_strings,
+    TIMING_STEP_FREEIPMI_READ_sensor_reading_type,
+    TIMING_STEP_FREEIPMI_READ_sensor_reading,
+    TIMING_STEP_FREEIPMI_READ_event_reading_type_code,
+    TIMING_STEP_FREEIPMI_READ_record_type,
+    TIMING_STEP_FREEIPMI_READ_record_type_class,
+    TIMING_STEP_FREEIPMI_READ_sel_state,
+    TIMING_STEP_FREEIPMI_READ_event_direction,
+    TIMING_STEP_FREEIPMI_READ_event_type_code,
+    TIMING_STEP_FREEIPMI_READ_event_offset_type,
+    TIMING_STEP_FREEIPMI_READ_event_offset,
+    TIMING_STEP_FREEIPMI_READ_event_offset_string,
+    TIMING_STEP_FREEIPMI_READ_manufacturer_id,
 
     // terminator
     TIMING_STEP_MAX,

@@ -50,11 +50,11 @@ typedef enum {
     // needed for negotiating errors between parent and child
 } STREAM_CAPABILITIES;
 
-#ifdef  ENABLE_COMPRESSION
+#ifdef  ENABLE_RRDPUSH_COMPRESSION
 #define STREAM_HAS_COMPRESSION STREAM_CAP_COMPRESSION
 #else
 #define STREAM_HAS_COMPRESSION 0
-#endif  // ENABLE_COMPRESSION
+#endif  // ENABLE_RRDPUSH_COMPRESSION
 
 STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender);
 
@@ -118,7 +118,7 @@ typedef struct {
     char *kernel_version;
 } stream_encoded_t;
 
-#ifdef ENABLE_COMPRESSION
+#ifdef ENABLE_RRDPUSH_COMPRESSION
 // signature MUST end with a newline
 #define RRDPUSH_COMPRESSION_SIGNATURE ((uint32_t)('z' | 0x80) | (0x80 << 8) | (0x80 << 16) | ('\n' << 24))
 #define RRDPUSH_COMPRESSION_SIGNATURE_MASK ((uint32_t)0xff | (0x80 << 8) | (0x80 << 16) | (0xff << 24))
@@ -249,7 +249,7 @@ struct sender_state {
     size_t not_connected_loops;
     // Metrics are collected asynchronously by collector threads calling rrdset_done_push(). This can also trigger
     // the lazy creation of the sender thread - both cases (buffer access and thread creation) are guarded here.
-    netdata_mutex_t mutex;
+    SPINLOCK spinlock;
     struct circular_buffer *buffer;
     char read_buffer[PLUGINSD_LINE_MAX + 1];
     ssize_t read_len;
@@ -262,9 +262,9 @@ struct sender_state {
 
     uint16_t hops;
 
-#ifdef ENABLE_COMPRESSION
+#ifdef ENABLE_RRDPUSH_COMPRESSION
     struct compressor_state compressor;
-#endif
+#endif // ENABLE_RRDPUSH_COMPRESSION
 
 #ifdef ENABLE_HTTPS
     NETDATA_SSL ssl;                     // structure used to encrypt the connection
@@ -295,6 +295,9 @@ struct sender_state {
         time_t last_buffer_recreate_s;          // true when the sender buffer should be re-created
     } atomic;
 };
+
+#define sender_lock(sender) spinlock_lock(&(sender)->spinlock)
+#define sender_unlock(sender) spinlock_unlock(&(sender)->spinlock)
 
 #define rrdpush_sender_pipe_has_pending_data(sender) __atomic_load_n(&(sender)->atomic.pending_data, __ATOMIC_RELAXED)
 #define rrdpush_sender_pipe_set_pending_data(sender) __atomic_store_n(&(sender)->atomic.pending_data, true, __ATOMIC_RELAXED)
@@ -347,6 +350,19 @@ typedef struct stream_node_instance {
 } STREAM_NODE_INSTANCE;
 */
 
+struct buffered_reader {
+    ssize_t read_len;
+    ssize_t pos;
+    char read_buffer[PLUGINSD_LINE_MAX + 1];
+};
+
+char *buffered_reader_next_line(struct buffered_reader *reader, char *dst, size_t dst_size);
+static inline void buffered_reader_init(struct buffered_reader *reader) {
+    reader->read_buffer[0] = '\0';
+    reader->read_len = 0;
+    reader->pos = 0;
+}
+
 struct receiver_state {
     RRDHOST *host;
     pid_t tid;
@@ -368,8 +384,8 @@ struct receiver_state {
     struct rrdhost_system_info *system_info;
     STREAM_CAPABILITIES capabilities;
     time_t last_msg_t;
-    char read_buffer[PLUGINSD_LINE_MAX + 1];
-    int read_len;
+
+    struct buffered_reader reader;
 
     uint16_t hops;
 
@@ -384,6 +400,7 @@ struct receiver_state {
         int update_every;
         int health_enabled; // CONFIG_BOOLEAN_YES, CONFIG_BOOLEAN_NO, CONFIG_BOOLEAN_AUTO
         time_t alarms_delay;
+        uint32_t alarms_history;
         int rrdpush_enabled;
         char *rrdpush_api_key; // DONT FREE - it is allocated in appconfig
         char *rrdpush_send_charts_matching; // DONT FREE - it is allocated in appconfig
@@ -400,9 +417,9 @@ struct receiver_state {
 
     time_t replication_first_time_t;
 
-#ifdef ENABLE_COMPRESSION
+#ifdef ENABLE_RRDPUSH_COMPRESSION
     struct decompressor_state decompressor;
-#endif
+#endif // ENABLE_RRDPUSH_COMPRESSION
 /*
     struct {
         uint32_t count;
@@ -424,9 +441,9 @@ struct rrdpush_destinations {
 };
 
 extern unsigned int default_rrdpush_enabled;
-#ifdef ENABLE_COMPRESSION
-extern unsigned int default_compression_enabled;
-#endif
+#ifdef ENABLE_RRDPUSH_COMPRESSION
+extern unsigned int default_rrdpush_compression_enabled;
+#endif // ENABLE_RRDPUSH_COMPRESSION
 extern char *default_rrdpush_destination;
 extern char *default_rrdpush_api_key;
 extern char *default_rrdpush_send_charts_matching;
@@ -484,9 +501,9 @@ int connect_to_one_of_destinations(
 
 void rrdpush_signal_sender_to_wake_up(struct sender_state *s);
 
-#ifdef ENABLE_COMPRESSION
+#ifdef ENABLE_RRDPUSH_COMPRESSION
 struct compressor_state *create_compressor();
-#endif
+#endif // ENABLE_RRDPUSH_COMPRESSION
 
 void rrdpush_reset_destinations_postpone_time(RRDHOST *host);
 const char *stream_handshake_error_to_string(STREAM_HANDSHAKE handshake_error);

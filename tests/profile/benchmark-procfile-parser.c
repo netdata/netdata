@@ -17,29 +17,29 @@ extern size_t procfile_max_allocation;
 
 
 static inline void pflines_reset(pflines *fl) {
-    // debug(D_PROCFILE, PF_PREFIX ":   resetting lines");
+    // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   resetting lines");
 
     fl->len = 0;
 }
 
 static inline void pflines_free(pflines *fl) {
-    // debug(D_PROCFILE, PF_PREFIX ":   freeing lines");
+    // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   freeing lines");
 
     freez(fl);
 }
 
 static inline void pfwords_reset(pfwords *fw) {
-    // debug(D_PROCFILE, PF_PREFIX ":   resetting words");
+    // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   resetting words");
     fw->len = 0;
 }
 
 
 static inline void pfwords_add(procfile *ff, char *str) {
-    // debug(D_PROCFILE, PF_PREFIX ":   adding word No %d: '%s'", fw->len, str);
+    // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   adding word No %d: '%s'", fw->len, str);
 
     pfwords *fw = ff->words;
     if(unlikely(fw->len == fw->size)) {
-        // debug(D_PROCFILE, PF_PREFIX ":   expanding words");
+        // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   expanding words");
 
         ff->words = fw = reallocz(fw, sizeof(pfwords) + (fw->size + PFWORDS_INCREASE_STEP) * sizeof(char *));
         fw->size += PFWORDS_INCREASE_STEP;
@@ -50,11 +50,11 @@ static inline void pfwords_add(procfile *ff, char *str) {
 
 NEVERNULL
 static inline size_t *pflines_add(procfile *ff) {
-    // debug(D_PROCFILE, PF_PREFIX ":   adding line %d at word %d", fl->len, first_word);
+    // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   adding line %d at word %d", fl->len, first_word);
 
     pflines *fl = ff->lines;
     if(unlikely(fl->len == fl->size)) {
-        // debug(D_PROCFILE, PF_PREFIX ":   expanding lines");
+        // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   expanding lines");
 
         ff->lines = fl = reallocz(fl, sizeof(pflines) + (fl->size + PFLINES_INCREASE_STEP) * sizeof(ffline));
         fl->size += PFLINES_INCREASE_STEP;
@@ -70,7 +70,7 @@ static inline size_t *pflines_add(procfile *ff) {
 
 NOINLINE
 static void procfile_parser(procfile *ff) {
-    // debug(D_PROCFILE, PF_PREFIX ": Parsing file '%s'", ff->filename);
+    // netdata_log_debug(D_PROCFILE, PF_PREFIX ": Parsing file '%s'", ff->filename);
 
     char  *s = ff->data                 // our current position
         , *e = &ff->data[ff->len]       // the terminating null
@@ -115,7 +115,7 @@ static void procfile_parser(procfile *ff) {
 		        (*line_words)++;
 		        t = ++s;
 
-		        // debug(D_PROCFILE, PF_PREFIX ":   ended line %d with %d words", l, ff->lines->lines[l].words);
+		        // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   ended line %d with %d words", l, ff->lines->lines[l].words);
 
 		        line_words = pflines_add(ff);
 		    	break;
@@ -190,7 +190,7 @@ static void procfile_parser(procfile *ff) {
 
 
 procfile *procfile_readall1(procfile *ff) {
-    // debug(D_PROCFILE, PF_PREFIX ": Reading file '%s'.", ff->filename);
+    // netdata_log_debug(D_PROCFILE, PF_PREFIX ": Reading file '%s'.", ff->filename);
 
     ff->len = 0;    // zero the used size
     ssize_t r = 1;  // read at least once
@@ -199,15 +199,15 @@ procfile *procfile_readall1(procfile *ff) {
         ssize_t x = ff->size - s;
 
         if(unlikely(!x)) {
-            debug(D_PROCFILE, PF_PREFIX ": Expanding data buffer for file '%s'.", procfile_filename(ff));
+            netdata_log_debug(D_PROCFILE, PF_PREFIX ": Expanding data buffer for file '%s'.", procfile_filename(ff));
             ff = reallocz(ff, sizeof(procfile) + ff->size + PROCFILE_INCREMENT_BUFFER);
             ff->size += PROCFILE_INCREMENT_BUFFER;
         }
 
-        debug(D_PROCFILE, "Reading file '%s', from position %zd with length %zd", procfile_filename(ff), s, (ssize_t)(ff->size - s));
+        netdata_log_debug(D_PROCFILE, "Reading file '%s', from position %zd with length %zd", procfile_filename(ff), s, (ssize_t)(ff->size - s));
         r = read(ff->fd, &ff->data[s], ff->size - s);
         if(unlikely(r == -1)) {
-            if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) error(PF_PREFIX ": Cannot read from file '%s' on fd %d", procfile_filename(ff), ff->fd);
+            if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) netdata_log_error(PF_PREFIX ": Cannot read from file '%s' on fd %d", procfile_filename(ff), ff->fd);
             procfile_close(ff);
             return NULL;
         }
@@ -215,9 +215,9 @@ procfile *procfile_readall1(procfile *ff) {
         ff->len += r;
     }
 
-    // debug(D_PROCFILE, "Rewinding file '%s'", ff->filename);
+    // netdata_log_debug(D_PROCFILE, "Rewinding file '%s'", ff->filename);
     if(unlikely(lseek(ff->fd, 0, SEEK_SET) == -1)) {
-        if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
+        if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) netdata_log_error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
         procfile_close(ff);
         return NULL;
     }
@@ -232,7 +232,7 @@ procfile *procfile_readall1(procfile *ff) {
         if(unlikely(ff->words->len > procfile_max_words)) procfile_max_words = ff->words->len;
     }
 
-    // debug(D_PROCFILE, "File '%s' updated.", ff->filename);
+    // netdata_log_debug(D_PROCFILE, "File '%s' updated.", ff->filename);
     return ff;
 }
 

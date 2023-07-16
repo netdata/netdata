@@ -530,7 +530,7 @@ static FILE *open_log_file(int fd, FILE *fp, const char *filename, int *enabled_
     else {
         f = open(filename, O_WRONLY | O_APPEND | O_CREAT, 0664);
         if(f == -1) {
-            error("Cannot open file '%s'. Leaving %d to its default.", filename, fd);
+            netdata_log_error("Cannot open file '%s'. Leaving %d to its default.", filename, fd);
             if(fd_ptr) *fd_ptr = fd;
             return fp;
         }
@@ -550,12 +550,12 @@ static FILE *open_log_file(int fd, FILE *fp, const char *filename, int *enabled_
         // it automatically closes
         int t = dup2(f, fd);
         if (t == -1) {
-            error("Cannot dup2() new fd %d to old fd %d for '%s'", f, fd, filename);
+            netdata_log_error("Cannot dup2() new fd %d to old fd %d for '%s'", f, fd, filename);
             close(f);
             if(fd_ptr) *fd_ptr = fd;
             return fp;
         }
-        // info("dup2() new fd %d to old fd %d for '%s'", f, fd, filename);
+        // netdata_log_info("dup2() new fd %d to old fd %d for '%s'", f, fd, filename);
         close(f);
     }
     else fd = f;
@@ -563,10 +563,10 @@ static FILE *open_log_file(int fd, FILE *fp, const char *filename, int *enabled_
     if(!fp) {
         fp = fdopen(fd, "a");
         if (!fp)
-            error("Cannot fdopen() fd %d ('%s')", fd, filename);
+            netdata_log_error("Cannot fdopen() fd %d ('%s')", fd, filename);
         else {
             if (setvbuf(fp, NULL, _IOLBF, 0) != 0)
-                error("Cannot set line buffering on fd %d ('%s')", fd, filename);
+                netdata_log_error("Cannot set line buffering on fd %d ('%s')", fd, filename);
         }
     }
 
@@ -634,7 +634,7 @@ int error_log_limit(int reset) {
     static time_t start = 0;
     static unsigned long counter = 0, prevented = 0;
 
-    FILE *fp = stderror;
+    FILE *fp = stderror ? stderror : stderr;
 
     // fprintf(fp, "FLOOD: counter=%lu, allowed=%lu, backup=%lu, period=%llu\n", counter, error_log_errors_per_period, error_log_errors_per_period_backup, (unsigned long long)error_log_throttle_period);
 
@@ -781,7 +781,7 @@ void debug_int( const char *file, const char *function, const unsigned long line
 void info_int( int is_collector, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... )
 {
     va_list args;
-    FILE *fp = (is_collector) ? stderr : stderror;
+    FILE *fp = (is_collector || !stderror) ? stderr : stderror;
 
     log_lock();
 
@@ -841,7 +841,7 @@ static const char *strerror_result_string(const char *a, const char *b) { (void)
 #endif
 
 void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
-    FILE *fp = stderror;
+    FILE *fp = stderror ? stderror : stderr;
 
     if(erl->sleep_ut)
         sleep_usec(erl->sleep_ut);
@@ -910,7 +910,7 @@ void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __ma
 void error_int(int is_collector, const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
     // save a copy of errno - just in case this function generates a new error
     int __errno = errno;
-    FILE *fp = (is_collector) ? stderr : stderror;
+    FILE *fp = (is_collector || !stderror) ? stderr : stderror;
 
     va_list args;
 
@@ -975,7 +975,7 @@ static void print_call_stack(void) {
 #endif
 
 void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
-    FILE *fp = stderror;
+    FILE *fp = stderror ? stderror : stderr;
 
     // save a copy of errno - just in case this function generates a new error
     int __errno = errno;
@@ -1046,7 +1046,7 @@ void fatal_int( const char *file, const char *function, const unsigned long line
 // ----------------------------------------------------------------------------
 // access log
 
-void log_access( const char *fmt, ... ) {
+void netdata_log_access( const char *fmt, ... ) {
     va_list args;
 
     if(access_log_syslog) {
@@ -1078,7 +1078,7 @@ void log_access( const char *fmt, ... ) {
 // ----------------------------------------------------------------------------
 // health log
 
-void log_health( const char *fmt, ... ) {
+void netdata_log_health( const char *fmt, ... ) {
     va_list args;
 
     if(health_log_syslog) {

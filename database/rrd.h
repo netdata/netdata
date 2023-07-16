@@ -241,9 +241,9 @@ typedef enum __attribute__ ((__packed__)) rrddim_options {
     // this is 8-bit
 } RRDDIM_OPTIONS;
 
-#define rrddim_option_check(rd, option) ((rd)->options & (option))
-#define rrddim_option_set(rd, option)   (rd)->options |= (option)
-#define rrddim_option_clear(rd, option) (rd)->options &= ~(option)
+#define rrddim_option_check(rd, option) ((rd)->collector.options & (option))
+#define rrddim_option_set(rd, option)   (rd)->collector.options |= (option)
+#define rrddim_option_clear(rd, option) (rd)->collector.options &= ~(option)
 
 // flags are runtime changing status flags (atomics are required to alter/access them)
 typedef enum __attribute__ ((__packed__)) rrddim_flags {
@@ -352,41 +352,18 @@ struct rrddim {
     STRING *name;                                   // the name of this dimension (as presented to user)
 
     RRD_ALGORITHM algorithm;                        // the algorithm that is applied to add new collected values
-    RRDDIM_OPTIONS options;                         // permanent configuration options
     RRD_MEMORY_MODE rrd_memory_mode;                // the memory mode for this dimension
     RRDDIM_FLAGS flags;                             // run time changing status flags
 
     int32_t multiplier;                             // the multiplier of the collected values
     int32_t divisor;                                // the divider of the collected values
 
-    uint32_t collections_counter;                   // the number of times we added values to this rrddim
-
     // ------------------------------------------------------------------------
     // operational state members
 
-    rrd_ml_dimension_t *ml_dimension;                   // machine learning data about this dimension
-
-    // ------------------------------------------------------------------------
-    // linking to siblings and parents
-
     struct rrdset *rrdset;
+    rrd_ml_dimension_t *ml_dimension;                   // machine learning data about this dimension
     RRDMETRIC_ACQUIRED *rrdmetric;                  // the rrdmetric of this dimension
-
-    // ------------------------------------------------------------------------
-    // data collection members
-
-    struct timeval last_collected_time;             // when was this dimension last updated
-                                                    // this is actual date time we updated the last_collected_value
-                                                    // THIS IS DIFFERENT FROM THE SAME MEMBER OF RRDSET
-
-    collected_number collected_value_max;           // the absolute maximum of the collected value
-
-    NETDATA_DOUBLE calculated_value;                // the current calculated value, after applying the algorithm - resets to zero after being used
-    NETDATA_DOUBLE last_calculated_value;           // the last calculated value processed
-    NETDATA_DOUBLE last_stored_value;               // the last value as stored in the database (after interpolation)
-
-    collected_number collected_value;               // the current value, as collected - resets to 0 after being used
-    collected_number last_collected_value;          // the last value that was collected, after being processed
 
 #ifdef NETDATA_LOG_COLLECTION_ERRORS
     usec_t rrddim_store_metric_last_ut;             // the timestamp we last called rrddim_store_metric()
@@ -406,6 +383,28 @@ struct rrddim {
     } db;
 
     // ------------------------------------------------------------------------
+    // data collection members
+
+    struct {
+        RRDDIM_OPTIONS options;                         // permanent configuration options
+
+        uint32_t counter;                               // the number of times we added values to this rrddim
+
+        collected_number collected_value;               // the current value, as collected - resets to 0 after being used
+        collected_number collected_value_max;           // the absolute maximum of the collected value
+        collected_number last_collected_value;          // the last value that was collected, after being processed
+
+        struct timeval last_collected_time;             // when was this dimension last updated
+                                                        // this is actual date time we updated the last_collected_value
+                                                        // THIS IS DIFFERENT FROM THE SAME MEMBER OF RRDSET
+
+        NETDATA_DOUBLE calculated_value;                // the current calculated value, after applying the algorithm - resets to zero after being used
+        NETDATA_DOUBLE last_calculated_value;           // the last calculated value processed
+
+        NETDATA_DOUBLE last_stored_value;               // the last value as stored in the database (after interpolation)
+    } collector;
+
+    // ------------------------------------------------------------------------
 
     struct rrddim_tier tiers[];                     // our tiers of databases
 };
@@ -415,13 +414,13 @@ size_t rrddim_size(void);
 #define rrddim_id(rd) string2str((rd)->id)
 #define rrddim_name(rd) string2str((rd) ->name)
 
-#define rrddim_check_updated(rd) ((rd)->options & RRDDIM_OPTION_UPDATED)
-#define rrddim_set_updated(rd) (rd)->options |= RRDDIM_OPTION_UPDATED
-#define rrddim_clear_updated(rd) (rd)->options &= ~RRDDIM_OPTION_UPDATED
+#define rrddim_check_updated(rd) ((rd)->collector.options & RRDDIM_OPTION_UPDATED)
+#define rrddim_set_updated(rd) (rd)->collector.options |= RRDDIM_OPTION_UPDATED
+#define rrddim_clear_updated(rd) (rd)->collector.options &= ~RRDDIM_OPTION_UPDATED
 
-#define rrddim_check_exposed(rd) ((rd)->options & RRDDIM_OPTION_EXPOSED)
-#define rrddim_set_exposed(rd) (rd)->options |= RRDDIM_OPTION_EXPOSED
-#define rrddim_clear_exposed(rd) (rd)->options &= ~RRDDIM_OPTION_EXPOSED
+#define rrddim_check_exposed(rd) ((rd)->collector.options & RRDDIM_OPTION_EXPOSED)
+#define rrddim_set_exposed(rd) (rd)->collector.options |= RRDDIM_OPTION_EXPOSED
+#define rrddim_clear_exposed(rd) (rd)->collector.options &= ~RRDDIM_OPTION_EXPOSED
 
 // returns the RRDDIM cache filename, or NULL if it does not exist
 const char *rrddim_cache_filename(RRDDIM *rd);
@@ -521,6 +520,27 @@ static inline size_t storage_engine_disk_space_used(STORAGE_ENGINE_BACKEND backe
 #ifdef ENABLE_DBENGINE
     if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
         return rrdeng_disk_space_used(db_instance);
+#endif
+
+    // TODO - calculate the total host disk space for memory mode save and map
+    return 0;
+}
+
+time_t rrdeng_global_first_time_s(STORAGE_INSTANCE *db_instance);
+static inline time_t storage_engine_global_first_time_s(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance) {
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_global_first_time_s(db_instance);
+#endif
+
+    return now_realtime_sec() - (time_t)(default_rrd_history_entries * default_rrd_update_every);
+}
+
+size_t rrdeng_currently_collected_metrics(STORAGE_INSTANCE *db_instance);
+static inline size_t storage_engine_collected_metrics(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance) {
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_currently_collected_metrics(db_instance);
 #endif
 
     // TODO - calculate the total host disk space for memory mode save and map
@@ -866,7 +886,7 @@ struct rrdset {
     const RRDFAMILY_ACQUIRED *rrdfamily;            // pointer to RRDFAMILY dictionary item, this chart belongs to
 
     struct {
-        netdata_rwlock_t rwlock;                    // protection for RRDCALC *base
+        RW_SPINLOCK spinlock;                       // protection for RRDCALC *base
         RRDCALC *base;                              // double linked list of RRDCALC related to this RRDSET
     } alerts;
 
@@ -1085,8 +1105,9 @@ typedef struct alarm_log {
     uint32_t next_alarm_id;
     unsigned int count;
     unsigned int max;
+    uint32_t health_log_history;                   // the health log history in seconds to be kept in db
     ALARM_ENTRY *alarms;
-    netdata_rwlock_t alarm_log_rwlock;
+    RW_SPINLOCK spinlock;
 } ALARM_LOG;
 
 typedef struct health {
@@ -1310,7 +1331,7 @@ extern RRDHOST *localhost;
 #define rrdhost_sender_replicating_charts_minus_one(host) (__atomic_sub_fetch(&((host)->rrdpush_sender_replicating_charts), 1, __ATOMIC_RELAXED))
 #define rrdhost_sender_replicating_charts_zero(host) (__atomic_store_n(&((host)->rrdpush_sender_replicating_charts), 0, __ATOMIC_RELAXED))
 
-#define rrdhost_is_online(host) ((host) == localhost || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED) || rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST)))
+#define rrdhost_is_online(host) ((host) == localhost || rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST) || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED))
 bool rrdhost_matches_window(RRDHOST *host, time_t after, time_t before, time_t now);
 
 extern DICTIONARY *rrdhost_root_index;

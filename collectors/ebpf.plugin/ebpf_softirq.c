@@ -61,6 +61,26 @@ static softirq_val_t softirq_vals[] = {
 static softirq_ebpf_val_t *softirq_ebpf_vals = NULL;
 
 /**
+ * Obsolete global
+ *
+ * Obsolete global charts created by thread.
+ *
+ * @param em a pointer to `struct ebpf_module`
+ */
+static void ebpf_obsolete_softirq_global(ebpf_module_t *em)
+{
+    ebpf_write_chart_obsolete(NETDATA_EBPF_SYSTEM_GROUP,
+                              "softirq_latency",
+                              "Software IRQ latency",
+                              EBPF_COMMON_DIMENSION_MILLISECONDS,
+                              "softirqs",
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                              NULL,
+                              NETDATA_CHART_PRIO_SYSTEM_SOFTIRQS+1,
+                              em->update_every);
+}
+
+/**
  * Cleanup
  *
  * Clean up allocated memory.
@@ -71,16 +91,32 @@ static void softirq_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    if (em->objects)
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        pthread_mutex_lock(&lock);
+
+        ebpf_obsolete_softirq_global(em);
+
+        pthread_mutex_unlock(&lock);
+        fflush(stdout);
+    }
+
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
+
+    if (em->objects) {
         ebpf_unload_legacy_code(em->objects, em->probe_links);
+        em->objects = NULL;
+        em->probe_links = NULL;
+    }
 
     for (int i = 0; softirq_tracepoints[i].class != NULL; i++) {
         ebpf_disable_tracepoint(&softirq_tracepoints[i]);
     }
     freez(softirq_ebpf_vals);
+    softirq_ebpf_vals = NULL;
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_update_stats(&plugin_statistics, em);
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -170,7 +206,7 @@ static void softirq_collector(ebpf_module_t *em)
     softirq_create_charts(em->update_every);
     softirq_create_dims();
     ebpf_update_stats(&plugin_statistics, em);
-    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
     pthread_mutex_unlock(&lock);
 
     // loop and read from published data until ebpf plugin is closed.
@@ -180,7 +216,9 @@ static void softirq_collector(ebpf_module_t *em)
     int counter = update_every - 1;
     int maps_per_core = em->maps_per_core;
     //This will be cancelled by its parent
-    while (!ebpf_exit_plugin) {
+    uint32_t running_time = 0;
+    uint32_t lifetime = em->lifetime;
+    while (!ebpf_exit_plugin && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_exit_plugin || ++counter != update_every)
             continue;
@@ -195,6 +233,15 @@ static void softirq_collector(ebpf_module_t *em)
         write_end_chart();
 
         pthread_mutex_unlock(&lock);
+
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (running_time && !em->running_time)
+            running_time = update_every;
+        else
+            running_time += update_every;
+
+        em->running_time = running_time;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 

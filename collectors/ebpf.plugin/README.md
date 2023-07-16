@@ -235,13 +235,12 @@ Linux metrics:
 
 The eBPF collector enables and runs the following eBPF programs by default:
 
+-   `cachestat`: Netdata's eBPF data collector creates charts about the memory page cache. When the integration with
+    [`apps.plugin`](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md) is enabled, this collector creates charts for the whole host _and_
+    for each application.
 -   `fd` :  This eBPF program creates charts that show information about calls to open files.
 -   `mount`: This eBPF program creates charts that show calls to syscalls mount(2) and umount(2).
 -   `shm`: This eBPF program creates charts that show calls to syscalls shmget(2), shmat(2), shmdt(2) and shmctl(2).
--   `sync`: Monitor calls to syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2).
--   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
-    bandwidth consumed by each.
--   `vfs`: This eBPF program creates charts that show information about VFS (Virtual File System) functions.
 -   `process`: This eBPF program creates charts that show information about process life. When in `return` mode, it also
     creates charts showing errors when these operations are executed.
 -   `hardirq`: This eBPF program creates charts that show information about time spent servicing individual hardware
@@ -254,9 +253,6 @@ The eBPF collector enables and runs the following eBPF programs by default:
 
 You can also enable the following eBPF programs:
 
--   `cachestat`: Netdata's eBPF data collector creates charts about the memory page cache. When the integration with
-    [`apps.plugin`](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md) is enabled, this collector creates charts for the whole host _and_
-    for each application.
 -   `dcstat` : This eBPF program creates charts that show information about file access using directory cache. It appends
     `kprobes` for `lookup_fast()` and `d_lookup()` to identify if files are inside directory cache, outside and files are
     not found.
@@ -264,7 +260,11 @@ You can also enable the following eBPF programs:
 -   `filesystem` : This eBPF program creates charts that show information about some filesystem latency.
 -   `swap` : This eBPF program creates charts that show information about swap access.
 -   `mdflush`: This eBPF program creates charts that show information about
+-   `sync`: Monitor calls to syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2).
+-   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
+    bandwidth consumed by each.
     multi-device software flushes.
+-   `vfs`: This eBPF program creates charts that show information about VFS (Virtual File System) functions.
 
 ### Configuring eBPF threads
 
@@ -989,3 +989,50 @@ shows how the lockdown module impacts `ebpf.plugin` based on the selected option
 
 If you or your distribution compiled the kernel with the last combination, your system cannot load shared libraries
 required to run `ebpf.plugin`.
+
+## Function
+
+The eBPF plugin has a [function](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md) named
+`ebpf_thread` that controls its internal threads and helps to reduce the overhead on host. Using the function you
+can run the plugin with all threads disabled and enable them only when you want to take a look in specific areas.
+
+### List threads
+
+To list all threads status you can query directly the endpoint function:
+
+`http://localhost:19999/api/v1/function?function=ebpf_thread`
+
+It is also possible to query a specific thread adding keyword `thread` and thread name:
+
+`http://localhost:19999/api/v1/function?function=ebpf_thread%20thread:mount`
+
+### Enable thread
+
+It is possible to enable a specific thread using the keyword `enable`:
+
+`http://localhost:19999/api/v1/function?function=ebpf_thread%20enable:mount`
+
+this will run thread `mount` during 300 seconds (5 minutes). You can specify a specific period by appending the period
+after the thread name:
+
+`http://localhost:19999/api/v1/function?function=ebpf_thread%20enable:mount:600`
+
+in this example thread `mount` will run during 600 seconds (10 minutes).
+
+### Disable thread
+
+It is also possible to stop any thread running using the keyword `disable`. For example, to disable `cachestat` you can
+request:
+
+`http://localhost:19999/api/v1/function?function=ebpf_thread%20disable:cachestat`
+
+### Debugging threads
+
+You can verify the impact of threads on the host by running the
+[ebpf_thread_function.sh](https://github.com/netdata/netdata/blob/master/tests/ebpf/ebpf_thread_function.sh)
+script on your environment.
+
+You can check the results of having threads running on your environment in the Netdata monitoring section on your
+dashboard
+
+<img src="https://github.com/netdata/netdata/assets/49162938/91823573-114c-4c16-b634-cc46f7bb1bcf" alt="Threads running." />

@@ -251,7 +251,7 @@ int zswap_collect_data(struct netdata_zswap_metric *metric)
     snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, metric->filename);
 
     if (read_single_number_file(filename, (unsigned long long *)&metric->value)) {
-        error("Cannot read file %s", filename);
+        netdata_log_error("Cannot read file %s", filename);
         return 1;
     }
 
@@ -383,7 +383,7 @@ int do_debugfs_zswap(int update_every, const char *name)
     static int check_if_enabled = 1;
 
     if (likely(check_if_enabled && debugfs_is_zswap_enabled())) {
-        info("Zswap is disabled");
+        netdata_log_info("Zswap is disabled");
         return 1;
     }
 

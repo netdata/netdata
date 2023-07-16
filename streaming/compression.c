@@ -1,6 +1,6 @@
 #include "rrdpush.h"
 
-#ifdef ENABLE_COMPRESSION
+#ifdef ENABLE_RRDPUSH_COMPRESSION
 #include "lz4.h"
 
 #define STREAM_COMPRESSION_MSG "STREAM_COMPRESSION"
@@ -52,7 +52,7 @@ size_t rrdpush_compress(struct compressor_state *state, const char *data, size_t
         return 0;
 
     if(unlikely(size > COMPRESSION_MAX_MSG_SIZE)) {
-        error("RRDPUSH COMPRESS: Compression Failed - Message size %lu above compression buffer limit: %d",
+        netdata_log_error("RRDPUSH COMPRESS: Compression Failed - Message size %lu above compression buffer limit: %d",
               (long unsigned int)size, COMPRESSION_MAX_MSG_SIZE);
         return 0;
     }
@@ -83,7 +83,7 @@ size_t rrdpush_compress(struct compressor_state *state, const char *data, size_t
         1);
 
     if (compressed_data_size < 0) {
-        error("Data compression error: %ld", compressed_data_size);
+        netdata_log_error("Data compression error: %ld", compressed_data_size);
         return 0;
     }
 
@@ -96,7 +96,7 @@ size_t rrdpush_compress(struct compressor_state *state, const char *data, size_t
     uint32_t len = ((compressed_data_size & 0x7f) | 0x80 | (((compressed_data_size & (0x7f << 7)) << 1) | 0x8000)) << 8;
     *(uint32_t *)state->compression_result_buffer = len | RRDPUSH_COMPRESSION_SIGNATURE;
     *out = state->compression_result_buffer;
-    debug(D_STREAM, "%s: Compressed data header: %ld", STREAM_COMPRESSION_MSG, compressed_data_size);
+    netdata_log_debug(D_STREAM, "%s: Compressed data header: %ld", STREAM_COMPRESSION_MSG, compressed_data_size);
     return compressed_data_size + RRDPUSH_COMPRESSION_SIGNATURE_SIZE;
 }
 
@@ -125,7 +125,7 @@ size_t rrdpush_decompress(struct decompressor_state *state, const char *compress
             );
 
     if (unlikely(decompressed_size < 0)) {
-        error("RRDPUSH DECOMPRESS: decompressor returned negative decompressed bytes: %ld", decompressed_size);
+        netdata_log_error("RRDPUSH DECOMPRESS: decompressor returned negative decompressed bytes: %ld", decompressed_size);
         return 0;
     }
 

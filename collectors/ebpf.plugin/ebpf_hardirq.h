@@ -3,6 +3,9 @@
 #ifndef NETDATA_EBPF_HARDIRQ_H
 #define NETDATA_EBPF_HARDIRQ_H 1
 
+// Module description
+#define NETDATA_EBPF_HARDIRQ_MODULE_DESC "Show time spent servicing individual hardware interrupt requests (hard IRQs)."
+
 #include <stdint.h>
 #include "libnetdata/avl/avl.h"
 
@@ -32,6 +35,11 @@ enum hardirq_ebpf_static {
     HARDIRQ_EBPF_STATIC_X86_PLATFORM_IPI,
 
     HARDIRQ_EBPF_STATIC_END
+};
+
+enum hardirq_maps {
+    HARDIRQ_MAP_LATENCY,
+    HARDIRQ_MAP_LATENCY_STATIC
 };
 
 typedef struct hardirq_ebpf_static_val {

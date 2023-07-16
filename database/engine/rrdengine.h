@@ -383,6 +383,8 @@ struct rrdengine_instance {
         bool migration_to_v2_running;
         bool now_deleting_files;
         unsigned extents_currently_being_flushed;   // non-zero until we commit data to disk (both datafile and journal file)
+
+        time_t first_time_s;
     } atomic;
 
     struct {

@@ -1,0 +1,42 @@
+---
+name: Checks
+on:
+  pull_request:
+    paths-ignore: # This MUST be kept in sync with the paths key for the checks.yml workflow.
+      - '**.c'
+      - '**.cc'
+      - '**.h'
+      - '**.hh'
+      - '**.in'
+      - '!netdata.spec.in'
+      - 'configure.ac'
+      - '**/Makefile*'
+      - 'Makefile*'
+      - '.gitignore'
+      - '.github/workflows/checks.yml'
+      - 'build/**'
+      - 'aclk/aclk-schemas/'
+      - 'ml/dlib/'
+      - 'mqtt_websockets'
+      - 'web/server/h2o/libh2o'
+env:
+  DISABLE_TELEMETRY: 1
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  libressl-checks:
+    name: LibreSSL
+    runs-on: ubuntu-latest
+    steps:
+      - run: "echo 'NOT REQUIRED'"
+  clang-checks:
+    name: Clang
+    runs-on: ubuntu-latest
+    steps:
+      - run: "echo 'NOT REQUIRED'"
+  gitignore-check:
+    name: .gitignore
+    runs-on: ubuntu-latest
+    steps:
+      - run: "echo 'NOT REQUIRED'"

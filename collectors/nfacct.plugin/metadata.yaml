@@ -1,0 +1,119 @@
+meta:
+  plugin_name: nfacct.plugin
+  module_name: nfacct.plugin
+  alternative_monitored_instances: []
+  monitored_instance:
+    name: nfacct
+    link: ''
+    categories: []
+    icon_filename: ''
+  related_resources:
+    integrations:
+      list: []
+  info_provided_to_referring_integrations:
+    description: ''
+  keywords: []
+  most_popular: false
+overview:
+  data_collection:
+    metrics_description: ''
+    method_description: ''
+  supported_platforms:
+    include: []
+    exclude: []
+  multi-instance: true
+  additional_permissions:
+    description: ''
+  default_behavior:
+    auto_detection:
+      description: ''
+    limits:
+      description: ''
+    performance_impact:
+      description: ''
+setup:
+  prerequisites:
+    list: []
+  configuration:
+    file:
+      name: ''
+      description: ''
+    options:
+      description: ''
+      folding:
+        title: ''
+        enabled: true
+      list: []
+    examples:
+      folding:
+        enabled: true
+        title: ''
+      list: []
+troubleshooting:
+  problems:
+    list: []
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+    - name: global
+      description: ""
+      labels: []
+      metrics:
+        - name: netfilter.netlink_new
+          description: Connection Tracker New Connections
+          unit: "connections/s"
+          chart_type: line
+          dimensions:
+            - name: new
+            - name: ignore
+            - name: invalid
+        - name: netfilter.netlink_changes
+          description: Connection Tracker Changes
+          unit: "changes/s"
+          chart_type: line
+          dimensions:
+            - name: insert
+            - name: delete
+            - name: delete_list
+        - name: netfilter.netlink_search
+          description: Connection Tracker Searches
+          unit: "searches/s"
+          chart_type: line
+          dimensions:
+            - name: searched
+            - name: search_restart
+            - name: found
+        - name: netfilter.netlink_errors
+          description: Connection Tracker Errors
+          unit: "events/s"
+          chart_type: line
+          dimensions:
+            - name: icmp_error
+            - name: insert_failed
+            - name: drop
+            - name: early_drop
+        - name: netfilter.netlink_expect
+          description: Connection Tracker Expectations
+          unit: "expectations/s"
+          chart_type: line
+          dimensions:
+            - name: created
+            - name: deleted
+            - name: new
+        - name: netfilter.nfacct_packets
+          description: Netfilter Accounting Packets
+          unit: "packets/s"
+          chart_type: line
+          dimensions:
+            - name: a dimension per nfacct object
+        - name: netfilter.nfacct_bytes
+          description: Netfilter Accounting Bandwidth
+          unit: "kilobytes/s"
+          chart_type: line
+          dimensions:
+            - name: a dimension per nfacct object
