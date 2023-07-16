@@ -131,7 +131,7 @@ Netdata is built around a **modular metrics processing pipeline**.
 
 Each Netdata Agent can perform the following functions:
 
-1. **COLLECT**<br/>
+1. **`COLLECT` metrics from their sources**<br/>
    Uses [internal](https://github.com/netdata/netdata/tree/master/collectors) and [external](https://github.com/netdata/go.d.plugin/tree/master/modules) plugins to collect data from their sources.
 
    Netdata auto-detects and collects almost everything from the operating system: including CPU, Interrupts, Memory, Disks, Mount Points, Filesystems, Network Stack, Network Interfaces, Containers, VMs, Processes, SystemD Units, Linux Performance Metrics, Linux eBPF, Hardware Sensors, IPMI, and more.
@@ -144,26 +144,29 @@ Each Netdata Agent can perform the following functions:
 
    And it also supports synthetic tests / white box tests, so you can ping servers, check API responses, or even check filesystem files and directories to generate metrics, train ML and run alerts and notifications on their status.
    
-3. **STORE**<br/>
+2. **`STORE` metrics to a database**<br/>
    Uses database engine plugins to store the collected data, either in memory and/or on disk. We have developed our own [`dbengine`](https://github.com/netdata/netdata/tree/master/database/engine#readme) for storing the data in a very efficient manner, allowing Netdata to have less than 1 byte per sample on disk and amazingly fast queries.
    
-4. **LEARN** (ML)<br/>
+3. **`LEARN` the behavior of metrics** (ML)<br/>
    Trains multiple Machine-Learning (ML) models per metric to learn the behavior of each metric individually.
    
-5. **DETECT** (ML)<br/>
+4. **`DETECT` anomalies in metrics** (ML)<br/>
    Uses the trained machine learning (ML) models to detect outliers and mark collected samples as **anomalies**. Netdata stores anomaly information together with each sample and also streams it to Netdata Parents so that the anomaly is also available at query time for the whole retention of each metric.
 
-6. **CHECK**<br/>
+5. **`CHECK` metrics and trigger alert notifications**<br/>
    Uses its configured alerts to check the metrics for common issues and send alert notifications.
 
-7. **STREAM**<br/>
+6. **`STREAM` metrics to other Netdata Agents**<br/>
    Push metrics in real-time to Netdata Parents.
 
-8. **ARCHIVE**<br/>
+7. **`ARCHIVE` metrics to 3rd party databases**<br/>
    Export metrics to industry standard time-series databases, like `Prometheus`, `InfluxDB`, `OpenTSDB`, `Graphite`, etc.
 
-9. **QUERY**<br/>
+8. **`QUERY` metrics and present dashboards**<br/>
    Provide an API to query the data and present interactive dashboards to users.
+
+9. **`SCORE` metrics to reveal similarities and patterns**<br/>
+   Score the metrics according to given criteria, to find the needle in the haystack.
 
 When using Netdata Parents, all the functions of a Netdata Agent (except data collection) can be delegated to Parents to offload production systems.
 
@@ -242,7 +245,7 @@ So, the biggest difference of Netdata to Prometheus and Grafana, is that we deci
 
   - When compared to Grafana, Netdata is fully automated. Grafana has more customization capabilities than Netdata, but Netdata presents fully functional dashboards by itself and most importantly it gives you the means to understand, analyze, filter, slice and dice the data without the need for you to edit queries or be aware of any peculiarities the underlying metrics may have. Furthermore, to help you when you need to find the needle in the haystack, Netdata has advanced troubleshooting tools provided by the Netdata metrics scoring engine, that allows it to score metrics based on their anomaly rate, their differences or similarities for any given time-frame.
 
-Despite all these, Netdata integrates nicely with Prometheus and Grafana and we have reports from users who use Netdata with Prometheus and Grafana in production.
+Still, if you are already familiar with Prometheus and Grafana, Netdata integrates nicely with them, and we have reports from users who use Netdata with Prometheus and Grafana in production.
 
 ### :cloud: Do I have to subscribe to Netdata Cloud?
 
