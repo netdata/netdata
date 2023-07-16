@@ -86,7 +86,7 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
 
 ### 2. **Configure Collectors** :boom:
 
-   Netdata auto-detects and auto-discovers most operating system data sources and applications. However, many data sources require some manual configuration, usually to allow Netdata get access to the metrics.
+   Netdata [auto-detects and auto-discovers](https://learn.netdata.cloud/docs/data-collection/) most operating system data sources and applications. However, many data sources require some [manual configuration](https://learn.netdata.cloud/docs/data-collection/collectors-configuration), usually to allow Netdata get access to the metrics.
    
    - For a detailed list of all data collectors, check [this guide](https://learn.netdata.cloud/docs/data-collection/).
    - To monitor Windows servers and applications use [this guide](https://learn.netdata.cloud/docs/data-collection/monitor-anything/system-metrics/windows-machines).
