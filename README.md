@@ -173,7 +173,7 @@ When using Netdata Parents, all the functions of a Netdata Agent (except data co
 ## FAQ
 
 <details>
- <summary>:shield: Is this secure?</summary>
+<summary>:shield: Is this secure?</summary>
 
 Of course it is! We do our best to ensure it is!
 
@@ -186,18 +186,8 @@ We understand that Netdata is a software piece that is installed on millions of 
   - Check also our [security policies and advisories published so far](https://github.com/netdata/netdata/security).
 </details>
 
-### :shield: Is this secure?
-
-Of course it is! We do our best to ensure it is!
-
-We understand that Netdata is a software piece that is installed on millions of production systems across the world. So, it is important for us, Netdata to be as secure as possible:
-
-  - We follow the [Open Source Security Foundation](https://bestpractices.coreinfrastructure.org/en/projects/2231) best practices.
-  - We have given great attention to detail when it comes to security design. Check out our [security design](https://learn.netdata.cloud/docs/architecture/security-and-privacy-design).
-  - Netdata is a popular open-source project and is frequently tested by many security analysts.
-  - Check also our [security policies and advisories published so far](https://github.com/netdata/netdata/security).
-
-### :cyclone: Will this consume a lot of resources on my servers?
+<details>
+<summary>:cyclone: Will this consume a lot of resources on my servers?</summary>
 
 No. It will not! We promise this will be fast!
 
@@ -211,8 +201,10 @@ This is what you should expect:
 Netdata has extensive internal instrumentation to help us reveal how the resources consumed are used. All these are available in the "Netdata Monitoring" section of the dashboard. Depending on your use case, there are many options to optimize resource consumption.
 
 Even if you need to run Netdata on extremely weak embedded or IoT systems, you will find that Netdata can be tuned to be very performant.
+</details>
 
-### :scroll: How much retention can I have?
+<details>
+<summary>:scroll: How much retention can I have?</summary>
 
 As much as you need!
 
@@ -224,14 +216,20 @@ Netdata supports **tiering**, to downsample past data and save disk space. With 
 
 All tiers are updated in parallel during data collection. Just increase the disk space you give to Netdata to get a longer history for your metrics. Tiers are automatically chosen at query time depending on the time frame and the resolution requested.
 
-### :rocket: Does it scale? I have really a lot of servers!
+</details>
+
+<details>
+<summary>:rocket: Does it scale? I have really a lot of servers!</summary>
 
 Yes, of course it does!
 
   - :airplane: Netdata Parents provide great vertical scalability, so you can have as big parents as the CPU, RAM and Disk resources you can dedicate to them. In our lab we constantly stress test Netdata Parents with about 2 million metrics collected per second.
   - :rocket: In addition, Netdata Cloud provides virtually unlimited horizontal scalability. It "merges" all the Netdata parents you have into one unified infrastructure at query time. Netdata Cloud itself is probably the biggest single installation monitoring platform ever created, currently monitoring about 100k online servers with about 10k servers changing state (added/removed) per day!
 
-### :floppy_disk: My production servers are very sensitive in disk I/O. Can I use Netdata?
+</details>
+
+<details>
+<summary>:floppy_disk: My production servers are very sensitive in disk I/O. Can I use Netdata?</summary>
 
 Yes, you can!
 
@@ -244,7 +242,10 @@ We suggest the following:
 
 Using the above, the Netdata Agent on your production system will not need a disk.
 
-### :raised_eyebrow: How is Netdata different from a Prometheus and Grafana setup?
+</details>
+
+<details>
+<summary>:raised_eyebrow: How is Netdata different from a Prometheus and Grafana setup?</summary>
 
 First we have to say that Prometheus as a time-series database and Grafana as a visualizer are excellent tools for what they do.
 
@@ -260,7 +261,10 @@ So, the biggest difference of Netdata to Prometheus and Grafana, is that we deci
 
 Still, if you are already familiar with Prometheus and Grafana, Netdata integrates nicely with them, and we have reports from users who use Netdata with Prometheus and Grafana in production.
 
-### :cloud: Do I have to subscribe to Netdata Cloud?
+</details>
+
+<details>
+<summary>:cloud: Do I have to subscribe to Netdata Cloud?</summary>
 
 No. But we hope you will find it useful.
 
@@ -275,11 +279,16 @@ The Netdata Agent dashboard and the Netdata Cloud dashboard are the same. Still,
 
 So, although it is not required, you can get the most out of your Netdata installation by using Netdata Cloud.
 
-### :office: Who uses Netdata?
+</details>
+
+<details>
+<summary>:office: Who uses Netdata?</summary>
 
 Netdata is a popular project. Check its [stargazers on github](https://github.com/netdata/netdata/stargazers). You will find people from quite popular companies and enterprises, including: SAP, Qualcomm, IBM, Amazon, Intel, AMD, Unity, Baidu, Cisco, Samsung, Netflix, Facebook and hundreds more.
 
 Netdata is also popular in universities, including New York University, Columbia University, New Jersey University, and dozens more.
+
+</details>
 
 ## :book: Documentation
 
