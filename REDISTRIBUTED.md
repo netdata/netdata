@@ -9,9 +9,9 @@ learn_rel_path: "Developers"
 
 # Redistributed software
 
-Netdata copyright info:
- Copyright 2023, Netdata Inc.
- Released under [GPL v3 or later](https://raw.githubusercontent.com/netdata/netdata/master/LICENSE).
+Netdata copyright info:<br/>
+Copyright 2023, Netdata Inc.<br/>
+Released under [GPL v3 or later](https://raw.githubusercontent.com/netdata/netdata/master/LICENSE).
 
 Netdata uses SPDX license tags to identify the license for its files.
 Individual licenses referenced in the tags are available on the [SPDX project site](http://spdx.org/licenses/).
