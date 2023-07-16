@@ -41,4 +41,6 @@ void service_exits(void){};
 // required by get_system_cpus()
 char *netdata_configured_host_prefix = "";
 
+bool unittest_running = false;
+
 #endif // NETDATA_LIB_DUMMIES_H

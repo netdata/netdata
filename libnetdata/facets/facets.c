@@ -76,6 +76,8 @@ struct facet_key {
 
     FACET_KEY_OPTIONS options;
 
+    bool default_selected_for_values; // the default "selected" for all values in the dictionary
+
     // members about the current row
     uint32_t key_found_in_row;
     uint32_t key_values_selected_in_row;
@@ -187,7 +189,8 @@ static void facet_value_insert_callback(const DICTIONARY_ITEM *item __maybe_unus
         facet_value_is_used(k, v);
     }
 
-    v->selected = true;
+    if(!v->selected)
+        v->selected = k->default_selected_for_values;
 }
 
 static bool facet_value_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data) {
@@ -213,8 +216,9 @@ static void facet_value_delete_callback(const DICTIONARY_ITEM *item __maybe_unus
 // ----------------------------------------------------------------------------
 // FACET_KEY dictionary hooks
 
-static inline void facet_key_late_init(FACETS *facets, FACET_KEY *k, const char *name) {
-    k->name = strdupz(name);
+static inline void facet_key_late_init(FACETS *facets, FACET_KEY *k) {
+    if(k->values)
+        return;
 
     if(facets_key_is_facet(facets, k)) {
         k->values = dictionary_create_advanced(
@@ -230,9 +234,11 @@ static void facet_key_insert_callback(const DICTIONARY_ITEM *item __maybe_unused
     FACET_KEY *k = value;
     FACETS *facets = data;
 
-    if(k->name)
+    if(k->name) {
         // an actual value, not a filter
-        facet_key_late_init(facets, k, k->name);
+        k->name = strdupz(k->name);
+        facet_key_late_init(facets, k);
+    }
 
     k->current_value = buffer_create(0, NULL);
 }
@@ -242,9 +248,11 @@ static bool facet_key_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
     FACET_KEY *nk = new_value;
     FACETS *facets = data;
 
-    if(!k->name && nk->name)
+    if(!k->name && nk->name) {
         // an actual value, not a filter
-        facet_key_late_init(facets, k, nk->name);
+        k->name = strdupz(nk->name);
+        facet_key_late_init(facets, k);
+    }
 
     return false;
 }
@@ -298,13 +306,39 @@ void facets_accepted_param(FACETS *facets, const char *param) {
 }
 
 inline FACET_KEY *facets_register_key(FACETS *facets, const char *key, FACET_KEY_OPTIONS options) {
-    FACET_KEY t = {
+    FACET_KEY tk = {
             .name = key,
             .options = options,
+            .default_selected_for_values = true,
     };
     char hash[FACET_HASH_SIZE];
-    hash_keys_and_values(t.name, hash);
-    return dictionary_set(facets->keys, hash, &t, sizeof(t));
+    hash_keys_and_values(tk.name, hash);
+    return dictionary_set(facets->keys, hash, &tk, sizeof(tk));
+}
+
+void facets_set_items(FACETS *facets, uint32_t items) {
+    facets->max_items_to_return = items;
+}
+
+void facets_set_anchor(FACETS *facets, usec_t anchor) {
+    facets->anchor = anchor;
+}
+
+void facets_register_facet_filter(FACETS *facets, const char *key_id, char *value_ids, FACET_KEY_OPTIONS options) {
+    FACET_KEY tk = {
+            .options = options,
+    };
+    FACET_KEY *k = dictionary_set(facets->keys, key_id, &tk, sizeof(tk));
+
+    k->default_selected_for_values = false;
+    k->options |= FACET_KEY_OPTION_FACET;
+    k->options &= ~FACET_KEY_OPTION_NO_FACET;
+    facet_key_late_init(facets, k);
+
+    FACET_VALUE tv = {
+            .selected = true,
+    };
+    dictionary_set(k->values, value_ids, &tv, sizeof(tv));
 }
 
 // ----------------------------------------------------------------------------
@@ -314,12 +348,12 @@ static inline void facets_check_value(FACETS *facets __maybe_unused, FACET_KEY *
         buffer_strcat(k->current_value, FACET_VALUE_UNSET);
 
     if(k->values) {
-        FACET_VALUE t = {
+        FACET_VALUE tk = {
             .name = buffer_tostring(k->current_value),
         };
         char hash[FACET_HASH_SIZE];
-        hash_keys_and_values(t.name, hash);
-        dictionary_set(k->values, hash, &t, sizeof(t));
+        hash_keys_and_values(tk.name, hash);
+        dictionary_set(k->values, hash, &tk, sizeof(tk));
     }
     else {
         k->key_found_in_row++;
