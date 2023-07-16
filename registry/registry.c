@@ -195,7 +195,7 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w) {
 
     buffer_json_member_add_array(w->response.data, "nodes");
     RRDHOST *h;
-    dfe_start_read(rrdhost_root_index, h) {
+    dfe_start_read(rrdb.rrdhost_root_index, h) {
         buffer_json_add_array_item_object(w->response.data);
         buffer_json_member_add_string(w->response.data, "machine_guid", h->machine_guid);
 
