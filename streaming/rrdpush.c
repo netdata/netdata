@@ -801,7 +801,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
     rpt->ssl = NETDATA_SSL_UNSET_CONNECTION;
 #endif
 
-    rpt->config.update_every = rrdb.default_rrd_update_every;
+    rpt->config.update_every = rrdb.default_update_every;
 
     // parse the parameters and fill rpt and rpt->system_info
 

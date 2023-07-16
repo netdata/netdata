@@ -44,7 +44,7 @@ int mark_scheduled_instances(struct engine *engine)
 
     for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
         if (!instance->disabled && (engine->now % instance->config.update_every >=
-                                    instance->config.update_every - rrdb.localhost->rrd_update_every)) {
+                                    instance->config.update_every - rrdb.localhost->update_every)) {
             instance->scheduled = 1;
             instances_were_scheduled = 1;
             instance->before = engine->now;

@@ -700,7 +700,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
          , rpt->client_port
          , rrdhost_hostname(rpt->host)
          , rpt->host->machine_guid
-         , rpt->host->rrd_update_every
+         , rpt->host->update_every
          , rpt->host->rrd_history_entries
          , storage_engine_name(rpt->host->storage_engine_id)
          , (rpt->config.health_enabled == CONFIG_BOOLEAN_NO)?"disabled":((rpt->config.health_enabled == CONFIG_BOOLEAN_YES)?"enabled":"auto")
@@ -715,7 +715,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
 
 
     struct plugind cd = {
-            .update_every = rrdb.default_rrd_update_every,
+            .update_every = rrdb.default_update_every,
             .unsafe = {
                     .spinlock = NETDATA_SPINLOCK_INITIALIZER,
                     .running = true,

@@ -344,7 +344,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
             , ""
             , program_name
             , program_version
-            , rrdb.default_rrd_update_every
+            , rrdb.default_update_every
             , rrdb.default_rrd_history_entries
             , default_storage_engine_id
             , default_health_enabled
@@ -401,7 +401,7 @@ struct rrdb rrdb = {
         RRD_BACKFILL_NEW,
         RRD_BACKFILL_NEW
     },
-    .default_rrd_update_every = UPDATE_EVERY_MIN,
+    .default_update_every = UPDATE_EVERY_MIN,
     .default_rrd_history_entries = RRD_DEFAULT_HISTORY_ENTRIES,
     .gap_when_lost_iterations_above = 1,
     .rrdset_free_obsolete_time_s = RRD_DEFAULT_HISTORY_ENTRIES,

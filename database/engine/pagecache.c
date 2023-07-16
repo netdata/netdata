@@ -232,7 +232,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
     time_t dt_s = mrg_metric_get_update_every_s(main_mrg, metric);
 
     if(!dt_s)
-        dt_s = rrdb.default_rrd_update_every;
+        dt_s = rrdb.default_update_every;
 
     time_t previous_page_end_time_s = now_s - dt_s;
     bool first = true;
@@ -423,7 +423,7 @@ static size_t list_has_time_gaps(
     time_t now_s = wanted_start_time_s;
     time_t dt_s = mrg_metric_get_update_every_s(main_mrg, metric);
     if(!dt_s)
-        dt_s = rrdb.default_rrd_update_every;
+        dt_s = rrdb.default_update_every;
 
     size_t pages_pass2 = 0, pages_pass3 = 0;
     while((pd = pdc_find_page_for_time(

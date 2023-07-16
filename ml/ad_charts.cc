@@ -27,7 +27,7 @@ void ml_update_dimensions_chart(ml_host_t *host, const ml_machine_learning_stats
                     NETDATA_ML_PLUGIN, // plugin
                     NETDATA_ML_MODULE_TRAINING, // module
                     NETDATA_ML_CHART_PRIO_MACHINE_LEARNING_STATUS, // priority
-                    rrdb.localhost->rrd_update_every, // update_every
+                    rrdb.localhost->update_every, // update_every
                     RRDSET_TYPE_LINE // chart_type
             );
             rrdset_flag_set(host->machine_learning_status_rs , RRDSET_FLAG_ANOMALY_DETECTION);
@@ -69,7 +69,7 @@ void ml_update_dimensions_chart(ml_host_t *host, const ml_machine_learning_stats
                     NETDATA_ML_PLUGIN, // plugin
                     NETDATA_ML_MODULE_TRAINING, // module
                     NETDATA_ML_CHART_PRIO_METRIC_TYPES, // priority
-                    rrdb.localhost->rrd_update_every, // update_every
+                    rrdb.localhost->update_every, // update_every
                     RRDSET_TYPE_LINE // chart_type
             );
             rrdset_flag_set(host->metric_type_rs, RRDSET_FLAG_ANOMALY_DETECTION);
@@ -111,7 +111,7 @@ void ml_update_dimensions_chart(ml_host_t *host, const ml_machine_learning_stats
                     NETDATA_ML_PLUGIN, // plugin
                     NETDATA_ML_MODULE_TRAINING, // module
                     NETDATA_ML_CHART_PRIO_TRAINING_STATUS, // priority
-                    rrdb.localhost->rrd_update_every, // update_every
+                    rrdb.localhost->update_every, // update_every
                     RRDSET_TYPE_LINE // chart_type
             );
 
@@ -166,7 +166,7 @@ void ml_update_dimensions_chart(ml_host_t *host, const ml_machine_learning_stats
                     NETDATA_ML_PLUGIN, // plugin
                     NETDATA_ML_MODULE_TRAINING, // module
                     ML_CHART_PRIO_DIMENSIONS, // priority
-                    rrdb.localhost->rrd_update_every, // update_every
+                    rrdb.localhost->update_every, // update_every
                     RRDSET_TYPE_LINE // chart_type
             );
             rrdset_flag_set(host->dimensions_rs, RRDSET_FLAG_ANOMALY_DETECTION);
@@ -206,7 +206,7 @@ void ml_update_dimensions_chart(ml_host_t *host, const ml_machine_learning_stats
                     NETDATA_ML_PLUGIN, // plugin
                     NETDATA_ML_MODULE_DETECTION, // module
                     NETDATA_ML_CHART_RUNNING, // priority
-                    rrdb.localhost->rrd_update_every, // update_every
+                    rrdb.localhost->update_every, // update_every
                     RRDSET_TYPE_LINE // chart_type
             );
             rrdset_flag_set(host->ml_running_rs, RRDSET_FLAG_ANOMALY_DETECTION);
@@ -245,7 +245,7 @@ void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number 
                     NETDATA_ML_PLUGIN, // plugin
                     NETDATA_ML_MODULE_DETECTION, // module
                     ML_CHART_PRIO_ANOMALY_RATE, // priority
-                    rrdb.localhost->rrd_update_every, // update_every
+                    rrdb.localhost->update_every, // update_every
                     RRDSET_TYPE_LINE // chart_type
             );
             rrdset_flag_set(host->anomaly_rate_rs, RRDSET_FLAG_ANOMALY_DETECTION);
@@ -282,7 +282,7 @@ void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number 
                     NETDATA_ML_PLUGIN, // plugin
                     NETDATA_ML_MODULE_DETECTION, // module
                     ML_CHART_PRIO_DETECTOR_EVENTS, // priority
-                    rrdb.localhost->rrd_update_every, // update_every
+                    rrdb.localhost->update_every, // update_every
                     RRDSET_TYPE_LINE // chart_type
             );
             rrdset_flag_set(host->detector_events_rs, RRDSET_FLAG_ANOMALY_DETECTION);
@@ -299,7 +299,7 @@ void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number 
         if (host->ml_running) {
             ONEWAYALLOC *OWA = onewayalloc_create(0);
             time_t Now = now_realtime_sec();
-            time_t Before = Now - host->rh->rrd_update_every;
+            time_t Before = Now - host->rh->update_every;
             time_t After = Before - Cfg.anomaly_detection_query_duration;
             RRDR_OPTIONS Options = static_cast<RRDR_OPTIONS>(0x00000000);
 
@@ -372,7 +372,7 @@ void ml_update_training_statistics_chart(ml_training_thread_t *training_thread, 
                     NETDATA_ML_PLUGIN, // plugin
                     NETDATA_ML_MODULE_TRAINING, // module
                     NETDATA_ML_CHART_PRIO_QUEUE_STATS, // priority
-                    rrdb.localhost->rrd_update_every, // update_every
+                    rrdb.localhost->update_every, // update_every
                     RRDSET_TYPE_LINE// chart_type
             );
             rrdset_flag_set(training_thread->queue_stats_rs, RRDSET_FLAG_ANOMALY_DETECTION);
@@ -414,7 +414,7 @@ void ml_update_training_statistics_chart(ml_training_thread_t *training_thread, 
                     NETDATA_ML_PLUGIN, // plugin
                     NETDATA_ML_MODULE_TRAINING, // module
                     NETDATA_ML_CHART_PRIO_TRAINING_TIME_STATS, // priority
-                    rrdb.localhost->rrd_update_every, // update_every
+                    rrdb.localhost->update_every, // update_every
                     RRDSET_TYPE_LINE// chart_type
             );
             rrdset_flag_set(training_thread->training_time_stats_rs, RRDSET_FLAG_ANOMALY_DETECTION);
@@ -460,7 +460,7 @@ void ml_update_training_statistics_chart(ml_training_thread_t *training_thread, 
                     NETDATA_ML_PLUGIN, // plugin
                     NETDATA_ML_MODULE_TRAINING, // module
                     NETDATA_ML_CHART_PRIO_TRAINING_RESULTS, // priority
-                    rrdb.localhost->rrd_update_every, // update_every
+                    rrdb.localhost->update_every, // update_every
                     RRDSET_TYPE_LINE// chart_type
             );
             rrdset_flag_set(training_thread->training_results_rs, RRDSET_FLAG_ANOMALY_DETECTION);
@@ -509,7 +509,7 @@ void ml_update_global_statistics_charts(uint64_t models_consulted) {
                     , NETDATA_ML_PLUGIN // plugin
                     , NETDATA_ML_MODULE_DETECTION // module
                     , NETDATA_ML_CHART_PRIO_MACHINE_LEARNING_STATUS // priority
-                    , rrdb.localhost->rrd_update_every // update_every
+                    , rrdb.localhost->update_every // update_every
                     , RRDSET_TYPE_AREA // chart_type
             );
 

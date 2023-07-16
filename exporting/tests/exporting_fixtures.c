@@ -77,7 +77,7 @@ int setup_rrdhost()
 {
     localhost = calloc(1, sizeof(RRDHOST));
 
-    localhost->rrd_update_every = 1;
+    localhost->update_every = 1;
 
     localhost->tags = string_strdupz("TAG1=VALUE1 TAG2=VALUE2");
 

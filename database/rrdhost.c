@@ -202,7 +202,7 @@ void set_host_properties(RRDHOST *host, int update_every, STORAGE_ENGINE_ID stor
                          const char *program_version)
 {
 
-    host->rrd_update_every = update_every;
+    host->update_every = update_every;
     host->storage_engine_id = storage_engine_id;
 
     rrdhost_init_os(host, os);
@@ -324,8 +324,8 @@ int is_legacy = 1;
         case STORAGE_ENGINE_SAVE:
         case STORAGE_ENGINE_RAM:
         default:
-            if(host->rrdpush_seconds_to_replicate > (time_t) host->rrd_history_entries * (time_t) host->rrd_update_every)
-                host->rrdpush_seconds_to_replicate = (time_t) host->rrd_history_entries * (time_t) host->rrd_update_every;
+            if(host->rrdpush_seconds_to_replicate > (time_t) host->rrd_history_entries * (time_t) host->update_every)
+                host->rrdpush_seconds_to_replicate = (time_t) host->rrd_history_entries * (time_t) host->update_every;
             break;
     }
 
@@ -508,7 +508,7 @@ int is_legacy = 1;
          , rrdhost_tags(host)
          , rrdhost_program_name(host)
          , rrdhost_program_version(host)
-         , host->rrd_update_every
+         , host->update_every
          , storage_engine_name(host->storage_engine_id)
          , host->rrd_history_entries
          , rrdhost_has_rrdpush_sender_enabled(host)?"enabled":"disabled"
@@ -596,10 +596,10 @@ static void rrdhost_update(RRDHOST *host
         string_freez(t);
     }
 
-    if(host->rrd_update_every != update_every)
+    if(host->update_every != update_every)
         netdata_log_error("Host '%s' has an update frequency of %d seconds, but the wanted one is %d seconds. "
                           "Restart netdata here to apply the new settings.",
-                          rrdhost_hostname(host), host->rrd_update_every, update_every);
+                          rrdhost_hostname(host), host->update_every, update_every);
 
     if(host->storage_engine_id != storage_engine_id) {
         netdata_log_error("Host '%s' has memory mode '%s', but the wanted one is '%s'. "

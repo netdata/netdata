@@ -1276,7 +1276,7 @@ void web_client_build_http_header(struct web_client *w) {
     // set a proper expiration date, if not already set
     if(unlikely(!w->response.data->expires)) {
         if(w->response.data->options & WB_CONTENT_NO_CACHEABLE)
-            w->response.data->expires = w->response.data->date + rrdb.localhost->rrd_update_every;
+            w->response.data->expires = w->response.data->date + rrdb.localhost->update_every;
         else
             w->response.data->expires = w->response.data->date + 86400;
     }

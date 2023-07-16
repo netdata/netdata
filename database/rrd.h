@@ -792,7 +792,7 @@ struct rrdhost {
     RRDHOST_FLAGS flags;                            // runtime flags about this RRDHOST (atomics on this)
     RRDHOST_FLAGS *exporting_flags;                 // array of flags for exporting connector instances
 
-    int32_t rrd_update_every;                       // the update frequency of the host
+    int32_t update_every;                       // the update frequency of the host
     int32_t rrd_history_entries;                    // the number of history entries for the host's charts
 
     STORAGE_ENGINE_ID storage_engine_id;            // the configured storage engine id for the charts of this host
@@ -930,7 +930,7 @@ struct rrdb {
     size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
     RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS];
 
-    int default_rrd_update_every;
+    int default_update_every;
     int default_rrd_history_entries;
 
     int gap_when_lost_iterations_above;

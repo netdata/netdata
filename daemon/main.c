@@ -1082,11 +1082,11 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get default database update frequency
 
-    rrdb.default_rrd_update_every = (int) config_get_number(CONFIG_SECTION_DB, "update every", rrdb.default_rrd_update_every);
-    if(rrdb.default_rrd_update_every < UPDATE_EVERY_MIN || rrdb.default_rrd_update_every > UPDATE_EVERY_MAX) {
-        netdata_log_error("Invalid data collection frequency (update every) %d given. Defaulting to %d.", rrdb.default_rrd_update_every, UPDATE_EVERY_MIN);
-        rrdb.default_rrd_update_every = UPDATE_EVERY_MIN;
-        config_set_number(CONFIG_SECTION_DB, "update every", rrdb.default_rrd_update_every);
+    rrdb.default_update_every = (int) config_get_number(CONFIG_SECTION_DB, "update every", rrdb.default_update_every);
+    if(rrdb.default_update_every < UPDATE_EVERY_MIN || rrdb.default_update_every > UPDATE_EVERY_MAX) {
+        netdata_log_error("Invalid data collection frequency (update every) %d given. Defaulting to %d.", rrdb.default_update_every, UPDATE_EVERY_MIN);
+        rrdb.default_update_every = UPDATE_EVERY_MIN;
+        config_set_number(CONFIG_SECTION_DB, "update every", rrdb.default_update_every);
     }
 
     // ------------------------------------------------------------------------
@@ -1486,7 +1486,7 @@ int main(int argc, char **argv) {
                             // No call to load the config file on this code-path
                             post_conf_load(&user);
                             get_netdata_configured_variables();
-                            rrdb.default_rrd_update_every = 1;
+                            rrdb.default_update_every = 1;
                             default_storage_engine_id = STORAGE_ENGINE_RAM;
                             default_health_enabled = 0;
                             rrdb.storage_tiers = 1;
@@ -1571,7 +1571,7 @@ int main(int argc, char **argv) {
                             unsigned history_seconds = strtoul(optarg, NULL, 0);
                             post_conf_load(&user);
                             get_netdata_configured_variables();
-                            rrdb.default_rrd_update_every = 1;
+                            rrdb.default_update_every = 1;
                             registry_init();
                             if(rrd_init("dbengine-dataset", NULL, true)) {
                                 fprintf(stderr, "rrd_init failed for unittest\n");

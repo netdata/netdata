@@ -849,7 +849,7 @@ static void test_create_main_rusage_chart(void **state)
     expect_string(rrdset_create_custom, plugin, "exporting");
     expect_value(rrdset_create_custom, module, NULL);
     expect_value(rrdset_create_custom, priority, 130600);
-    expect_value(rrdset_create_custom, update_every, localhost->rrd_update_every);
+    expect_value(rrdset_create_custom, update_every, localhost->update_every);
     expect_value(rrdset_create_custom, chart_type, RRDSET_TYPE_STACKED);
     will_return(rrdset_create_custom, st_rusage);
 

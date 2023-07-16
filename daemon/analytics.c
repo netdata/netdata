@@ -827,7 +827,7 @@ void set_global_environment()
 {
     {
         char b[16];
-        snprintfz(b, 15, "%d", rrdb.default_rrd_update_every);
+        snprintfz(b, 15, "%d", rrdb.default_update_every);
         setenv("NETDATA_UPDATE_EVERY", b, 1);
     }
 

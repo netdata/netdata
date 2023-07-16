@@ -746,8 +746,8 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle,
 
         handle->dt_s = db_update_every_s;
         if (!handle->dt_s) {
-            handle->dt_s = rrdb.default_rrd_update_every;
-            mrg_metric_set_update_every_s_if_zero(main_mrg, metric, rrdb.default_rrd_update_every);
+            handle->dt_s = rrdb.default_update_every;
+            mrg_metric_set_update_every_s_if_zero(main_mrg, metric, rrdb.default_update_every);
         }
 
         rrddim_handle->handle = (STORAGE_QUERY_HANDLE *) handle;
@@ -1295,7 +1295,7 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
             if(likely(points > 1))
                 update_every_s = (time_t) ((end_time_s - start_time_s) / (points - 1));
             else {
-                update_every_s = (time_t) (rrdb.default_rrd_update_every * get_tier_grouping(datafile->ctx->config.tier));
+                update_every_s = (time_t) (rrdb.default_update_every * get_tier_grouping(datafile->ctx->config.tier));
                 stats->single_point_pages++;
             }
 
@@ -1377,7 +1377,7 @@ static RRDENG_SIZE_STATS rrdeng_size_statistics_internal(struct rrdengine_instan
 //    stats.sizeof_metric_in_index = 40;
 //    stats.sizeof_page_in_index = 24;
 
-    stats.default_granularity_secs = (size_t) rrdb.default_rrd_update_every * get_tier_grouping(ctx->config.tier);
+    stats.default_granularity_secs = (size_t) rrdb.default_update_every * get_tier_grouping(ctx->config.tier);
 
     return stats;
 }

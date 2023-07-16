@@ -1896,7 +1896,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
 
         // statistics
         usec_t now_mono_ut = now_monotonic_usec();
-        if(unlikely(now_mono_ut - last_now_mono_ut > rrdb.default_rrd_update_every * USEC_PER_SEC)) {
+        if(unlikely(now_mono_ut - last_now_mono_ut > rrdb.default_update_every * USEC_PER_SEC)) {
             last_now_mono_ut = now_mono_ut;
 
             worker_is_busy(WORKER_JOB_STATISTICS);
