@@ -263,7 +263,6 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     {
         size_t initialized = 0;
         for (size_t tier = 0; tier < rrdb.storage_tiers; tier++) {
-            rd->tiers[tier].tier_grouping = host->db[tier].tier_grouping;
             rd->tiers[tier].db_metric_handle = storage_engine_metric_get_or_create(rd, host->db[tier].id, host->db[tier].instance);
             storage_point_unset(rd->tiers[tier].virtual_point);
             initialized++;

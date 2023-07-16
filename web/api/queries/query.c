@@ -1956,11 +1956,12 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
         return;
 
     struct rrddim_tier *t = &rd->tiers[tier];
-    if(unlikely(!t)) return;
+    if (unlikely(!t))
+        return;
 
     STORAGE_ENGINE_ID storage_engine_id = rd->rrdset->storage_engine_id;
     time_t latest_time_s = storage_engine_latest_time_s(storage_engine_id, t->db_metric_handle);
-    time_t granularity = (time_t)t->tier_grouping * (time_t)rd->rrdset->update_every;
+    time_t granularity = (time_t) rd->rrdset->rrdhost->db[tier].tier_grouping * (time_t)rd->rrdset->update_every;
     time_t time_diff   = now_s - latest_time_s;
 
     // if the user wants only NEW backfilling, and we don't have any data

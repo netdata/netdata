@@ -226,7 +226,6 @@ bool exporting_labels_filter_callback(const char *name, const char *value, RRDLA
 
 struct rrddim_tier {
     STORAGE_POINT virtual_point;
-    uint32_t tier_grouping;
     time_t next_point_end_time_s;
     STORAGE_METRIC_HANDLE *db_metric_handle;        // the metric handle inside the database
     STORAGE_COLLECT_HANDLE *db_collection_handle;   // the data collection handle

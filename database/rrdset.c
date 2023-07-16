@@ -1348,14 +1348,15 @@ static inline void rrdset_init_last_updated_time(RRDSET *st) {
 
 static __thread size_t rrdset_done_statistics_points_stored_per_tier[RRD_STORAGE_TIERS];
 
-static inline time_t tier_next_point_time_s(RRDDIM *rd, struct rrddim_tier *t, time_t now_s) {
-    time_t loop = (time_t)rd->rrdset->update_every * (time_t)t->tier_grouping;
+static inline time_t tier_next_point_time_s(RRDDIM *rd, size_t tier, time_t now_s) {
+    uint32_t tier_grouping = rd->rrdset->rrdhost->db[tier].tier_grouping;
+    time_t loop = (time_t)rd->rrdset->update_every * (time_t) tier_grouping;
     return now_s + loop - ((now_s + loop) % loop);
 }
 
 void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut __maybe_unused) {
     if (unlikely(!t->next_point_end_time_s))
-        t->next_point_end_time_s = tier_next_point_time_s(rd, t, sp.end_time_s);
+        t->next_point_end_time_s = tier_next_point_time_s(rd, tier, sp.end_time_s);
 
     if(unlikely(sp.start_time_s >= t->next_point_end_time_s)) {
         // flush the virtual point, it is done
@@ -1387,7 +1388,7 @@ void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAG
 
         rrdset_done_statistics_points_stored_per_tier[tier]++;
         t->virtual_point.count = 0; // make the point unset
-        t->next_point_end_time_s = tier_next_point_time_s(rd, t, sp.end_time_s);
+        t->next_point_end_time_s = tier_next_point_time_s(rd, tier, sp.end_time_s);
     }
 
     // merge the dates into our virtual point
