@@ -27,6 +27,7 @@ dist_healthconfig_DATA = \
     health.d/adaptec_raid.conf \
     health.d/anomalies.conf \
     health.d/apcupsd.conf \
+    health.d/apps.conf \
     health.d/bcache.conf \
     health.d/beanstalkd.conf \
     health.d/bind_rndc.conf \
