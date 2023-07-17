@@ -84,7 +84,7 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
    
    Netdata can be installed on all Linux, MacOS, and FreeBSD systems. We provide binary packages for the most popular operating systems and package managers.
 
-   - Install on [Ubuntu, Debian CentOS, Arch, Alpine, Gentoo](https://learn.netdata.cloud/docs/installing/one-line-installer-for-all-linux-systems).
+   - Install on [Ubuntu, Debian CentOS, Fedora, Suse, Red Hat, Arch, Alpine, Gentoo](https://learn.netdata.cloud/docs/installing/one-line-installer-for-all-linux-systems).
    - Install with [Docker](https://learn.netdata.cloud/docs/installing/docker). Netdata is a [Verified Publisher on DockerHub](https://hub.docker.com/r/netdata/netdata) and our users enjoy free unlimited DockerHub pulls :heart_eyes:.
    - Install on [MacOS](https://learn.netdata.cloud/docs/installing/macos) :metal:.
    - Install on [FreeBSD](https://learn.netdata.cloud/docs/installing/freebsd) and [pfSense](https://learn.netdata.cloud/docs/installing/pfsense).
