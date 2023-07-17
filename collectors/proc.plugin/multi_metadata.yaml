@@ -4736,7 +4736,7 @@ modules:
         list: []
     alerts:
       - name: linux_power_supply_capacity
-        link: 
+        link: |
           https://github.com/netdata/netdata/blob/master/health/health.d/linux_power_supply.conf
         metric: powersupply.capacity
         info: percentage of remaining power supply capacity
