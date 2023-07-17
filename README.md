@@ -174,130 +174,120 @@ When using Netdata Parents, all the functions of a Netdata Agent (except data co
 
 <details>
 <summary>:shield: Is this secure?</summary>
-<br>
+
 Of course it is! We do our best to ensure it is!
-<br><br>
+
 We understand that Netdata is a software piece that is installed on millions of production systems across the world. So, it is important for us, Netdata to be as secure as possible:
-<br><br>
-  - We follow the <a href="https://bestpractices.coreinfrastructure.org/en/projects/2231">Open Source Security Foundation</a> best practices.
-  - We have given great attention to detail when it comes to security design. Check out our <a href="https://learn.netdata.cloud/docs/architecture/security-and-privacy-design">security design</a>.
-  - Netdata is a popular open-source project and is frequently tested by many security analysts.
-  - Check also our <a href="https://github.com/netdata/netdata/security">security policies and advisories published so far</a>.
-<br><br>
+
+- We follow the [Open Source Security Foundation](https://bestpractices.coreinfrastructure.org/en/projects/2231) best practices.
+- We have given great attention to detail when it comes to security design. Check out our [security design](https://learn.netdata.cloud/docs/architecture/security-and-privacy-design).
+- Netdata is a popular open-source project and is frequently tested by many security analysts.
+- Check also our [security policies and advisories published so far](https://github.com/netdata/netdata/security).
+
 </details>
 
 <details>
 <summary>:cyclone: Will this consume a lot of resources on my servers?</summary>
-<br>
+
 No. It will not! We promise this will be fast!
-<br><br>
+
 Although each Netdata Agent is a complete monitoring solution packed into a single application, and despite the fact that Netdata collects **every metric every single second** and trains **multiple ML models** per metric, you will find that Netdata has amazing performance! In many cases, it outperforms other monitoring solutions that have significantly fewer features or far smaller data collection rates.
-<br><br>
+
 This is what you should expect:
-<br><br>
+
   - For production systems, each Netdata Agent with default settings (everything enabled, ML, Health, DB) should consume about 5% CPU utilization of one core and about 150 MiB or RAM. By using a Netdata parent and streaming all metrics to that parent, you can disable ML & health and use an ephemeral DB mode (like `alloc`) on the children, leading to utilization of about 1% CPU of a single core and 100 MiB of RAM. Of course, these depend on how many metrics are collected.
   - For Netdata Parents, for about 1 to 2 million metrics, all collected every second, we suggest a server with 16 cores and 32GB RAM. Less than half of it will be used for data collection and ML. The rest will be available for queries.
-<br><br>
+
 Netdata has extensive internal instrumentation to help us reveal how the resources consumed are used. All these are available in the "Netdata Monitoring" section of the dashboard. Depending on your use case, there are many options to optimize resource consumption.
-<br><br>
+
 Even if you need to run Netdata on extremely weak embedded or IoT systems, you will find that Netdata can be tuned to be very performant.
-<br><br>
+
 </details>
 
 <details>
 <summary>:scroll: How much retention can I have?</summary>
-<br>
+
 As much as you need!
-<br><br>
+
 Netdata supports **tiering**, to downsample past data and save disk space. With default settings, it has 3 tiers:
-<br><br>
-<ol>
-  <li><code>tier 0</code>, with high resolution, per-second, data.</li>
-  <li><code>tier 1</code>, mid-resolution, per minute, data.</li>
-  <li><code>tier 2</code>, low-resolution, per hour, data.</li>
-</ol>
-<br>
+
+1. `tier 0`, with high resolution, per-second, data.
+1. `tier 1`, mid-resolution, per minute, data.
+1. `tier 2`, low-resolution, per hour, data.
+
 All tiers are updated in parallel during data collection. Just increase the disk space you give to Netdata to get a longer history for your metrics. Tiers are automatically chosen at query time depending on the time frame and the resolution requested.
-<br><br>
+
 </details>
 
 <details>
 <summary>:rocket: Does it scale? I have really a lot of servers!</summary>
-<br>
+
 Yes, of course it does!
-<br><br>
-<ul>
-  <li>:airplane: Netdata Parents provide great vertical scalability, so you can have as big parents as the CPU, RAM and Disk resources you can dedicate to them. In our lab we constantly stress test Netdata Parents with about 2 million metrics collected per second.</li>
-  <li>:rocket: In addition, Netdata Cloud provides virtually unlimited horizontal scalability. It "merges" all the Netdata parents you have into one unified infrastructure at query time. Netdata Cloud itself is probably the biggest single installation monitoring platform ever created, currently monitoring about 100k online servers with about 10k servers changing state (added/removed) per day!</li>
-</ul>
-<br>
+
+- :airplane: Netdata Parents provide great vertical scalability, so you can have as big parents as the CPU, RAM and Disk resources you can dedicate to them. In our lab we constantly stress test Netdata Parents with about 2 million metrics collected per second.
+- :rocket: In addition, Netdata Cloud provides virtually unlimited horizontal scalability. It "merges" all the Netdata parents you have into one unified infrastructure at query time. Netdata Cloud itself is probably the biggest single installation monitoring platform ever created, currently monitoring about 100k online servers with about 10k servers changing state (added/removed) per day!
+
 </details>
 
 <details>
 <summary>:floppy_disk: My production servers are very sensitive in disk I/O. Can I use Netdata?</summary>
-<br>
+
 Yes, you can!
-<br><br>
+
 We suggest the following:
-<br><br>
-<ol>
-  <li>Use database mode <code>alloc</code> or <code>ram</code> to disable writing metric data to disk.</li>
-  <li>Configure streaming to push in real-time all metrics to a Netdata Parent. The Netdata Parent will maintain metrics on disk for this node.</li>
-  <li>Disable ML and health on this node. The Netdata Parent will do them for this node.</li>
-  <li>Use the Netdata Parent to access the dashboard.</li>
-</ol>
-<br>
+
+1. Use database mode `alloc` or `ram` to disable writing metric data to disk.
+1. Configure streaming to push in real-time all metrics to a Netdata Parent. The Netdata Parent will maintain metrics on disk for this node.
+1. Disable ML and health on this node. The Netdata Parent will do them for this node.
+1. Use the Netdata Parent to access the dashboard.
+
 Using the above, the Netdata Agent on your production system will not need a disk.
-<br>
+
 </details>
 
 <details>
 <summary>:raised_eyebrow: How is Netdata different from a Prometheus and Grafana setup?</summary>
-<br>
+
 First we have to say that Prometheus as a time-series database and Grafana as a visualizer are excellent tools for what they do.
-<br><br>
+
 However, we believe that such a setup is missing a key element: A Prometheus and Grafana setup assumes that you know everything about the metrics you collect and you understand deeply how they are structured, they should be queried and visualized.
-<br><br>
+
 In reality this setup has a lot of problems. The vast number of technologies, operating systems, and applications we use in our modern stacks, makes it impossible for any single person to know and understand everything about anything. We get testimonials regularly from Netdata users across the biggest enterprises, that Netdata manages to reveal issues, anomalies and problems they were not aware of and they didn't even have the means to find or troubleshoot.
-<br><br>
+
 So, the biggest difference of Netdata to Prometheus and Grafana, is that we decided that the tool needs to have a much better understanding of the components, the applications and the metrics it monitors.
-<br><br>
-<ul>
-  <li>When compared to Prometheus, Netdata needs for each metric much more than just a name, some labels and a value over time. A metric in Netdata is a structured entity that correlates with other metrics in a certain way, has specific attributes that depict how it should be organized, treated, queried and visualized. We call this the NIDL (Nodes, Instances, Dimensions, Labels) framework. To maintain such an index is a challenge: first because the raw metrics collected do not provide this information, so we have to add it, and second because we need to maintain this index for the lifetime of each metric, which with our current database retention, it is usually more than a year.</li>
-  <li>When compared to Grafana, Netdata is fully automated. Grafana has more customization capabilities than Netdata, but Netdata presents fully functional dashboards by itself and most importantly it gives you the means to understand, analyze, filter, slice and dice the data without the need for you to edit queries or be aware of any peculiarities the underlying metrics may have. Furthermore, to help you when you need to find the needle in the haystack, Netdata has advanced troubleshooting tools provided by the Netdata metrics scoring engine, that allows it to score metrics based on their anomaly rate, their differences or similarities for any given time-frame.</li>
-</ul>
-<br>
+
+- When compared to Prometheus, Netdata needs for each metric much more than just a name, some labels and a value over time. A metric in Netdata is a structured entity that correlates with other metrics in a certain way, has specific attributes that depict how it should be organized, treated, queried and visualized. We call this the NIDL (Nodes, Instances, Dimensions, Labels) framework. To maintain such an index is a challenge: first because the raw metrics collected do not provide this information, so we have to add it, and second because we need to maintain this index for the lifetime of each metric, which with our current database retention, it is usually more than a year.
+- When compared to Grafana, Netdata is fully automated. Grafana has more customization capabilities than Netdata, but Netdata presents fully functional dashboards by itself and most importantly it gives you the means to understand, analyze, filter, slice and dice the data without the need for you to edit queries or be aware of any peculiarities the underlying metrics may have. Furthermore, to help you when you need to find the needle in the haystack, Netdata has advanced troubleshooting tools provided by the Netdata metrics scoring engine, that allows it to score metrics based on their anomaly rate, their differences or similarities for any given time-frame.
+
 Still, if you are already familiar with Prometheus and Grafana, Netdata integrates nicely with them, and we have reports from users who use Netdata with Prometheus and Grafana in production.
-<br>
+
 </details>
 
 <details>
 <summary>:cloud: Do I have to subscribe to Netdata Cloud?</summary>
-<br>
+
 No. But we hope you will find it useful.
-<br><br>
+
 The Netdata Agent dashboard and the Netdata Cloud dashboard are the same. Still, Netdata Cloud provides additional features, that the Netdata Agent is not capable of. These include:
-<br><br>
-<ol>
-  <li>Customizability (custom dashboards and other settings are persisted when you are signed in to Netdata Cloud)</li>
-  <li>Configuration of Alerts and Data Collection from the UI (coming soon).</li>
-  <li>Security (role-based access control - RBAC).</li>
-  <li>Horizontal Scalability ("blend" multiple independent parents in one uniform infrastructure).</li>
-  <li>Central Dispatch of Alert Notifications (even when multiple independent parents are involved).</li>
-  <li>Mobile App for Alert Notifications (coming soon).</li>
-</ol>
-<br>
+
+1. Customizability (custom dashboards and other settings are persisted when you are signed in to Netdata Cloud).
+1. Configuration of Alerts and Data Collection from the UI (coming soon).
+1. Security (role-based access control - RBAC).
+1. Horizontal Scalability ("blend" multiple independent parents in one uniform infrastructure).
+1. Central Dispatch of Alert Notifications (even when multiple independent parents are involved).
+1. Mobile App for Alert Notifications (coming soon).
+
 So, although it is not required, you can get the most out of your Netdata installation by using Netdata Cloud.
-<br>
+
 </details>
 
 <details>
 <summary>:office: Who uses Netdata?</summary>
-<br>
-Netdata is a popular project. Check its <a href="https://github.com/netdata/netdata/stargazers">stargazers on github</a>. You will find people from quite popular companies and enterprises, including: SAP, Qualcomm, IBM, Amazon, Intel, AMD, Unity, Baidu, Cisco, Samsung, Netflix, Facebook and hundreds more.
-<br><br>
+
+Netdata is a popular project. Check its [stargazers on github](https://github.com/netdata/netdata/stargazers). You will find people from quite popular companies and enterprises, including: SAP, Qualcomm, IBM, Amazon, Intel, AMD, Unity, Baidu, Cisco, Samsung, Netflix, Facebook and hundreds more.
+
 Netdata is also popular in universities, including New York University, Columbia University, New Jersey University, and dozens more.
-<br>
+
 </details>
 
 ## :book: Documentation
