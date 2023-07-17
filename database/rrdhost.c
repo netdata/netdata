@@ -1057,6 +1057,23 @@ void rrdhost_delete_charts(RRDHOST *host) {
 // ----------------------------------------------------------------------------
 // RRDHOST - cleanup host files
 
+static void delete_obsolete_dimensions(RRDSET *st) {
+    RRDDIM *rd;
+
+    netdata_log_info("Deleting dimensions of chart '%s' ('%s') from disk...", rrdset_id(st), rrdset_name(st));
+
+    rrddim_foreach_read(rd, st) {
+        if(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
+            const char *cache_filename = rrddim_cache_filename(rd);
+            if(!cache_filename) continue;
+            netdata_log_info("Deleting dimension file '%s'.", cache_filename);
+            if(unlikely(unlink(cache_filename) == -1))
+                netdata_log_error("Cannot delete dimension file '%s'", cache_filename);
+        }
+    }
+    rrddim_foreach_done(rd);
+}
+
 void rrdhost_cleanup_charts(RRDHOST *host) {
     if(!host) return;
 
@@ -1073,7 +1090,7 @@ void rrdhost_cleanup_charts(RRDHOST *host) {
             rrdset_delete_files(st);
 
         else if(rrdhost_delete_obsolete_charts && rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))
-            rrdset_delete_obsolete_dimensions(st);
+            delete_obsolete_dimensions(st);
 
         else
             rrdset_save(st);
