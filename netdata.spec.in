@@ -3,6 +3,8 @@
 %global version @PACKAGE_VERSION@
 %global ENABLE_SENTRY_OPT 0
 %global ENABLE_SENTRY_OPT %(echo $ENABLE_SENTRY_OPT)
+%global _debugsource_packages 1
+%global _debuginfo_subpackages 0
 
 #TODO: Temporary fix for the build-id error during go.d plugin set up
 %global _missing_build_ids_terminate_build 0
