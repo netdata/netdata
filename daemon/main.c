@@ -1322,6 +1322,138 @@ int get_system_info(struct rrdhost_system_info *system_info, bool log) {
     return 0;
 }
 
+static void localhost_load_config_labels(void) {
+    int status = config_load(NULL, 1, CONFIG_SECTION_HOST_LABEL);
+    if(!status) {
+        char *filename = CONFIG_DIR "/" CONFIG_FILENAME;
+        netdata_log_error("RRDLABEL: Cannot reload the configuration file '%s', using labels in memory", filename);
+    }
+
+    struct section *co = appconfig_get_section(&netdata_config, CONFIG_SECTION_HOST_LABEL);
+    if(co) {
+        config_section_wrlock(co);
+        struct config_option *cv;
+        for(cv = co->values; cv ; cv = cv->next) {
+            rrdlabels_add(rrdb.localhost->rrdlabels, cv->name, cv->value, RRDLABEL_SRC_CONFIG);
+            cv->flags |= CONFIG_VALUE_USED;
+        }
+        config_section_unlock(co);
+    }
+}
+
+static void localhost_load_kubernetes_labels(void) {
+    char label_script[sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("get-kubernetes-labels.sh") + 2)];
+    sprintf(label_script, "%s/%s", netdata_configured_primary_plugins_dir, "get-kubernetes-labels.sh");
+
+    if (unlikely(access(label_script, R_OK) != 0)) {
+        netdata_log_error("Kubernetes pod label fetching script %s not found.",label_script);
+        return;
+    }
+
+    netdata_log_debug(D_RRDHOST, "Attempting to fetch external labels via %s", label_script);
+
+    pid_t pid;
+    FILE *fp_child_input;
+    FILE *fp_child_output = netdata_popen(label_script, &pid, &fp_child_input);
+    if(!fp_child_output) return;
+
+    char buffer[1000 + 1];
+    while (fgets(buffer, 1000, fp_child_output) != NULL)
+        rrdlabels_add_pair(rrdb.localhost->rrdlabels, buffer, RRDLABEL_SRC_AUTO|RRDLABEL_SRC_K8S);
+
+    // Non-zero exit code means that all the script output is error messages. We've shown already any message that didn't include a ':'
+    // Here we'll inform with an ERROR that the script failed, show whatever (if anything) was added to the list of labels, free the memory and set the return to null
+    int rc = netdata_pclose(fp_child_input, fp_child_output, pid);
+    if(rc)
+        netdata_log_error("%s exited abnormally. Failed to get kubernetes labels.", label_script);
+}
+
+static void localhost_load_auto_labels(void) {
+    DICTIONARY *labels = rrdb.localhost->rrdlabels;
+
+    if (rrdb.localhost->system_info->cloud_provider_type)
+        rrdlabels_add(labels, "_cloud_provider_type", rrdb.localhost->system_info->cloud_provider_type, RRDLABEL_SRC_AUTO);
+
+    if (rrdb.localhost->system_info->cloud_instance_type)
+        rrdlabels_add(labels, "_cloud_instance_type", rrdb.localhost->system_info->cloud_instance_type, RRDLABEL_SRC_AUTO);
+
+    if (rrdb.localhost->system_info->cloud_instance_region)
+        rrdlabels_add(labels, "_cloud_instance_region", rrdb.localhost->system_info->cloud_instance_region, RRDLABEL_SRC_AUTO);
+
+    if (rrdb.localhost->system_info->host_os_name)
+        rrdlabels_add(labels, "_os_name", rrdb.localhost->system_info->host_os_name, RRDLABEL_SRC_AUTO);
+
+    if (rrdb.localhost->system_info->host_os_version)
+        rrdlabels_add(labels, "_os_version", rrdb.localhost->system_info->host_os_version, RRDLABEL_SRC_AUTO);
+
+    if (rrdb.localhost->system_info->kernel_version)
+        rrdlabels_add(labels, "_kernel_version", rrdb.localhost->system_info->kernel_version, RRDLABEL_SRC_AUTO);
+
+    if (rrdb.localhost->system_info->host_cores)
+        rrdlabels_add(labels, "_system_cores", rrdb.localhost->system_info->host_cores, RRDLABEL_SRC_AUTO);
+
+    if (rrdb.localhost->system_info->host_cpu_freq)
+        rrdlabels_add(labels, "_system_cpu_freq", rrdb.localhost->system_info->host_cpu_freq, RRDLABEL_SRC_AUTO);
+
+    if (rrdb.localhost->system_info->host_ram_total)
+        rrdlabels_add(labels, "_system_ram_total", rrdb.localhost->system_info->host_ram_total, RRDLABEL_SRC_AUTO);
+
+    if (rrdb.localhost->system_info->host_disk_space)
+        rrdlabels_add(labels, "_system_disk_space", rrdb.localhost->system_info->host_disk_space, RRDLABEL_SRC_AUTO);
+
+    if (rrdb.localhost->system_info->architecture)
+        rrdlabels_add(labels, "_architecture", rrdb.localhost->system_info->architecture, RRDLABEL_SRC_AUTO);
+
+    if (rrdb.localhost->system_info->virtualization)
+        rrdlabels_add(labels, "_virtualization", rrdb.localhost->system_info->virtualization, RRDLABEL_SRC_AUTO);
+
+    if (rrdb.localhost->system_info->container)
+        rrdlabels_add(labels, "_container", rrdb.localhost->system_info->container, RRDLABEL_SRC_AUTO);
+
+    if (rrdb.localhost->system_info->container_detection)
+        rrdlabels_add(labels, "_container_detection", rrdb.localhost->system_info->container_detection, RRDLABEL_SRC_AUTO);
+
+    if (rrdb.localhost->system_info->virt_detection)
+        rrdlabels_add(labels, "_virt_detection", rrdb.localhost->system_info->virt_detection, RRDLABEL_SRC_AUTO);
+
+    if (rrdb.localhost->system_info->is_k8s_node)
+        rrdlabels_add(labels, "_is_k8s_node", rrdb.localhost->system_info->is_k8s_node, RRDLABEL_SRC_AUTO);
+
+    if (rrdb.localhost->system_info->install_type)
+        rrdlabels_add(labels, "_install_type", rrdb.localhost->system_info->install_type, RRDLABEL_SRC_AUTO);
+
+    if (rrdb.localhost->system_info->prebuilt_arch)
+        rrdlabels_add(labels, "_prebuilt_arch", rrdb.localhost->system_info->prebuilt_arch, RRDLABEL_SRC_AUTO);
+
+    if (rrdb.localhost->system_info->prebuilt_dist)
+        rrdlabels_add(labels, "_prebuilt_dist", rrdb.localhost->system_info->prebuilt_dist, RRDLABEL_SRC_AUTO);
+
+    add_aclk_host_labels();
+
+    health_add_host_labels();
+
+    rrdlabels_add(labels, "_is_parent", (rrdb.localhost->connected_children_count > 0) ? "true" : "false", RRDLABEL_SRC_AUTO);
+
+    if (rrdb.localhost->rrdpush_send_destination)
+        rrdlabels_add(labels, "_streams_to", rrdb.localhost->rrdpush_send_destination, RRDLABEL_SRC_AUTO);
+}
+
+void localhost_load_labels(void) {
+    if(!rrdb.localhost->rrdlabels)
+        rrdb.localhost->rrdlabels = rrdlabels_create();
+
+    rrdlabels_unmark_all(rrdb.localhost->rrdlabels);
+
+    // priority is important here
+    localhost_load_config_labels();
+    localhost_load_kubernetes_labels();
+    localhost_load_auto_labels();
+
+    rrdhost_flag_set(rrdb.localhost, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
+
+    rrdpush_send_host_labels(rrdb.localhost);
+}
+
 void set_silencers_filename() {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/health.silencers.json", netdata_configured_varlib_dir);
@@ -2076,9 +2208,9 @@ int main(int argc, char **argv) {
 
     error_log_limit_reset();
 
-    // Load host labels
+    // Load localhost labels
     delta_startup_time("collect host labels");
-    reload_host_labels();
+    localhost_load_labels();
 
     // ------------------------------------------------------------------------
     // spawn the threads

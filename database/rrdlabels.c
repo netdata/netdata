@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #define NETDATA_RRD_INTERNALS
-#include "rrd.h"
+#include "rrdlabels.h"
 
 // ----------------------------------------------------------------------------
 // labels sanitization
@@ -1012,18 +1012,6 @@ void rrdlabels_to_buffer_json_members(DICTIONARY *labels, BUFFER *wb) {
     }
     dfe_done(lb);
 }
-
-void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels) {
-    if(!st->rrdlabels)
-        st->rrdlabels = rrdlabels_create();
-
-    if (new_rrdlabels)
-        rrdlabels_migrate_to_these(st->rrdlabels, new_rrdlabels);
-
-    rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
-    rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
-}
-
 
 // ----------------------------------------------------------------------------
 // rrdlabels unit test
