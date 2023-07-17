@@ -258,6 +258,7 @@ static void flb_complete_buff_item(struct File_info *p_file_info){
 
     circ_buff_insert(buff);
 
+    uv_timer_again(&p_file_info->flb_tmp_buff_cpy_timer);
 }
 
 void flb_complete_item_timer_timeout_cb(uv_timer_t *handle) {
