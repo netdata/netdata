@@ -674,10 +674,22 @@ get_system_info() {
           DISTRO_COMPAT_NAME="${DISTRO}"
       else
           case "${DISTRO}" in
-          opensuse-leap) DISTRO_COMPAT_NAME="opensuse" ;;
-          cloudlinux|almalinux|rocky|rhel) DISTRO_COMPAT_NAME="centos" ;;
-          artix|manjaro|obarun) DISTRO_COMPAT_NAME="arch" ;;
-          *) DISTRO_COMPAT_NAME="unknown" ;;
+          opensuse-leap)
+              DISTRO_COMPAT_NAME="opensuse"
+              ;;
+          opensuse-tumbleweed)
+              DISTRO_COMPAT_NAME="opensuse"
+              SYSVERSION="tumbleweed"
+              ;;
+          cloudlinux|almalinux|rocky|rhel)
+              DISTRO_COMPAT_NAME="centos"
+              ;;
+          artix|manjaro|obarun)
+              DISTRO_COMPAT_NAME="arch"
+              ;;
+          *)
+              DISTRO_COMPAT_NAME="unknown"
+              ;;
           esac
       fi
 

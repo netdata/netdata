@@ -164,14 +164,14 @@ include:
 
   - &opensuse
     distro: opensuse
-    version: "15.4"
+    version: "tumbleweed"
     eol_check: true
-    base_image: opensuse/leap:15.4
+    base_image: opensuse/tumbleweed
     jsonc_removal: |
       zypper rm -y libjson-c-devel
     packages: &opensuse_packages
       type: rpm
-      repo_distro: opensuse/15.4
+      repo_distro: opensuse/tumbleweed
       arches:
         - x86_64
         - aarch64
@@ -183,6 +183,12 @@ include:
     packages:
       <<: *opensuse_packages
       repo_distro: opensuse/15.5
+  - <<: *opensuse
+    version: "15.4"
+    base_image: opensuse/leap:15.4
+    packages:
+      <<: *opensuse_packages
+      repo_distro: opensuse/15.4
 
   - &oracle
     distro: oraclelinux
