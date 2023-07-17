@@ -774,6 +774,7 @@ set(RRD_PLUGIN_FILES
         database/engine/rrdenginelib.h
         database/engine/rrdengineapi.c
         database/engine/rrdengineapi.h
+        database/engine/rrddim_eng.h
         database/engine/pagecache.c
         database/engine/pagecache.h
         database/engine/cache.c
