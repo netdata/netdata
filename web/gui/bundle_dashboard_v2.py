@@ -90,6 +90,7 @@ def copy_dashboard():
     (TMPPATH / 'agent' / 'index.html').rename(Path('./index.html'))
     (TMPPATH / 'agent' / 'registry-access.html').rename('./registry-access.html')
     (TMPPATH / 'agent' / 'registry-alert-redirect.html').rename('./registry-alert-redirect.html')
+    (TMPPATH / 'agent' / 'registry-hello.html').rename('./registry-hello.html')
     shutil.copytree(TMPPATH / 'agent' / 'static', Path('./static'), dirs_exist_ok=True)
     shutil.rmtree(TMPPATH)
     print('Copying README.md')
