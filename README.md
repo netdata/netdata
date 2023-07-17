@@ -275,7 +275,7 @@ Netdata's documentation is available at [**Netdata Learn**](https://learn.netdat
 This site also hosts a number of [guides](https://learn.netdata.cloud/guides) to help newer users better understand how
 to collect metrics, troubleshoot via charts, export to external databases, and more.
 
-## Community
+## :tada: Community
 
 Netdata is an inclusive open-source project and community. Please read our [Code of Conduct](https://github.com/netdata/.github/blob/main/CODE_OF_CONDUCT.md).
 
@@ -293,14 +293,30 @@ You can also find Netdata on:
 -   [Repology](https://repology.org/metapackage/netdata/versions)
 -   [Facebook](https://www.facebook.com/linuxnetdata/)
 
-## Contribute
+## :pray: Contribute
 
-Contributions are essential to the success of open-source projects. While we continue to invest in and improve Netdata, we need your help!
+Contributions are essential to the success of open-source projects. In other words, we need you help to keep Netdata great!
 
+What is a contribution? All the following are highly valuable to Netdata:
+
+1. **Let us know of the best-practices you believe should be standardized**<br/>
+   Netdata should out-of-the-box detect as many infrastructure issues as possible. By sharing your knowledge and experiences, you help us build a monitoring solution that has baked into it all the best-practices about infrastructure monitoring.
+
+2. **Let us know if Netdata is not perfect for your use case**<br/>
+   We aim to support as many use cases, operating systems and integrations, as possible. We rely on you to bring to our attention that Netdata is sub-optimal for a certain use-case. Open a github issue, or start a github discussion about it, to discuss what you need and what you believe Netdata should be doing for your use case. Keep in mind though that we cant' promise we will implement it. We prioritize development on use-cases that are common to our community, are in the same direction we want Netdata to evolve and are aligned with our roadmap.
+
+3. **Support other community members**<br/>
+   Join our community on Github, Discord and Reddit and help them out. Generally, Netdata is relatively easy to setup and configure, but still people may need a little push in the right direction to use it effectively. Supporting other members is a great contribution by itself!
+
+4. **Add or improve integrations you need**<br/>
+   Integrations are generally easier and simpler to develop. If you want to contribute code to Netdata, we suggest to start with integrations you need and Netdata may not currently support.
+
+General information about contributions:
+
+- Check our [Security Policy](https://github.com/netdata/netdata/security/policy).
+- Found a bug? Open a [GitHub issue](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml&title=%5BBug%5D%3A+).
 - Read our [Contributing Guide](https://github.com/netdata/.github/blob/main/CONTRIBUTING.md), which contains all the information you need to contribute to Netdata, such as improving our documentation, engaging in the community, and developing new features. We've made it as frictionless as possible, but if you need help, just ping us on our community forums!
 - We have a whole category dedicated to contributing and extending Netdata on our [community forums](https://community.netdata.cloud/c/agent-development/9)
-- Found a bug? Open a [GitHub issue](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml&title=%5BBug%5D%3A+).
-- View our [Security Policy](https://github.com/netdata/netdata/security/policy).
 
 Package maintainers should read the guide on [building Netdata from source](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/source.md) for
 instructions on building each Netdata component from the source and preparing a package.
