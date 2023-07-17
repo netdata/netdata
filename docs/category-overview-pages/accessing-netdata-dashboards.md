@@ -2,13 +2,13 @@
 
 This section contains documentation on how you can access the Netdata dashboards, which are the same both for the Agent and Cloud.
 
+A user accessing the Netdata dashboard **through the Cloud** will always be presented with the latest Netdata dashboard version.
+
 A user accessing the Netdata dashboard **through the Agent** will, by default, be presented with the latest Netdata dashboard version (which is the one also used on Netdata Cloud).
 The exceptions happen when the:
 * Agent doesn't have external network access, so it won't be able to get the latest Netdata dashboards, but will fallback to the Netdata dashboard version that 
 was shipped with the agent;
 * User has defined, e.g. through URL bookmark, that he wants to see the previous version of the dashboard (accessible `http://NODE:19999/v1`, replacing `NODE` ith the IP address or hostname of your Agent). 
-
-A user accessing the Netdata dashboard **through the Cloud** will always be presented with the latest Netdata dashboard version.
 
 ## Main areas
 
