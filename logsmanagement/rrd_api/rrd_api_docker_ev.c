@@ -41,7 +41,7 @@ void docker_ev_chart_init(struct File_info *p_file_info){
                 , NULL
                 , ++chart_prio
                 , p_file_info->update_every
-                , RRDSET_TYPE_AREA
+                , RRDSET_TYPE_LINE
         );
         chart_data->dim_lines_rate = rrddim_add(chart_data->st_lines_rate, "records", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
