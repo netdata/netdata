@@ -1291,6 +1291,20 @@ static NETDATA_DOUBLE rrdhost_sender_replication_completion_unsafe(RRDHOST *host
     return completion;
 }
 
+static void rrdhost_retention(RRDHOST *host, time_t now, bool online, time_t *from, time_t *to)
+{
+    spinlock_lock(&host->retention.spinlock);
+    time_t first_time_s = host->retention.first_time_s;
+    time_t last_time_s = host->retention.last_time_s;
+    spinlock_unlock(&host->retention.spinlock);
+
+    if (from)
+        *from = first_time_s;
+
+    if (to)
+        *to = online ? now : last_time_s;
+}
+
 bool rrdhost_matches_window(RRDHOST *host, time_t after, time_t before, time_t now) {
     time_t first_time_s, last_time_s;
     rrdhost_retention(host, now, rrdhost_is_online(host), &first_time_s, &last_time_s);
