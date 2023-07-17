@@ -419,11 +419,19 @@ int register_module(struct configurable_plugin *plugin, struct module *module)
 static dyncfg_config_t get_plugin_config(struct configurable_plugin *plugin)
 {
     if (plugin->plugins_d)
-        plugin->get_config_cb(plugin->cb_usr_ctx);
+        return plugin->get_config_cb(plugin->cb_usr_ctx);
 
     //TODO
-    
     return plugin->config;
+}
+
+static dyncfg_config_t get_module_config(struct module *module)
+{
+    if (module->plugin->plugins_d)
+        return module->get_config_cb(module->set_config_cb_usr_ctx, module->name);
+
+    //TODO
+    return module->config;
 }
 
 struct uni_http_response dyn_conf_process_http_request(int method, const char *plugin, const char *module, const char *job_id, void *post_payload, size_t post_payload_size)
@@ -523,12 +531,12 @@ struct uni_http_response dyn_conf_process_http_request(int method, const char *p
     }
     if (job_id == NULL) {
         if (method == HTTP_METHOD_GET) {
-            resp.content = mallocz(mod->config.data_size);
-            memcpy(resp.content, mod->config.data, mod->config.data_size);
+            dyncfg_config_t cfg = get_module_config(mod);
+            resp.content = mallocz(cfg.data_size);
+            memcpy(resp.content, cfg.data, cfg.data_size);
             resp.status = HTTP_RESP_OK;
-//          resp.content_type = CT_APPLICATION_JSON;
             resp.content_free = free;
-            resp.content_length = mod->config.data_size;
+            resp.content_length = cfg.data_size;
             return resp;
         } else if (method == HTTP_METHOD_PUT) {
             if (post_payload == NULL) {

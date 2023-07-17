@@ -1926,7 +1926,7 @@ static dyncfg_config_t get_module_config_cb(void *usr_ctx, const char *modulenam
     PARSER *parser = usr_ctx;
     char buf[1024];
     snprintfz(buf, sizeof(buf), "get_module_config %s", modulename);
-    return call_virtual_function_blocking(parser, "get_module_config modulename");
+    return call_virtual_function_blocking(parser, buf);
 }
 
 static inline PARSER_RC pluginsd_register_plugin(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser __maybe_unused) {
@@ -1970,6 +1970,7 @@ static inline PARSER_RC pluginsd_register_module(char **words __maybe_unused, si
 
     mod->set_config_cb = _plugin_set_config_cb;
     mod->get_config_cb = get_module_config_cb;
+    mod->set_config_cb_usr_ctx = parser;
 
     register_module(plug_cfg, mod);
     return PARSER_RC_OK;
