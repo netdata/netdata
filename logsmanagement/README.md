@@ -284,7 +284,7 @@ there is no parsing at all by default.
 To create a custom chart, the following key-value configuration options must be 
 added to the respective log source configuration section:
 
-    custom 1 chart = identifier
+	custom 1 chart = identifier
 	custom 1 regex name = kernel
 	custom 1 regex = .*\bkernel\b.*
 	custom 1 ignore case = no
@@ -339,16 +339,6 @@ And the generated charts based on this configuration:
 ## Streaming
 
 </a>
-
-TODO
-
-_How to configure streaming if child is Fluent-Bit?_
-
-_How to configure streaming if child is Netdata?_
-
-_What about Fluent-Bit retries, if network is down? Logs received out of order?_
-
-_Compression via gzip_
 
 Netdata supports 2 streaming configurations:
 1. `syslog` messages over Unix or network sockets. 
