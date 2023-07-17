@@ -66,7 +66,7 @@ then
 	cd ../..
 	sudo $INSTALL_PATH/netdata/usr/libexec/netdata/netdata-uninstaller.sh -y -f -e $INSTALL_PATH/netdata/etc/netdata/.environment
 	sudo rm -rf $INSTALL_PATH/netdata/etc/netdata # Remove /etc/netdata if it persists for some reason
-	sudo git clean -dxff && git fetch --tags --all && git submodule update --init --recursive --force 
+	sudo git clean -dxff && git submodule update --init --recursive --force 
 
 	if [ "$build_for_release" -eq 0 ]
 	then

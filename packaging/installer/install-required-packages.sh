@@ -663,7 +663,7 @@ declare -A pkg_cmake=(
   ['default']="cmake"
 )
 
-# bison and flex are required by Fluent-Bit to compile with --enable-logsmanagement
+# bison and flex are required by Fluent-Bit
 declare -A pkg_bison=(
   ['default']="bison"
 )
@@ -672,7 +672,7 @@ declare -A pkg_flex=(
   ['default']="flex"
 )
 
-# fts-dev is required by Fluent-Bit to compile with --enable-logsmanagement on Alpine
+# fts-dev is required by Fluent-Bit on Alpine
 declare -A pkg_fts_dev=(
   ['default']="NOTREQUIRED"
   ['alpine']="musl-fts-dev"
@@ -681,7 +681,7 @@ declare -A pkg_fts_dev=(
   ['alpine-3.14.10']="fts-dev"
 )
 
-# cmake3 is required by Fluent-Bit to compile with --enable-logsmanagement on CentOS 7
+# cmake3 is required by Fluent-Bit on CentOS 7
 declare -A pkg_cmake3=(
   ['default']="NOTREQUIRED"
   ['centos-7']="cmake3"

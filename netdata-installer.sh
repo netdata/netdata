@@ -1020,7 +1020,6 @@ bundle_fluentbit() {
       CFLAGS="${CFLAGS} -DFLB_HAVE_INOTIFY"
     fi
     FLUENT_BIT_BUILD_SUCCESS=1
-    NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-logsmanagement)}" | sed 's/$/ --enable-logsmanagement/g')"
     run_ok "Fluent-Bit built successfully."
   else
     run_failed "Failed to build Fluent-Bit, Netdata Logs Management support will be disabled in this build."
