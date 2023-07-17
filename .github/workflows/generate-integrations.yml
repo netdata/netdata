@@ -30,7 +30,7 @@ jobs:
           submodules: recursive
       - name: Get Go Ref
         id: get-go-ref
-        run: echo "go_ref=$(cat packaging/go.d.version)" >> $GITHUB_ENV
+        run: echo "go_ref=$(cat packaging/go.d.version)" >> "${GITHUB_ENV}"
       - name: Checkout Go
         id: checkout-go
         uses: actions/checkout@v3
