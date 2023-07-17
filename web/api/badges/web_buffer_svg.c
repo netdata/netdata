@@ -1055,7 +1055,8 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     if(rc) {
         if (refresh > 0) {
             buffer_sprintf(w->response.header, "Refresh: %d\r\n", refresh);
-            w->response.data->expires = now_realtime_sec() + refresh;
+            w->response.data->date = now_realtime_sec();
+            w->response.data->expires = w->response.data->date + refresh;
         }
         else buffer_no_cacheable(w->response.data);
 
