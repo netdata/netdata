@@ -239,6 +239,9 @@ Yes, of course it does!
 
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
+Netdata is a distributed monitoring solution. You can scale it to infinity by spreading Netdata servers across your infrastructure.
+
+With the streaming feature of Netdata Agents, we can support monitoring ephemeral servers, but also allow the creation of "monitoring islands" where metrics are aggregated to a few servers (Netdata Parents) for increased retention, or for offloading production systems.
 
   - :airplane: Netdata Parents provide great vertical scalability, so you can have as big parents as the CPU, RAM and Disk resources you can dedicate to them. In our lab we constantly stress test Netdata Parents with about 2 million metrics collected per second.
     
