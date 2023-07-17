@@ -59,7 +59,6 @@ alerts:
     info: number of buried jobs across all tubes. You need to manually kick them so
       they can be processed. Presence of buried jobs in a tube does not affect new
       jobs.
-    os: "freebsd"
 metrics:
   folding:
     title: Metrics

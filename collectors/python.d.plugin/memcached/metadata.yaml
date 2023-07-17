@@ -57,13 +57,16 @@ alerts:
     link: https://github.com/netdata/netdata/blob/master/health/health.d/memcached.conf
     metric: memcached.cache
     info: cache memory utilization
-    os: "freebsd"
   - name: memcached_cache_fill_rate
     link: https://github.com/netdata/netdata/blob/master/health/health.d/memcached.conf
     metric: memcached.cache
     info: average rate the cache fills up (positive), or frees up (negative) space
       over the last hour
-    os: "freebsd"
+  - name: memcached_out_of_cache_space_time
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/memcached.conf
+    metric: memcached.cache
+    info: estimated time the cache will run out of space if the system continues to
+      add data at the same rate as the past hour
 metrics:
   folding:
     title: Metrics

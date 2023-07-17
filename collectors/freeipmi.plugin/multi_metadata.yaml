@@ -131,7 +131,6 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/health/health.d/ipmi.conf
         metric: ipmi.sensor_state
         info: IPMI sensor ${label:sensor} (${label:component}) state
-        os: "linux"
     metrics:
       folding:
         title: Metrics

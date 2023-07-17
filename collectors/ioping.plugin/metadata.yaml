@@ -52,7 +52,11 @@ setup:
 troubleshooting:
   problems:
     list: []
-alerts: []
+alerts:
+  - name: ioping_disk_latency
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/ioping.conf
+    metric: ioping.latency
+    info: average I/O latency over the last 10 seconds
 metrics:
   folding:
     title: Metrics

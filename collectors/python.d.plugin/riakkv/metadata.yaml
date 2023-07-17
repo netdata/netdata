@@ -58,32 +58,31 @@ alerts:
     metric: riak.kv.latency.get
     info: average time between reception of client GET request and subsequent response
       to client over the last hour
-    os: "*"
   - name: riakkv_kv_get_slow
     link: https://github.com/netdata/netdata/blob/master/health/health.d/riakkv.conf
     metric: riak.kv.latency.get
     info: average time between reception of client GET request and subsequent response
       to the client over the last 3 minutes, compared to the average over the last
       hour
-    os: "*"
   - name: riakkv_1h_kv_put_mean_latency
     link: https://github.com/netdata/netdata/blob/master/health/health.d/riakkv.conf
     metric: riak.kv.latency.put
     info: average time between reception of client PUT request and subsequent response
       to the client over the last hour
-    os: "*"
   - name: riakkv_kv_put_slow
     link: https://github.com/netdata/netdata/blob/master/health/health.d/riakkv.conf
     metric: riak.kv.latency.put
     info: average time between reception of client PUT request and subsequent response
       to the client over the last 3 minutes, compared to the average over the last
       hour
-    os: "*"
+  - name: riakkv_vm_high_process_count
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/riakkv.conf
+    metric: riak.vm
+    info: number of processes running in the Erlang VM
   - name: riakkv_list_keys_active
     link: https://github.com/netdata/netdata/blob/master/health/health.d/riakkv.conf
     metric: riak.core.fsm_active
     info: number of currently running list keys finite state machines
-    os: "*"
 metrics:
   folding:
     title: Metrics
