@@ -183,31 +183,31 @@ We understand that Netdata is a software piece that is installed on millions of 
 - We have given great attention to detail when it comes to security design. Check out our [security design](https://learn.netdata.cloud/docs/architecture/security-and-privacy-design).
 - Netdata is a popular open-source project and is frequently tested by many security analysts.
 - Check also our [security policies and advisories published so far](https://github.com/netdata/netdata/security).
-
 </details>
 
 <details>
 <summary>:cyclone: Will this consume a lot of resources on my servers?</summary>
 <br>
 No. It will not! We promise this will be fast!
+<br><br>
 
 Although each Netdata Agent is a complete monitoring solution packed into a single application, and despite the fact that Netdata collects **every metric every single second** and trains **multiple ML models** per metric, you will find that Netdata has amazing performance! In many cases, it outperforms other monitoring solutions that have significantly fewer features or far smaller data collection rates.
 
 This is what you should expect:
 
-  - For production systems, each Netdata Agent with default settings (everything enabled, ML, Health, DB) should consume about 5% CPU utilization of one core and about 150 MiB or RAM. By using a Netdata parent and streaming all metrics to that parent, you can disable ML & health and use an ephemeral DB mode (like `alloc`) on the children, leading to utilization of about 1% CPU of a single core and 100 MiB of RAM. Of course, these depend on how many metrics are collected.
-  - For Netdata Parents, for about 1 to 2 million metrics, all collected every second, we suggest a server with 16 cores and 32GB RAM. Less than half of it will be used for data collection and ML. The rest will be available for queries.
+- For production systems, each Netdata Agent with default settings (everything enabled, ML, Health, DB) should consume about 5% CPU utilization of one core and about 150 MiB or RAM. By using a Netdata parent and streaming all metrics to that parent, you can disable ML & health and use an ephemeral DB mode (like `alloc`) on the children, leading to utilization of about 1% CPU of a single core and 100 MiB of RAM. Of course, these depend on how many metrics are collected.
+- For Netdata Parents, for about 1 to 2 million metrics, all collected every second, we suggest a server with 16 cores and 32GB RAM. Less than half of it will be used for data collection and ML. The rest will be available for queries.
 
 Netdata has extensive internal instrumentation to help us reveal how the resources consumed are used. All these are available in the "Netdata Monitoring" section of the dashboard. Depending on your use case, there are many options to optimize resource consumption.
 
 Even if you need to run Netdata on extremely weak embedded or IoT systems, you will find that Netdata can be tuned to be very performant.
-
 </details>
 
 <details>
 <summary>:scroll: How much retention can I have?</summary>
 <br>
 As much as you need!
+<br><br>
 
 Netdata supports **tiering**, to downsample past data and save disk space. With default settings, it has 3 tiers:
 
@@ -226,13 +226,13 @@ Yes, of course it does!
 
 - :airplane: Netdata Parents provide great vertical scalability, so you can have as big parents as the CPU, RAM and Disk resources you can dedicate to them. In our lab we constantly stress test Netdata Parents with about 2 million metrics collected per second.
 - :rocket: In addition, Netdata Cloud provides virtually unlimited horizontal scalability. It "merges" all the Netdata parents you have into one unified infrastructure at query time. Netdata Cloud itself is probably the biggest single installation monitoring platform ever created, currently monitoring about 100k online servers with about 10k servers changing state (added/removed) per day!
-
 </details>
 
 <details>
 <summary>:floppy_disk: My production servers are very sensitive in disk I/O. Can I use Netdata?</summary>
 <br>
 Yes, you can!
+<br><br>
 
 We suggest the following:
 
@@ -242,7 +242,6 @@ We suggest the following:
 1. Use the Netdata Parent to access the dashboard.
 
 Using the above, the Netdata Agent on your production system will not need a disk.
-
 </details>
 
 <details>
@@ -260,13 +259,13 @@ So, the biggest difference of Netdata to Prometheus and Grafana, is that we deci
 - When compared to Grafana, Netdata is fully automated. Grafana has more customization capabilities than Netdata, but Netdata presents fully functional dashboards by itself and most importantly it gives you the means to understand, analyze, filter, slice and dice the data without the need for you to edit queries or be aware of any peculiarities the underlying metrics may have. Furthermore, to help you when you need to find the needle in the haystack, Netdata has advanced troubleshooting tools provided by the Netdata metrics scoring engine, that allows it to score metrics based on their anomaly rate, their differences or similarities for any given time-frame.
 
 Still, if you are already familiar with Prometheus and Grafana, Netdata integrates nicely with them, and we have reports from users who use Netdata with Prometheus and Grafana in production.
-
 </details>
 
 <details>
 <summary>:cloud: Do I have to subscribe to Netdata Cloud?</summary>
 <br>
 No. But we hope you will find it useful.
+<br><br>
 
 The Netdata Agent dashboard and the Netdata Cloud dashboard are the same. Still, Netdata Cloud provides additional features, that the Netdata Agent is not capable of. These include:
 
@@ -278,16 +277,15 @@ The Netdata Agent dashboard and the Netdata Cloud dashboard are the same. Still,
 1. Mobile App for Alert Notifications (coming soon).
 
 So, although it is not required, you can get the most out of your Netdata installation by using Netdata Cloud.
-
 </details>
 
 <details>
 <summary>:office: Who uses Netdata?</summary>
 <br>
+
 Netdata is a popular project. Check its [stargazers on github](https://github.com/netdata/netdata/stargazers). You will find people from quite popular companies and enterprises, including: SAP, Qualcomm, IBM, Amazon, Intel, AMD, Unity, Baidu, Cisco, Samsung, Netflix, Facebook and hundreds more.
 
 Netdata is also popular in universities, including New York University, Columbia University, New Jersey University, and dozens more.
-
 </details>
 
 ## :book: Documentation
