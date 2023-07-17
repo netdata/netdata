@@ -18,19 +18,19 @@
 
 Netdata collects metrics per second and presents them in beautiful low-latency dashboards. It is designed to run on all of your physical and virtual servers, cloud deployments, Kubernetes clusters, and edge/IoT devices, to monitor everything you run.
 
-- :boom: **Collects metrics from [800+ integrations](https://www.netdata.cloud/integrations/)**<br/>
+- :boom: **Collects metrics from 800+ integrations**<br/>
   Operating system metrics, container metrics, virtual machines, hardware sensors, applications metrics, OpenMetrics exporters, StatsD, and logs.
   
-- :muscle: **[Real-Time, Low-Latency, High-Resolution](https://learn.netdata.cloud/docs/data-collection/)**<br/>
+- :muscle: **Real-Time, Low-Latency, High-Resolution**<br/>
   All metrics are collected per second and are on the dashboard immediately after data collection. Netdata is designed to be fast.
 
-- :face_in_clouds: **Unsupervised [Anomaly Detection](https://learn.netdata.cloud/docs/ml-and-troubleshooting/machine-learning-ml-powered-anomaly-detection)**<br/>
+- :face_in_clouds: **Unsupervised Anomaly Detection**<br/>
   Trains multiple Machine-Learning (ML) models for each metric collected and detects anomalies based on the past behavior of each metric individually.
 
-- :fire: **Powerful [Visualization](https://learn.netdata.cloud/docs/visualizations/)**<br/>
+- :fire: **Powerful Visualization**<br/>
   Clear and precise visualization that allows you to quickly understand any dataset, but also to filter, slice and dice the data directly on the dashboard, without the need to learn any query language.
 
-- :bell: **Out of box [Alerts](https://learn.netdata.cloud/docs/alerting/)**<br/>
+- :bell: **Out of box Alerts**<br/>
   Comes with hundreds of alerts out of the box to detect common issues and pitfalls, revealing issues that can easily go unnoticed.
 
 - :sunglasses: **Low Maintenance**<br/>
