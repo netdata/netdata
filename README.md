@@ -61,7 +61,7 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
 <hr class="solid">
 
 > :bulb: **Important Note**<br/>
-> People get addicted to Netdata. **Once you use it on your systems, there's no going back!**<br/>
+> People get addicted to Netdata. Once you use it on your systems, **there's no going back!**<br/>
 > _You have been warned..._<br/>
 
 <hr class="solid">
@@ -105,9 +105,21 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
    
    Netdata Parents provide:
 
-   - Infrastructure level dashboards, at `http://parent.server.ip:19999/`
-   - Increased retention for all metrics of all your nodes
-   - Central configuration of alerts and dispatch of notifications
+   - **Infrastructure level dashboards, at `http://parent.server.ip:19999/`.**<br/>
+   
+     Each Netdata Agent has an API listening at the TCP port 19999 of each server.
+     When you hit that port with a web browser (e.g. `http://server.ip:19999/`), the Netdata Agent UI is presented.
+     When the Netdata Agent is also a Parent, the UI of the Parent includes data for all nodes that stream metrics to that Parent.
+     
+   - **Increased retention for all metrics of all your nodes.**<br/>
+   
+     Each Netdata Agent maintains each own database of metrics. But Parents can be given additional resources to maintain a much longer database than
+     individual Netdata Agents.
+    
+   - **Central configuration of alerts and dispatch of notifications.**<br/>
+   
+     Netdata Agents and Parents can dispatch alert notifications multiple third party systems, including: `email`, `Alerta`, `AWS SNS`, `Discord`, `Dynatrace`, `flock`, `gotify`, `IRC`, `Matrix`, `MessageBird`, `Microsoft Teams`, `ntfy`, `OPSgenie`, `PagerDuty`, `Prowl`, `PushBullet`, `PushOver`, `RocketChat`, `Slack`, `SMS tools`, `StackPulse`, `Syslog`, `Telegram`, `Twilio`.
+     Using Netdata Parents, all these integrations can be configured only once, at the Parent.
 
    You can also use Netdata Parents to:
 
@@ -155,7 +167,7 @@ Each Netdata Agent can perform the following functions:
    Uses database engine plugins to store the collected data, either in memory and/or on disk. We have developed our own [`dbengine`](https://github.com/netdata/netdata/tree/master/database/engine#readme) for storing the data in a very efficient manner, allowing Netdata to have less than 1 byte per sample on disk and amazingly fast queries.
    
 3. **`LEARN` the behavior of metrics** (ML)<br/>
-   Trains multiple Machine-Learning (ML) models per metric to learn the behavior of each metric individually.
+   Trains multiple Machine-Learning (ML) models per metric to learn the behavior of each metric individually. Netdata uses the `kmeans` algorithm and creates by default a model per metric per hour, based on the values collected for that metric over the last 6 hours. The trained models are persisted to disk.
    
 4. **`DETECT` anomalies in metrics** (ML)<br/>
    Uses the trained machine learning (ML) models to detect outliers and mark collected samples as **anomalies**. Netdata stores anomaly information together with each sample and also streams it to Netdata Parents so that the anomaly is also available at query time for the whole retention of each metric.
@@ -180,7 +192,7 @@ When using Netdata Parents, all the functions of a Netdata Agent (except data co
 
 ## FAQ
 
-### :shield: Is this secure?
+### :shield: Is Netdata secure?
 
 Of course it is! We do our best to ensure it is!
 
@@ -197,7 +209,7 @@ We understand that Netdata is a software piece that is installed on millions of 
 &nbsp;<br/>&nbsp;<br/>
 </details>
 
-### :cyclone: Will this consume a lot of resources on my servers?
+### :cyclone: Will Netdata consume significant resources on my servers?
 
 No. It will not! We promise this will be fast!
 
@@ -241,7 +253,7 @@ All tiers are updated in parallel during data collection. Just increase the disk
 
 ### :rocket: Does it scale? I have really a lot of servers!
 
-Yes, of course it does!
+Netdata is designed to scale and can handle large volumes of data.
 
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
@@ -305,7 +317,7 @@ Still, if you are already familiar with Prometheus and Grafana, Netdata integrat
 
 ### :cloud: Do I have to subscribe to Netdata Cloud?
 
-No. But we hope you will find it useful.
+Subscribing to Netdata Cloud is optional but many users find it enhances their experience with Netdata.
 
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
