@@ -151,6 +151,8 @@ def render_keys(integrations):
 
         print(f':debug:Processing { item["id"] }')
 
+        item['meta']['monitored_instance']['categories'] = list(set(item['meta']['monitored_instance']['categories']))
+
         for scope in item['metrics']['scopes']:
             if scope['name'] == 'global':
                 scope['name'] = f'{ item["meta"]["monitored_instance"]["name"] } instance'
