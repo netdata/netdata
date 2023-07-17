@@ -53,7 +53,7 @@ dist_webv2_DATA = \
     $(srcdir)/872.275aea4fbb0bddf87e5c.chunk.js \
     $(srcdir)/934.740327ad146334f2e12a.chunk.js \
     $(srcdir)/969.06cb39bd087afec3de22.chunk.js \
-    $(srcdir)/LICENSE.txt \
+    $(srcdir)/LICENSE.md \
     $(srcdir)/agent.html \
     $(srcdir)/app.0917ff2bf5d3b8b0678d.css \
     $(srcdir)/app.d1c7445dd1bef7afc40c.js \
