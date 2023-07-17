@@ -70,28 +70,6 @@ const char *rrdset_type_name(RRDSET_TYPE chart_type) {
 }
 
 // ----------------------------------------------------------------------------
-// RRD - cache directory
-
-char *rrdhost_cache_dir_for_rrdset_alloc(RRDHOST *host, const char *id) {
-    char *ret = NULL;
-
-    char b[FILENAME_MAX + 1];
-    char n[FILENAME_MAX + 1];
-    rrdset_strncpyz_name(b, id, FILENAME_MAX);
-
-    snprintfz(n, FILENAME_MAX, "%s/%s", host->cache_dir, b);
-    ret = strdupz(n);
-
-    if(host->storage_engine_id == STORAGE_ENGINE_MAP || host->storage_engine_id == STORAGE_ENGINE_SAVE) {
-        int r = mkdir(ret, 0775);
-        if(r != 0 && errno != EEXIST)
-            netdata_log_error("Cannot create directory '%s'", ret);
-    }
-
-    return ret;
-}
-
-// ----------------------------------------------------------------------------
 // RRD - string management
 
 STRING *rrd_string_strdupz(const char *s) {

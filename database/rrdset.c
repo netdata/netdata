@@ -157,8 +157,24 @@ const char *rrdset_cache_filename(RRDSET *st) {
 }
 
 const char *rrdset_cache_dir(RRDSET *st) {
-    if(!st->db.cache_dir)
-        st->db.cache_dir = rrdhost_cache_dir_for_rrdset_alloc(st->rrdhost, rrdset_id(st));
+    if (st->db.cache_dir)
+        return st->db.cache_dir;
+
+    char b[FILENAME_MAX + 1];
+    rrdset_strncpyz_name(b, rrdset_id(st), FILENAME_MAX);
+
+    char n[FILENAME_MAX + 1];
+    snprintfz(n, FILENAME_MAX, "%s/%s", st->rrdhost->cache_dir, b);
+
+    st->db.cache_dir = strdupz(n);
+
+    if (st->rrdhost->storage_engine_id == STORAGE_ENGINE_MAP ||
+        st->rrdhost->storage_engine_id == STORAGE_ENGINE_SAVE)
+    {
+        int r = mkdir(st->db.cache_dir, 0775);
+        if(r != 0 && errno != EEXIST)
+            netdata_log_error("Cannot create directory '%s'", st->db.cache_dir);
+    }
 
     return st->db.cache_dir;
 }
