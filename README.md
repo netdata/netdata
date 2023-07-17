@@ -40,7 +40,8 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
   Netdata is a modular platform that can be extended in all possible ways and it also integrates nicely with other monitoring solutions.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/cncf/artwork/master/other/cncf/horizontal/white/cncf-white.svg" alt="CNCF" width="300">
+  <img src="https://raw.githubusercontent.com/cncf/artwork/master/other/cncf/horizontal/white/cncf-white.svg#gh-dark-mode-only" alt="CNCF" width="300">
+  <img src="https://raw.githubusercontent.com/cncf/artwork/master/other/cncf/horizontal/black/cncf-black.svg#gh-light-mode-only" alt="CNCF" width="300">
   <br />
   Netdata actively supports and is a member of the Cloud Native Computing Foundation (CNCF)<br />
   &nbsp;<br/>
