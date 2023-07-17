@@ -1611,7 +1611,7 @@ static inline RRDSET *statsd_private_rrdset_create(
             , priority        // priority
             , update_every    // update every
             , chart_type      // chart type
-            , default_storage_engine_id     // memory mode
+            , default_storage_engine_id     // storage_engine_id
             , rrdb.default_rrd_history_entries // history
     );
     rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);

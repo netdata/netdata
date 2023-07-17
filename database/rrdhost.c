@@ -688,7 +688,7 @@ RRDHOST *rrdhost_get_or_create(
         if (likely(!archived && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)))
             return host;
 
-        /* If a legacy memory mode instantiates all dbengine state must be discarded to avoid inconsistencies */
+        /* If a legacy storage engine instantiates all dbengine state must be discarded to avoid inconsistencies */
         netdata_log_error("Archived host '%s' has memory mode '%s', but the wanted one is '%s'. Discarding archived state.",
                           rrdhost_hostname(host),
                           storage_engine_name(host->storage_engine_id),

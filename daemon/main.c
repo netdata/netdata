@@ -1090,7 +1090,7 @@ static void get_netdata_configured_variables() {
     }
 
     // ------------------------------------------------------------------------
-    // get default memory mode for the database
+    // get default storage engine for the database
 
     {
         const char *se_name = config_get(CONFIG_SECTION_DB, "mode", storage_engine_name(default_storage_engine_id));

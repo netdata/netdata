@@ -65,7 +65,7 @@ void rrddim_memory_file_update(RRDDIM *rd) {
 void rrddim_memory_file_free(RRDDIM *rd) {
     if(!rd || !rd->db.rd_on_file) return;
 
-    // needed for memory mode map, to save the latest state
+    // needed for storage engine MAP, to save the latest state
     rrddim_memory_file_update(rd);
 
     struct rrddim_map_save_v019 *rd_on_file = rd->db.rd_on_file;

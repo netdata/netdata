@@ -318,10 +318,10 @@ size_t rrddim_size(void);
 // returns the RRDDIM cache filename, or NULL if it does not exist
 const char *rrddim_cache_filename(RRDDIM *rd);
 
-// updated the header with the latest RRDDIM value, for memory mode MAP and SAVE
+// updated the header with the latest RRDDIM value, for storage engines MAP and SAVE
 void rrddim_memory_file_update(RRDDIM *rd);
 
-// free the memory file structures for memory mode MAP and SAVE
+// free the memory file structures for storage engines MAP and SAVE
 void rrddim_memory_file_free(RRDDIM *rd);
 
 // return the v019 header size of RRDDIM files

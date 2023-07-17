@@ -166,7 +166,7 @@ const char *rrdset_cache_dir(RRDSET *st) {
 void rrdset_memory_file_free(RRDSET *st) {
     if(!st->db.st_on_file) return;
 
-    // needed for memory mode map, to save the latest state
+    // needed for storage engine MAP, to save the latest state
     rrdset_memory_file_update(st);
 
     struct rrdset_map_save_v019 *st_on_file = st->db.st_on_file;
