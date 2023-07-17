@@ -2288,9 +2288,12 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
         // dictionary and decode each of the parameters individually.
         // OR: in url_query_string_decoded use as separator a control character that cannot appear in the URL.
 
-        char *question_mark_start = strchr(path_and_query_string, '?');
+        char path_and_query_string_decoded[NETDATA_WEB_REQUEST_URL_SIZE + 2];
+        url_decode_r(path_and_query_string_decoded, path_and_query_string, NETDATA_WEB_REQUEST_URL_SIZE + 1);
+
+        char *question_mark_start = strchr(path_and_query_string_decoded, '?');
         if (question_mark_start)
-            url_decode_r(buffer, question_mark_start, NETDATA_WEB_REQUEST_URL_SIZE + 1);
+            strncpyz(buffer, question_mark_start, NETDATA_WEB_REQUEST_URL_SIZE + 1);
 
         buffer[NETDATA_WEB_REQUEST_URL_SIZE + 1] = '\0';
         buffer_strcat(w->url_query_string_decoded, buffer);
@@ -2298,10 +2301,10 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
         if (question_mark_start) {
             char c = *question_mark_start;
             *question_mark_start = '\0';
-            url_decode_r(buffer, path_and_query_string, NETDATA_WEB_REQUEST_URL_SIZE + 1);
+            strncpyz(buffer, path_and_query_string_decoded, NETDATA_WEB_REQUEST_URL_SIZE + 1);
             *question_mark_start = c;
         } else
-            url_decode_r(buffer, path_and_query_string, NETDATA_WEB_REQUEST_URL_SIZE + 1);
+            strncpyz(buffer, path_and_query_string_decoded, NETDATA_WEB_REQUEST_URL_SIZE + 1);
 
         buffer[NETDATA_WEB_REQUEST_URL_SIZE + 1] = '\0';
         buffer_strcat(w->url_path_decoded, buffer);
