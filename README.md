@@ -304,12 +304,14 @@ What is a contribution? All the following are highly valuable to Netdata:
    Netdata should out-of-the-box detect as many infrastructure issues as possible. By sharing your knowledge and experiences, you help us build a monitoring solution that has baked into it all the best-practices about infrastructure monitoring.
 
 2. **Let us know if Netdata is not perfect for your use case**<br/>
-   We aim to support as many use cases, operating systems and integrations, as possible. We rely on you to bring to our attention that Netdata is sub-optimal for a certain use-case. Open a github issue, or start a github discussion about it, to discuss what you need and what you believe Netdata should be doing for your use case. Keep in mind though that we cant' promise we will implement it. We prioritize development on use-cases that are common to our community, are in the same direction we want Netdata to evolve and are aligned with our roadmap.
+   We aim to support as many use cases, operating systems and integrations, as possible. We rely on you to bring to our attention that Netdata is sub-optimal for a certain use-case. Open a github issue, or start a github discussion about it, to discuss what you need and what you believe Netdata should be doing for your use case.
 
-3. **Support other community members**<br/>
+   Keep in mind though that we can't promise we will implement it. We prioritize development on use-cases that are common to our community, are in the same direction we want Netdata to evolve and are aligned with our roadmap.
+
+4. **Support other community members**<br/>
    Join our community on Github, Discord and Reddit and help them out. Generally, Netdata is relatively easy to setup and configure, but still people may need a little push in the right direction to use it effectively. Supporting other members is a great contribution by itself!
 
-4. **Add or improve integrations you need**<br/>
+5. **Add or improve integrations you need**<br/>
    Integrations are generally easier and simpler to develop. If you want to contribute code to Netdata, we suggest to start with integrations you need and Netdata may not currently support.
 
 General information about contributions:
