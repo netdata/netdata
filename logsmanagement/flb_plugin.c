@@ -429,8 +429,20 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                             parse_web_log_line( (Web_log_parser_config_t *) p_file_info->parser_config->gen_config, 
                                                 message, message_size, &line_parsed);
 
-                            if(likely(p_file_info->use_log_timestamp))
+                            if(likely(p_file_info->use_log_timestamp)){
                                 timestamp = line_parsed.timestamp * MSEC_PER_SEC; // convert to msec from sec
+
+                                { /* ------------------ FIXME ------------------------  
+                                   * Temporary kludge so that metrics don't break when
+                                   * a new record has timestamp before the current one. 
+                                   */
+                                    static msec_t previous_timestamp = 0;
+                                    if((((long long) timestamp - (long long) previous_timestamp) < 0))
+                                        timestamp = previous_timestamp;
+                                    
+                                    previous_timestamp = timestamp;
+                                }
+                            }
                         }
 
                         new_tmp_text_size = message_size + 1; // +1 for '\n'
