@@ -296,7 +296,7 @@ You can also find Netdata on:
 
 ## :pray: Contribute
 
-Contributions are essential to the success of open-source projects. In other words, we need you help to keep Netdata great!
+Contributions are essential to the success of open-source projects. In other words, we need your help to keep Netdata great!
 
 What is a contribution? All the following are highly valuable to Netdata:
 
