@@ -27,7 +27,6 @@ dist_healthconfig_DATA = \
     health.d/adaptec_raid.conf \
     health.d/anomalies.conf \
     health.d/apcupsd.conf \
-    health.d/apps.conf \
     health.d/bcache.conf \
     health.d/beanstalkd.conf \
     health.d/bind_rndc.conf \
@@ -45,6 +44,7 @@ dist_healthconfig_DATA = \
     health.d/elasticsearch.conf \
     health.d/entropy.conf \
     health.d/exporting.conf \
+    health.d/file_descriptors.conf \
     health.d/geth.conf \
     health.d/ioping.conf \
     health.d/gearman.conf \
