@@ -32,8 +32,14 @@ This collector only supports collecting metrics from a single instance of this i
 [[ entry.overview.additional_permissions.description ]]
 [% endif %]
 
-[# TODO: Add related resources section #]
+[% if related %]
+[[ entry.meta.name ]] can be monitored further using the following other integrations:
 
+[% for res in related %]
+- {% relatedResource id="[[ res.id ]]" %}[[ res.name ]]{% /relatedResource %}
+[% endfor %]
+
+[% endif %]
 ### Default Behavior
 
 #### Auto-Detection

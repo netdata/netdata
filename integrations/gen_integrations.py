@@ -145,11 +145,30 @@ def load_metadata():
     return ret
 
 
-def render_keys(integrations):
-    for item in integrations:
-        item['id'] = f'{ item["meta"]["plugin_name"] }-{ item["meta"]["module_name"] }'
+def make_id(meta):
+    return f'{ meta["plugin_name"] }-{ meta["module_name"] }'
 
+
+def render_keys(integrations):
+    print(':debug:Generating integration IDs.')
+
+    for item in integrations:
+        item['id'] = make_id(item['meta'])
+
+    idmap = {i['id']: i for i in integrations}
+
+    for item in integrations:
         print(f':debug:Processing { item["id"] }')
+
+        related = [
+            {
+                'plugin_name': r['plugin_name'],
+                'module_name': r['module_name'],
+                'id': make_id(r),
+                'name': idmap[make_id(r)]['meta']['monitored_instance']['name'],
+                'info': idmap[make_id(r)]['meta']['info_provided_to_referring_integrations'],
+            } for r in item['meta']['related_resources']['integrations']['list']
+        ]
 
         item['meta']['monitored_instance']['categories'] = list(set(item['meta']['monitored_instance']['categories']))
 
@@ -159,7 +178,7 @@ def render_keys(integrations):
 
         for key in RENDER_KEYS:
             template = JINJA_ENV.get_template(f'{ key }.md')
-            data = template.render(entry=item)
+            data = template.render(entry=item, related=related)
             item[key] = data
 
     return integrations
