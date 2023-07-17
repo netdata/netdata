@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#define NETDATA_RRD_INTERNALS
+
 #include "pdc.h"
 
 struct extent_page_details_list {

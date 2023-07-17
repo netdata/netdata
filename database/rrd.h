@@ -1170,11 +1170,7 @@ void rrdset_free(RRDSET *st);
 
 void rrddim_free(RRDSET *st, RRDDIM *rd);
 
-#ifdef NETDATA_RRD_INTERNALS
-
 const char *rrdset_cache_dir(RRDSET *st);
-
-#endif /* NETDATA_RRD_INTERNALS */
 
 void set_host_properties(
     RRDHOST *host, int update_every, STORAGE_ENGINE_ID storage_engine_id, const char *registry_hostname,

@@ -1,4 +1,3 @@
-#define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 
 #define MAX_FUNCTION_LENGTH (PLUGINSD_LINE_MAX - 512) // we need some space for the rest of the line
