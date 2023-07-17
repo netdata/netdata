@@ -209,7 +209,7 @@ REGISTRY_PERSON *registry_request_delete(const char *person_guid, char *machine_
 }
 
 
-REGISTRY_MACHINE *registry_request_machine(const char *person_guid, char *request_machine) {
+REGISTRY_MACHINE *registry_request_machine(const char *person_guid, char *request_machine, STRING **hostname) {
     char pbuf[GUID_LEN + 1];
     char mbuf[GUID_LEN + 1];
 
@@ -239,8 +239,10 @@ REGISTRY_MACHINE *registry_request_machine(const char *person_guid, char *reques
 
     // make sure the user has access
     for(REGISTRY_PERSON_URL *pu = p->person_urls; pu ;pu = pu->next)
-        if(pu->machine == m)
+        if(pu->machine == m) {
+            *hostname = string_dup(pu->machine_name);
             return m;
+        }
 
     return NULL;
 }
