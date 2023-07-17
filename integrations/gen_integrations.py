@@ -160,15 +160,22 @@ def render_keys(integrations):
     for item in integrations:
         print(f':debug:Processing { item["id"] }')
 
-        related = [
-            {
-                'plugin_name': r['plugin_name'],
-                'module_name': r['module_name'],
-                'id': make_id(r),
-                'name': idmap[make_id(r)]['meta']['monitored_instance']['name'],
-                'info': idmap[make_id(r)]['meta']['info_provided_to_referring_integrations'],
-            } for r in item['meta']['related_resources']['integrations']['list']
-        ]
+        related = []
+
+        for res in item['meta']['related_resources']['integrations']['list']:
+            res_id = make_id(res)
+
+            if res_id not in idmap.keys():
+                print(f':warning:Could not find related integration { res_id }, ignoring it.')
+                continue
+
+            related.append({
+                'plugin_name': res['plugin_name'],
+                'module_name': res['module_name'],
+                'id': res_id,
+                'name': idmap[res_id]['meta']['monitored_instance']['name'],
+                'info': idmap[res_id]['meta']['info_provided_to_referring_integrations'],
+            })
 
         item['meta']['monitored_instance']['categories'] = list(set(item['meta']['monitored_instance']['categories']))
 
