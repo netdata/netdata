@@ -420,8 +420,8 @@ static dyncfg_config_t get_plugin_config(struct configurable_plugin *plugin)
 {
     if (plugin->plugins_d)
         plugin->get_config_cb(plugin->cb_usr_ctx);
-    else
 
+    //TODO
     
     return plugin->config;
 }

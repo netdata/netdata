@@ -1842,12 +1842,14 @@ static enum set_config_result _plugin_set_config_cb(void *usr_ctx, dyncfg_config
 struct mutex_cond {
     pthread_mutex_t lock;
     pthread_cond_t cond;
+    int rc;
 };
 
 static void virt_fnc_got_data_cb(BUFFER *wb, int code, void *callback_data)
 {
     struct mutex_cond *ctx = callback_data;
     pthread_mutex_lock(&ctx->lock);
+    ctx->rc = code;
     pthread_cond_broadcast(&ctx->cond);
     pthread_mutex_unlock(&ctx->lock);
 }
@@ -1869,7 +1871,7 @@ dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name)
         .timeout = VIRT_FNC_TIMEOUT,
         .function = string_strdupz(name),
         .callback = virt_fnc_got_data_cb,
-        .callback_data = &cond
+        .callback_data = &cond,
     };
 
     uuid_t uuid;
@@ -1919,6 +1921,14 @@ static dyncfg_config_t get_plugin_config_cb(void *usr_ctx)
     return call_virtual_function_blocking(parser, "get_plugin_config");
 }
 
+static dyncfg_config_t get_module_config_cb(void *usr_ctx, const char *modulename)
+{
+    PARSER *parser = usr_ctx;
+    char buf[1024];
+    snprintfz(buf, sizeof(buf), "get_module_config %s", modulename);
+    return call_virtual_function_blocking(parser, "get_module_config modulename");
+}
+
 static inline PARSER_RC pluginsd_register_plugin(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser __maybe_unused) {
     netdata_log_info("PLUGINSD: DYNCFG_ENABLE");
 
@@ -1959,6 +1969,7 @@ static inline PARSER_RC pluginsd_register_module(char **words __maybe_unused, si
     mod->name = strdupz(words[1]);
 
     mod->set_config_cb = _plugin_set_config_cb;
+    mod->get_config_cb = get_module_config_cb;
 
     register_module(plug_cfg, mod);
     return PARSER_RC_OK;

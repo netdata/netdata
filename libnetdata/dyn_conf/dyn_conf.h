@@ -74,6 +74,9 @@ struct module
     DICTIONARY *jobs;
 
     set_config_cb_t set_config_cb;
+
+    dyncfg_config_t (*get_config_cb)(void *usr_ctx, const char* name);
+
     void *set_config_cb_usr_ctx;
 };
 
