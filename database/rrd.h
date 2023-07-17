@@ -1175,7 +1175,6 @@ void rrddim_free(RRDSET *st, RRDDIM *rd);
 char *rrdhost_cache_dir_for_rrdset_alloc(RRDHOST *host, const char *id);
 const char *rrdset_cache_dir(RRDSET *st);
 
-void rrdset_reset(RRDSET *st);
 void rrdset_delete_obsolete_dimensions(RRDSET *st);
 
 #endif /* NETDATA_RRD_INTERNALS */

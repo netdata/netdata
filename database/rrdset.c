@@ -1004,10 +1004,7 @@ inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
     }
 }
 
-// ----------------------------------------------------------------------------
-// RRDSET - reset a chart
-
-void rrdset_reset(RRDSET *st) {
+static void rrdset_reset(RRDSET *st) {
     netdata_log_debug(D_RRD_CALLS, "rrdset_reset() %s", rrdset_name(st));
 
     st->last_collected_time.tv_sec = 0;
