@@ -2260,7 +2260,6 @@ ssize_t web_client_receive(struct web_client *w)
     return(bytes);
 }
 
-
 void web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string) {
     char buffer[NETDATA_WEB_REQUEST_URL_SIZE + 2];
     buffer[0] = '\0';
@@ -2282,32 +2281,24 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
     }
     else {
         // in non-stream mode, there is a path
-
         // FIXME - the way this is implemented, query string params never accept the symbol &, not even encoded as %26
         // To support the symbol & in query string params, we need to turn the url_query_string_decoded into a
         // dictionary and decode each of the parameters individually.
         // OR: in url_query_string_decoded use as separator a control character that cannot appear in the URL.
 
-        char path_and_query_string_decoded[NETDATA_WEB_REQUEST_URL_SIZE + 2];
-        url_decode_r(path_and_query_string_decoded, path_and_query_string, NETDATA_WEB_REQUEST_URL_SIZE + 1);
+        url_decode_r(buffer, path_and_query_string, NETDATA_WEB_REQUEST_URL_SIZE + 1);
 
-        char *question_mark_start = strchr(path_and_query_string_decoded, '?');
-        if (question_mark_start)
-            strncpyz(buffer, question_mark_start, NETDATA_WEB_REQUEST_URL_SIZE + 1);
-
-        buffer[NETDATA_WEB_REQUEST_URL_SIZE + 1] = '\0';
-        buffer_strcat(w->url_query_string_decoded, buffer);
-
+        char *question_mark_start = strchr(buffer, '?');
         if (question_mark_start) {
+            buffer_strcat(w->url_query_string_decoded, question_mark_start);
             char c = *question_mark_start;
             *question_mark_start = '\0';
-            strncpyz(buffer, path_and_query_string_decoded, NETDATA_WEB_REQUEST_URL_SIZE + 1);
+            buffer_strcat(w->url_path_decoded, buffer);
             *question_mark_start = c;
-        } else
-            strncpyz(buffer, path_and_query_string_decoded, NETDATA_WEB_REQUEST_URL_SIZE + 1);
-
-        buffer[NETDATA_WEB_REQUEST_URL_SIZE + 1] = '\0';
-        buffer_strcat(w->url_path_decoded, buffer);
+        } else {
+            buffer_strcat(w->url_query_string_decoded, buffer);
+            buffer_strcat(w->url_path_decoded, buffer);
+        }
     }
 }
 
