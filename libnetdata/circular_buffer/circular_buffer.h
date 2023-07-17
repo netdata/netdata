@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #ifndef CIRCULAR_BUFFER_H
 #define CIRCULAR_BUFFER_H 1
 

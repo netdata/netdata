@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include <google/protobuf/message.h>
 #include <google/protobuf/util/json_util.h>
 

@@ -1,6 +1,4 @@
-//
-// Created by Christopher on 11/12/18.
-//
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "health_cmdapi.h"
 

@@ -1,4 +1,5 @@
-#include "../libnetdata.h"
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "aral.h"
 
 #ifdef NETDATA_TRACE_ALLOCATIONS

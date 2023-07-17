@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #ifndef ARAL_H
 #define ARAL_H 1

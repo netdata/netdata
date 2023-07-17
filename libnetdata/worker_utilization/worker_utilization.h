@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #ifndef WORKER_UTILIZATION_H
 #define WORKER_UTILIZATION_H 1
 
