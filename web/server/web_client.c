@@ -1276,12 +1276,15 @@ void web_client_build_http_header(struct web_client *w) {
     if(unlikely(w->response.code != HTTP_RESP_OK))
         buffer_no_cacheable(w->response.data);
 
+    if(unlikely(!w->response.data->date))
+        w->response.data->date = now_realtime_sec();
+
     // set a proper expiration date, if not already set
     if(unlikely(!w->response.data->expires)) {
         if(w->response.data->options & WB_CONTENT_NO_CACHEABLE)
-            w->response.data->expires = w->timings.tv_ready.tv_sec + localhost->rrd_update_every;
+            w->response.data->expires = w->response.data->date + localhost->rrd_update_every;
         else
-            w->response.data->expires = w->timings.tv_ready.tv_sec + 86400;
+            w->response.data->expires = w->response.data->date + 86400;
     }
 
     // prepare the HTTP response header
@@ -1867,10 +1870,6 @@ void web_client_process_request(struct web_client *w) {
     web_client_timeout_checkpoint_response_ready(w, NULL);
 
     w->response.sent = 0;
-
-    // set a proper last modified date
-    if(unlikely(!w->response.data->date))
-        w->response.data->date = w->timings.tv_ready.tv_sec;
 
     web_client_send_http_header(w);
 

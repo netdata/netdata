@@ -304,7 +304,8 @@
                       "default_value": {
                         "type": [
                           "string",
-                          "number"
+                          "number",
+                          "boolean"
                         ],
                         "description": "Default value. Leave empty if none."
                       },
@@ -540,7 +541,12 @@
                     },
                     "chart_type": {
                       "type": "string",
-                      "description": "Metric description (chart type)."
+                      "description": "Metric description (chart type).",
+                      "enum": [
+                        "line",
+                        "area",
+                        "stacked"
+                      ]
                     },
                     "dimensions": {
                       "type": "array",

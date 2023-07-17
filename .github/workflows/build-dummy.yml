@@ -81,8 +81,6 @@ jobs:
     env:
       RETRY_DELAY: 300
     strategy:
-      # Unlike the actual build tests, this completes _very_ fast (average of about 3 minutes for each job), so we
-      # just run everything in parallel instead lof limiting job concurrency.
       fail-fast: false
       matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
     steps:
@@ -93,10 +91,8 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - matrix
-      - prepare-test-images
     strategy:
       fail-fast: false
-      max-parallel: 8
       matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
     steps:
       - run: echo 'NOT REQUIRED'
@@ -105,12 +101,9 @@ jobs:
     name: Test Generated Distfile and Updater Code
     runs-on: ubuntu-latest
     needs:
-      - build-dist
       - matrix
-      - prepare-test-images
     strategy:
       fail-fast: false
-      max-parallel: 8
       matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
     steps:
       - run: echo 'NOT REQUIRED'
@@ -118,24 +111,17 @@ jobs:
   prepare-upload: # Consolidate the artifacts for uploading or releasing.
     name: Prepare Artifacts
     runs-on: ubuntu-latest
-    needs:
-      - build-dist
-      - build-static
     steps:
       - run: echo 'NOT REQUIRED'
 
   artifact-verification-dist: # Verify the regular installer works with the consolidated artifacts.
     name: Test Consolidated Artifacts (Source)
     runs-on: ubuntu-latest
-    needs:
-      - prepare-upload
     steps:
       - run: echo 'NOT REQUIRED'
 
   artifact-verification-static: # Verify the static installer works with the consolidated artifacts.
     name: Test Consolidated Artifacts (Static)
     runs-on: ubuntu-latest
-    needs:
-      - prepare-upload
     steps:
       - run: echo 'NOT REQUIRED'
