@@ -1,9 +1,9 @@
 <p align="center">
 <a href="https://www.netdata.cloud#gh-light-mode-only">
-  <img src="https://raw.githubusercontent.com/netdata/website/master/themes/tailwind/static/img/netdata-logo-coloured.svg?token=GHSAT0AAAAAAB5ID66RRURF4GA2GUTO2NPYZFVLFMA#gh-light-mode-only" alt="Netdata" width="300"/>
+  <img src="https://github.com/netdata/netdata/assets/2662304/a62997fb-d75d-42df-b188-b804cd034a70#gh-light-mode-only" alt="Netdata" width="300"/>
 </a>
 <a href="https://www.netdata.cloud#gh-dark-mode-only">
-  <img src="https://raw.githubusercontent.com/netdata/website/master/themes/tailwind/static/img/netdata-logo-white.svg?token=GHSAT0AAAAAAB5ID66QFQFDXG66SH76V26CZFVLHCA#gh-dark-mode-only" alt="Netdata" width="300"/>
+  <img src="https://github.com/netdata/netdata/assets/2662304/95ea1560-5e83-44d3-ad33-7980f8298b65#gh-dark-mode-only" alt="Netdata" width="300"/>
 </a>
 </p>
 <h3 align="center">Monitor your servers, containers, and applications,<br/>in high-resolution and in real-time.</h3>
