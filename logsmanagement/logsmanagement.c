@@ -1076,40 +1076,26 @@ static void logs_management_init(uv_loop_t *main_loop,
     /* -------------------------------------------------------------------------
      * Initialize input plugin for local log sources.
      * ------------------------------------------------------------------------- */
-    switch(p_file_info->log_type){
-        int rc;
-        case FLB_GENERIC:
-        case FLB_WEB_LOG:
-        case FLB_KMSG:
-        case FLB_SYSTEMD:
-        case FLB_DOCKER_EV:
-        case FLB_SYSLOG:
-        case FLB_SERIAL: {
-            if(p_file_info->log_source == LOG_SOURCE_LOCAL){
-                rc = flb_add_input(p_file_info);
-                if(unlikely(rc)){
-                    collector_error("[%s]: flb_add_input() error: %d", p_file_info->chart_name, rc);
-                    return p_file_info_destroy(p_file_info);
-                }
-            }
-
-            /* flb_complete_item_timer_timeout_cb() is needed for 
-             * both local and non-local sources. */
-            p_file_info->flb_tmp_buff_cpy_timer.data = p_file_info;
-            if(unlikely(0 != uv_mutex_init(&p_file_info->flb_tmp_buff_mut))){
-                fatal("uv_mutex_init(&p_file_info->flb_tmp_buff_mut) failed");
-            }
-            fatal_assert(0 == uv_timer_init(main_loop, &p_file_info->flb_tmp_buff_cpy_timer));
-            fatal_assert(0 == uv_timer_start( &p_file_info->flb_tmp_buff_cpy_timer, 
-                                              flb_complete_item_timer_timeout_cb, 0, 
-                                              p_file_info->update_timeout * MSEC_PER_SEC));
-            break;
-        }
-        default: 
+    if(p_file_info->log_source == LOG_SOURCE_LOCAL){
+        int rc = flb_add_input(p_file_info);
+        if(unlikely(rc)){
+            collector_error("[%s]: flb_add_input() error: %d", p_file_info->chart_name, rc);
             return p_file_info_destroy(p_file_info);
+        }
     }
 
+    /* flb_complete_item_timer_timeout_cb() is needed 
+     * for both local and non-local sources. */
+    p_file_info->flb_tmp_buff_cpy_timer.data = p_file_info;
+    if(unlikely(0 != uv_mutex_init(&p_file_info->flb_tmp_buff_mut))){
+        fatal("uv_mutex_init(&p_file_info->flb_tmp_buff_mut) failed");
+    }
+    fatal_assert(0 == uv_timer_init(main_loop, &p_file_info->flb_tmp_buff_cpy_timer));
+    fatal_assert(0 == uv_timer_start(   &p_file_info->flb_tmp_buff_cpy_timer, 
+                                        flb_complete_item_timer_timeout_cb, 0, 
+                                        p_file_info->update_timeout * MSEC_PER_SEC));
 
+    
     /* -------------------------------------------------------------------------
      * All set up successfully - add p_file_info to list of all p_file_info structs.
      * ------------------------------------------------------------------------- */
