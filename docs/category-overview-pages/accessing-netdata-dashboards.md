@@ -22,7 +22,7 @@ The Netdata dashboard consists of the following main areas:
 * [Functions](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md)
 * [Events feed](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md)
 
-> ⚠️ Some areas will have restricted functionality but, where possible, you will still be able to fully experience the feature having a _last step_ depending on the need of the user being signed-in to Netdata Cloud, e.g saving visualization settings on charts or custom dashboards, or the node being claimed to Netdata Cloud, e.g. executing function on an Agent.
+> ⚠️ Some areas will have restricted functionality but, where possible, you will still be able to fully experience the features having the dependency on a _last step_ for you to be signed-in to Netdata Cloud, e.g saving visualization settings on charts or custom dashboards, or claiming the node to Netdata Cloud, e.g. executing function on an Agent.
 
 
 Documentation for previous Agent dashboard can still be found [here](https://github.com/netdata/netdata/blob/master/web/gui/README.md).
