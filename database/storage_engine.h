@@ -17,8 +17,10 @@ static inline STORAGE_METRICS_GROUP *storage_engine_metrics_group_get(STORAGE_EN
         case STORAGE_ENGINE_SAVE:
         case STORAGE_ENGINE_ALLOC:
             return rrddim_metrics_group_get(instance, uuid);
+#ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
             return rrdeng_metrics_group_get(instance, uuid);
+#endif
         default:
             __builtin_unreachable();
     }
@@ -34,9 +36,11 @@ static inline void storage_engine_metrics_group_release(STORAGE_ENGINE_ID id, ST
         case STORAGE_ENGINE_ALLOC:
             rrddim_metrics_group_release(instance, smg);
             break;
+#ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
             rrdeng_metrics_group_release(instance, smg);
             break;
+#endif
         default:
             __builtin_unreachable();
     }
@@ -51,8 +55,10 @@ static inline STORAGE_COLLECT_HANDLE *storage_metric_store_init(STORAGE_ENGINE_I
         case STORAGE_ENGINE_SAVE:
         case STORAGE_ENGINE_ALLOC:
             return rrddim_collect_init(metric_handle, update_every, smg);
+#ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
             return rrdeng_store_metric_init(metric_handle, update_every, smg);
+#endif
         default:
             __builtin_unreachable();
     }
@@ -72,10 +78,12 @@ static inline void storage_engine_store_metric(
             return rrddim_collect_store_metric(collection_handle, point_in_time_ut,
                                                n, min_value, max_value,
                                                count, anomaly_count, flags);
+#ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
             return rrdeng_store_metric_next(collection_handle, point_in_time_ut,
                                             n, min_value, max_value,
                                             count, anomaly_count, flags);
+#endif
         default:
             __builtin_unreachable();
     }
@@ -90,8 +98,10 @@ static inline size_t storage_engine_disk_space_max(STORAGE_ENGINE_ID id, STORAGE
         case STORAGE_ENGINE_SAVE:
         case STORAGE_ENGINE_ALLOC:
             return rrddim_disk_space_max(db_instance);
+#ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
             return rrdeng_disk_space_max(db_instance);
+#endif
         default:
             __builtin_unreachable();
     }
@@ -106,8 +116,10 @@ static inline size_t storage_engine_disk_space_used(STORAGE_ENGINE_ID id, STORAG
         case STORAGE_ENGINE_SAVE:
         case STORAGE_ENGINE_ALLOC:
             return rrddim_disk_space_used(db_instance);
+#ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
             return rrdeng_disk_space_max(db_instance);
+#endif
         default:
             __builtin_unreachable();
     }
@@ -122,8 +134,10 @@ static inline time_t storage_engine_global_first_time_s(STORAGE_ENGINE_ID id, ST
         case STORAGE_ENGINE_SAVE:
         case STORAGE_ENGINE_ALLOC:
             return rrddim_global_first_time_s(db_instance);
+#ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
             return rrdeng_global_first_time_s(db_instance);
+#endif
         default:
             __builtin_unreachable();
     }
@@ -138,8 +152,10 @@ static inline size_t storage_engine_collected_metrics(STORAGE_ENGINE_ID id, STOR
         case STORAGE_ENGINE_SAVE:
         case STORAGE_ENGINE_ALLOC:
             return rrddim_currently_collected_metrics(db_instance);
+#ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
             return rrdeng_currently_collected_metrics(db_instance);
+#endif
         default:
             __builtin_unreachable();
     }
@@ -155,9 +171,11 @@ static inline void storage_engine_store_flush(STORAGE_ENGINE_ID id, STORAGE_COLL
         case STORAGE_ENGINE_ALLOC:
             rrddim_store_metric_flush(collection_handle);
             return;
+#ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
             rrdeng_store_metric_flush_current_page(collection_handle);
             return;
+#endif
         default:
             __builtin_unreachable();
     }
@@ -174,8 +192,10 @@ static inline int storage_engine_store_finalize(STORAGE_ENGINE_ID id, STORAGE_CO
         case STORAGE_ENGINE_SAVE:
         case STORAGE_ENGINE_ALLOC:
             return rrddim_collect_finalize(collection_handle);
+#ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
             return rrdeng_store_metric_finalize(collection_handle);
+#endif
         default:
             __builtin_unreachable();
     }
@@ -191,9 +211,11 @@ static inline void storage_engine_store_change_collection_frequency(STORAGE_ENGI
         case STORAGE_ENGINE_ALLOC:
             rrddim_store_metric_change_collection_frequency(collection_handle, update_every);
             return;
+#ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
             rrdeng_store_metric_change_collection_frequency(collection_handle, update_every);
             return;
+#endif
         default:
             __builtin_unreachable();
     }
@@ -208,8 +230,10 @@ static inline time_t storage_engine_oldest_time_s(STORAGE_ENGINE_ID id, STORAGE_
         case STORAGE_ENGINE_SAVE:
         case STORAGE_ENGINE_ALLOC:
             return rrddim_query_oldest_time_s(db_metric_handle);
+#ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
             return rrdeng_metric_oldest_time(db_metric_handle);
+#endif
         default:
             __builtin_unreachable();
     }
@@ -224,8 +248,10 @@ static inline time_t storage_engine_latest_time_s(STORAGE_ENGINE_ID id, STORAGE_
         case STORAGE_ENGINE_SAVE:
         case STORAGE_ENGINE_ALLOC:
             return rrddim_query_latest_time_s(db_metric_handle);
+#ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
             return rrdeng_metric_latest_time(db_metric_handle);
+#endif
         default:
             __builtin_unreachable();
     }
@@ -246,9 +272,11 @@ static inline void storage_engine_query_init(
         case STORAGE_ENGINE_ALLOC:
             rrddim_query_init(db_metric_handle, handle, start_time_s, end_time_s, priority);
             return;
+#ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
             rrdeng_load_metric_init(db_metric_handle, handle, start_time_s, end_time_s, priority);
             return;
+#endif
         default:
             __builtin_unreachable();
     }
@@ -263,8 +291,10 @@ static inline STORAGE_POINT storage_engine_query_next_metric(struct storage_engi
         case STORAGE_ENGINE_SAVE:
         case STORAGE_ENGINE_ALLOC:
             return rrddim_query_next_metric(handle);
+#ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
             return rrdeng_load_metric_next(handle);
+#endif
         default:
             __builtin_unreachable();
     }
@@ -279,8 +309,10 @@ static inline int storage_engine_query_is_finished(struct storage_engine_query_h
         case STORAGE_ENGINE_SAVE:
         case STORAGE_ENGINE_ALLOC:
             return rrddim_query_is_finished(handle);
+#ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
             return rrdeng_load_metric_is_finished(handle);
+#endif
         default:
             __builtin_unreachable();
     }
@@ -296,9 +328,11 @@ static inline void storage_engine_query_finalize(struct storage_engine_query_han
         case STORAGE_ENGINE_ALLOC:
             rrddim_query_finalize(handle);
             return;
+#ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
             rrdeng_load_metric_finalize(handle);
             return;
+#endif
         default:
             __builtin_unreachable();
     }
@@ -313,8 +347,10 @@ static inline time_t storage_engine_align_to_optimal_before(struct storage_engin
         case STORAGE_ENGINE_SAVE:
         case STORAGE_ENGINE_ALLOC:
             return rrddim_query_align_to_optimal_before(handle);
+#ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
             return rrdeng_load_align_to_optimal_before(handle);
+#endif
         default:
             __builtin_unreachable();
     }
@@ -329,8 +365,10 @@ static inline bool storage_engine_metric_retention(STORAGE_ENGINE_ID id, STORAGE
         case STORAGE_ENGINE_SAVE:
         case STORAGE_ENGINE_ALLOC:
             return rrddim_metric_retention_by_uuid(db_instance, uuid, first_entry_s, last_entry_s);
+#ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
             return rrdeng_metric_retention_by_uuid(db_instance, uuid, first_entry_s, last_entry_s);
+#endif
         default:
             __builtin_unreachable();
     }
@@ -345,8 +383,10 @@ static inline STORAGE_METRIC_HANDLE *storage_engine_metric_get(STORAGE_ENGINE_ID
         case STORAGE_ENGINE_SAVE:
         case STORAGE_ENGINE_ALLOC:
             return rrddim_metric_get(instance, uuid);
+#ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
             return rrdeng_metric_get(instance, uuid);
+#endif
         default:
             __builtin_unreachable();
     }
@@ -361,8 +401,10 @@ static inline STORAGE_METRIC_HANDLE *storage_engine_metric_get_or_create(RRDDIM 
         case STORAGE_ENGINE_SAVE:
         case STORAGE_ENGINE_ALLOC:
             return rrddim_metric_get_or_create(rd, instance);
+#ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
             return rrdeng_metric_get_or_create(rd, instance);
+#endif
         default:
             __builtin_unreachable();
     }
@@ -378,9 +420,11 @@ static inline void storage_engine_metric_release(STORAGE_ENGINE_ID id, STORAGE_M
         case STORAGE_ENGINE_ALLOC:
             rrddim_metric_release(db_metric_handle);
             break;
+#ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
             rrdeng_metric_release(db_metric_handle);
             break;
+#endif
         default:
             __builtin_unreachable();
     }
@@ -395,8 +439,10 @@ static inline STORAGE_METRIC_HANDLE *storage_engine_metric_dup(STORAGE_ENGINE_ID
         case STORAGE_ENGINE_SAVE:
         case STORAGE_ENGINE_ALLOC:
             return rrddim_metric_dup(db_metric_handle);
+#ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
             return rrdeng_metric_dup(db_metric_handle);
+#endif
         default:
             __builtin_unreachable();
     }

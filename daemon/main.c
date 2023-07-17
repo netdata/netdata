@@ -1169,9 +1169,9 @@ static void get_netdata_configured_variables() {
         config_set_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", rrdb.default_multidb_disk_quota_mb);
     }
 #else
-    if (default_storage_engine == STORAGE_ENGINE_DBENGINE) {
+    if (default_storage_engine_id  == STORAGE_ENGINE_DBENGINE) {
        error_report("RRD_MEMORY_MODE_DBENGINE is not supported in this platform. The agent will use db mode 'save' instead.");
-       default_storage_engine = STORAGE_ENGINE_SAVE;
+       default_storage_engine_id = STORAGE_ENGINE_SAVE;
     }
 #endif
     // ------------------------------------------------------------------------

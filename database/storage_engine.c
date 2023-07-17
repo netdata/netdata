@@ -10,7 +10,7 @@
 #ifdef ENABLE_DBENGINE
 STORAGE_ENGINE_ID default_storage_engine_id = STORAGE_ENGINE_DBENGINE;
 #else
-STORAGE_ENGINE_ID default_storage_engine = STORAGE_ENGINE_SAVE;
+STORAGE_ENGINE_ID default_storage_engine_id = STORAGE_ENGINE_SAVE;
 #endif
 
 const char *storage_engine_name(STORAGE_ENGINE_ID id) {
