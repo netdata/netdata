@@ -18,6 +18,7 @@ static struct proc_module {
     {.name = "/proc/stat",                   .dim = "stat",         .func = do_proc_stat},
     {.name = "/proc/uptime",                 .dim = "uptime",       .func = do_proc_uptime},
     {.name = "/proc/loadavg",                .dim = "loadavg",      .func = do_proc_loadavg},
+    {.name = "/proc/sys/fs/file-nr",         .dim = "file-nr",      .func = do_proc_sys_fs_file_nr},
     {.name = "/proc/sys/kernel/random/entropy_avail", .dim = "entropy", .func = do_proc_sys_kernel_random_entropy_avail},
 
     // pressure metrics

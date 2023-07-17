@@ -141,6 +141,17 @@ static const char *proc_states[] = {
 // internal flags
 // handled in code (automatically set)
 
+// log each problem once per process
+// log flood protection flags (log_thrown)
+typedef enum __attribute__((packed)) {
+    PID_LOG_IO      = (1 << 0),
+    PID_LOG_STATUS  = (1 << 1),
+    PID_LOG_CMDLINE = (1 << 2),
+    PID_LOG_FDS     = (1 << 3),
+    PID_LOG_STAT    = (1 << 4),
+    PID_LOG_LIMITS  = (1 << 5),
+} PID_LOG;
+
 static int
         show_guest_time = 0,            // 1 when guest values are collected
         show_guest_time_old = 0,
@@ -211,6 +222,25 @@ struct openfds {
     kernel_uint_t other;
 };
 
+struct pid_limits {
+//    kernel_uint_t max_cpu_time;
+//    kernel_uint_t max_file_size;
+//    kernel_uint_t max_data_size;
+//    kernel_uint_t max_stack_size;
+//    kernel_uint_t max_core_file_size;
+//    kernel_uint_t max_resident_set;
+//    kernel_uint_t max_processes;
+    kernel_uint_t max_open_files;
+//    kernel_uint_t max_locked_memory;
+//    kernel_uint_t max_address_space;
+//    kernel_uint_t max_file_locks;
+//    kernel_uint_t max_pending_signals;
+//    kernel_uint_t max_msgqueue_size;
+//    kernel_uint_t max_nice_priority;
+//    kernel_uint_t max_realtime_priority;
+//    kernel_uint_t max_realtime_timeout;
+};
+
 // ----------------------------------------------------------------------------
 // target
 //
@@ -268,6 +298,8 @@ struct target {
 
     struct openfds openfds;
 
+    NETDATA_DOUBLE max_open_files_percent;
+
     kernel_uint_t starttime;
     kernel_uint_t collected_starttime;
     kernel_uint_t uptime_min;
@@ -318,18 +350,17 @@ struct pid_fd {
 
 struct pid_stat {
     int32_t pid;
-    char comm[MAX_COMPARE_NAME + 1];
-    char *cmdline;
-
-    uint32_t log_thrown;
-
-    char state;
     int32_t ppid;
     // int32_t pgrp;
     // int32_t session;
     // int32_t tty_nr;
     // int32_t tpgid;
     // uint64_t flags;
+
+    char state;
+
+    char comm[MAX_COMPARE_NAME + 1];
+    char *cmdline;
 
     // these are raw values collected
     kernel_uint_t minflt_raw;
@@ -415,22 +446,28 @@ struct pid_stat {
     kernel_uint_t io_storage_bytes_written;
     kernel_uint_t io_cancelled_write_bytes;
 
+    kernel_uint_t uptime;
+
     struct pid_fd *fds;             // array of fds it uses
     size_t fds_size;                // the size of the fds array
 
     struct openfds openfds;
-
-    int children_count;             // number of processes directly referencing this
-    unsigned char keep:1;           // 1 when we need to keep this process in memory even after it exited
-    int keeploops;                  // increases by 1 every time keep is 1 and updated 0
-    unsigned char updated:1;        // 1 when the process is currently running
-    unsigned char merged:1;         // 1 when it has been merged to its parent
-    unsigned char read:1;           // 1 when we have already read this process for this iteration
+    struct pid_limits limits;
 
     int sortlist;                   // higher numbers = top on the process tree
                                     // each process gets a unique number
 
+    int children_count;             // number of processes directly referencing this
+    int keeploops;                  // increases by 1 every time keep is 1 and updated 0
+
+    PID_LOG log_thrown;
+
+    bool keep;                      // true when we need to keep this process in memory even after it exited
+    bool updated;                   // true when the process is currently running
+    bool merged;                    // true when it has been merged to its parent
+    bool read;                      // true when we have already read this process for this iteration
     bool matched_by_config;
+
     struct target *target;          // app_groups.conf targets
     struct target *user_target;     // uid based targets
     struct target *group_target;    // gid based targets
@@ -440,8 +477,7 @@ struct pid_stat {
 
     usec_t io_collected_usec;
     usec_t last_io_collected_usec;
-
-    kernel_uint_t uptime;
+    usec_t last_limits_collected_usec;
 
     char *fds_dirname;              // the full directory name in /proc/PID/fd
 
@@ -449,6 +485,7 @@ struct pid_stat {
     char *status_filename;
     char *io_filename;
     char *cmdline_filename;
+    char *limits_filename;
 
     struct pid_stat *parent;
     struct pid_stat *prev;
@@ -458,14 +495,6 @@ struct pid_stat {
 size_t pagesize;
 
 kernel_uint_t global_uptime;
-
-// log each problem once per process
-// log flood protection flags (log_thrown)
-#define PID_LOG_IO      0x00000001
-#define PID_LOG_STATUS  0x00000002
-#define PID_LOG_CMDLINE 0x00000004
-#define PID_LOG_FDS     0x00000008
-#define PID_LOG_STAT    0x00000010
 
 static struct pid_stat
         *root_of_pids = NULL,   // global list of all processes running
@@ -1019,6 +1048,7 @@ static inline void del_pid_entry(pid_t pid) {
     freez(p->fds_dirname);
     freez(p->stat_filename);
     freez(p->status_filename);
+    freez(p->limits_filename);
 #ifndef __FreeBSD__
     arl_free(p->status_arl);
 #endif
@@ -1033,7 +1063,7 @@ static inline void del_pid_entry(pid_t pid) {
 
 // ----------------------------------------------------------------------------
 
-static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
+static inline int managed_log(struct pid_stat *p, PID_LOG log, int status) {
     if(unlikely(!status)) {
         // netdata_log_error("command failed log %u, errno %d", log, errno);
 
@@ -1072,6 +1102,13 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
                         netdata_log_error("Cannot process entries in %s/proc/%d/fd (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
                         #endif
                         break;
+
+                    case PID_LOG_LIMITS:
+                        #ifdef __FreeBSD__
+                        ;
+                        #else
+                        netdata_log_error("Cannot process %s/proc/%d/limits (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
+                        #endif
 
                     case PID_LOG_STAT:
                         break;
@@ -1313,6 +1350,54 @@ static void update_proc_state_count(char proc_state) {
     }
 }
 #endif // !__FreeBSD__
+
+#define MAX_PROC_PID_LIMITS 8192
+#define PROC_PID_LIMITS_MAX_OPEN_FILES_KEY "\nMax open files "
+
+static inline kernel_uint_t get_proc_pid_limits_limit(char *buf, const char *key, size_t key_len, kernel_uint_t def) {
+    char *line = strstr(buf, key);
+    if(!line)
+        return def;
+
+    char *v = &line[key_len];
+    while(isspace(*v)) v++;
+
+    return str2ull(v, NULL);
+}
+
+static inline int read_proc_pid_limits(struct pid_stat *p, void *ptr) {
+    (void)ptr;
+
+#ifdef __FreeBSD__
+    return 0;
+#else
+    static char proc_pid_limits[MAX_PROC_PID_LIMITS + 1];
+
+    if(p->io_collected_usec > p->last_limits_collected_usec && p->io_collected_usec - p->last_limits_collected_usec <= 60 * USEC_PER_SEC)
+        // too frequent, we want to collect limits once per minute
+        return 0;
+
+    if(unlikely(!p->limits_filename)) {
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/limits", netdata_configured_host_prefix, p->pid);
+        p->limits_filename = strdupz(filename);
+    }
+
+    int fd = open(p->limits_filename, procfile_open_flags, 0666);
+    if(unlikely(fd == -1)) return 0;
+
+    ssize_t bytes = read(fd, proc_pid_limits, MAX_PROC_PID_LIMITS);
+    close(fd);
+
+    if(bytes <= 0)
+        return 0;
+
+    p->limits.max_open_files = get_proc_pid_limits_limit(proc_pid_limits, PROC_PID_LIMITS_MAX_OPEN_FILES_KEY, sizeof(PROC_PID_LIMITS_MAX_OPEN_FILES_KEY) - 1, 0);
+    p->last_limits_collected_usec = p->io_collected_usec;
+
+    return 1;
+#endif
+}
 
 static inline int read_proc_pid_status(struct pid_stat *p, void *ptr) {
     p->status_vmsize           = 0;
@@ -2460,7 +2545,7 @@ static inline void process_exited_processes() {
                 if(majflt) debug_find_lost_child(p, majflt, 2);
             }
 
-            p->keep = 1;
+            p->keep = true;
 
             debug_log(" > remaining resources - KEEP - for another loop: %s (%d %s total resources: utime=" KERNEL_UINT_FORMAT " stime=" KERNEL_UINT_FORMAT " gtime=" KERNEL_UINT_FORMAT " minflt=" KERNEL_UINT_FORMAT " majflt=" KERNEL_UINT_FORMAT ")"
                 , p->comm
@@ -2475,7 +2560,7 @@ static inline void process_exited_processes() {
 
             for(pp = p->parent; pp ; pp = pp->parent) {
                 if(pp->updated) break;
-                pp->keep = 1;
+                pp->keep = true;
 
                 debug_log(" > - KEEP - parent for another loop: %s (%d %s)"
                     , pp->comm
@@ -2573,7 +2658,7 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
 
     struct pid_stat *p = get_pid_entry(pid);
     if(unlikely(!p || p->read)) return 0;
-    p->read = 1;
+    p->read = true;
 
     // debug_log("Reading process %d (%s), sortlist %d", p->pid, p->comm, p->sortlist);
 
@@ -2605,8 +2690,10 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
     // --------------------------------------------------------------------
     // /proc/<pid>/fd
 
-    if(enable_file_charts)
-            managed_log(p, PID_LOG_FDS, read_pid_file_descriptors(p, ptr));
+    if(enable_file_charts) {
+        managed_log(p, PID_LOG_FDS, read_pid_file_descriptors(p, ptr));
+        managed_log(p, PID_LOG_LIMITS, read_proc_pid_limits(p, ptr));
+    }
 
     // --------------------------------------------------------------------
     // done!
@@ -2615,8 +2702,8 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
         debug_log("Read process %d (%s) sortlisted %d, but its parent %d (%s) sortlisted %d, is not read", p->pid, p->comm, p->sortlist, all_pids[p->ppid]->pid, all_pids[p->ppid]->comm, all_pids[p->ppid]->sortlist);
 
     // mark it as updated
-    p->updated = 1;
-    p->keep = 0;
+    p->updated = true;
+    p->keep = false;
     p->keeploops = 0;
 
     return 1;
@@ -2673,9 +2760,9 @@ static int collect_data_for_all_processes(void) {
         size_t slc = 0;
 #endif
         for(p = root_of_pids; p ; p = p->next) {
-            p->read             = 0; // mark it as not read, so that collect_data_for_pid() will read it
-            p->updated          = 0;
-            p->merged           = 0;
+            p->read             = false; // mark it as not read, so that collect_data_for_pid() will read it
+            p->updated          = false;
+            p->merged           = false;
             p->children_count   = 0;
             p->parent           = NULL;
 
@@ -2801,7 +2888,7 @@ static void cleanup_exited_pids(void) {
         }
         else {
             if(unlikely(p->keep)) p->keeploops++;
-            p->keep = 0;
+            p->keep = false;
             p = p->next;
         }
     }
@@ -2855,7 +2942,7 @@ static void apply_apps_groups_targets_inheritance(void) {
                 )) {
                 // mark it as merged
                 p->parent->children_count--;
-                p->merged = 1;
+                p->merged = true;
 
                 // the parent inherits the child's target, if it does not have a target itself
                 if(unlikely(p->target && !p->parent->target)) {
@@ -2965,6 +3052,8 @@ static size_t zero_all_targets(struct target *root) {
             w->openfds.signalfds = 0;
             w->openfds.eventpolls = 0;
             w->openfds.other = 0;
+
+            w->max_open_files_percent = 0.0;
         }
 
         w->collected_starttime = 0;
@@ -3112,6 +3201,23 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
     if(unlikely(!w)) {
         netdata_log_error("pid %d %s was left without a target!", p->pid, p->comm);
         return;
+    }
+
+    if(p->limits.max_open_files > 0) {
+        kernel_uint_t all_dfs =
+                p->openfds.files +
+                p->openfds.pipes +
+                p->openfds.sockets +
+                p->openfds.inotifies +
+                p->openfds.eventfds +
+                p->openfds.timerfds +
+                p->openfds.signalfds +
+                p->openfds.eventpolls +
+                p->openfds.other;
+
+        NETDATA_DOUBLE percent = (NETDATA_DOUBLE)all_dfs * 100.0 / (NETDATA_DOUBLE)p->limits.max_open_files;
+        if(percent > w->max_open_files_percent)
+            w->max_open_files_percent = percent;
     }
 
     w->cutime  += p->cutime;
@@ -3742,6 +3848,14 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
                 send_SET(w->name, w->openfds.pipes);
         }
         send_END();
+
+        send_BEGIN(type, "fd_limit", dt);
+        for (w = root; w; w = w->next) {
+            if (unlikely(w->exposed && w->processes))
+                send_SET(w->name, w->max_open_files_percent * 100.0);
+        }
+        send_END();
+
     }
 }
 
@@ -3985,6 +4099,14 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed))
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+        }
+        APPS_PLUGIN_FUNCTIONS();
+
+        fprintf(stdout, "CHART %s.fd_limit '' '%s File Descriptors Limit' '%%' processes %s.fd_limit line 20054 %d\n", type,
+                title, type, update_every);
+        for (w = root; w; w = w->next) {
+            if (unlikely(w->exposed))
+                fprintf(stdout, "DIMENSION %s '' absolute 1 100\n", w->name);
         }
         APPS_PLUGIN_FUNCTIONS();
     }
