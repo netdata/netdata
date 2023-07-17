@@ -1071,6 +1071,7 @@ endif #ENABLE_H2O
 
 NETDATA_FILES = \
     collectors/all.h \
+    collectors/utils.h \
     $(DAEMON_FILES) \
     $(LIBNETDATA_FILES) \
     $(API_PLUGIN_FILES) \
