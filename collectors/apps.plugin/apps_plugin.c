@@ -141,6 +141,17 @@ static const char *proc_states[] = {
 // internal flags
 // handled in code (automatically set)
 
+// log each problem once per process
+// log flood protection flags (log_thrown)
+typedef enum __attribute__((packed)) {
+    PID_LOG_IO      = (1 << 0),
+    PID_LOG_STATUS  = (1 << 1),
+    PID_LOG_CMDLINE = (1 << 2),
+    PID_LOG_FDS     = (1 << 3),
+    PID_LOG_STAT    = (1 << 4),
+    PID_LOG_LIMITS  = (1 << 5),
+} PID_LOG;
+
 static int
         show_guest_time = 0,            // 1 when guest values are collected
         show_guest_time_old = 0,
@@ -339,9 +350,6 @@ struct pid_fd {
 
 struct pid_stat {
     int32_t pid;
-
-    uint32_t log_thrown;
-
     int32_t ppid;
     // int32_t pgrp;
     // int32_t session;
@@ -422,13 +430,13 @@ struct pid_stat {
     ARL_BASE *status_arl;
 #endif
 
-     kernel_uint_t io_logical_bytes_read_raw;
-     kernel_uint_t io_logical_bytes_written_raw;
-     kernel_uint_t io_read_calls_raw;
-     kernel_uint_t io_write_calls_raw;
-     kernel_uint_t io_storage_bytes_read_raw;
-     kernel_uint_t io_storage_bytes_written_raw;
-     kernel_uint_t io_cancelled_write_bytes_raw;
+    kernel_uint_t io_logical_bytes_read_raw;
+    kernel_uint_t io_logical_bytes_written_raw;
+    kernel_uint_t io_read_calls_raw;
+    kernel_uint_t io_write_calls_raw;
+    kernel_uint_t io_storage_bytes_read_raw;
+    kernel_uint_t io_storage_bytes_written_raw;
+    kernel_uint_t io_cancelled_write_bytes_raw;
 
     kernel_uint_t io_logical_bytes_read;
     kernel_uint_t io_logical_bytes_written;
@@ -452,6 +460,8 @@ struct pid_stat {
     int children_count;             // number of processes directly referencing this
     int keeploops;                  // increases by 1 every time keep is 1 and updated 0
 
+    PID_LOG log_thrown;
+
     bool keep;                      // true when we need to keep this process in memory even after it exited
     bool updated;                   // true when the process is currently running
     bool merged;                    // true when it has been merged to its parent
@@ -467,6 +477,7 @@ struct pid_stat {
 
     usec_t io_collected_usec;
     usec_t last_io_collected_usec;
+    usec_t last_limits_collected_usec;
 
     char *fds_dirname;              // the full directory name in /proc/PID/fd
 
@@ -484,15 +495,6 @@ struct pid_stat {
 size_t pagesize;
 
 kernel_uint_t global_uptime;
-
-// log each problem once per process
-// log flood protection flags (log_thrown)
-#define PID_LOG_IO      0x00000001
-#define PID_LOG_STATUS  0x00000002
-#define PID_LOG_CMDLINE 0x00000004
-#define PID_LOG_FDS     0x00000008
-#define PID_LOG_STAT    0x00000010
-#define PID_LOG_LIMITS  0x00000020
 
 static struct pid_stat
         *root_of_pids = NULL,   // global list of all processes running
@@ -1061,7 +1063,7 @@ static inline void del_pid_entry(pid_t pid) {
 
 // ----------------------------------------------------------------------------
 
-static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
+static inline int managed_log(struct pid_stat *p, PID_LOG log, int status) {
     if(unlikely(!status)) {
         // netdata_log_error("command failed log %u, errno %d", log, errno);
 
@@ -1371,6 +1373,10 @@ static inline int read_proc_pid_limits(struct pid_stat *p, void *ptr) {
 #else
     static char proc_pid_limits[MAX_PROC_PID_LIMITS + 1];
 
+    if(p->io_collected_usec > p->last_limits_collected_usec && p->io_collected_usec - p->last_limits_collected_usec <= 60 * USEC_PER_SEC)
+        // too frequent, we want to collect limits once per minute
+        return 0;
+
     if(unlikely(!p->limits_filename)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/proc/%d/limits", netdata_configured_host_prefix, p->pid);
@@ -1387,6 +1393,7 @@ static inline int read_proc_pid_limits(struct pid_stat *p, void *ptr) {
         return 0;
 
     p->limits.max_open_files = get_proc_pid_limits_limit(proc_pid_limits, PROC_PID_LIMITS_MAX_OPEN_FILES_KEY, sizeof(PROC_PID_LIMITS_MAX_OPEN_FILES_KEY) - 1, 0);
+    p->last_limits_collected_usec = p->io_collected_usec;
 
     return 1;
 #endif
