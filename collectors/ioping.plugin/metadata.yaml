@@ -1,7 +1,6 @@
 meta:
   plugin_name: ioping.plugin
   module_name: ioping.plugin
-  alternative_monitored_instances: []
   monitored_instance:
     name: ioping
     link: ''

@@ -1,7 +1,6 @@
 meta:
   plugin_name: python.d.plugin
   module_name: megacli
-  alternative_monitored_instances: []
   monitored_instance:
     name: python.d megacli
     link: ''
@@ -68,8 +67,7 @@ alerts:
   - name: megacli_bbu_relative_charge
     link: https://github.com/netdata/netdata/blob/master/health/health.d/megacli.conf
     metric: megacli.bbu_relative_charge
-    info: average battery backup unit (BBU) relative state of charge over the last
-      10 seconds
+    info: average battery backup unit (BBU) relative state of charge over the last 10 seconds
   - name: megacli_bbu_cycle_count
     link: https://github.com/netdata/netdata/blob/master/health/health.d/megacli.conf
     metric: megacli.bbu_cycle_count

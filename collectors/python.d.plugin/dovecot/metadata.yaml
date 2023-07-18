@@ -1,7 +1,6 @@
 meta:
   plugin_name: python.d.plugin
   module_name: dovecot
-  alternative_monitored_instances: []
   monitored_instance:
     name: python.d dovecot
     link: ''

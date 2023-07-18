@@ -3,7 +3,6 @@ modules:
   - meta:
       plugin_name: debugfs.plugin
       module_name: /sys/kernel/debug/extfrag
-      alternative_monitored_instances: []
       monitored_instance:
         name: debugfs /sys/kernel/debug/extfrag
         link: ''
@@ -119,7 +118,6 @@ modules:
   - meta:
       plugin_name: debugfs.plugin
       module_name: /sys/kernel/debug/zswap
-      alternative_monitored_instances: []
       monitored_instance:
         name: debugfs /sys/kernel/debug/zswap
         link: ''
@@ -216,8 +214,7 @@ modules:
               dimensions:
                 - name: limit
             - name: system.zswap_written_back_raw_bytes
-              description: Zswap uncomressed bytes written back when pool limit was
-                reached
+              description: Zswap uncomressed bytes written back when pool limit was reached
               unit: "bytes/s"
               chart_type: area
               dimensions:

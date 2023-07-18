@@ -3,7 +3,6 @@ modules:
   - meta:
       plugin_name: apps.plugin
       module_name: system
-      alternative_monitored_instances: []
       monitored_instance:
         name: apps system
         link: ''
@@ -79,7 +78,6 @@ modules:
   - meta:
       plugin_name: apps.plugin
       module_name: apps
-      alternative_monitored_instances: []
       monitored_instance:
         name: apps apps
         link: ''
@@ -295,7 +293,6 @@ modules:
   - meta:
       plugin_name: apps.plugin
       module_name: groups
-      alternative_monitored_instances: []
       monitored_instance:
         name: apps groups
         link: ''
@@ -511,7 +508,6 @@ modules:
   - meta:
       plugin_name: apps.plugin
       module_name: users
-      alternative_monitored_instances: []
       monitored_instance:
         name: apps users
         link: ''
@@ -727,7 +723,6 @@ modules:
   - meta:
       plugin_name: apps.plugin
       module_name: netdata
-      alternative_monitored_instances: []
       monitored_instance:
         name: apps netdata
         link: ''

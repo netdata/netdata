@@ -3,7 +3,6 @@ modules:
   - meta:
       plugin_name: ebpf.plugin
       module_name: filedescriptor
-      alternative_monitored_instances: []
       monitored_instance:
         name: ebpf filedescriptor
         link: ''
@@ -159,7 +158,6 @@ modules:
   - meta:
       plugin_name: ebpf.plugin
       module_name: processes
-      alternative_monitored_instances: []
       monitored_instance:
         name: ebpf processes
         link: ''
@@ -344,7 +342,6 @@ modules:
   - meta:
       plugin_name: ebpf.plugin
       module_name: disk
-      alternative_monitored_instances: []
       monitored_instance:
         name: ebpf disk
         link: ''
@@ -416,7 +413,6 @@ modules:
   - meta:
       plugin_name: ebpf.plugin
       module_name: hardirq
-      alternative_monitored_instances: []
       monitored_instance:
         name: ebpf hardirq
         link: ''
@@ -488,7 +484,6 @@ modules:
   - meta:
       plugin_name: ebpf.plugin
       module_name: cachestat
-      alternative_monitored_instances: []
       monitored_instance:
         name: ebpf cachestat
         link: ''
@@ -654,7 +649,6 @@ modules:
   - meta:
       plugin_name: ebpf.plugin
       module_name: sync
-      alternative_monitored_instances: []
       monitored_instance:
         name: ebpf sync
         link: ''
@@ -707,12 +701,9 @@ modules:
         list: []
     alerts:
       - name: sync_freq
-        link: |
-          https://github.com/netdata/netdata/blob/master/health/health.d/synchronization.conf
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/synchronization.conf
         metric: mem.sync
-        info: number of sync() system calls. Every call causes all pending modifications
-          to filesystem metadata and cached file data to be written to the underlying
-          filesystems.
+        info: number of sync() system calls. Every call causes all pending modifications to filesystem metadata and cached file data to be written to the underlying filesystems.
     metrics:
       folding:
         title: Metrics
@@ -753,7 +744,6 @@ modules:
   - meta:
       plugin_name: ebpf.plugin
       module_name: mdflush
-      alternative_monitored_instances: []
       monitored_instance:
         name: ebpf mdflush
         link: ''
@@ -825,7 +815,6 @@ modules:
   - meta:
       plugin_name: ebpf.plugin
       module_name: swap
-      alternative_monitored_instances: []
       monitored_instance:
         name: ebpf swap
         link: ''
@@ -938,7 +927,6 @@ modules:
   - meta:
       plugin_name: ebpf.plugin
       module_name: oomkill
-      alternative_monitored_instances: []
       monitored_instance:
         name: ebpf oomkill
         link: ''
@@ -1026,7 +1014,6 @@ modules:
   - meta:
       plugin_name: ebpf.plugin
       module_name: socket
-      alternative_monitored_instances: []
       monitored_instance:
         name: ebpf socket
         link: ''
@@ -1319,7 +1306,6 @@ modules:
   - meta:
       plugin_name: ebpf.plugin
       module_name: dcstat
-      alternative_monitored_instances: []
       monitored_instance:
         name: ebpf dcstat
         link: ''
@@ -1479,7 +1465,6 @@ modules:
   - meta:
       plugin_name: ebpf.plugin
       module_name: filesystem
-      alternative_monitored_instances: []
       monitored_instance:
         name: ebpf filesystem
         link: ''
@@ -1583,7 +1568,6 @@ modules:
   - meta:
       plugin_name: ebpf.plugin
       module_name: shm
-      alternative_monitored_instances: []
       monitored_instance:
         name: ebpf shm
         link: ''
@@ -1734,7 +1718,6 @@ modules:
   - meta:
       plugin_name: ebpf.plugin
       module_name: softirq
-      alternative_monitored_instances: []
       monitored_instance:
         name: ebpf softirq
         link: ''
@@ -1806,7 +1789,6 @@ modules:
   - meta:
       plugin_name: ebpf.plugin
       module_name: mount
-      alternative_monitored_instances: []
       monitored_instance:
         name: ebpf mount
         link: ''
@@ -1886,7 +1868,6 @@ modules:
   - meta:
       plugin_name: ebpf.plugin
       module_name: vfs
-      alternative_monitored_instances: []
       monitored_instance:
         name: ebpf vfs
         link: ''
@@ -2253,7 +2234,6 @@ modules:
   - meta:
       plugin_name: ebpf.plugin
       module_name: process
-      alternative_monitored_instances: []
       monitored_instance:
         name: ebpf process
         link: ''

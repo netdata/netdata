@@ -1,143 +1,53 @@
 meta:
   plugin_name: python.d.plugin
   module_name: alarms
-  alternative_monitored_instances: []
   monitored_instance:
-    name: Netdata Agent Alarms
-    link: "https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#alarm-statuses"
-    categories:
-      - data-collection.notifications
-    icon_filename: ""
+    name: python.d alarms
+    link: ''
+    categories: []
+    icon_filename: ''
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: "Monitor Netdata Agent alarm statuses."
-  keywords:
-    - notification monitoring
-    - alerts
-    - agent alerts
+    description: ''
+  keywords: []
   most_popular: false
 overview:
   data_collection:
-    metrics_description: |
-      This collector monitors the statuses of the alarms the Netdata Agent produces and will display them as integer values in a chart.
-    method_description: |
-      It uses the `/api/v1/alarms?all` endpoint of the Agent, and creates a dimension per alarm.
+    metrics_description: ''
+    method_description: ''
   supported_platforms:
     include: []
     exclude: []
   multi-instance: true
   additional_permissions:
-    description: ""
+    description: ''
   default_behavior:
     auto_detection:
-      description: |
-        It discovers instances of Netdata running on localhost, and gathers metrics from `http://127.0.0.1:19999/api/v1/alarms?all`. `CLEAR` status is mapped to `0`, `WARNING` to `1` and `CRITICAL` to `2`. Also, by default all alarms produced will be monitored.
+      description: ''
     limits:
-      description: ""
+      description: ''
     performance_impact:
-      description: ""
+      description: ''
 setup:
   prerequisites:
-    list:
-      - title: Enable the collector
-        description: |
-          You can enable the collector by going to your [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory), use the `edit-config` script to edit `python.d.conf` and set the attribute `alarms: yes`.
-
-          After this change, save the file and [restart Netdata](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md).
+    list: []
   configuration:
     file:
-      name: "python.d/alarms.conf"
+      name: ''
+      description: ''
     options:
-      description: "The following options can be defined globally: update_every, priority, penalty, autodetection_retry."
+      description: ''
       folding:
-        title: "Config options"
+        title: ''
         enabled: true
-      list:
-        - name: update_every
-          description: Data collection frequency.
-          default_value: 10
-          required: false
-        - name: priority
-          description: |
-            Priority of the chart, lower values bring the chart to the top of the page.
-          default_value: 60000
-          required: false
-        - name: penalty
-          description: |
-            Apply a penalty to `update_every` in case of failures. Penalty will increase every 5 failed updates in a row, Max penalty is 10 min.
-          default_value: yes
-          required: false
-        - name: autodetection_retry
-          description: Re-check interval in seconds. Zero means not to schedule re-check.
-          default_value: 0
-          required: false
-        - name: url
-          description: The URL to fetch data from.
-          default_value: http://127.0.0.1:19999/api/v1/alarms?all
-          required: true
-        - name: status_map
-          description: Mapping for the alarm statuses to numbers.
-          default_value: |
-            ```yaml
-            CLEAR: 0
-            WARNING: 1
-            CRITICAL: 2
-            ```
-          required: false
-        - name: collect_alarm_values
-          description: If set to true, will include a chart with calculated alarm values.
-          default_value: "false"
-          required: false
-        - name: alarm_status_chart_type
-          description: Defines the type of chart (e.g. line or stacked)
-          default_value: line
-          required: false
-        - name: alarm_contains_words
-          description: Comma separated list of words to filter alarm names for.
-          default_value: ""
-          required: false
-        - name: alarm_excludes_words
-          description: Comma separated list of words to exclude based on alarm name.
-          default_value: ""
-          required: false
+      list: []
     examples:
       folding:
         enabled: true
-        title: "Config"
-      list:
-        - name: Basic
-          description: A basic example configuration
-          folding:
-            enabled: false
-          config: |
-            local:
-              url: 'http://127.0.0.1:19999/api/v1/alarms?all'
-        - name: Custom mappings, filters and update frequency
-          description: |
-            This example uses custom mappings for the statuses, filters to include only alarms having `cpu` or `load` in their names, while also making the update frequency 5 seconds.
-          config: |
-            update_every: 5
-            local:
-              url: 'http://127.0.0.1:19999/api/v1/alarms?all'
-              status_map:
-                CLEAR: 0
-                WARNING: 5
-                CRITICAL: 10
-              alarm_contains_words: 'cpu,load'
-
-        - name: Multi-instance
-          description: |
-            > **Note**: When you define multiple jobs, their names must be unique.
-
-            Collecting metrics from local and remote instances.
-          config: |
-            local:
-              url: 'http://127.0.0.1:19999/api/v1/alarms?all'
-
-            remote:
-              url: 'http://192.0.2.1:19999/api/v1/alarms?all'
+        title: ''
+      list: []
 troubleshooting:
   problems:
     list: []
@@ -150,7 +60,7 @@ metrics:
   availability: []
   scopes:
     - name: global
-      description: "These metrics apply to each Netdata Agent that is monitored with this collector."
+      description: ""
       labels: []
       metrics:
         - name: alarms.status
@@ -160,7 +70,7 @@ metrics:
           dimensions:
             - name: a dimension per alarm
         - name: alarms.status
-          description: Alarm Values, available only when `collect_alarm_values` is set to `true`
+          description: Alarm Values
           unit: "value"
           chart_type: line
           dimensions:
