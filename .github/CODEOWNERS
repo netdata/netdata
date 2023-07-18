@@ -26,12 +26,12 @@ health/notifications/ @Ferroin @thiagoftsm @MrZammler
 ml/ @andrewm4894 @vkalintiris
 libnetdata/ @thiagoftsm @vkalintiris
 packaging/ @Ferroin @tkatsoulas
-registry/ @jacekkolasa
+registry/ @novykh
 streaming/ @thiagoftsm
 system/ @Ferroin @tkatsoulas
 tests/ @Ferroin @vkalintiris @tkatsoulas
 web/ @thiagoftsm @vkalintiris
-web/gui/ @jacekkolasa
+web/gui/ @novykh
 
 # Ownership by filetype (overwrites ownership by directory)
 *.am @Ferroin @tkatsoulas
