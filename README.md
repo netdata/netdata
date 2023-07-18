@@ -66,15 +66,23 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
 <hr class="solid">
 
-> :bulb: **Important Note**<br/>
+> **Important** :bulb:<br/>
 > People get addicted to Netdata. Once you use it on your systems, **there's no going back!**<br/>
 
 <hr class="solid">
 
-## What's New In A Year?
+## What's New and Coming?
 
-| When | Release | What | Description|
-|:----:|:-------:|:----:|:-----------|
+| When | Status | What | Description|
+|:----:|:------:|:----:|:-----------|
+|later|researching|WebRTC|Browser to Agent communication via WebRTC.|
+|later|interrupted|Advanced Troubleshooting|Expanded view of dashboard charts integrating Metrics Correlations, Anomaly Advisor and many more.|
+|next|planned|Easy Custom<br/>Dashboards|Drag and drop charts to create custom dashboards on the fly, while troubleshooting!|
+|next|planned|More Customizability|Set default settings for all charts and views!|
+|soon|in progress|UCUM Units|Migrate all metrics to the Unified Code for Units of Measure.|
+|soon|in progress|Netdata Cloud<br/>On-Prem|Netdata Cloud available for On-Prem installation!|
+|soon|in progress|Click to Activate|Configure Alerts and Data Collectors from the UI!|
+|soon|finishing|Integrations|Netdata Integrations Marketplace!|
 |Jul<br/>2023|in the<br/>nightlies|New Agent UI|Now Netdata Cloud and Netdata Agent share the same dashboard!|
 |Jun<br/>2023|[v1.40](https://github.com/netdata/netdata/releases/tag/v1.40.0)|Summary Dashboards|High level tiles everywhere!|
 |||Machine Learning|Multiple ML models per metric.|
