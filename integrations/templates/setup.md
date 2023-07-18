@@ -8,6 +8,7 @@
 
 [% endfor %]
 [% endif %]
+[% if entry.setup.configuration.file.name %]
 ### Configuration
 
 #### File
@@ -75,4 +76,5 @@ sudo ./edit-config [[ entry.setup.configuration.file.name ]]
 [% endif %]
 [% endif %]
 [% endfor %]
+[% endif %]
 [% endif %]

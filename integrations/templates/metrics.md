@@ -1,3 +1,4 @@
+[% if entry.metrics.scopes %]
 ## Metrics
 
 [% if entry.metrics.folding.enabled %]
@@ -36,4 +37,5 @@ This scope has no labels.
 [% endfor %]
 [% if entry.metrics.folding.enabled %]
 {% /details %}
+[% endif %]
 [% endif %]
