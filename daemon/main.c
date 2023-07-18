@@ -1874,11 +1874,6 @@ int main(int argc, char **argv) {
         init_sentry();
     }
 
-    char *nd_disable_cloud = getenv("NETDATA_DISABLE_CLOUD");
-    if (nd_disable_cloud && !strncmp(nd_disable_cloud, "1", 1)) {
-        appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", "false");
-    }
-
     // ------------------------------------------------------------------------
     // initialize netdata
     {
