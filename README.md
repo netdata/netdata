@@ -22,7 +22,11 @@
 </p>
 <hr class="solid">
 
-Netdata collects metrics per second and presents them in beautiful low-latency dashboards. It is designed to run on all of your physical and virtual servers, cloud deployments, Kubernetes clusters, and edge/IoT devices, to monitor everything you run.
+Netdata collects metrics per second and presents them in beautiful low-latency dashboards. It is designed to run on all of your physical and virtual servers, cloud deployments, Kubernetes clusters, and edge/IoT devices, to monitor your systems, containers and applications.
+
+It scales nicely from just a single server to thousands of servers, even in complex multi/mixed/hybrid cloud environments, and given enough disk space it can keep your metrics for years.
+
+**KEY FEATURES**:<br/>
 
 - :boom: **Collects metrics from 800+ integrations**<br/>
   Operating system metrics, container metrics, virtual machines, hardware sensors, applications metrics, OpenMetrics exporters, StatsD, and logs.
@@ -37,14 +41,15 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
   Clear and precise visualization that allows you to quickly understand any dataset, but also to filter, slice and dice the data directly on the dashboard, without the need to learn any query language.
 
 - :bell: **Out of box Alerts**<br/>
-  Comes with hundreds of alerts out of the box to detect common issues and pitfalls, revealing issues that can easily go unnoticed.
+  Comes with hundreds of alerts out of the box to detect common issues and pitfalls, revealing issues that can easily go unnoticed. It supports several notification methods to let you know when your attention is needed.
 
 - :sunglasses: **Low Maintenance**<br/>
-  Fully automated in every aspect: automated dashboards, out-of-the-box alerts, auto-detection, auto-discovery of metrics, and easily configurable.
+  Fully automated in every aspect: automated dashboards, out-of-the-box alerts, auto-detection and auto-discovery of metrics, zero-touch machine-learning, easy scalability and high availability and CI/CD friendly.
 
 - :star: **Open and Extensible**<br/>
   Netdata is a modular platform that can be extended in all possible ways and it also integrates nicely with other monitoring solutions.
 
+&nbsp;<br/>
 <p align="center">
   <img src="https://raw.githubusercontent.com/cncf/artwork/master/other/cncf/horizontal/white/cncf-white.svg#gh-dark-mode-only" alt="CNCF" width="300">
   <img src="https://raw.githubusercontent.com/cncf/artwork/master/other/cncf/horizontal/black/cncf-black.svg#gh-light-mode-only" alt="CNCF" width="300">
@@ -53,6 +58,7 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
   &nbsp;<br/>
   ...and due to your love :heart:, it is the 3rd most :star:'d project in the <a href="https://landscape.cncf.io/card-mode?grouping=no&sort=stars">CNCF landscape</a>!
 </p>
+&nbsp;<br/>
 
 <hr class="solid">
 
