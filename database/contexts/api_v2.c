@@ -9,40 +9,58 @@
 
 struct alert_transitions_facets alert_transition_facets[] = {
         [ATF_STATUS] = {
-                .id = "status",
+                .id = "f_status",
                 .name = "Alert Status",
-                .query_param = "status",
+                .query_param = "f_status",
                 .order = 1,
         },
         [ATF_TYPE] = {
-                .id = "type",
+                .id = "f_type",
                 .name = "Alert Type",
-                .query_param = "type",
+                .query_param = "f_type",
                 .order = 2,
         },
         [ATF_ROLE] = {
-                .id = "role",
+                .id = "f_role",
                 .name = "Recipient Role",
-                .query_param = "role",
+                .query_param = "f_role",
                 .order = 3,
         },
         [ATF_CLASS] = {
-                .id = "class",
+                .id = "f_class",
                 .name = "Alert Class",
-                .query_param = "class",
+                .query_param = "f_class",
                 .order = 4,
         },
         [ATF_COMPONENT] = {
-                .id = "component",
+                .id = "f_component",
                 .name = "Alert Component",
-                .query_param = "component",
+                .query_param = "f_component",
                 .order = 5,
         },
         [ATF_NODE] = {
-                .id = "node",
+                .id = "f_node",
                 .name = "Alert Node",
-                .query_param = "node",
+                .query_param = "f_node",
                 .order = 6,
+        },
+        [ATF_ALERT_NAME] = {
+                .id = "f_alert",
+                .name = "Alert Name",
+                .query_param = "f_alert",
+                .order = 7,
+        },
+        [ATF_CHART_NAME] = {
+                .id = "f_instance",
+                .name = "Instance Name",
+                .query_param = "f_instance",
+                .order = 8,
+        },
+        [ATF_CONTEXT] = {
+                .id = "f_context",
+                .name = "Context",
+                .query_param = "f_context",
+                .order = 9,
         },
 
         // terminator
@@ -1300,7 +1318,8 @@ static int contexts_v2_alert_instance_to_json_callback(const DICTIONARY_ITEM *it
         buffer_json_member_add_uint64(wb, "ni", t->ni);
 
         buffer_json_member_add_string(wb, "nm", string2str(t->name));
-        buffer_json_member_add_string(wb, "ch", string2str(t->chart_name));
+        buffer_json_member_add_string(wb, "ch", string2str(t->chart_id));
+        buffer_json_member_add_string(wb, "ch_n", string2str(t->chart_name));
 
         if(ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_SUMMARY)
             buffer_json_member_add_uint64(wb, "ati", t->ati);
@@ -1392,6 +1411,7 @@ struct sql_alert_transition_fixed_size {
     uint32_t alarm_id;
     char alert_name[SQL_TRANSITION_DATA_SMALL_STRING];
     char chart[RRD_ID_LENGTH_MAX];
+    char chart_name[RRD_ID_LENGTH_MAX];
     char chart_context[SQL_TRANSITION_DATA_MEDIUM_STRING];
     char family[SQL_TRANSITION_DATA_SMALL_STRING];
     char recipient[SQL_TRANSITION_DATA_MEDIUM_STRING];
@@ -1430,6 +1450,7 @@ static struct sql_alert_transition_fixed_size *contexts_v2_alert_transition_dup(
     n->alarm_id = t->alarm_id;
     strncpyz(n->alert_name, t->alert_name ? t->alert_name : "", sizeof(n->alert_name) - 1);
     strncpyz(n->chart, t->chart ? t->chart : "", sizeof(n->chart) - 1);
+    strncpyz(n->chart_name, t->chart_name ? t->chart_name : n->chart, sizeof(n->chart_name) - 1);
     strncpyz(n->chart_context, t->chart_context ? t->chart_context : "", sizeof(n->chart_context) - 1);
     strncpyz(n->family, t->family ? t->family : "", sizeof(n->family) - 1);
     strncpyz(n->recipient, t->recipient ? t->recipient : "", sizeof(n->recipient) - 1);
@@ -1547,6 +1568,9 @@ static void contexts_v2_alert_transition_callback(struct sql_alert_transition_da
             [ATF_COMPONENT] = t->component,
             [ATF_ROLE] = t->recipient && *t->recipient ? t->recipient : string2str(localhost->health.health_default_recipient),
             [ATF_NODE] = machine_guid,
+            [ATF_ALERT_NAME] = t->alert_name,
+            [ATF_CHART_NAME] = t->chart_name,
+            [ATF_CONTEXT] = t->chart_context,
     };
 
     for(size_t i = 0; i < ATF_TOTAL_ENTRIES ;i++) {
@@ -1681,6 +1705,7 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
 
             buffer_json_member_add_string(wb, "alert", *t->alert_name ? t->alert_name : NULL);
             buffer_json_member_add_string(wb, "instance", *t->chart ? t->chart : NULL);
+            buffer_json_member_add_string(wb, "instance_n", *t->chart_name ? t->chart_name : NULL);
             buffer_json_member_add_string(wb, "context", *t->chart_context ? t->chart_context : NULL);
             // buffer_json_member_add_string(wb, "family", *t->family ? t->family : NULL);
             buffer_json_member_add_string(wb, "component", *t->component ? t->component : NULL);

@@ -424,6 +424,7 @@ struct sql_alert_transition_data {
     uint32_t alarm_id;
     const char *alert_name;
     const char *chart;
+    const char *chart_name;
     const char *chart_context;
     const char *family;
     const char *recipient;
@@ -589,6 +590,9 @@ typedef enum __attribute__((packed)) {
     ATF_COMPONENT,
     ATF_ROLE,
     ATF_NODE,
+    ATF_ALERT_NAME,
+    ATF_CHART_NAME,
+    ATF_CONTEXT,
 
     // total
     ATF_TOTAL_ENTRIES,

@@ -1766,16 +1766,21 @@ fail:
 
 #define SQL_POPULATE_TEMP_ALERT_TRANSITION_TABLE "INSERT INTO v_%p (host_id) VALUES (@host_id)"
 
-#define SQL_SEARCH_ALERT_TRANSITION "SELECT h.host_id, h.alarm_id, h.config_hash_id, h.name, h.chart, h.family, h.recipient, h.units, h.exec, h.chart_context,  d.when_key, " \
-    "d.duration, d.non_clear_duration, d.flags, d.delay_up_to_timestamp, d.info, d.exec_code, d.new_status, d.old_status, d.delay, " \
-    " d.new_value, d.old_value, d.last_repeat, d.transition_id, d.global_id, ah.class, ah.type, ah.component FROM health_log h, health_log_detail d, v_%p t, alert_hash ah " \
-    " WHERE h.host_id = t.host_id AND h.config_hash_id = ah.hash_id AND h.health_log_id = d.health_log_id AND d.global_id BETWEEN @after AND @before "
+#define SQL_SEARCH_ALERT_TRANSITION_SELECT "SELECT " \
+    "h.host_id, h.alarm_id, h.config_hash_id, h.name, h.chart, h.family, h.recipient, h.units, h.exec, " \
+    "h.chart_context,  d.when_key, d.duration, d.non_clear_duration, d.flags, d.delay_up_to_timestamp, " \
+    "d.info, d.exec_code, d.new_status, d.old_status, d.delay, d.new_value, d.old_value, d.last_repeat, " \
+    "d.transition_id, d.global_id, ah.class, ah.type, ah.component, d.exec_run_timestamp"
 
+#define SQL_SEARCH_ALERT_TRANSITION_COMMON_WHERE \
+    "h.config_hash_id = ah.hash_id AND h.health_log_id = d.health_log_id" \
+    " AND ( d.new_status > 2 OR d.old_status > 2 )"
 
-#define SQL_SEARCH_ALERT_TRANSITION_DIRECT "SELECT h.host_id, h.alarm_id, h.config_hash_id, h.name, h.chart, h.family, h.recipient, h.units, h.exec, h.chart_context,  d.when_key, " \
-    "d.duration, d.non_clear_duration, d.flags, d.delay_up_to_timestamp, d.info, d.exec_code, d.new_status, d.old_status, d.delay, " \
-    " d.new_value, d.old_value, d.last_repeat, d.transition_id, d.global_id, ah.class, ah.type, ah.component, d.exec_run_timestamp FROM health_log h, health_log_detail d, alert_hash ah " \
-    " WHERE h.config_hash_id = ah.hash_id AND h.health_log_id = d.health_log_id AND transition_id = @transition "
+#define SQL_SEARCH_ALERT_TRANSITION SQL_SEARCH_ALERT_TRANSITION_SELECT " FROM health_log h, health_log_detail d, v_%p t, alert_hash ah " \
+    " WHERE h.host_id = t.host_id AND " SQL_SEARCH_ALERT_TRANSITION_COMMON_WHERE " AND d.global_id BETWEEN @after AND @before "
+
+#define SQL_SEARCH_ALERT_TRANSITION_DIRECT SQL_SEARCH_ALERT_TRANSITION_SELECT " FROM health_log h, health_log_detail d, alert_hash ah " \
+    " WHERE " SQL_SEARCH_ALERT_TRANSITION_COMMON_WHERE " AND transition_id = @transition "
 
 void sql_alert_transitions(
     DICTIONARY *nodes,
@@ -1909,6 +1914,7 @@ run_query:;
         atd.config_hash_id = (uuid_t *)sqlite3_column_blob(res, 2);
         atd.alert_name = (const char *) sqlite3_column_text(res, 3);
         atd.chart = (const char *) sqlite3_column_text(res, 4);
+        atd.chart_name = (const char *) sqlite3_column_text(res, 4); // FIXME don't copy the id, find the name
         atd.family = (const char *) sqlite3_column_text(res, 5);
         atd.recipient = (const char *) sqlite3_column_text(res, 6);
         atd.units = (const char *) sqlite3_column_text(res, 7);
