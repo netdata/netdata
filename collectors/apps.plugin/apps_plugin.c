@@ -222,6 +222,8 @@ struct openfds {
     kernel_uint_t other;
 };
 
+#define pid_openfds_sum(p) ((p)->openfds.files + (p)->openfds.pipes + (p)->openfds.sockets + (p)->openfds.inotifies + (p)->openfds.eventfds + (p)->openfds.timerfds + (p)->openfds.signalfds + (p)->openfds.eventpolls + (p)->openfds.other)
+
 struct pid_limits {
 //    kernel_uint_t max_cpu_time;
 //    kernel_uint_t max_file_size;
@@ -453,6 +455,8 @@ struct pid_stat {
 
     struct openfds openfds;
     struct pid_limits limits;
+
+    NETDATA_DOUBLE openfds_limits_percent;
 
     int sortlist;                   // higher numbers = top on the process tree
                                     // each process gets a unique number
@@ -1371,11 +1375,13 @@ static inline int read_proc_pid_limits(struct pid_stat *p, void *ptr) {
 #ifdef __FreeBSD__
     return 0;
 #else
-    static char proc_pid_limits[MAX_PROC_PID_LIMITS + 1];
+    static char proc_pid_limits_buffer[MAX_PROC_PID_LIMITS + 1];
+    int ret = 0;
 
-    if(p->io_collected_usec > p->last_limits_collected_usec && p->io_collected_usec - p->last_limits_collected_usec <= 60 * USEC_PER_SEC)
+    kernel_uint_t all_fds = pid_openfds_sum(p);
+    if(all_fds < p->limits.max_open_files / 2 && p->io_collected_usec > p->last_limits_collected_usec && p->io_collected_usec - p->last_limits_collected_usec <= 60 * USEC_PER_SEC)
         // too frequent, we want to collect limits once per minute
-        return 0;
+        goto cleanup;
 
     if(unlikely(!p->limits_filename)) {
         char filename[FILENAME_MAX + 1];
@@ -1384,18 +1390,26 @@ static inline int read_proc_pid_limits(struct pid_stat *p, void *ptr) {
     }
 
     int fd = open(p->limits_filename, procfile_open_flags, 0666);
-    if(unlikely(fd == -1)) return 0;
+    if(unlikely(fd == -1)) goto cleanup;
 
-    ssize_t bytes = read(fd, proc_pid_limits, MAX_PROC_PID_LIMITS);
+    ssize_t bytes = read(fd, proc_pid_limits_buffer, MAX_PROC_PID_LIMITS);
     close(fd);
 
     if(bytes <= 0)
-        return 0;
+        goto cleanup;
 
-    p->limits.max_open_files = get_proc_pid_limits_limit(proc_pid_limits, PROC_PID_LIMITS_MAX_OPEN_FILES_KEY, sizeof(PROC_PID_LIMITS_MAX_OPEN_FILES_KEY) - 1, 0);
+    p->limits.max_open_files = get_proc_pid_limits_limit(proc_pid_limits_buffer, PROC_PID_LIMITS_MAX_OPEN_FILES_KEY, sizeof(PROC_PID_LIMITS_MAX_OPEN_FILES_KEY) - 1, 0);
     p->last_limits_collected_usec = p->io_collected_usec;
 
-    return 1;
+    ret = 1;
+
+cleanup:
+    if(p->limits.max_open_files)
+        p->openfds_limits_percent = (NETDATA_DOUBLE)all_fds * 100.0 / (NETDATA_DOUBLE)p->limits.max_open_files;
+    else
+        p->openfds_limits_percent = 0.0;
+
+    return ret;
 #endif
 }
 
@@ -3203,22 +3217,8 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
         return;
     }
 
-    if(p->limits.max_open_files > 0) {
-        kernel_uint_t all_dfs =
-                p->openfds.files +
-                p->openfds.pipes +
-                p->openfds.sockets +
-                p->openfds.inotifies +
-                p->openfds.eventfds +
-                p->openfds.timerfds +
-                p->openfds.signalfds +
-                p->openfds.eventpolls +
-                p->openfds.other;
-
-        NETDATA_DOUBLE percent = (NETDATA_DOUBLE)all_dfs * 100.0 / (NETDATA_DOUBLE)p->limits.max_open_files;
-        if(percent > w->max_open_files_percent)
-            w->max_open_files_percent = percent;
-    }
+    if(p->openfds_limits_percent > w->max_open_files_percent)
+        w->max_open_files_percent = p->openfds_limits_percent;
 
     w->cutime  += p->cutime;
     w->cstime  += p->cstime;
@@ -3849,7 +3849,14 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
         }
         send_END();
 
-        send_BEGIN(type, "fd_limit", dt);
+        send_BEGIN(type, "fds_open", dt);
+        for (w = root; w; w = w->next) {
+            if (unlikely(w->exposed && w->processes))
+                send_SET(w->name, pid_openfds_sum(w));
+        }
+        send_END();
+
+        send_BEGIN(type, "fds_open_limit", dt);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed && w->processes))
                 send_SET(w->name, w->max_open_files_percent * 100.0);
@@ -4102,7 +4109,15 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         }
         APPS_PLUGIN_FUNCTIONS();
 
-        fprintf(stdout, "CHART %s.fd_limit '' '%s File Descriptors Limit' '%%' processes %s.fd_limit line 20054 %d\n", type,
+        fprintf(stdout, "CHART %s.fds_open '' '%s Open File Descriptors' 'fds' processes %s.fds_open line 20054 %d\n", type,
+                title, type, update_every);
+        for (w = root; w; w = w->next) {
+            if (unlikely(w->exposed))
+                fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+        }
+        APPS_PLUGIN_FUNCTIONS();
+
+        fprintf(stdout, "CHART %s.fds_open_limit '' '%s Open File Descriptors Limit' '%%' processes %s.fds_open_limit line 20055 %d\n", type,
                 title, type, update_every);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed))
@@ -4599,6 +4614,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
             , Shared_max = 0.0
             , Swap_max = 0.0
             , Memory_max = 0.0
+            , FDsLimitPercent_max = 0.0
             ;
 
     unsigned long long
@@ -4744,7 +4760,8 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         add_value_field_llu_with_max(wb, TMajFlt, (p->majflt + p->cmajflt) / RATES_DETAIL);
 
         // open file descriptors
-        add_value_field_llu_with_max(wb, FDs, p->openfds.files + p->openfds.pipes + p->openfds.sockets + p->openfds.inotifies + p->openfds.eventfds + p->openfds.timerfds + p->openfds.signalfds + p->openfds.eventpolls + p->openfds.other);
+        add_value_field_ndd_with_max(wb, FDsLimitPercent, p->openfds_limits_percent);
+        add_value_field_llu_with_max(wb, FDs, pid_openfds_sum(p));
         add_value_field_llu_with_max(wb, Files, p->openfds.files);
         add_value_field_llu_with_max(wb, Pipes, p->openfds.pipes);
         add_value_field_llu_with_max(wb, Sockets, p->openfds.sockets);
@@ -4754,6 +4771,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         add_value_field_llu_with_max(wb, SigFDs, p->openfds.signalfds);
         add_value_field_llu_with_max(wb, EvPollFDs, p->openfds.eventpolls);
         add_value_field_llu_with_max(wb, OtherFDs, p->openfds.other);
+
 
         // processes, threads, uptime
         add_value_field_llu_with_max(wb, Processes, p->children_count);
@@ -4983,6 +5001,11 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         // open file descriptors
+        buffer_rrdf_table_add_field(wb, field_id++, "FDsLimitPercent", "Percentage of Open Descriptors vs Limits",
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
+                                    RRDF_FIELD_TRANSFORM_NUMBER, 0, "%", FDsLimitPercent_max, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
         buffer_rrdf_table_add_field(wb, field_id++, "FDs", "All Open File Descriptors",
                                     RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
                                     RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", FDs_max, RRDF_FIELD_SORT_DESCENDING, NULL,
