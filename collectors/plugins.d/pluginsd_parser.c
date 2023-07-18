@@ -1877,7 +1877,7 @@ static void virt_fnc_got_data_cb(BUFFER *wb, int code, void *callback_data)
 }
 
 #define VIRT_FNC_TIMEOUT 1
-dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name, const char *payload) {
+dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name, int *rc, const char *payload) {
     usec_t now = now_realtime_usec();
     BUFFER *wb = buffer_create(4096, NULL);
 
@@ -1924,8 +1924,8 @@ dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name,
 
     pthread_mutex_lock(&cond.lock);
 
-    int rc = pthread_cond_timedwait(&cond.cond, &cond.lock, &tp);
-    if (rc == ETIMEDOUT)
+    int ret = pthread_cond_timedwait(&cond.cond, &cond.lock, &tp);
+    if (ret == ETIMEDOUT)
         netdata_log_error("PLUGINSD: DYNCFG virtual function %s timed out", name);
 
     pthread_mutex_unlock(&cond.lock);
@@ -1934,6 +1934,9 @@ dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name,
     cfg.data = strdupz(buffer_tostring(wb));
     cfg.data_size = strlen(cfg.data);
 
+    if (rc != NULL)
+        *rc = cond.rc;
+
     buffer_free(wb);
     return cfg;
 }
@@ -1941,7 +1944,7 @@ dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name,
 static dyncfg_config_t get_plugin_config_cb(void *usr_ctx)
 {
     PARSER *parser = usr_ctx;
-    return call_virtual_function_blocking(parser, "get_plugin_config", NULL);
+    return call_virtual_function_blocking(parser, "get_plugin_config", NULL, NULL);
 }
 
 static dyncfg_config_t get_module_config_cb(void *usr_ctx, const char *modulename)
@@ -1949,22 +1952,30 @@ static dyncfg_config_t get_module_config_cb(void *usr_ctx, const char *modulenam
     PARSER *parser = usr_ctx;
     char buf[1024];
     snprintfz(buf, sizeof(buf), "get_module_config %s", modulename);
-    return call_virtual_function_blocking(parser, buf, NULL);
+    return call_virtual_function_blocking(parser, buf, NULL, NULL);
 }
 
 enum set_config_result set_plugin_config_cb(void *usr_ctx, dyncfg_config_t *cfg)
 {
     PARSER *parser = usr_ctx;
-    call_virtual_function_blocking(parser, "set_plugin_config", cfg->data);
+    int rc;
+    call_virtual_function_blocking(parser, "set_plugin_config", &rc, cfg->data);
+    if(rc != 1)
+        return SET_CONFIG_REJECTED;
     return SET_CONFIG_ACCEPTED;
 }
 
 enum set_config_result set_module_config_cb(void *usr_ctx, const char *module_name, dyncfg_config_t *cfg)
 {
     PARSER *parser = usr_ctx;
+    int rc;
+
     char buf[1024];
     snprintfz(buf, sizeof(buf), "set_module_config %s", module_name);
-    call_virtual_function_blocking(parser, buf, cfg->data);
+    call_virtual_function_blocking(parser, buf, &rc, cfg->data);
+
+    if(rc != 1)
+        return SET_CONFIG_REJECTED;
     return SET_CONFIG_ACCEPTED;
 }
 
