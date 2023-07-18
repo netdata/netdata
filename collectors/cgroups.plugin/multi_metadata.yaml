@@ -616,20 +616,23 @@ modules:
         metric: cgroup.net_packets
         info: average number of packets received by the network interface ${label:device}
           over the last minute
-        os: "linux"
       - name: cgroup_10s_received_packets_storm
         link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
         metric: cgroup.net_packets
         info: ratio of average number of received packets for the network interface
           ${label:device} over the last 10 seconds, compared to the rate over the
           last minute
-        os: "linux"
       - name: k8s_cgroup_1m_received_packets_rate
         link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
         metric: k8s.cgroup.net_packets
         info: average number of packets received by the network interface ${label:device}
           over the last minute
-        os: "linux"
+      - name: k8s_cgroup_10s_received_packets_storm
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
+        metric: k8s.cgroup.net_packets
+        info: ratio of average number of received packets for the network interface
+          ${label:device} over the last 10 seconds, compared to the rate over the
+          last minute
     metrics:
       folding:
         title: Metrics

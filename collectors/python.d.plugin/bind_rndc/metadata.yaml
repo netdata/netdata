@@ -52,7 +52,11 @@ setup:
 troubleshooting:
   problems:
     list: []
-alerts: []
+alerts:
+  - name: bind_rndc_stats_file_size
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/bind_rndc.conf
+    metric: bind_rndc.stats_size
+    info: BIND statistics-file size
 metrics:
   folding:
     title: Metrics

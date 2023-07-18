@@ -70,6 +70,11 @@ modules:
         metric: system.load
         info: system five-minute load average
         os: "linux"
+      - name: load_average_1
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
+        metric: system.load
+        info: system one-minute load average
+        os: "linux"
     metrics:
       folding:
         title: Metrics
@@ -143,7 +148,11 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
+    alerts:
+      - name: active_processes
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/processes.conf
+        metric: system.active_processes
+        info: system process IDs (PID) space utilization
     metrics:
       folding:
         title: Metrics
@@ -245,6 +254,11 @@ modules:
         metric: system.cpu
         info: average CPU steal time over the last 20 minutes
         os: "linux"
+      - name: 10min_cpu_usage
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
+        metric: system.cpu
+        info: average CPU utilization over the last 10 minutes (excluding nice)
+        os: "freebsd"
     metrics:
       folding:
         title: Metrics
@@ -778,7 +792,12 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
+    alerts:
+      - name: used_swap
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/swap.conf
+        metric: system.swap
+        info: swap memory utilization
+        os: "linux freebsd"
     metrics:
       folding:
         title: Metrics
@@ -868,6 +887,12 @@ modules:
         info: percentage of estimated amount of RAM available for userspace processes,
           without causing swapping
         os: "linux"
+      - name: ram_available
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
+        metric: mem.available
+        info: percentage of estimated amount of RAM available for userspace processes,
+          without causing swapping
+        os: "freebsd"
     metrics:
       folding:
         title: Metrics
@@ -1110,6 +1135,11 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/health/health.d/ipc.conf
         metric: system.ipc_semaphores
         info: IPC semaphore utilization
+        os: "linux"
+      - name: semaphore_arrays_used
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/ipc.conf
+        metric: system.ipc_semaphore_arrays
+        info: IPC semaphore arrays utilization
         os: "linux"
     metrics:
       folding:
@@ -1437,6 +1467,12 @@ modules:
           or net.core.netdev_budget_usecs with work remaining over the last minute
           (this can be a cause for dropped packets)
         os: "linux"
+      - name: 10min_netisr_backlog_exceeded
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/softnet.conf
+        metric: system.softnet_stat
+        info: average number of drops in the last minute due to exceeded sysctl net.route.netisr_maxqlen
+          (this can be a cause for dropped packets)
+        os: "freebsd"
     metrics:
       folding:
         title: Metrics
@@ -1668,7 +1704,12 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
+    alerts:
+      - name: tcp_connections
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_conn.conf
+        metric: ipv4.tcpsock
+        info: IPv4 TCP connections utilization
+        os: "linux"
     metrics:
       folding:
         title: Metrics
@@ -1757,6 +1798,13 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
         metric: ipv4.tcphandshake
         info: average number of received TCP RESETS over the last minute
+        os: "linux freebsd"
+      - name: 10s_ipv4_tcp_resets_received
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
+        metric: ipv4.tcphandshake
+        info: average number of received TCP RESETS over the last 10 seconds. This
+          can be an indication that a service this host needs has crashed. Netdata
+          will not send a clear notification for this alarm.
         os: "linux freebsd"
     metrics:
       folding:
@@ -1893,6 +1941,11 @@ modules:
         metric: ipv4.udperrors
         info: average number of UDP receive buffer errors over the last minute
         os: "linux freebsd"
+      - name: 1m_ipv4_udp_send_buffer_errors
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf
+        metric: ipv4.udperrors
+        info: average number of UDP send buffer errors over the last minute
+        os: "linux"
     metrics:
       folding:
         title: Metrics
@@ -2553,6 +2606,13 @@ modules:
         info: average number of packets received by the network interface ${label:device}
           over the last minute
         os: "linux freebsd"
+      - name: 10s_received_packets_storm
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.packets
+        info: ratio of average number of received packets for the network interface
+          ${label:device} over the last 10 seconds, compared to the rate over the
+          last minute
+        os: "linux freebsd"
       - name: interface_inbound_errors
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
         metric: net.errors
@@ -2809,7 +2869,6 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/health/health.d/zfs.conf
         metric: zfs.memory_ops
         info: number of times ZFS had to limit the ARC growth in the last 10 minutes
-        os: "*"
     metrics:
       folding:
         title: Metrics

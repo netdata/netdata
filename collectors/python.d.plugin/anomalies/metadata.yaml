@@ -57,7 +57,10 @@ alerts:
     link: https://github.com/netdata/netdata/blob/master/health/health.d/anomalies.conf
     metric: anomalies.probability
     info: average anomaly probability over the last 2 minutes
-    os: "linux"
+  - name: anomalies_anomaly_flags
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/anomalies.conf
+    metric: anomalies.anomaly
+    info: number of anomalies in the last 2 minutes
 metrics:
   folding:
     title: Metrics

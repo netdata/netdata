@@ -58,6 +58,11 @@ alerts:
     metric: boinc.tasks
     info: average number of total tasks over the last 10 minutes
     os: "*"
+  - name: boinc_active_tasks
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
+    metric: boinc.tasks
+    info: average number of active tasks over the last 10 minutes
+    os: "*"
   - name: boinc_compute_errors
     link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
     metric: boinc.states
