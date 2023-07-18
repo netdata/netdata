@@ -1,7 +1,6 @@
 meta:
   plugin_name: tc.plugin
   module_name: tc.plugin
-  alternative_monitored_instances: []
   monitored_instance:
     name: tc
     link: ''

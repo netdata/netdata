@@ -1,7 +1,6 @@
 meta:
   plugin_name: charts.d.plugin
   module_name: libreswan
-  alternative_monitored_instances: []
   monitored_instance:
     name: charts.d libreswan
     link: ''

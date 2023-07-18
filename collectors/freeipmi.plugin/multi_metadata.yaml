@@ -3,7 +3,6 @@ modules:
   - meta:
       plugin_name: freeipmi.plugin
       module_name: sel
-      alternative_monitored_instances: []
       monitored_instance:
         name: freeipmi sel
         link: ''
@@ -75,7 +74,6 @@ modules:
   - meta:
       plugin_name: freeipmi.plugin
       module_name: sensors
-      alternative_monitored_instances: []
       monitored_instance:
         name: freeipmi sensors
         link: ''

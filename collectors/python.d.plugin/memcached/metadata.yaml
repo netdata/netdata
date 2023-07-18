@@ -1,7 +1,6 @@
 meta:
   plugin_name: python.d.plugin
   module_name: memcached
-  alternative_monitored_instances: []
   monitored_instance:
     name: python.d memcached
     link: ''
@@ -60,13 +59,11 @@ alerts:
   - name: memcached_cache_fill_rate
     link: https://github.com/netdata/netdata/blob/master/health/health.d/memcached.conf
     metric: memcached.cache
-    info: average rate the cache fills up (positive), or frees up (negative) space
-      over the last hour
+    info: average rate the cache fills up (positive), or frees up (negative) space over the last hour
   - name: memcached_out_of_cache_space_time
     link: https://github.com/netdata/netdata/blob/master/health/health.d/memcached.conf
     metric: memcached.cache
-    info: estimated time the cache will run out of space if the system continues to
-      add data at the same rate as the past hour
+    info: estimated time the cache will run out of space if the system continues to add data at the same rate as the past hour
 metrics:
   folding:
     title: Metrics

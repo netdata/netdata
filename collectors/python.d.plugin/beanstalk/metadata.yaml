@@ -1,7 +1,6 @@
 meta:
   plugin_name: python.d.plugin
   module_name: beanstalk
-  alternative_monitored_instances: []
   monitored_instance:
     name: python.d beanstalk
     link: ''
@@ -56,9 +55,7 @@ alerts:
   - name: beanstalk_server_buried_jobs
     link: https://github.com/netdata/netdata/blob/master/health/health.d/beanstalkd.conf
     metric: beanstalk.current_jobs
-    info: number of buried jobs across all tubes. You need to manually kick them so
-      they can be processed. Presence of buried jobs in a tube does not affect new
-      jobs.
+    info: number of buried jobs across all tubes. You need to manually kick them so they can be processed. Presence of buried jobs in a tube does not affect new jobs.
 metrics:
   folding:
     title: Metrics

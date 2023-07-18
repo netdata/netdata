@@ -1,7 +1,6 @@
 meta:
   plugin_name: cups.plugin
   module_name: cups.plugin
-  alternative_monitored_instances: []
   monitored_instance:
     name: cups
     link: ''
