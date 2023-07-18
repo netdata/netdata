@@ -182,7 +182,7 @@ Each Netdata Agent can perform the following functions:
    Uses the trained machine learning (ML) models to detect outliers and mark collected samples as **anomalies**. Netdata stores anomaly information together with each sample and also streams it to Netdata Parents so that the anomaly is also available at query time for the whole retention of each metric.
 
 5. **`CHECK` metrics and trigger alert notifications**<br/>
-   Uses its configured alerts to check the metrics for common issues and send alert notifications.
+   Uses its configured alerts (you can configure your own) to check the metrics for common issues and uses notifications plugins to send alert notifications.
 
 6. **`STREAM` metrics to other Netdata Agents**<br/>
    Push metrics in real-time to Netdata Parents.
