@@ -2,7 +2,7 @@
 
 The Netdata Assistant is a feature that uses large language models and the Netdata community's collective knowledge to guide you during troubleshooting. It is designed to make understanding and root causing alerts simpler and faster.
 
-# Using Netdata Assistant
+## Using Netdata Assistant
 
 - Navigate to the alerts tab
 - If there are active alerts, the `Actions` column will have an Assistant button
