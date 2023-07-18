@@ -772,7 +772,7 @@ void sql_check_removed_alerts_state(RRDHOST *host)
             "hld.updates_id, hld.when_key, hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, " \
             "hld.delay_up_to_timestamp, hl.name, hl.chart, hl.family, hl.exec, hl.recipient, ah.source, hl.units, " \
             "hld.info, hld.exec_code, hld.new_status, hld.old_status, hld.delay, hld.new_value, hld.old_value, " \
-            "hld.last_repeat, ah.class, ah.component, ah.type, hl.chart_context, hld.transition_id, hld.global_id " \
+            "hld.last_repeat, ah.class, ah.component, ah.type, hl.chart_context, hld.transition_id, hld.global_id, hl.chart_name " \
             "FROM health_log hl, alert_hash ah, health_log_detail hld " \
             "WHERE hl.config_hash_id = ah.hash_id and hl.host_id = @host_id and hl.last_transition_id = hld.transition_id;"
 void sql_health_alarm_log_load(RRDHOST *host) {
@@ -950,6 +950,11 @@ void sql_health_alarm_log_load(RRDHOST *host) {
 
         if (sqlite3_column_type(res, 32) != SQLITE_NULL)
             ae->global_id = sqlite3_column_int64(res, 32);
+
+        if (sqlite3_column_type(res, 33) != SQLITE_NULL)
+            ae->chart_name = string_strdupz((char *) sqlite3_column_text(res, 33));
+        else
+            ae->chart_name = NULL;
 
         char value_string[100 + 1];
         string_freez(ae->old_value_string);
