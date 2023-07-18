@@ -73,7 +73,11 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
 ## What's New and Coming?
 
-The following list includes our immediate development plans and a summary view of the last 12 months' releases:
+> **Spoiler!**<br/>
+> The nightly version of the Netdata Agent has a new UI that is planned to be released July 19th 2023.
+
+<details><summary>Click to see our immediate development plans and a summary view of the last 12 months' releases...</summary>
+&nbsp;<br/>
 
 | When | Status | What | Description|
 |:----:|:------:|:----:|:-----------|
@@ -104,7 +108,7 @@ The following list includes our immediate development plans and a summary view o
 |||Kubernetes|Monitor your kubernetes workloads.|
 |||Machine Learning|Anomaly Rate information on every chart.|
 
-
+</details>
 
 <hr class="solid">
 
@@ -200,6 +204,9 @@ The following list includes our immediate development plans and a summary view o
 
 Netdata is built around a **modular metrics processing pipeline**.
 
+<details><summary>Click to see more details about this pipeline...</summary>
+&nbsp;<br/>
+
 Each Netdata Agent can perform the following functions:
 
 1. **`COLLECT` metrics from their sources**<br/>
@@ -241,6 +248,7 @@ Each Netdata Agent can perform the following functions:
 
 When using Netdata Parents, all the functions of a Netdata Agent (except data collection) can be delegated to Parents to offload production systems.
 
+</details>
 
 ## FAQ
 
