@@ -25,7 +25,7 @@
         demoFavourites: {"postgresql":["postgres"],"redis":["redis"],"dns-query":["dns_query"],"http-endpoints":["httpcheck"],"nginx":["web_log","nginx"],"apache":["apache"],"host-reachability":["ping"],"cassandra":["cassandra"],"coredns":["coredns"],"logind":["logind"],"iis":["iis"],"active-directory":["ad"],"windows":["windows","ad","iis","mssql","exchange","netframework"],"docker":["cgroup","docker"]},
         webpackPublicPath: "https://app.netdata.cloud",
         agentApiUrl: searchParams.get("agent") || getBasename(),
-        version: "6.21.0",
+        version: "6.21.3",
         tracking: false,
         cookieDomain: ".netdata.cloud"
       }
@@ -120,8 +120,11 @@
       fetch(window.envSettings.agentApiUrl + "/api/v1/registry?action=hello", { cache: "no-cache", credentials: "include" })
         .then(function(response) { return response.json() })
         .then(function(data) {
-          window.envSettings.apiUrl = data.cloud_base_url
-          window.envSettings.cloudUrl = data.cloud_base_url
+          var to = data.cloud_base_url.lastIndexOf('/');
+          to = (to == -1 || to < data.cloud_base_url.length -2) ? data.cloud_base_url.length : to;
+          var cloudUrl = data.cloud_base_url.substring(0, to);
+          window.envSettings.apiUrl = cloudUrl
+          window.envSettings.cloudUrl = cloudUrl
 
           window.localNetdataRegistry = {
             anonymousStatistics: data.anonymous_statistics,
