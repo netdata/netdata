@@ -8,7 +8,7 @@ A user accessing the Netdata dashboard **from the Agent** will, by default, be p
 The exceptions happen when the:
 * Agent doesn't have external network access, so it won't be able to get the latest Netdata dashboards, but will fallback to the Netdata dashboard version that 
 was shipped with the agent;
-* User has defined, e.g. through URL bookmark, that he wants to see the previous version of the dashboard (accessible `http://NODE:19999/v1`, replacing `NODE` with the IP address or hostname of your Agent). 
+* Users have defined, e.g. through URL bookmark, that they wants to see the previous version of the dashboard (accessible `http://NODE:19999/v1`, replacing `NODE` with the IP address or hostname of your Agent). 
 
 ## Main sections
 
