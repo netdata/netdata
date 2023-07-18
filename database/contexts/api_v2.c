@@ -1684,7 +1684,7 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
 
             buffer_json_member_add_string(wb, "alert", *t->alert_name ? t->alert_name : NULL);
             buffer_json_member_add_string(wb, "instance", *t->chart ? t->chart : NULL);
-            buffer_json_member_add_string(wb, "instance_n", *t->chart_name ? t->chart_name : NULL);
+            buffer_json_member_add_string(wb, "instance_n", *t->chart_name ? t->chart_name : (*t->chart ? t->chart : NULL));
             buffer_json_member_add_string(wb, "context", *t->chart_context ? t->chart_context : NULL);
             // buffer_json_member_add_string(wb, "family", *t->family ? t->family : NULL);
             buffer_json_member_add_string(wb, "component", *t->component ? t->component : NULL);
