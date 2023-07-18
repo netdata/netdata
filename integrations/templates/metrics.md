@@ -30,6 +30,7 @@ This scope has no labels.
 
 [% for metric in scope.metrics %]
 | [[ metric.name ]] | [% for d in metric.dimensions %][[ d.name ]][% if not loop.last %], [% endif %][% endfor %] | [[ metric.unit ]] |[% for a in entry.metrics.availability %] [% if a.name in metric.availability %]+[% else %]-[% endif %] |[% endfor %]
+
 [% endfor %]
 
 [% endfor %]

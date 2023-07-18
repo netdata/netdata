@@ -2,9 +2,9 @@
 
 ## Overview
 
-[[ entry.overview.metrics_description ]]
+[[ entry.overview.data_collection.metrics_description ]]
 
-[[ entry.overview.method_description ]]
+[[ entry.overview.data_collection.method_description ]]
 
 [% if entry.overview.supported_platforms.include %]
 This collector is only supported on the following platforms:
