@@ -313,10 +313,7 @@ static int do_migration_v10_v11(sqlite3 *database, const char *name)
     if (table_exists_in_database("health_log") && !column_exists_in_table("health_log", "chart_name"))
         return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v10_v11[0]);
 
-    snprintfz(sql, 2047, "update health_log set chart_name = c.type || '.' || c.name from chart c where (c.type || '.' || c.id) = chart and c.name is not null;");
-    sqlite3_exec_monitored(database, sql, 0, 0, NULL);
-
-    snprintfz(sql, 2047, "update health_log set chart_name = c.type || '.' || c.id from chart c where (c.type || '.' || c.id) = chart and c.name is null and chart_name is null;");
+    snprintfz(sql, 2047, "update health_log set chart_name = c.type || '.' || IFNULL(c.name, c.id) from chart c where (c.type || '.' || c.id) = chart;");
     sqlite3_exec_monitored(database, sql, 0, 0, NULL);
 
     return 0;
