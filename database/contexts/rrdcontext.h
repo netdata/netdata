@@ -590,6 +590,9 @@ typedef enum __attribute__((packed)) {
     ATF_COMPONENT,
     ATF_ROLE,
     ATF_NODE,
+    ATF_ALERT_NAME,
+    ATF_CHART_NAME,
+    ATF_CONTEXT,
 
     // total
     ATF_TOTAL_ENTRIES,
