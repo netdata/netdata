@@ -226,6 +226,9 @@ dyncfg_config_t load_config(const char *plugin_name, const char *module_name, co
 
 static const char *set_plugin_config(struct configurable_plugin *plugin, dyncfg_config_t cfg)
 {
+    plugin->set_config_cb(plugin->cb_usr_ctx, &cfg);
+    return NULL;
+
     if (store_config(plugin->name, NULL, NULL, cfg)) {
         error_report("DYNCFG could not store config for module \"%s\"", plugin->name);
         return "could not store config on disk";
@@ -270,7 +273,7 @@ static const char *set_module_config(struct module *mod, dyncfg_config_t cfg)
     memcpy(mod->config.data, cfg.data, cfg.data_size);
     pthread_mutex_unlock(&plugin->lock);
 
-    if (mod->set_config_cb != NULL && mod->set_config_cb(mod->set_config_cb_usr_ctx, &mod->config)) {
+    if (mod->set_config_cb != NULL && mod->set_config_cb(mod->set_config_cb_usr_ctx, mod->name, &cfg)) {
         error_report("DYNCFG module \"%s\" set_module_config_cb failed", plugin->name);
         return "set_module_config_cb failed";
     }

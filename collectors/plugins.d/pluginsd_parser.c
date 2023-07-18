@@ -769,7 +769,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     if(ret < 0) {
         netdata_log_error("FUNCTION_PAYLOAD: failed to send function to plugin, error %d", ret);
         rrd_call_function_error(pf->destination_wb, "Failed to communicate with collector", HTTP_RESP_BACKEND_FETCH_FAILED);
-}
+    }
     else {
         internal_error(LOG_FUNCTIONS,
                        "FUNCTION_PAYLOAD '%s' with transaction '%s' sent to collector (%d bytes, in %llu usec)",
@@ -1952,6 +1952,22 @@ static dyncfg_config_t get_module_config_cb(void *usr_ctx, const char *modulenam
     return call_virtual_function_blocking(parser, buf, NULL);
 }
 
+enum set_config_result set_plugin_config_cb(void *usr_ctx, dyncfg_config_t *cfg)
+{
+    PARSER *parser = usr_ctx;
+    call_virtual_function_blocking(parser, "set_plugin_config", cfg->data);
+    return SET_CONFIG_ACCEPTED;
+}
+
+enum set_config_result set_module_config_cb(void *usr_ctx, const char *module_name, dyncfg_config_t *cfg)
+{
+    PARSER *parser = usr_ctx;
+    char buf[1024];
+    snprintfz(buf, sizeof(buf), "set_module_config %s", module_name);
+    call_virtual_function_blocking(parser, buf, cfg->data);
+    return SET_CONFIG_ACCEPTED;
+}
+
 static inline PARSER_RC pluginsd_register_plugin(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser __maybe_unused) {
     netdata_log_info("PLUGINSD: DYNCFG_ENABLE");
 
@@ -1963,7 +1979,7 @@ static inline PARSER_RC pluginsd_register_plugin(char **words __maybe_unused, si
 
     cfg->name = strdupz(words[1]);
     cfg->plugins_d = 1;
-    cfg->set_config_cb = _plugin_set_config_cb;
+    cfg->set_config_cb = set_plugin_config_cb;
     cfg->get_config_cb = get_plugin_config_cb;
     cfg->cb_usr_ctx = parser;
 
@@ -1991,7 +2007,7 @@ static inline PARSER_RC pluginsd_register_module(char **words __maybe_unused, si
 
     mod->name = strdupz(words[1]);
 
-    mod->set_config_cb = _plugin_set_config_cb;
+    mod->set_config_cb = set_module_config_cb;
     mod->get_config_cb = get_module_config_cb;
     mod->set_config_cb_usr_ctx = parser;
 

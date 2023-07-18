@@ -43,8 +43,6 @@ enum set_config_result {
     SET_CONFIG_DEFFER
 };
 
-typedef enum set_config_result (*set_config_cb_t)(void *usr_ctx, dyncfg_config_t *cfg);
-
 struct job
 {
     char *name;
@@ -55,7 +53,7 @@ struct job
 
     struct module *module;
 
-    set_config_cb_t set_config_cb;
+//    set_config_cb_t set_config_cb;
     void *set_config_cb_usr_ctx;
 };
 
@@ -73,7 +71,7 @@ struct module
 
     DICTIONARY *jobs;
 
-    set_config_cb_t set_config_cb;
+    enum set_config_result (*set_config_cb)(void *usr_ctx, const char *module_name, dyncfg_config_t *cfg);
 
     dyncfg_config_t (*get_config_cb)(void *usr_ctx, const char* name);
 
@@ -90,7 +88,7 @@ struct configurable_plugin {
     dyncfg_config_t default_config;
 
     dyncfg_config_t (*get_config_cb)(void *usr_ctx);
-    set_config_cb_t set_config_cb;
+    enum set_config_result (*set_config_cb)(void *usr_ctx, dyncfg_config_t *cfg);
     void *cb_usr_ctx; // context for all callbacks (split if needed in future)
 
     unsigned int plugins_d:1;
