@@ -1045,6 +1045,7 @@ struct alarm_entry {
     STRING *name;
     STRING *chart;
     STRING *chart_context;
+    STRING *chart_name;
     STRING *family;
 
     STRING *classification;
