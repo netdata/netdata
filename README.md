@@ -87,7 +87,7 @@ It scales nicely from just a single server to thousands of servers, even in comp
 |next|planned|More Customizability|Set default settings for all charts and views!|
 |soon|in progress|SystemD Journal|View the SystemD Journal of your systems on the dashboard.|
 |soon|in progress|UCUM Units|Migrate all metrics to the Unified Code for Units of Measure.|
-|soon|in progress|Netdata Cloud<br/>On-Prem|Netdata Cloud available for On-Prem installation!|
+|**soon**|**in progress**|**Netdata Cloud<br/>On-Prem**|**Netdata Cloud available for On-Prem installation!**|
 |soon|in progress|Click to Activate|Configure Alerts and Data Collectors from the UI!|
 |soon|finishing|Integrations|Netdata Integrations Marketplace!|
 |Jul<br/>2023|in the<br/>nightlies|New Agent UI|Now Netdata Cloud and Netdata Agent share the same dashboard!|
