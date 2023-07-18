@@ -307,14 +307,10 @@ static int do_migration_v9_v10(sqlite3 *database, const char *name)
 
 static int do_migration_v10_v11(sqlite3 *database, const char *name)
 {
-    char sql[2048];
     netdata_log_info("Running \"%s\" database migration", name);
 
     if (table_exists_in_database("health_log") && !column_exists_in_table("health_log", "chart_name"))
         return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v10_v11[0]);
-
-    snprintfz(sql, 2047, "update health_log set chart_name = c.type || '.' || IFNULL(c.name, c.id) from chart c where (c.type || '.' || c.id) = chart;");
-    sqlite3_exec_monitored(database, sql, 0, 0, NULL);
 
     return 0;
 }
