@@ -25,9 +25,9 @@ The scope defines the instance that the metric belongs to. An instance is unique
 This scope has no labels.
 [% endif %]
 
-| Metric | Dimensions | Unit |[% for a in entry.metrics.availability %]| [[ a.name ]] |[% endfor %]
+| Metric | Dimensions | Unit |[% for a in entry.metrics.availability %] [[ a.name ]] |[% endfor %]
 
-|--------|:----------:|:----:|[% for a in entry.metrics.availability %]|:---:|[% endfor %]
+|--------|:----------:|:----:|[% for a in entry.metrics.availability %]:---:|[% endfor %]
 
 [% for metric in scope.metrics %]
 | [[ metric.name ]] | [% for d in metric.dimensions %][[ d.name ]][% if not loop.last %], [% endif %][% endfor %] | [[ metric.unit ]] |[% for a in entry.metrics.availability %] [% if a.name in metric.availability %]+[% else %]-[% endif %] |[% endfor %]
