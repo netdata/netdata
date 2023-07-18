@@ -22,6 +22,10 @@
   description: ""
   most-popular: false
   children:
+    - id: other
+      name: Other
+      description: ""
+      most-popular: false
     - id: data-collection.containers-and-vms
       name: Containers and VMs
       description: ""
