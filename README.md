@@ -81,7 +81,7 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
 | When | Status | What | Description|
 |:----:|:------:|:----:|:-----------|
-|later|researching|WebRTC|Browser to Agent communication via WebRTC.|
+|later|POC|WebRTC|Browser to Agent communication via WebRTC.|
 |later|interrupted|Advanced Troubleshooting|Expanded view of dashboard charts integrating Metrics Correlations, Anomaly Advisor and many more.|
 |next|planned|Easy Custom<br/>Dashboards|Drag and drop charts to create custom dashboards on the fly, while troubleshooting!|
 |next|planned|More Customizability|Set default settings for all charts and views!|
