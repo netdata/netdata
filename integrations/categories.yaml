@@ -107,18 +107,8 @@
       description: ""
       most-popular: false
       children: []
-    - id: data-collection.cloud-provider
-      name: Cloud Provider
-      description: ""
-      most-popular: false
-      children: []
     - id: data-collection.synthetic-checks
       name: Synthetic Checks
-      description: ""
-      most-popular: false
-      children: []
-    - id: data-collection.storage-mount-points-and-filesystems
-      name: Storage Mount Points and Filesystems
       description: ""
       most-popular: false
       children: []
