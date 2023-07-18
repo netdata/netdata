@@ -81,11 +81,6 @@ get_zone(const char *control_type, struct zone_t *parent, const char *dirname, s
     }
 
     *zones = (struct zone_t *)reallocz(*zones, sizeof(struct zone_t) * (*count + 1));
-    if (unlikely(*zones == NULL)) {
-        collector_error("reallocz failed");
-        *count = 0;
-        return NULL;
-    }
 
     struct zone_t *zone = &(*zones)[*count];
     strcpy(zone->path, temp);
