@@ -75,7 +75,7 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
 | When | Release | What | Description|
 |:----:|:-------:|:----:|:-----------|
-|Jul<br/>2023|in the nightlies|New Agent UI|Now Netdata Cloud and Netdata Agent share the same dashboard!|
+|Jul<br/>2023|in the<br/>nightlies|New Agent UI|Now Netdata Cloud and Netdata Agent share the same dashboard!|
 |Jun<br/>2023|[v1.40](https://github.com/netdata/netdata/releases/tag/v1.40.0)|Summary Dashboards|High level tiles everywhere!|
 |||Machine Learning|Multiple ML models per metric.|
 |||SSL|Netdata Agent gets a new SSL layer.|
