@@ -79,7 +79,7 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
   <a href="https://hub.docker.com/r/netdata/netdata"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=dockerhub.pulls_sum&divide=1000&precision=1&units=k&label=docker+hub+pulls&after=-86400&group=incremental-sum&label=docker%20hub%20pulls%20today&options=unaligned&v44" alt="Docker Hub pulls today"></a>
 </p>
 
-### 1. **Install Netdata Agents everywhere** :v:
+### 1. **Install Netdata everywhere** :v:
    
    Netdata can be installed on all Linux, MacOS, and FreeBSD systems. We provide binary packages for the most popular operating systems and package managers.
 
