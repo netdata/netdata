@@ -346,6 +346,10 @@ static void alert_instances_v2_insert_callback(const DICTIONARY_ITEM *item __may
     t->chart_name = rc->rrdset->name;
     t->family = rc->rrdset->family;
     t->units = rc->units;
+    t->classification = rc->classification;
+    t->type = rc->type;
+    t->recipient = rc->recipient;
+    t->component = rc->component;
     t->name = rc->name;
     t->source = rc->source;
     t->status = rc->status;
@@ -1335,6 +1339,11 @@ static int contexts_v2_alert_instance_to_json_callback(const DICTIONARY_ITEM *it
             buffer_json_member_add_time_t(wb, "tr_t", t->last_status_change);
             buffer_json_member_add_uuid(wb, "cfg", &t->config_hash_id);
             buffer_json_member_add_string(wb, "src", string2str(t->source));
+
+            buffer_json_member_add_string(wb, "to", string2str(t->recipient));
+            buffer_json_member_add_string(wb, "tp", string2str(t->type));
+            buffer_json_member_add_string(wb, "cm", string2str(t->component));
+            buffer_json_member_add_string(wb, "cl", string2str(t->classification));
 
             // Agent specific fields
             buffer_json_member_add_uint64(wb, "gi", t->global_id);
