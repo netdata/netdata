@@ -65,7 +65,7 @@ setup:
           default_value: 60000
           required: false
         - name: penalty
-          description:
+          description: |
             Apply a penalty to `update_every` in case of failures. Penalty will increase every 5 failed updates in a row, Max penalty is 10 min.
           default_value: yes
           required: false
