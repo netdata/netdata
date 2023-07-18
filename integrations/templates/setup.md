@@ -18,6 +18,7 @@ The configuration file name for this integration is `[[ entry.setup.configuratio
 Configuration for this specific integration is located in the `[[ entry.setup.configuration.file.section_name ]]` section within that file.
 [% endif %]
 
+[#
 The file format is YAML. Generally, the format is:
 
 ```yaml
@@ -27,6 +28,7 @@ jobs:
   - name: some_name1
   - name: some_name1
 ```
+#]
 
 You can edit the configuration file using the `edit-config` script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory).
