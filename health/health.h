@@ -57,9 +57,7 @@ void health_alarms_values2json(RRDHOST *host, BUFFER *wb, int all);
 void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf);
 void health_api_v1_chart_custom_variables2json(RRDSET *st, BUFFER *buf);
 
-int health_alarm_log_open(RRDHOST *host);
 void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae);
-void health_alarm_log_load(RRDHOST *host);
 
 ALARM_ENTRY* health_create_alarm_entry(
     RRDHOST *host,
