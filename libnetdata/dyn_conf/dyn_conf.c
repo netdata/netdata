@@ -224,32 +224,18 @@ dyncfg_config_t load_config(const char *plugin_name, const char *module_name, co
     return config;
 }
 
-static const char *set_plugin_config(struct configurable_plugin *plugin, dyncfg_config_t cfg)
+const char *set_plugin_config(struct configurable_plugin *plugin, dyncfg_config_t cfg)
 {
-    plugin->set_config_cb(plugin->cb_usr_ctx, &cfg);
-    return NULL;
+    enum set_config_result rc = plugin->set_config_cb(plugin->cb_usr_ctx, &cfg);
+    if (rc != SET_CONFIG_ACCEPTED) {
+        error_report("DYNCFG plugin \"%s\" rejected config", plugin->name);
+        return "plugin rejected config";
+    }
 
     if (store_config(plugin->name, NULL, NULL, cfg)) {
         error_report("DYNCFG could not store config for module \"%s\"", plugin->name);
         return "could not store config on disk";
     }
-
-    if (plugin->set_config_cb == NULL) {
-        error_report("DYNCFG module \"%s\" has no set_config_cb", plugin->name);
-        return "module has no set_config_cb callback";
-    }
-
-    pthread_mutex_lock(&plugin->lock);
-    plugin->config.data_size = cfg.data_size;
-    plugin->config.data = mallocz(cfg.data_size);
-    memcpy(plugin->config.data, cfg.data, cfg.data_size);
-    pthread_mutex_unlock(&plugin->lock);
-
-    if (plugin->set_config_cb != NULL && plugin->set_config_cb(plugin->cb_usr_ctx, &plugin->config)) {
-        error_report("DYNCFG module \"%s\" set_config_cb failed", plugin->name);
-        return "set_config_cb failed";
-    }
-
     return NULL;
 }
 
@@ -439,6 +425,7 @@ static dyncfg_config_t get_module_config(struct module *module)
 
 struct uni_http_response dyn_conf_process_http_request(int method, const char *plugin, const char *module, const char *job_id, void *post_payload, size_t post_payload_size)
 {
+    const char *response;
     struct uni_http_response resp = {
         .status = HTTP_RESP_INTERNAL_SERVER_ERROR,
         .content_type = CT_TEXT_PLAIN,
@@ -491,10 +478,16 @@ struct uni_http_response dyn_conf_process_http_request(int method, const char *p
                 .data = post_payload,
                 .data_size = post_payload_size
             };
-            set_plugin_config(plug, cont);
-            resp.status = HTTP_RESP_OK;
-            resp.content = "OK";
-            resp.content_length = strlen(resp.content);
+            response = set_plugin_config(plug, cont);
+            if (response == NULL) {
+                resp.status = HTTP_RESP_OK;
+                resp.content = "OK";
+                resp.content_length = strlen(resp.content);
+            } else {
+                resp.status = HTTP_RESP_BAD_REQUEST;
+                resp.content = response;
+                resp.content_length = strlen(resp.content);
+            }
             return resp;
         }
         resp.content = "method not allowed";
