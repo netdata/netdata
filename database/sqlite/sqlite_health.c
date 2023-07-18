@@ -1773,11 +1773,10 @@ fail:
     "d.transition_id, d.global_id, ah.class, ah.type, ah.component, d.exec_run_timestamp"
 
 #define SQL_SEARCH_ALERT_TRANSITION_COMMON_WHERE \
-    "h.config_hash_id = ah.hash_id AND h.health_log_id = d.health_log_id" \
-    " AND ( d.new_status > 2 OR d.old_status > 2 )"
+    "h.config_hash_id = ah.hash_id AND h.health_log_id = d.health_log_id"
 
 #define SQL_SEARCH_ALERT_TRANSITION SQL_SEARCH_ALERT_TRANSITION_SELECT " FROM health_log h, health_log_detail d, v_%p t, alert_hash ah " \
-    " WHERE h.host_id = t.host_id AND " SQL_SEARCH_ALERT_TRANSITION_COMMON_WHERE " AND d.global_id BETWEEN @after AND @before "
+    " WHERE h.host_id = t.host_id AND " SQL_SEARCH_ALERT_TRANSITION_COMMON_WHERE " AND ( d.new_status > 2 OR d.old_status > 2 ) AND d.global_id BETWEEN @after AND @before "
 
 #define SQL_SEARCH_ALERT_TRANSITION_DIRECT SQL_SEARCH_ALERT_TRANSITION_SELECT " FROM health_log h, health_log_detail d, alert_hash ah " \
     " WHERE " SQL_SEARCH_ALERT_TRANSITION_COMMON_WHERE " AND transition_id = @transition "
