@@ -726,6 +726,7 @@ struct inflight_function {
     usec_t timeout_ut;
     usec_t started_ut;
     usec_t sent_ut;
+    const char *payload;
 };
 
 static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void *func, void *parser_ptr) {
@@ -737,7 +738,8 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     pf->code = HTTP_RESP_GATEWAY_TIMEOUT;
 
     char buffer[2048 + 1];
-    snprintfz(buffer, 2048, "FUNCTION %s %d \"%s\"\n",
+    snprintfz(buffer, 2048, "%s %s %d \"%s\"\n",
+                      pf->payload ? "FUNCTION_PAYLOAD" : "FUNCTION",
                       dictionary_acquired_item_name(item),
                       pf->timeout,
                       string2str(pf->function));
@@ -757,6 +759,25 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
                        string2str(pf->function), dictionary_acquired_item_name(item), ret,
                        pf->sent_ut - pf->started_ut);
     }
+
+    if (!pf->payload)
+        return;
+    
+    // send the payload to the plugin
+    ret = send_to_plugin(pf->payload, parser);
+
+    if(ret < 0) {
+        netdata_log_error("FUNCTION_PAYLOAD: failed to send function to plugin, error %d", ret);
+        rrd_call_function_error(pf->destination_wb, "Failed to communicate with collector", HTTP_RESP_BACKEND_FETCH_FAILED);
+}
+    else {
+        internal_error(LOG_FUNCTIONS,
+                       "FUNCTION_PAYLOAD '%s' with transaction '%s' sent to collector (%d bytes, in %llu usec)",
+                       string2str(pf->function), dictionary_acquired_item_name(item), ret,
+                       pf->sent_ut - pf->started_ut);
+    }
+
+    send_to_plugin("\nFUNCTION_PAYLOAD_END\n", parser);
 }
 
 static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused, void *new_func, void *parser_ptr __maybe_unused) {
@@ -827,6 +848,7 @@ static int pluginsd_execute_function_callback(BUFFER *destination_wb, int timeou
         .function = string_strdupz(function),
         .callback = callback,
         .callback_data = callback_data,
+        .payload = NULL
     };
 
     uuid_t uuid;
@@ -1855,7 +1877,7 @@ static void virt_fnc_got_data_cb(BUFFER *wb, int code, void *callback_data)
 }
 
 #define VIRT_FNC_TIMEOUT 1
-dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name) {
+dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name, const char *payload) {
     usec_t now = now_realtime_usec();
     BUFFER *wb = buffer_create(4096, NULL);
 
@@ -1872,6 +1894,7 @@ dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name)
         .function = string_strdupz(name),
         .callback = virt_fnc_got_data_cb,
         .callback_data = &cond,
+        .payload = payload,
     };
 
     uuid_t uuid;
@@ -1918,7 +1941,7 @@ dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name)
 static dyncfg_config_t get_plugin_config_cb(void *usr_ctx)
 {
     PARSER *parser = usr_ctx;
-    return call_virtual_function_blocking(parser, "get_plugin_config");
+    return call_virtual_function_blocking(parser, "get_plugin_config", NULL);
 }
 
 static dyncfg_config_t get_module_config_cb(void *usr_ctx, const char *modulename)
@@ -1926,7 +1949,7 @@ static dyncfg_config_t get_module_config_cb(void *usr_ctx, const char *modulenam
     PARSER *parser = usr_ctx;
     char buf[1024];
     snprintfz(buf, sizeof(buf), "get_module_config %s", modulename);
-    return call_virtual_function_blocking(parser, buf);
+    return call_virtual_function_blocking(parser, buf, NULL);
 }
 
 static inline PARSER_RC pluginsd_register_plugin(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser __maybe_unused) {
