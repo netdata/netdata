@@ -133,7 +133,7 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
    - Offload your production systems (the parents runs ML, alerts, queries, etc for all its children)
    - Secure your production systems (the parents accept user connections, for all its children)
 
-### 5. **Connect your Netdata to Netdata Cloud** :cloud:
+### 5. **Connect to Netdata Cloud** :cloud:
 
    Optionally, [sign-in](https://app.netdata.cloud/sign-in) to [Netdata Cloud](https://www.netdata.cloud/) and claim your Netdata Agents and Parents.
    If you connect your Netdata Parents, there is no need to connect your Netdata Agents. They will be connected via the Parents.
