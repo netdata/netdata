@@ -57,7 +57,10 @@ alerts:
     link: https://github.com/netdata/netdata/blob/master/health/health.d/adaptec_raid.conf
     metric: adaptec_raid.ld_status
     info: logical device status is failed or degraded
-    os: "linux"
+  - name: adaptec_raid_pd_state
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/adaptec_raid.conf
+    metric: adaptec_raid.pd_state
+    info: physical device state is not online
 metrics:
   folding:
     title: Metrics

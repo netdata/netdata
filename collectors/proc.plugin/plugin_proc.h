@@ -22,6 +22,7 @@ int do_proc_meminfo(int update_every, usec_t dt);
 int do_proc_vmstat(int update_every, usec_t dt);
 int do_proc_net_rpc_nfs(int update_every, usec_t dt);
 int do_proc_net_rpc_nfsd(int update_every, usec_t dt);
+int do_proc_sys_fs_file_nr(int update_every, usec_t dt);
 int do_proc_sys_kernel_random_entropy_avail(int update_every, usec_t dt);
 int do_proc_interrupts(int update_every, usec_t dt);
 int do_proc_softirqs(int update_every, usec_t dt);

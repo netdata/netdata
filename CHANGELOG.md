@@ -6,10 +6,18 @@
 
 **Merged pull requests:**
 
+- update v2 dashboard [\#15427](https://github.com/netdata/netdata/pull/15427) ([ilyam8](https://github.com/ilyam8))
+- fix unlocked registry access and add hostname to search response [\#15426](https://github.com/netdata/netdata/pull/15426) ([ktsaou](https://github.com/ktsaou))
+- Update README.md [\#15424](https://github.com/netdata/netdata/pull/15424) ([christophidesp](https://github.com/christophidesp))
+- use real-time clock for http response headers [\#15421](https://github.com/netdata/netdata/pull/15421) ([ktsaou](https://github.com/ktsaou))
+- Minor typo fix on consul.conf [\#15419](https://github.com/netdata/netdata/pull/15419) ([Ancairon](https://github.com/Ancairon))
+- monitor applications file descriptor limits [\#15417](https://github.com/netdata/netdata/pull/15417) ([ktsaou](https://github.com/ktsaou))
 - Update README.md [\#15416](https://github.com/netdata/netdata/pull/15416) ([ktsaou](https://github.com/ktsaou))
 - Update README.md [\#15414](https://github.com/netdata/netdata/pull/15414) ([ktsaou](https://github.com/ktsaou))
+- collector meta: restrict chart\_type to known values [\#15413](https://github.com/netdata/netdata/pull/15413) ([ilyam8](https://github.com/ilyam8))
 - Update README.md [\#15412](https://github.com/netdata/netdata/pull/15412) ([tkatsoulas](https://github.com/tkatsoulas))
 - add reference to cncf [\#15408](https://github.com/netdata/netdata/pull/15408) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- Make skipped CI run even faster. [\#15407](https://github.com/netdata/netdata/pull/15407) ([Ferroin](https://github.com/Ferroin))
 - Pre release fixes [\#15405](https://github.com/netdata/netdata/pull/15405) ([ktsaou](https://github.com/ktsaou))
 - Hide eBPF functions [\#15404](https://github.com/netdata/netdata/pull/15404) ([thiagoftsm](https://github.com/thiagoftsm))
 - remove collector meta definitions [\#15403](https://github.com/netdata/netdata/pull/15403) ([ilyam8](https://github.com/ilyam8))
@@ -404,18 +412,6 @@
 - Improve performance.md [\#14778](https://github.com/netdata/netdata/pull/14778) ([cakrit](https://github.com/cakrit))
 - Update reverse-proxies.md [\#14777](https://github.com/netdata/netdata/pull/14777) ([cakrit](https://github.com/cakrit))
 - Update performance.md [\#14776](https://github.com/netdata/netdata/pull/14776) ([cakrit](https://github.com/cakrit))
-- add validation step before using Azure metadata \(AZURE\_IMDS\_DATA\)  [\#14775](https://github.com/netdata/netdata/pull/14775) ([ilyam8](https://github.com/ilyam8))
-- Create reverse-proxies.md [\#14774](https://github.com/netdata/netdata/pull/14774) ([cakrit](https://github.com/cakrit))
-- Add gzip compression info to nginx proxy readme [\#14773](https://github.com/netdata/netdata/pull/14773) ([cakrit](https://github.com/cakrit))
-- Update API [\#14772](https://github.com/netdata/netdata/pull/14772) ([cakrit](https://github.com/cakrit))
-- Add Amazon Linux 2023 to CI, packaging, and platform support. [\#14771](https://github.com/netdata/netdata/pull/14771) ([Ferroin](https://github.com/Ferroin))
-- Pass node\_id and config\_hash vars when queueing alert configurations [\#14769](https://github.com/netdata/netdata/pull/14769) ([MrZammler](https://github.com/MrZammler))
-- Assorted improvements for our platform EOL check code. [\#14768](https://github.com/netdata/netdata/pull/14768) ([Ferroin](https://github.com/Ferroin))
-- minor addition to distros matrix [\#14767](https://github.com/netdata/netdata/pull/14767) ([tkatsoulas](https://github.com/tkatsoulas))
-- Update "View active alerts" documentation [\#14766](https://github.com/netdata/netdata/pull/14766) ([Ancairon](https://github.com/Ancairon))
-- Skip alert template variables from alert snapshots [\#14763](https://github.com/netdata/netdata/pull/14763) ([MrZammler](https://github.com/MrZammler))
-- Accept all=true for alarms api v1 call [\#14762](https://github.com/netdata/netdata/pull/14762) ([MrZammler](https://github.com/MrZammler))
-- fix /sys/block/zram in docker [\#14759](https://github.com/netdata/netdata/pull/14759) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 

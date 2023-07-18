@@ -113,7 +113,7 @@ static int registry_json_person_url_callback(REGISTRY_PERSON_URL *pu, struct reg
 }
 
 // callback for rendering MACHINE_URLs
-static int registry_json_machine_url_callback(REGISTRY_MACHINE_URL *mu, struct registry_json_walk_person_urls_callback *c) {
+static int registry_json_machine_url_callback(REGISTRY_MACHINE_URL *mu, struct registry_json_walk_person_urls_callback *c, STRING *hostname) {
     if(unlikely(!asterisks))
         asterisks = string_strdupz("***");
 
@@ -127,6 +127,7 @@ static int registry_json_machine_url_callback(REGISTRY_MACHINE_URL *mu, struct r
     buffer_json_add_array_item_string(w->response.data, string2str(mu->url));
     buffer_json_add_array_item_uint64(w->response.data, mu->last_t * (uint64_t) 1000);
     buffer_json_add_array_item_uint64(w->response.data, mu->usages);
+    buffer_json_add_array_item_string(w->response.data, string2str(hostname));
     buffer_json_array_close(w->response.data);
 
     return 1;
@@ -226,7 +227,9 @@ int registry_request_access_json(RRDHOST *host, struct web_client *w, char *pers
     // verify the browser supports cookies or the bearer
 
     if(registry.verify_cookies_redirects > 0 && !person_guid[0]) {
+        registry_lock();
         registry_request_access(REGISTRY_VERIFY_COOKIES_GUID, machine_guid, url, name, when);
+        registry_unlock();
 
         buffer_flush(w->response.data);
         registry_set_cookie(w, REGISTRY_VERIFY_COOKIES_GUID);
@@ -320,11 +323,13 @@ int registry_request_search_json(RRDHOST *host, struct web_client *w, char *pers
 
     registry_lock();
 
-    REGISTRY_MACHINE *m = registry_request_machine(person_guid, request_machine);
+    STRING *hostname = NULL;
+    REGISTRY_MACHINE *m = registry_request_machine(person_guid, request_machine, &hostname);
     if(!m) {
         registry_json_header(host, w, "search", REGISTRY_STATUS_FAILED);
         registry_json_footer(w);
         registry_unlock();
+        string_freez(hostname);
         return HTTP_RESP_NOT_FOUND;
     }
 
@@ -334,12 +339,13 @@ int registry_request_search_json(RRDHOST *host, struct web_client *w, char *pers
     struct registry_json_walk_person_urls_callback c = { NULL, m, w, 0 };
 
     for(REGISTRY_MACHINE_URL *mu = m->machine_urls; mu ; mu = mu->next)
-        registry_json_machine_url_callback(mu, &c);
+        registry_json_machine_url_callback(mu, &c, hostname);
 
     buffer_json_array_close(w->response.data);
 
     registry_json_footer(w);
     registry_unlock();
+    string_freez(hostname);
     return HTTP_RESP_OK;
 }
 

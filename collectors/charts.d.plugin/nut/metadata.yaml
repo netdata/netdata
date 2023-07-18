@@ -63,6 +63,10 @@ alerts:
     metric: nut.load
     info: average UPS load over the last 10 minutes
     os: "*"
+  - name: nut_last_collected_secs
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/nut.conf
+    metric: nut.load
+    info: number of seconds since the last successful data collection
 metrics:
   folding:
     title: Metrics

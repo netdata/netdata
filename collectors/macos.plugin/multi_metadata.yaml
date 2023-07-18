@@ -71,6 +71,11 @@ modules:
         metric: system.cpu
         info: average CPU steal time over the last 20 minutes
         os: "linux"
+      - name: 10min_cpu_usage
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
+        metric: system.cpu
+        info: average CPU utilization over the last 10 minutes (excluding nice)
+        os: "freebsd"
       - name: ram_in_use
         link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
         metric: system.ram
@@ -210,6 +215,16 @@ modules:
         metric: system.load
         info: system five-minute load average
         os: "linux"
+      - name: load_average_1
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
+        metric: system.load
+        info: system one-minute load average
+        os: "linux"
+      - name: used_swap
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/swap.conf
+        metric: system.swap
+        info: swap memory utilization
+        os: "linux freebsd"
       - name: 1m_ipv4_tcp_resets_sent
         link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
         metric: ipv4.tcphandshake
@@ -227,11 +242,23 @@ modules:
         metric: ipv4.tcphandshake
         info: average number of received TCP RESETS over the last minute
         os: "linux freebsd"
+      - name: 10s_ipv4_tcp_resets_received
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
+        metric: ipv4.tcphandshake
+        info: average number of received TCP RESETS over the last 10 seconds. This
+          can be an indication that a service this host needs has crashed. Netdata
+          will not send a clear notification for this alarm.
+        os: "linux freebsd"
       - name: 1m_ipv4_udp_receive_buffer_errors
         link: https://github.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf
         metric: ipv4.udperrors
         info: average number of UDP receive buffer errors over the last minute
         os: "linux freebsd"
+      - name: 1m_ipv4_udp_send_buffer_errors
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf
+        metric: ipv4.udperrors
+        info: average number of UDP send buffer errors over the last minute
+        os: "linux"
     metrics:
       folding:
         title: Metrics
@@ -628,6 +655,13 @@ modules:
         metric: net.packets
         info: average number of packets received by the network interface ${label:device}
           over the last minute
+        os: "linux freebsd"
+      - name: 10s_received_packets_storm
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.packets
+        info: ratio of average number of received packets for the network interface
+          ${label:device} over the last 10 seconds, compared to the rate over the
+          last minute
         os: "linux freebsd"
       - name: interface_inbound_errors
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf

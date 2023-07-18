@@ -401,6 +401,7 @@ PROC_PLUGIN_FILES = \
     collectors/proc.plugin/zfs_common.h \
     collectors/proc.plugin/proc_spl_kstat_zfs.c \
     collectors/proc.plugin/proc_stat.c \
+    collectors/proc.plugin/proc_sys_fs_file_nr.c \
     collectors/proc.plugin/proc_sys_kernel_random_entropy_avail.c \
     collectors/proc.plugin/proc_vmstat.c \
     collectors/proc.plugin/proc_uptime.c \

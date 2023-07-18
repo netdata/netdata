@@ -1,9 +1,9 @@
 <p align="center">
 <a href="https://www.netdata.cloud#gh-light-mode-only">
-  <img src="https://raw.githubusercontent.com/netdata/website/master/themes/tailwind/static/img/netdata-logo-coloured.svg?token=GHSAT0AAAAAAB5ID66RRURF4GA2GUTO2NPYZFVLFMA#gh-light-mode-only" alt="Netdata" width="300"/>
+  <img src="https://github.com/netdata/netdata/assets/2662304/a62997fb-d75d-42df-b188-b804cd034a70#gh-light-mode-only" alt="Netdata" width="300"/>
 </a>
 <a href="https://www.netdata.cloud#gh-dark-mode-only">
-  <img src="https://raw.githubusercontent.com/netdata/website/master/themes/tailwind/static/img/netdata-logo-white.svg?token=GHSAT0AAAAAAB5ID66QFQFDXG66SH76V26CZFVLHCA#gh-dark-mode-only" alt="Netdata" width="300"/>
+  <img src="https://github.com/netdata/netdata/assets/2662304/95ea1560-5e83-44d3-ad33-7980f8298b65#gh-dark-mode-only" alt="Netdata" width="300"/>
 </a>
 </p>
 <h3 align="center">Monitor your servers, containers, and applications,<br/>in high-resolution and in real-time.</h3>
@@ -61,8 +61,7 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
 <hr class="solid">
 
 > :bulb: **Important Note**<br/>
-> People get addicted to Netdata. **Once you use it on your systems, there's no going back!**<br/>
-> _You have been warned..._<br/>
+> People get addicted to Netdata. Once you use it on your systems, **there's no going back!**<br/>
 
 <hr class="solid">
 
@@ -105,9 +104,21 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
    
    Netdata Parents provide:
 
-   - Infrastructure level dashboards, at `http://parent.server.ip:19999/`
-   - Increased retention for all metrics of all your nodes
-   - Central configuration of alerts and dispatch of notifications
+   - **Infrastructure level dashboards, at `http://parent.server.ip:19999/`.**<br/>
+   
+     Each Netdata Agent has an API listening at the TCP port 19999 of each server.
+     When you hit that port with a web browser (e.g. `http://server.ip:19999/`), the Netdata Agent UI is presented.
+     When the Netdata Agent is also a Parent, the UI of the Parent includes data for all nodes that stream metrics to that Parent.
+     
+   - **Increased retention for all metrics of all your nodes.**<br/>
+   
+     Each Netdata Agent maintains each own database of metrics. But Parents can be given additional resources to maintain a much longer database than
+     individual Netdata Agents.
+    
+   - **Central configuration of alerts and dispatch of notifications.**<br/>
+   
+     Netdata Agents and Parents can dispatch alert notifications multiple third party systems, including: `email`, `Alerta`, `AWS SNS`, `Discord`, `Dynatrace`, `flock`, `gotify`, `IRC`, `Matrix`, `MessageBird`, `Microsoft Teams`, `ntfy`, `OPSgenie`, `PagerDuty`, `Prowl`, `PushBullet`, `PushOver`, `RocketChat`, `Slack`, `SMS tools`, `StackPulse`, `Syslog`, `Telegram`, `Twilio`.
+     Using Netdata Parents, all these integrations can be configured only once, at the Parent.
 
    You can also use Netdata Parents to:
 
@@ -155,7 +166,7 @@ Each Netdata Agent can perform the following functions:
    Uses database engine plugins to store the collected data, either in memory and/or on disk. We have developed our own [`dbengine`](https://github.com/netdata/netdata/tree/master/database/engine#readme) for storing the data in a very efficient manner, allowing Netdata to have less than 1 byte per sample on disk and amazingly fast queries.
    
 3. **`LEARN` the behavior of metrics** (ML)<br/>
-   Trains multiple Machine-Learning (ML) models per metric to learn the behavior of each metric individually.
+   Trains multiple Machine-Learning (ML) models per metric to learn the behavior of each metric individually. Netdata uses the `kmeans` algorithm and creates by default a model per metric per hour, based on the values collected for that metric over the last 6 hours. The trained models are persisted to disk.
    
 4. **`DETECT` anomalies in metrics** (ML)<br/>
    Uses the trained machine learning (ML) models to detect outliers and mark collected samples as **anomalies**. Netdata stores anomaly information together with each sample and also streams it to Netdata Parents so that the anomaly is also available at query time for the whole retention of each metric.
@@ -180,7 +191,7 @@ When using Netdata Parents, all the functions of a Netdata Agent (except data co
 
 ## FAQ
 
-### :shield: Is this secure?
+### :shield: Is Netdata secure?
 
 Of course it is! We do our best to ensure it is!
 
@@ -197,7 +208,7 @@ We understand that Netdata is a software piece that is installed on millions of 
 &nbsp;<br/>&nbsp;<br/>
 </details>
 
-### :cyclone: Will this consume a lot of resources on my servers?
+### :cyclone: Will Netdata consume significant resources on my servers?
 
 No. It will not! We promise this will be fast!
 
@@ -241,7 +252,7 @@ All tiers are updated in parallel during data collection. Just increase the disk
 
 ### :rocket: Does it scale? I have really a lot of servers!
 
-Yes, of course it does!
+Netdata is designed to scale and can handle large volumes of data.
 
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
@@ -305,7 +316,7 @@ Still, if you are already familiar with Prometheus and Grafana, Netdata integrat
 
 ### :cloud: Do I have to subscribe to Netdata Cloud?
 
-No. But we hope you will find it useful.
+Subscribing to Netdata Cloud is optional but many users find it enhances their experience with Netdata.
 
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
@@ -373,12 +384,12 @@ What is a contribution? All the following are highly valuable to Netdata:
    Netdata should out-of-the-box detect as many infrastructure issues as possible. By sharing your knowledge and experiences, you help us build a monitoring solution that has baked into it all the best-practices about infrastructure monitoring.
 
 2. **Let us know if Netdata is not perfect for your use case**<br/>
-   We aim to support as many use cases, operating systems and integrations, as possible. We rely on you to bring to our attention that Netdata is sub-optimal for a certain use-case. Open a github issue, or start a github discussion about it, to discuss what you need and what you believe Netdata should be doing for your use case.
+   We aim to support as many use cases as possible and your feedback can be invaluable. Open a github issue, or start a github discussion about it, to discuss how you want to use Netdata and what you need.
 
-   Keep in mind though that we can't promise we will implement it. We prioritize development on use-cases that are common to our community, are in the same direction we want Netdata to evolve and are aligned with our roadmap.
+   Although we can't implement everything imaginable, we try to prioritize development on use-cases that are common to our community, are in the same direction we want Netdata to evolve and are aligned with our roadmap.
 
 4. **Support other community members**<br/>
-   Join our community on Github, Discord and Reddit and help them out. Generally, Netdata is relatively easy to setup and configure, but still people may need a little push in the right direction to use it effectively. Supporting other members is a great contribution by itself!
+   Join our community on Github, Discord and Reddit. Generally, Netdata is relatively easy to setup and configure, but still people may need a little push in the right direction to use it effectively. Supporting other members is a great contribution by itself!
 
 5. **Add or improve integrations you need**<br/>
    Integrations are generally easier and simpler to develop. If you want to contribute code to Netdata, we suggest to start with integrations you need and Netdata may not currently support.
