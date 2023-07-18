@@ -65,7 +65,7 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
 
 <hr class="solid">
 
-## Quick Start
+## Getting Started
 
 <p align="center">
   <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=M&value_color=blue&precision=2&divide=1000000&options=unaligned&v44" alt="User base"></a>
@@ -84,7 +84,8 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
    Netdata can be installed on all Linux, MacOS, and FreeBSD systems. We provide binary packages for the most popular operating systems and package managers.
 
    - Install on [Ubuntu, Debian CentOS, Fedora, Suse, Red Hat, Arch, Alpine, Gentoo, even BusyBox](https://learn.netdata.cloud/docs/installing/one-line-installer-for-all-linux-systems).
-   - Install with [Docker](https://learn.netdata.cloud/docs/installing/docker). Netdata is a [Verified Publisher on DockerHub](https://hub.docker.com/r/netdata/netdata) and our users enjoy free unlimited DockerHub pulls :heart_eyes:.
+   - Install with [Docker](https://learn.netdata.cloud/docs/installing/docker).<br/>
+     Netdata is a [Verified Publisher on DockerHub](https://hub.docker.com/r/netdata/netdata) and our users enjoy free unlimited DockerHub pulls :heart_eyes:.
    - Install on [MacOS](https://learn.netdata.cloud/docs/installing/macos) :metal:.
    - Install on [FreeBSD](https://learn.netdata.cloud/docs/installing/freebsd) and [pfSense](https://learn.netdata.cloud/docs/installing/pfsense).
    - Install [from source](https://learn.netdata.cloud/docs/installing/build-the-netdata-agent-yourself/compile-from-source-code)
@@ -94,13 +95,21 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
 
    Netdata auto-detects and auto-discovers most operating system data sources and applications. However, many data sources require some manual configuration, usually to allow Netdata get access to the metrics.
    
-   - For a detailed list of all data collectors, check [this guide](https://learn.netdata.cloud/docs/data-collection/).
+   - For a detailed list of the 800+ collectors available, check [this guide](https://learn.netdata.cloud/docs/data-collection/).
    - To monitor Windows servers and applications use [this guide](https://learn.netdata.cloud/docs/data-collection/monitor-anything/system-metrics/windows-machines).
    - To monitor SNMP devices check [this guide](https://learn.netdata.cloud/docs/data-collection/monitor-anything/networking/snmp).
 
-### 3. **Configure Netdata Parents** :family:
+### 3. **Configure Alert Notifications** :bell:
 
-   A Netdata Parent is a Netdata Agent that has been configured to accept [streaming connections](https://learn.netdata.cloud/docs/streaming/streaming-configuration-reference) from other Netdata agents.
+   Netdata comes with hundreds of pre-configured alerts, that are automatically start checking your metrics immediately after they get collected.
+
+   Netdata will dispatch alert notifications to multiple third party systems, including: `email`, `Alerta`, `AWS SNS`, `Discord`, `Dynatrace`, `flock`, `gotify`, `IRC`, `Matrix`, `MessageBird`, `Microsoft Teams`, `ntfy`, `OPSgenie`, `PagerDuty`, `Prowl`, `PushBullet`, `PushOver`, `RocketChat`, `Slack`, `SMS tools`, `StackPulse`, `Syslog`, `Telegram`, `Twilio`.
+
+   By default, Netdata will start sending e-mail notifications, if there is a configured MTA on the systems it is installed. 
+
+### 4. **Configure Netdata Parents** :family:
+
+   Optionally, configure one or more Netdata Parents. A Netdata Parent is a Netdata Agent that has been configured to accept [streaming connections](https://learn.netdata.cloud/docs/streaming/streaming-configuration-reference) from other Netdata agents.
    
    Netdata Parents provide:
 
@@ -117,19 +126,19 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
     
    - **Central configuration of alerts and dispatch of notifications.**<br/>
    
-     Netdata Agents and Parents can dispatch alert notifications multiple third party systems, including: `email`, `Alerta`, `AWS SNS`, `Discord`, `Dynatrace`, `flock`, `gotify`, `IRC`, `Matrix`, `MessageBird`, `Microsoft Teams`, `ntfy`, `OPSgenie`, `PagerDuty`, `Prowl`, `PushBullet`, `PushOver`, `RocketChat`, `Slack`, `SMS tools`, `StackPulse`, `Syslog`, `Telegram`, `Twilio`.
-     Using Netdata Parents, all these integrations can be configured only once, at the Parent.
+     Using Netdata Parents, all the alert notifications integrations can be configured only once, at the Parent and they can be disabled at the Netdata Agents.
 
    You can also use Netdata Parents to:
 
    - Offload your production systems (the parents runs ML, alerts, queries, etc for all its children)
    - Secure your production systems (the parents accept user connections, for all its children)
 
-### 4. **Connect your Parents to Netdata Cloud** :cloud:
+### 5. **Connect your Netdata to Netdata Cloud** :cloud:
 
-   Optionally, [sign-in](https://app.netdata.cloud/sign-in) to [Netdata Cloud](https://www.netdata.cloud/) and claim your Netdata Parents.
+   Optionally, [sign-in](https://app.netdata.cloud/sign-in) to [Netdata Cloud](https://www.netdata.cloud/) and claim your Netdata Agents and Parents.
+   If you connect your Netdata Parents, there is no need to connect your Netdata Agents. They will be connected via the Parents.
    
-   When your parents are connected to Netdata Cloud, you can (on top of the above):
+   When your Netdata are connected to Netdata Cloud, you can (on top of the above):
 
    - Organize your infra in spaces and rooms
    - Create, manage, and share **custom dashboards**
@@ -141,6 +150,7 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
    - Netdata Mobile App notifications (coming soon)
 
    :love_you_gesture: Netdata Cloud does not prevent you from using your Netdata Agents and Parents directly, and vice versa.<br/>
+   
    :ok_hand: Your metrics are still stored in your network when you connect your Netdata Agents and Parents to Netdata Cloud.
 
 ## How it works
