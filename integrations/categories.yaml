@@ -117,11 +117,6 @@
       description: ""
       most-popular: false
       children: []
-    - id: data-collection.containers-vms
-      name: Containers & VMs
-      description: ""
-      most-popular: false
-      children: []
     - id: data-collection.ci-cd-systems
       name: CI/CD Systems
       description: ""
