@@ -92,7 +92,7 @@ static void ebpf_function_error(const char *transaction, int code, const char *m
  *****************************************************************/
 
 /**
- * Function enable
+ * Function: thread
  *
  * Enable a specific thread.
  *
@@ -361,6 +361,46 @@ static void ebpf_function_thread_manipulation(const char *transaction,
     buffer_free(wb);
 }
 
+/*****************************************************************
+ *  EBPF THREAD FUNCTION
+ *****************************************************************/
+
+/**
+ * Function: Socket
+ *
+ * Show information for sockets stored in hash tables.
+ *
+ * @param transaction  the transaction id that Netdata sent for this function execution
+ * @param function     function name and arguments given to thread.
+ * @param line_buffer  buffer used to parse args
+ * @param line_max     Number of arguments given
+ * @param timeout      The function timeout
+ * @param em           The structure with thread information
+ */
+static void ebpf_function_socket_manipulation(const char *transaction,
+                                              char *function __maybe_unused,
+                                              char *line_buffer __maybe_unused,
+                                              int line_max __maybe_unused,
+                                              int timeout __maybe_unused,
+                                              ebpf_module_t *em)
+{
+    UNUSED(transaction);
+    UNUSED(line_buffer);
+    UNUSED(timeout);
+    UNUSED(em);
+
+    char *words[PLUGINSD_MAX_WORDS] = { NULL };
+    size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
+    for(int i = 1; i < PLUGINSD_MAX_WORDS ; i++) {
+        const char *keyword = get_word(words, num_words, i);
+        if (!keyword)
+            break;
+
+        if(strncmp(keyword, "help", 4) == 0) {
+            return;
+        }
+    }
+}
 
 /*****************************************************************
  *  EBPF FUNCTION THREAD
@@ -401,6 +441,13 @@ void *ebpf_function_thread(void *ptr)
                 int timeout = str2i(timeout_s);
                 if (!strncmp(function, EBPF_FUNCTION_THREAD, sizeof(EBPF_FUNCTION_THREAD) - 1))
                     ebpf_function_thread_manipulation(transaction,
+                                                      function,
+                                                      buffer,
+                                                      PLUGINSD_LINE_MAX + 1,
+                                                      timeout,
+                                                      em);
+                else if (!strncmp(function, EBPF_FUNCTION_SOCKET, sizeof(EBPF_FUNCTION_SOCKET) - 1))
+                    ebpf_function_socket_manipulation(transaction,
                                                       function,
                                                       buffer,
                                                       PLUGINSD_LINE_MAX + 1,
