@@ -15,13 +15,36 @@
           "description": "Module name (e.g. apache, /proc/stat, httpcheck). It usually has the same name as the module configuration file (external plugin) or the section name in netdata.conf (internal plugin)."
         },
         "monitored_instance": {
-          "$ref": "#/$defs/_monitored_instance"
-        },
-        "alternative_monitored_instances": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/_monitored_instance"
-          }
+          "type": "object",
+          "description": "Information about the monitored instance (metrics source).",
+          "properties": {
+            "name": {
+              "description": "Metrics source name (e.g. VerneMQ, Network interfaces, Files and directories). Use official spelling for applications.",
+              "type": "string"
+            },
+            "link": {
+              "description": "Link to the monitored instance official website if any.",
+              "type": "string"
+            },
+            "categories": {
+              "type": "array",
+              "description": "Category IDs that this integration falls into. IDs can be found in integrations/categories.yaml",
+              "items": {
+                "type": "string",
+                "description": "String defining integration category"
+              }
+            },
+            "icon_filename": {
+              "type": "string",
+              "description": "The filename of the integration's icon, as sourced from https://github.com/netdata/website/tree/master/themes/tailwind/static/img."
+            }
+          },
+          "required": [
+            "name",
+            "link",
+            "categories",
+            "icon_filename"
+          ]
         },
         "keywords": {
           "type": "array",
@@ -91,7 +114,6 @@
         "plugin_name",
         "module_name",
         "monitored_instance",
-        "alternative_monitored_instances",
         "keywords",
         "related_resources",
         "info_provided_to_referring_integrations",
@@ -634,38 +656,6 @@
       },
       "required": [
         "enabled"
-      ]
-    },
-    "_monitored_instance": {
-      "type": "object",
-      "description": "Information about the monitored instance (metrics source).",
-      "properties": {
-        "name": {
-          "description": "Metrics source name (e.g. VerneMQ, Network interfaces, Files and directories). Use official spelling for applications.",
-          "type": "string"
-        },
-        "link": {
-          "description": "Link to the monitored instance official website if any.",
-          "type": "string"
-        },
-        "categories": {
-          "type": "array",
-          "description": "Category IDs that this integration falls into. IDs can be found in integrations/categories.yaml",
-          "items": {
-            "type": "string",
-            "description": "String defining integration category"
-          }
-        },
-        "icon_filename": {
-          "type": "string",
-          "description": "The filename of the integration's icon, as sourced from https://github.com/netdata/website/tree/master/themes/tailwind/static/img."
-        }
-      },
-      "required": [
-        "name",
-        "link",
-        "categories",
-        "icon_filename"
       ]
     }
   }
