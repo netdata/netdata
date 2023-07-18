@@ -73,6 +73,8 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
 ## What's New and Coming?
 
+The following list includes our immediate development plans and a summary view of the last 12 months' releases:
+
 | When | Status | What | Description|
 |:----:|:------:|:----:|:-----------|
 |later|researching|WebRTC|Browser to Agent communication via WebRTC.|
