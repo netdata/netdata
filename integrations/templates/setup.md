@@ -41,8 +41,7 @@ sudo ./edit-config [[ entry.setup.configuration.file.name ]]
 
 [% if entry.setup.configuration.options.list %]
 [% if entry.setup.configuration.options.folding.enabled %]
-<details>
-<summary>[[ entry.setup.configuration.options.folding.title ]]</summary>
+{% details summary="[[ entry.setup.configuration.options.folding.title ]]" %}
 [% endif %]
 | Name | Description | Default | Required |
 |:----:|-------------|:-------:|:--------:|
@@ -50,7 +49,7 @@ sudo ./edit-config [[ entry.setup.configuration.file.name ]]
 | [[ item.name ]] | [[ item.description ]] | [[ item.default ]] | [[ item.required ]] |
 [% endfor %]
 [% if entry.setup.configuration.options.folding.enabled %]
-</details>
+{% /details %}
 [% endif %]
 [% endif %]
 
@@ -64,8 +63,7 @@ sudo ./edit-config [[ entry.setup.configuration.file.name ]]
 
 [% if entry.setup.configuration.examples.folding.enabled %]
 [% if example.folding %]
-<details>
-<summary>[[ entry.setup.configuration.examples.folding.title ]]</summary>
+{% details summary="[[ entry.setup.configuration.examples.folding.title ]]" %}
 [% endif %]
 [% endif %]
 ```yaml
@@ -73,7 +71,7 @@ sudo ./edit-config [[ entry.setup.configuration.file.name ]]
 ```
 [% if entry.setup.configuration.examples.folding.enabled %]
 [% if example.folding %]
-</details>
+{% /details %}
 [% endif %]
 [% endif %]
 [% endfor %]

@@ -1,4 +1,4 @@
-[% if entry.troubleshooting.list|length > 0 %]
+[% if entry.troubleshooting.list %]
 ## Troubleshooting
 
 [% for item in entry.troubleshooting.list %]

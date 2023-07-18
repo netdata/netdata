@@ -1,8 +1,7 @@
 ## Metrics
 
 [% if entry.metrics.folding.enabled %]
-<details>
-<summary>[[ entry.metrics.folding.title ]]</summary>
+{% details summary="[[ entry.metrics.folding.title ]]" %}
 [% endif %]
 Metrics grouped by *scope*.
 
@@ -26,12 +25,14 @@ This scope has no labels.
 [% endif %]
 
 | Metric | Dimensions | Unit |[% for a in entry.metrics.availability %]| [[ a.name ]] |[% endfor %]
+
 |--------|:----------:|:----:|[% for a in entry.metrics.availability %]|:---:|[% endfor %]
+
 [% for metric in scope.metrics %]
 | [[ metric.name ]] | [% for d in metric.dimensions %][[ d.name ]][% if not loop.last %], [% endif %][% endfor %] | [[ metric.unit ]] |[% for a in entry.metrics.availability %] [% if a.name in metric.availability %]+[% else %]-[% endif %] |[% endfor %]
 [% endfor %]
 
 [% endfor %]
 [% if entry.metrics.folding.enabled %]
-</details>
+{% /details %}
 [% endif %]
