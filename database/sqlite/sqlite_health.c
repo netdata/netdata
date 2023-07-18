@@ -83,8 +83,8 @@ failed:
    Inserts an entry in the table
 */
 #define SQL_INSERT_HEALTH_LOG "INSERT INTO health_log (host_id, alarm_id, " \
-    "config_hash_id, name, chart, family, exec, recipient, units, chart_context, last_transition_id) " \
-    "VALUES (?,?,?,?,?,?,?,?,?,?,?) " \
+    "config_hash_id, name, chart, family, exec, recipient, units, chart_context, last_transition_id, chart_name) " \
+    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?) " \
     "ON CONFLICT (host_id, alarm_id) DO UPDATE SET last_transition_id = excluded.last_transition_id RETURNING health_log_id; "
 
 #define SQL_INSERT_HEALTH_LOG_DETAIL "INSERT INTO health_log_detail (health_log_id, unique_id, alarm_id, alarm_event_id, " \
@@ -171,6 +171,12 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
     rc = sqlite3_bind_blob(res, 11, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind transition_id parameter for SQL_INSERT_HEALTH_LOG");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_string_or_null(res, ae->chart_name, 12);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind chart_name parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
