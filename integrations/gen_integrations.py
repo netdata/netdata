@@ -57,18 +57,29 @@ MULTI_VALIDATOR = Draft7Validator(
     registry=registry,
 )
 
-JINJA_ENV = jinja2.Environment(
-    loader=jinja2.FileSystemLoader(TEMPLATE_PATH),
-    autoescape=jinja2.select_autoescape(),
-    block_start_string='[%',
-    block_end_string='%]',
-    variable_start_string='[[',
-    variable_end_string=']]',
-    comment_start_string='[#',
-    comment_end_string='#]',
-    trim_blocks=True,
-    lstrip_blocks=True,
-)
+_jinja_env = False
+
+
+def get_jinja_env():
+    global _jinja_env
+
+    if not _jinja_env:
+        from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+        _jinja_env = Environment(
+            loader=FileSystemLoader(TEMPLATE_PATH),
+            autoescape=select_autoescape(),
+            block_start_string='[%',
+            block_end_string='%]',
+            variable_start_string='[[',
+            variable_end_string=']]',
+            comment_start_string='[#',
+            comment_end_string='#]',
+            trim_blocks=True,
+            lstrip_blocks=True,
+        )
+
+    return _jinja_env
 
 
 def get_metadata_entries():
@@ -184,7 +195,7 @@ def render_keys(integrations):
                 scope['name'] = f'{ item["meta"]["monitored_instance"]["name"] } instance'
 
         for key in RENDER_KEYS:
-            template = JINJA_ENV.get_template(f'{ key }.md')
+            template = get_jinja_env().get_template(f'{ key }.md')
             data = template.render(entry=item, related=related)
             item[key] = data
 
@@ -192,7 +203,7 @@ def render_keys(integrations):
 
 
 def render_integrations(categories, integrations):
-    template = JINJA_ENV.get_template('integrations.js')
+    template = get_jinja_env().get_template('integrations.js')
     data = template.render(
         categories=json.dumps(categories),
         integrations=json.dumps(integrations),
