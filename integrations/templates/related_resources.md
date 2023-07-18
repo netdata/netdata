@@ -2,6 +2,6 @@
 You can further monitor this integration by using:
 
 [% for item in related %]
-- **[[ item.name ]]**: [[ item.info.description ]]
+- {% relatedResource id="[[ item.id ]]" %}[[ item.name ]]{% /relatedResource %}: [[ item.info.description ]]
 [% endfor %]
 [% endif %]
