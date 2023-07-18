@@ -2098,3 +2098,67 @@ fail_only_drop:
     return added;
 }
 
+#define SQL_FETCH_CHART_NAME "SELECT chart_name FROM health_log where host_id = @host_id LIMIT 1;"
+bool is_chart_name_populated(uuid_t  *host_uuid)
+{
+    sqlite3_stmt *res = NULL;
+    int rc;
+
+    bool status = true;
+
+    rc = sqlite3_prepare_v2(db_meta, SQL_FETCH_CHART_NAME, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to check health_log chart_name");
+        return true;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id for health_log chart_name check");
+        goto fail;
+    }
+
+    rc = sqlite3_step_monitored(res);
+    if (likely(rc == SQLITE_ROW))
+        status = sqlite3_column_type(res, 0) != SQLITE_NULL;
+fail:
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement for health_log chart_name check");
+
+    return status;
+}
+
+#define SQL_POPULATE_CHART_NAME " UPDATE health_log SET chart_name = upd.chart_name FROM " \
+    "(SELECT c.type || '.' || IFNULL(c.name, c.id) AS chart_name, hl.host_id FROM " \
+    "chart c, health_log hl WHERE (c.type || '.' || c.id) = hl.chart AND c.host_id = hl.host_id " \
+    "AND hl.host_id = @host_id) AS upd WHERE health_log.host_id = upd.host_id"
+
+void chart_name_populate(uuid_t *host_uuid)
+{
+    sqlite3_stmt *res = NULL;
+    int rc;
+
+    rc = sqlite3_prepare_v2(db_meta, SQL_POPULATE_CHART_NAME, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to update health_log chart_name");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id for health_log chart_name update");
+        goto fail;
+    }
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to update chart name in health_log, rc = %d", rc);
+
+fail:
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement for health_log chart_name update");
+}
