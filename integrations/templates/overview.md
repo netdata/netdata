@@ -4,6 +4,7 @@
 
 [[ entry.overview.data_collection.metrics_description ]]
 
+[% if entry.overview.data_collection.method_description %]
 [[ entry.overview.data_collection.method_description ]]
 
 [% if entry.overview.supported_platforms.include %]
@@ -64,4 +65,5 @@ The default configuration for this integration does not impose any limits on dat
 [[ entry.overview.default_behavior.performance_impact.description ]]
 [% else %]
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
+[% endif %]
 [% endif %]
