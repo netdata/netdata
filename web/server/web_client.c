@@ -2296,7 +2296,7 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
             buffer_strcat(w->url_path_decoded, buffer);
             *question_mark_start = c;
         } else {
-            buffer_strcat(w->url_query_string_decoded, buffer);
+            buffer_strcat(w->url_query_string_decoded, "");
             buffer_strcat(w->url_path_decoded, buffer);
         }
     }
