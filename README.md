@@ -77,21 +77,21 @@ It scales nicely from just a single server to thousands of servers, even in comp
 |:----:|:-------:|:----:|:-----------|
 |Jul<br/>2023|in the nightlies|New Agent UI|Now Netdata Cloud and Netdata Agent share the same dashboard!|
 |Jun<br/>2023|[v1.40](https://github.com/netdata/netdata/releases/tag/v1.40.0)|Summary Dashboards|High level tiles everywhere!|
-|||Machine Learning accuracy|Multiple ML models per metric. Models are persisted on disk.|
+|||Machine Learning|Multiple ML models per metric. Models are persisted on disk.|
 |||SSL|Netdata Agent gets a new SSL layer.|
 |May<br/>2023|[v1.39](https://github.com/netdata/netdata/releases/tag/v1.39.0)|New Cloud UI|Filter, slice and dice any dataset from the UI! ML-first!|
 |||Microsoft Windows|Monitor Windows hosts and apps!|
-|||Virtual Nodes supports|Go collectors can now be assigned to virtual nodes!|
+|||Virtual Nodes|Go collectors can now be assigned to virtual nodes!|
 |Feb<br/>2023|[v1.38](https://github.com/netdata/netdata/releases/tag/v1.38.0)|DBENGINE v2|Faster, more reliable, far more scalable!|
 |||Netdata Functions|Netdata beyond metrics! Monitoring anything!|
 |||Events Feed|Live feed of events about topology changes and alerts.|
-|||Role Based Access Control|More roles, offering finer control over access to infrastructure.|
+|||Role Based<br/>Access Control|More roles, offering finer control over access to infrastructure.|
 |Nov<br/>2022|[v1.37](https://github.com/netdata/netdata/releases/tag/v1.37.0)|Infinite Scalability|Streaming compression. Replication. Active-active clustering.|
-|||Grafana Plugin for Netdata|Netdata Cloud as a data source for Grafana.|
+|||Grafana Plugin|Netdata Cloud as a data source for Grafana.|
 |||PostgreSQL|Completely rewritten, to reveal all the info, even at the table level.|
 |Aug<br/>2022|[v1.36](https://github.com/netdata/netdata/releases/tag/v1.36.0)|Metrics Correlations|Advanced algorithms to find the needle in the haystack.|
 |||Database Tiering|Netdata gets unlimited retention!|
-|||Kubernetes monitoring|Monitor your kubernetes workloads.|
+|||Kubernetes|Monitor your kubernetes workloads.|
 |||Machine Learning|Anomaly Rate information on every chart.|
 
 
