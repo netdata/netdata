@@ -22,7 +22,7 @@
   description: ""
   most-popular: false
   children:
-    - id: other
+    - id: data-collection.other
       name: Other
       description: ""
       most-popular: false
