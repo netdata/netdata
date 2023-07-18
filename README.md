@@ -101,7 +101,7 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
 
 ### 3. **Configure Alert Notifications** :bell:
 
-   Netdata comes with hundreds of pre-configured alerts, that are automatically start checking your metrics immediately after they get collected.
+   Netdata comes with hundreds of pre-configured alerts, that automatically check your metrics, immediately after they start getting collected.
 
    Netdata will dispatch alert notifications to multiple third party systems, including: `email`, `Alerta`, `AWS SNS`, `Discord`, `Dynatrace`, `flock`, `gotify`, `IRC`, `Matrix`, `MessageBird`, `Microsoft Teams`, `ntfy`, `OPSgenie`, `PagerDuty`, `Prowl`, `PushBullet`, `PushOver`, `RocketChat`, `Slack`, `SMS tools`, `StackPulse`, `Syslog`, `Telegram`, `Twilio`.
 
