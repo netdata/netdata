@@ -5,8 +5,6 @@ import sys
 
 from pathlib import Path
 
-import jinja2
-
 from jsonschema import Draft7Validator, ValidationError
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT7
@@ -82,6 +80,25 @@ def get_jinja_env():
     return _jinja_env
 
 
+def get_category_sets(categories):
+    default = set()
+    valid = set()
+
+    for c in categories:
+        if 'id' in c:
+            valid.add(c['id'])
+
+        if c.get('collector_default', False):
+            default.add(c['id'])
+
+        if 'children' in c and c['children']:
+            d, v = get_category_sets(c['children'])
+            default |= d
+            valid |= v
+
+    return (default, valid)
+
+
 def get_metadata_entries():
     single = []
     multi = []
@@ -134,6 +151,7 @@ def load_metadata():
             print(f':warning file={ path }:Failed to validate { path } against the schema.')
             continue
 
+        data['_src_path'] = path
         ret.append(data)
 
     for path in multi:
@@ -151,6 +169,7 @@ def load_metadata():
 
         for item in data['modules']:
             item['meta']['plugin_name'] = data['plugin_name']
+            item['_src_path'] = path
             ret.append(item)
 
     return ret
@@ -160,7 +179,11 @@ def make_id(meta):
     return f'{ meta["plugin_name"] }-{ meta["module_name"] }'
 
 
-def render_keys(integrations):
+def render_keys(integrations, categories):
+    print(':debug:Computing default categories.')
+
+    default_cats, valid_cats = get_category_sets(categories)
+
     print(':debug:Generating integration IDs.')
 
     for item in integrations:
@@ -177,7 +200,7 @@ def render_keys(integrations):
             res_id = make_id(res)
 
             if res_id not in idmap.keys():
-                print(f':warning:Could not find related integration { res_id }, ignoring it.')
+                print(f':warning file={ item["_src_path"] }:Could not find related integration { res_id }, ignoring it.')
                 continue
 
             related.append({
@@ -188,7 +211,16 @@ def render_keys(integrations):
                 'info': idmap[res_id]['meta']['info_provided_to_referring_integrations'],
             })
 
-        item['meta']['monitored_instance']['categories'] = list(set(item['meta']['monitored_instance']['categories']))
+        item_cats = set(item['meta']['monitored_instance']['categories'])
+        bogus_cats = item_cats - valid_cats
+
+        if bogus_cats:
+            print(f':warning file={ item["_src_path"] }:Ignoring invalid categories: { ", ".join(bogus_cats) }')
+
+        if not item_cats:
+            item['meta']['monitored_instance']['categories'] = list(default_cats)
+        else:
+            item['meta']['monitored_instance']['categories'] = list(item_cats)
 
         for scope in item['metrics']['scopes']:
             if scope['name'] == 'global':
@@ -198,6 +230,8 @@ def render_keys(integrations):
             template = get_jinja_env().get_template(f'{ key }.md')
             data = template.render(entry=item, related=related)
             item[key] = data
+
+        del item['_src_path']
 
     return integrations
 
@@ -213,8 +247,8 @@ def render_integrations(categories, integrations):
 
 def main():
     metadata = load_metadata()
-    integrations = render_keys(metadata)
     categories = load_yaml(CATEGORIES_FILE)
+    integrations = render_keys(metadata, categories)
     render_integrations(categories, integrations)
 
 

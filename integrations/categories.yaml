@@ -34,6 +34,7 @@
       description: ""
       most_popular: false
       priority: -1
+      collector_default: true
       children: []
     - id: data-collection.ebpf
       name: eBPF

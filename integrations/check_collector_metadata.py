@@ -7,20 +7,7 @@ from pathlib import Path
 from jsonschema import ValidationError
 
 from gen_integrations import (CATEGORIES_FILE, SINGLE_PATTERN, MULTI_PATTERN, SINGLE_VALIDATOR, MULTI_VALIDATOR,
-                              load_yaml)
-
-
-def get_valid_categories(categories):
-    ret = set()
-
-    for c in categories:
-        if 'id' in c:
-            ret.add(c['id'])
-
-        if 'children' in c and c['children']:
-            ret |= get_valid_categories(c['children'])
-
-    return ret
+                              load_yaml, get_category_sets)
 
 
 def main():
@@ -50,7 +37,7 @@ def main():
         print(':error:Failed to load categories file.')
         return 2
 
-    valid_categories = get_valid_categories(categories)
+    _, valid_categories = get_category_sets(categories)
 
     data = load_yaml(check_path)
 
@@ -84,7 +71,7 @@ def main():
 
     failed = False
 
-    for module in check_modules:
+    for idx, module in enumerate(check_modules):
         invalid_cats = set(module['meta']['monitored_instance']['categories']) - valid_categories
 
         if invalid_cats:
