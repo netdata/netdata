@@ -2,7 +2,7 @@
 
 /*
  * netdata apps.plugin
- * (C) Copyright 2016-2017 Costa Tsaousis <costa@tsaousis.gr>
+ * (C) Copyright 2023 Netdata Inc.
  * Released under GPL v3+
  */
 
@@ -180,7 +180,7 @@ static size_t
 // the metrics. This results in utilization that exceeds the total utilization
 // of the system.
 //
-// With normalization we align the per-process utilization, to the total of
+// During normalization, we align the per-process utilization, to the total of
 // the system. We first consume the exited children utilization and it the
 // collected values is above the total, we proportionally scale each reported
 // metric.
@@ -557,8 +557,6 @@ struct file_descriptor {
 static int
         all_files_len = 0,
         all_files_size = 0;
-
-long currentmaxfds = 0;
 
 // ----------------------------------------------------------------------------
 // read users and groups from files
@@ -1318,8 +1316,7 @@ void arl_callback_status_voluntary_ctxt_switches(const char *name, uint32_t hash
     if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 2)) return;
 
     struct pid_stat *p = aptr->p;
-    pid_incremental_rate(
-        stat, p->status_voluntary_ctxt_switches, str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)));
+    pid_incremental_rate(stat, p->status_voluntary_ctxt_switches, str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)));
 }
 
 void arl_callback_status_nonvoluntary_ctxt_switches(const char *name, uint32_t hash, const char *value, void *dst) {
@@ -1328,8 +1325,7 @@ void arl_callback_status_nonvoluntary_ctxt_switches(const char *name, uint32_t h
     if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 2)) return;
 
     struct pid_stat *p = aptr->p;
-    pid_incremental_rate(
-        stat, p->status_nonvoluntary_ctxt_switches, str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)));
+    pid_incremental_rate(stat, p->status_nonvoluntary_ctxt_switches, str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)));
 }
 
 static void update_proc_state_count(char proc_state) {
@@ -2918,7 +2914,7 @@ static void apply_apps_groups_targets_inheritance(void) {
         if(unlikely(debug_enabled)) loops++;
         found = 0;
         for(p = root_of_pids; p ; p = p->next) {
-            // if this process does not have a target
+            // if this process does not have a target,
             // and it has a parent
             // and its parent has a target
             // then, set the parent's target to this process
@@ -2985,7 +2981,7 @@ static void apply_apps_groups_targets_inheritance(void) {
     if(unlikely(debug_enabled)) loops++;
     for(p = root_of_pids; p ; p = p->next) {
         // if the process is not merged itself
-        // then is is a top level process
+        // then it is a top level process
         if(unlikely(!p->merged && !p->target))
             p->target = apps_groups_default_target;
 
@@ -3199,9 +3195,6 @@ static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
         aggregate_fd_on_target(fd, u);
         aggregate_fd_on_target(fd, g);
     }
-
-    if (currentfds >= currentmaxfds)
-        currentmaxfds = currentfds;
 }
 
 static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o) {
@@ -3828,10 +3821,6 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed && w->processes))
                 send_SET(w->name, w->openfds.files);
-        }
-        if (!strcmp("apps", type)){
-            kernel_uint_t usedfdpercentage = (kernel_uint_t) ((currentmaxfds * 100) / sysconf(_SC_OPEN_MAX));
-            fprintf(stdout, "VARIABLE fdperc = " KERNEL_UINT_FORMAT "\n", usedfdpercentage);
         }
         send_END();
 
@@ -5576,7 +5565,6 @@ int main(int argc, char **argv) {
             exit(1);
         }
 
-        currentmaxfds = 0;
         calculate_netdata_statistics();
         normalize_utilization(apps_groups_root_target);
 
