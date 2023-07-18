@@ -85,7 +85,7 @@ It scales nicely from just a single server to thousands of servers, even in comp
 |later|interrupted|Advanced Troubleshooting|Expanded view of dashboard charts integrating Metrics Correlations, Anomaly Advisor and many more.|
 |next|planned|Easy Custom<br/>Dashboards|Drag and drop charts to create custom dashboards on the fly, while troubleshooting!|
 |next|planned|More Customizability|Set default settings for all charts and views!|
-|soon|in progress|SystemD Journal|View the SystemD Journal of all your system via the UI.|
+|soon|in progress|SystemD Journal|View the SystemD Journal of your systems on the dashboard.|
 |soon|in progress|UCUM Units|Migrate all metrics to the Unified Code for Units of Measure.|
 |soon|in progress|Netdata Cloud<br/>On-Prem|Netdata Cloud available for On-Prem installation!|
 |soon|in progress|Click to Activate|Configure Alerts and Data Collectors from the UI!|
