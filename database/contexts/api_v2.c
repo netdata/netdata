@@ -1300,7 +1300,8 @@ static int contexts_v2_alert_instance_to_json_callback(const DICTIONARY_ITEM *it
         buffer_json_member_add_uint64(wb, "ni", t->ni);
 
         buffer_json_member_add_string(wb, "nm", string2str(t->name));
-        buffer_json_member_add_string(wb, "ch", string2str(t->chart_name));
+        buffer_json_member_add_string(wb, "ch", string2str(t->chart_id));
+        buffer_json_member_add_string(wb, "ch_n", string2str(t->chart_name));
 
         if(ctl->request->options & CONTEXT_V2_OPTION_ALERTS_WITH_SUMMARY)
             buffer_json_member_add_uint64(wb, "ati", t->ati);
@@ -1392,6 +1393,7 @@ struct sql_alert_transition_fixed_size {
     uint32_t alarm_id;
     char alert_name[SQL_TRANSITION_DATA_SMALL_STRING];
     char chart[RRD_ID_LENGTH_MAX];
+    char chart_name[RRD_ID_LENGTH_MAX];
     char chart_context[SQL_TRANSITION_DATA_MEDIUM_STRING];
     char family[SQL_TRANSITION_DATA_SMALL_STRING];
     char recipient[SQL_TRANSITION_DATA_MEDIUM_STRING];
@@ -1430,6 +1432,7 @@ static struct sql_alert_transition_fixed_size *contexts_v2_alert_transition_dup(
     n->alarm_id = t->alarm_id;
     strncpyz(n->alert_name, t->alert_name ? t->alert_name : "", sizeof(n->alert_name) - 1);
     strncpyz(n->chart, t->chart ? t->chart : "", sizeof(n->chart) - 1);
+    strncpyz(n->chart_name, t->chart_name ? t->chart_name : "", sizeof(n->chart_name) - 1);
     strncpyz(n->chart_context, t->chart_context ? t->chart_context : "", sizeof(n->chart_context) - 1);
     strncpyz(n->family, t->family ? t->family : "", sizeof(n->family) - 1);
     strncpyz(n->recipient, t->recipient ? t->recipient : "", sizeof(n->recipient) - 1);
@@ -1681,6 +1684,7 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
 
             buffer_json_member_add_string(wb, "alert", *t->alert_name ? t->alert_name : NULL);
             buffer_json_member_add_string(wb, "instance", *t->chart ? t->chart : NULL);
+            buffer_json_member_add_string(wb, "instance_n", *t->chart_name ? t->chart_name : NULL);
             buffer_json_member_add_string(wb, "context", *t->chart_context ? t->chart_context : NULL);
             // buffer_json_member_add_string(wb, "family", *t->family ? t->family : NULL);
             buffer_json_member_add_string(wb, "component", *t->component ? t->component : NULL);

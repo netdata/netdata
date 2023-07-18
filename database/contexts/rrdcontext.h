@@ -424,6 +424,7 @@ struct sql_alert_transition_data {
     uint32_t alarm_id;
     const char *alert_name;
     const char *chart;
+    const char *chart_name;
     const char *chart_context;
     const char *family;
     const char *recipient;
