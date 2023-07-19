@@ -908,7 +908,7 @@ if test "${enable_h2o}" != "no"; then
 
     if test "${can_build_h2o}" = "yes"; then
         AC_DEFINE([ENABLE_H2O], [1], [H2O web server])
-        H2O_CFLAGS="-I\$(abs_top_srcdir)/web/server/h2o/libh2o/include -I\$(abs_top_srcdir)/web/server/h2o/libh2o/deps/picotls/include -I\$(abs_top_srcdir)/web/server/h2o/libh2o/deps/quicly/include -DH2O_USE_LIBUV=0"
+        H2O_CFLAGS="-Wno-unused-result -Wno-misleading-indentation -Wno-format-security -Wno-format -Wno-unused-function -Wno-unused-parameter -Wno-type-limits -Wno-unused-but-set-variable -Wno-implicit-fallthrough -I\$(abs_top_srcdir)/web/server/h2o/libh2o/include -I\$(abs_top_srcdir)/web/server/h2o/libh2o/deps/picotls/include -I\$(abs_top_srcdir)/web/server/h2o/libh2o/deps/quicly/include -DH2O_USE_LIBUV=0"
     fi
 fi
 AM_CONDITIONAL([ENABLE_H2O], [test "${can_build_h2o}" = "yes"])

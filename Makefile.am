@@ -1059,7 +1059,7 @@ if ENABLE_H2O
 noinst_LIBRARIES += libh2o.a
 
 # until h2o updates support for OpenSSL 3.0 we silence the warnings
-libh2o_a_CFLAGS = $(CFLAGS) -Wno-deprecated-declarations -Wno-unused-parameter -Wno-sign-compare -Wno-missing-field-initializers -DH2O_USE_LIBUV=0 $(libh2o_a_INCLUDES)
+libh2o_a_CFLAGS = $(CFLAGS) -Wno-old-style-declaration -Wno-deprecated-declarations -Wno-unused-parameter -Wno-sign-compare -Wno-missing-field-initializers -DH2O_USE_LIBUV=0 $(libh2o_a_INCLUDES)
 
 if LINUX
     libh2o_a_CFLAGS += -D_GNU_SOURCE

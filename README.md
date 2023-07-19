@@ -17,12 +17,21 @@
   <a href="https://github.com/netdata/netdata-nightlies/releases/latest"><img src="https://img.shields.io/github/release/netdata/netdata-nightlies.svg" alt="Latest nightly build"></a>
   <br />
   <a href="https://bestpractices.coreinfrastructure.org/projects/2231"><img src="https://bestpractices.coreinfrastructure.org/projects/2231/badge" alt="CII Best Practices"></a>
+  <a href="https://scan.coverity.com/projects/netdata-netdata?tab=overview"><img alt="Coverity Scan" src="https://img.shields.io/coverity/scan/netdata"></a>
   <a href="https://codeclimate.com/github/netdata/netdata"><img src="https://codeclimate.com/github/netdata/netdata/badges/gpa.svg" alt="Code Climate"></a>
   <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPL%20v3%2B-blue.svg" alt="License: GPL v3+"></a>
+  <br />
+  <a href="https://discord.com/invite/mPZ6WZKKG2"><img alt="Discord" src="https://img.shields.io/discord/847502280503590932?logo=discord&logoColor=white&label=chat%20on%20discord"></a>
+  <a href="https://community.netdata.cloud"><img alt="Discourse topics" src="https://img.shields.io/discourse/topics?server=https%3A%2F%2Fcommunity.netdata.cloud%2F&logo=discourse&label=discourse%20forum"></a>
+  <a href="https://github.com/netdata/netdata/discussions"><img alt="GitHub Discussions" src="https://img.shields.io/github/discussions/netdata/netdata?logo=github&label=github%20discussions"></a>
 </p>
 <hr class="solid">
 
-Netdata collects metrics per second and presents them in beautiful low-latency dashboards. It is designed to run on all of your physical and virtual servers, cloud deployments, Kubernetes clusters, and edge/IoT devices, to monitor everything you run.
+Netdata collects metrics per second and presents them in beautiful low-latency dashboards. It is designed to run on all of your physical and virtual servers, cloud deployments, Kubernetes clusters, and edge/IoT devices, to monitor your systems, containers and applications.
+
+It scales nicely from just a single server to thousands of servers, even in complex multi/mixed/hybrid cloud environments, and given enough disk space it can keep your metrics for years.
+
+**KEY FEATURES**:<br/>
 
 - :boom: **Collects metrics from 800+ integrations**<br/>
   Operating system metrics, container metrics, virtual machines, hardware sensors, applications metrics, OpenMetrics exporters, StatsD, and logs.
@@ -37,14 +46,15 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
   Clear and precise visualization that allows you to quickly understand any dataset, but also to filter, slice and dice the data directly on the dashboard, without the need to learn any query language.
 
 - :bell: **Out of box Alerts**<br/>
-  Comes with hundreds of alerts out of the box to detect common issues and pitfalls, revealing issues that can easily go unnoticed.
+  Comes with hundreds of alerts out of the box to detect common issues and pitfalls, revealing issues that can easily go unnoticed. It supports several notification methods to let you know when your attention is needed.
 
 - :sunglasses: **Low Maintenance**<br/>
-  Fully automated in every aspect: automated dashboards, out-of-the-box alerts, auto-detection, auto-discovery of metrics, and easily configurable.
+  Fully automated in every aspect: automated dashboards, out-of-the-box alerts, auto-detection and auto-discovery of metrics, zero-touch machine-learning, easy scalability and high availability and CI/CD friendly.
 
 - :star: **Open and Extensible**<br/>
   Netdata is a modular platform that can be extended in all possible ways and it also integrates nicely with other monitoring solutions.
 
+&nbsp;<br/>
 <p align="center">
   <img src="https://raw.githubusercontent.com/cncf/artwork/master/other/cncf/horizontal/white/cncf-white.svg#gh-dark-mode-only" alt="CNCF" width="300">
   <img src="https://raw.githubusercontent.com/cncf/artwork/master/other/cncf/horizontal/black/cncf-black.svg#gh-light-mode-only" alt="CNCF" width="300">
@@ -53,6 +63,7 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
   &nbsp;<br/>
   ...and due to your love :heart:, it is the 3rd most :star:'d project in the <a href="https://landscape.cncf.io/card-mode?grouping=no&sort=stars">CNCF landscape</a>!
 </p>
+&nbsp;<br/>
 
 <hr class="solid">
 
@@ -60,12 +71,54 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
 
 <hr class="solid">
 
-> :bulb: **Important Note**<br/>
+> **Important** :bulb:<br/>
 > People get addicted to Netdata. Once you use it on your systems, **there's no going back!**<br/>
 
 <hr class="solid">
 
-## Quick Start
+## What's New and Coming?
+
+> **Spoiler!**<br/>
+> The nightly version of the Netdata Agent has a new UI that is planned to be released July 19th 2023.
+
+<details><summary>Click to see our immediate development plans and a summary view of the last 12 months' releases...</summary>
+&nbsp;<br/>
+
+| When | Status | What | Description|
+|:----:|:------:|:----:|:-----------|
+|later|POC|WebRTC|Browser to Agent communication via WebRTC.|
+|later|interrupted|Advanced Troubleshooting|Expanded view of dashboard charts integrating Metrics Correlations, Anomaly Advisor and many more.|
+|next|planned|Easy Custom<br/>Dashboards|Drag and drop charts to create custom dashboards on the fly, while troubleshooting!|
+|next|planned|More Customizability|Set default settings for all charts and views!|
+|soon|in progress|SystemD Journal|View the SystemD Journal of your systems on the dashboard.|
+|soon|in progress|UCUM Units|Migrate all metrics to the Unified Code for Units of Measure.|
+|**soon**|**in progress**|**Netdata Cloud<br/>On-Prem**|**Netdata Cloud available for On-Prem installation!**|
+|soon|in progress|Click to Activate|Configure Alerts and Data Collectors from the UI!|
+|soon|finishing|Integrations|Netdata Integrations Marketplace!|
+|Jul<br/>2023|in the<br/>nightlies|New Agent UI|Now Netdata Cloud and Netdata Agent share the same dashboard!|
+|Jun<br/>2023|[v1.40](https://github.com/netdata/netdata/releases/tag/v1.40.0)|Summary Dashboards|High level tiles everywhere!|
+|||Machine Learning|Multiple ML models per metric.|
+|||SSL|Netdata Agent gets a new SSL layer.|
+|May<br/>2023|[v1.39](https://github.com/netdata/netdata/releases/tag/v1.39.0)|New Cloud UI|Filter, slice and dice any dataset from the UI! ML-first!|
+|||Microsoft Windows|Monitor Windows hosts and apps!|
+|||Virtual Nodes|Go collectors can now be assigned to virtual nodes!|
+|Feb<br/>2023|[v1.38](https://github.com/netdata/netdata/releases/tag/v1.38.0)|DBENGINE v2|Faster, more reliable, far more scalable!|
+|||Netdata Functions|Netdata beyond metrics! Monitoring anything!|
+|||Events Feed|Live feed of events about topology changes and alerts.|
+|||Role Based<br/>Access Control|More roles, offering finer control over access to infrastructure.|
+|Nov<br/>2022|[v1.37](https://github.com/netdata/netdata/releases/tag/v1.37.0)|Infinite Scalability|Streaming compression. Replication. Active-active clustering.|
+|||Grafana Plugin|Netdata Cloud as a data source for Grafana.|
+|||PostgreSQL|Completely rewritten, to reveal all the info, even at the table level.|
+|Aug<br/>2022|[v1.36](https://github.com/netdata/netdata/releases/tag/v1.36.0)|Metrics Correlations|Advanced algorithms to find the needle in the haystack.|
+|||Database Tiering|Netdata gets unlimited retention!|
+|||Kubernetes|Monitor your kubernetes workloads.|
+|||Machine Learning|Anomaly Rate information on every chart.|
+
+</details>
+
+<hr class="solid">
+
+## Getting Started
 
 <p align="center">
   <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=M&value_color=blue&precision=2&divide=1000000&options=unaligned&v44" alt="User base"></a>
@@ -79,28 +132,37 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
   <a href="https://hub.docker.com/r/netdata/netdata"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=dockerhub.pulls_sum&divide=1000&precision=1&units=k&label=docker+hub+pulls&after=-86400&group=incremental-sum&label=docker%20hub%20pulls%20today&options=unaligned&v44" alt="Docker Hub pulls today"></a>
 </p>
 
-### 1. **Install Netdata Agents everywhere** :v:
+### 1. **Install Netdata everywhere** :v:
    
    Netdata can be installed on all Linux, MacOS, and FreeBSD systems. We provide binary packages for the most popular operating systems and package managers.
 
    - Install on [Ubuntu, Debian CentOS, Fedora, Suse, Red Hat, Arch, Alpine, Gentoo, even BusyBox](https://learn.netdata.cloud/docs/installing/one-line-installer-for-all-linux-systems).
-   - Install with [Docker](https://learn.netdata.cloud/docs/installing/docker). Netdata is a [Verified Publisher on DockerHub](https://hub.docker.com/r/netdata/netdata) and our users enjoy free unlimited DockerHub pulls :heart_eyes:.
+   - Install with [Docker](https://learn.netdata.cloud/docs/installing/docker).<br/>
+     Netdata is a [Verified Publisher on DockerHub](https://hub.docker.com/r/netdata/netdata) and our users enjoy free unlimited DockerHub pulls :heart_eyes:.
    - Install on [MacOS](https://learn.netdata.cloud/docs/installing/macos) :metal:.
    - Install on [FreeBSD](https://learn.netdata.cloud/docs/installing/freebsd) and [pfSense](https://learn.netdata.cloud/docs/installing/pfsense).
-   - Install [from source](https://learn.netdata.cloud/docs/installing/build-the-netdata-agent-yourself/compile-from-source-code)
+   - Install [from source](https://learn.netdata.cloud/docs/installing/build-the-netdata-agent-yourself/compile-from-source-code) ![github downloads](https://img.shields.io/github/downloads/netdata/netdata/total?color=success&logo=github)
    - For Kubernetes deployments [check here](https://learn.netdata.cloud/docs/installation/install-on-specific-environments/kubernetes/).
 
 ### 2. **Configure Collectors** :boom:
 
    Netdata auto-detects and auto-discovers most operating system data sources and applications. However, many data sources require some manual configuration, usually to allow Netdata get access to the metrics.
    
-   - For a detailed list of all data collectors, check [this guide](https://learn.netdata.cloud/docs/data-collection/).
+   - For a detailed list of the 800+ collectors available, check [this guide](https://learn.netdata.cloud/docs/data-collection/).
    - To monitor Windows servers and applications use [this guide](https://learn.netdata.cloud/docs/data-collection/monitor-anything/system-metrics/windows-machines).
    - To monitor SNMP devices check [this guide](https://learn.netdata.cloud/docs/data-collection/monitor-anything/networking/snmp).
 
-### 3. **Configure Netdata Parents** :family:
+### 3. **Configure Alert Notifications** :bell:
 
-   A Netdata Parent is a Netdata Agent that has been configured to accept [streaming connections](https://learn.netdata.cloud/docs/streaming/streaming-configuration-reference) from other Netdata agents.
+   Netdata comes with hundreds of pre-configured alerts, that automatically check your metrics, immediately after they start getting collected.
+
+   Netdata can dispatch alert notifications to multiple third party systems, including: `email`, `Alerta`, `AWS SNS`, `Discord`, `Dynatrace`, `flock`, `gotify`, `IRC`, `Matrix`, `MessageBird`, `Microsoft Teams`, `ntfy`, `OPSgenie`, `PagerDuty`, `Prowl`, `PushBullet`, `PushOver`, `RocketChat`, `Slack`, `SMS tools`, `StackPulse`, `Syslog`, `Telegram`, `Twilio`.
+
+   By default, Netdata will send e-mail notifications, if there is a configured MTA on the system. 
+
+### 4. **Configure Netdata Parents** :family:
+
+   Optionally, configure one or more Netdata Parents. A Netdata Parent is a Netdata Agent that has been configured to accept [streaming connections](https://learn.netdata.cloud/docs/streaming/streaming-configuration-reference) from other Netdata agents.
    
    Netdata Parents provide:
 
@@ -117,19 +179,19 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
     
    - **Central configuration of alerts and dispatch of notifications.**<br/>
    
-     Netdata Agents and Parents can dispatch alert notifications multiple third party systems, including: `email`, `Alerta`, `AWS SNS`, `Discord`, `Dynatrace`, `flock`, `gotify`, `IRC`, `Matrix`, `MessageBird`, `Microsoft Teams`, `ntfy`, `OPSgenie`, `PagerDuty`, `Prowl`, `PushBullet`, `PushOver`, `RocketChat`, `Slack`, `SMS tools`, `StackPulse`, `Syslog`, `Telegram`, `Twilio`.
-     Using Netdata Parents, all these integrations can be configured only once, at the Parent.
+     Using Netdata Parents, all the alert notifications integrations can be configured only once, at the Parent and they can be disabled at the Netdata Agents.
 
    You can also use Netdata Parents to:
 
    - Offload your production systems (the parents runs ML, alerts, queries, etc for all its children)
    - Secure your production systems (the parents accept user connections, for all its children)
 
-### 4. **Connect your Parents to Netdata Cloud** :cloud:
+### 5. **Connect to Netdata Cloud** :cloud:
 
-   Optionally, sign-up to Netdata Cloud and claim your Netdata Parents.
+   Optionally, [sign-in](https://app.netdata.cloud/sign-in) to [Netdata Cloud](https://www.netdata.cloud/) and claim your Netdata Agents and Parents.
+   If you connect your Netdata Parents, there is no need to connect your Netdata Agents. They will be connected via the Parents.
    
-   When your parents are connected to Netdata Cloud, you can (on top of the above):
+   When your Netdata are connected to Netdata Cloud, you can (on top of the above):
 
    - Organize your infra in spaces and rooms
    - Create, manage, and share **custom dashboards**
@@ -141,11 +203,21 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
    - Netdata Mobile App notifications (coming soon)
 
    :love_you_gesture: Netdata Cloud does not prevent you from using your Netdata Agents and Parents directly, and vice versa.<br/>
+   
    :ok_hand: Your metrics are still stored in your network when you connect your Netdata Agents and Parents to Netdata Cloud.
+
+<hr class="solid">
+
+![Netdata Agent 2](https://github.com/netdata/netdata/assets/2662304/49981d85-89b9-4b95-8e45-da7a39e6dd48)
+
+<hr class="solid">
 
 ## How it works
 
 Netdata is built around a **modular metrics processing pipeline**.
+
+<details><summary>Click to see more details about this pipeline...</summary>
+&nbsp;<br/>
 
 Each Netdata Agent can perform the following functions:
 
@@ -172,7 +244,7 @@ Each Netdata Agent can perform the following functions:
    Uses the trained machine learning (ML) models to detect outliers and mark collected samples as **anomalies**. Netdata stores anomaly information together with each sample and also streams it to Netdata Parents so that the anomaly is also available at query time for the whole retention of each metric.
 
 5. **`CHECK` metrics and trigger alert notifications**<br/>
-   Uses its configured alerts to check the metrics for common issues and send alert notifications.
+   Uses its configured alerts (you can configure your own) to check the metrics for common issues and uses notifications plugins to send alert notifications.
 
 6. **`STREAM` metrics to other Netdata Agents**<br/>
    Push metrics in real-time to Netdata Parents.
@@ -188,6 +260,7 @@ Each Netdata Agent can perform the following functions:
 
 When using Netdata Parents, all the functions of a Netdata Agent (except data collection) can be delegated to Parents to offload production systems.
 
+</details>
 
 ## FAQ
 
@@ -358,21 +431,22 @@ to collect metrics, troubleshoot via charts, export to external databases, and m
 
 ## :tada: Community
 
+<p align="center">
+  <a href="https://discord.com/invite/mPZ6WZKKG2"><img alt="Discord" src="https://img.shields.io/discord/847502280503590932?logo=discord&logoColor=white&label=chat%20on%20discord"></a>
+  <a href="https://community.netdata.cloud"><img alt="Discourse topics" src="https://img.shields.io/discourse/topics?server=https%3A%2F%2Fcommunity.netdata.cloud%2F&logo=discourse&label=discourse%20forum"></a>
+  <a href="https://github.com/netdata/netdata/discussions"><img alt="GitHub Discussions" src="https://img.shields.io/github/discussions/netdata/netdata?logo=github&label=github%20discussions"></a>
+</p>
+
 Netdata is an inclusive open-source project and community. Please read our [Code of Conduct](https://github.com/netdata/.github/blob/main/CODE_OF_CONDUCT.md).
 
-Find most of the Netdata team in our [community forums](https://community.netdata.cloud). It's the best place to
-ask questions, find resources, and engage with passionate professionals. The team is also available and active in our [Discord](https://discord.com/invite/mPZ6WZKKG2) too.
+Join the Netdata community:
 
-You can also find Netdata on:
+- Chat with us and other community members on [Discord](https://discord.com/invite/mPZ6WZKKG2).
+- Start a discussion on [Github discussions](https://github.com/netdata/netdata/discussions).
+- Open a topic to our [community forums](https://community.netdata.cloud).
 
--   [Twitter](https://twitter.com/linuxnetdata)
--   [YouTube](https://www.youtube.com/c/Netdata)
--   [Reddit](https://www.reddit.com/r/netdata/)
--   [LinkedIn](https://www.linkedin.com/company/netdata-cloud/)
--   [StackShare](https://stackshare.io/netdata)
--   [Product Hunt](https://www.producthunt.com/posts/netdata-monitoring-agent/)
--   [Repology](https://repology.org/metapackage/netdata/versions)
--   [Facebook](https://www.facebook.com/linuxnetdata/)
+> You can also find Netdata on:<br/>
+> [Twitter](https://twitter.com/linuxnetdata) | [YouTube](https://www.youtube.com/c/Netdata) | [Reddit](https://www.reddit.com/r/netdata/) | [LinkedIn](https://www.linkedin.com/company/netdata-cloud/) | [StackShare](https://stackshare.io/netdata) | [Product Hunt](https://www.producthunt.com/posts/netdata-monitoring-agent/) | [Repology](https://repology.org/metapackage/netdata/versions) | [Facebook](https://www.facebook.com/linuxnetdata/)
 
 ## :pray: Contribute
 

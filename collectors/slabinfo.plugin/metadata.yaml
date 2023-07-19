@@ -1,7 +1,6 @@
 meta:
   plugin_name: slabinfo.plugin
   module_name: slabinfo.plugin
-  alternative_monitored_instances: []
   monitored_instance:
     name: slabinfo
     link: ''
@@ -60,25 +59,25 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: mem.slabmemory
-          description: Memory Usage
-          unit: "B"
-          chart_type: line
-          dimensions:
-            - name: a dimension per cache
-        - name: mem.slabfilling
-          description: Object Filling
-          unit: "%"
-          chart_type: line
-          dimensions:
-            - name: a dimension per cache
-        - name: mem.slabwaste
-          description: Memory waste
-          unit: "B"
-          chart_type: line
-          dimensions:
-            - name: a dimension per cache
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: mem.slabmemory
+      description: Memory Usage
+      unit: "B"
+      chart_type: line
+      dimensions:
+      - name: a dimension per cache
+    - name: mem.slabfilling
+      description: Object Filling
+      unit: "%"
+      chart_type: line
+      dimensions:
+      - name: a dimension per cache
+    - name: mem.slabwaste
+      description: Memory waste
+      unit: "B"
+      chart_type: line
+      dimensions:
+      - name: a dimension per cache
