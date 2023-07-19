@@ -441,8 +441,8 @@ Join the Netdata community:
 - Start a discussion on [Github discussions](https://github.com/netdata/netdata/discussions).
 - Open a topic to our [community forums](https://community.netdata.cloud).
 
-You can also find Netdata on:<br/>
-[Twitter](https://twitter.com/linuxnetdata) | [YouTube](https://www.youtube.com/c/Netdata) | [Reddit](https://www.reddit.com/r/netdata/) | [LinkedIn](https://www.linkedin.com/company/netdata-cloud/) | [StackShare](https://stackshare.io/netdata) | [Product Hunt](https://www.producthunt.com/posts/netdata-monitoring-agent/) | [Repology](https://repology.org/metapackage/netdata/versions) | [Facebook](https://www.facebook.com/linuxnetdata/)
+> You can also find Netdata on:<br/>
+> [Twitter](https://twitter.com/linuxnetdata) | [YouTube](https://www.youtube.com/c/Netdata) | [Reddit](https://www.reddit.com/r/netdata/) | [LinkedIn](https://www.linkedin.com/company/netdata-cloud/) | [StackShare](https://stackshare.io/netdata) | [Product Hunt](https://www.producthunt.com/posts/netdata-monitoring-agent/) | [Repology](https://repology.org/metapackage/netdata/versions) | [Facebook](https://www.facebook.com/linuxnetdata/)
 
 ## :pray: Contribute
 
