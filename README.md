@@ -79,7 +79,7 @@ It scales nicely from just a single server to thousands of servers, even in comp
 ## What's New and Coming?
 
 > **Spoiler!**<br/>
-> The nightly version of the Netdata Agent has a new UI that is planned to be released July 19th 2023.
+> Netdata Integrations Marketplace is coming...
 
 <details><summary>Click to see our immediate development plans and a summary view of the last 12 months' releases...</summary>
 &nbsp;<br/>
@@ -95,7 +95,7 @@ It scales nicely from just a single server to thousands of servers, even in comp
 |**soon**|**in progress**|**Netdata Cloud<br/>On-Prem**|**Netdata Cloud available for On-Prem installation!**|
 |soon|in progress|Click to Activate|Configure Alerts and Data Collectors from the UI!|
 |soon|finishing|Integrations|Netdata Integrations Marketplace!|
-|Jul<br/>2023|in the<br/>nightlies|New Agent UI|Now Netdata Cloud and Netdata Agent share the same dashboard!|
+|Jul<br/>2023|[v1.41](https://github.com/netdata/netdata/releases/tag/v1.41.0)|New Agent UI|Now Netdata Cloud and Netdata Agent share the same dashboard!|
 |Jun<br/>2023|[v1.40](https://github.com/netdata/netdata/releases/tag/v1.40.0)|Summary Dashboards|High level tiles everywhere!|
 |||Machine Learning|Multiple ML models per metric.|
 |||SSL|Netdata Agent gets a new SSL layer.|
