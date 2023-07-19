@@ -3500,7 +3500,7 @@ cleanipdup:
  *
  * @param ptr  is a pointer with the text to parse.
  */
-static void ebpf_parse_ips(char *ptr)
+void ebpf_parse_ips(char *ptr)
 {
     // No value
     if (unlikely(!ptr))

@@ -468,10 +468,16 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             const char *name = &keyword[sizeof(EBPF_THREADS_ENABLE_CATEGORY) - 1];
             separator = strchr(name, ':');
             if (separator)
-                network_viewer_opt.hostname_resolution_enabled = (!strcmp(separator, "NO")) ? CONFIG_BOOLEAN_NO :
-                                                                                              CONFIG_BOOLEAN_YES;
+                network_viewer_opt.hostname_resolution_enabled = (!strcmp(++separator, "NO")) ? CONFIG_BOOLEAN_NO :
+                                                                                                CONFIG_BOOLEAN_YES;
             else
                 network_viewer_opt.hostname_resolution_enabled = CONFIG_BOOLEAN_NO;
+        } else if (strncmp(keyword, EBPF_THREADS_SOCKET_RANGE, sizeof(EBPF_THREADS_SOCKET_RANGE) -1) == 0) {
+            const char *name = &keyword[sizeof(EBPF_THREADS_ENABLE_CATEGORY) - 1];
+            separator = strchr(name, ':');
+            if (separator) {
+                ebpf_parse_ips(++separator);
+            }
         } else if(strncmp(keyword, "help", 4) == 0) {
             ebpf_function_socket_help(transaction);
             return;
