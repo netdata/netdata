@@ -52,12 +52,18 @@ sudo ./edit-config [[ entry.setup.configuration.file.name ]]
 | [[ item.name ]] | [[ item.description ]] | [[ item.default ]] | [[ item.required ]] |
 [% endfor %]
 
-[[ entry.setup.configuration.options.detailed_description ]]
+[% for item in entry.setup.configuration.options.list %]
+[% if 'detailed_description' in item %]
+##### [[ item.name ]]
+
+[[ item.detailed_description ]]
+
+[% endif %]
+[% endfor %]
 [% if entry.setup.configuration.options.folding.enabled %]
 {% /details %}
 [% endif %]
 [% endif %]
-
 [% if entry.setup.configuration.examples.list %]
 #### Examples
 
