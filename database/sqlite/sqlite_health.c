@@ -2131,9 +2131,10 @@ fail:
 }
 
 #define SQL_POPULATE_CHART_NAME " UPDATE health_log SET chart_name = upd.chart_name FROM " \
-    "(SELECT c.type || '.' || IFNULL(c.name, c.id) AS chart_name, hl.host_id FROM " \
+    "(SELECT c.type || '.' || IFNULL(c.name, c.id) AS chart_name, hl.host_id, hl.health_log_id FROM " \
     "chart c, health_log hl WHERE (c.type || '.' || c.id) = hl.chart AND c.host_id = hl.host_id " \
-    "AND hl.host_id = @host_id) AS upd WHERE health_log.host_id = upd.host_id"
+    "AND hl.host_id = @host_id) AS upd WHERE health_log.host_id = upd.host_id " \
+    "AND health_log.health_log_id = upd.health_log_id"
 
 void chart_name_populate(uuid_t *host_uuid)
 {
