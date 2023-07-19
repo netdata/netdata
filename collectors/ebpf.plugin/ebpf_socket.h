@@ -277,11 +277,13 @@ typedef struct netdata_socket {
     uint64_t sent_packets;
     uint64_t recv_bytes;
     uint64_t sent_bytes;
-    uint64_t first; // First timestamp
-    uint64_t ct;   // Current timestamp
+    uint64_t first_timestamp;
+    uint64_t current_timestamp;
+    uint32_t close;       // Current timestamp
     uint32_t retransmit; // It is never used with UDP
     uint16_t protocol;
-    uint16_t reserved;
+    uint16_t family;
+    uint32_t reserved;
 } netdata_socket_t;
 
 typedef struct netdata_plot_values {

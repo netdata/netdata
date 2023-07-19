@@ -719,8 +719,8 @@ static void ebpf_update_global_publish(
  */
 static inline void update_nv_plot_data(netdata_plot_values_t *plot, netdata_socket_t *sock)
 {
-    if (sock->ct != plot->last_time) {
-        plot->last_time         = sock->ct;
+    if (sock->current_timestamp != plot->last_time) {
+        plot->last_time         = sock->current_timestamp;
         plot->plot_recv_packets = sock->recv_packets;
         plot->plot_sent_packets = sock->sent_packets;
         plot->plot_recv_bytes   = sock->recv_bytes;
@@ -1848,7 +1848,7 @@ static inline void update_socket_data(netdata_socket_t *sock, netdata_socket_t *
     sock->recv_bytes   = lvalues->recv_bytes;
     sock->sent_bytes   = lvalues->sent_bytes;
     sock->retransmit   = lvalues->retransmit;
-    sock->ct = lvalues->ct;
+    sock->current_timestamp = lvalues->current_timestamp;
 }
 
 /**
@@ -1872,7 +1872,7 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
 
     ret = (netdata_socket_plot_t *) avl_search_lock(&out->tree, (avl_t *)&test);
     if (ret) {
-        if (lvalues->ct != ret->plot.last_time) {
+        if (lvalues->current_timestamp != ret->plot.last_time) {
             update_socket_data(&ret->sock, lvalues);
         }
     } else {
@@ -1883,7 +1883,7 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
 
         int resolved;
         if (curr == last) {
-            if (lvalues->ct != w->plot.last_time) {
+            if (lvalues->current_timestamp != w->plot.last_time) {
                 update_socket_data(&w->sock, lvalues);
             }
             return;
@@ -1975,7 +1975,7 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
     uint16_t retransmit = 0;
     int i;
     uint8_t protocol = values[0].protocol;
-    uint64_t ct = values[0].ct;
+    uint64_t ct = values[0].current_timestamp;
     for (i = 1; i < end; i++) {
         netdata_socket_t *w = &values[i];
 
@@ -1988,8 +1988,8 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
         if (!protocol)
             protocol = w->protocol;
 
-        if (w->ct != ct)
-            ct = w->ct;
+        if (w->current_timestamp != ct)
+            ct = w->current_timestamp;
     }
 
     values[0].recv_packets += precv;
@@ -1998,7 +1998,7 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
     values[0].sent_bytes   += bsent;
     values[0].retransmit   += retransmit;
     values[0].protocol     = (!protocol)?IPPROTO_TCP:protocol;
-    values[0].ct           = ct;
+    values[0].current_timestamp = ct;
 
     uint32_t dir;
     netdata_vector_plot_t *table = select_vector_to_store(&dir, key, protocol);
