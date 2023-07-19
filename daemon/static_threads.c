@@ -201,15 +201,6 @@ const struct netdata_static_thread static_threads_common[] = {
     },
 
 #if defined(ENABLE_LOGSMANAGEMENT)
-    // {
-    //     .name = "PLUGIN[logsmanagement]",
-    //     .config_section = NULL,
-    //     .config_name = NULL,
-    //     .enabled = 1,
-    //     .thread = NULL,
-    //     .init_routine = NULL,
-    //     .start_routine = logsmanagement_plugin_main
-    // },
     {
         .name = "LOGSMANAGEMENT",
         .config_section = NULL,
