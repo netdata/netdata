@@ -1,17 +1,22 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.40.1...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.40.1...v1.41.0)
 
 **Merged pull requests:**
 
+- Include license for web v2 [\#15453](https://github.com/netdata/netdata/pull/15453) ([tkatsoulas](https://github.com/tkatsoulas))
+- Updates to metadata.yaml [\#15452](https://github.com/netdata/netdata/pull/15452) ([shyamvalsan](https://github.com/shyamvalsan))
+- Add apps yaml [\#15451](https://github.com/netdata/netdata/pull/15451) ([Ancairon](https://github.com/Ancairon))
+- Add cgroups yaml [\#15450](https://github.com/netdata/netdata/pull/15450) ([Ancairon](https://github.com/Ancairon))
 - Fix multiline [\#15449](https://github.com/netdata/netdata/pull/15449) ([Ancairon](https://github.com/Ancairon))
 - bump v2 dashboard to v6.21.3 [\#15448](https://github.com/netdata/netdata/pull/15448) ([ilyam8](https://github.com/ilyam8))
 - fix alerts transitions search when something specific is asked for [\#15447](https://github.com/netdata/netdata/pull/15447) ([ktsaou](https://github.com/ktsaou))
 - collector meta: remove meta.alternative\_monitored\_instances [\#15445](https://github.com/netdata/netdata/pull/15445) ([ilyam8](https://github.com/ilyam8))
 - added missing fields to alerts instances [\#15442](https://github.com/netdata/netdata/pull/15442) ([ktsaou](https://github.com/ktsaou))
 - removed dup categories [\#15440](https://github.com/netdata/netdata/pull/15440) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- Create netdata-assistant docs [\#15438](https://github.com/netdata/netdata/pull/15438) ([shyamvalsan](https://github.com/shyamvalsan))
 - apps.plugin fds limits improvements [\#15437](https://github.com/netdata/netdata/pull/15437) ([ktsaou](https://github.com/ktsaou))
 - disable apps\_group\_file\_descriptors\_utilization alarm [\#15435](https://github.com/netdata/netdata/pull/15435) ([ilyam8](https://github.com/ilyam8))
 - Add catch-all category entry in categories.yaml [\#15434](https://github.com/netdata/netdata/pull/15434) ([Ancairon](https://github.com/Ancairon))
@@ -65,6 +70,7 @@
 - Add keys to integrations schema, categories, icon path, plus some fixes [\#15365](https://github.com/netdata/netdata/pull/15365) ([Ancairon](https://github.com/Ancairon))
 - format the sdr cache filenames [\#15361](https://github.com/netdata/netdata/pull/15361) ([ktsaou](https://github.com/ktsaou))
 - fix\(freeipmi\): set sensor state on every reading [\#15360](https://github.com/netdata/netdata/pull/15360) ([ilyam8](https://github.com/ilyam8))
+- documentation update for the release of the new UI [\#15359](https://github.com/netdata/netdata/pull/15359) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Rename multi module yamls to same name but wuth prefix [\#15356](https://github.com/netdata/netdata/pull/15356) ([Ancairon](https://github.com/Ancairon))
 - Update dashboard to version v3.0.1. [\#15352](https://github.com/netdata/netdata/pull/15352) ([netdatabot](https://github.com/netdatabot))
 - Fix installation type command [\#15351](https://github.com/netdata/netdata/pull/15351) ([hugovalente-pm](https://github.com/hugovalente-pm))
@@ -407,10 +413,6 @@
 - Minor improvements to netdata-security.md [\#14815](https://github.com/netdata/netdata/pull/14815) ([cakrit](https://github.com/cakrit))
 - Update privacy link in aclk doc [\#14813](https://github.com/netdata/netdata/pull/14813) ([cakrit](https://github.com/cakrit))
 - Consolidate security and privacy documents [\#14812](https://github.com/netdata/netdata/pull/14812) ([cakrit](https://github.com/cakrit))
-- Update role-based-access.md [\#14811](https://github.com/netdata/netdata/pull/14811) ([cakrit](https://github.com/cakrit))
-- Save and load ML models [\#14810](https://github.com/netdata/netdata/pull/14810) ([vkalintiris](https://github.com/vkalintiris))
-- diskspace: don't collect inodes on msdosfs [\#14809](https://github.com/netdata/netdata/pull/14809) ([ilyam8](https://github.com/ilyam8))
-- Document CetusGuard as a Docker socket proxy solution [\#14806](https://github.com/netdata/netdata/pull/14806) ([hectorm](https://github.com/hectorm))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
