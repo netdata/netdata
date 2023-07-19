@@ -235,6 +235,7 @@ modules:
         description: ''
       keywords:
        - groups
+       - processes
        - user auditing
        - authorization
        - os
@@ -455,6 +456,7 @@ modules:
         description: ''
       keywords:
        - users
+       - processes
        - os
        - host monitoring
       most_popular: false
