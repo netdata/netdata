@@ -57,13 +57,11 @@ static void ebpf_function_thread_manipulation_help(const char *transaction) {
             "      Disable a sp.\n"
             "\n"
             "Filters can be combined. Each filter can be given only one time.\n"
-            "Process thread is not controlled by functions until we finish the creation of functions per thread..\n"
             );
     pluginsd_function_result_end_to_stdout();
     fflush(stdout);
     pthread_mutex_unlock(&lock);
 }
-
 
 /*****************************************************************
  *  EBPF ERROR FUNCTIONS
@@ -366,6 +364,46 @@ static void ebpf_function_thread_manipulation(const char *transaction,
  *****************************************************************/
 
 /**
+ * Thread Help
+ *
+ * Shows help with all options accepted by thread function.
+ *
+ * @param transaction  the transaction id that Netdata sent for this function execution
+*/
+static void ebpf_function_socket_help(const char *transaction) {
+    pthread_mutex_lock(&lock);
+    pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600);
+    fprintf(stdout, "%s",
+            "ebpf.plugin / socket\n"
+            "\n"
+            "Function `socket` display information for all open sockets during ebpf.plugin run time.\n"
+            "\n"
+            "The following filters are supported:\n"
+            "\n"
+            "   family:FAMILY\n"
+            "      Shows information for the FAMILY specified. Option accepts IPV4, IPV6 and all, that is the default.\n"
+            "\n"
+            "   period:PERIOD\n"
+            "      Enable socket to run a specific PERIOD in seconds. When PERIOD is not\n"
+            "      specified plugin will use the default 300 seconds\n"
+            "\n"
+            "   resolve:BOOL\n"
+            "      Resolve IP address, default value is NO.\n"
+            "\n"
+            "   range:CIDR\n"
+            "      Show sockets that have only a specific destination. Default all addresses.\n"
+            "\n"
+            "   port:range\n"
+            "      Show sockets that have only a specific destination.\n"
+            "\n"
+            "Filters can be combined. Each filter can be given only one time. Default all ports\n"
+    );
+    pluginsd_function_result_end_to_stdout();
+    fflush(stdout);
+    pthread_mutex_unlock(&lock);
+}
+
+/**
  * Function: Socket
  *
  * Show information for sockets stored in hash tables.
@@ -384,7 +422,6 @@ static void ebpf_function_socket_manipulation(const char *transaction,
                                               int timeout __maybe_unused,
                                               ebpf_module_t *em)
 {
-    UNUSED(transaction);
     UNUSED(line_buffer);
     UNUSED(timeout);
     UNUSED(em);
@@ -397,6 +434,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             break;
 
         if(strncmp(keyword, "help", 4) == 0) {
+            ebpf_function_socket_help(transaction);
             return;
         }
     }
