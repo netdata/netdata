@@ -428,6 +428,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
 
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
     size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
+    char *separator;
     for(int i = 1; i < PLUGINSD_MAX_WORDS ; i++) {
         const char *keyword = get_word(words, num_words, i);
         if (!keyword)
@@ -435,7 +436,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
 
         if (strncmp(keyword, EBPF_THREADS_SOCKET_FAMILY, sizeof(EBPF_THREADS_SOCKET_FAMILY) -1) == 0) {
             const char *name = &keyword[sizeof(EBPF_THREADS_SOCKET_FAMILY) - 1];
-            char *separator = strchr(name, ':');
+            separator = strchr(name, ':');
             if (separator) {
                 separator++;
                 if (!strcmp(separator, "IPV4"))
@@ -450,15 +451,25 @@ static void ebpf_function_socket_manipulation(const char *transaction,
         } else if (strncmp(keyword, EBPF_THREADS_SOCKET_FAMILY, sizeof(EBPF_THREADS_SOCKET_FAMILY) -1) == 0) {
             int period = -1;
             const char *name = &keyword[sizeof(EBPF_THREADS_ENABLE_CATEGORY) - 1];
-            char *separator = strchr(name, ':');
+            separator = strchr(name, ':');
+            pthread_mutex_lock(&ebpf_exit_cleanup);
             if (separator) {
                 period = str2i(++separator);
                 if (period > 0) {
-                    pthread_mutex_lock(&ebpf_exit_cleanup);
                     ebpf_modules[EBPF_MODULE_SOCKET_IDX].lifetime = period;
-                    pthread_mutex_unlock(&ebpf_exit_cleanup);
                 }
-            }
+            } else
+                ebpf_modules[EBPF_MODULE_SOCKET_IDX].lifetime = EBPF_DEFAULT_LIFETIME;
+
+            pthread_mutex_unlock(&ebpf_exit_cleanup);
+        } else if (strncmp(keyword, EBPF_THREADS_SOCKET_RESOLVE, sizeof(EBPF_THREADS_SOCKET_RESOLVE) -1) == 0) {
+            const char *name = &keyword[sizeof(EBPF_THREADS_ENABLE_CATEGORY) - 1];
+            separator = strchr(name, ':');
+            if (separator)
+                network_viewer_opt.hostname_resolution_enabled = (!strcmp(separator, "NO")) ? CONFIG_BOOLEAN_NO :
+                                                                                              CONFIG_BOOLEAN_YES;
+            else
+                network_viewer_opt.hostname_resolution_enabled = CONFIG_BOOLEAN_NO;
         } else if(strncmp(keyword, "help", 4) == 0) {
             ebpf_function_socket_help(transaction);
             return;
