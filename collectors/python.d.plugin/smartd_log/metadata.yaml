@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: S.M.A.R.T.
     link: ''
-    categories: data-collection.hardware-devices-and-sensors
+    categories:
+    - data-collection.hardware-devices-and-sensors
     icon_filename: 'smart.png'
   related_resources:
     integrations:

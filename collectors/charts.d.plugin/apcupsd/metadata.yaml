@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: APC UPS
     link: ''
-    categories: data-collection.ups
+    categories:
+    - data-collection.ups
     icon_filename: 'apc.png'
   related_resources:
     integrations:

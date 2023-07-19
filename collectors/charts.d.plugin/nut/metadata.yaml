@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: UPS/PDU
     link: ''
-    categories: data-collection.ups
+    categories:
+    - data-collection.ups
     icon_filename: 'plug-circle-bolt.svg'
   related_resources:
     integrations:

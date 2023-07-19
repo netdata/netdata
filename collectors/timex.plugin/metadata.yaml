@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: Timex
     link: ''
-    categories: data-collection.system-clock-and-ntp
+    categories:
+    - data-collection.system-clock-and-ntp
     icon_filename: 'syslog.png'
   related_resources:
     integrations:

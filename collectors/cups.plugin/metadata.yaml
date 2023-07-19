@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: CUPS
     link: ''
-    categories: data-collection.hardware-devices-and-sensors
+    categories:
+    - data-collection.hardware-devices-and-sensors
     icon_filename: 'cups.png'
   related_resources:
     integrations:

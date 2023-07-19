@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: Netfilter
     link: ''
-    categories: data-collection.networking-stack-and-network-interfaces
+    categories:
+    - data-collection.networking-stack-and-network-interfaces
     icon_filename: 'netfilter.png'
   related_resources:
     integrations:

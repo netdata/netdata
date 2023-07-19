@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: ISCBind (RNDC)
     link: ''
-    categories: data-collection.dns-and-dhcp-servers
+    categories:
+    - data-collection.dns-and-dhcp-servers
     icon_filename: 'isc.png'
   related_resources:
     integrations:

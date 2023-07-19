@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: NSD
     link: ''
-    categories: data-collection.dns-and-dhcp-servers
+    categories:
+    - data-collection.dns-and-dhcp-servers
     icon_filename: 'nsd.svg'
   related_resources:
     integrations:

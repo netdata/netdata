@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: Monit
     link: ''
-    categories: data-collection.synthetic-checks
+    categories:
+    - data-collection.synthetic-checks
     icon_filename: 'monit.png'
   related_resources:
     integrations:

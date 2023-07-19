@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: Xen/XCP-ng
     link: ''
-    categories: data-collection.containers-and-vms
+    categories:
+    - data-collection.containers-and-vms
     icon_filename: 'xen.png'
   related_resources:
     integrations:

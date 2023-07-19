@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: Varnish
     link: ''
-    categories: data-collection.web-servers-and-web-proxies
+    categories:
+    - data-collection.web-servers-and-web-proxies
     icon_filename: 'varnish.png'
   related_resources:
     integrations:

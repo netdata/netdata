@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: Puppet
     link: ''
-    categories: data-collection.provisioning-systems
+    categories:
+    - data-collection.provisioning-systems
     icon_filename: 'puppet.jpeg'
   related_resources:
     integrations:

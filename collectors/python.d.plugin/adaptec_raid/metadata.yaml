@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: AdaptecRAID
     link: ''
-    categories: data-collection.storage-mount-points-and-filesystems
+    categories:
+    - data-collection.storage-mount-points-and-filesystems
     icon_filename: 'adaptec.png'
   related_resources:
     integrations:

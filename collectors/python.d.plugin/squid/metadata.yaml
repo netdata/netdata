@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: Squid
     link: ''
-    categories: data-collection.web-servers-and-web-proxies
+    categories:
+    - data-collection.web-servers-and-web-proxies
     icon_filename: 'squid.png'
   related_resources:
     integrations:

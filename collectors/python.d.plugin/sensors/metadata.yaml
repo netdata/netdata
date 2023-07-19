@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: Linux Sensors (lm-sensors)
     link: ''
-    categories: data-collection.hardware-devices-and-sensors
+    categories:
+    - data-collection.hardware-devices-and-sensors
     icon_filename: 'microchip.svg'
   related_resources:
     integrations:

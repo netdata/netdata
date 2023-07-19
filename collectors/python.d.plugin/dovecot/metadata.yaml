@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: Dovecot
     link: ''
-    categories: data-collection.mail-servers
+    categories:
+    - data-collection.mail-servers
     icon_filename: 'dovecot.png'
   related_resources:
     integrations:

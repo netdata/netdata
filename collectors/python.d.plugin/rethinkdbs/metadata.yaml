@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: RethinkDB
     link: ''
-    categories: data-collection.database-servers
+    categories:
+    - data-collection.database-servers
     icon_filename: 'rethinkdb.png'
   related_resources:
     integrations:

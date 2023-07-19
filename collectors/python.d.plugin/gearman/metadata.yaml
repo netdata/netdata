@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: Gearman
     link: ''
-    categories: data-collection.distributed-computing-systems
+    categories:
+    - data-collection.distributed-computing-systems
     icon_filename: 'gearman.png'
   related_resources:
     integrations:

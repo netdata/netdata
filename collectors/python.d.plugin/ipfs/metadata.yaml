@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: IPFS
     link: ''
-    categories: data-collection.storage-mount-points-and-filesystems
+    categories:
+    - data-collection.storage-mount-points-and-filesystems
     icon_filename: 'ipfs.png'
   related_resources:
     integrations:

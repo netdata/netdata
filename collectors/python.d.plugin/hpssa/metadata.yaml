@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: hpssa
   monitored_instance:
-    name: python.d hpssa
+    name: HP Smart Storage Arrays
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.storage-mount-points-and-filesystems
+    icon_filename: 'hp.jpeg'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Examine HP Smart Storage Arrays metrics with Netdata for efficient storage management. Improve your storage efficiency with real-time performance insights.'
     method_description: ''
   supported_platforms:
     include: []

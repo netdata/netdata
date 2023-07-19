@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: Libreswan
     link: ''
-    categories: data-collection.vpns
+    categories:
+    - data-collection.vpns
     icon_filename: 'libreswan.png'
   related_resources:
     integrations:

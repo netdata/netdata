@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: Go applications
     link: ''
-    categories: data-collection.apm
+    categories:
+    - data-collection.apm
     icon_filename: 'go.png'
   related_resources:
     integrations:

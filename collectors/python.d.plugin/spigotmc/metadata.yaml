@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: SpigotMC
     link: ''
-    categories: data-collection.gaming
+    categories:
+    - data-collection.gaming
     icon_filename: 'spigot.jfif'
   related_resources:
     integrations:

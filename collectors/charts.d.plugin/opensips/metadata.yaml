@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: OpenSIPS
     link: ''
-    categories: data-collection.telephony-servers
+    categories:
+    - data-collection.telephony-servers
     icon_filename: 'opensips.png'
   related_resources:
     integrations:

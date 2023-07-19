@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: RetroShare
     link: ''
-    categories: data-collection.p2p
+    categories:
+    - data-collection.p2p
     icon_filename: 'retroshare.png'
   related_resources:
     integrations:

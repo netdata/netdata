@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: CPU performance
     link: ''
-    categories: data-collection.linux-systems
+    categories:
+    - data-collection.linux-systems
     icon_filename: 'bolt.svg'
   related_resources:
     integrations:

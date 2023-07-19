@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: uWSGI
     link: ''
-    categories: data-collection.web-servers-and-web-proxies
+    categories:
+    - data-collection.web-servers-and-web-proxies
     icon_filename: 'uwsgi.png'
   related_resources:
     integrations:

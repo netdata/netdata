@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: IOPing
     link: ''
-    categories: data-collection.synthetic-checks
+    categories:
+    - data-collection.synthetic-checks
     icon_filename: 'syslog.png'
   related_resources:
     integrations:

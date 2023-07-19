@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: OpenLDAP
     link: ''
-    categories: data-collection.authentication-and-authorization
+    categories:
+    - data-collection.authentication-and-authorization
     icon_filename: 'statsd.png'
   related_resources:
     integrations:

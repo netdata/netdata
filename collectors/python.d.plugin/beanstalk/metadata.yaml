@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: Beanstalk
     link: ''
-    categories: data-collection.message-brokers
+    categories:
+    - data-collection.message-brokers
     icon_filename: 'beanstalk.png'
   related_resources:
     integrations:

@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: HAProxy
     link: ''
-    categories: data-collection.web-servers-and-web-proxies
+    categories:
+    - data-collection.web-servers-and-web-proxies
     icon_filename: 'haproxy.png'
   related_resources:
     integrations:

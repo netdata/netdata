@@ -4,7 +4,8 @@ meta:
   monitored_instance:
     name: Fail2ban
     link: ''
-    categories: data-collection.authentication-and-authorization
+    categories:
+    - data-collection.authentication-and-authorization
     icon_filename: 'fail2ban.png'
   related_resources:
     integrations:
