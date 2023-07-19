@@ -1424,7 +1424,7 @@ try_package_install() {
       if [ "${INTERACTIVE}" = "0" ]; then
         install_subcmd="--non-interactive --no-gpg-checks install"
       else
-        install_subcmd="install"
+        install_subcmd="--no-gpg-checks install"
       fi
       common_rpm_opts
       pm_cmd="zypper"
