@@ -262,12 +262,12 @@ static inline void ebpf_socket_disable_specific_probe(struct socket_bpf *obj, ne
  * @param obj is the main structure for bpf objects.
  * @param sel option selected by user.
  */
-static int ebpf_socket_attach_probes(struct socket_bpf *obj, netdata_run_mode_t sel)
+static long ebpf_socket_attach_probes(struct socket_bpf *obj, netdata_run_mode_t sel)
 {
     obj->links.netdata_inet_csk_accept_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_inet_csk_accept_kretprobe,
                                                                               true,
                                                                               socket_targets[NETDATA_FCNT_INET_CSK_ACCEPT].name);
-    int ret = libbpf_get_error(obj->links.netdata_inet_csk_accept_kretprobe);
+    long ret = libbpf_get_error(obj->links.netdata_inet_csk_accept_kretprobe);
     if (ret)
             return -1;
 
@@ -434,7 +434,7 @@ static inline int ebpf_socket_load_and_attach(struct socket_bpf *obj, ebpf_modul
     if (test == EBPF_LOAD_TRAMPOLINE) {
         ret = socket_bpf__attach(obj);
     } else {
-        ret = ebpf_socket_attach_probes(obj, em->mode);
+        ret = (int)ebpf_socket_attach_probes(obj, em->mode);
     }
 
     if (!ret) {
