@@ -308,8 +308,14 @@ typedef struct ebpf_module {
         const char *thread_description;
     } info;
 
+    // Helpers used with plugin
+    struct {
+        void *(*start_routine)(void *);                             // the thread function
+        void (*apps_routine)(struct ebpf_module *em, void *ptr);    // the apps charts
+        void (*fnct_routine)(BUFFER *bf);                           // the function used for exteernal requests
+    } functions;
+
     enum ebpf_threads_status enabled;
-    void *(*start_routine)(void *);
     int update_every;
     int global_charts;
     netdata_apps_integration_flags_t apps_charts;
@@ -318,7 +324,6 @@ typedef struct ebpf_module {
     netdata_run_mode_t mode;
     uint32_t thread_id;
     int optional;
-    void (*apps_routine)(struct ebpf_module *em, void *ptr);
     ebpf_local_maps_t *maps;
     ebpf_specify_name_t *names;
     uint32_t pid_map_size;
