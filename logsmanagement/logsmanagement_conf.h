@@ -16,7 +16,7 @@
 #define GiB * 1073741824ULL
 
 #if !defined(LOGS_MANAGEMENT_STRESS_TEST)
-#define ENABLE_LOGS_MANAGEMENT_DEFAULT CONFIG_BOOLEAN_NO        /**< Whether to enable or not logs management in netdata.conf by default */
+#define ENABLE_LOGS_MANAGEMENT_DEFAULT CONFIG_BOOLEAN_NO        /**< Whether to enable or not logs management in netdata.conf by default **/
 #else 
 #define ENABLE_LOGS_MANAGEMENT_DEFAULT CONFIG_BOOLEAN_YES       /**< Whether to enable or not logs management in netdata.conf by default, if stress tests are enabled */
 #endif
@@ -34,7 +34,7 @@
 #else 
 #define ENABLE_COLLECTED_LOGS_TOTAL_DEFAULT CONFIG_BOOLEAN_YES  /**< Default value to enable (or not) metrics of total collected log records, if stress tests are enabled **/
 #endif
-#define ENABLE_COLLECTED_LOGS_RATE_DEFAULT CONFIG_BOOLEAN_YES   /**< Default value to enable (or not) metrics of rate of collected log records */
+#define ENABLE_COLLECTED_LOGS_RATE_DEFAULT CONFIG_BOOLEAN_YES   /**< Default value to enable (or not) metrics of rate of collected log records **/
 
 /* -------------------------------------------------------------------------- */
 

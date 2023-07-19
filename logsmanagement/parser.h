@@ -50,7 +50,8 @@ typedef enum{
     CHART_KMSG_DEVICE =             1 << 20,
 
     /* FLB_DOCKER_EV charts */
-    CHART_DOCKER_EV_TYPE =          1 << 21
+    CHART_DOCKER_EV_TYPE =          1 << 21,
+    CHART_DOCKER_EV_ACTION =        1 << 22
 
 } chart_type_t;
 
@@ -317,35 +318,49 @@ static const char *docker_ev_type_string[] = {
 
 #define NUM_OF_DOCKER_EV_TYPES ((int) (sizeof docker_ev_type_string / sizeof docker_ev_type_string[0]))
 
-// static const char *docker_ev_action_string[] = {
-// 	/* Containers actions */
-// 	"attach", "commit", "copy", "create", "destroy", "detach", "die", "exec_create", "exec_detach", "exec_die", 
-// 	"exec_start", "export", "health_status", "kill", "oom", "pause", "rename", "resize", "restart", "start", "stop", 
-// 	"top", "unpause", "update",
-// 	/* Images actions */
-// 	"delete", "import", "load", "pull", "push", "save", "tag", "untag",
-// 	/* Plugins actions */
-// 	"enable", "disable", "install", "remove",
-// 	/* Volumes actions */
-// 	/*"create",*/ /*"destroy",*/ "mount", "unmount",
-// 	/* Networks actions */
-// 	/*"create",*/ "connect", /*"destroy",*/ "disconnect", /*"remove"*/
-// 	/* Daemons actions */
-// 	"reload",
-// 	/* Services actions */
-// 	/*"create", "remove", "update",*/
-// 	/* Nodes actions */
-// 	/*"create", "remove", "update",*/
-// 	/* Secrets actions */
-// 	/*"create", "remove", "update",*/
-// 	/* Configs actions */
-// 	/*"create", "remove", "update",*/
-// };
+#define NUM_OF_CONTAINER_ACTIONS 25 /**< == size of 'Containers actions' array, largest array in docker_ev_action_string **/
 
-// #define NUM_OF_DOCKER_EV_ACTIONS ((int) (sizeof docker_ev_action_string / sizeof docker_ev_action_string[0]))
+static const char *docker_ev_action_string[NUM_OF_DOCKER_EV_TYPES][NUM_OF_CONTAINER_ACTIONS] = {
+    /* Order of arrays is important, it must match the order of docker_ev_type_string[] strings. */
+
+	/* Containers actions */
+	{"attach", "commit", "copy", "create", "destroy", "detach", "die", "exec_create", "exec_detach", "exec_die", 
+	"exec_start", "export", "health_status", "kill", "oom", "pause", "rename", "resize", "restart", "start", "stop", 
+	"top", "unpause", "update", NULL},
+
+	/* Images actions */
+	{"delete", "import", "load", "pull", "push", "save", "tag", "untag", NULL},
+
+	/* Plugins actions */
+	{"enable", "disable", "install", "remove", NULL},
+
+	/* Volumes actions */
+	{"create", "destroy", "mount", "unmount", NULL},
+
+	/* Networks actions */
+	{"create", "connect", "destroy", "disconnect", "remove", NULL},
+
+	/* Daemons actions */
+	{"reload", NULL},
+
+	/* Services actions */
+	{"create", "remove", "update", NULL},
+
+	/* Nodes actions */
+	{"create", "remove", "update", NULL},
+
+	/* Secrets actions */
+	{"create", "remove", "update", NULL},
+
+	/* Configs actions */
+	{"create", "remove", "update", NULL},
+
+    {"unknown", NULL}
+};
 
 typedef struct docker_ev_metrics{
-    unsigned int ev_type[NUM_OF_DOCKER_EV_TYPES];				
+    unsigned int ev_type[NUM_OF_DOCKER_EV_TYPES];
+    unsigned int ev_action[NUM_OF_DOCKER_EV_TYPES][NUM_OF_CONTAINER_ACTIONS];
 } Docker_ev_metrics_t;
 
 /* -------------------------------------------------------------------------- */

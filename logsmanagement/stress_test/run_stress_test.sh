@@ -72,7 +72,7 @@ then
 	then
 		c_flags="-O1 -ggdb -Wall -Wextra -fsanitize=address -static-libasan "
 		c_flags+="-fno-omit-frame-pointer -Wformat-signedness -fstack-protector-all -Wformat-truncation=2 -Wunused-result "
-		c_flags+="-D_FORTIFY_SOURCE=2 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_DEV_MODE=1 -DLOGS_MANAGEMENT_STRESS_TEST=$enable_stress_tests "
+		c_flags+="-DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_DEV_MODE=1 -DLOGS_MANAGEMENT_STRESS_TEST=$enable_stress_tests "
 		# c_flags+="-Wl,--no-as-needed -ldl "
 		sudo CFLAGS="$c_flags" ./netdata-installer.sh \
 					--dont-start-it \

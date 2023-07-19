@@ -32,6 +32,11 @@ struct Chart_data_docker_ev {
     RRDSET *st_dock_ev_type;
     RRDDIM *dim_dock_ev_type[NUM_OF_DOCKER_EV_TYPES];
     collected_number num_dock_ev_type[NUM_OF_DOCKER_EV_TYPES];
+
+    /* Docker events metrics - action type */
+    RRDSET *st_dock_ev_action;
+    RRDDIM *dim_dock_ev_action[NUM_OF_DOCKER_EV_TYPES][NUM_OF_CONTAINER_ACTIONS];
+    collected_number num_dock_ev_action[NUM_OF_DOCKER_EV_TYPES][NUM_OF_CONTAINER_ACTIONS];
 };
 
 void docker_ev_chart_init(struct File_info *p_file_info);

@@ -860,6 +860,9 @@ static void logs_management_init(uv_loop_t *main_loop,
         if(appconfig_get_boolean(&log_management_config, config_section->name, "event type chart", CONFIG_BOOLEAN_NO)) {
             p_file_info->parser_config->chart_config |= CHART_DOCKER_EV_TYPE;
         }
+        if(appconfig_get_boolean(&log_management_config, config_section->name, "event action chart", CONFIG_BOOLEAN_NO)) {
+            p_file_info->parser_config->chart_config |= CHART_DOCKER_EV_ACTION;
+        }
     }
     else if(p_file_info->log_type == FLB_SERIAL){
         Flb_serial_config_t *serial_config = (Flb_serial_config_t *) callocz(1, sizeof(Flb_serial_config_t));

@@ -933,7 +933,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
     /* FLB_DOCKER_EV case */
     else if(p_file_info->log_type == FLB_DOCKER_EV){ 
 
-        const size_t docker_ev_datetime_size = sizeof "2022-08-26T15:33:20.802840200+0000";
+        const size_t docker_ev_datetime_size = sizeof "2022-08-26T15:33:20.802840200+0000" /* example datetime */;
         char docker_ev_datetime[docker_ev_datetime_size];
         docker_ev_datetime[0] = 0;
         if(likely(docker_ev_time && docker_ev_timeNano)){
@@ -948,40 +948,33 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
             memcpy(&docker_ev_datetime[20], &docker_ev_timeNano_s, docker_ev_timeNano_s_size - 1);
 
             new_tmp_text_size += docker_ev_datetime_size; // -1 for null terminator, +1 for ' ' character
-
-            // netdata_log_debug(D_LOGS_MANAG, "docker_time:%s", docker_ev_datetime);
         }
 
-        if(likely(docker_ev_type)){
-            // netdata_log_debug(D_LOGS_MANAG,"docker_ev_type: %.*s", (int) docker_ev_type_size, docker_ev_type);
-            int i;
-            for(i = 0; i < NUM_OF_DOCKER_EV_TYPES - 1; i++){
-                if(!strncmp(docker_ev_type, docker_ev_type_string[i], docker_ev_type_size)){
-                    p_file_info->parser_metrics->docker_ev->ev_type[i]++;
+        if(likely(docker_ev_type && docker_ev_action)){
+            int ev_off = -1;
+            while(++ev_off < NUM_OF_DOCKER_EV_TYPES){
+                if(!strncmp(docker_ev_type, docker_ev_type_string[ev_off], docker_ev_type_size)){
+                    p_file_info->parser_metrics->docker_ev->ev_type[ev_off]++;
+
+                    int act_off = -1;
+                    while(docker_ev_action_string[ev_off][++act_off] != NULL){
+                        if(!strncmp(docker_ev_action, docker_ev_action_string[ev_off][act_off], docker_ev_action_size)){
+                            p_file_info->parser_metrics->docker_ev->ev_action[ev_off][act_off]++;
+                            break;
+                        }
+                    }
+                    if(unlikely(docker_ev_action_string[ev_off][act_off] == NULL))
+                        p_file_info->parser_metrics->docker_ev->ev_action[NUM_OF_DOCKER_EV_TYPES - 1][0]++; // 'unknown'
+
                     break;
                 }
             }
-            if(unlikely(i >= NUM_OF_DOCKER_EV_TYPES - 1)){
-                p_file_info->parser_metrics->docker_ev->ev_type[i]++; // 'unknown'
+            if(unlikely(ev_off >= NUM_OF_DOCKER_EV_TYPES - 1)){
+                p_file_info->parser_metrics->docker_ev->ev_type[ev_off]++; // 'unknown'
+                p_file_info->parser_metrics->docker_ev->ev_action[NUM_OF_DOCKER_EV_TYPES - 1][0]++; // 'unknown'
             }
 
-            new_tmp_text_size += docker_ev_type_size + 1; // +1 for ' ' char
-        }
-
-        if(likely(docker_ev_action)){
-            // netdata_log_debug(D_LOGS_MANAG,"docker_ev_action: %.*s", (int) docker_ev_action_size, docker_ev_action);
-        //     int i;
-        //     for(i = 0; i < NUM_OF_DOCKER_EV_TYPES - 1; i++){
-        //         if(!strncmp(docker_ev_action, docker_ev_action_string[i], docker_ev_action_size)){
-        //             p_file_info->parser_metrics->docker_ev->ev_action[i]++;
-        //             break;
-        //         }
-        //     }
-        //     if(unlikely(i >= NUM_OF_DOCKER_EV_TYPES - 1)){
-        //         p_file_info->parser_metrics->docker_ev->ev_action[i]++; // 'unknown'
-        //     }
-
-            new_tmp_text_size += docker_ev_action_size + 1; // +1 for ' ' char
+            new_tmp_text_size += docker_ev_type_size + docker_ev_action_size + 2; // +2 for ' ' chars
         }
 
         if(likely(docker_ev_id)){
