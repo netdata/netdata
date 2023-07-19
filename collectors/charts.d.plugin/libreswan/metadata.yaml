@@ -2,10 +2,11 @@ meta:
   plugin_name: charts.d.plugin
   module_name: libreswan
   monitored_instance:
-    name: charts.d libreswan
+    name: Libreswan
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.vpns
+    icon_filename: 'libreswan.png'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor Libreswan performance for optimal IPsec VPN operations. Improve your VPN operations with Netdata''s real-time metrics and built-in alerts.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,20 +60,20 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: IPSEC tunnel
-      description: ""
-      labels: []
-      metrics:
-        - name: libreswan.net
-          description: LibreSWAN Tunnel ${name} Traffic
-          unit: "kilobits/s"
-          chart_type: area
-          dimensions:
-            - name: in
-            - name: out
-        - name: libreswan.uptime
-          description: LibreSWAN Tunnel ${name} Uptime
-          unit: "seconds"
-          chart_type: line
-          dimensions:
-            - name: uptime
+  - name: IPSEC tunnel
+    description: ""
+    labels: []
+    metrics:
+    - name: libreswan.net
+      description: LibreSWAN Tunnel ${name} Traffic
+      unit: "kilobits/s"
+      chart_type: area
+      dimensions:
+      - name: in
+      - name: out
+    - name: libreswan.uptime
+      description: LibreSWAN Tunnel ${name} Uptime
+      unit: "seconds"
+      chart_type: line
+      dimensions:
+      - name: uptime

@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: bind_rndc
   monitored_instance:
-    name: python.d bind_rndc
+    name: ISCBind (RNDC)
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.dns-and-dhcp-servers
+    icon_filename: 'isc.png'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor ISCBind (RNDC) performance for optimal DNS server operations. Monitor query rates, response times, and error rates to ensure reliable DNS service delivery.'
     method_description: ''
   supported_platforms:
     include: []
@@ -52,10 +53,10 @@ troubleshooting:
   problems:
     list: []
 alerts:
-  - name: bind_rndc_stats_file_size
-    link: https://github.com/netdata/netdata/blob/master/health/health.d/bind_rndc.conf
-    metric: bind_rndc.stats_size
-    info: BIND statistics-file size
+- name: bind_rndc_stats_file_size
+  link: https://github.com/netdata/netdata/blob/master/health/health.d/bind_rndc.conf
+  metric: bind_rndc.stats_size
+  info: BIND statistics-file size
 metrics:
   folding:
     title: Metrics
@@ -63,42 +64,42 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: bind_rndc.name_server_statistics
-          description: Name Server Statistics
-          unit: "stats"
-          chart_type: line
-          dimensions:
-            - name: requests
-            - name: rejected_queries
-            - name: success
-            - name: failure
-            - name: responses
-            - name: duplicate
-            - name: recursion
-            - name: nxrrset
-            - name: nxdomain
-            - name: non_auth_answer
-            - name: auth_answer
-            - name: dropped_queries
-        - name: bind_rndc.incoming_queries
-          description: Incoming queries
-          unit: "queries"
-          chart_type: line
-          dimensions:
-            - name: a dimension per incoming query type
-        - name: bind_rndc.outgoing_queries
-          description: Outgoing queries
-          unit: "queries"
-          chart_type: line
-          dimensions:
-            - name: a dimension per outgoing query type
-        - name: bind_rndc.stats_size
-          description: Named Stats File Size
-          unit: "MiB"
-          chart_type: line
-          dimensions:
-            - name: stats_size
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: bind_rndc.name_server_statistics
+      description: Name Server Statistics
+      unit: "stats"
+      chart_type: line
+      dimensions:
+      - name: requests
+      - name: rejected_queries
+      - name: success
+      - name: failure
+      - name: responses
+      - name: duplicate
+      - name: recursion
+      - name: nxrrset
+      - name: nxdomain
+      - name: non_auth_answer
+      - name: auth_answer
+      - name: dropped_queries
+    - name: bind_rndc.incoming_queries
+      description: Incoming queries
+      unit: "queries"
+      chart_type: line
+      dimensions:
+      - name: a dimension per incoming query type
+    - name: bind_rndc.outgoing_queries
+      description: Outgoing queries
+      unit: "queries"
+      chart_type: line
+      dimensions:
+      - name: a dimension per outgoing query type
+    - name: bind_rndc.stats_size
+      description: Named Stats File Size
+      unit: "MiB"
+      chart_type: line
+      dimensions:
+      - name: stats_size

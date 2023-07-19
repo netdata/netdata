@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: nsd
   monitored_instance:
-    name: python.d nsd
+    name: NSD
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.dns-and-dhcp-servers
+    icon_filename: 'nsd.svg'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor NSD performance for optimal authoritative DNS server operations. Monitor query rates, response times, and error rates to ensure reliable DNS service delivery.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,65 +60,65 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: nsd.queries
-          description: queries
-          unit: "queries/s"
-          chart_type: line
-          dimensions:
-            - name: queries
-        - name: nsd.zones
-          description: zones
-          unit: "zones"
-          chart_type: stacked
-          dimensions:
-            - name: master
-            - name: slave
-        - name: nsd.protocols
-          description: protocol
-          unit: "queries/s"
-          chart_type: stacked
-          dimensions:
-            - name: udp
-            - name: udp6
-            - name: tcp
-            - name: tcp6
-        - name: nsd.type
-          description: query type
-          unit: "queries/s"
-          chart_type: stacked
-          dimensions:
-            - name: A
-            - name: NS
-            - name: CNAME
-            - name: SOA
-            - name: PTR
-            - name: HINFO
-            - name: MX
-            - name: NAPTR
-            - name: TXT
-            - name: AAAA
-            - name: SRV
-            - name: ANY
-        - name: nsd.transfer
-          description: transfer
-          unit: "queries/s"
-          chart_type: stacked
-          dimensions:
-            - name: NOTIFY
-            - name: AXFR
-        - name: nsd.rcode
-          description: return code
-          unit: "queries/s"
-          chart_type: stacked
-          dimensions:
-            - name: NOERROR
-            - name: FORMERR
-            - name: SERVFAIL
-            - name: NXDOMAIN
-            - name: NOTIMP
-            - name: REFUSED
-            - name: YXDOMAIN
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: nsd.queries
+      description: queries
+      unit: "queries/s"
+      chart_type: line
+      dimensions:
+      - name: queries
+    - name: nsd.zones
+      description: zones
+      unit: "zones"
+      chart_type: stacked
+      dimensions:
+      - name: master
+      - name: slave
+    - name: nsd.protocols
+      description: protocol
+      unit: "queries/s"
+      chart_type: stacked
+      dimensions:
+      - name: udp
+      - name: udp6
+      - name: tcp
+      - name: tcp6
+    - name: nsd.type
+      description: query type
+      unit: "queries/s"
+      chart_type: stacked
+      dimensions:
+      - name: A
+      - name: NS
+      - name: CNAME
+      - name: SOA
+      - name: PTR
+      - name: HINFO
+      - name: MX
+      - name: NAPTR
+      - name: TXT
+      - name: AAAA
+      - name: SRV
+      - name: ANY
+    - name: nsd.transfer
+      description: transfer
+      unit: "queries/s"
+      chart_type: stacked
+      dimensions:
+      - name: NOTIFY
+      - name: AXFR
+    - name: nsd.rcode
+      description: return code
+      unit: "queries/s"
+      chart_type: stacked
+      dimensions:
+      - name: NOERROR
+      - name: FORMERR
+      - name: SERVFAIL
+      - name: NXDOMAIN
+      - name: NOTIMP
+      - name: REFUSED
+      - name: YXDOMAIN

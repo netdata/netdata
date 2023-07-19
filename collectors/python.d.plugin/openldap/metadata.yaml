@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: openldap
   monitored_instance:
-    name: python.d openldap
+    name: OpenLDAP
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.authentication-and-authorization
+    icon_filename: 'statsd.png'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Examine OpenLDAP metrics for insights into directory service operations. Analyze query rates, response times, and error rates for efficient directory services.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,57 +60,57 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: openldap.total_connections
-          description: Total Connections
-          unit: "connections/s"
-          chart_type: line
-          dimensions:
-            - name: connections
-        - name: openldap.traffic_stats
-          description: Traffic
-          unit: "KiB/s"
-          chart_type: line
-          dimensions:
-            - name: sent
-        - name: openldap.operations_status
-          description: Operations Status
-          unit: "ops/s"
-          chart_type: line
-          dimensions:
-            - name: completed
-            - name: initiated
-        - name: openldap.referrals
-          description: Referrals
-          unit: "referrals/s"
-          chart_type: line
-          dimensions:
-            - name: sent
-        - name: openldap.entries
-          description: Entries
-          unit: "entries/s"
-          chart_type: line
-          dimensions:
-            - name: sent
-        - name: openldap.ldap_operations
-          description: Operations
-          unit: "ops/s"
-          chart_type: line
-          dimensions:
-            - name: bind
-            - name: search
-            - name: unbind
-            - name: add
-            - name: delete
-            - name: modify
-            - name: compare
-        - name: openldap.waiters
-          description: Waiters
-          unit: "waiters/s"
-          chart_type: line
-          dimensions:
-            - name: write
-            - name: read
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: openldap.total_connections
+      description: Total Connections
+      unit: "connections/s"
+      chart_type: line
+      dimensions:
+      - name: connections
+    - name: openldap.traffic_stats
+      description: Traffic
+      unit: "KiB/s"
+      chart_type: line
+      dimensions:
+      - name: sent
+    - name: openldap.operations_status
+      description: Operations Status
+      unit: "ops/s"
+      chart_type: line
+      dimensions:
+      - name: completed
+      - name: initiated
+    - name: openldap.referrals
+      description: Referrals
+      unit: "referrals/s"
+      chart_type: line
+      dimensions:
+      - name: sent
+    - name: openldap.entries
+      description: Entries
+      unit: "entries/s"
+      chart_type: line
+      dimensions:
+      - name: sent
+    - name: openldap.ldap_operations
+      description: Operations
+      unit: "ops/s"
+      chart_type: line
+      dimensions:
+      - name: bind
+      - name: search
+      - name: unbind
+      - name: add
+      - name: delete
+      - name: modify
+      - name: compare
+    - name: openldap.waiters
+      description: Waiters
+      unit: "waiters/s"
+      chart_type: line
+      dimensions:
+      - name: write
+      - name: read

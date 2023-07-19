@@ -2,10 +2,11 @@ meta:
   plugin_name: nfacct.plugin
   module_name: nfacct.plugin
   monitored_instance:
-    name: nfacct
+    name: Netfilter
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.networking-stack-and-network-interfaces
+    icon_filename: 'netfilter.png'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor Netfilter metrics for optimal packet filtering and manipulation. Keep tabs on packet counts, dropped packets, and error rates to secure network operations.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,60 +60,60 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: netfilter.netlink_new
-          description: Connection Tracker New Connections
-          unit: "connections/s"
-          chart_type: line
-          dimensions:
-            - name: new
-            - name: ignore
-            - name: invalid
-        - name: netfilter.netlink_changes
-          description: Connection Tracker Changes
-          unit: "changes/s"
-          chart_type: line
-          dimensions:
-            - name: insert
-            - name: delete
-            - name: delete_list
-        - name: netfilter.netlink_search
-          description: Connection Tracker Searches
-          unit: "searches/s"
-          chart_type: line
-          dimensions:
-            - name: searched
-            - name: search_restart
-            - name: found
-        - name: netfilter.netlink_errors
-          description: Connection Tracker Errors
-          unit: "events/s"
-          chart_type: line
-          dimensions:
-            - name: icmp_error
-            - name: insert_failed
-            - name: drop
-            - name: early_drop
-        - name: netfilter.netlink_expect
-          description: Connection Tracker Expectations
-          unit: "expectations/s"
-          chart_type: line
-          dimensions:
-            - name: created
-            - name: deleted
-            - name: new
-        - name: netfilter.nfacct_packets
-          description: Netfilter Accounting Packets
-          unit: "packets/s"
-          chart_type: line
-          dimensions:
-            - name: a dimension per nfacct object
-        - name: netfilter.nfacct_bytes
-          description: Netfilter Accounting Bandwidth
-          unit: "kilobytes/s"
-          chart_type: line
-          dimensions:
-            - name: a dimension per nfacct object
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: netfilter.netlink_new
+      description: Connection Tracker New Connections
+      unit: "connections/s"
+      chart_type: line
+      dimensions:
+      - name: new
+      - name: ignore
+      - name: invalid
+    - name: netfilter.netlink_changes
+      description: Connection Tracker Changes
+      unit: "changes/s"
+      chart_type: line
+      dimensions:
+      - name: insert
+      - name: delete
+      - name: delete_list
+    - name: netfilter.netlink_search
+      description: Connection Tracker Searches
+      unit: "searches/s"
+      chart_type: line
+      dimensions:
+      - name: searched
+      - name: search_restart
+      - name: found
+    - name: netfilter.netlink_errors
+      description: Connection Tracker Errors
+      unit: "events/s"
+      chart_type: line
+      dimensions:
+      - name: icmp_error
+      - name: insert_failed
+      - name: drop
+      - name: early_drop
+    - name: netfilter.netlink_expect
+      description: Connection Tracker Expectations
+      unit: "expectations/s"
+      chart_type: line
+      dimensions:
+      - name: created
+      - name: deleted
+      - name: new
+    - name: netfilter.nfacct_packets
+      description: Netfilter Accounting Packets
+      unit: "packets/s"
+      chart_type: line
+      dimensions:
+      - name: a dimension per nfacct object
+    - name: netfilter.nfacct_bytes
+      description: Netfilter Accounting Bandwidth
+      unit: "kilobytes/s"
+      chart_type: line
+      dimensions:
+      - name: a dimension per nfacct object

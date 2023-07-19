@@ -2,10 +2,11 @@ meta:
   plugin_name: cups.plugin
   module_name: cups.plugin
   monitored_instance:
-    name: cups
+    name: CUPS
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.hardware-devices-and-sensors
+    icon_filename: 'cups.png'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor CUPS performance for achieving optimal printing system operations. Monitor job statuses, queue lengths, and error rates to ensure smooth printing tasks.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,59 +60,59 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: cups.dests_state
-          description: Destinations by state
-          unit: "dests"
-          chart_type: stacked
-          dimensions:
-            - name: idle
-            - name: printing
-            - name: stopped
-        - name: cups.dests_option
-          description: Destinations by option
-          unit: "dests"
-          chart_type: line
-          dimensions:
-            - name: total
-            - name: acceptingjobs
-            - name: shared
-        - name: cups.job_num
-          description: Active jobs
-          unit: "jobs"
-          chart_type: stacked
-          dimensions:
-            - name: pending
-            - name: held
-            - name: processing
-        - name: cups.job_size
-          description: Active jobs size
-          unit: "KB"
-          chart_type: stacked
-          dimensions:
-            - name: pending
-            - name: held
-            - name: processing
-    - name: destination
-      description: ""
-      labels: []
-      metrics:
-        - name: cups.destination_job_num
-          description: Active jobs of {destination}
-          unit: "jobs"
-          chart_type: stacked
-          dimensions:
-            - name: pending
-            - name: held
-            - name: processing
-        - name: cups.destination_job_size
-          description: Active jobs size of {destination}
-          unit: "KB"
-          chart_type: stacked
-          dimensions:
-            - name: pending
-            - name: held
-            - name: processing
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: cups.dests_state
+      description: Destinations by state
+      unit: "dests"
+      chart_type: stacked
+      dimensions:
+      - name: idle
+      - name: printing
+      - name: stopped
+    - name: cups.dests_option
+      description: Destinations by option
+      unit: "dests"
+      chart_type: line
+      dimensions:
+      - name: total
+      - name: acceptingjobs
+      - name: shared
+    - name: cups.job_num
+      description: Active jobs
+      unit: "jobs"
+      chart_type: stacked
+      dimensions:
+      - name: pending
+      - name: held
+      - name: processing
+    - name: cups.job_size
+      description: Active jobs size
+      unit: "KB"
+      chart_type: stacked
+      dimensions:
+      - name: pending
+      - name: held
+      - name: processing
+  - name: destination
+    description: ""
+    labels: []
+    metrics:
+    - name: cups.destination_job_num
+      description: Active jobs of {destination}
+      unit: "jobs"
+      chart_type: stacked
+      dimensions:
+      - name: pending
+      - name: held
+      - name: processing
+    - name: cups.destination_job_size
+      description: Active jobs size of {destination}
+      unit: "KB"
+      chart_type: stacked
+      dimensions:
+      - name: pending
+      - name: held
+      - name: processing

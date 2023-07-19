@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: beanstalk
   monitored_instance:
-    name: python.d beanstalk
+    name: Beanstalk
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.message-brokers
+    icon_filename: 'beanstalk.png'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor Beanstalk metrics to enhance job queueing and processing efficiency. Track job rates, processing times, and queue lengths for better task management.'
     method_description: ''
   supported_platforms:
     include: []
@@ -52,10 +53,10 @@ troubleshooting:
   problems:
     list: []
 alerts:
-  - name: beanstalk_server_buried_jobs
-    link: https://github.com/netdata/netdata/blob/master/health/health.d/beanstalkd.conf
-    metric: beanstalk.current_jobs
-    info: number of buried jobs across all tubes. You need to manually kick them so they can be processed. Presence of buried jobs in a tube does not affect new jobs.
+- name: beanstalk_server_buried_jobs
+  link: https://github.com/netdata/netdata/blob/master/health/health.d/beanstalkd.conf
+  metric: beanstalk.current_jobs
+  info: number of buried jobs across all tubes. You need to manually kick them so they can be processed. Presence of buried jobs in a tube does not affect new jobs.
 metrics:
   folding:
     title: Metrics
@@ -63,131 +64,131 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: beanstalk.cpu_usage
-          description: Cpu Usage
-          unit: "cpu time"
-          chart_type: area
-          dimensions:
-            - name: user
-            - name: system
-        - name: beanstalk.jobs_rate
-          description: Jobs Rate
-          unit: "jobs/s"
-          chart_type: line
-          dimensions:
-            - name: total
-            - name: timeouts
-        - name: beanstalk.connections_rate
-          description: Connections Rate
-          unit: "connections/s"
-          chart_type: area
-          dimensions:
-            - name: connections
-        - name: beanstalk.commands_rate
-          description: Commands Rate
-          unit: "commands/s"
-          chart_type: stacked
-          dimensions:
-            - name: put
-            - name: peek
-            - name: peek-ready
-            - name: peek-delayed
-            - name: peek-buried
-            - name: reserve
-            - name: use
-            - name: watch
-            - name: ignore
-            - name: delete
-            - name: bury
-            - name: kick
-            - name: stats
-            - name: stats-job
-            - name: stats-tube
-            - name: list-tubes
-            - name: list-tube-used
-            - name: list-tubes-watched
-            - name: pause-tube
-        - name: beanstalk.connections_rate
-          description: Current Tubes
-          unit: "tubes"
-          chart_type: area
-          dimensions:
-            - name: tubes
-        - name: beanstalk.current_jobs
-          description: Current Jobs
-          unit: "jobs"
-          chart_type: stacked
-          dimensions:
-            - name: urgent
-            - name: ready
-            - name: reserved
-            - name: delayed
-            - name: buried
-        - name: beanstalk.current_connections
-          description: Current Connections
-          unit: "connections"
-          chart_type: line
-          dimensions:
-            - name: written
-            - name: producers
-            - name: workers
-            - name: waiting
-        - name: beanstalk.binlog
-          description: Binlog
-          unit: "records/s"
-          chart_type: line
-          dimensions:
-            - name: written
-            - name: migrated
-        - name: beanstalk.uptime
-          description: seconds
-          unit: "seconds"
-          chart_type: line
-          dimensions:
-            - name: uptime
-    - name: tube
-      description: ""
-      labels: []
-      metrics:
-        - name: beanstalk.jobs_rate
-          description: Jobs Rate
-          unit: "jobs/s"
-          chart_type: area
-          dimensions:
-            - name: jobs
-        - name: beanstalk.jobs
-          description: Jobs
-          unit: "jobs"
-          chart_type: stacked
-          dimensions:
-            - name: urgent
-            - name: ready
-            - name: reserved
-            - name: delayed
-            - name: buried
-        - name: beanstalk.connections
-          description: Connections
-          unit: "connections"
-          chart_type: stacked
-          dimensions:
-            - name: using
-            - name: waiting
-            - name: watching
-        - name: beanstalk.commands
-          description: Commands
-          unit: "commands/s"
-          chart_type: stacked
-          dimensions:
-            - name: deletes
-            - name: pauses
-        - name: beanstalk.pause
-          description: Pause
-          unit: "seconds"
-          chart_type: stacked
-          dimensions:
-            - name: since
-            - name: left
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: beanstalk.cpu_usage
+      description: Cpu Usage
+      unit: "cpu time"
+      chart_type: area
+      dimensions:
+      - name: user
+      - name: system
+    - name: beanstalk.jobs_rate
+      description: Jobs Rate
+      unit: "jobs/s"
+      chart_type: line
+      dimensions:
+      - name: total
+      - name: timeouts
+    - name: beanstalk.connections_rate
+      description: Connections Rate
+      unit: "connections/s"
+      chart_type: area
+      dimensions:
+      - name: connections
+    - name: beanstalk.commands_rate
+      description: Commands Rate
+      unit: "commands/s"
+      chart_type: stacked
+      dimensions:
+      - name: put
+      - name: peek
+      - name: peek-ready
+      - name: peek-delayed
+      - name: peek-buried
+      - name: reserve
+      - name: use
+      - name: watch
+      - name: ignore
+      - name: delete
+      - name: bury
+      - name: kick
+      - name: stats
+      - name: stats-job
+      - name: stats-tube
+      - name: list-tubes
+      - name: list-tube-used
+      - name: list-tubes-watched
+      - name: pause-tube
+    - name: beanstalk.connections_rate
+      description: Current Tubes
+      unit: "tubes"
+      chart_type: area
+      dimensions:
+      - name: tubes
+    - name: beanstalk.current_jobs
+      description: Current Jobs
+      unit: "jobs"
+      chart_type: stacked
+      dimensions:
+      - name: urgent
+      - name: ready
+      - name: reserved
+      - name: delayed
+      - name: buried
+    - name: beanstalk.current_connections
+      description: Current Connections
+      unit: "connections"
+      chart_type: line
+      dimensions:
+      - name: written
+      - name: producers
+      - name: workers
+      - name: waiting
+    - name: beanstalk.binlog
+      description: Binlog
+      unit: "records/s"
+      chart_type: line
+      dimensions:
+      - name: written
+      - name: migrated
+    - name: beanstalk.uptime
+      description: seconds
+      unit: "seconds"
+      chart_type: line
+      dimensions:
+      - name: uptime
+  - name: tube
+    description: ""
+    labels: []
+    metrics:
+    - name: beanstalk.jobs_rate
+      description: Jobs Rate
+      unit: "jobs/s"
+      chart_type: area
+      dimensions:
+      - name: jobs
+    - name: beanstalk.jobs
+      description: Jobs
+      unit: "jobs"
+      chart_type: stacked
+      dimensions:
+      - name: urgent
+      - name: ready
+      - name: reserved
+      - name: delayed
+      - name: buried
+    - name: beanstalk.connections
+      description: Connections
+      unit: "connections"
+      chart_type: stacked
+      dimensions:
+      - name: using
+      - name: waiting
+      - name: watching
+    - name: beanstalk.commands
+      description: Commands
+      unit: "commands/s"
+      chart_type: stacked
+      dimensions:
+      - name: deletes
+      - name: pauses
+    - name: beanstalk.pause
+      description: Pause
+      unit: "seconds"
+      chart_type: stacked
+      dimensions:
+      - name: since
+      - name: left

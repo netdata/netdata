@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: w1sensor
   monitored_instance:
-    name: python.d w1sensor
+    name: 1-Wire Sensors
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.hardware-devices-and-sensors
+    icon_filename: '1-wire.png'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor 1-Wire Sensors metrics with Netdata for optimal environmental conditions monitoring. Enhance your environmental monitoring with real-time insights and alerts.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,13 +60,13 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: w1sensor.temp
-          description: 1-Wire Temperature Sensor
-          unit: "Celsius"
-          chart_type: line
-          dimensions:
-            - name: a dimension per sensor
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: w1sensor.temp
+      description: 1-Wire Temperature Sensor
+      unit: "Celsius"
+      chart_type: line
+      dimensions:
+      - name: a dimension per sensor

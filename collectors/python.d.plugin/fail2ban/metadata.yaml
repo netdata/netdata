@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: fail2ban
   monitored_instance:
-    name: python.d fail2ban
+    name: Fail2ban
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.authentication-and-authorization
+    icon_filename: 'fail2ban.png'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor Fail2ban performance for prime intrusion prevention operations. Monitor ban counts, jail statuses, and failed login attempts to ensure robust network security.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,25 +60,25 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: fail2ban.faile_attempts
-          description: Failed attempts
-          unit: "attempts/s"
-          chart_type: line
-          dimensions:
-            - name: a dimension per jail
-        - name: fail2ban.bans
-          description: Bans
-          unit: "bans/s"
-          chart_type: line
-          dimensions:
-            - name: a dimension per jail
-        - name: fail2ban.banned_ips
-          description: Banned IP addresses (since the last restart of netdata)
-          unit: "ips"
-          chart_type: line
-          dimensions:
-            - name: a dimension per jail
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: fail2ban.faile_attempts
+      description: Failed attempts
+      unit: "attempts/s"
+      chart_type: line
+      dimensions:
+      - name: a dimension per jail
+    - name: fail2ban.bans
+      description: Bans
+      unit: "bans/s"
+      chart_type: line
+      dimensions:
+      - name: a dimension per jail
+    - name: fail2ban.banned_ips
+      description: Banned IP addresses (since the last restart of netdata)
+      unit: "ips"
+      chart_type: line
+      dimensions:
+      - name: a dimension per jail

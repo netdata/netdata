@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: puppet
   monitored_instance:
-    name: python.d puppet
+    name: Puppet
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.provisioning-systems
+    icon_filename: 'puppet.jpeg'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor Puppet configurations with Netdata for changes, errors, and performance metrics. Enhance configuration management and troubleshoot faster with real-time insights and built-in alerts.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,34 +60,34 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: puppet.jvm
-          description: JVM Heap
-          unit: "MiB"
-          chart_type: area
-          dimensions:
-            - name: committed
-            - name: used
-        - name: puppet.jvm
-          description: JVM Non-Heap
-          unit: "MiB"
-          chart_type: area
-          dimensions:
-            - name: committed
-            - name: used
-        - name: puppet.cpu
-          description: CPU usage
-          unit: "percentage"
-          chart_type: stacked
-          dimensions:
-            - name: execution
-            - name: GC
-        - name: puppet.fdopen
-          description: File Descriptors
-          unit: "descriptors"
-          chart_type: line
-          dimensions:
-            - name: used
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: puppet.jvm
+      description: JVM Heap
+      unit: "MiB"
+      chart_type: area
+      dimensions:
+      - name: committed
+      - name: used
+    - name: puppet.jvm
+      description: JVM Non-Heap
+      unit: "MiB"
+      chart_type: area
+      dimensions:
+      - name: committed
+      - name: used
+    - name: puppet.cpu
+      description: CPU usage
+      unit: "percentage"
+      chart_type: stacked
+      dimensions:
+      - name: execution
+      - name: GC
+    - name: puppet.fdopen
+      description: File Descriptors
+      unit: "descriptors"
+      chart_type: line
+      dimensions:
+      - name: used

@@ -2,10 +2,11 @@ meta:
   plugin_name: charts.d.plugin
   module_name: ap
   monitored_instance:
-    name: charts.d ap
+    name: Access Points
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.networking-stack-and-network-interfaces
+    icon_filename: 'netdata.png'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Maintain surveillance over Access Points, ensuring optimal wireless network connectivity and performance. Monitor and troubleshoot in realtime for high-quality network operations.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,48 +60,48 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: wireless device
-      description: ""
-      labels: []
-      metrics:
-        - name: ap.clients
-          description: Connected clients to ${ssid} on ${dev}
-          unit: "clients"
-          chart_type: line
-          dimensions:
-            - name: clients
-        - name: ap.net
-          description: Bandwidth for ${ssid} on ${dev}
-          unit: "kilobits/s"
-          chart_type: area
-          dimensions:
-            - name: received
-            - name: sent
-        - name: ap.packets
-          description: Packets for ${ssid} on ${dev}
-          unit: "packets/s"
-          chart_type: line
-          dimensions:
-            - name: received
-            - name: sent
-        - name: ap.issues
-          description: Transmit Issues for ${ssid} on ${dev}
-          unit: "issues/s"
-          chart_type: line
-          dimensions:
-            - name: retries
-            - name: failures
-        - name: ap.signal
-          description: Average Signal for ${ssid} on ${dev}
-          unit: "dBm"
-          chart_type: line
-          dimensions:
-            - name: average signal
-        - name: ap.bitrate
-          description: Bitrate for ${ssid} on ${dev}
-          unit: "Mbps"
-          chart_type: line
-          dimensions:
-            - name: receive
-            - name: transmit
-            - name: expected
+  - name: wireless device
+    description: ""
+    labels: []
+    metrics:
+    - name: ap.clients
+      description: Connected clients to ${ssid} on ${dev}
+      unit: "clients"
+      chart_type: line
+      dimensions:
+      - name: clients
+    - name: ap.net
+      description: Bandwidth for ${ssid} on ${dev}
+      unit: "kilobits/s"
+      chart_type: area
+      dimensions:
+      - name: received
+      - name: sent
+    - name: ap.packets
+      description: Packets for ${ssid} on ${dev}
+      unit: "packets/s"
+      chart_type: line
+      dimensions:
+      - name: received
+      - name: sent
+    - name: ap.issues
+      description: Transmit Issues for ${ssid} on ${dev}
+      unit: "issues/s"
+      chart_type: line
+      dimensions:
+      - name: retries
+      - name: failures
+    - name: ap.signal
+      description: Average Signal for ${ssid} on ${dev}
+      unit: "dBm"
+      chart_type: line
+      dimensions:
+      - name: average signal
+    - name: ap.bitrate
+      description: Bitrate for ${ssid} on ${dev}
+      unit: "Mbps"
+      chart_type: line
+      dimensions:
+      - name: receive
+      - name: transmit
+      - name: expected

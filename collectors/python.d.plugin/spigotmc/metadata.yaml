@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: spigotmc
   monitored_instance:
-    name: python.d spigotmc
+    name: SpigotMC
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.gaming
+    icon_filename: 'spigot.jfif'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor SpigotMC performance with Netdata for optimal Minecraft server operations. Improve your gaming experience with real-time server performance insights.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,29 +60,29 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: spigotmc.tps
-          description: Spigot Ticks Per Second
-          unit: "ticks"
-          chart_type: line
-          dimensions:
-            - name: 1 Minute Average
-            - name: 5 Minute Average
-            - name: 15 Minute Average
-        - name: spigotmc.users
-          description: Minecraft Users
-          unit: "users"
-          chart_type: area
-          dimensions:
-            - name: Users
-        - name: spigotmc.mem
-          description: Minecraft Memory Usage
-          unit: "MiB"
-          chart_type: line
-          dimensions:
-            - name: used
-            - name: allocated
-            - name: max
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: spigotmc.tps
+      description: Spigot Ticks Per Second
+      unit: "ticks"
+      chart_type: line
+      dimensions:
+      - name: 1 Minute Average
+      - name: 5 Minute Average
+      - name: 15 Minute Average
+    - name: spigotmc.users
+      description: Minecraft Users
+      unit: "users"
+      chart_type: area
+      dimensions:
+      - name: Users
+    - name: spigotmc.mem
+      description: Minecraft Memory Usage
+      unit: "MiB"
+      chart_type: line
+      dimensions:
+      - name: used
+      - name: allocated
+      - name: max

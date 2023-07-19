@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: exim
   monitored_instance:
-    name: python.d exim
+    name: Exim
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.mail-servers
+    icon_filename: 'exim.jpg'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor Exim metrics for efficient mail transfer'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,13 +60,13 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: exim.qemails
-          description: Exim Queue Emails
-          unit: "emails"
-          chart_type: line
-          dimensions:
-            - name: emails
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: exim.qemails
+      description: Exim Queue Emails
+      unit: "emails"
+      chart_type: line
+      dimensions:
+      - name: emails

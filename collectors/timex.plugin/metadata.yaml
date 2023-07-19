@@ -2,10 +2,11 @@ meta:
   plugin_name: timex.plugin
   module_name: timex.plugin
   monitored_instance:
-    name: timex
+    name: Timex
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.system-clock-and-ntp
+    icon_filename: 'syslog.png'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Examine Timex metrics to gain insights into system clock operations. Study time sync status, clock drift, and adjustments to ensure accurate system timekeeping.'
     method_description: ''
   supported_platforms:
     include: []
@@ -52,11 +53,11 @@ troubleshooting:
   problems:
     list: []
 alerts:
-  - name: system_clock_sync_state
-    link: https://github.com/netdata/netdata/blob/master/health/health.d/timex.conf
-    metric: system.clock_sync_state
-    info: when set to 0, the system kernel believes the system clock is not properly synchronized to a reliable server
-    os: "linux"
+- name: system_clock_sync_state
+  link: https://github.com/netdata/netdata/blob/master/health/health.d/timex.conf
+  metric: system.clock_sync_state
+  info: when set to 0, the system kernel believes the system clock is not properly synchronized to a reliable server
+  os: "linux"
 metrics:
   folding:
     title: Metrics
@@ -64,26 +65,26 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: system.clock_sync_state
-          description: System Clock Synchronization State
-          unit: "state"
-          chart_type: line
-          dimensions:
-            - name: state
-        - name: system.clock_status
-          description: System Clock Status
-          unit: "status"
-          chart_type: line
-          dimensions:
-            - name: unsync
-            - name: clockerr
-        - name: system.clock_sync_offset
-          description: Computed Time Offset Between Local System and Reference Clock
-          unit: "milliseconds"
-          chart_type: line
-          dimensions:
-            - name: offset
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: system.clock_sync_state
+      description: System Clock Synchronization State
+      unit: "state"
+      chart_type: line
+      dimensions:
+      - name: state
+    - name: system.clock_status
+      description: System Clock Status
+      unit: "status"
+      chart_type: line
+      dimensions:
+      - name: unsync
+      - name: clockerr
+    - name: system.clock_sync_offset
+      description: Computed Time Offset Between Local System and Reference Clock
+      unit: "milliseconds"
+      chart_type: line
+      dimensions:
+      - name: offset

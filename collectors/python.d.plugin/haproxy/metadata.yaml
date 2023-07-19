@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: haproxy
   monitored_instance:
-    name: python.d haproxy
+    name: HAProxy
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.web-servers-and-web-proxies
+    icon_filename: 'haproxy.png'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor HAProxy performance for ideal load balancing operations. Monitor session rates, queue lengths, and error rates to maintain balanced network traffic.'
     method_description: ''
   supported_platforms:
     include: []
@@ -52,14 +53,14 @@ troubleshooting:
   problems:
     list: []
 alerts:
-  - name: haproxy_backend_server_status
-    link: https://github.com/netdata/netdata/blob/master/health/health.d/haproxy.conf
-    metric: haproxy_hs.down
-    info: average number of failed haproxy backend servers over the last 10 seconds
-  - name: haproxy_backend_status
-    link: https://github.com/netdata/netdata/blob/master/health/health.d/haproxy.conf
-    metric: haproxy_hb.down
-    info: average number of failed haproxy backends over the last 10 seconds
+- name: haproxy_backend_server_status
+  link: https://github.com/netdata/netdata/blob/master/health/health.d/haproxy.conf
+  metric: haproxy_hs.down
+  info: average number of failed haproxy backend servers over the last 10 seconds
+- name: haproxy_backend_status
+  link: https://github.com/netdata/netdata/blob/master/health/health.d/haproxy.conf
+  metric: haproxy_hb.down
+  info: average number of failed haproxy backends over the last 10 seconds
 metrics:
   folding:
     title: Metrics
@@ -67,187 +68,187 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: haproxy_f.bin
-          description: Kilobytes In
-          unit: "KiB/s"
-          chart_type: line
-          dimensions:
-            - name: a dimension per frontend server
-        - name: haproxy_f.bout
-          description: Kilobytes Out
-          unit: "KiB/s"
-          chart_type: line
-          dimensions:
-            - name: a dimension per frontend server
-        - name: haproxy_f.scur
-          description: Sessions Active
-          unit: "sessions"
-          chart_type: line
-          dimensions:
-            - name: a dimension per frontend server
-        - name: haproxy_f.qcur
-          description: Session In Queue
-          unit: "sessions"
-          chart_type: line
-          dimensions:
-            - name: a dimension per frontend server
-        - name: haproxy_f.hrsp_1xx
-          description: HTTP responses with 1xx code
-          unit: "responses/s"
-          chart_type: line
-          dimensions:
-            - name: a dimension per frontend server
-        - name: haproxy_f.hrsp_2xx
-          description: HTTP responses with 2xx code
-          unit: "responses/s"
-          chart_type: line
-          dimensions:
-            - name: a dimension per frontend server
-        - name: haproxy_f.hrsp_3xx
-          description: HTTP responses with 3xx code
-          unit: "responses/s"
-          chart_type: line
-          dimensions:
-            - name: a dimension per frontend server
-        - name: haproxy_f.hrsp_4xx
-          description: HTTP responses with 4xx code
-          unit: "responses/s"
-          chart_type: line
-          dimensions:
-            - name: a dimension per frontend server
-        - name: haproxy_f.hrsp_5xx
-          description: HTTP responses with 5xx code
-          unit: "responses/s"
-          chart_type: line
-          dimensions:
-            - name: a dimension per frontend server
-        - name: haproxy_f.hrsp_other
-          description: HTTP responses with other codes (protocol error)
-          unit: "responses/s"
-          chart_type: line
-          dimensions:
-            - name: a dimension per frontend server
-        - name: haproxy_f.hrsp_total
-          description: HTTP responses
-          unit: "responses"
-          chart_type: line
-          dimensions:
-            - name: a dimension per frontend server
-        - name: haproxy_b.bin
-          description: Kilobytes In
-          unit: "KiB/s"
-          chart_type: line
-          dimensions:
-            - name: a dimension per backend server
-        - name: haproxy_b.bout
-          description: Kilobytes Out
-          unit: "KiB/s"
-          chart_type: line
-          dimensions:
-            - name: a dimension per backend server
-        - name: haproxy_b.scur
-          description: Sessions Active
-          unit: "sessions"
-          chart_type: line
-          dimensions:
-            - name: a dimension per backend server
-        - name: haproxy_b.qcur
-          description: Sessions In Queue
-          unit: "sessions"
-          chart_type: line
-          dimensions:
-            - name: a dimension per backend server
-        - name: haproxy_b.hrsp_1xx
-          description: HTTP responses with 1xx code
-          unit: "responses/s"
-          chart_type: line
-          dimensions:
-            - name: a dimension per backend server
-        - name: haproxy_b.hrsp_2xx
-          description: HTTP responses with 2xx code
-          unit: "responses/s"
-          chart_type: line
-          dimensions:
-            - name: a dimension per backend server
-        - name: haproxy_b.hrsp_3xx
-          description: HTTP responses with 3xx code
-          unit: "responses/s"
-          chart_type: line
-          dimensions:
-            - name: a dimension per backend server
-        - name: haproxy_b.hrsp_4xx
-          description: HTTP responses with 4xx code
-          unit: "responses/s"
-          chart_type: line
-          dimensions:
-            - name: a dimension per backend server
-        - name: haproxy_b.hrsp_5xx
-          description: HTTP responses with 5xx code
-          unit: "responses/s"
-          chart_type: line
-          dimensions:
-            - name: a dimension per backend server
-        - name: haproxy_b.hrsp_other
-          description: HTTP responses with other codes (protocol error)
-          unit: "responses/s"
-          chart_type: line
-          dimensions:
-            - name: a dimension per backend server
-        - name: haproxy_b.hrsp_total
-          description: HTTP responses (total)
-          unit: "responses/s"
-          chart_type: line
-          dimensions:
-            - name: a dimension per backend server
-        - name: haproxy_b.qtime
-          description: The average queue time over the 1024 last requests
-          unit: "milliseconds"
-          chart_type: line
-          dimensions:
-            - name: a dimension per backend server
-        - name: haproxy_b.ctime
-          description: The average connect time over the 1024 last requests
-          unit: "milliseconds"
-          chart_type: line
-          dimensions:
-            - name: a dimension per backend server
-        - name: haproxy_b.rtime
-          description: The average response time over the 1024 last requests
-          unit: "milliseconds"
-          chart_type: line
-          dimensions:
-            - name: a dimension per backend server
-        - name: haproxy_b.ttime
-          description: The average total session time over the 1024 last requests
-          unit: "milliseconds"
-          chart_type: line
-          dimensions:
-            - name: a dimension per backend server
-        - name: haproxy_hs.down
-          description: Backend Servers In DOWN State
-          unit: "failed servers"
-          chart_type: line
-          dimensions:
-            - name: a dimension per backend server
-        - name: haproxy_hs.up
-          description: Backend Servers In UP State
-          unit: "health servers"
-          chart_type: line
-          dimensions:
-            - name: a dimension per backend server
-        - name: haproxy_hb.down
-          description: Is Backend Failed?
-          unit: "boolean"
-          chart_type: line
-          dimensions:
-            - name: a dimension per backend server
-        - name: haproxy.idle
-          description: The Ratio Of Polling Time Vs Total Time
-          unit: "percentage"
-          chart_type: line
-          dimensions:
-            - name: idle
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: haproxy_f.bin
+      description: Kilobytes In
+      unit: "KiB/s"
+      chart_type: line
+      dimensions:
+      - name: a dimension per frontend server
+    - name: haproxy_f.bout
+      description: Kilobytes Out
+      unit: "KiB/s"
+      chart_type: line
+      dimensions:
+      - name: a dimension per frontend server
+    - name: haproxy_f.scur
+      description: Sessions Active
+      unit: "sessions"
+      chart_type: line
+      dimensions:
+      - name: a dimension per frontend server
+    - name: haproxy_f.qcur
+      description: Session In Queue
+      unit: "sessions"
+      chart_type: line
+      dimensions:
+      - name: a dimension per frontend server
+    - name: haproxy_f.hrsp_1xx
+      description: HTTP responses with 1xx code
+      unit: "responses/s"
+      chart_type: line
+      dimensions:
+      - name: a dimension per frontend server
+    - name: haproxy_f.hrsp_2xx
+      description: HTTP responses with 2xx code
+      unit: "responses/s"
+      chart_type: line
+      dimensions:
+      - name: a dimension per frontend server
+    - name: haproxy_f.hrsp_3xx
+      description: HTTP responses with 3xx code
+      unit: "responses/s"
+      chart_type: line
+      dimensions:
+      - name: a dimension per frontend server
+    - name: haproxy_f.hrsp_4xx
+      description: HTTP responses with 4xx code
+      unit: "responses/s"
+      chart_type: line
+      dimensions:
+      - name: a dimension per frontend server
+    - name: haproxy_f.hrsp_5xx
+      description: HTTP responses with 5xx code
+      unit: "responses/s"
+      chart_type: line
+      dimensions:
+      - name: a dimension per frontend server
+    - name: haproxy_f.hrsp_other
+      description: HTTP responses with other codes (protocol error)
+      unit: "responses/s"
+      chart_type: line
+      dimensions:
+      - name: a dimension per frontend server
+    - name: haproxy_f.hrsp_total
+      description: HTTP responses
+      unit: "responses"
+      chart_type: line
+      dimensions:
+      - name: a dimension per frontend server
+    - name: haproxy_b.bin
+      description: Kilobytes In
+      unit: "KiB/s"
+      chart_type: line
+      dimensions:
+      - name: a dimension per backend server
+    - name: haproxy_b.bout
+      description: Kilobytes Out
+      unit: "KiB/s"
+      chart_type: line
+      dimensions:
+      - name: a dimension per backend server
+    - name: haproxy_b.scur
+      description: Sessions Active
+      unit: "sessions"
+      chart_type: line
+      dimensions:
+      - name: a dimension per backend server
+    - name: haproxy_b.qcur
+      description: Sessions In Queue
+      unit: "sessions"
+      chart_type: line
+      dimensions:
+      - name: a dimension per backend server
+    - name: haproxy_b.hrsp_1xx
+      description: HTTP responses with 1xx code
+      unit: "responses/s"
+      chart_type: line
+      dimensions:
+      - name: a dimension per backend server
+    - name: haproxy_b.hrsp_2xx
+      description: HTTP responses with 2xx code
+      unit: "responses/s"
+      chart_type: line
+      dimensions:
+      - name: a dimension per backend server
+    - name: haproxy_b.hrsp_3xx
+      description: HTTP responses with 3xx code
+      unit: "responses/s"
+      chart_type: line
+      dimensions:
+      - name: a dimension per backend server
+    - name: haproxy_b.hrsp_4xx
+      description: HTTP responses with 4xx code
+      unit: "responses/s"
+      chart_type: line
+      dimensions:
+      - name: a dimension per backend server
+    - name: haproxy_b.hrsp_5xx
+      description: HTTP responses with 5xx code
+      unit: "responses/s"
+      chart_type: line
+      dimensions:
+      - name: a dimension per backend server
+    - name: haproxy_b.hrsp_other
+      description: HTTP responses with other codes (protocol error)
+      unit: "responses/s"
+      chart_type: line
+      dimensions:
+      - name: a dimension per backend server
+    - name: haproxy_b.hrsp_total
+      description: HTTP responses (total)
+      unit: "responses/s"
+      chart_type: line
+      dimensions:
+      - name: a dimension per backend server
+    - name: haproxy_b.qtime
+      description: The average queue time over the 1024 last requests
+      unit: "milliseconds"
+      chart_type: line
+      dimensions:
+      - name: a dimension per backend server
+    - name: haproxy_b.ctime
+      description: The average connect time over the 1024 last requests
+      unit: "milliseconds"
+      chart_type: line
+      dimensions:
+      - name: a dimension per backend server
+    - name: haproxy_b.rtime
+      description: The average response time over the 1024 last requests
+      unit: "milliseconds"
+      chart_type: line
+      dimensions:
+      - name: a dimension per backend server
+    - name: haproxy_b.ttime
+      description: The average total session time over the 1024 last requests
+      unit: "milliseconds"
+      chart_type: line
+      dimensions:
+      - name: a dimension per backend server
+    - name: haproxy_hs.down
+      description: Backend Servers In DOWN State
+      unit: "failed servers"
+      chart_type: line
+      dimensions:
+      - name: a dimension per backend server
+    - name: haproxy_hs.up
+      description: Backend Servers In UP State
+      unit: "health servers"
+      chart_type: line
+      dimensions:
+      - name: a dimension per backend server
+    - name: haproxy_hb.down
+      description: Is Backend Failed?
+      unit: "boolean"
+      chart_type: line
+      dimensions:
+      - name: a dimension per backend server
+    - name: haproxy.idle
+      description: The Ratio Of Polling Time Vs Total Time
+      unit: "percentage"
+      chart_type: line
+      dimensions:
+      - name: idle

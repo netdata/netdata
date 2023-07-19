@@ -2,10 +2,11 @@ meta:
   plugin_name: diskspace.plugin
   module_name: diskspace.plugin
   monitored_instance:
-    name: diskspace
+    name: Disk space
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.linux-systems
+    icon_filename: 'hard-drive.svg'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor Disk space metrics for proficient storage management. Keep track of usage, free space, and error rates to prevent disk space issues.'
     method_description: ''
   supported_platforms:
     include: []
@@ -52,16 +53,16 @@ troubleshooting:
   problems:
     list: []
 alerts:
-  - name: disk_space_usage
-    link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
-    metric: disk.space
-    info: disk ${label:mount_point} space utilization
-    os: "linux freebsd"
-  - name: disk_inode_usage
-    link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
-    metric: disk.inodes
-    info: disk ${label:mount_point} inode utilization
-    os: "linux freebsd"
+- name: disk_space_usage
+  link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
+  metric: disk.space
+  info: disk ${label:mount_point} space utilization
+  os: "linux freebsd"
+- name: disk_inode_usage
+  link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
+  metric: disk.inodes
+  info: disk ${label:mount_point} inode utilization
+  os: "linux freebsd"
 metrics:
   folding:
     title: Metrics
@@ -69,29 +70,29 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: mount point
-      description: ""
-      labels:
-        - name: mount_point
-          description: TBD
-        - name: filesystem
-          description: TBD
-        - name: mount_root
-          description: TBD
-      metrics:
-        - name: disk.space
-          description: Disk Space Usage
-          unit: "GiB"
-          chart_type: stacked
-          dimensions:
-            - name: avail
-            - name: used
-            - name: reserved_for_root
-        - name: disk.inodes
-          description: Disk Files (inodes) Usage
-          unit: "inodes"
-          chart_type: stacked
-          dimensions:
-            - name: avail
-            - name: used
-            - name: reserved_for_root
+  - name: mount point
+    description: ""
+    labels:
+    - name: mount_point
+      description: TBD
+    - name: filesystem
+      description: TBD
+    - name: mount_root
+      description: TBD
+    metrics:
+    - name: disk.space
+      description: Disk Space Usage
+      unit: "GiB"
+      chart_type: stacked
+      dimensions:
+      - name: avail
+      - name: used
+      - name: reserved_for_root
+    - name: disk.inodes
+      description: Disk Files (inodes) Usage
+      unit: "inodes"
+      chart_type: stacked
+      dimensions:
+      - name: avail
+      - name: used
+      - name: reserved_for_root

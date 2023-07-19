@@ -2,10 +2,11 @@ meta:
   plugin_name: charts.d.plugin
   module_name: apcupsd
   monitored_instance:
-    name: charts.d apcupsd
+    name: APC UPS
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.ups
+    icon_filename: 'apc.png'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor APC UPS performance with Netdata for optimal uninterruptible power supply operations. Enhance your power supply reliability with real-time APC UPS metrics.'
     method_description: ''
   supported_platforms:
     include: []
@@ -52,20 +53,20 @@ troubleshooting:
   problems:
     list: []
 alerts:
-  - name: apcupsd_ups_charge
-    link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
-    metric: apcupsd.charge
-    info: average UPS charge over the last minute
-    os: "*"
-  - name: apcupsd_10min_ups_load
-    link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
-    metric: apcupsd.load
-    info: average UPS load over the last 10 minutes
-    os: "*"
-  - name: apcupsd_last_collected_secs
-    link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
-    metric: apcupsd.load
-    info: number of seconds since the last successful data collection
+- name: apcupsd_ups_charge
+  link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
+  metric: apcupsd.charge
+  info: average UPS charge over the last minute
+  os: "*"
+- name: apcupsd_10min_ups_load
+  link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
+  metric: apcupsd.load
+  info: average UPS load over the last 10 minutes
+  os: "*"
+- name: apcupsd_last_collected_secs
+  link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
+  metric: apcupsd.load
+  info: number of seconds since the last successful data collection
 metrics:
   folding:
     title: Metrics
@@ -73,71 +74,71 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: ups
-      description: ""
-      labels: []
-      metrics:
-        - name: apcupsd.charge
-          description: UPS Charge
-          unit: "percentage"
-          chart_type: area
-          dimensions:
-            - name: charge
-        - name: apcupsd.battery.voltage
-          description: UPS Battery Voltage
-          unit: "Volts"
-          chart_type: line
-          dimensions:
-            - name: voltage
-            - name: nominal
-        - name: apcupsd.input.voltage
-          description: UPS Input Voltage
-          unit: "Volts"
-          chart_type: line
-          dimensions:
-            - name: voltage
-            - name: min
-            - name: max
-        - name: apcupsd.output.voltage
-          description: UPS Output Voltage
-          unit: "Volts"
-          chart_type: line
-          dimensions:
-            - name: absolute
-            - name: nominal
-        - name: apcupsd.input.frequency
-          description: UPS Input Voltage
-          unit: "Hz"
-          chart_type: line
-          dimensions:
-            - name: frequency
-        - name: apcupsd.load
-          description: UPS Load
-          unit: "percentage"
-          chart_type: area
-          dimensions:
-            - name: load
-        - name: apcupsd.load_usage
-          description: UPS Load Usage
-          unit: "Watts"
-          chart_type: area
-          dimensions:
-            - name: load
-        - name: apcupsd.temperature
-          description: UPS Temperature
-          unit: "Celsius"
-          chart_type: line
-          dimensions:
-            - name: temp
-        - name: apcupsd.time
-          description: UPS Time Remaining
-          unit: "Minutes"
-          chart_type: area
-          dimensions:
-            - name: time
-        - name: apcupsd.online
-          description: UPS ONLINE flag
-          unit: "boolean"
-          chart_type: line
-          dimensions:
-            - name: online
+  - name: ups
+    description: ""
+    labels: []
+    metrics:
+    - name: apcupsd.charge
+      description: UPS Charge
+      unit: "percentage"
+      chart_type: area
+      dimensions:
+      - name: charge
+    - name: apcupsd.battery.voltage
+      description: UPS Battery Voltage
+      unit: "Volts"
+      chart_type: line
+      dimensions:
+      - name: voltage
+      - name: nominal
+    - name: apcupsd.input.voltage
+      description: UPS Input Voltage
+      unit: "Volts"
+      chart_type: line
+      dimensions:
+      - name: voltage
+      - name: min
+      - name: max
+    - name: apcupsd.output.voltage
+      description: UPS Output Voltage
+      unit: "Volts"
+      chart_type: line
+      dimensions:
+      - name: absolute
+      - name: nominal
+    - name: apcupsd.input.frequency
+      description: UPS Input Voltage
+      unit: "Hz"
+      chart_type: line
+      dimensions:
+      - name: frequency
+    - name: apcupsd.load
+      description: UPS Load
+      unit: "percentage"
+      chart_type: area
+      dimensions:
+      - name: load
+    - name: apcupsd.load_usage
+      description: UPS Load Usage
+      unit: "Watts"
+      chart_type: area
+      dimensions:
+      - name: load
+    - name: apcupsd.temperature
+      description: UPS Temperature
+      unit: "Celsius"
+      chart_type: line
+      dimensions:
+      - name: temp
+    - name: apcupsd.time
+      description: UPS Time Remaining
+      unit: "Minutes"
+      chart_type: area
+      dimensions:
+      - name: time
+    - name: apcupsd.online
+      description: UPS ONLINE flag
+      unit: "boolean"
+      chart_type: line
+      dimensions:
+      - name: online

@@ -59,19 +59,19 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: zscores.z
-          description: Z Score
-          unit: "z"
-          chart_type: line
-          dimensions:
-            - name: a dimension per chart or dimension
-        - name: zscores.3stddev
-          description: Z Score >3
-          unit: "count"
-          chart_type: stacked
-          dimensions:
-            - name: a dimension per chart or dimension
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: zscores.z
+      description: Z Score
+      unit: "z"
+      chart_type: line
+      dimensions:
+      - name: a dimension per chart or dimension
+    - name: zscores.3stddev
+      description: Z Score >3
+      unit: "count"
+      chart_type: stacked
+      dimensions:
+      - name: a dimension per chart or dimension

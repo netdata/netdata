@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: varnish
   monitored_instance:
-    name: python.d varnish
+    name: Varnish
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.web-servers-and-web-proxies
+    icon_filename: 'varnish.png'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor Varnish metrics with Netdata for efficient HTTP accelerator performance. Enhance your web performance with real-time Varnish metrics.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,133 +60,133 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: varnish.session_connection
-          description: Connections Statistics
-          unit: "connections/s"
-          chart_type: line
-          dimensions:
-            - name: accepted
-            - name: dropped
-        - name: varnish.client_requests
-          description: Client Requests
-          unit: "requests/s"
-          chart_type: line
-          dimensions:
-            - name: received
-        - name: varnish.all_time_hit_rate
-          description: All History Hit Rate Ratio
-          unit: "percentage"
-          chart_type: stacked
-          dimensions:
-            - name: hit
-            - name: miss
-            - name: hitpass
-        - name: varnish.current_poll_hit_rate
-          description: Current Poll Hit Rate Ratio
-          unit: "percentage"
-          chart_type: stacked
-          dimensions:
-            - name: hit
-            - name: miss
-            - name: hitpass
-        - name: varnish.cached_objects_expired
-          description: Expired Objects
-          unit: "expired/s"
-          chart_type: line
-          dimensions:
-            - name: objects
-        - name: varnish.cached_objects_nuked
-          description: Least Recently Used Nuked Objects
-          unit: "nuked/s"
-          chart_type: line
-          dimensions:
-            - name: objects
-        - name: varnish.threads_total
-          description: Number Of Threads In All Pools
-          unit: "number"
-          chart_type: line
-          dimensions:
-            - name: None
-        - name: varnish.threads_statistics
-          description: Threads Statistics
-          unit: "threads/s"
-          chart_type: line
-          dimensions:
-            - name: created
-            - name: failed
-            - name: limited
-        - name: varnish.threads_queue_len
-          description: Current Queue Length
-          unit: "requests"
-          chart_type: line
-          dimensions:
-            - name: in queue
-        - name: varnish.backend_connections
-          description: Backend Connections Statistics
-          unit: "connections/s"
-          chart_type: line
-          dimensions:
-            - name: successful
-            - name: unhealthy
-            - name: reused
-            - name: closed
-            - name: recycled
-            - name: failed
-        - name: varnish.backend_requests
-          description: Requests To The Backend
-          unit: "requests/s"
-          chart_type: line
-          dimensions:
-            - name: sent
-        - name: varnish.esi_statistics
-          description: ESI Statistics
-          unit: "problems/s"
-          chart_type: line
-          dimensions:
-            - name: errors
-            - name: warnings
-        - name: varnish.memory_usage
-          description: Memory Usage
-          unit: "MiB"
-          chart_type: stacked
-          dimensions:
-            - name: free
-            - name: allocated
-        - name: varnish.uptime
-          description: Uptime
-          unit: "seconds"
-          chart_type: line
-          dimensions:
-            - name: uptime
-    - name: Backend
-      description: ""
-      labels: []
-      metrics:
-        - name: varnish.backend
-          description: Backend {backend_name}
-          unit: "kilobits/s"
-          chart_type: area
-          dimensions:
-            - name: header
-            - name: body
-    - name: Storage
-      description: ""
-      labels: []
-      metrics:
-        - name: varnish.storage_usage
-          description: Storage {storage_name} Usage
-          unit: "KiB"
-          chart_type: stacked
-          dimensions:
-            - name: free
-            - name: allocated
-        - name: varnish.storage_alloc_objs
-          description: Storage {storage_name} Allocated Objects
-          unit: "objects"
-          chart_type: line
-          dimensions:
-            - name: allocated
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: varnish.session_connection
+      description: Connections Statistics
+      unit: "connections/s"
+      chart_type: line
+      dimensions:
+      - name: accepted
+      - name: dropped
+    - name: varnish.client_requests
+      description: Client Requests
+      unit: "requests/s"
+      chart_type: line
+      dimensions:
+      - name: received
+    - name: varnish.all_time_hit_rate
+      description: All History Hit Rate Ratio
+      unit: "percentage"
+      chart_type: stacked
+      dimensions:
+      - name: hit
+      - name: miss
+      - name: hitpass
+    - name: varnish.current_poll_hit_rate
+      description: Current Poll Hit Rate Ratio
+      unit: "percentage"
+      chart_type: stacked
+      dimensions:
+      - name: hit
+      - name: miss
+      - name: hitpass
+    - name: varnish.cached_objects_expired
+      description: Expired Objects
+      unit: "expired/s"
+      chart_type: line
+      dimensions:
+      - name: objects
+    - name: varnish.cached_objects_nuked
+      description: Least Recently Used Nuked Objects
+      unit: "nuked/s"
+      chart_type: line
+      dimensions:
+      - name: objects
+    - name: varnish.threads_total
+      description: Number Of Threads In All Pools
+      unit: "number"
+      chart_type: line
+      dimensions:
+      - name: None
+    - name: varnish.threads_statistics
+      description: Threads Statistics
+      unit: "threads/s"
+      chart_type: line
+      dimensions:
+      - name: created
+      - name: failed
+      - name: limited
+    - name: varnish.threads_queue_len
+      description: Current Queue Length
+      unit: "requests"
+      chart_type: line
+      dimensions:
+      - name: in queue
+    - name: varnish.backend_connections
+      description: Backend Connections Statistics
+      unit: "connections/s"
+      chart_type: line
+      dimensions:
+      - name: successful
+      - name: unhealthy
+      - name: reused
+      - name: closed
+      - name: recycled
+      - name: failed
+    - name: varnish.backend_requests
+      description: Requests To The Backend
+      unit: "requests/s"
+      chart_type: line
+      dimensions:
+      - name: sent
+    - name: varnish.esi_statistics
+      description: ESI Statistics
+      unit: "problems/s"
+      chart_type: line
+      dimensions:
+      - name: errors
+      - name: warnings
+    - name: varnish.memory_usage
+      description: Memory Usage
+      unit: "MiB"
+      chart_type: stacked
+      dimensions:
+      - name: free
+      - name: allocated
+    - name: varnish.uptime
+      description: Uptime
+      unit: "seconds"
+      chart_type: line
+      dimensions:
+      - name: uptime
+  - name: Backend
+    description: ""
+    labels: []
+    metrics:
+    - name: varnish.backend
+      description: Backend {backend_name}
+      unit: "kilobits/s"
+      chart_type: area
+      dimensions:
+      - name: header
+      - name: body
+  - name: Storage
+    description: ""
+    labels: []
+    metrics:
+    - name: varnish.storage_usage
+      description: Storage {storage_name} Usage
+      unit: "KiB"
+      chart_type: stacked
+      dimensions:
+      - name: free
+      - name: allocated
+    - name: varnish.storage_alloc_objs
+      description: Storage {storage_name} Allocated Objects
+      unit: "objects"
+      chart_type: line
+      dimensions:
+      - name: allocated

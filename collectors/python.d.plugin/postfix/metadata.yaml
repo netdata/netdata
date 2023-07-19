@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: postfix
   monitored_instance:
-    name: python.d postfix
+    name: Postfix
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.mail-servers
+    icon_filename: 'postfix.png'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Keep an eye on Postfix metrics for efficient mail server operations. Improve your mail server performance with Netdata''s real-time metrics and built-in alerts.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,19 +60,19 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: postfix.qemails
-          description: Postfix Queue Emails
-          unit: "emails"
-          chart_type: line
-          dimensions:
-            - name: emails
-        - name: postfix.qsize
-          description: Postfix Queue Emails Size
-          unit: "KiB"
-          chart_type: area
-          dimensions:
-            - name: size
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: postfix.qemails
+      description: Postfix Queue Emails
+      unit: "emails"
+      chart_type: line
+      dimensions:
+      - name: emails
+    - name: postfix.qsize
+      description: Postfix Queue Emails Size
+      unit: "KiB"
+      chart_type: area
+      dimensions:
+      - name: size

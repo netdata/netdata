@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: samba
   monitored_instance:
-    name: python.d samba
+    name: Samba
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.storage-mount-points-and-filesystems
+    icon_filename: 'samba.jpg'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor Samba performance for optimal network file sharing operations. Netdata provides real-time insights and alerts for efficient file sharing.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,64 +60,64 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: syscall.rw
-          description: R/Ws
-          unit: "KiB/s"
-          chart_type: area
-          dimensions:
-            - name: sendfile
-            - name: recvfile
-        - name: smb2.rw
-          description: R/Ws
-          unit: "KiB/s"
-          chart_type: area
-          dimensions:
-            - name: readout
-            - name: writein
-            - name: readin
-            - name: writeout
-        - name: smb2.create_close
-          description: Create/Close
-          unit: "operations/s"
-          chart_type: line
-          dimensions:
-            - name: create
-            - name: close
-        - name: smb2.get_set_info
-          description: Info
-          unit: "operations/s"
-          chart_type: line
-          dimensions:
-            - name: getinfo
-            - name: setinfo
-        - name: smb2.find
-          description: Find
-          unit: "operations/s"
-          chart_type: line
-          dimensions:
-            - name: find
-        - name: smb2.notify
-          description: Notify
-          unit: "operations/s"
-          chart_type: line
-          dimensions:
-            - name: notify
-        - name: smb2.sm_counters
-          description: Lesser Ops
-          unit: "count"
-          chart_type: stacked
-          dimensions:
-            - name: tcon
-            - name: negprot
-            - name: tdis
-            - name: cancel
-            - name: logoff
-            - name: flush
-            - name: lock
-            - name: keepalive
-            - name: break
-            - name: sessetup
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: syscall.rw
+      description: R/Ws
+      unit: "KiB/s"
+      chart_type: area
+      dimensions:
+      - name: sendfile
+      - name: recvfile
+    - name: smb2.rw
+      description: R/Ws
+      unit: "KiB/s"
+      chart_type: area
+      dimensions:
+      - name: readout
+      - name: writein
+      - name: readin
+      - name: writeout
+    - name: smb2.create_close
+      description: Create/Close
+      unit: "operations/s"
+      chart_type: line
+      dimensions:
+      - name: create
+      - name: close
+    - name: smb2.get_set_info
+      description: Info
+      unit: "operations/s"
+      chart_type: line
+      dimensions:
+      - name: getinfo
+      - name: setinfo
+    - name: smb2.find
+      description: Find
+      unit: "operations/s"
+      chart_type: line
+      dimensions:
+      - name: find
+    - name: smb2.notify
+      description: Notify
+      unit: "operations/s"
+      chart_type: line
+      dimensions:
+      - name: notify
+    - name: smb2.sm_counters
+      description: Lesser Ops
+      unit: "count"
+      chart_type: stacked
+      dimensions:
+      - name: tcon
+      - name: negprot
+      - name: tdis
+      - name: cancel
+      - name: logoff
+      - name: flush
+      - name: lock
+      - name: keepalive
+      - name: break
+      - name: sessetup

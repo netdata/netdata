@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: dovecot
   monitored_instance:
-    name: python.d dovecot
+    name: Dovecot
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.mail-servers
+    icon_filename: 'dovecot.png'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Examine Dovecot metrics for insights into IMAP and POP3 server operations. Analyze connection statuses, mailbox operations, and error rates for efficient mail server operations.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,87 +60,87 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: dovecot.sessions
-          description: Dovecot Active Sessions
-          unit: "number"
-          chart_type: line
-          dimensions:
-            - name: active sessions
-        - name: dovecot.logins
-          description: Dovecot Logins
-          unit: "number"
-          chart_type: line
-          dimensions:
-            - name: logins
-        - name: dovecot.commands
-          description: Dovecot Commands
-          unit: "commands"
-          chart_type: line
-          dimensions:
-            - name: commands
-        - name: dovecot.faults
-          description: Dovecot Page Faults
-          unit: "faults"
-          chart_type: line
-          dimensions:
-            - name: minor
-            - name: major
-        - name: dovecot.context_switches
-          description: Dovecot Context Switches
-          unit: "switches"
-          chart_type: line
-          dimensions:
-            - name: voluntary
-            - name: involuntary
-        - name: dovecot.io
-          description: Dovecot Disk I/O
-          unit: "KiB/s"
-          chart_type: area
-          dimensions:
-            - name: read
-            - name: write
-        - name: dovecot.net
-          description: Dovecot Network Bandwidth
-          unit: "kilobits/s"
-          chart_type: area
-          dimensions:
-            - name: read
-            - name: write
-        - name: dovecot.syscalls
-          description: Dovecot Number of SysCalls
-          unit: "syscalls/s"
-          chart_type: line
-          dimensions:
-            - name: read
-            - name: write
-        - name: dovecot.lookup
-          description: Dovecot Lookups
-          unit: "number/s"
-          chart_type: stacked
-          dimensions:
-            - name: path
-            - name: attr
-        - name: dovecot.cache
-          description: Dovecot Cache Hits
-          unit: "hits/s"
-          chart_type: line
-          dimensions:
-            - name: hits
-        - name: dovecot.auth
-          description: Dovecot Authentications
-          unit: "attempts"
-          chart_type: stacked
-          dimensions:
-            - name: ok
-            - name: failed
-        - name: dovecot.auth_cache
-          description: Dovecot Authentication Cache
-          unit: "number"
-          chart_type: stacked
-          dimensions:
-            - name: hit
-            - name: miss
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: dovecot.sessions
+      description: Dovecot Active Sessions
+      unit: "number"
+      chart_type: line
+      dimensions:
+      - name: active sessions
+    - name: dovecot.logins
+      description: Dovecot Logins
+      unit: "number"
+      chart_type: line
+      dimensions:
+      - name: logins
+    - name: dovecot.commands
+      description: Dovecot Commands
+      unit: "commands"
+      chart_type: line
+      dimensions:
+      - name: commands
+    - name: dovecot.faults
+      description: Dovecot Page Faults
+      unit: "faults"
+      chart_type: line
+      dimensions:
+      - name: minor
+      - name: major
+    - name: dovecot.context_switches
+      description: Dovecot Context Switches
+      unit: "switches"
+      chart_type: line
+      dimensions:
+      - name: voluntary
+      - name: involuntary
+    - name: dovecot.io
+      description: Dovecot Disk I/O
+      unit: "KiB/s"
+      chart_type: area
+      dimensions:
+      - name: read
+      - name: write
+    - name: dovecot.net
+      description: Dovecot Network Bandwidth
+      unit: "kilobits/s"
+      chart_type: area
+      dimensions:
+      - name: read
+      - name: write
+    - name: dovecot.syscalls
+      description: Dovecot Number of SysCalls
+      unit: "syscalls/s"
+      chart_type: line
+      dimensions:
+      - name: read
+      - name: write
+    - name: dovecot.lookup
+      description: Dovecot Lookups
+      unit: "number/s"
+      chart_type: stacked
+      dimensions:
+      - name: path
+      - name: attr
+    - name: dovecot.cache
+      description: Dovecot Cache Hits
+      unit: "hits/s"
+      chart_type: line
+      dimensions:
+      - name: hits
+    - name: dovecot.auth
+      description: Dovecot Authentications
+      unit: "attempts"
+      chart_type: stacked
+      dimensions:
+      - name: ok
+      - name: failed
+    - name: dovecot.auth_cache
+      description: Dovecot Authentication Cache
+      unit: "number"
+      chart_type: stacked
+      dimensions:
+      - name: hit
+      - name: miss

@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: memcached
   monitored_instance:
-    name: python.d memcached
+    name: Memcached
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.database-servers
+    icon_filename: 'memcached.png'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor Memcached metrics for proficient in-memory key-value store operations. Track cache hits, misses, and memory usage for efficient data caching.'
     method_description: ''
   supported_platforms:
     include: []
@@ -52,18 +53,18 @@ troubleshooting:
   problems:
     list: []
 alerts:
-  - name: memcached_cache_memory_usage
-    link: https://github.com/netdata/netdata/blob/master/health/health.d/memcached.conf
-    metric: memcached.cache
-    info: cache memory utilization
-  - name: memcached_cache_fill_rate
-    link: https://github.com/netdata/netdata/blob/master/health/health.d/memcached.conf
-    metric: memcached.cache
-    info: average rate the cache fills up (positive), or frees up (negative) space over the last hour
-  - name: memcached_out_of_cache_space_time
-    link: https://github.com/netdata/netdata/blob/master/health/health.d/memcached.conf
-    metric: memcached.cache
-    info: estimated time the cache will run out of space if the system continues to add data at the same rate as the past hour
+- name: memcached_cache_memory_usage
+  link: https://github.com/netdata/netdata/blob/master/health/health.d/memcached.conf
+  metric: memcached.cache
+  info: cache memory utilization
+- name: memcached_cache_fill_rate
+  link: https://github.com/netdata/netdata/blob/master/health/health.d/memcached.conf
+  metric: memcached.cache
+  info: average rate the cache fills up (positive), or frees up (negative) space over the last hour
+- name: memcached_out_of_cache_space_time
+  link: https://github.com/netdata/netdata/blob/master/health/health.d/memcached.conf
+  metric: memcached.cache
+  info: estimated time the cache will run out of space if the system continues to add data at the same rate as the past hour
 metrics:
   folding:
     title: Metrics
@@ -71,104 +72,104 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: memcached.cache
-          description: Cache Size
-          unit: "MiB"
-          chart_type: stacked
-          dimensions:
-            - name: available
-            - name: used
-        - name: memcached.net
-          description: Network
-          unit: "kilobits/s"
-          chart_type: area
-          dimensions:
-            - name: in
-            - name: out
-        - name: memcached.connections
-          description: Connections
-          unit: "connections/s"
-          chart_type: line
-          dimensions:
-            - name: current
-            - name: rejected
-            - name: total
-        - name: memcached.items
-          description: Items
-          unit: "items"
-          chart_type: line
-          dimensions:
-            - name: current
-            - name: total
-        - name: memcached.evicted_reclaimed
-          description: Evicted and Reclaimed Items
-          unit: "items"
-          chart_type: line
-          dimensions:
-            - name: reclaimed
-            - name: evicted
-        - name: memcached.get
-          description: Get Requests
-          unit: "requests"
-          chart_type: stacked
-          dimensions:
-            - name: hints
-            - name: misses
-        - name: memcached.get_rate
-          description: Get Request Rate
-          unit: "requests/s"
-          chart_type: line
-          dimensions:
-            - name: rate
-        - name: memcached.set_rate
-          description: Set Request Rate
-          unit: "requests/s"
-          chart_type: line
-          dimensions:
-            - name: rate
-        - name: memcached.delete
-          description: Delete Requests
-          unit: "requests"
-          chart_type: stacked
-          dimensions:
-            - name: hits
-            - name: misses
-        - name: memcached.cas
-          description: Check and Set Requests
-          unit: "requests"
-          chart_type: stacked
-          dimensions:
-            - name: hits
-            - name: misses
-            - name: bad value
-        - name: memcached.increment
-          description: Increment Requests
-          unit: "requests"
-          chart_type: stacked
-          dimensions:
-            - name: hits
-            - name: misses
-        - name: memcached.decrement
-          description: Decrement Requests
-          unit: "requests"
-          chart_type: stacked
-          dimensions:
-            - name: hits
-            - name: misses
-        - name: memcached.touch
-          description: Touch Requests
-          unit: "requests"
-          chart_type: stacked
-          dimensions:
-            - name: hits
-            - name: misses
-        - name: memcached.touch_rate
-          description: Touch Request Rate
-          unit: "requests/s"
-          chart_type: line
-          dimensions:
-            - name: rate
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: memcached.cache
+      description: Cache Size
+      unit: "MiB"
+      chart_type: stacked
+      dimensions:
+      - name: available
+      - name: used
+    - name: memcached.net
+      description: Network
+      unit: "kilobits/s"
+      chart_type: area
+      dimensions:
+      - name: in
+      - name: out
+    - name: memcached.connections
+      description: Connections
+      unit: "connections/s"
+      chart_type: line
+      dimensions:
+      - name: current
+      - name: rejected
+      - name: total
+    - name: memcached.items
+      description: Items
+      unit: "items"
+      chart_type: line
+      dimensions:
+      - name: current
+      - name: total
+    - name: memcached.evicted_reclaimed
+      description: Evicted and Reclaimed Items
+      unit: "items"
+      chart_type: line
+      dimensions:
+      - name: reclaimed
+      - name: evicted
+    - name: memcached.get
+      description: Get Requests
+      unit: "requests"
+      chart_type: stacked
+      dimensions:
+      - name: hints
+      - name: misses
+    - name: memcached.get_rate
+      description: Get Request Rate
+      unit: "requests/s"
+      chart_type: line
+      dimensions:
+      - name: rate
+    - name: memcached.set_rate
+      description: Set Request Rate
+      unit: "requests/s"
+      chart_type: line
+      dimensions:
+      - name: rate
+    - name: memcached.delete
+      description: Delete Requests
+      unit: "requests"
+      chart_type: stacked
+      dimensions:
+      - name: hits
+      - name: misses
+    - name: memcached.cas
+      description: Check and Set Requests
+      unit: "requests"
+      chart_type: stacked
+      dimensions:
+      - name: hits
+      - name: misses
+      - name: bad value
+    - name: memcached.increment
+      description: Increment Requests
+      unit: "requests"
+      chart_type: stacked
+      dimensions:
+      - name: hits
+      - name: misses
+    - name: memcached.decrement
+      description: Decrement Requests
+      unit: "requests"
+      chart_type: stacked
+      dimensions:
+      - name: hits
+      - name: misses
+    - name: memcached.touch
+      description: Touch Requests
+      unit: "requests"
+      chart_type: stacked
+      dimensions:
+      - name: hits
+      - name: misses
+    - name: memcached.touch_rate
+      description: Touch Request Rate
+      unit: "requests/s"
+      chart_type: line
+      dimensions:
+      - name: rate

@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: oracledb
   monitored_instance:
-    name: python.d oracledb
+    name: OracleDB
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.database-servers
+    icon_filename: 'oracle.jpeg'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor OracleDB performance for efficient database operations and resource management. Netdata provides real-time insights and alerts for optimal database management.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,157 +60,157 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: oracledb.session_count
-          description: Session Count
-          unit: "sessions"
-          chart_type: line
-          dimensions:
-            - name: total
-            - name: active
-        - name: oracledb.session_limit_usage
-          description: Session Limit Usage
-          unit: "%"
-          chart_type: area
-          dimensions:
-            - name: usage
-        - name: oracledb.logons
-          description: Logons
-          unit: "events/s"
-          chart_type: area
-          dimensions:
-            - name: logons
-        - name: oracledb.physical_disk_read_writes
-          description: Physical Disk Reads/Writes
-          unit: "events/s"
-          chart_type: area
-          dimensions:
-            - name: reads
-            - name: writes
-        - name: oracledb.sorts_on_disks
-          description: Sorts On Disk
-          unit: "events/s"
-          chart_type: line
-          dimensions:
-            - name: sorts
-        - name: oracledb.full_table_scans
-          description: Full Table Scans
-          unit: "events/s"
-          chart_type: line
-          dimensions:
-            - name: full table scans
-        - name: oracledb.database_wait_time_ratio
-          description: Database Wait Time Ratio
-          unit: "%"
-          chart_type: line
-          dimensions:
-            - name: wait time ratio
-        - name: oracledb.shared_pool_free_memory
-          description: Shared Pool Free Memory
-          unit: "%"
-          chart_type: line
-          dimensions:
-            - name: free memory
-        - name: oracledb.in_memory_sorts_ratio
-          description: In-Memory Sorts Ratio
-          unit: "%"
-          chart_type: line
-          dimensions:
-            - name: in-memory sorts
-        - name: oracledb.sql_service_response_time
-          description: SQL Service Response Time
-          unit: "seconds"
-          chart_type: line
-          dimensions:
-            - name: time
-        - name: oracledb.user_rollbacks
-          description: User Rollbacks
-          unit: "events/s"
-          chart_type: line
-          dimensions:
-            - name: rollbacks
-        - name: oracledb.enqueue_timeouts
-          description: Enqueue Timeouts
-          unit: "events/s"
-          chart_type: line
-          dimensions:
-            - name: enqueue timeouts
-        - name: oracledb.cache_hit_ration
-          description: Cache Hit Ratio
-          unit: "%"
-          chart_type: stacked
-          dimensions:
-            - name: buffer
-            - name: cursor
-            - name: library
-            - name: row
-        - name: oracledb.global_cache_blocks
-          description: Global Cache Blocks Events
-          unit: "events/s"
-          chart_type: area
-          dimensions:
-            - name: corrupted
-            - name: lost
-        - name: oracledb.activity
-          description: Activities
-          unit: "events/s"
-          chart_type: stacked
-          dimensions:
-            - name: parse count
-            - name: execute count
-            - name: user commits
-            - name: user rollbacks
-        - name: oracledb.wait_time
-          description: Wait Time
-          unit: "ms"
-          chart_type: stacked
-          dimensions:
-            - name: application
-            - name: configuration
-            - name: administrative
-            - name: concurrency
-            - name: commit
-            - name: network
-            - name: user I/O
-            - name: system I/O
-            - name: scheduler
-            - name: other
-        - name: oracledb.tablespace_size
-          description: Size
-          unit: "KiB"
-          chart_type: line
-          dimensions:
-            - name: a dimension per active tablespace
-        - name: oracledb.tablespace_usage
-          description: Usage
-          unit: "KiB"
-          chart_type: line
-          dimensions:
-            - name: a dimension per active tablespace
-        - name: oracledb.tablespace_usage_in_percent
-          description: Usage
-          unit: "%"
-          chart_type: line
-          dimensions:
-            - name: a dimension per active tablespace
-        - name: oracledb.allocated_size
-          description: Size
-          unit: "B"
-          chart_type: line
-          dimensions:
-            - name: a dimension per active tablespace
-        - name: oracledb.allocated_usage
-          description: Usage
-          unit: "B"
-          chart_type: line
-          dimensions:
-            - name: a dimension per active tablespace
-        - name: oracledb.allocated_usage_in_percent
-          description: Usage
-          unit: "%"
-          chart_type: line
-          dimensions:
-            - name: a dimension per active tablespace
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: oracledb.session_count
+      description: Session Count
+      unit: "sessions"
+      chart_type: line
+      dimensions:
+      - name: total
+      - name: active
+    - name: oracledb.session_limit_usage
+      description: Session Limit Usage
+      unit: "%"
+      chart_type: area
+      dimensions:
+      - name: usage
+    - name: oracledb.logons
+      description: Logons
+      unit: "events/s"
+      chart_type: area
+      dimensions:
+      - name: logons
+    - name: oracledb.physical_disk_read_writes
+      description: Physical Disk Reads/Writes
+      unit: "events/s"
+      chart_type: area
+      dimensions:
+      - name: reads
+      - name: writes
+    - name: oracledb.sorts_on_disks
+      description: Sorts On Disk
+      unit: "events/s"
+      chart_type: line
+      dimensions:
+      - name: sorts
+    - name: oracledb.full_table_scans
+      description: Full Table Scans
+      unit: "events/s"
+      chart_type: line
+      dimensions:
+      - name: full table scans
+    - name: oracledb.database_wait_time_ratio
+      description: Database Wait Time Ratio
+      unit: "%"
+      chart_type: line
+      dimensions:
+      - name: wait time ratio
+    - name: oracledb.shared_pool_free_memory
+      description: Shared Pool Free Memory
+      unit: "%"
+      chart_type: line
+      dimensions:
+      - name: free memory
+    - name: oracledb.in_memory_sorts_ratio
+      description: In-Memory Sorts Ratio
+      unit: "%"
+      chart_type: line
+      dimensions:
+      - name: in-memory sorts
+    - name: oracledb.sql_service_response_time
+      description: SQL Service Response Time
+      unit: "seconds"
+      chart_type: line
+      dimensions:
+      - name: time
+    - name: oracledb.user_rollbacks
+      description: User Rollbacks
+      unit: "events/s"
+      chart_type: line
+      dimensions:
+      - name: rollbacks
+    - name: oracledb.enqueue_timeouts
+      description: Enqueue Timeouts
+      unit: "events/s"
+      chart_type: line
+      dimensions:
+      - name: enqueue timeouts
+    - name: oracledb.cache_hit_ration
+      description: Cache Hit Ratio
+      unit: "%"
+      chart_type: stacked
+      dimensions:
+      - name: buffer
+      - name: cursor
+      - name: library
+      - name: row
+    - name: oracledb.global_cache_blocks
+      description: Global Cache Blocks Events
+      unit: "events/s"
+      chart_type: area
+      dimensions:
+      - name: corrupted
+      - name: lost
+    - name: oracledb.activity
+      description: Activities
+      unit: "events/s"
+      chart_type: stacked
+      dimensions:
+      - name: parse count
+      - name: execute count
+      - name: user commits
+      - name: user rollbacks
+    - name: oracledb.wait_time
+      description: Wait Time
+      unit: "ms"
+      chart_type: stacked
+      dimensions:
+      - name: application
+      - name: configuration
+      - name: administrative
+      - name: concurrency
+      - name: commit
+      - name: network
+      - name: user I/O
+      - name: system I/O
+      - name: scheduler
+      - name: other
+    - name: oracledb.tablespace_size
+      description: Size
+      unit: "KiB"
+      chart_type: line
+      dimensions:
+      - name: a dimension per active tablespace
+    - name: oracledb.tablespace_usage
+      description: Usage
+      unit: "KiB"
+      chart_type: line
+      dimensions:
+      - name: a dimension per active tablespace
+    - name: oracledb.tablespace_usage_in_percent
+      description: Usage
+      unit: "%"
+      chart_type: line
+      dimensions:
+      - name: a dimension per active tablespace
+    - name: oracledb.allocated_size
+      description: Size
+      unit: "B"
+      chart_type: line
+      dimensions:
+      - name: a dimension per active tablespace
+    - name: oracledb.allocated_usage
+      description: Usage
+      unit: "B"
+      chart_type: line
+      dimensions:
+      - name: a dimension per active tablespace
+    - name: oracledb.allocated_usage_in_percent
+      description: Usage
+      unit: "%"
+      chart_type: line
+      dimensions:
+      - name: a dimension per active tablespace

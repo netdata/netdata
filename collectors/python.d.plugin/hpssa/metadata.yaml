@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: hpssa
   monitored_instance:
-    name: python.d hpssa
+    name: HP Smart Storage Arrays
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.storage-mount-points-and-filesystems
+    icon_filename: 'hp.jpeg'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Examine HP Smart Storage Arrays metrics with Netdata for efficient storage management. Improve your storage efficiency with real-time performance insights.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,40 +60,40 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: hpssa.ctrl_status
-          description: Status 1 is OK, Status 0 is not OK
-          unit: "Status"
-          chart_type: line
-          dimensions:
-            - name: ctrl_{adapter slot}_status
-            - name: cache_{adapter slot}_status
-            - name: battery_{adapter slot}_status per adapter
-        - name: hpssa.ctrl_temperature
-          description: Temperature
-          unit: "Celsius"
-          chart_type: line
-          dimensions:
-            - name: ctrl_{adapter slot}_temperature
-            - name: cache_{adapter slot}_temperature per adapter
-        - name: hpssa.ld_status
-          description: Status 1 is OK, Status 0 is not OK
-          unit: "Status"
-          chart_type: line
-          dimensions:
-            - name: a dimension per logical drive
-        - name: hpssa.pd_status
-          description: Status 1 is OK, Status 0 is not OK
-          unit: "Status"
-          chart_type: line
-          dimensions:
-            - name: a dimension per physical drive
-        - name: hpssa.pd_temperature
-          description: Temperature
-          unit: "Celsius"
-          chart_type: line
-          dimensions:
-            - name: a dimension per physical drive
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: hpssa.ctrl_status
+      description: Status 1 is OK, Status 0 is not OK
+      unit: "Status"
+      chart_type: line
+      dimensions:
+      - name: ctrl_{adapter slot}_status
+      - name: cache_{adapter slot}_status
+      - name: battery_{adapter slot}_status per adapter
+    - name: hpssa.ctrl_temperature
+      description: Temperature
+      unit: "Celsius"
+      chart_type: line
+      dimensions:
+      - name: ctrl_{adapter slot}_temperature
+      - name: cache_{adapter slot}_temperature per adapter
+    - name: hpssa.ld_status
+      description: Status 1 is OK, Status 0 is not OK
+      unit: "Status"
+      chart_type: line
+      dimensions:
+      - name: a dimension per logical drive
+    - name: hpssa.pd_status
+      description: Status 1 is OK, Status 0 is not OK
+      unit: "Status"
+      chart_type: line
+      dimensions:
+      - name: a dimension per physical drive
+    - name: hpssa.pd_temperature
+      description: Temperature
+      unit: "Celsius"
+      chart_type: line
+      dimensions:
+      - name: a dimension per physical drive

@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: rethinkdbs
   monitored_instance:
-    name: python.d rethinkdbs
+    name: RethinkDB
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.database-servers
+    icon_filename: 'rethinkdb.png'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor RethinkDB performance for real-time database operations and performance. Improve your database operations with Netdata''s real-time metrics and built-in alerts.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,62 +60,62 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: rethinkdb.cluster_connected_servers
-          description: Connected Servers
-          unit: "servers"
-          chart_type: stacked
-          dimensions:
-            - name: connected
-            - name: missing
-        - name: rethinkdb.cluster_clients_active
-          description: Active Clients
-          unit: "clients"
-          chart_type: line
-          dimensions:
-            - name: active
-        - name: rethinkdb.cluster_queries
-          description: Queries
-          unit: "queries/s"
-          chart_type: line
-          dimensions:
-            - name: queries
-        - name: rethinkdb.cluster_documents
-          description: Documents
-          unit: "documents/s"
-          chart_type: line
-          dimensions:
-            - name: reads
-            - name: writes
-    - name: database server
-      description: ""
-      labels: []
-      metrics:
-        - name: rethinkdb.client_connections
-          description: Client Connections
-          unit: "connections"
-          chart_type: line
-          dimensions:
-            - name: connections
-        - name: rethinkdb.clients_active
-          description: Active Clients
-          unit: "clients"
-          chart_type: line
-          dimensions:
-            - name: active
-        - name: rethinkdb.queries
-          description: Queries
-          unit: "queries/s"
-          chart_type: line
-          dimensions:
-            - name: queries
-        - name: rethinkdb.documents
-          description: Documents
-          unit: "documents/s"
-          chart_type: line
-          dimensions:
-            - name: reads
-            - name: writes
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: rethinkdb.cluster_connected_servers
+      description: Connected Servers
+      unit: "servers"
+      chart_type: stacked
+      dimensions:
+      - name: connected
+      - name: missing
+    - name: rethinkdb.cluster_clients_active
+      description: Active Clients
+      unit: "clients"
+      chart_type: line
+      dimensions:
+      - name: active
+    - name: rethinkdb.cluster_queries
+      description: Queries
+      unit: "queries/s"
+      chart_type: line
+      dimensions:
+      - name: queries
+    - name: rethinkdb.cluster_documents
+      description: Documents
+      unit: "documents/s"
+      chart_type: line
+      dimensions:
+      - name: reads
+      - name: writes
+  - name: database server
+    description: ""
+    labels: []
+    metrics:
+    - name: rethinkdb.client_connections
+      description: Client Connections
+      unit: "connections"
+      chart_type: line
+      dimensions:
+      - name: connections
+    - name: rethinkdb.clients_active
+      description: Active Clients
+      unit: "clients"
+      chart_type: line
+      dimensions:
+      - name: active
+    - name: rethinkdb.queries
+      description: Queries
+      unit: "queries/s"
+      chart_type: line
+      dimensions:
+      - name: queries
+    - name: rethinkdb.documents
+      description: Documents
+      unit: "documents/s"
+      chart_type: line
+      dimensions:
+      - name: reads
+      - name: writes

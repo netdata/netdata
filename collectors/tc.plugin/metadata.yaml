@@ -4,8 +4,9 @@ meta:
   monitored_instance:
     name: tc
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.networking-stack-and-network-interfaces
+    icon_filename: 'freeradius.png'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Examine tc metrics to gain insights into Linux traffic control operations. Study packet flow rates, queue lengths, and drop rates to optimize network traffic flow.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,43 +60,43 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: network device, direction
-      description: ""
-      labels:
-        - name: device
-          description: TBD
-        - name: name
-          description: TBD
-        - name: family
-          description: TBD
-      metrics:
-        - name: tc.qos
-          description: Class Usage
-          unit: "kilobits/s"
-          chart_type: stacked
-          dimensions:
-            - name: a dimension per class
-        - name: tc.qos_packets
-          description: Class Packets
-          unit: "packets/s"
-          chart_type: stacked
-          dimensions:
-            - name: a dimension per class
-        - name: tc.qos_dropped
-          description: Class Dropped Packets
-          unit: "packets/s"
-          chart_type: stacked
-          dimensions:
-            - name: a dimension per class
-        - name: tc.qos_tokens
-          description: Class Tokens
-          unit: "tokens"
-          chart_type: line
-          dimensions:
-            - name: a dimension per class
-        - name: tc.qos_ctokens
-          description: Class cTokens
-          unit: "ctokens"
-          chart_type: line
-          dimensions:
-            - name: a dimension per class
+  - name: network device, direction
+    description: ""
+    labels:
+    - name: device
+      description: TBD
+    - name: name
+      description: TBD
+    - name: family
+      description: TBD
+    metrics:
+    - name: tc.qos
+      description: Class Usage
+      unit: "kilobits/s"
+      chart_type: stacked
+      dimensions:
+      - name: a dimension per class
+    - name: tc.qos_packets
+      description: Class Packets
+      unit: "packets/s"
+      chart_type: stacked
+      dimensions:
+      - name: a dimension per class
+    - name: tc.qos_dropped
+      description: Class Dropped Packets
+      unit: "packets/s"
+      chart_type: stacked
+      dimensions:
+      - name: a dimension per class
+    - name: tc.qos_tokens
+      description: Class Tokens
+      unit: "tokens"
+      chart_type: line
+      dimensions:
+      - name: a dimension per class
+    - name: tc.qos_ctokens
+      description: Class cTokens
+      unit: "ctokens"
+      chart_type: line
+      dimensions:
+      - name: a dimension per class

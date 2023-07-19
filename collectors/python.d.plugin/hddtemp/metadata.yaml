@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: hddtemp
   monitored_instance:
-    name: python.d hddtemp
+    name: HDD temperature
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.hardware-devices-and-sensors
+    icon_filename: 'hard-drive.svg'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor HDD temperature metrics for maintaining optimal hard drive health. Keep tabs on drive temperatures, read/write speeds, and error rates to ensure hard drive longevity.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,13 +60,13 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: hddtemp.temperatures
-          description: Disk Temperatures
-          unit: "Celsius"
-          chart_type: line
-          dimensions:
-            - name: a dimension per disk
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: hddtemp.temperatures
+      description: Disk Temperatures
+      unit: "Celsius"
+      chart_type: line
+      dimensions:
+      - name: a dimension per disk

@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: boinc
   monitored_instance:
-    name: python.d boinc
+    name: BOINC
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.distributed-computing-systems
+    icon_filename: 'bolt.svg'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Study BOINC metrics to gain insights into volunteer computing projects. Examine computation times, task completion rates, and project statuses to enhance volunteer computing efforts.'
     method_description: ''
   supported_platforms:
     include: []
@@ -52,26 +53,26 @@ troubleshooting:
   problems:
     list: []
 alerts:
-  - name: boinc_total_tasks
-    link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
-    metric: boinc.tasks
-    info: average number of total tasks over the last 10 minutes
-    os: "*"
-  - name: boinc_active_tasks
-    link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
-    metric: boinc.tasks
-    info: average number of active tasks over the last 10 minutes
-    os: "*"
-  - name: boinc_compute_errors
-    link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
-    metric: boinc.states
-    info: average number of compute errors over the last 10 minutes
-    os: "*"
-  - name: boinc_upload_errors
-    link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
-    metric: boinc.states
-    info: average number of failed uploads over the last 10 minutes
-    os: "*"
+- name: boinc_total_tasks
+  link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
+  metric: boinc.tasks
+  info: average number of total tasks over the last 10 minutes
+  os: "*"
+- name: boinc_active_tasks
+  link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
+  metric: boinc.tasks
+  info: average number of active tasks over the last 10 minutes
+  os: "*"
+- name: boinc_compute_errors
+  link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
+  metric: boinc.states
+  info: average number of compute errors over the last 10 minutes
+  os: "*"
+- name: boinc_upload_errors
+  link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
+  metric: boinc.states
+  info: average number of failed uploads over the last 10 minutes
+  os: "*"
 metrics:
   folding:
     title: Metrics
@@ -79,46 +80,46 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: boinc.tasks
-          description: Overall Tasks
-          unit: "tasks"
-          chart_type: line
-          dimensions:
-            - name: Total
-            - name: Active
-        - name: boinc.states
-          description: Tasks per State
-          unit: "tasks"
-          chart_type: line
-          dimensions:
-            - name: New
-            - name: Downloading
-            - name: Ready to Run
-            - name: Compute Errors
-            - name: Uploading
-            - name: Uploaded
-            - name: Aborted
-            - name: Failed Uploads
-        - name: boinc.sched
-          description: Tasks per Scheduler State
-          unit: "tasks"
-          chart_type: line
-          dimensions:
-            - name: Uninitialized
-            - name: Preempted
-            - name: Scheduled
-        - name: boinc.process
-          description: Tasks per Process State
-          unit: "tasks"
-          chart_type: line
-          dimensions:
-            - name: Uninitialized
-            - name: Executing
-            - name: Suspended
-            - name: Aborted
-            - name: Quit
-            - name: Copy Pending
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: boinc.tasks
+      description: Overall Tasks
+      unit: "tasks"
+      chart_type: line
+      dimensions:
+      - name: Total
+      - name: Active
+    - name: boinc.states
+      description: Tasks per State
+      unit: "tasks"
+      chart_type: line
+      dimensions:
+      - name: New
+      - name: Downloading
+      - name: Ready to Run
+      - name: Compute Errors
+      - name: Uploading
+      - name: Uploaded
+      - name: Aborted
+      - name: Failed Uploads
+    - name: boinc.sched
+      description: Tasks per Scheduler State
+      unit: "tasks"
+      chart_type: line
+      dimensions:
+      - name: Uninitialized
+      - name: Preempted
+      - name: Scheduled
+    - name: boinc.process
+      description: Tasks per Process State
+      unit: "tasks"
+      chart_type: line
+      dimensions:
+      - name: Uninitialized
+      - name: Executing
+      - name: Suspended
+      - name: Aborted
+      - name: Quit
+      - name: Copy Pending

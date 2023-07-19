@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: gearman
   monitored_instance:
-    name: python.d gearman
+    name: Gearman
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.distributed-computing-systems
+    icon_filename: 'gearman.png'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor Gearman metrics for proficient system task distribution. Track job counts, worker statuses, and queue lengths for effective distributed task management.'
     method_description: ''
   supported_platforms:
     include: []
@@ -52,10 +53,10 @@ troubleshooting:
   problems:
     list: []
 alerts:
-  - name: gearman_workers_queued
-    link: https://github.com/netdata/netdata/blob/master/health/health.d/gearman.conf
-    metric: gearman.single_job
-    info: average number of queued jobs over the last 10 minutes
+- name: gearman_workers_queued
+  link: https://github.com/netdata/netdata/blob/master/health/health.d/gearman.conf
+  metric: gearman.single_job
+  info: average number of queued jobs over the last 10 minutes
 metrics:
   folding:
     title: Metrics
@@ -63,26 +64,26 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: gearman.total_jobs
-          description: Total Jobs
-          unit: "Jobs"
-          chart_type: line
-          dimensions:
-            - name: Pending
-            - name: Running
-    - name: gearman job
-      description: ""
-      labels: []
-      metrics:
-        - name: gearman.single_job
-          description: '{job_name}'
-          unit: "Jobs"
-          chart_type: stacked
-          dimensions:
-            - name: Pending
-            - name: Idle
-            - name: Runnning
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: gearman.total_jobs
+      description: Total Jobs
+      unit: "Jobs"
+      chart_type: line
+      dimensions:
+      - name: Pending
+      - name: Running
+  - name: gearman job
+    description: ""
+    labels: []
+    metrics:
+    - name: gearman.single_job
+      description: '{job_name}'
+      unit: "Jobs"
+      chart_type: stacked
+      dimensions:
+      - name: Pending
+      - name: Idle
+      - name: Runnning

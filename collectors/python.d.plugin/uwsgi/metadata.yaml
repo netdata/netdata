@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: uwsgi
   monitored_instance:
-    name: python.d uwsgi
+    name: uWSGI
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.web-servers-and-web-proxies
+    icon_filename: 'uwsgi.png'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor uWSGI performance for optimal application server operations. Monitor request rates, worker statuses, and error rates to ensure efficient application delivery.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,55 +60,55 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: uwsgi.requests
-          description: Requests
-          unit: "requests/s"
-          chart_type: stacked
-          dimensions:
-            - name: a dimension per worker
-        - name: uwsgi.tx
-          description: Transmitted data
-          unit: "KiB/s"
-          chart_type: stacked
-          dimensions:
-            - name: a dimension per worker
-        - name: uwsgi.avg_rt
-          description: Average request time
-          unit: "milliseconds"
-          chart_type: line
-          dimensions:
-            - name: a dimension per worker
-        - name: uwsgi.memory_rss
-          description: RSS (Resident Set Size)
-          unit: "MiB"
-          chart_type: stacked
-          dimensions:
-            - name: a dimension per worker
-        - name: uwsgi.memory_vsz
-          description: VSZ (Virtual Memory Size)
-          unit: "MiB"
-          chart_type: stacked
-          dimensions:
-            - name: a dimension per worker
-        - name: uwsgi.exceptions
-          description: Exceptions
-          unit: "exceptions"
-          chart_type: line
-          dimensions:
-            - name: exceptions
-        - name: uwsgi.harakiris
-          description: Harakiris
-          unit: "harakiris"
-          chart_type: line
-          dimensions:
-            - name: harakiris
-        - name: uwsgi.respawns
-          description: Respawns
-          unit: "respawns"
-          chart_type: line
-          dimensions:
-            - name: respawns
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: uwsgi.requests
+      description: Requests
+      unit: "requests/s"
+      chart_type: stacked
+      dimensions:
+      - name: a dimension per worker
+    - name: uwsgi.tx
+      description: Transmitted data
+      unit: "KiB/s"
+      chart_type: stacked
+      dimensions:
+      - name: a dimension per worker
+    - name: uwsgi.avg_rt
+      description: Average request time
+      unit: "milliseconds"
+      chart_type: line
+      dimensions:
+      - name: a dimension per worker
+    - name: uwsgi.memory_rss
+      description: RSS (Resident Set Size)
+      unit: "MiB"
+      chart_type: stacked
+      dimensions:
+      - name: a dimension per worker
+    - name: uwsgi.memory_vsz
+      description: VSZ (Virtual Memory Size)
+      unit: "MiB"
+      chart_type: stacked
+      dimensions:
+      - name: a dimension per worker
+    - name: uwsgi.exceptions
+      description: Exceptions
+      unit: "exceptions"
+      chart_type: line
+      dimensions:
+      - name: exceptions
+    - name: uwsgi.harakiris
+      description: Harakiris
+      unit: "harakiris"
+      chart_type: line
+      dimensions:
+      - name: harakiris
+    - name: uwsgi.respawns
+      description: Respawns
+      unit: "respawns"
+      chart_type: line
+      dimensions:
+      - name: respawns

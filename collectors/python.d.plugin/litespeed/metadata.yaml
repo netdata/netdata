@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: litespeed
   monitored_instance:
-    name: python.d litespeed
+    name: Litespeed
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.web-servers-and-web-proxies
+    icon_filename: 'litespeed.svg'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Examine Litespeed metrics for insights into web server operations. Analyze request rates, response times, and error rates for efficient web service delivery.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,65 +60,65 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: litespeed.net_throughput
-          description: Network Throughput HTTP
-          unit: "kilobits/s"
-          chart_type: area
-          dimensions:
-            - name: in
-            - name: out
-        - name: litespeed.net_throughput
-          description: Network Throughput HTTPS
-          unit: "kilobits/s"
-          chart_type: area
-          dimensions:
-            - name: in
-            - name: out
-        - name: litespeed.connections
-          description: Connections HTTP
-          unit: "conns"
-          chart_type: stacked
-          dimensions:
-            - name: free
-            - name: used
-        - name: litespeed.connections
-          description: Connections HTTPS
-          unit: "conns"
-          chart_type: stacked
-          dimensions:
-            - name: free
-            - name: used
-        - name: litespeed.requests
-          description: Requests
-          unit: "requests/s"
-          chart_type: line
-          dimensions:
-            - name: requests
-        - name: litespeed.requests_processing
-          description: Requests In Processing
-          unit: "requests"
-          chart_type: line
-          dimensions:
-            - name: processing
-        - name: litespeed.cache
-          description: Public Cache Hits
-          unit: "hits/s"
-          chart_type: line
-          dimensions:
-            - name: hits
-        - name: litespeed.cache
-          description: Private Cache Hits
-          unit: "hits/s"
-          chart_type: line
-          dimensions:
-            - name: hits
-        - name: litespeed.static
-          description: Static Hits
-          unit: "hits/s"
-          chart_type: line
-          dimensions:
-            - name: hits
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: litespeed.net_throughput
+      description: Network Throughput HTTP
+      unit: "kilobits/s"
+      chart_type: area
+      dimensions:
+      - name: in
+      - name: out
+    - name: litespeed.net_throughput
+      description: Network Throughput HTTPS
+      unit: "kilobits/s"
+      chart_type: area
+      dimensions:
+      - name: in
+      - name: out
+    - name: litespeed.connections
+      description: Connections HTTP
+      unit: "conns"
+      chart_type: stacked
+      dimensions:
+      - name: free
+      - name: used
+    - name: litespeed.connections
+      description: Connections HTTPS
+      unit: "conns"
+      chart_type: stacked
+      dimensions:
+      - name: free
+      - name: used
+    - name: litespeed.requests
+      description: Requests
+      unit: "requests/s"
+      chart_type: line
+      dimensions:
+      - name: requests
+    - name: litespeed.requests_processing
+      description: Requests In Processing
+      unit: "requests"
+      chart_type: line
+      dimensions:
+      - name: processing
+    - name: litespeed.cache
+      description: Public Cache Hits
+      unit: "hits/s"
+      chart_type: line
+      dimensions:
+      - name: hits
+    - name: litespeed.cache
+      description: Private Cache Hits
+      unit: "hits/s"
+      chart_type: line
+      dimensions:
+      - name: hits
+    - name: litespeed.static
+      description: Static Hits
+      unit: "hits/s"
+      chart_type: line
+      dimensions:
+      - name: hits

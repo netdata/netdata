@@ -2,10 +2,11 @@ meta:
   plugin_name: idlejitter.plugin
   module_name: idlejitter.plugin
   monitored_instance:
-    name: idlejitter
+    name: IdleJitter
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.synthetic-checks
+    icon_filename: 'syslog.png'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor IdleJitter performance for optimal system idle process operations. Monitor CPU idle times, wake-ups, and power states to optimize system resource usage.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,15 +60,15 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: system.idlejitter
-          description: CPU Idle Jitter
-          unit: "microseconds lost/s"
-          chart_type: line
-          dimensions:
-            - name: min
-            - name: max
-            - name: average
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: system.idlejitter
+      description: CPU Idle Jitter
+      unit: "microseconds lost/s"
+      chart_type: line
+      dimensions:
+      - name: min
+      - name: max
+      - name: average

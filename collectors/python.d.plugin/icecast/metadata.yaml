@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: icecast
   monitored_instance:
-    name: python.d icecast
+    name: Icecast
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.media-streaming-servers
+    icon_filename: 'icecast.png'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Examine Icecast metrics for insights into media streaming server operations. Study listener counts, bitrate, and connection statuses for smooth streaming services.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,13 +60,13 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: icecast.listeners
-          description: Number Of Listeners
-          unit: "listeners"
-          chart_type: line
-          dimensions:
-            - name: a dimension for each active source
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: icecast.listeners
+      description: Number Of Listeners
+      unit: "listeners"
+      chart_type: line
+      dimensions:
+      - name: a dimension for each active source

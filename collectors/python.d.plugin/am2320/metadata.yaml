@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: am2320
   monitored_instance:
-    name: python.d am2320
+    name: AM2320
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.hardware-devices-and-sensors
+    icon_filename: 'microchip.svg'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor AM2320 metrics with Netdata for optimal temperature and humidity sensor performance. Improve your sensor performance with comprehensive dashboards and anomaly detection.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,19 +60,19 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: am2320.temperature
-          description: Temperature
-          unit: "celsius"
-          chart_type: line
-          dimensions:
-            - name: temperature
-        - name: am2320.humidity
-          description: Relative Humidity
-          unit: "percentage"
-          chart_type: line
-          dimensions:
-            - name: humidity
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: am2320.temperature
+      description: Temperature
+      unit: "celsius"
+      chart_type: line
+      dimensions:
+      - name: temperature
+    - name: am2320.humidity
+      description: Relative Humidity
+      unit: "percentage"
+      chart_type: line
+      dimensions:
+      - name: humidity

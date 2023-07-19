@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: tor
   monitored_instance:
-    name: python.d tor
+    name: Tor
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.vpns
+    icon_filename: 'tor.png'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor Tor metrics with Netdata for efficient anonymous communication operations. Enhance your anonymous communication with real-time insights and alerts.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,14 +60,14 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: tor.traffic
-          description: Tor Traffic
-          unit: "KiB/s"
-          chart_type: area
-          dimensions:
-            - name: read
-            - name: write
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: tor.traffic
+      description: Tor Traffic
+      unit: "KiB/s"
+      chart_type: area
+      dimensions:
+      - name: read
+      - name: write

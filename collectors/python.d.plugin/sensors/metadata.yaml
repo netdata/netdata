@@ -2,10 +2,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: sensors
   monitored_instance:
-    name: python.d sensors
+    name: Linux Sensors (lm-sensors)
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.hardware-devices-and-sensors
+    icon_filename: 'microchip.svg'
   related_resources:
     integrations:
       list: []
@@ -15,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Examine Linux Sensors metrics with Netdata for insights into hardware health and performance. Enhance your system''s reliability with real-time hardware health insights.'
     method_description: ''
   supported_platforms:
     include: []
@@ -59,49 +60,49 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: chip
-      description: ""
-      labels: []
-      metrics:
-        - name: sensors.temperature
-          description: Temperature
-          unit: "Celsius"
-          chart_type: line
-          dimensions:
-            - name: a dimension per sensor
-        - name: sensors.voltage
-          description: Voltage
-          unit: "Volts"
-          chart_type: line
-          dimensions:
-            - name: a dimension per sensor
-        - name: sensors.current
-          description: Current
-          unit: "Ampere"
-          chart_type: line
-          dimensions:
-            - name: a dimension per sensor
-        - name: sensors.power
-          description: Power
-          unit: "Watt"
-          chart_type: line
-          dimensions:
-            - name: a dimension per sensor
-        - name: sensors.fan
-          description: Fans speed
-          unit: "Rotations/min"
-          chart_type: line
-          dimensions:
-            - name: a dimension per sensor
-        - name: sensors.energy
-          description: Energy
-          unit: "Joule"
-          chart_type: line
-          dimensions:
-            - name: a dimension per sensor
-        - name: sensors.humidity
-          description: Humidity
-          unit: "Percent"
-          chart_type: line
-          dimensions:
-            - name: a dimension per sensor
+  - name: chip
+    description: ""
+    labels: []
+    metrics:
+    - name: sensors.temperature
+      description: Temperature
+      unit: "Celsius"
+      chart_type: line
+      dimensions:
+      - name: a dimension per sensor
+    - name: sensors.voltage
+      description: Voltage
+      unit: "Volts"
+      chart_type: line
+      dimensions:
+      - name: a dimension per sensor
+    - name: sensors.current
+      description: Current
+      unit: "Ampere"
+      chart_type: line
+      dimensions:
+      - name: a dimension per sensor
+    - name: sensors.power
+      description: Power
+      unit: "Watt"
+      chart_type: line
+      dimensions:
+      - name: a dimension per sensor
+    - name: sensors.fan
+      description: Fans speed
+      unit: "Rotations/min"
+      chart_type: line
+      dimensions:
+      - name: a dimension per sensor
+    - name: sensors.energy
+      description: Energy
+      unit: "Joule"
+      chart_type: line
+      dimensions:
+      - name: a dimension per sensor
+    - name: sensors.humidity
+      description: Humidity
+      unit: "Percent"
+      chart_type: line
+      dimensions:
+      - name: a dimension per sensor
