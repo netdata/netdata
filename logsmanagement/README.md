@@ -200,6 +200,7 @@ This collector will use the Docker API to collect Docker events logs. See also d
 |      :------------:  	| ------------ |
 | `log path` | Docker socket UNIX path. If set to `auto`, the default path will be used. |
 | `event type chart` | Enable chart showing the Docker object type of the collected logs. |
+| `event action chart` | Enable chart showing the Docker object action of the collected logs. |
 
 <a name="collector-configuration-tail"/>
 
