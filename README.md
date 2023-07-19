@@ -84,35 +84,35 @@ It scales nicely from just a single server to thousands of servers, even in comp
 <details><summary>Click to see our immediate development plans and a summary view of the last 12 months' releases...</summary>
 &nbsp;<br/>
 
-| When | Status | What | Description|
-|:----:|:------:|:----:|:-----------|
-|later|POC|WebRTC|Browser to Agent communication via WebRTC.|
-|later|interrupted|Advanced Troubleshooting|Expanded view of dashboard charts integrating Metrics Correlations, Anomaly Advisor and many more.|
-|next|planned|Easy Custom<br/>Dashboards|Drag and drop charts to create custom dashboards on the fly, while troubleshooting!|
-|next|planned|More Customizability|Set default settings for all charts and views!|
-|soon|in progress|SystemD Journal|View the SystemD Journal of your systems on the dashboard.|
-|soon|in progress|UCUM Units|Migrate all metrics to the Unified Code for Units of Measure.|
-|**soon**|**in progress**|**Netdata Cloud<br/>On-Prem**|**Netdata Cloud available for On-Prem installation!**|
-|soon|in progress|Click to Activate|Configure Alerts and Data Collectors from the UI!|
-|soon|finishing|Integrations|Netdata Integrations Marketplace!|
-|Jul<br/>2023|in the<br/>nightlies|New Agent UI|Now Netdata Cloud and Netdata Agent share the same dashboard!|
-|Jun<br/>2023|[v1.40](https://github.com/netdata/netdata/releases/tag/v1.40.0)|Summary Dashboards|High level tiles everywhere!|
-|||Machine Learning|Multiple ML models per metric.|
-|||SSL|Netdata Agent gets a new SSL layer.|
-|May<br/>2023|[v1.39](https://github.com/netdata/netdata/releases/tag/v1.39.0)|New Cloud UI|Filter, slice and dice any dataset from the UI! ML-first!|
-|||Microsoft Windows|Monitor Windows hosts and apps!|
-|||Virtual Nodes|Go collectors can now be assigned to virtual nodes!|
-|Feb<br/>2023|[v1.38](https://github.com/netdata/netdata/releases/tag/v1.38.0)|DBENGINE v2|Faster, more reliable, far more scalable!|
-|||Netdata Functions|Netdata beyond metrics! Monitoring anything!|
-|||Events Feed|Live feed of events about topology changes and alerts.|
-|||Role Based<br/>Access Control|More roles, offering finer control over access to infrastructure.|
-|Nov<br/>2022|[v1.37](https://github.com/netdata/netdata/releases/tag/v1.37.0)|Infinite Scalability|Streaming compression. Replication. Active-active clustering.|
-|||Grafana Plugin|Netdata Cloud as a data source for Grafana.|
-|||PostgreSQL|Completely rewritten, to reveal all the info, even at the table level.|
-|Aug<br/>2022|[v1.36](https://github.com/netdata/netdata/releases/tag/v1.36.0)|Metrics Correlations|Advanced algorithms to find the needle in the haystack.|
-|||Database Tiering|Netdata gets unlimited retention!|
-|||Kubernetes|Monitor your kubernetes workloads.|
-|||Machine Learning|Anomaly Rate information on every chart.|
+| What | Description | When | Status |
+|:----:|:-----------:|:----:|:------:|
+|WebRTC|Browser to Agent communication via WebRTC.|later|POC|
+|Advanced Troubleshooting|Expanded view of dashboard charts integrating Metrics Correlations, Anomaly Advisor and many more.|later|interrupted|
+|Easy Custom<br/>Dashboards|Drag and drop charts to create custom dashboards on the fly, while troubleshooting!|next|planned|
+|More Customizability|Set default settings for all charts and views!|next|planned|
+|SystemD Journal|View the SystemD Journal of your systems on the dashboard.|soon|in progress|
+|UCUM Units|Migrate all metrics to the Unified Code for Units of Measure.|soon|in progress|
+|**Netdata Cloud<br/>On-Prem**|**Netdata Cloud available for On-Prem installation!**|**soon**|**in progress**|
+|Click to Activate|Configure Alerts and Data Collectors from the UI!|soon|in progress|
+|Integrations|Netdata Integrations Marketplace!|soon|finishing|
+|New Agent UI|Now Netdata Cloud and Netdata Agent share the same dashboard!|Jul<br/>2023|in the<br/>nightlies|
+|Summary Dashboards|High level tiles everywhere!|Jun<br/>2023|[v1.40](https://github.com/netdata/netdata/releases/tag/v1.40.0)|
+|Machine Learning|Multiple ML models per metric.|||
+|SSL|Netdata Agent gets a new SSL layer.|||
+|New Cloud UI|Filter, slice and dice any dataset from the UI! ML-first!|May<br/>2023|[v1.39](https://github.com/netdata/netdata/releases/tag/v1.39.0)|
+|Microsoft Windows|Monitor Windows hosts and apps!|||
+|Virtual Nodes|Go collectors can now be assigned to virtual nodes!|||
+|DBENGINE v2|Faster, more reliable, far more scalable!|Feb<br/>2023|[v1.38](https://github.com/netdata/netdata/releases/tag/v1.38.0)|
+|Netdata Functions|Netdata beyond metrics! Monitoring anything!|||
+|Events Feed|Live feed of events about topology changes and alerts.|||
+|Role Based<br/>Access Control|More roles, offering finer control over access to infrastructure.|||
+|Infinite Scalability|Streaming compression. Replication. Active-active clustering.|Nov<br/>2022|[v1.37](https://github.com/netdata/netdata/releases/tag/v1.37.0)|
+|Grafana Plugin|Netdata Cloud as a data source for Grafana.|||
+|PostgreSQL|Completely rewritten, to reveal all the info, even at the table level.|||
+|Metrics Correlations|Advanced algorithms to find the needle in the haystack.|Aug<br/>2022|[v1.36](https://github.com/netdata/netdata/releases/tag/v1.36.0)|
+|Database Tiering|Netdata gets unlimited retention!|||
+|Kubernetes|Monitor your kubernetes workloads.|||
+|Machine Learning|Anomaly Rate information on every chart.|||
 
 </details>
 
