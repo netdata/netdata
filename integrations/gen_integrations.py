@@ -176,7 +176,14 @@ def load_metadata():
 
 
 def make_id(meta):
-    return f'{ meta["plugin_name"] }-{ meta["module_name"] }'
+    if 'monitored_instance' in meta:
+        instance_name = meta['monitored_instance']['name'].replace(' ', '_')
+    elif 'instance_name' in meta:
+        instance_name = meta['instance_name']
+    else:
+        instance_name = '000_unknown'
+
+    return f'{ meta["plugin_name"] }-{ meta["module_name"] }-{ instance_name }'
 
 
 def render_keys(integrations, categories):
