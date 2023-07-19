@@ -30,6 +30,7 @@ fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " \"" NAME "\" 10 \"%s\"\n", DESC); \
 
 // socket constants
 #define EBPF_THREADS_SOCKET_FAMILY "family:"
+#define EBPF_THREADS_SOCKET_PERIOD "period:"
 
 void *ebpf_function_thread(void *ptr);
 

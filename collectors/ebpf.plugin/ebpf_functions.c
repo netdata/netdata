@@ -447,6 +447,18 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             } else {
                 network_viewer_opt.family = AF_UNSPEC;
             }
+        } else if (strncmp(keyword, EBPF_THREADS_SOCKET_FAMILY, sizeof(EBPF_THREADS_SOCKET_FAMILY) -1) == 0) {
+            int period = -1;
+            const char *name = &keyword[sizeof(EBPF_THREADS_ENABLE_CATEGORY) - 1];
+            char *separator = strchr(name, ':');
+            if (separator) {
+                period = str2i(++separator);
+                if (period > 0) {
+                    pthread_mutex_lock(&ebpf_exit_cleanup);
+                    ebpf_modules[EBPF_MODULE_SOCKET_IDX].lifetime = period;
+                    pthread_mutex_unlock(&ebpf_exit_cleanup);
+                }
+            }
         } else if(strncmp(keyword, "help", 4) == 0) {
             ebpf_function_socket_help(transaction);
             return;
