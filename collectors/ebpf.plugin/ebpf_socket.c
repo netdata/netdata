@@ -3649,7 +3649,7 @@ static void read_max_dimension(struct config *cfg)
  *
  * @param ptr  is a pointer with the text to parse.
  */
-static void parse_ports(char *ptr)
+void ebpf_parse_ports(char *ptr)
 {
     // No value
     if (unlikely(!ptr))
@@ -3788,7 +3788,7 @@ void parse_network_viewer_section(struct config *cfg)
                                                                           CONFIG_BOOLEAN_NO);
 
     char *value = appconfig_get(cfg, EBPF_NETWORK_VIEWER_SECTION, EBPF_CONFIG_PORTS, NULL);
-    parse_ports(value);
+    ebpf_parse_ports(value);
 
     if (network_viewer_opt.hostname_resolution_enabled) {
         value = appconfig_get(cfg, EBPF_NETWORK_VIEWER_SECTION, EBPF_CONFIG_HOSTNAMES, NULL);

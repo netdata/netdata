@@ -33,6 +33,7 @@ fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " \"" NAME "\" 10 \"%s\"\n", DESC); \
 #define EBPF_THREADS_SOCKET_PERIOD "period:"
 #define EBPF_THREADS_SOCKET_RESOLVE "resolve:"
 #define EBPF_THREADS_SOCKET_RANGE "range:"
+#define EBPF_THREADS_SOCKET_PORT "port:"
 
 void *ebpf_function_thread(void *ptr);
 
