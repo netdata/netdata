@@ -31,8 +31,11 @@
 #define SYSTEMD_KEYS_INCLUDED_IN_FACETS         \
     "_TRANSPORT"                                \
     "|SYSLOG_IDENTIFIER"                        \
+    "|SYSLOG_FACILITY"                          \
+    "|PRIORITY"                                 \
     "|_HOSTNAME"                                \
     "|_RUNTIME_SCOPE"                           \
+    "|_PID"                                     \
     "|_UID"                                     \
     "|_GID"                                     \
     "|_SYSTEMD_UNIT"                            \
@@ -179,7 +182,10 @@ static void function_systemd_journal(const char *transaction, char *function __m
 
     // register the fields in the order you want them on the dashboard
 
-    facets_register_key(facets, "_COMM",
+    facets_register_key(facets, "SYSLOG_IDENTIFIER",
+                        FACET_KEY_OPTION_FACET|FACET_KEY_OPTION_VISIBLE);
+
+    facets_register_key(facets, "_PID",
                         FACET_KEY_OPTION_FACET|FACET_KEY_OPTION_VISIBLE);
 
     facets_register_key(facets, "MESSAGE",
