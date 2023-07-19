@@ -29,11 +29,11 @@ fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " \"" NAME "\" 10 \"%s\"\n", DESC); \
 #define EBPF_THREAD_STATUS_STOPPED "stopped"
 
 // socket constants
-#define EBPF_THREADS_SOCKET_FAMILY "family:"
-#define EBPF_THREADS_SOCKET_PERIOD "period:"
-#define EBPF_THREADS_SOCKET_RESOLVE "resolve:"
-#define EBPF_THREADS_SOCKET_RANGE "range:"
-#define EBPF_THREADS_SOCKET_PORT "port:"
+#define EBPF_FUNCTION_SOCKET_FAMILY "family:"
+#define EBPF_FUNCTION_SOCKET_PERIOD "period:"
+#define EBPF_FUNCTION_SOCKET_RESOLVE "resolve:"
+#define EBPF_FUNCTION_SOCKET_RANGE "range:"
+#define EBPF_FUNCTION_SOCKET_PORT "port:"
 
 void *ebpf_function_thread(void *ptr);
 

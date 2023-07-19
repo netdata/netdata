@@ -437,8 +437,8 @@ static void ebpf_function_socket_manipulation(const char *transaction,
         if (!keyword)
             break;
 
-        if (strncmp(keyword, EBPF_THREADS_SOCKET_FAMILY, sizeof(EBPF_THREADS_SOCKET_FAMILY) -1) == 0) {
-            name = &keyword[sizeof(EBPF_THREADS_SOCKET_FAMILY) - 1];
+        if (strncmp(keyword, EBPF_FUNCTION_SOCKET_FAMILY, sizeof(EBPF_FUNCTION_SOCKET_FAMILY) -1) == 0) {
+            name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_FAMILY) - 1];
             separator = strchr(name, ':');
             if (separator) {
                 separator++;
@@ -451,9 +451,9 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             } else {
                 network_viewer_opt.family = AF_UNSPEC;
             }
-        } else if (strncmp(keyword, EBPF_THREADS_SOCKET_PERIOD, sizeof(EBPF_THREADS_SOCKET_PERIOD) -1) == 0) {
+        } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_PERIOD, sizeof(EBPF_FUNCTION_SOCKET_PERIOD) -1) == 0) {
             int period = -1;
-            name = &keyword[sizeof(EBPF_THREADS_SOCKET_PERIOD) - 1];
+            name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_PERIOD) - 1];
             separator = strchr(name, ':');
             pthread_mutex_lock(&ebpf_exit_cleanup);
             if (separator) {
@@ -465,22 +465,22 @@ static void ebpf_function_socket_manipulation(const char *transaction,
                 ebpf_modules[EBPF_MODULE_SOCKET_IDX].lifetime = EBPF_DEFAULT_LIFETIME;
 
             pthread_mutex_unlock(&ebpf_exit_cleanup);
-        } else if (strncmp(keyword, EBPF_THREADS_SOCKET_RESOLVE, sizeof(EBPF_THREADS_SOCKET_RESOLVE) -1) == 0) {
-            name = &keyword[sizeof(EBPF_THREADS_SOCKET_RESOLVE) - 1];
+        } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_RESOLVE, sizeof(EBPF_FUNCTION_SOCKET_RESOLVE) -1) == 0) {
+            name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_RESOLVE) - 1];
             separator = strchr(name, ':');
             if (separator)
                 network_viewer_opt.hostname_resolution_enabled = (!strcmp(++separator, "NO")) ? CONFIG_BOOLEAN_NO :
                                                                                                 CONFIG_BOOLEAN_YES;
             else
                 network_viewer_opt.hostname_resolution_enabled = CONFIG_BOOLEAN_NO;
-        } else if (strncmp(keyword, EBPF_THREADS_SOCKET_RANGE, sizeof(EBPF_THREADS_SOCKET_RANGE) -1) == 0) {
-            name = &keyword[sizeof(EBPF_THREADS_SOCKET_RANGE) - 1];
+        } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_RANGE, sizeof(EBPF_FUNCTION_SOCKET_RANGE) -1) == 0) {
+            name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_RANGE) - 1];
             separator = strchr(name, ':');
             if (separator) {
                 ebpf_parse_ips(++separator);
             }
-        } else if (strncmp(keyword, EBPF_THREADS_SOCKET_PORT, sizeof(EBPF_THREADS_SOCKET_PORT) -1) == 0) {
-            name = &keyword[sizeof(EBPF_THREADS_SOCKET_PORT) - 1];
+        } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_PORT, sizeof(EBPF_FUNCTION_SOCKET_PORT) -1) == 0) {
+            name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_PORT) - 1];
             separator = strchr(name, ':');
             if (separator) {
                 ebpf_parse_ports(++separator);
