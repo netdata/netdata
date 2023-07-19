@@ -412,14 +412,14 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                 //     }
                 // }                    
                 
-                /* FLB_GENERIC, FLB_WEB_LOG and FLB_SERIAL case */
-                if( p_file_info->log_type == FLB_GENERIC || 
+                /* FLB_TAIL, FLB_WEB_LOG and FLB_SERIAL case */
+                if( p_file_info->log_type == FLB_TAIL || 
                     p_file_info->log_type == FLB_WEB_LOG || 
                     p_file_info->log_type == FLB_SERIAL){
                     if( !strncmp(p->key.via.str.ptr, LOG_REC_KEY, (size_t) p->key.via.str.size) ||
                         /* The following line is in case we collect systemd logs 
                          * (tagged as "MESSAGE") or docker_events (tagged as
-                         * "message") via a "Forward" source to an FLB_GENERIC 
+                         * "message") via a "Forward" source to an FLB_TAIL 
                          * parent. */
                         !strncasecmp(p->key.via.str.ptr, LOG_REC_KEY_SYSTEMD, (size_t) p->key.via.str.size)){
 
@@ -454,7 +454,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                     ++p;
                     continue;
                 }
-                /* FLB_GENERIC, FLB_WEB_LOG and FLB_SERIAL case end */
+                /* FLB_TAIL, FLB_WEB_LOG and FLB_SERIAL case end */
 
                 /* FLB_KMSG case */
                 if(p_file_info->log_type == FLB_KMSG){
@@ -699,8 +699,8 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
     /* Parse number of log lines - common for all log source types */
     buff->in->num_lines++;
 
-    /* FLB_GENERIC, FLB_WEB_LOG and FLB_SERIAL case */
-    if( p_file_info->log_type == FLB_GENERIC || 
+    /* FLB_TAIL, FLB_WEB_LOG and FLB_SERIAL case */
+    if( p_file_info->log_type == FLB_TAIL || 
         p_file_info->log_type == FLB_WEB_LOG || 
         p_file_info->log_type == FLB_SERIAL){
 
@@ -719,7 +719,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
         buff->in->data[tmp_item_off++] = '\n';
         m_assert(tmp_item_off == new_tmp_text_size, "tmp_item_off should be == new_tmp_text_size");
         buff->in->text_size = new_tmp_text_size;
-    } /* FLB_GENERIC, FLB_WEB_LOG and FLB_SERIAL case end */
+    } /* FLB_TAIL, FLB_WEB_LOG and FLB_SERIAL case end */
 
     /* FLB_KMSG case */
     else if(p_file_info->log_type == FLB_KMSG){
@@ -1106,14 +1106,14 @@ int flb_add_input(struct File_info *const p_file_info){
 
 
     switch(p_file_info->log_type){
-        case FLB_GENERIC:
+        case FLB_TAIL:
         case FLB_WEB_LOG: {
 
             char update_every_str[10]; 
             snprintfz(update_every_str, 10, "%d", p_file_info->update_every);
 
             netdata_log_debug(  D_LOGS_MANAG, "Setting up %s tail for %s (basename:%s)", 
-                    p_file_info->log_type == FLB_GENERIC ? "FLB_GENERIC" : "FLB_WEB_LOG",
+                    p_file_info->log_type == FLB_TAIL ? "FLB_TAIL" : "FLB_WEB_LOG",
                     p_file_info->filename, p_file_info->file_basename);
         
             /* Set up input from log source */

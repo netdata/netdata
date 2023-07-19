@@ -55,7 +55,7 @@ The following log collectors are supported at the moment. The table will be upda
 | systemd       	| `flb_systemd` 		| Collection of journald logs.|
 | docker events 	| `flb_docker_events` 	| Collection of docker events logs, similar to executing the `docker events` command.|
 | web log       	| `flb_web_log` 		| Collection of Apache or Nginx access logs.|
-| generic (tail)	| `flb_generic` 		| Collection of new logs from files by "tailing" them.|
+| tail				| `flb_tail` 			| Collection of new logs from files by "tailing" them.|
 | syslog socket   	| `flb_syslog`  		| Collection of RFC-3164 syslog logs by creating listening sockets.|
 | serial        	| `flb_serial`  		| Collection of logs from a serial interface.|
 
@@ -127,7 +127,7 @@ There are some fundamental configuration options that are common to all collecto
 | `update every` 		| Equivalent value in `[logs management]` section of `netdata.conf` (or Netdata global value, if higher). | How often metrics in charts will be updated every (in seconds).
 | `update timeout` 		| Equivalent value in `[logs management]` section of `netdata.conf` (or Netdata global value, if higher). | Maximum timeout charts may be delayed by while waiting for new logs.
 | `use log timestamp` 	| Equivalent value in `[logs management]` section of `netdata.conf` (`auto` by default). | If set to `auto`, log timestamps (when available) will be used for precise metrics aggregation. Otherwise (if set to `no`), collection timestamps will be used instead (which may result in lagged metrics under heavy system load, but it will reduce CPU usage).
-| `log type` 			| `flb_generic`	| Type of this log collector, see [relevant table](#collector-types) for a complete list of supported collectors.
+| `log type` 			| `flb_tail`	| Type of this log collector, see [relevant table](#collector-types) for a complete list of supported collectors.
 | `circular buffer max size` | Equivalent value in `[logs management]` section of `netdata.conf`. | Maximum RAM that can be used to buffer collected logs until they are saved to the disk database.
 | `circular buffer drop logs if full` | Equivalent value in `[logs management]` section of `netdata.conf` (`no` by default). | If there are new logs pending to be collected and the circular buffer is full, enabling this setting will allow old buffered logs to be dropped in favor of new ones. If disabled, collection of new logs will be blocked until there is free space again in the buffer (no logs will be lost in this case, but logs will not be ingested in real-time).
 | `compression acceleration` | Equivalent value in `[logs management]` section of `netdata.conf` (`1` by default). | Fine-tunes tradeoff between log compression speed and compression ratio, see [here](https://github.com/lz4/lz4/blob/90d68e37093d815e7ea06b0ee3c168cccffc84b8/lib/lz4.h#L195) for more details. 
@@ -278,7 +278,7 @@ This collector will collect logs through a serial interface. See also documentat
 
 In addition to the predefined charts, each log source supports the option to extract 
 user-defined metrics, by matching log records to [POSIX Extended Regular Expressions](https://en.wikibooks.org/wiki/Regular_Expressions/POSIX-Extended_Regular_Expressions). 
-This can be very useful particularly for `FLB_GENERIC` type log sources, where
+This can be very useful particularly for `FLB_TAIL` type log sources, where
 there is no parsing at all by default.
 
 To create a custom chart, the following key-value configuration options must be 
@@ -307,7 +307,7 @@ Example of configuration for a generic log source collection with custom regex-b
 [Auth.log]
 	enabled = yes
 	update every = 1
-	log type = generic
+	log type = flb_tail
 	circular buffer max size = 256 # in MiB
 	compression acceleration = 1 # see https://github.com/lz4/lz4/blob/90d68e37093d815e7ea06b0ee3c168cccffc84b8/lib/lz4.h#L195
 	buffer flush to DB = 6 # in sec, default 6 min 4
@@ -456,7 +456,7 @@ This is the most flexible option for a parent log collection, as it allows aggre
 
 	## Required settings
 	enabled = yes
-	log type = flb_generic
+	log type = flb_tail
 
 	## Optional settings, common to all log source. 
 	## Uncomment to override global equivalents.
@@ -483,7 +483,7 @@ Children instances do not have to use the `tail` input plugin specifically. Any 
 fluent-bit -i systemd -p Read_From_Tail=on -p Strip_Underscores=on -o forward -p Compress=gzip -F record_modifier -p 'Record="stream guid" 6ce266f5-2704-444d-a301-2423b9d30738' -m '*'
 ```
 
-The caveat is that an `flb_generic` log collection on a parent won't generate any type-specific charts by default, but [custom charts](#custom-charts) can be of course manually added by the user.
+The caveat is that an `flb_tail` log collection on a parent won't generate any type-specific charts by default, but [custom charts](#custom-charts) can be of course manually added by the user.
 
 <a name="streaming-docker-events"/>
 
@@ -527,7 +527,7 @@ or
 fluent-bit -R ~/fluent-bit/conf/parsers.conf -i docker_events -p Parser=docker -o forward -F record_modifier -p 'Record="stream guid" 6ce266f5-2704-444d-a301-2423b9d30737' -m '*'
 ```
 
-If instead the user desires to stream to a parent that collects logs into an `flb_generic` log collection, then a parser is not necessary and the unstructured logs can also be streamed in their original JSON format:
+If instead the user desires to stream to a parent that collects logs into an `flb_tail` log collection, then a parser is not necessary and the unstructured logs can also be streamed in their original JSON format:
 ```
 fluent-bit -i docker_events -o forward -F record_modifier -p 'Record="stream guid 6ce266f5-2704-444d-a301-2423b9d30737' -m '*'
 ```

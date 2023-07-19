@@ -15,7 +15,7 @@
 
 // Cool trick --> http://userpage.fu-berlin.de/~ram/pub/pub_jf47ht81Ht/c_preprocessor_applications_en
 /* WARNING: DO NOT CHANGED THE ORDER OF LOG_SRC_TYPES, ONLY APPEND NEW TYPES */
-#define LOG_SRC_TYPES   LST(FLB_GENERIC)LST(FLB_WEB_LOG)LST(FLB_KMSG) \
+#define LOG_SRC_TYPES   LST(FLB_TAIL)LST(FLB_WEB_LOG)LST(FLB_KMSG) \
                         LST(FLB_SYSTEMD)LST(FLB_DOCKER_EV)LST(FLB_SYSLOG) \
                         LST(FLB_SERIAL)
 #define LST(x) x,

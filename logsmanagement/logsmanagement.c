@@ -51,7 +51,7 @@ struct File_infos_arr *p_file_infos_arr = NULL;
 
 
 static struct Chart_meta chart_types[] = {
-    {.type = FLB_GENERIC,   .init = generic_chart_init,   .update = generic_chart_update},
+    {.type = FLB_TAIL,      .init = generic_chart_init,   .update = generic_chart_update},
     {.type = FLB_WEB_LOG,   .init = web_log_chart_init,   .update = web_log_chart_update},
     {.type = FLB_KMSG,      .init = kernel_chart_init,    .update = kernel_chart_update},
     {.type = FLB_SYSTEMD,   .init = systemd_chart_init,   .update = systemd_chart_update},
@@ -414,17 +414,17 @@ static void logs_management_init(uv_loop_t *main_loop,
     /* -------------------------------------------------------------------------
      * Check log type.
      * ------------------------------------------------------------------------- */
-    char *type = appconfig_get(&log_management_config, config_section->name, "log type", "flb_generic");
-    if(!type || !*type) p_file_info->log_type = FLB_GENERIC; // Default
+    char *type = appconfig_get(&log_management_config, config_section->name, "log type", "flb_tail");
+    if(!type || !*type) p_file_info->log_type = FLB_TAIL; // Default
     else{
-        if(!strcasecmp(type, "flb_generic")) p_file_info->log_type = FLB_GENERIC;
+        if(!strcasecmp(type, "flb_tail")) p_file_info->log_type = FLB_TAIL;
         else if (!strcasecmp(type, "flb_web_log")) p_file_info->log_type = FLB_WEB_LOG;
         else if (!strcasecmp(type, "flb_kmsg")) p_file_info->log_type = FLB_KMSG;
         else if (!strcasecmp(type, "flb_systemd")) p_file_info->log_type = FLB_SYSTEMD;
         else if (!strcasecmp(type, "flb_docker_events")) p_file_info->log_type = FLB_DOCKER_EV;
         else if (!strcasecmp(type, "flb_syslog")) p_file_info->log_type = FLB_SYSLOG;
         else if (!strcasecmp(type, "flb_serial")) p_file_info->log_type = FLB_SERIAL;
-        else p_file_info->log_type = FLB_GENERIC;
+        else p_file_info->log_type = FLB_TAIL;
     }
     freez(type);
     collector_info("[%s]: log type = %s", p_file_info->chart_name, log_src_type_t_str[p_file_info->log_type]);
@@ -474,7 +474,7 @@ static void logs_management_init(uv_loop_t *main_loop,
         p_file_info->filename = NULL;
             
         switch(p_file_info->log_type){
-            case FLB_GENERIC:
+            case FLB_TAIL:
                 if(!strcmp(p_file_info->chart_name, "Netdata error.log")){
                     char path[FILENAME_MAX + 1];
                     snprintfz(path, FILENAME_MAX, "%s/error.log", netdata_configured_log_dir);
@@ -663,7 +663,7 @@ static void logs_management_init(uv_loop_t *main_loop,
      * Deal with log-type-specific configuration options.
      * ------------------------------------------------------------------------- */
     
-    if(p_file_info->log_type == FLB_GENERIC){/* Do nothing */}
+    if(p_file_info->log_type == FLB_TAIL){/* Do nothing */}
     else if(p_file_info->log_type == FLB_WEB_LOG){
         /* Check if a valid web log format configuration is detected */
         char *log_format = appconfig_get(&log_management_config, config_section->name, "log format", "auto");
