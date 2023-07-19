@@ -301,9 +301,13 @@ enum ebpf_global_table_values {
 typedef uint64_t netdata_idx_t;
 
 typedef struct ebpf_module {
-    const char *thread_name;
-    const char *config_name;
-    const char *thread_description;
+    // Constants used with module
+    struct {
+        const char *thread_name;
+        const char *config_name;
+        const char *thread_description;
+    } info;
+
     enum ebpf_threads_status enabled;
     void *(*start_routine)(void *);
     int update_every;

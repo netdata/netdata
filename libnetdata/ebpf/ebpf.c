@@ -855,7 +855,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
 
     uint32_t idx = ebpf_select_index(em->kernels, is_rhf, kver);
 
-    ebpf_mount_name(lpath, 4095, plugins_dir, idx, em->thread_name, em->mode, is_rhf);
+    ebpf_mount_name(lpath, 4095, plugins_dir, idx, em->info.thread_name, em->mode, is_rhf);
 
     // When this function is called ebpf.plugin is using legacy code, so we should reset the variable
     em->load &= ~ NETDATA_EBPF_LOAD_METHODS;
@@ -1269,7 +1269,7 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_m
 
 #ifdef NETDATA_DEV_MODE
     netdata_log_info("The thread %s was configured with: mode = %s; update every = %d; apps = %s; cgroup = %s; ebpf type format = %s; ebpf co-re tracing = %s; collect pid = %s; maps per core = %s, lifetime=%u",
-         modules->thread_name,
+         modules->info.thread_name,
          load_mode,
          modules->update_every,
          (modules->apps_charts)?"enabled":"disabled",

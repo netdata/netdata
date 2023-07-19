@@ -17,7 +17,7 @@
 ebpf_module_t *ebpf_functions_select_module(const char *thread_name) {
     int i;
     for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
-        if (strcmp(ebpf_modules[i].thread_name, thread_name) == 0) {
+        if (strcmp(ebpf_modules[i].info.thread_name, thread_name) == 0) {
             return &ebpf_modules[i];
         }
     }
@@ -226,10 +226,10 @@ static void ebpf_function_thread_manipulation(const char *transaction,
         // THE ORDER SHOULD BE THE SAME WITH THE FIELDS!
 
         // thread name
-        buffer_json_add_array_item_string(wb, wem->thread_name);
+        buffer_json_add_array_item_string(wb, wem->info.thread_name);
 
         // description
-        buffer_json_add_array_item_string(wb, wem->thread_description);
+        buffer_json_add_array_item_string(wb, wem->info.thread_description);
         // Either it is not running or received a disabled signal and it is stopping.
         if (wem->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING ||
             (!wem->lifetime && (int)wem->running_time == wem->update_every)) {
