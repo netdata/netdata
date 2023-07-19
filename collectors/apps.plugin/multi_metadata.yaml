@@ -1,85 +1,11 @@
 name: apps.plugin
 modules:
-  - meta:
-      plugin_name: apps.plugin
-      module_name: system
-      monitored_instance:
-        name: apps system
-        link: ''
-        categories: []
-        icon_filename: ''
-      related_resources:
-        integrations:
-          list: []
-      info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
-      most_popular: false
-    overview:
-      data_collection:
-        metrics_description: ''
-        method_description: ''
-      supported_platforms:
-        include: []
-        exclude: []
-      multi-instance: true
-      additional_permissions:
-        description: ''
-      default_behavior:
-        auto_detection:
-          description: ''
-        limits:
-          description: ''
-        performance_impact:
-          description: ''
-    setup:
-      prerequisites:
-        list: []
-      configuration:
-        file:
-          name: ''
-          description: ''
-        options:
-          description: ''
-          folding:
-            title: ''
-            enabled: true
-          list: []
-        examples:
-          folding:
-            enabled: true
-            title: ''
-          list: []
-    troubleshooting:
-      problems:
-        list: []
-    alerts: []
-    metrics:
-      folding:
-        title: Metrics
-        enabled: false
-      description: ""
-      availability: []
-      scopes:
-        - name: global
-          description: ""
-          labels: []
-          metrics:
-            - name: system.processes_state
-              description: System Processes State
-              unit: "processes"
-              chart_type: line
-              dimensions:
-                - name: running
-                - name: sleeping_interruptible
-                - name: sleeping_uninterruptible
-                - name: zombie
-                - name: stopped
+  # removed system.processes_state
   - meta:
       plugin_name: apps.plugin
       module_name: apps
       monitored_instance:
-        name: apps apps
+        name: Applications
         link: ''
         categories: []
         icon_filename: ''
@@ -88,7 +14,11 @@ modules:
           list: []
       info_provided_to_referring_integrations:
         description: ''
-      keywords: []
+      keywords:
+       - applications
+       - processes
+       - os
+       - host monitoring
       most_popular: false
     overview:
       data_collection:
@@ -294,7 +224,7 @@ modules:
       plugin_name: apps.plugin
       module_name: groups
       monitored_instance:
-        name: apps groups
+        name: User Groups
         link: ''
         categories: []
         icon_filename: ''
@@ -303,7 +233,13 @@ modules:
           list: []
       info_provided_to_referring_integrations:
         description: ''
-      keywords: []
+      keywords:
+       - groups
+       - processes
+       - user auditing
+       - authorization
+       - os
+       - host monitoring
       most_popular: false
     overview:
       data_collection:
@@ -509,7 +445,7 @@ modules:
       plugin_name: apps.plugin
       module_name: users
       monitored_instance:
-        name: apps users
+        name: Users
         link: ''
         categories: []
         icon_filename: ''
@@ -518,7 +454,11 @@ modules:
           list: []
       info_provided_to_referring_integrations:
         description: ''
-      keywords: []
+      keywords:
+       - users
+       - processes
+       - os
+       - host monitoring
       most_popular: false
     overview:
       data_collection:
@@ -720,109 +660,3 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: a dimension per user
-  - meta:
-      plugin_name: apps.plugin
-      module_name: netdata
-      monitored_instance:
-        name: apps netdata
-        link: ''
-        categories: []
-        icon_filename: ''
-      related_resources:
-        integrations:
-          list: []
-      info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
-      most_popular: false
-    overview:
-      data_collection:
-        metrics_description: ''
-        method_description: ''
-      supported_platforms:
-        include: []
-        exclude: []
-      multi-instance: true
-      additional_permissions:
-        description: ''
-      default_behavior:
-        auto_detection:
-          description: ''
-        limits:
-          description: ''
-        performance_impact:
-          description: ''
-    setup:
-      prerequisites:
-        list: []
-      configuration:
-        file:
-          name: ''
-          description: ''
-        options:
-          description: ''
-          folding:
-            title: ''
-            enabled: true
-          list: []
-        examples:
-          folding:
-            enabled: true
-            title: ''
-          list: []
-    troubleshooting:
-      problems:
-        list: []
-    alerts: []
-    metrics:
-      folding:
-        title: Metrics
-        enabled: false
-      description: ""
-      availability: []
-      scopes:
-        - name: global
-          description: ""
-          labels: []
-          metrics:
-            - name: netdata.apps_cpu
-              description: Apps Plugin CPU
-              unit: "milliseconds/s"
-              chart_type: stacked
-              dimensions:
-                - name: user
-                - name: system
-            - name: netdata.apps_sizes
-              description: Apps Plugin Files
-              unit: "files/s"
-              chart_type: line
-              dimensions:
-                - name: calls
-                - name: files
-                - name: filenames
-                - name: inode_changes
-                - name: link_changes
-                - name: pids
-                - name: fds
-                - name: targets
-                - name: new_pids
-            - name: netdata.apps_fix
-              description: Apps Plugin Normalization Ratios
-              unit: "percentage"
-              chart_type: line
-              dimensions:
-                - name: utime
-                - name: stime
-                - name: gtime
-                - name: minflt
-                - name: majflt
-            - name: netdata.apps_children_fix
-              description: Apps Plugin Exited Children Normalization Ratios
-              unit: "percentage"
-              chart_type: line
-              dimensions:
-                - name: utime
-                - name: stime
-                - name: gtime
-                - name: minflt
-                - name: majflt
