@@ -124,13 +124,6 @@ static int ebpf_swap_attach_kprobe(struct swap_bpf *obj)
     if (ret)
         return -1;
 
-    obj->links.netdata_release_task_probe = bpf_program__attach_kprobe(obj->progs.netdata_release_task_probe,
-                                                                         false,
-                                                                         EBPF_COMMON_FNCT_CLEAN_UP);
-    ret = libbpf_get_error(obj->links.netdata_swap_writepage_probe);
-    if (ret)
-        return -1;
-
     return 0;
 }
 
@@ -176,7 +169,6 @@ static void ebpf_swap_adjust_map(struct swap_bpf *obj, ebpf_module_t *em)
 static void ebpf_swap_disable_release_task(struct swap_bpf *obj)
 {
     bpf_program__set_autoload(obj->progs.netdata_release_task_fentry, false);
-    bpf_program__set_autoload(obj->progs.netdata_release_task_probe, false);
 }
 
 /**

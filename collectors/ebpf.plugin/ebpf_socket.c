@@ -48,16 +48,7 @@ static ebpf_local_maps_t socket_maps[] = {{.name = "tbl_bandwidth",
                                            .map_type = BPF_MAP_TYPE_PERCPU_HASH
 #endif
                                            },
-                                          {.name = "tbl_conn_ipv4",
-                                           .internal_input = NETDATA_COMPILED_CONNECTIONS_ALLOWED,
-                                           .user_input = NETDATA_MAXIMUM_CONNECTIONS_ALLOWED,
-                                           .type = NETDATA_EBPF_MAP_STATIC,
-                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
-#ifdef LIBBPF_MAJOR_VERSION
-                                           .map_type = BPF_MAP_TYPE_PERCPU_HASH
-#endif
-                                          },
-                                          {.name = "tbl_conn_ipv6",
+                                           {.name = "tbl_nd_socket",
                                            .internal_input = NETDATA_COMPILED_CONNECTIONS_ALLOWED,
                                            .user_input = NETDATA_MAXIMUM_CONNECTIONS_ALLOWED,
                                            .type = NETDATA_EBPF_MAP_STATIC,
@@ -156,7 +147,6 @@ static void ebpf_socket_disable_probes(struct socket_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_tcp_sendmsg_kprobe, false);
     bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_kretprobe, false);
     bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_kprobe, false);
-    bpf_program__set_autoload(obj->progs.netdata_socket_release_task_kprobe, false);
 }
 
 /**
@@ -180,7 +170,6 @@ static void ebpf_socket_disable_trampoline(struct socket_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_tcp_sendmsg_fexit, false);
     bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_fentry, false);
     bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_fexit, false);
-    bpf_program__set_autoload(obj->progs.netdata_socket_release_task_fentry, false);
 }
 
 /**
@@ -224,8 +213,6 @@ static void ebpf_set_trampoline_target(struct socket_bpf *obj)
 
     bpf_program__set_attach_target(obj->progs.netdata_udp_sendmsg_fexit, 0,
                                    socket_targets[NETDATA_FCNT_UDP_SENDMSG].name);
-
-    bpf_program__set_attach_target(obj->progs.netdata_socket_release_task_fentry, 0, EBPF_COMMON_FNCT_CLEAN_UP);
 }
 
 
@@ -363,12 +350,6 @@ static int ebpf_socket_attach_probes(struct socket_bpf *obj, netdata_run_mode_t 
             return -1;
     }
 
-    obj->links.netdata_socket_release_task_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_socket_release_task_kprobe,
-                                                                               false,  EBPF_COMMON_FNCT_CLEAN_UP);
-    ret = libbpf_get_error(obj->links.netdata_socket_release_task_kprobe);
-    if (ret)
-        return -1;
-
     return 0;
 }
 
@@ -384,8 +365,7 @@ static void ebpf_socket_set_hash_tables(struct socket_bpf *obj)
     socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH].map_fd = bpf_map__fd(obj->maps.tbl_bandwidth);
     socket_maps[NETDATA_SOCKET_GLOBAL].map_fd = bpf_map__fd(obj->maps.tbl_global_sock);
     socket_maps[NETDATA_SOCKET_LPORTS].map_fd = bpf_map__fd(obj->maps.tbl_lports);
-    socket_maps[NETDATA_SOCKET_TABLE_IPV4].map_fd = bpf_map__fd(obj->maps.tbl_conn_ipv4);
-    socket_maps[NETDATA_SOCKET_TABLE_IPV6].map_fd = bpf_map__fd(obj->maps.tbl_conn_ipv6);
+    socket_maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd = bpf_map__fd(obj->maps.tbl_nd_socket);
     socket_maps[NETDATA_SOCKET_TABLE_UDP].map_fd = bpf_map__fd(obj->maps.tbl_nv_udp);
     socket_maps[NETDATA_SOCKET_TABLE_CTRL].map_fd = bpf_map__fd(obj->maps.socket_ctrl);
 }
@@ -403,19 +383,14 @@ static void ebpf_socket_adjust_map(struct socket_bpf *obj, ebpf_module_t *em)
     ebpf_update_map_size(obj->maps.tbl_bandwidth, &socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH],
                          em, bpf_map__name(obj->maps.tbl_bandwidth));
 
-    ebpf_update_map_size(obj->maps.tbl_conn_ipv4, &socket_maps[NETDATA_SOCKET_TABLE_IPV4],
-                         em, bpf_map__name(obj->maps.tbl_conn_ipv4));
-
-    ebpf_update_map_size(obj->maps.tbl_conn_ipv6, &socket_maps[NETDATA_SOCKET_TABLE_IPV6],
-                         em, bpf_map__name(obj->maps.tbl_conn_ipv6));
+    ebpf_update_map_size(obj->maps.tbl_nd_socket, &socket_maps[NETDATA_SOCKET_OPEN_SOCKET],
+                         em, bpf_map__name(obj->maps.tbl_nd_socket));
 
     ebpf_update_map_size(obj->maps.tbl_nv_udp, &socket_maps[NETDATA_SOCKET_TABLE_UDP],
                          em, bpf_map__name(obj->maps.tbl_nv_udp));
 
-
     ebpf_update_map_type(obj->maps.tbl_bandwidth, &socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH]);
-    ebpf_update_map_type(obj->maps.tbl_conn_ipv4, &socket_maps[NETDATA_SOCKET_TABLE_IPV4]);
-    ebpf_update_map_type(obj->maps.tbl_conn_ipv6, &socket_maps[NETDATA_SOCKET_TABLE_IPV6]);
+    ebpf_update_map_type(obj->maps.tbl_nd_socket, &socket_maps[NETDATA_SOCKET_OPEN_SOCKET]);
     ebpf_update_map_type(obj->maps.tbl_nv_udp, &socket_maps[NETDATA_SOCKET_TABLE_UDP]);
     ebpf_update_map_type(obj->maps.socket_ctrl, &socket_maps[NETDATA_SOCKET_TABLE_CTRL]);
     ebpf_update_map_type(obj->maps.tbl_global_sock, &socket_maps[NETDATA_SOCKET_GLOBAL]);
@@ -2181,8 +2156,7 @@ void *ebpf_socket_read_hash(void *ptr)
 
     heartbeat_t hb;
     heartbeat_init(&hb);
-    int fd_ipv4 = socket_maps[NETDATA_SOCKET_TABLE_IPV4].map_fd;
-    int fd_ipv6 = socket_maps[NETDATA_SOCKET_TABLE_IPV6].map_fd;
+    int fd = socket_maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd;
     int maps_per_core = em->maps_per_core;
     // This thread is cancelled from another thread
     uint32_t running_time;
@@ -2193,8 +2167,7 @@ void *ebpf_socket_read_hash(void *ptr)
            break;
 
         pthread_mutex_lock(&nv_mutex);
-        ebpf_read_socket_hash_table(fd_ipv4, AF_INET, maps_per_core);
-        ebpf_read_socket_hash_table(fd_ipv6, AF_INET6, maps_per_core);
+        ebpf_read_socket_hash_table(fd, AF_INET6, maps_per_core);
         pthread_mutex_unlock(&nv_mutex);
     }
 
@@ -3920,13 +3893,10 @@ void parse_table_size_options(struct config *cfg)
                                                                                             EBPF_GLOBAL_SECTION,
                                                                                             EBPF_CONFIG_BANDWIDTH_SIZE, NETDATA_MAXIMUM_CONNECTIONS_ALLOWED);
 
-    socket_maps[NETDATA_SOCKET_TABLE_IPV4].user_input = (uint32_t) appconfig_get_number(cfg,
-                                                                                       EBPF_GLOBAL_SECTION,
-                                                                                       EBPF_CONFIG_IPV4_SIZE, NETDATA_MAXIMUM_CONNECTIONS_ALLOWED);
-
-    socket_maps[NETDATA_SOCKET_TABLE_IPV6].user_input = (uint32_t) appconfig_get_number(cfg,
-                                                                                       EBPF_GLOBAL_SECTION,
-                                                                                       EBPF_CONFIG_IPV6_SIZE, NETDATA_MAXIMUM_CONNECTIONS_ALLOWED);
+    socket_maps[NETDATA_SOCKET_OPEN_SOCKET].user_input = (uint32_t) appconfig_get_number(cfg,
+                                                                                        EBPF_GLOBAL_SECTION,
+                                                                                        EBPF_CONFIG_SOCKET_MONITORING_SIZE,
+                                                                                        NETDATA_MAXIMUM_CONNECTIONS_ALLOWED);
 
     socket_maps[NETDATA_SOCKET_TABLE_UDP].user_input = (uint32_t) appconfig_get_number(cfg,
                                                                                       EBPF_GLOBAL_SECTION,

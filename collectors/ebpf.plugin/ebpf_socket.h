@@ -22,8 +22,7 @@
 #define EBPF_CONFIG_PORTS "ports"
 #define EBPF_CONFIG_HOSTNAMES "hostnames"
 #define EBPF_CONFIG_BANDWIDTH_SIZE "bandwidth table size"
-#define EBPF_CONFIG_IPV4_SIZE "ipv4 connection table size"
-#define EBPF_CONFIG_IPV6_SIZE "ipv6 connection table size"
+#define EBPF_CONFIG_SOCKET_MONITORING_SIZE "socket monitoring table size"
 #define EBPF_CONFIG_UDP_SIZE "udp connection table size"
 #define EBPF_MAXIMUM_DIMENSIONS "maximum dimensions"
 
@@ -31,8 +30,7 @@ enum ebpf_socket_table_list {
     NETDATA_SOCKET_TABLE_BANDWIDTH,
     NETDATA_SOCKET_GLOBAL,
     NETDATA_SOCKET_LPORTS,
-    NETDATA_SOCKET_TABLE_IPV4,
-    NETDATA_SOCKET_TABLE_IPV6,
+    NETDATA_SOCKET_OPEN_SOCKET,
     NETDATA_SOCKET_TABLE_UDP,
     NETDATA_SOCKET_TABLE_CTRL
 };
