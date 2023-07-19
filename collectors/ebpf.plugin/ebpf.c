@@ -2686,58 +2686,50 @@ static void update_internal_metric_variable()
 }
 
 /**
- * Create chart for Statistic Thread
+ * Create Thread Chart
  *
- * Write to standard output current values for threads.
+ * Write to standard output current values for threads charts.
  *
+ * @param name         is the chart name
+ * @param title        chart title.
+ * @param units        chart units
+ * @param order        is the chart order
  * @param update_every time used to update charts
+ * @param module       a module to create a specific chart.
  */
-static inline void ebpf_create_statistic_thread_chart(int update_every)
+static void ebpf_create_thread_chart(char *name,
+                                     char *title,
+                                     char *units,
+                                     int order,
+                                     int update_every,
+                                     ebpf_module_t *module)
 {
+    // common call for specific and all charts.
     ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
-                         NETDATA_EBPF_THREADS,
-                         "Threads running.",
-                         "boolean",
+                         name,
+                         title,
+                         units,
                          NETDATA_EBPF_FAMILY,
                          NETDATA_EBPF_CHART_TYPE_LINE,
                          NULL,
-                         NETDATA_EBPF_ORDER_STAT_THREADS,
+                         order,
                          update_every,
-                         NETDATA_EBPF_MODULE_NAME_PROCESS);
+                         "main");
 
-    int i;
-    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
-        ebpf_write_global_dimension((char *)ebpf_modules[i].info.thread_name,
-                                    (char *)ebpf_modules[i].info.thread_name,
+    if (module) {
+        ebpf_write_global_dimension((char *)module->info.thread_name,
+                                    (char *)module->info.thread_name,
                                     ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+        return;
     }
-}
-
-/**
- * Create lifetime Thread Chart
- *
- * Write to standard output current values for threads lifetime.
- *
- * @param update_every time used to update charts
- */
-static inline void ebpf_create_lifetime_thread_chart(int update_every)
-{
-    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
-                         NETDATA_EBPF_LIFE_TIME,
-                         "Threads running.",
-                         "seconds",
-                         NETDATA_EBPF_FAMILY,
-                         NETDATA_EBPF_CHART_TYPE_LINE,
-                         NULL,
-                         NETDATA_EBPF_ORDER_STAT_LIFE_TIME,
-                         update_every,
-                         NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     int i;
     for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
-        ebpf_write_global_dimension((char *)ebpf_modules[i].info.thread_name,
-                                    (char *)ebpf_modules[i].info.thread_name,
-                                    ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+        ebpf_module_t *em = &ebpf_modules[i];
+        if (!em->functions.fnct_routine)
+            ebpf_write_global_dimension((char *)em->info.thread_name,
+                                        (char *)em->info.thread_name,
+                                        ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
     }
 }
 
@@ -2929,12 +2921,22 @@ static void ebpf_create_statistic_charts(int update_every)
 
     create_charts = 0;
 
-    ebpf_create_statistic_thread_chart(update_every);
+    ebpf_create_thread_chart(NETDATA_EBPF_THREADS,
+                             "Threads running.",
+                             "boolean",
+                             NETDATA_EBPF_ORDER_STAT_THREADS,
+                             update_every,
+                             NULL);
 #ifdef NETDATA_DEV_MODE
     EBPF_PLUGIN_FUNCTIONS(EBPF_FUNCTION_THREAD, EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
 #endif
 
-    ebpf_create_lifetime_thread_chart(update_every);
+    ebpf_create_thread_chart(NETDATA_EBPF_LIFE_TIME,
+                             "Time remaining for thread.",
+                             "seconds",
+                             NETDATA_EBPF_ORDER_STAT_LIFE_TIME,
+                             update_every,
+                             NULL);
 #ifdef NETDATA_DEV_MODE
     EBPF_PLUGIN_FUNCTIONS(EBPF_FUNCTION_THREAD, EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
 #endif
