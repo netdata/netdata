@@ -1,54 +1,57 @@
 name: cgroups.plugin
 modules:
-  - meta:
+  - &module
+    meta: &meta
       plugin_name: cgroups.plugin
       module_name: /sys/fs/cgroup
       monitored_instance:
-        name: cgroups /sys/fs/cgroup
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: Containers
+        link: ""
+        categories:
+          - data-collection.containers-and-vms
+        icon_filename: netdata.png
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
-      most_popular: false
+        description: ""
+      keywords:
+        - containers
+      most_popular: true
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -58,22 +61,20 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
         metric: cgroup.cpu_limit
         info: average cgroup CPU utilization over the last 10 minutes
-        os: "linux"
       - name: cgroup_ram_in_use
         link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
         metric: cgroup.mem_usage
         info: cgroup memory utilization
-        os: "linux"
-      - name: k8s_cgroup_10min_cpu_usage
+      - name: cgroup_1m_received_packets_rate
         link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
-        metric: k8s.cgroup.cpu_limit
-        info: average cgroup CPU utilization over the last 10 minutes
-        os: "linux"
-      - name: k8s_cgroup_ram_in_use
+        metric: cgroup.net_packets
+        info: average number of packets received by the network interface ${label:device} over the last minute
+      - name: cgroup_10s_received_packets_storm
         link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
-        metric: k8s.cgroup.mem_usage
-        info: cgroup memory utilization
-        os: "linux"
+        metric: cgroup.net_packets
+        info:
+          ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over
+          the last minute
     metrics:
       folding:
         title: Metrics
@@ -309,6 +310,136 @@ modules:
               chart_type: line
               dimensions:
                 - name: time
+        - name: cgroup network device
+          description: ""
+          labels:
+            - name: container_name
+              description: TBD
+            - name: image
+              description: TBD
+            - name: device
+              description: TBD
+            - name: interface_type
+              description: TBD
+          metrics:
+            - name: cgroup.net_net
+              description: Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: cgroup.net_packets
+              description: Packets
+              unit: "pps"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+                - name: multicast
+            - name: cgroup.net_errors
+              description: Interface Errors
+              unit: "errors/s"
+              chart_type: line
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: cgroup.net_drops
+              description: Interface Drops
+              unit: "errors/s"
+              chart_type: line
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: cgroup.net_fifo
+              description: Interface FIFO Buffer Errors
+              unit: "errors/s"
+              chart_type: line
+              dimensions:
+                - name: receive
+                - name: transmit
+            - name: cgroup.net_compressed
+              description: Interface FIFO Buffer Errors
+              unit: "pps"
+              chart_type: line
+              dimensions:
+                - name: receive
+                - name: sent
+            - name: cgroup.net_events
+              description: Network Interface Events
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: frames
+                - name: collisions
+                - name: carrier
+            - name: cgroup.net_operstate
+              description: Interface Operational State
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: up
+                - name: down
+                - name: notpresent
+                - name: lowerlayerdown
+                - name: testing
+                - name: dormant
+                - name: unknown
+            - name: cgroup.net_carrier
+              description: Interface Physical Link State
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: up
+                - name: down
+            - name: cgroup.net_mtu
+              description: Interface MTU
+              unit: "octets"
+              chart_type: line
+              dimensions:
+                - name: mtu
+
+  - <<: *module
+    meta:
+      <<: *meta
+      monitored_instance:
+        name: Kubernetes Containers
+        link: https://kubernetes.io/
+        icon_filename: k8s.png
+        categories:
+          - data-collection.containers-vms
+          - data-collection.kubernetes
+      keywords:
+        - k8s
+        - kubernetes
+        - pods
+        - containers
+    alerts:
+      - name: k8s_cgroup_10min_cpu_usage
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
+        metric: k8s.cgroup.cpu_limit
+        info: average cgroup CPU utilization over the last 10 minutes
+      - name: k8s_cgroup_ram_in_use
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
+        metric: k8s.cgroup.mem_usage
+        info: cgroup memory utilization
+      - name: k8s_cgroup_1m_received_packets_rate
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
+        metric: k8s.cgroup.net_packets
+        info: average number of packets received by the network interface ${label:device} over the last minute
+      - name: k8s_cgroup_10s_received_packets_storm
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
+        metric: k8s.cgroup.net_packets
+        info:
+          ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over
+          the last minute
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
         - name: k8s cgroup
           description: ""
           labels:
@@ -555,172 +686,7 @@ modules:
               chart_type: line
               dimensions:
                 - name: time
-  - meta:
-      plugin_name: cgroups.plugin
-      module_name: /proc/net/dev
-      monitored_instance:
-        name: cgroups /proc/net/dev
-        link: ''
-        categories: []
-        icon_filename: ''
-      related_resources:
-        integrations:
-          list: []
-      info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
-      most_popular: false
-    overview:
-      data_collection:
-        metrics_description: ''
-        method_description: ''
-      supported_platforms:
-        include: []
-        exclude: []
-      multi-instance: true
-      additional_permissions:
-        description: ''
-      default_behavior:
-        auto_detection:
-          description: ''
-        limits:
-          description: ''
-        performance_impact:
-          description: ''
-    setup:
-      prerequisites:
-        list: []
-      configuration:
-        file:
-          name: ''
-          description: ''
-        options:
-          description: ''
-          folding:
-            title: ''
-            enabled: true
-          list: []
-        examples:
-          folding:
-            enabled: true
-            title: ''
-          list: []
-    troubleshooting:
-      problems:
-        list: []
-    alerts:
-      - name: cgroup_1m_received_packets_rate
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
-        metric: cgroup.net_packets
-        info: average number of packets received by the network interface ${label:device} over the last minute
-      - name: cgroup_10s_received_packets_storm
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
-        metric: cgroup.net_packets
-        info: ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over the last minute
-      - name: k8s_cgroup_1m_received_packets_rate
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
-        metric: k8s.cgroup.net_packets
-        info: average number of packets received by the network interface ${label:device} over the last minute
-      - name: k8s_cgroup_10s_received_packets_storm
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
-        metric: k8s.cgroup.net_packets
-        info: ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over the last minute
-    metrics:
-      folding:
-        title: Metrics
-        enabled: false
-      description: ""
-      availability: []
-      scopes:
-        - name: cgroup, network device
-          description: ""
-          labels:
-            - name: container_name
-              description: TBD
-            - name: image
-              description: TBD
-            - name: device
-              description: TBD
-            - name: interface_type
-              description: TBD
-          metrics:
-            - name: cgroup.net_net
-              description: Bandwidth
-              unit: "kilobits/s"
-              chart_type: area
-              dimensions:
-                - name: received
-                - name: sent
-            - name: cgroup.net_packets
-              description: Packets
-              unit: "pps"
-              chart_type: line
-              dimensions:
-                - name: received
-                - name: sent
-                - name: multicast
-            - name: cgroup.net_errors
-              description: Interface Errors
-              unit: "errors/s"
-              chart_type: line
-              dimensions:
-                - name: inbound
-                - name: outbound
-            - name: cgroup.net_drops
-              description: Interface Drops
-              unit: "errors/s"
-              chart_type: line
-              dimensions:
-                - name: inbound
-                - name: outbound
-            - name: cgroup.net_fifo
-              description: Interface FIFO Buffer Errors
-              unit: "errors/s"
-              chart_type: line
-              dimensions:
-                - name: receive
-                - name: transmit
-            - name: cgroup.net_compressed
-              description: Interface FIFO Buffer Errors
-              unit: "pps"
-              chart_type: line
-              dimensions:
-                - name: receive
-                - name: sent
-            - name: cgroup.net_events
-              description: Network Interface Events
-              unit: "events/s"
-              chart_type: line
-              dimensions:
-                - name: frames
-                - name: collisions
-                - name: carrier
-            - name: cgroup.net_operstate
-              description: Interface Operational State
-              unit: "state"
-              chart_type: line
-              dimensions:
-                - name: up
-                - name: down
-                - name: notpresent
-                - name: lowerlayerdown
-                - name: testing
-                - name: dormant
-                - name: unknown
-            - name: cgroup.net_carrier
-              description: Interface Physical Link State
-              unit: "state"
-              chart_type: line
-              dimensions:
-                - name: up
-                - name: down
-            - name: cgroup.net_mtu
-              description: Interface MTU
-              unit: "octets"
-              chart_type: line
-              dimensions:
-                - name: mtu
-        - name: k8s cgroup, network device
+        - name: k8s cgroup network device
           description: ""
           labels:
             - name: device
@@ -826,59 +792,16 @@ modules:
               chart_type: line
               dimensions:
                 - name: mtu
-  - meta:
-      plugin_name: cgroups.plugin
-      module_name: systemd
+
+  - <<: *module
+    meta:
+      <<: *meta
       monitored_instance:
-        name: cgroups systemd
-        link: ''
-        categories: []
-        icon_filename: ''
-      related_resources:
-        integrations:
-          list: []
-      info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
-      most_popular: false
-    overview:
-      data_collection:
-        metrics_description: ''
-        method_description: ''
-      supported_platforms:
-        include: []
-        exclude: []
-      multi-instance: true
-      additional_permissions:
-        description: ''
-      default_behavior:
-        auto_detection:
-          description: ''
-        limits:
-          description: ''
-        performance_impact:
-          description: ''
-    setup:
-      prerequisites:
-        list: []
-      configuration:
-        file:
-          name: ''
-          description: ''
-        options:
-          description: ''
-          folding:
-            title: ''
-            enabled: true
-          list: []
-        examples:
-          folding:
-            enabled: true
-            title: ''
-          list: []
-    troubleshooting:
-      problems:
-        list: []
+        name: Systemd Services
+        link: ""
+        icon_filename: systemd.png
+        categories:
+          - data-collection.systemd
     alerts: []
     metrics:
       folding:
@@ -1035,3 +958,66 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
+  - <<: *module
+    meta:
+      <<: *meta
+      monitored_instance:
+        name: Virtual Machines
+        link: ""
+        icon_filename: k8s.png
+        categories:
+          - data-collection.containers-vms
+          - data-collection.kubernetes
+      keywords:
+        - vms
+        - virtualization
+        - container
+  - <<: *module
+    meta:
+      <<: *meta
+      monitored_instance:
+        name: LXC Containers
+        link: ""
+        icon_filename: lxc.png
+        categories:
+          - data-collection.containers-vms
+      keywords:
+        - lxc
+        - lxd
+        - container
+  - <<: *module
+    meta:
+      <<: *meta
+      monitored_instance:
+        name: Libvirt Containers
+        link: ""
+        icon_filename: libvirt.png
+        categories:
+          - data-collection.containers-vms
+      keywords:
+        - libvirt
+        - container
+  - <<: *module
+    meta:
+      <<: *meta
+      monitored_instance:
+        name: oVirt Containers
+        link: ""
+        icon_filename: ovirt.png
+        categories:
+          - data-collection.containers-vms
+      keywords:
+        - ovirt
+        - container
+  - <<: *module
+    meta:
+      <<: *meta
+      monitored_instance:
+        name: Proxmox Containers
+        link: ""
+        icon_filename: proxmox.png
+        categories:
+          - data-collection.containers-vms
+      keywords:
+        - proxmox
+        - container
