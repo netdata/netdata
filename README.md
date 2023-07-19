@@ -430,23 +430,19 @@ to collect metrics, troubleshoot via charts, export to external databases, and m
 <p align="center">
   <a href="https://discord.com/invite/mPZ6WZKKG2"><img alt="Discord" src="https://img.shields.io/discord/847502280503590932?logo=discord&logoColor=white&label=chat%20on%20discord"></a>
   <a href="https://community.netdata.cloud"><img alt="Discourse topics" src="https://img.shields.io/discourse/topics?server=https%3A%2F%2Fcommunity.netdata.cloud%2F&logo=discourse&label=discourse%20forum"></a>
+  <a href="https://github.com/netdata/netdata/discussions"><img alt="GitHub Discussions" src="https://img.shields.io/github/discussions/netdata/netdata?logo=github&label=github%20discussions"></a>
 </p>
 
 Netdata is an inclusive open-source project and community. Please read our [Code of Conduct](https://github.com/netdata/.github/blob/main/CODE_OF_CONDUCT.md).
 
-Find most of the Netdata team in our [community forums](https://community.netdata.cloud). It's the best place to
-ask questions, find resources, and engage with passionate professionals. The team is also available and active in our [Discord](https://discord.com/invite/mPZ6WZKKG2) too.
+Join the Netdata community:
 
-You can also find Netdata on:
+- Chat with us and other community members on [Discord](https://discord.com/invite/mPZ6WZKKG2).
+- Start a discussion on [Github discussions](https://github.com/netdata/netdata/discussions).
+- Open a topic to our [community forums](https://community.netdata.cloud).
 
--   [Twitter](https://twitter.com/linuxnetdata)
--   [YouTube](https://www.youtube.com/c/Netdata)
--   [Reddit](https://www.reddit.com/r/netdata/)
--   [LinkedIn](https://www.linkedin.com/company/netdata-cloud/)
--   [StackShare](https://stackshare.io/netdata)
--   [Product Hunt](https://www.producthunt.com/posts/netdata-monitoring-agent/)
--   [Repology](https://repology.org/metapackage/netdata/versions)
--   [Facebook](https://www.facebook.com/linuxnetdata/)
+You can also find Netdata on:<br/>
+[Twitter](https://twitter.com/linuxnetdata) | [YouTube](https://www.youtube.com/c/Netdata) | [Reddit](https://www.reddit.com/r/netdata/) | [LinkedIn](https://www.linkedin.com/company/netdata-cloud/) | [StackShare](https://stackshare.io/netdata) | [Product Hunt](https://www.producthunt.com/posts/netdata-monitoring-agent/) | [Repology](https://repology.org/metapackage/netdata/versions) | [Facebook](https://www.facebook.com/linuxnetdata/)
 
 ## :pray: Contribute
 
