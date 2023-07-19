@@ -63,7 +63,6 @@ const char *database_config[] = {
 };
 
 const char *database_cleanup[] = {
-    "DELETE FROM chart WHERE chart_id NOT IN (SELECT chart_id FROM dimension);",
     "DELETE FROM host WHERE host_id NOT IN (SELECT host_id FROM chart);",
     "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);",
     "DELETE FROM host_info WHERE host_id NOT IN (SELECT host_id FROM host);",
