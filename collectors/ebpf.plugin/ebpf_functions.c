@@ -433,7 +433,21 @@ static void ebpf_function_socket_manipulation(const char *transaction,
         if (!keyword)
             break;
 
-        if(strncmp(keyword, "help", 4) == 0) {
+        if (strncmp(keyword, EBPF_THREADS_SOCKET_FAMILY, sizeof(EBPF_THREADS_SOCKET_FAMILY) -1) == 0) {
+            const char *name = &keyword[sizeof(EBPF_THREADS_SOCKET_FAMILY) - 1];
+            char *separator = strchr(name, ':');
+            if (separator) {
+                separator++;
+                if (!strcmp(separator, "IPV4"))
+                    network_viewer_opt.family = AF_INET;
+                else if (!strcmp(separator, "IPV6"))
+                    network_viewer_opt.family = AF_INET6;
+                else
+                    network_viewer_opt.family = AF_UNSPEC;
+            } else {
+                network_viewer_opt.family = AF_UNSPEC;
+            }
+        } else if(strncmp(keyword, "help", 4) == 0) {
             ebpf_function_socket_help(transaction);
             return;
         }
