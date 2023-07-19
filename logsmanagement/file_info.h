@@ -45,6 +45,11 @@ typedef enum log_src_state {
     LOG_SRC_EXITING                 /*!< cleanup and destroy stage */
 } LOG_SRC_STATE;
 
+typedef struct flb_tail_config {
+    int use_inotify;
+} Flb_tail_config_t;
+
+
 typedef struct flb_serial_config {
     char *bitrate;
     char *min_bytes;

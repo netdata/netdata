@@ -1115,6 +1115,9 @@ int flb_add_input(struct File_info *const p_file_info){
             netdata_log_debug(  D_LOGS_MANAG, "Setting up %s tail for %s (basename:%s)", 
                     p_file_info->log_type == FLB_TAIL ? "FLB_TAIL" : "FLB_WEB_LOG",
                     p_file_info->filename, p_file_info->file_basename);
+
+            Flb_tail_config_t *tail_config = (Flb_tail_config_t *) p_file_info->flb_config;
+            if(unlikely(!tail_config)) return CONFIG_READ_ERROR;
         
             /* Set up input from log source */
             p_file_info->flb_input = flb_input(ctx, "tail", NULL);
@@ -1127,8 +1130,7 @@ int flb_add_input(struct File_info *const p_file_info){
                 "Skip_Long_Lines", "On",
                 "Skip_Empty_Lines", "On",
 #if defined(FLB_HAVE_INOTIFY)
-                // TODO: Add configuration option for user, to either use inotify or stat.
-                "Inotify_Watcher", "true", 
+                "Inotify_Watcher", tail_config->use_inotify ? "true" : "false", 
 #endif
                 NULL) != 0) return FLB_INPUT_SET_ERROR;
 

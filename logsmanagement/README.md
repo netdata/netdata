@@ -12,6 +12,7 @@
 	- [Kernel logs (kmsg)](#collector-configuration-kmsg)
     - [Systemd](#collector-configuration-systemd)
 	- [Docker events](#collector-configuration-docker-events)
+	- [Tail](#collector-configuration-tail)
 	- [Web log](#collector-configuration-web-log)
 	- [Syslog socket](#collector-configuration-syslog)
 	- [Serial](#collector-configuration-serial)
@@ -54,8 +55,8 @@ The following log collectors are supported at the moment. The table will be upda
 | kernel logs (kmsg)| `flb_kmsg`    		| Collection of new kernel ring buffer logs.|
 | systemd       	| `flb_systemd` 		| Collection of journald logs.|
 | docker events 	| `flb_docker_events` 	| Collection of docker events logs, similar to executing the `docker events` command.|
+| tail				| `flb_tail` 			| Collection of new logs from files by "tailing" them, similar to `tail -f`.|
 | web log       	| `flb_web_log` 		| Collection of Apache or Nginx access logs.|
-| tail				| `flb_tail` 			| Collection of new logs from files by "tailing" them.|
 | syslog socket   	| `flb_syslog`  		| Collection of RFC-3164 syslog logs by creating listening sockets.|
 | serial        	| `flb_serial`  		| Collection of logs from a serial interface.|
 
@@ -200,6 +201,20 @@ This collector will use the Docker API to collect Docker events logs. See also d
 | `log path` | Docker socket UNIX path. If set to `auto`, the default path will be used. |
 | `event type chart` | Enable chart showing the Docker object type of the collected logs. |
 
+<a name="collector-configuration-tail"/>
+
+### Tail
+
+</a>
+
+This collector will collect any type of logs from a log file, similar to executing the `tail -f` command. See also documentation of [Fluent Bit tail plugin](https://docs.fluentbit.io/manual/pipeline/inputs/tail).
+
+|  Configuration Option | Description  |
+|      :------------:  	| ------------ |
+| `log path` | The path to the log file to be monitored. |
+| `use inotify` | Select between inotify and file stat watchers (providing `libfluent-bit.so` has been built with inotify support). It defaults to `yes`. Set to `no` if abnormally high CPU usage is observed. |
+
+
 <a name="collector-configuration-web-log"/>
 
 ### Web log
@@ -211,6 +226,7 @@ This collector will collect [Apache](https://httpd.apache.org/) and [Nginx](http
 |  Configuration Option | Description  |
 |      :------------:  	| ------------ |
 | `log path` | The path to the web server's `access.log`. If set to `auto`, the collector will attempt to auto-discover it, provided the name of the configuration section is either `Apache access.log` or `Nginx access.log`. |
+| `use inotify` | Select between inotify and file stat watchers (providing `libfluent-bit.so` has been built with inotify support). It defaults to `yes`. Set to `no` if abnormally high CPU usage is observed. |
 | `log format` | The log format to be used for parsing. Unlike the [`GO weblog`]() module, only the `CSV` parser is supported and it can be configured [in the same way](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md#known-fields) as in the `GO` module. If set to `auto`, the collector will attempt to auto-detect the log format using the same logic explained [here](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md#log-parser-auto-detection). |
 | `verify parsed logs` | If set to `yes`, the parser will attempt to verify that the parsed fields are valid, before extracting metrics from them. If they are invalid (for example, the response code is less than `100`), the `invalid` dimension will be incremented instead. Setting this to `no` will result in a slight performance gain. |
 | `vhosts chart` | Enable chart showing names of the virtual hosts extracted from the collected logs. |

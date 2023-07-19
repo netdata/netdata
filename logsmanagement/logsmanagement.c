@@ -663,8 +663,16 @@ static void logs_management_init(uv_loop_t *main_loop,
      * Deal with log-type-specific configuration options.
      * ------------------------------------------------------------------------- */
     
-    if(p_file_info->log_type == FLB_TAIL){/* Do nothing */}
-    else if(p_file_info->log_type == FLB_WEB_LOG){
+    if(p_file_info->log_type == FLB_TAIL || p_file_info->log_type == FLB_WEB_LOG){
+        Flb_tail_config_t *tail_config = (Flb_tail_config_t *) callocz(1, sizeof(Flb_tail_config_t));
+        if(appconfig_get_boolean(&log_management_config, config_section->name, "use inotify", CONFIG_BOOLEAN_YES))
+            tail_config->use_inotify = 1;
+        collector_info( "[%s]: use inotify = %s",  p_file_info->chart_name, tail_config->use_inotify? "yes" : "no");
+
+        p_file_info->flb_config = tail_config;
+    }
+    
+    if(p_file_info->log_type == FLB_WEB_LOG){
         /* Check if a valid web log format configuration is detected */
         char *log_format = appconfig_get(&log_management_config, config_section->name, "log format", "auto");
         const char delimiter = ' '; // TODO!!: TO READ FROM CONFIG
