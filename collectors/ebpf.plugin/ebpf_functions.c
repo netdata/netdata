@@ -424,7 +424,6 @@ static void ebpf_function_socket_manipulation(const char *transaction,
 {
     UNUSED(line_buffer);
     UNUSED(timeout);
-    UNUSED(em);
 
     network_viewer_opt.enabled = CONFIG_BOOLEAN_YES;
 
@@ -459,10 +458,10 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             if (separator) {
                 period = str2i(++separator);
                 if (period > 0) {
-                    ebpf_modules[EBPF_MODULE_SOCKET_IDX].lifetime = period;
+                    em->lifetime = period;
                 }
             } else
-                ebpf_modules[EBPF_MODULE_SOCKET_IDX].lifetime = EBPF_DEFAULT_LIFETIME;
+                em->lifetime = EBPF_DEFAULT_LIFETIME;
 
             pthread_mutex_unlock(&ebpf_exit_cleanup);
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_RESOLVE, sizeof(EBPF_FUNCTION_SOCKET_RESOLVE) -1) == 0) {
@@ -542,7 +541,7 @@ void *ebpf_function_thread(void *ptr)
                                                       buffer,
                                                       PLUGINSD_LINE_MAX + 1,
                                                       timeout,
-                                                      em);
+                                                      &ebpf_modules[EBPF_MODULE_SOCKET_IDX]);
                 else
                     ebpf_function_error(transaction,
                                         HTTP_RESP_NOT_FOUND,
