@@ -426,6 +426,8 @@ static void ebpf_function_socket_manipulation(const char *transaction,
     UNUSED(timeout);
     UNUSED(em);
 
+    network_viewer_opt.enabled = CONFIG_BOOLEAN_YES;
+
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
     size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
     char *separator;
