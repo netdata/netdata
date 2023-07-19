@@ -226,6 +226,12 @@ def render_keys(integrations, categories):
             if scope['name'] == 'global':
                 scope['name'] = f'{ item["meta"]["monitored_instance"]["name"] } instance'
 
+        for cfg_example in item['setup']['configuration']['examples']['list']:
+            if 'folding' not in cfg_example:
+                cfg_example['folding'] = {
+                    'enabled': item['setup']['configuration']['examples']['folding']['enabled']
+                }
+
         for key in RENDER_KEYS:
             template = get_jinja_env().get_template(f'{ key }.md')
             data = template.render(entry=item, related=related)

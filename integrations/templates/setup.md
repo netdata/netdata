@@ -72,18 +72,14 @@ sudo ./edit-config [[ entry.setup.configuration.file.name ]]
 
 [[ example.description ]]
 
-[% if entry.setup.configuration.examples.folding.enabled %]
-[% if example.folding %]
+[% if example.folding.enabled %]
 {% details summary="[[ entry.setup.configuration.examples.folding.title ]]" %}
-[% endif %]
 [% endif %]
 ```yaml
 [[ example.config ]]
 ```
-[% if entry.setup.configuration.examples.folding.enabled %]
-[% if example.folding %]
+[% if example.folding.enabled %]
 {% /details %}
-[% endif %]
 [% endif %]
 [% endfor %]
 [% endif %]
