@@ -59,19 +59,19 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: alarms.status
-          description: Alarms ({status mapping})
-          unit: "status"
-          chart_type: line
-          dimensions:
-            - name: a dimension per alarm
-        - name: alarms.status
-          description: Alarm Values
-          unit: "value"
-          chart_type: line
-          dimensions:
-            - name: a dimension per alarm
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: alarms.status
+      description: Alarms ({status mapping})
+      unit: "status"
+      chart_type: line
+      dimensions:
+      - name: a dimension per alarm
+    - name: alarms.status
+      description: Alarm Values
+      unit: "value"
+      chart_type: line
+      dimensions:
+      - name: a dimension per alarm

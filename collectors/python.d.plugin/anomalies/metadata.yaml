@@ -52,14 +52,14 @@ troubleshooting:
   problems:
     list: []
 alerts:
-  - name: anomalies_anomaly_probabilities
-    link: https://github.com/netdata/netdata/blob/master/health/health.d/anomalies.conf
-    metric: anomalies.probability
-    info: average anomaly probability over the last 2 minutes
-  - name: anomalies_anomaly_flags
-    link: https://github.com/netdata/netdata/blob/master/health/health.d/anomalies.conf
-    metric: anomalies.anomaly
-    info: number of anomalies in the last 2 minutes
+- name: anomalies_anomaly_probabilities
+  link: https://github.com/netdata/netdata/blob/master/health/health.d/anomalies.conf
+  metric: anomalies.probability
+  info: average anomaly probability over the last 2 minutes
+- name: anomalies_anomaly_flags
+  link: https://github.com/netdata/netdata/blob/master/health/health.d/anomalies.conf
+  metric: anomalies.anomaly
+  info: number of anomalies in the last 2 minutes
 metrics:
   folding:
     title: Metrics
@@ -67,19 +67,19 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: anomalies.probability
-          description: Anomaly Probability
-          unit: "probability"
-          chart_type: line
-          dimensions:
-            - name: a dimension per probability
-        - name: anomalies.anomaly
-          description: Anomaly
-          unit: "count"
-          chart_type: stacked
-          dimensions:
-            - name: a dimension per anomaly
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: anomalies.probability
+      description: Anomaly Probability
+      unit: "probability"
+      chart_type: line
+      dimensions:
+      - name: a dimension per probability
+    - name: anomalies.anomaly
+      description: Anomaly
+      unit: "count"
+      chart_type: stacked
+      dimensions:
+      - name: a dimension per anomaly
