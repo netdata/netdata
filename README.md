@@ -427,6 +427,11 @@ to collect metrics, troubleshoot via charts, export to external databases, and m
 
 ## :tada: Community
 
+<p align="center">
+  <a href="https://discord.com/invite/mPZ6WZKKG2"><img alt="Discord" src="https://img.shields.io/discord/847502280503590932?logo=discord&logoColor=white&label=chat%20on%20discord"></a>
+  <a href="https://community.netdata.cloud"><img alt="Discourse topics" src="https://img.shields.io/discourse/topics?server=https%3A%2F%2Fcommunity.netdata.cloud%2F&logo=discourse&label=discourse%20forum"></a>
+</p>
+
 Netdata is an inclusive open-source project and community. Please read our [Code of Conduct](https://github.com/netdata/.github/blob/main/CODE_OF_CONDUCT.md).
 
 Find most of the Netdata team in our [community forums](https://community.netdata.cloud). It's the best place to
