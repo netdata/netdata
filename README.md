@@ -201,6 +201,12 @@ It scales nicely from just a single server to thousands of servers, even in comp
    
    :ok_hand: Your metrics are still stored in your network when you connect your Netdata Agents and Parents to Netdata Cloud.
 
+<hr class="solid">
+
+![Netdata Agent 2](https://github.com/netdata/netdata/assets/2662304/49981d85-89b9-4b95-8e45-da7a39e6dd48)
+
+<hr class="solid">
+
 ## How it works
 
 Netdata is built around a **modular metrics processing pipeline**.
