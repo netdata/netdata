@@ -3,8 +3,9 @@
 #ifndef NETDATA_EBPF_FD_H
 #define NETDATA_EBPF_FD_H 1
 
-// Module name
+// Module name & File description
 #define NETDATA_EBPF_MODULE_NAME_FD "filedescriptor"
+#define NETDATA_EBPF_FD_MODULE_DESC "Monitor when files are open and closed. This thread is integrated with apps and cgroup."
 
 // Menu group
 #define NETDATA_FILE_GROUP "file_access"

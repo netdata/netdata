@@ -202,7 +202,7 @@ static int machine_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         count++;
     }
 
-    freez(m);
+    aral_freez(registry.machines_aral, m);
 
     return count + 1;
 }
@@ -219,13 +219,14 @@ static int registry_person_del_callback(const DICTIONARY_ITEM *item __maybe_unus
     //dictionary_del(registry.persons, p->guid);
 
     netdata_log_debug(D_REGISTRY, "Registry: freeing person '%s'", p->guid);
-    freez(p);
+    aral_freez(registry.persons_aral, p);
 
     return 1;
 }
 
 void registry_free(void) {
     if(!registry.enabled) return;
+    registry.enabled = false;
 
     netdata_log_debug(D_REGISTRY, "Registry: destroying persons dictionary");
     dictionary_walkthrough_read(registry.persons, registry_person_del_callback, NULL);

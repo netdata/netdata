@@ -43,6 +43,7 @@
 #define EBPF_CFG_MAPS_PER_CORE "maps per core"
 
 #define EBPF_CFG_UPDATE_EVERY "update every"
+#define EBPF_CFG_LIFETIME "lifetime"
 #define EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT 10
 #define EBPF_CFG_PID_SIZE "pid table size"
 #define EBPF_CFG_APPLICATION "apps"
@@ -270,15 +271,17 @@ typedef enum netdata_apps_integration_flags {
 #define NETDATA_EBPF_STAT_DIMENSION_ARAL "aral"
 
 enum ebpf_threads_status {
-    NETDATA_THREAD_EBPF_RUNNING,
-    NETDATA_THREAD_EBPF_STOPPING,
-    NETDATA_THREAD_EBPF_STOPPED,
-    NETDATA_THREAD_EBPF_NOT_RUNNING
+    NETDATA_THREAD_EBPF_RUNNING,            // started by plugin
+    NETDATA_THREAD_EBPF_FUNCTION_RUNNING,   // started by function
+    NETDATA_THREAD_EBPF_STOPPING,           // stopping thread
+    NETDATA_THREAD_EBPF_STOPPED,            // thread stopped
+    NETDATA_THREAD_EBPF_NOT_RUNNING         // thread was never started
 };
 
 typedef struct ebpf_module {
     const char *thread_name;
     const char *config_name;
+    const char *thread_description;
     enum ebpf_threads_status enabled;
     void *(*start_routine)(void *);
     int update_every;
@@ -306,7 +309,15 @@ typedef struct ebpf_module {
     char memory_usage[NETDATA_EBPF_CHART_MEM_LENGTH];
     char memory_allocations[NETDATA_EBPF_CHART_MEM_LENGTH];
     int maps_per_core;
+
+    // period to run
+    uint32_t running_time; // internal usage, this is used to reset a value when a new request happens.
+    uint32_t lifetime;
 } ebpf_module_t;
+
+#define EBPF_DEFAULT_LIFETIME 300
+// This will be present until all functions are merged
+#define EBPF_NON_FUNCTION_LIFE_TIME 86400
 
 int ebpf_get_kernel_version();
 int get_redhat_release();
@@ -336,6 +347,7 @@ void ebpf_update_map_size(struct bpf_map *map, ebpf_local_maps_t *lmap, ebpf_mod
 typedef struct netdata_ebpf_histogram {
     char *name;
     char *title;
+    char *ctx;
     int order;
     uint64_t histogram[NETDATA_EBPF_HIST_MAX_BINS];
 } netdata_ebpf_histogram_t;
@@ -425,9 +437,11 @@ void ebpf_update_map_type(struct bpf_map *map, ebpf_local_maps_t *w);
 void ebpf_define_map_type(ebpf_local_maps_t *maps, int maps_per_core, int kver);
 #endif
 
-void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report, ebpf_local_maps_t *maps);
+void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report, ebpf_local_maps_t *maps,
+                                           ebpf_stats_action_t action);
 void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *map, ebpf_stats_action_t action);
-void ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em);
+int ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em);
+void ebpf_statistic_obsolete_aral_chart(ebpf_module_t *em, int prio);
 void ebpf_send_data_aral_chart(ARAL *memory, ebpf_module_t *em);
 
 #endif /* NETDATA_EBPF_H */

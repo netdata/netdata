@@ -3,8 +3,9 @@
 #ifndef NETDATA_EBPF_MOUNT_H
 #define NETDATA_EBPF_MOUNT_H 1
 
-// Module name
+// Module name & description
 #define NETDATA_EBPF_MODULE_NAME_MOUNT "mount"
+#define NETDATA_EBPF_MOUNT_MODULE_DESC "Show calls to syscalls mount(2) and umount(2)."
 
 #define NETDATA_EBPF_MOUNT_SYSCALL 2
 

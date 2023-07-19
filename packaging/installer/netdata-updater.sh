@@ -678,7 +678,8 @@ update_static() {
   cd "${ndtmpdir}" || fatal "Failed to change current working directory to ${ndtmpdir}" U0019
 
   if update_available; then
-    sysarch="$(uname -m)"
+    sysarch="${PREBUILT_ARCH}"
+    [ -z "$sysarch" ] && sysarch="$(uname -m)"
     download "${NETDATA_TARBALL_CHECKSUM_URL}" "${ndtmpdir}/sha256sum.txt"
     download "${NETDATA_TARBALL_URL}" "${ndtmpdir}/netdata-${sysarch}-latest.gz.run"
     if ! grep "netdata-${sysarch}-latest.gz.run" "${ndtmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
@@ -731,7 +732,7 @@ update_binpkg() {
     DISTRO_COMPAT_NAME="${DISTRO}"
   else
     case "${DISTRO}" in
-      opensuse-leap)
+      opensuse-leap|opensuse-tumbleweed)
         DISTRO_COMPAT_NAME="opensuse"
         ;;
       cloudlinux|almalinux|rocky|rhel)

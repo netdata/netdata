@@ -130,6 +130,10 @@ struct netdata_static_thread socket_threads = {
     .start_routine = NULL
 };
 
+#ifdef NETDATA_DEV_MODE
+int socket_disable_priority;
+#endif
+
 #ifdef LIBBPF_MAJOR_VERSION
 /**
  * Disable Probe
@@ -646,6 +650,8 @@ static void ebpf_socket_free(ebpf_module_t *em )
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_update_stats(&plugin_statistics, em);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -1217,6 +1223,8 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
                           &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF],
                           2, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
     }
+
+    fflush(stdout);
 }
 
 /**
@@ -2177,7 +2185,9 @@ void *ebpf_socket_read_hash(void *ptr)
     int fd_ipv6 = socket_maps[NETDATA_SOCKET_TABLE_IPV6].map_fd;
     int maps_per_core = em->maps_per_core;
     // This thread is cancelled from another thread
-    for (;;) {
+    uint32_t running_time;
+    uint32_t lifetime = em->lifetime;
+    for (running_time = 0;!ebpf_exit_plugin && running_time < lifetime; running_time++) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_exit_plugin)
            break;
@@ -2918,7 +2928,9 @@ static void socket_collector(ebpf_module_t *em)
     int update_every = em->update_every;
     int maps_per_core = em->maps_per_core;
     int counter = update_every - 1;
-    while (!ebpf_exit_plugin) {
+    uint32_t running_time = 0;
+    uint32_t lifetime = em->lifetime;
+    while (!ebpf_exit_plugin && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_exit_plugin || ++counter != update_every)
             continue;
@@ -2973,6 +2985,15 @@ static void socket_collector(ebpf_module_t *em)
         }
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
+
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (running_time && !em->running_time)
+            running_time = update_every;
+        else
+            running_time += update_every;
+
+        em->running_time = running_time;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 
@@ -4015,11 +4036,11 @@ void *ebpf_socket_thread(void *ptr)
     ebpf_create_global_charts(em);
 
     ebpf_update_stats(&plugin_statistics, em);
-    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
 
 #ifdef NETDATA_DEV_MODE
     if (ebpf_aral_socket_pid)
-        ebpf_statistic_create_aral_chart(NETDATA_EBPF_SOCKET_ARAL_NAME, em);
+        socket_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_SOCKET_ARAL_NAME, em);
 #endif
 
     pthread_mutex_unlock(&lock);

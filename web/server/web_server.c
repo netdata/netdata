@@ -130,5 +130,5 @@ void web_client_update_acl_matches(struct web_client *w) {
 // --------------------------------------------------------------------------------------
 
 void web_server_log_connection(struct web_client *w, const char *msg) {
-    log_access("%llu: %d '[%s]:%s' '%s'", w->id, gettid(), w->client_ip, w->client_port, msg);
+    netdata_log_access("%llu: %d '[%s]:%s' '%s'", w->id, gettid(), w->client_ip, w->client_port, msg);
 }

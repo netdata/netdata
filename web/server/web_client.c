@@ -214,7 +214,7 @@ void web_client_request_done(struct web_client *w) {
         }
 
         // access log
-        log_access("%llu: %d '[%s]:%s' '%s' (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %d '%s'",
+        netdata_log_access("%llu: %d '[%s]:%s' '%s' (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %d '%s'",
                    w->id
                    , gettid()
                    , w->client_ip
@@ -743,7 +743,7 @@ const char *web_content_type_to_string(HTTP_CONTENT_TYPE content_type) {
             return "application/json; charset=utf-8";
 
         case CT_APPLICATION_X_JAVASCRIPT:
-            return "application/x-javascript; charset=utf-8";
+            return "application/javascript; charset=utf-8";
 
         case CT_TEXT_CSS:
             return "text/css; charset=utf-8";
@@ -796,35 +796,159 @@ const char *web_content_type_to_string(HTTP_CONTENT_TYPE content_type) {
         case CT_PROMETHEUS:
             return "text/plain; version=0.0.4";
 
+        case CT_AUDIO_MPEG:
+            return "audio/mpeg";
+
+        case CT_AUDIO_OGG:
+            return "audio/ogg";
+
+        case CT_VIDEO_MP4:
+            return "video/mp4";
+
+        case CT_APPLICATION_PDF:
+            return "application/pdf";
+
+        case CT_APPLICATION_ZIP:
+            return "application/zip";
+
         default:
         case CT_TEXT_PLAIN:
             return "text/plain; charset=utf-8";
     }
 }
 
-
 const char *web_response_code_to_string(int code) {
     switch(code) {
-        case HTTP_RESP_OK:
+        case 100:
+            return "Continue";
+        case 101:
+            return "Switching Protocols";
+        case 102:
+            return "Processing";
+        case 103:
+            return "Early Hints";
+
+        case 200:
             return "OK";
+        case 201:
+            return "Created";
+        case 202:
+            return "Accepted";
+        case 203:
+            return "Non-Authoritative Information";
+        case 204:
+            return "No Content";
+        case 205:
+            return "Reset Content";
+        case 206:
+            return "Partial Content";
+        case 207:
+            return "Multi-Status";
+        case 208:
+            return "Already Reported";
+        case 226:
+            return "IM Used";
 
-        case HTTP_RESP_MOVED_PERM:
+        case 300:
+            return "Multiple Choices";
+        case 301:
             return "Moved Permanently";
-
-        case HTTP_RESP_REDIR_TEMP:
+        case 302:
+            return "Found";
+        case 303:
+            return "See Other";
+        case 304:
+            return "Not Modified";
+        case 305:
+            return "Use Proxy";
+        case 306:
+            return "Switch Proxy";
+        case 307:
             return "Temporary Redirect";
+        case 308:
+            return "Permanent Redirect";
 
-        case HTTP_RESP_BAD_REQUEST:
+        case 400:
             return "Bad Request";
-
-        case HTTP_RESP_FORBIDDEN:
+        case 401:
+            return "Unauthorized";
+        case 402:
+            return "Payment Required";
+        case 403:
             return "Forbidden";
-
-        case HTTP_RESP_NOT_FOUND:
+        case 404:
             return "Not Found";
+        case 405:
+            return "Method Not Allowed";
+        case 406:
+            return "Not Acceptable";
+        case 407:
+            return "Proxy Authentication Required";
+        case 408:
+            return "Request Timeout";
+        case 409:
+            return "Conflict";
+        case 410:
+            return "Gone";
+        case 411:
+            return "Length Required";
+        case 412:
+            return "Precondition Failed";
+        case 413:
+            return "Payload Too Large";
+        case 414:
+            return "URI Too Long";
+        case 415:
+            return "Unsupported Media Type";
+        case 416:
+            return "Range Not Satisfiable";
+        case 417:
+            return "Expectation Failed";
+        case 418:
+            return "I'm a teapot";
+        case 421:
+            return "Misdirected Request";
+        case 422:
+            return "Unprocessable Entity";
+        case 423:
+            return "Locked";
+        case 424:
+            return "Failed Dependency";
+        case 425:
+            return "Too Early";
+        case 426:
+            return "Upgrade Required";
+        case 428:
+            return "Precondition Required";
+        case 429:
+            return "Too Many Requests";
+        case 431:
+            return "Request Header Fields Too Large";
+        case 451:
+            return "Unavailable For Legal Reasons";
 
-        case HTTP_RESP_PRECOND_FAIL:
-            return "Preconditions Failed";
+        case 500:
+            return "Internal Server Error";
+        case 501:
+            return "Not Implemented";
+        case 502:
+            return "Bad Gateway";
+        case 503:
+            return "Service Unavailable";
+        case 504:
+            return "Gateway Timeout";
+        case 505:
+            return "HTTP Version Not Supported";
+        case 506:
+            return "Variant Also Negotiates";
+        case 507:
+            return "Insufficient Storage";
+        case 508:
+            return "Loop Detected";
+        case 510:
+            return "Not Extended";
+        case 511:
+            return "Network Authentication Required";
 
         default:
             if(code >= 100 && code < 200)
@@ -837,7 +961,7 @@ const char *web_response_code_to_string(int code) {
                 return "Redirection";
 
             if(code >= 400 && code < 500)
-                return "Bad Request";
+                return "Client Error";
 
             if(code >= 500 && code < 600)
                 return "Server Error";
@@ -1152,12 +1276,15 @@ void web_client_build_http_header(struct web_client *w) {
     if(unlikely(w->response.code != HTTP_RESP_OK))
         buffer_no_cacheable(w->response.data);
 
+    if(unlikely(!w->response.data->date))
+        w->response.data->date = now_realtime_sec();
+
     // set a proper expiration date, if not already set
     if(unlikely(!w->response.data->expires)) {
         if(w->response.data->options & WB_CONTENT_NO_CACHEABLE)
-            w->response.data->expires = w->timings.tv_ready.tv_sec + localhost->rrd_update_every;
+            w->response.data->expires = w->response.data->date + localhost->rrd_update_every;
         else
-            w->response.data->expires = w->timings.tv_ready.tv_sec + 86400;
+            w->response.data->expires = w->response.data->date + 86400;
     }
 
     // prepare the HTTP response header
@@ -1744,10 +1871,6 @@ void web_client_process_request(struct web_client *w) {
 
     w->response.sent = 0;
 
-    // set a proper last modified date
-    if(unlikely(!w->response.data->date))
-        w->response.data->date = w->timings.tv_ready.tv_sec;
-
     web_client_send_http_header(w);
 
     // enable sending immediately if we have data
@@ -2136,7 +2259,6 @@ ssize_t web_client_receive(struct web_client *w)
     return(bytes);
 }
 
-
 void web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string) {
     char buffer[NETDATA_WEB_REQUEST_URL_SIZE + 2];
     buffer[0] = '\0';
@@ -2158,29 +2280,24 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
     }
     else {
         // in non-stream mode, there is a path
-
         // FIXME - the way this is implemented, query string params never accept the symbol &, not even encoded as %26
         // To support the symbol & in query string params, we need to turn the url_query_string_decoded into a
         // dictionary and decode each of the parameters individually.
         // OR: in url_query_string_decoded use as separator a control character that cannot appear in the URL.
 
-        char *question_mark_start = strchr(path_and_query_string, '?');
-        if (question_mark_start)
-            url_decode_r(buffer, question_mark_start, NETDATA_WEB_REQUEST_URL_SIZE + 1);
+        url_decode_r(buffer, path_and_query_string, NETDATA_WEB_REQUEST_URL_SIZE + 1);
 
-        buffer[NETDATA_WEB_REQUEST_URL_SIZE + 1] = '\0';
-        buffer_strcat(w->url_query_string_decoded, buffer);
-
+        char *question_mark_start = strchr(buffer, '?');
         if (question_mark_start) {
+            buffer_strcat(w->url_query_string_decoded, question_mark_start);
             char c = *question_mark_start;
             *question_mark_start = '\0';
-            url_decode_r(buffer, path_and_query_string, NETDATA_WEB_REQUEST_URL_SIZE + 1);
+            buffer_strcat(w->url_path_decoded, buffer);
             *question_mark_start = c;
-        } else
-            url_decode_r(buffer, path_and_query_string, NETDATA_WEB_REQUEST_URL_SIZE + 1);
-
-        buffer[NETDATA_WEB_REQUEST_URL_SIZE + 1] = '\0';
-        buffer_strcat(w->url_path_decoded, buffer);
+        } else {
+            buffer_strcat(w->url_query_string_decoded, "");
+            buffer_strcat(w->url_path_decoded, buffer);
+        }
     }
 }
 

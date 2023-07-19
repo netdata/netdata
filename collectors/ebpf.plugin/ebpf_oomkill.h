@@ -3,6 +3,9 @@
 #ifndef NETDATA_EBPF_OOMKILL_H
 #define NETDATA_EBPF_OOMKILL_H 1
 
+// Module description
+#define NETDATA_EBPF_OOMKILL_MODULE_DESC "Show OOM kills for all applications recognized via the apps.plugin."
+
 /*****************************************************************
  *  copied from kernel-collectors repo, with modifications needed
  *  for inclusion here.

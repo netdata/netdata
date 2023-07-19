@@ -347,7 +347,7 @@ static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, siz
 
 cleanup:
     now_monotonic_high_precision_timeval(&tv);
-    log_access("%llu: %d '[RTC]:%d:%d' '%s' (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %d '%s'",
+    netdata_log_access("%llu: %d '[RTC]:%d:%d' '%s' (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %d '%s'",
                w->id
             , gettid()
             , chan->conn->pc, chan->dc
@@ -373,7 +373,7 @@ static void myOpenCallback(int id __maybe_unused, void *user_ptr) {
     WEBRTC_DC *chan = user_ptr;
     internal_fatal(chan->dc != id, "WEBRTC[%d],DC[%d]: dc mismatch, expected %d, got %d", chan->conn->pc, chan->dc, chan->dc, id);
 
-    log_access("WEBRTC[%d],DC[%d]: %d DATA CHANNEL '%s' OPEN", chan->conn->pc, chan->dc, gettid(), chan->label);
+    netdata_log_access("WEBRTC[%d],DC[%d]: %d DATA CHANNEL '%s' OPEN", chan->conn->pc, chan->dc, gettid(), chan->label);
     internal_error(true, "WEBRTC[%d],DC[%d]: data channel opened.", chan->conn->pc, chan->dc);
     chan->open = true;
 }
@@ -391,7 +391,7 @@ static void myClosedCallback(int id __maybe_unused, void *user_ptr) {
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(chan->conn->channels.head, chan, link.prev, link.next);
     spinlock_unlock(&chan->conn->channels.spinlock);
 
-    log_access("WEBRTC[%d],DC[%d]: %d DATA CHANNEL '%s' CLOSED", chan->conn->pc, chan->dc, gettid(), chan->label);
+    netdata_log_access("WEBRTC[%d],DC[%d]: %d DATA CHANNEL '%s' CLOSED", chan->conn->pc, chan->dc, gettid(), chan->label);
 
     freez(chan->label);
     freez(chan);
@@ -573,27 +573,27 @@ static void myStateChangeCallback(int pc __maybe_unused, rtcState state, void *u
             break;
 
         case RTC_CONNECTING:
-            log_access("WEBRTC[%d]: %d CONNECTING", conn->pc, gettid());
+            netdata_log_access("WEBRTC[%d]: %d CONNECTING", conn->pc, gettid());
             internal_error(true, "WEBRTC[%d]: connecting...", conn->pc);
             break;
 
         case RTC_CONNECTED:
-            log_access("WEBRTC[%d]: %d CONNECTED", conn->pc, gettid());
+            netdata_log_access("WEBRTC[%d]: %d CONNECTED", conn->pc, gettid());
             internal_error(true, "WEBRTC[%d]: connected!", conn->pc);
             break;
 
         case RTC_DISCONNECTED:
-            log_access("WEBRTC[%d]: %d DISCONNECTED", conn->pc, gettid());
+            netdata_log_access("WEBRTC[%d]: %d DISCONNECTED", conn->pc, gettid());
             internal_error(true, "WEBRTC[%d]: disconnected.", conn->pc);
             break;
 
         case RTC_FAILED:
-            log_access("WEBRTC[%d]: %d CONNECTION FAILED", conn->pc, gettid());
+            netdata_log_access("WEBRTC[%d]: %d CONNECTION FAILED", conn->pc, gettid());
             internal_error(true, "WEBRTC[%d]: failed.", conn->pc);
             break;
 
         case RTC_CLOSED:
-            log_access("WEBRTC[%d]: %d CONNECTION CLOSED", conn->pc, gettid());
+            netdata_log_access("WEBRTC[%d]: %d CONNECTION CLOSED", conn->pc, gettid());
             internal_error(true, "WEBRTC[%d]: closed.", conn->pc);
             spinlock_lock(&webrtc_base.unsafe.spinlock);
             webrtc_destroy_connection_unsafe(conn);

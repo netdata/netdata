@@ -1,13 +1,21 @@
-plugin_name: ""
-module_name: ""
-monitored_instance:
-  name: ""
-  link: ""
-alternative_monitored_instances:
-  - name: ""
+meta:
+  plugin_name: ""
+  module_name: ""
+  alternative_monitored_instances: []
+  monitored_instance:
+    name: ""
     link: ""
-keywords:
-  - ""
+    categories: []
+    icon_filename: ""
+  related_resources:
+    integrations:
+      list:
+        - plugin_name: ""
+          module_name: ""
+  info_provided_to_referring_integrations:
+    description: ""
+  keywords: []
+  most_popular: false
 overview:
   data_collection:
     metrics_description: ""
@@ -45,11 +53,13 @@ setup:
           description: ""
           required: false
     examples:
+      folding:
+        enabled: true
+        title: ""
       list:
         - name: ""
           folding:
-            enabled: true
-            title: ""
+            enabled: false
           description: ""
           config: ""
 troubleshooting:
@@ -57,13 +67,6 @@ troubleshooting:
     list:
       - name: ""
         description: ""
-related_resources:
-  integrations:
-    list:
-      - plugin_name: ""
-        module_name: ""
-info_provided_to_referring_integrations:
-  description: ""
 alerts:
   - info: ""
     link: ""
@@ -92,4 +95,3 @@ metrics:
           chart_type: ""
           dimensions:
             - name: ""
-

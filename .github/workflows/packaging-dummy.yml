@@ -76,6 +76,5 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
       fail-fast: false
-      max-parallel: 8
     steps:
       - run: echo 'NOT REQUIRED'

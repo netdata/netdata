@@ -408,7 +408,7 @@ void aclk_graceful_disconnect(mqtt_wss_client client)
         }
     }
     netdata_log_info("ACLK link is down");
-    log_access("ACLK DISCONNECTED");
+    netdata_log_access("ACLK DISCONNECTED");
     aclk_stats_upd_online(0);
     last_disconnect_time = now_realtime_sec();
     aclk_connected = 0;
@@ -752,7 +752,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             last_conn_time_mqtt = now_realtime_sec();
             netdata_log_info("ACLK connection successfully established");
             aclk_status = ACLK_STATUS_CONNECTED;
-            log_access("ACLK CONNECTED");
+            netdata_log_access("ACLK CONNECTED");
             mqtt_connected_actions(client);
             return 0;
         }
@@ -857,7 +857,7 @@ void *aclk_main(void *ptr)
             aclk_stats_upd_online(0);
             last_disconnect_time = now_realtime_sec();
             aclk_connected = 0;
-            log_access("ACLK DISCONNECTED");
+            netdata_log_access("ACLK DISCONNECTED");
         }
     } while (service_running(SERVICE_ACLK));
 

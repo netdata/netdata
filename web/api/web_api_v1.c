@@ -903,7 +903,7 @@ cleanup:
 // /api/v1/registry?action=delete&machine=${machine_guid}&name=${hostname}&url=${url}&delete_url=${delete_url}
 //
 // Search for the URLs of a machine:
-// /api/v1/registry?action=search&machine=${machine_guid}&name=${hostname}&url=${url}&for=${machine_guid}
+// /api/v1/registry?action=search&for=${machine_guid}
 //
 // Impersonate:
 // /api/v1/registry?action=switch&machine=${machine_guid}&name=${hostname}&url=${url}&to=${new_person_guid}
@@ -1029,6 +1029,8 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
             return web_client_permission_denied(w);
     }
 
+    buffer_no_cacheable(w->response.data);
+
     switch(action) {
         case 'A':
             if(unlikely(!machine_guid || !machine_url || !url_name)) {
@@ -1053,15 +1055,15 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
             return registry_request_delete_json(host, w, person_guid, machine_guid, machine_url, delete_url, now_realtime_sec());
 
         case 'S':
-            if(unlikely(!machine_guid || !machine_url || !search_machine_guid)) {
-                netdata_log_error("Invalid registry request - search requires these parameters: machine ('%s'), url ('%s'), for ('%s')", machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", search_machine_guid?search_machine_guid:"UNSET");
+            if(unlikely(!search_machine_guid)) {
+                netdata_log_error("Invalid registry request - search requires these parameters: for ('%s')", search_machine_guid?search_machine_guid:"UNSET");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Search request.");
                 return HTTP_RESP_BAD_REQUEST;
             }
 
             web_client_enable_tracking_required(w);
-            return registry_request_search_json(host, w, person_guid, machine_guid, machine_url, search_machine_guid, now_realtime_sec());
+            return registry_request_search_json(host, w, person_guid, search_machine_guid);
 
         case 'W':
             if(unlikely(!machine_guid || !machine_url || !to_person_guid)) {
@@ -1777,18 +1779,18 @@ static struct web_api_command api_commands_v1[] = {
         // { "ml_models",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_models          },
 #endif
 
-        {"manage/health", 0, WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_ACLK | WEB_CLIENT_ACL_BEARER_REQUIRED, web_client_api_request_v1_mgmt_health           },
+        {"manage/health",        0, WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER, web_client_api_request_v1_mgmt_health },
         { "aclk",                0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_aclk_state            },
         { "metric_correlations", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_metric_correlations   },
         { "weights",             0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_weights               },
 
-        {"function", 0, WEB_CLIENT_ACL_ACLK | WEB_CLIENT_ACL_BEARER_REQUIRED | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_function },
-        {"functions", 0, WEB_CLIENT_ACL_ACLK | WEB_CLIENT_ACL_BEARER_REQUIRED | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_functions },
+        {"function",             0, WEB_CLIENT_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_function },
+        {"functions",            0, WEB_CLIENT_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_functions },
 
         { "dbengine_stats",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_dbengine_stats },
 
         // terminator
-        { NULL,              0, WEB_CLIENT_ACL_NONE,      NULL },
+        { NULL,                  0, WEB_CLIENT_ACL_NONE,      NULL },
 };
 
 inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url_path_endpoint) {

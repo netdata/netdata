@@ -353,8 +353,8 @@ int is_legacy = 1;
         case RRD_MEMORY_MODE_MAP:
         case RRD_MEMORY_MODE_SAVE:
         case RRD_MEMORY_MODE_RAM:
-            if(host->rrdpush_seconds_to_replicate > host->rrd_history_entries * host->rrd_update_every)
-                host->rrdpush_seconds_to_replicate = host->rrd_history_entries * host->rrd_update_every;
+            if(host->rrdpush_seconds_to_replicate > (time_t) host->rrd_history_entries * (time_t) host->rrd_update_every)
+                host->rrdpush_seconds_to_replicate = (time_t) host->rrd_history_entries * (time_t) host->rrd_update_every;
             break;
 
         case RRD_MEMORY_MODE_DBENGINE:
@@ -1065,12 +1065,14 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
         return 1;
     }
 
+#ifdef NETDATA_DEV_MODE
     // we register this only on localhost
     // for the other nodes, the origin server should register it
     rrd_collector_started(); // this creates a collector that runs for as long as netdata runs
     rrd_collector_add_function(localhost, NULL, "streaming", 10,
                                RRDFUNCTIONS_STREAMING_HELP, true,
                                rrdhost_function_streaming, NULL);
+#endif
 
     if (likely(system_info)) {
         migrate_localhost(&localhost->host_uuid);

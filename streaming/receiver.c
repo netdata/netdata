@@ -363,7 +363,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
         }
     }
 
-    result = parser ? parser->user.data_collections_count : 0;
+    result = parser->user.data_collections_count;
 
     // free parser with the pop function
     netdata_thread_cleanup_pop(1);
@@ -404,12 +404,14 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         if (rpt->config.health_enabled != CONFIG_BOOLEAN_NO) {
             if (rpt->config.alarms_delay > 0) {
                 host->health.health_delay_up_to = now_realtime_sec() + rpt->config.alarms_delay;
-                log_health(
+                netdata_log_health(
                         "[%s]: Postponing health checks for %" PRId64 " seconds, because it was just connected.",
                         rrdhost_hostname(host),
                         (int64_t) rpt->config.alarms_delay);
             }
         }
+
+        host->health_log.health_log_history = rpt->config.alarms_history;
 
 //         this is a test
 //        if(rpt->hops <= host->sender->hops)
@@ -552,6 +554,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
 
     rpt->config.health_enabled = (int)default_health_enabled;
     rpt->config.alarms_delay = 60;
+    rpt->config.alarms_history = HEALTH_LOG_DEFAULT_HISTORY;
 
     rpt->config.rrdpush_enabled = (int)default_rrdpush_enabled;
     rpt->config.rrdpush_destination = default_rrdpush_destination;
@@ -587,6 +590,9 @@ static void rrdpush_receive(struct receiver_state *rpt)
 
     rpt->config.alarms_delay = appconfig_get_number(&stream_config, rpt->key, "default postpone alarms on connect seconds", rpt->config.alarms_delay);
     rpt->config.alarms_delay = appconfig_get_number(&stream_config, rpt->machine_guid, "postpone alarms on connect seconds", rpt->config.alarms_delay);
+
+    rpt->config.alarms_history = appconfig_get_number(&stream_config, rpt->key, "default health log history", rpt->config.alarms_history);
+    rpt->config.alarms_history = appconfig_get_number(&stream_config, rpt->machine_guid, "health log history", rpt->config.alarms_history);
 
     rpt->config.rrdpush_enabled = appconfig_get_boolean(&stream_config, rpt->key, "default proxy enabled", rpt->config.rrdpush_enabled);
     rpt->config.rrdpush_enabled = appconfig_get_boolean(&stream_config, rpt->machine_guid, "proxy enabled", rpt->config.rrdpush_enabled);

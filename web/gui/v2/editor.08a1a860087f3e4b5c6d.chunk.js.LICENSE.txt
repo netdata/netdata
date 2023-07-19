@@ -1,3 +1,0 @@
-/*! @source http://purl.eligrey.com/github/Blob.js/blob/master/Blob.js */
-
-/*! @source http://purl.eligrey.com/github/classList.js/blob/master/classList.js */

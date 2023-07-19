@@ -1046,7 +1046,7 @@ void fatal_int( const char *file, const char *function, const unsigned long line
 // ----------------------------------------------------------------------------
 // access log
 
-void log_access( const char *fmt, ... ) {
+void netdata_log_access( const char *fmt, ... ) {
     va_list args;
 
     if(access_log_syslog) {
@@ -1078,7 +1078,7 @@ void log_access( const char *fmt, ... ) {
 // ----------------------------------------------------------------------------
 // health log
 
-void log_health( const char *fmt, ... ) {
+void netdata_log_health( const char *fmt, ... ) {
     va_list args;
 
     if(health_log_syslog) {

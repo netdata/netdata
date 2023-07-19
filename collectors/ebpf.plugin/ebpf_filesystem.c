@@ -395,13 +395,15 @@ static void ebpf_create_fs_charts(int update_every)
             snprintfz(chart_name, 63, "%s_read_latency", efp->filesystem);
             efp->hread.name = strdupz(chart_name);
             efp->hread.title = strdupz(title);
+            efp->hread.ctx = NULL;
             efp->hread.order = order;
             efp->family_name = strdupz(family);
 
             ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hread.name,
-                              title,
-                              EBPF_COMMON_DIMENSION_CALL, family,
-                              "filesystem.read_latency", NETDATA_EBPF_CHART_TYPE_STACKED, order, ebpf_create_global_dimension,
+                              efp->hread.title,
+                              EBPF_COMMON_DIMENSION_CALL, efp->family_name,
+                              "filesystem.read_latency", NETDATA_EBPF_CHART_TYPE_STACKED, order,
+                              ebpf_create_global_dimension,
                               filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
                               update_every, NETDATA_EBPF_MODULE_NAME_FILESYSTEM);
             order++;
@@ -410,11 +412,13 @@ static void ebpf_create_fs_charts(int update_every)
             snprintfz(chart_name, 63, "%s_write_latency", efp->filesystem);
             efp->hwrite.name = strdupz(chart_name);
             efp->hwrite.title = strdupz(title);
+            efp->hwrite.ctx = NULL;
             efp->hwrite.order = order;
             ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hwrite.name,
-                              title,
-                              EBPF_COMMON_DIMENSION_CALL, family,
-                              "filesystem.write_latency", NETDATA_EBPF_CHART_TYPE_STACKED, order, ebpf_create_global_dimension,
+                              efp->hwrite.title,
+                              EBPF_COMMON_DIMENSION_CALL, efp->family_name,
+                              "filesystem.write_latency", NETDATA_EBPF_CHART_TYPE_STACKED, order,
+                              ebpf_create_global_dimension,
                               filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
                               update_every, NETDATA_EBPF_MODULE_NAME_FILESYSTEM);
             order++;
@@ -423,11 +427,13 @@ static void ebpf_create_fs_charts(int update_every)
             snprintfz(chart_name, 63, "%s_open_latency", efp->filesystem);
             efp->hopen.name = strdupz(chart_name);
             efp->hopen.title = strdupz(title);
+            efp->hopen.ctx = NULL;
             efp->hopen.order = order;
             ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hopen.name,
-                              title,
-                              EBPF_COMMON_DIMENSION_CALL, family,
-                              "filesystem.open_latency", NETDATA_EBPF_CHART_TYPE_STACKED, order, ebpf_create_global_dimension,
+                              efp->hopen.title,
+                              EBPF_COMMON_DIMENSION_CALL, efp->family_name,
+                              "filesystem.open_latency", NETDATA_EBPF_CHART_TYPE_STACKED, order,
+                              ebpf_create_global_dimension,
                               filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
                               update_every, NETDATA_EBPF_MODULE_NAME_FILESYSTEM);
             order++;
@@ -438,9 +444,10 @@ static void ebpf_create_fs_charts(int update_every)
             snprintfz(ctx, 63, "filesystem.%s_latency", type);
             efp->hadditional.name = strdupz(chart_name);
             efp->hadditional.title = strdupz(title);
+            efp->hadditional.ctx = strdupz(ctx);
             efp->hadditional.order = order;
-            ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hadditional.name, title,
-                              EBPF_COMMON_DIMENSION_CALL, family,
+            ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY, efp->hadditional.name, efp->hadditional.title,
+                              EBPF_COMMON_DIMENSION_CALL, efp->family_name,
                               ctx, NETDATA_EBPF_CHART_TYPE_STACKED, order, ebpf_create_global_dimension,
                               filesystem_publish_aggregated, NETDATA_EBPF_HIST_MAX_BINS,
                               update_every, NETDATA_EBPF_MODULE_NAME_FILESYSTEM);
@@ -448,6 +455,8 @@ static void ebpf_create_fs_charts(int update_every)
             efp->flags |= NETDATA_FILESYSTEM_FLAG_CHART_CREATED;
         }
     }
+
+    fflush(stdout);
 }
 
 /**
@@ -459,6 +468,7 @@ static void ebpf_create_fs_charts(int update_every)
  */
 int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
 {
+    pthread_mutex_lock(&lock);
     int i;
     const char *saved_name = em->thread_name;
     uint64_t kernels = em->kernels;
@@ -476,6 +486,8 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
                 if (!efp->probe_links) {
                     em->thread_name = saved_name;
                     em->kernels = kernels;
+                    em->maps = NULL;
+                    pthread_mutex_unlock(&lock);
                     return -1;
                 }
             }
@@ -494,9 +506,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
             }
 #endif
             efp->flags |= NETDATA_FILESYSTEM_FLAG_HAS_PARTITION;
-            pthread_mutex_lock(&lock);
             ebpf_update_kernel_memory(&plugin_statistics, efp->fs_maps, EBPF_ACTION_STAT_ADD);
-            pthread_mutex_unlock(&lock);
 
             // Nedeed for filesystems like btrfs
             if ((efp->flags & NETDATA_FILESYSTEM_FILL_ADDRESS_TABLE) && (efp->addresses.function)) {
@@ -506,6 +516,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
         efp->flags &= ~NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM;
     }
     em->thread_name = saved_name;
+    pthread_mutex_unlock(&lock);
     em->kernels = kernels;
     em->maps = NULL;
 
@@ -616,43 +627,88 @@ void ebpf_filesystem_cleanup_ebpf_data()
         ebpf_filesystem_partitions_t *efp = &localfs[i];
         if (efp->probe_links) {
             freez(efp->family_name);
+            efp->family_name = NULL;
 
             freez(efp->hread.name);
+            efp->hread.name = NULL;
             freez(efp->hread.title);
+            efp->hread.title = NULL;
 
             freez(efp->hwrite.name);
+            efp->hwrite.name = NULL;
             freez(efp->hwrite.title);
+            efp->hwrite.title = NULL;
 
             freez(efp->hopen.name);
+            efp->hopen.name = NULL;
             freez(efp->hopen.title);
+            efp->hopen.title = NULL;
 
             freez(efp->hadditional.name);
+            efp->hadditional.name = NULL;
             freez(efp->hadditional.title);
+            efp->hadditional.title = NULL;
+            freez(efp->hadditional.ctx);
+            efp->hadditional.ctx = NULL;
         }
     }
 }
 
 /**
- * Filesystem Free
+ * Obsolete global
  *
- * Cleanup variables after child threads to stop
+ * Obsolete global charts created by thread.
  *
- * @param ptr thread data.
+ * @param em a pointer to `struct ebpf_module`
  */
-static void ebpf_filesystem_free(ebpf_module_t *em)
+static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
 {
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPING;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
+    int i;
+    for (i = 0; localfs[i].filesystem; i++) {
+        ebpf_filesystem_partitions_t *efp = &localfs[i];
+        if (!efp->objects)
+            continue;
 
-    ebpf_filesystem_cleanup_ebpf_data();
-    if (dimensions)
-        ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);
-    freez(filesystem_hash_values);
+        ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
+                                  efp->hread.name,
+                                  efp->hread.title,
+                                  EBPF_COMMON_DIMENSION_CALL,
+                                  efp->family_name,
+                                  NETDATA_EBPF_CHART_TYPE_STACKED,
+                                  "filesystem.read_latency",
+                                  efp->hread.order,
+                                  em->update_every);
 
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
+        ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
+                                  efp->hwrite.name,
+                                  efp->hwrite.title,
+                                  EBPF_COMMON_DIMENSION_CALL,
+                                  efp->family_name,
+                                  NETDATA_EBPF_CHART_TYPE_STACKED,
+                                  "filesystem.write_latency",
+                                  efp->hwrite.order,
+                                  em->update_every);
+
+        ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
+                                  efp->hopen.name,
+                                  efp->hopen.title,
+                                  EBPF_COMMON_DIMENSION_CALL,
+                                  efp->family_name,
+                                  NETDATA_EBPF_CHART_TYPE_STACKED,
+                                  "filesystem.open_latency",
+                                  efp->hopen.order,
+                                  em->update_every);
+
+        ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
+                                  efp->hadditional.name,
+                                  efp->hadditional.title,
+                                  EBPF_COMMON_DIMENSION_CALL,
+                                  efp->family_name,
+                                  NETDATA_EBPF_CHART_TYPE_STACKED,
+                                  efp->hadditional.ctx,
+                                  efp->hadditional.order,
+                                  em->update_every);
+    }
 }
 
 /**
@@ -665,7 +721,39 @@ static void ebpf_filesystem_free(ebpf_module_t *em)
 static void ebpf_filesystem_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    ebpf_filesystem_free(em);
+
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        pthread_mutex_lock(&lock);
+        ebpf_obsolete_filesystem_global(em);
+
+        pthread_mutex_unlock(&lock);
+        fflush(stdout);
+    }
+
+    ebpf_filesystem_cleanup_ebpf_data();
+    if (dimensions) {
+        ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);
+        dimensions = NULL;
+    }
+
+    freez(filesystem_hash_values);
+
+    int i;
+    for (i = 0; localfs[i].filesystem; i++) {
+        ebpf_filesystem_partitions_t *efp = &localfs[i];
+        if (!efp->probe_links)
+            continue;
+
+        ebpf_unload_legacy_code(efp->objects, efp->probe_links);
+        efp->objects = NULL;
+        efp->probe_links = NULL;
+        efp->flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION;
+    }
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_update_stats(&plugin_statistics, em);
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************
@@ -819,7 +907,9 @@ static void filesystem_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     int counter = update_every - 1;
-    while (!ebpf_exit_plugin) {
+    uint32_t running_time = 0;
+    uint32_t lifetime = em->lifetime;
+    while (!ebpf_exit_plugin && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
 
         if (ebpf_exit_plugin || ++counter != update_every)
@@ -833,6 +923,15 @@ static void filesystem_collector(ebpf_module_t *em)
         ebpf_histogram_send_data();
 
         pthread_mutex_unlock(&lock);
+
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (running_time && !em->running_time)
+            running_time = update_every;
+        else
+            running_time += update_every;
+
+        em->running_time = running_time;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 }
 

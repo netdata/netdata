@@ -366,6 +366,8 @@ EBPF_PLUGIN_FILES = \
     collectors/ebpf.plugin/ebpf_cgroup.h \
     collectors/ebpf.plugin/ebpf_unittest.c \
     collectors/ebpf.plugin/ebpf_unittest.h \
+    collectors/ebpf.plugin/ebpf_functions.c \
+    collectors/ebpf.plugin/ebpf_functions.h \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -400,6 +402,7 @@ PROC_PLUGIN_FILES = \
     collectors/proc.plugin/zfs_common.h \
     collectors/proc.plugin/proc_spl_kstat_zfs.c \
     collectors/proc.plugin/proc_stat.c \
+    collectors/proc.plugin/proc_sys_fs_file_nr.c \
     collectors/proc.plugin/proc_sys_kernel_random_entropy_avail.c \
     collectors/proc.plugin/proc_vmstat.c \
     collectors/proc.plugin/proc_uptime.c \
@@ -1102,7 +1105,7 @@ if ENABLE_H2O
 noinst_LIBRARIES += libh2o.a
 
 # until h2o updates support for OpenSSL 3.0 we silence the warnings
-libh2o_a_CFLAGS = $(CFLAGS) -Wno-deprecated-declarations -Wno-unused-parameter -Wno-sign-compare -Wno-missing-field-initializers -DH2O_USE_LIBUV=0 $(libh2o_a_INCLUDES)
+libh2o_a_CFLAGS = $(CFLAGS) -Wno-old-style-declaration -Wno-deprecated-declarations -Wno-unused-parameter -Wno-sign-compare -Wno-missing-field-initializers -DH2O_USE_LIBUV=0 $(libh2o_a_INCLUDES)
 
 if LINUX
     libh2o_a_CFLAGS += -D_GNU_SOURCE

@@ -1,6 +1,61 @@
-module_name: gearman
-plugin_name: python.d.plugin
-alerts: []
+meta:
+  plugin_name: python.d.plugin
+  module_name: gearman
+  monitored_instance:
+    name: python.d gearman
+    link: ''
+    categories: []
+    icon_filename: ''
+  related_resources:
+    integrations:
+      list: []
+  info_provided_to_referring_integrations:
+    description: ''
+  keywords: []
+  most_popular: false
+overview:
+  data_collection:
+    metrics_description: ''
+    method_description: ''
+  supported_platforms:
+    include: []
+    exclude: []
+  multi-instance: true
+  additional_permissions:
+    description: ''
+  default_behavior:
+    auto_detection:
+      description: ''
+    limits:
+      description: ''
+    performance_impact:
+      description: ''
+setup:
+  prerequisites:
+    list: []
+  configuration:
+    file:
+      name: ''
+      description: ''
+    options:
+      description: ''
+      folding:
+        title: ''
+        enabled: true
+      list: []
+    examples:
+      folding:
+        enabled: true
+        title: ''
+      list: []
+troubleshooting:
+  problems:
+    list: []
+alerts:
+  - name: gearman_workers_queued
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/gearman.conf
+    metric: gearman.single_job
+    info: average number of queued jobs over the last 10 minutes
 metrics:
   folding:
     title: Metrics

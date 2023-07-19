@@ -393,8 +393,8 @@ void sql_health_alarm_log_count(RRDHOST *host) {
 /* Health related SQL queries
    Cleans up the health_log_detail table on a non-claimed host
 */
-#define SQL_CLEANUP_HEALTH_LOG_DETAIL_NOT_CLAIMED(limit) "DELETE FROM health_log_detail where health_log_id in (select health_log_id from health_log where host_id = @host_id) ORDER BY unique_id ASC LIMIT %lu;", limit
-void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every) {
+#define SQL_CLEANUP_HEALTH_LOG_DETAIL_NOT_CLAIMED "DELETE FROM health_log_detail WHERE health_log_id IN (SELECT health_log_id FROM health_log WHERE host_id = ?1) AND when_key + ?2 < unixepoch() AND updated_by_id <> 0 AND transition_id NOT IN (SELECT last_transition_id FROM health_log hl WHERE hl.host_id = ?3);"
+void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host) {
     sqlite3_stmt *res = NULL;
     int rc;
     char command[MAX_HEALTH_SQL_SIZE + 1];
@@ -408,9 +408,7 @@ void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every
     char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_DETAIL_NOT_CLAIMED((unsigned long int) (host->health.health_log_entries_written - rotate_every)));
-
-    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_meta, SQL_CLEANUP_HEALTH_LOG_DETAIL_NOT_CLAIMED, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to cleanup health log detail table (un-claimed)");
         return;
@@ -423,15 +421,29 @@ void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every
         return;
     }
 
+    rc = sqlite3_bind_int64(res, 2, (sqlite3_int64)host->health_log.health_log_history);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind health log history for SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED.");
+        sqlite3_finalize(res);
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 3, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id for SQL_CLEANUP_HEALTH_LOG_NOT_CLAIMED.");
+        sqlite3_finalize(res);
+        return;
+    }
+
     rc = sqlite3_step_monitored(res);
     if (unlikely(rc != SQLITE_DONE))
-        error_report("Failed to cleanup health log table, rc = %d", rc);
+        error_report("Failed to cleanup health log detail table, rc = %d", rc);
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize the prepared statement to cleanup health log detail table (un-claimed)");
 
-    host->health.health_log_entries_written = rotate_every;
+    sql_health_alarm_log_count(host);
 
     snprintfz(command, MAX_HEALTH_SQL_SIZE, "aclk_alert_%s", uuid_str);
     if (unlikely(table_exists_in_database(command))) {
@@ -442,8 +454,8 @@ void sql_health_alarm_log_cleanup_not_claimed(RRDHOST *host, size_t rotate_every
 /* Health related SQL queries
    Cleans up the health_log_detail table on a claimed host
 */
-#define SQL_CLEANUP_HEALTH_LOG_DETAIL_CLAIMED(guid, limit) "DELETE from health_log_detail WHERE unique_id NOT IN (SELECT filtered_alert_unique_id FROM aclk_alert_%s) AND unique_id IN (SELECT hld.unique_id FROM health_log hl, health_log_detail hld WHERE hl.host_id = ?1 AND hl.health_log_id = hld.health_log_id) and health_log_id in (SELECT health_log_id FROM health_log WHERE host_id = ?2) ORDER BY unique_id asc LIMIT %lu;", guid, limit
-void sql_health_alarm_log_cleanup_claimed(RRDHOST *host, size_t rotate_every) {
+#define SQL_CLEANUP_HEALTH_LOG_DETAIL_CLAIMED(guid) "DELETE from health_log_detail WHERE unique_id NOT IN (SELECT filtered_alert_unique_id FROM aclk_alert_%s) AND unique_id IN (SELECT hld.unique_id FROM health_log hl, health_log_detail hld WHERE hl.host_id = ?1 AND hl.health_log_id = hld.health_log_id) AND health_log_id IN (SELECT health_log_id FROM health_log WHERE host_id = ?2) AND when_key + ?3 < unixepoch() AND updated_by_id <> 0 AND transition_id NOT IN (SELECT last_transition_id FROM health_log hl WHERE hl.host_id = ?4);", guid
+void sql_health_alarm_log_cleanup_claimed(RRDHOST *host) {
     sqlite3_stmt *res = NULL;
     int rc;
     char command[MAX_HEALTH_SQL_SIZE + 1];
@@ -459,11 +471,11 @@ void sql_health_alarm_log_cleanup_claimed(RRDHOST *host, size_t rotate_every) {
     snprintfz(command, MAX_HEALTH_SQL_SIZE, "aclk_alert_%s", uuid_str);
 
     if (!table_exists_in_database(command)) {
-        sql_health_alarm_log_cleanup_not_claimed(host, rotate_every);
+        sql_health_alarm_log_cleanup_not_claimed(host);
         return;
     }
 
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_DETAIL_CLAIMED(uuid_str, (unsigned long int) (host->health.health_log_entries_written - rotate_every)));
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_CLEANUP_HEALTH_LOG_DETAIL_CLAIMED(uuid_str));
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
@@ -485,9 +497,23 @@ void sql_health_alarm_log_cleanup_claimed(RRDHOST *host, size_t rotate_every) {
         return;
     }
 
+    rc = sqlite3_bind_int64(res, 3, (sqlite3_int64)host->health_log.health_log_history);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind health log history for SQL_CLEANUP_HEALTH_LOG_CLAIMED.");
+        sqlite3_finalize(res);
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 4, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind second host_id for SQL_CLEANUP_HEALTH_LOG_CLAIMED.");
+        sqlite3_finalize(res);
+        return;
+    }
+
     rc = sqlite3_step_monitored(res);
     if (unlikely(rc != SQLITE_DONE))
-        error_report("Failed to cleanup health log table, rc = %d", rc);
+        error_report("Failed to cleanup health log detail table, rc = %d", rc);
 
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
@@ -496,27 +522,17 @@ void sql_health_alarm_log_cleanup_claimed(RRDHOST *host, size_t rotate_every) {
     sql_health_alarm_log_count(host);
 
     sql_aclk_alert_clean_dead_entries(host);
+
 }
 
 /* Health related SQL queries
    Cleans up the health_log table.
 */
 void sql_health_alarm_log_cleanup(RRDHOST *host) {
-    static size_t rotate_every = 0;
-
-    if(unlikely(rotate_every == 0)) {
-        rotate_every = (size_t)config_get_number(CONFIG_SECTION_HEALTH, "rotate log every lines", 2000);
-        if(rotate_every < 100) rotate_every = 100;
-    }
-
-    if(likely(host->health.health_log_entries_written < rotate_every)) {
-        return;
-    }
-
     if (!claimed()) {
-        sql_health_alarm_log_cleanup_not_claimed(host, rotate_every);
+        sql_health_alarm_log_cleanup_not_claimed(host);
     } else
-        sql_health_alarm_log_cleanup_claimed(host, rotate_every);
+        sql_health_alarm_log_cleanup_claimed(host);
 }
 
 #define SQL_INJECT_REMOVED "insert into health_log_detail (health_log_id, unique_id, alarm_id, alarm_event_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, transition_id, global_id) select health_log_id, ?1, ?2, ?3, 0, ?4, unixepoch(), 0, 0, flags, exec_run_timestamp, unixepoch(), info, exec_code, -2, new_status, delay, NULL, new_value, 0, ?5, now_usec(0) from health_log_detail where unique_id = ?6 and transition_id = ?7;"
@@ -959,7 +975,7 @@ void sql_health_alarm_log_load(RRDHOST *host) {
     if (unlikely(!host->health_log.next_alarm_id || host->health_log.next_alarm_id <= host->health_max_alarm_id))
         host->health_log.next_alarm_id = host->health_max_alarm_id + 1;
 
-    log_health("[%s]: Table health_log, loaded %zd alarm entries, errors in %zd entries.", rrdhost_hostname(host), loaded, errored);
+    netdata_log_health("[%s]: Table health_log, loaded %zd alarm entries, errors in %zd entries.", rrdhost_hostname(host), loaded, errored);
 
     ret = sqlite3_finalize(res);
     if (unlikely(ret != SQLITE_OK))
@@ -1750,16 +1766,20 @@ fail:
 
 #define SQL_POPULATE_TEMP_ALERT_TRANSITION_TABLE "INSERT INTO v_%p (host_id) VALUES (@host_id)"
 
-#define SQL_SEARCH_ALERT_TRANSITION "SELECT h.host_id, h.alarm_id, h.config_hash_id, h.name, h.chart, h.family, h.recipient, h.units, h.exec, h.chart_context,  d.when_key, " \
-    "d.duration, d.non_clear_duration, d.flags, d.delay_up_to_timestamp, d.info, d.exec_code, d.new_status, d.old_status, d.delay, " \
-    " d.new_value, d.old_value, d.last_repeat, d.transition_id, d.global_id, ah.class, ah.type, ah.component FROM health_log h, health_log_detail d, v_%p t, alert_hash ah " \
-    " WHERE h.host_id = t.host_id AND h.config_hash_id = ah.hash_id AND h.health_log_id = d.health_log_id AND d.global_id BETWEEN @after AND @before "
+#define SQL_SEARCH_ALERT_TRANSITION_SELECT "SELECT " \
+    "h.host_id, h.alarm_id, h.config_hash_id, h.name, h.chart, h.family, h.recipient, h.units, h.exec, " \
+    "h.chart_context,  d.when_key, d.duration, d.non_clear_duration, d.flags, d.delay_up_to_timestamp, " \
+    "d.info, d.exec_code, d.new_status, d.old_status, d.delay, d.new_value, d.old_value, d.last_repeat, " \
+    "d.transition_id, d.global_id, ah.class, ah.type, ah.component, d.exec_run_timestamp"
 
+#define SQL_SEARCH_ALERT_TRANSITION_COMMON_WHERE \
+    "h.config_hash_id = ah.hash_id AND h.health_log_id = d.health_log_id"
 
-#define SQL_SEARCH_ALERT_TRANSITION_DIRECT "SELECT h.host_id, h.alarm_id, h.config_hash_id, h.name, h.chart, h.family, h.recipient, h.units, h.exec, h.chart_context,  d.when_key, " \
-    "d.duration, d.non_clear_duration, d.flags, d.delay_up_to_timestamp, d.info, d.exec_code, d.new_status, d.old_status, d.delay, " \
-    " d.new_value, d.old_value, d.last_repeat, d.transition_id, d.global_id, ah.class, ah.type, ah.component, d.exec_run_timestamp FROM health_log h, health_log_detail d, alert_hash ah " \
-    " WHERE h.config_hash_id = ah.hash_id AND h.health_log_id = d.health_log_id AND transition_id = @transition "
+#define SQL_SEARCH_ALERT_TRANSITION SQL_SEARCH_ALERT_TRANSITION_SELECT " FROM health_log h, health_log_detail d, v_%p t, alert_hash ah " \
+    " WHERE h.host_id = t.host_id AND " SQL_SEARCH_ALERT_TRANSITION_COMMON_WHERE " AND ( d.new_status > 2 OR d.old_status > 2 ) AND d.global_id BETWEEN @after AND @before "
+
+#define SQL_SEARCH_ALERT_TRANSITION_DIRECT SQL_SEARCH_ALERT_TRANSITION_SELECT " FROM health_log h, health_log_detail d, alert_hash ah " \
+    " WHERE " SQL_SEARCH_ALERT_TRANSITION_COMMON_WHERE " AND transition_id = @transition "
 
 void sql_alert_transitions(
     DICTIONARY *nodes,
@@ -1893,6 +1913,7 @@ run_query:;
         atd.config_hash_id = (uuid_t *)sqlite3_column_blob(res, 2);
         atd.alert_name = (const char *) sqlite3_column_text(res, 3);
         atd.chart = (const char *) sqlite3_column_text(res, 4);
+        atd.chart_name = (const char *) sqlite3_column_text(res, 4); // FIXME don't copy the id, find the name
         atd.family = (const char *) sqlite3_column_text(res, 5);
         atd.recipient = (const char *) sqlite3_column_text(res, 6);
         atd.units = (const char *) sqlite3_column_text(res, 7);

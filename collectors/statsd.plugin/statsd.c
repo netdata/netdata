@@ -2283,7 +2283,7 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
         if(unlikely(is_metric_checked(m))) break;
 
         if(unlikely(!(m->options & STATSD_METRIC_OPTION_CHECKED_IN_APPS))) {
-            log_access("NEW STATSD METRIC '%s': '%s'", statsd_metric_type_string(m->type), m->name);
+            netdata_log_access("NEW STATSD METRIC '%s': '%s'", statsd_metric_type_string(m->type), m->name);
             check_if_metric_is_for_app(index, m);
             m->options |= STATSD_METRIC_OPTION_CHECKED_IN_APPS;
         }

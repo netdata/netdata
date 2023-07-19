@@ -61,6 +61,11 @@ typedef enum __attribute__ ((__packed__)) {
     CT_IMAGE_ICNS,
     CT_IMAGE_BMP,
     CT_PROMETHEUS,
+    CT_AUDIO_MPEG,
+    CT_AUDIO_OGG,
+    CT_VIDEO_MP4,
+    CT_APPLICATION_PDF,
+    CT_APPLICATION_ZIP,
 } HTTP_CONTENT_TYPE;
 
 typedef struct web_buffer {

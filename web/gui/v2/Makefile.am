@@ -10,61 +10,64 @@ dist_noinst_DATA = \
 webv2dir=$(webdir)/v2
 
 dist_webv2_DATA = \
-    $(srcdir)/112.cc9fa5f3bdc0bf3ab2fc.css \
-    $(srcdir)/112.f3cc3f26cb7ea65ede41.chunk.js \
-    $(srcdir)/13.7c3b3cd4187fcefb1623.chunk.js \
-    $(srcdir)/13.7c3b3cd4187fcefb1623.chunk.js.LICENSE.txt \
-    $(srcdir)/147.9e6c024694ae5d9f7485.chunk.js \
-    $(srcdir)/154.08edb9b13cc76536f77b.chunk.js \
-    $(srcdir)/184.9a762940288432c72c72.chunk.js \
-    $(srcdir)/184.9a762940288432c72c72.chunk.js.LICENSE.txt \
-    $(srcdir)/193.d54814c07a0d644cb567.chunk.js \
-    $(srcdir)/20.199ca42b9c403ebb5a4b.chunk.js \
-    $(srcdir)/244.5e1b087a2c055d12f837.chunk.js \
-    $(srcdir)/248.86272c9648f6139424aa.chunk.js \
-    $(srcdir)/26.be6ba794320d9936a85b.chunk.js \
-    $(srcdir)/270.08e4ef898465cc7010c5.chunk.js \
-    $(srcdir)/309.75e6b92e62ab187b48d7.chunk.js \
-    $(srcdir)/327.eaeff782ee641ba2c9d8.chunk.js \
-    $(srcdir)/355.dd0f20ecc68e705a45c0.chunk.js \
-    $(srcdir)/378.941bd8959916b24bc871.chunk.js \
-    $(srcdir)/388.458f29c79c3cc31212b9.chunk.js \
+    $(srcdir)/102.17aa0264e26dca186379.chunk.js \
+    $(srcdir)/137.de2e733f582f64cad1cf.chunk.js \
+    $(srcdir)/18.c0d35b9d3651f2926247.chunk.js \
+    $(srcdir)/193.9784069d084ddfe4fc58.chunk.js \
+    $(srcdir)/20.8e903ddcd231de612dd1.chunk.js \
+    $(srcdir)/241.ceb939c3439523e12eed.chunk.js \
+    $(srcdir)/252.0ce2558c909b9913ec26.chunk.js \
+    $(srcdir)/282.b554eb54189aafeebb91.chunk.js \
+    $(srcdir)/296.debf8c655d29ffce5deb.chunk.js \
+    $(srcdir)/359.117da1c355c991bc1536.chunk.js \
+    $(srcdir)/360.fad154c858b78a20d8f5.chunk.js \
+    $(srcdir)/367.cf3f661f1c7bdb62b59b.chunk.js \
+    $(srcdir)/370.384da655707f4c3b6153.css \
+    $(srcdir)/370.b325df5122104f76cd4f.chunk.js \
+    $(srcdir)/376.ce2d4577bc3aaaa82b0c.js \
+    $(srcdir)/380.b8d7517354695cf1a14b.chunk.js \
+    $(srcdir)/380.ccb665950325037c0dda.css \
     $(srcdir)/3D_PARTY_LICENSES.txt \
-    $(srcdir)/405.2910b293f130e34614ef.chunk.js \
-    $(srcdir)/425.ae765beee3b0e73957ca.chunk.js \
-    $(srcdir)/425.ae765beee3b0e73957ca.chunk.js.LICENSE.txt \
-    $(srcdir)/425.d4eaadf9a64c80cfb238.css \
-    $(srcdir)/491.ccf50a459a599910a93b.chunk.js \
-    $(srcdir)/514.34e67f51cb675fe68e87.chunk.js \
-    $(srcdir)/620.772b37fee5d9609dfa1e.chunk.js \
-    $(srcdir)/642.754aee4a16c68ab5d2bf.chunk.js \
-    $(srcdir)/693.9e75ef0e12810484d834.chunk.js \
-    $(srcdir)/708.bc113d6eb7a73113761d.chunk.js \
-    $(srcdir)/724.382c69daa7d78aa070a2.chunk.js \
-    $(srcdir)/829.ccb665950325037c0dda.css \
-    $(srcdir)/829.e189ab1f9c0e3c4396c9.chunk.js \
-    $(srcdir)/829.e189ab1f9c0e3c4396c9.chunk.js.LICENSE.txt \
-    $(srcdir)/855.7237d882144380bcb56b.chunk.js \
-    $(srcdir)/898.481553c68483d38c6893.chunk.js \
-    $(srcdir)/910.64f12c4c30c45ef4836c.chunk.js \
-    $(srcdir)/92.056d9c7eb658e9ce69e4.chunk.js \
-    $(srcdir)/920.87513849f708cf43e189.chunk.js \
-    $(srcdir)/93.b5623ea98f7eb4813624.chunk.js \
-    $(srcdir)/957.8d8d89ae4226d9fa7335.chunk.js \
-    $(srcdir)/LISENCE.txt \
+    $(srcdir)/43.e139da6e48a4308e3cf9.chunk.js \
+    $(srcdir)/440.82afa1467d7c5912d8a3.chunk.js \
+    $(srcdir)/442.5189af01dfd7a61ba40e.chunk.js \
+    $(srcdir)/451.f9d139bad9fab4ae284e.chunk.js \
+    $(srcdir)/470.66f8d3453ba22aaf59a4.chunk.js \
+    $(srcdir)/471.6c89d0196ad91bf90026.chunk.js \
+    $(srcdir)/510.fe83a8e48e12c14f8a0d.chunk.js \
+    $(srcdir)/514.ec684ba16b52bc75806a.chunk.js \
+    $(srcdir)/533.fce31f51b4cd0d80431f.chunk.js \
+    $(srcdir)/564.cfb9f016d7ca91bf1f08.chunk.js \
+    $(srcdir)/575.66c199aa3d69cf00c3f2.chunk.js \
+    $(srcdir)/597.e016f0724a013f625e39.chunk.js \
+    $(srcdir)/610.6152d96681e6cfc6f2a2.chunk.js \
+    $(srcdir)/655.67b53d6b6e9d27b4a42f.chunk.js \
+    $(srcdir)/663.4d152adafa970bb87d62.chunk.js \
+    $(srcdir)/709.b63f3383f748847da537.chunk.js \
+    $(srcdir)/714.b3173197d7dc5e16cc3e.chunk.js \
+    $(srcdir)/722.fe99e9077a2c17b765b6.chunk.js \
+    $(srcdir)/723.71890dcc2eb1733f246f.chunk.js \
+    $(srcdir)/723.cc9fa5f3bdc0bf3ab2fc.css \
+    $(srcdir)/817.6e7799a5b5165571e3aa.chunk.js \
+    $(srcdir)/837.935d02101181aff72447.chunk.js \
+    $(srcdir)/851.590f9e758e12dbe1bb25.chunk.js \
+    $(srcdir)/86.9f4a6baa2ee824be04cc.chunk.js \
+    $(srcdir)/934.32aedee30124d08593f8.chunk.js \
+    $(srcdir)/969.4369033ce0ca17cd78e2.chunk.js \
     $(srcdir)/agent.html \
-    $(srcdir)/app.539f0e3a8de5e0c160a6.css \
-    $(srcdir)/app.a3211ee3254b0b069c2f.js \
-    $(srcdir)/app.a3211ee3254b0b069c2f.js.LICENSE.txt \
-    $(srcdir)/bundlesManifest.json \
-    $(srcdir)/editor.08a1a860087f3e4b5c6d.chunk.js \
-    $(srcdir)/editor.08a1a860087f3e4b5c6d.chunk.js.LICENSE.txt \
+    $(srcdir)/app.0917ff2bf5d3b8b0678d.css \
+    $(srcdir)/app.6ab19a21fbb78d48c8f6.js \
+    $(srcdir)/bundlesManifest.6.json \
+    $(srcdir)/editor.a3a8ebf852f1b5b77f53.chunk.js \
     $(srcdir)/favicon.ico \
     $(srcdir)/index.html \
     $(srcdir)/local-agent.html \
-    $(srcdir)/npm.react.dom.acf9c264afcd943d8be3.js \
-    $(srcdir)/npm.react.dom.acf9c264afcd943d8be3.js.LICENSE.txt \
-    $(srcdir)/runtime.71a9638c152729b59ed5.js \
+    $(srcdir)/npm.react.dom.512b66551e07201cd4f2.js \
+    $(srcdir)/registry-access.html \
+    $(srcdir)/registry-alert-redirect.html \
+    $(srcdir)/registry-hello.html \
+    $(srcdir)/runtime.9143995e93765a6faefd.js \
+    $(srcdir)/sw.js \
     $(NULL)
 
 webv2staticdir=$(webv2dir)/static
@@ -94,204 +97,10 @@ dist_webv2staticemailimg_DATA = \
 
 webv2staticimgdir=$(webv2staticdir)/img
 dist_webv2staticimg_DATA = \
-    $(srcdir)/static/img/1s-icon.svg \
-    $(srcdir)/static/img/archive-illustration.svg \
-    $(srcdir)/static/img/check-illustration.svg \
-    $(srcdir)/static/img/chevron_down.svg \
-    $(srcdir)/static/img/chevron_right.svg \
-    $(srcdir)/static/img/collect-illustration.svg \
-    $(srcdir)/static/img/contributors-icon.svg \
-    $(srcdir)/static/img/diag-lines-bg.svg \
-    $(srcdir)/static/img/down-more-arrow.svg \
-    $(srcdir)/static/img/forks-icon.svg \
-    $(srcdir)/static/img/free-icon.svg \
-    $(srcdir)/static/img/github-logo-color.svg \
-    $(srcdir)/static/img/google-logo-color.svg \
-    $(srcdir)/static/img/green-bullet.svg \
-    $(srcdir)/static/img/hero.png \
-    $(srcdir)/static/img/immediate-icon.svg \
-    $(srcdir)/static/img/installations-icon.svg \
-    $(srcdir)/static/img/iso-world-map.svg \
-    $(srcdir)/static/img/lightbulb.svg \
     $(srcdir)/static/img/list-style-image.svg \
-    $(srcdir)/static/img/netdata-full-logo.svg \
-    $(srcdir)/static/img/netdata-logo.svg \
-    $(srcdir)/static/img/netdata-logomark.svg \
-    $(srcdir)/static/img/netdata-wordmark.svg \
-    $(srcdir)/static/img/netdata_full_logo.svg \
-    $(srcdir)/static/img/netdata_logotype.svg \
-    $(srcdir)/static/img/netdata_wordmark_inv.svg \
-    $(srcdir)/static/img/new-dashboard.svg \
-    $(srcdir)/static/img/no-alarms.svg \
-    $(srcdir)/static/img/no-bookmarks.svg \
     $(srcdir)/static/img/no-filter-results.png \
     $(srcdir)/static/img/no-nodes-room.svg \
-    $(srcdir)/static/img/onboarding-background.png \
-    $(srcdir)/static/img/overview-welcome.png \
-    $(srcdir)/static/img/plugins-icon.svg \
-    $(srcdir)/static/img/presentation-icon.svg \
-    $(srcdir)/static/img/query-illustration.svg \
     $(srcdir)/static/img/rack.png \
-    $(srcdir)/static/img/right-more-arrow.svg \
-    $(srcdir)/static/img/sign-in-illustration.svg \
-    $(srcdir)/static/img/stars-icon.svg \
-    $(srcdir)/static/img/store-illustration.svg \
-    $(srcdir)/static/img/stream-illustration.svg \
-    $(srcdir)/static/img/unlimited-icon.svg \
-    $(srcdir)/static/img/unreachable-node.svg \
-    $(NULL)
-
-webv2staticimgintegrationsdir=$(webv2staticimgdir)/integrations
-dist_webv2staticimgintegrations_DATA = \
-    $(srcdir)/static/img/integrations/activemq.png \
-    $(srcdir)/static/img/integrations/adaptec.png \
-    $(srcdir)/static/img/integrations/alerta.png \
-    $(srcdir)/static/img/integrations/alpine.png \
-    $(srcdir)/static/img/integrations/amazonlinux.png \
-    $(srcdir)/static/img/integrations/apache.png \
-    $(srcdir)/static/img/integrations/apcupsd.png \
-    $(srcdir)/static/img/integrations/arch.png \
-    $(srcdir)/static/img/integrations/awssns.png \
-    $(srcdir)/static/img/integrations/beanstalkd.png \
-    $(srcdir)/static/img/integrations/bindrndc.png \
-    $(srcdir)/static/img/integrations/boinc.png \
-    $(srcdir)/static/img/integrations/btrfs.png \
-    $(srcdir)/static/img/integrations/centos.png \
-    $(srcdir)/static/img/integrations/ceph.png \
-    $(srcdir)/static/img/integrations/chrony.png \
-    $(srcdir)/static/img/integrations/consul.png \
-    $(srcdir)/static/img/integrations/coreos.png \
-    $(srcdir)/static/img/integrations/couchdb.png \
-    $(srcdir)/static/img/integrations/cups.png \
-    $(srcdir)/static/img/integrations/custom.png \
-    $(srcdir)/static/img/integrations/ddos.png \
-    $(srcdir)/static/img/integrations/debian.png \
-    $(srcdir)/static/img/integrations/discord.png \
-    $(srcdir)/static/img/integrations/dns.png \
-    $(srcdir)/static/img/integrations/dnsdist.png \
-    $(srcdir)/static/img/integrations/docker.png \
-    $(srcdir)/static/img/integrations/dockerd.png \
-    $(srcdir)/static/img/integrations/dockerhub.png \
-    $(srcdir)/static/img/integrations/dovecot.png \
-    $(srcdir)/static/img/integrations/elasticsearch.png \
-    $(srcdir)/static/img/integrations/email.png \
-    $(srcdir)/static/img/integrations/exim.png \
-    $(srcdir)/static/img/integrations/fail2ban.png \
-    $(srcdir)/static/img/integrations/fedora.png \
-    $(srcdir)/static/img/integrations/flock.png \
-    $(srcdir)/static/img/integrations/fluentd.png \
-    $(srcdir)/static/img/integrations/fping.png \
-    $(srcdir)/static/img/integrations/freebsd.png \
-    $(srcdir)/static/img/integrations/freenas.png \
-    $(srcdir)/static/img/integrations/freeradius.png \
-    $(srcdir)/static/img/integrations/fronius.png \
-    $(srcdir)/static/img/integrations/gentoo.png \
-    $(srcdir)/static/img/integrations/golang.png \
-    $(srcdir)/static/img/integrations/grafana.png \
-    $(srcdir)/static/img/integrations/graphite.png \
-    $(srcdir)/static/img/integrations/haproxy.png \
-    $(srcdir)/static/img/integrations/hddtemp.png \
-    $(srcdir)/static/img/integrations/hostapd.png \
-    $(srcdir)/static/img/integrations/icecast.png \
-    $(srcdir)/static/img/integrations/influxdb.png \
-    $(srcdir)/static/img/integrations/ipfs.png \
-    $(srcdir)/static/img/integrations/ipmi.png \
-    $(srcdir)/static/img/integrations/ipvs.png \
-    $(srcdir)/static/img/integrations/irc.png \
-    $(srcdir)/static/img/integrations/iscbind.png \
-    $(srcdir)/static/img/integrations/iscdhcp.png \
-    $(srcdir)/static/img/integrations/kafka.png \
-    $(srcdir)/static/img/integrations/kairosdb.png \
-    $(srcdir)/static/img/integrations/kavenegar.png \
-    $(srcdir)/static/img/integrations/kubernetes.png \
-    $(srcdir)/static/img/integrations/kubernites.png \
-    $(srcdir)/static/img/integrations/libreswan.png \
-    $(srcdir)/static/img/integrations/libvirt.png \
-    $(srcdir)/static/img/integrations/lighthttpd.png \
-    $(srcdir)/static/img/integrations/linux.png \
-    $(srcdir)/static/img/integrations/litespeed.png \
-    $(srcdir)/static/img/integrations/lm-sensors.png \
-    $(srcdir)/static/img/integrations/logstash.png \
-    $(srcdir)/static/img/integrations/lxc.png \
-    $(srcdir)/static/img/integrations/lxd.png \
-    $(srcdir)/static/img/integrations/macos.png \
-    $(srcdir)/static/img/integrations/mariadb.png \
-    $(srcdir)/static/img/integrations/memcached.png \
-    $(srcdir)/static/img/integrations/memcahced.png \
-    $(srcdir)/static/img/integrations/messagebird.png \
-    $(srcdir)/static/img/integrations/mongodb.png \
-    $(srcdir)/static/img/integrations/monit.png \
-    $(srcdir)/static/img/integrations/mysql.png \
-    $(srcdir)/static/img/integrations/netfilter.png \
-    $(srcdir)/static/img/integrations/network.png \
-    $(srcdir)/static/img/integrations/nfs.png \
-    $(srcdir)/static/img/integrations/nginx.png \
-    $(srcdir)/static/img/integrations/nginxplus.png \
-    $(srcdir)/static/img/integrations/nsd.png \
-    $(srcdir)/static/img/integrations/ntpd.png \
-    $(srcdir)/static/img/integrations/nut.png \
-    $(srcdir)/static/img/integrations/nvidia.png \
-    $(srcdir)/static/img/integrations/one-wire.png \
-    $(srcdir)/static/img/integrations/opensips.png \
-    $(srcdir)/static/img/integrations/openstack.png \
-    $(srcdir)/static/img/integrations/opensuse.png \
-    $(srcdir)/static/img/integrations/opentsdb.png \
-    $(srcdir)/static/img/integrations/openvpn.png \
-    $(srcdir)/static/img/integrations/openwrt.png \
-    $(srcdir)/static/img/integrations/openzfs.png \
-    $(srcdir)/static/img/integrations/oracle.png \
-    $(srcdir)/static/img/integrations/oraclelinux.png \
-    $(srcdir)/static/img/integrations/pagerduty.png \
-    $(srcdir)/static/img/integrations/pfsense.png \
-    $(srcdir)/static/img/integrations/phpfpm.png \
-    $(srcdir)/static/img/integrations/placeholder.png \
-    $(srcdir)/static/img/integrations/postfix.png \
-    $(srcdir)/static/img/integrations/postgresql.png \
-    $(srcdir)/static/img/integrations/powerdns.png \
-    $(srcdir)/static/img/integrations/prometheus.png \
-    $(srcdir)/static/img/integrations/prowl.png \
-    $(srcdir)/static/img/integrations/proxysql.png \
-    $(srcdir)/static/img/integrations/puppet.png \
-    $(srcdir)/static/img/integrations/pushbullet.png \
-    $(srcdir)/static/img/integrations/pushover.png \
-    $(srcdir)/static/img/integrations/qos.png \
-    $(srcdir)/static/img/integrations/rabbitmq.png \
-    $(srcdir)/static/img/integrations/raspian.png \
-    $(srcdir)/static/img/integrations/redis.png \
-    $(srcdir)/static/img/integrations/rethinkdb.png \
-    $(srcdir)/static/img/integrations/retroshare.png \
-    $(srcdir)/static/img/integrations/rhel.png \
-    $(srcdir)/static/img/integrations/rocketchat.png \
-    $(srcdir)/static/img/integrations/rpi.png \
-    $(srcdir)/static/img/integrations/samba.png \
-    $(srcdir)/static/img/integrations/slack.png \
-    $(srcdir)/static/img/integrations/smartd.gif \
-    $(srcdir)/static/img/integrations/smartd.png \
-    $(srcdir)/static/img/integrations/smawebbox.jpg \
-    $(srcdir)/static/img/integrations/smstools3.png \
-    $(srcdir)/static/img/integrations/snmp.png \
-    $(srcdir)/static/img/integrations/solr.png \
-    $(srcdir)/static/img/integrations/spigot.png \
-    $(srcdir)/static/img/integrations/springboot.png \
-    $(srcdir)/static/img/integrations/squid.png \
-    $(srcdir)/static/img/integrations/statsd.png \
-    $(srcdir)/static/img/integrations/stiebeleltron.png \
-    $(srcdir)/static/img/integrations/suse.png \
-    $(srcdir)/static/img/integrations/systemd.png \
-    $(srcdir)/static/img/integrations/systemdnspawn.png \
-    $(srcdir)/static/img/integrations/telegram.png \
-    $(srcdir)/static/img/integrations/tomcat.png \
-    $(srcdir)/static/img/integrations/tor.png \
-    $(srcdir)/static/img/integrations/traefik.png \
-    $(srcdir)/static/img/integrations/twilio.png \
-    $(srcdir)/static/img/integrations/ubuntu.png \
-    $(srcdir)/static/img/integrations/unbound.png \
-    $(srcdir)/static/img/integrations/uwsgi.png \
-    $(srcdir)/static/img/integrations/varnish.png \
-    $(srcdir)/static/img/integrations/veritas.png \
-    $(srcdir)/static/img/integrations/webnotif.png \
-    $(srcdir)/static/img/integrations/xen.png \
-    $(srcdir)/static/img/integrations/zfs.png \
     $(NULL)
 
 webv2staticimglogososdir=$(webv2staticimgdir)/logos/os
@@ -460,55 +269,6 @@ dist_webv2staticimgmail_DATA = \
     $(srcdir)/static/img/mail/isotype.svg \
     $(srcdir)/static/img/mail/logotype.png \
     $(srcdir)/static/img/mail/logotype.svg \
-    $(NULL)
-
-webv2staticsitealarmsdir=$(webv2staticdir)/site/alarms
-dist_webv2staticsitealarms_DATA = \
-    $(srcdir)/static/site/alarms/redirect.html \
-    $(srcdir)/static/site/alarms/redirect.js \
-    $(srcdir)/static/site/alarms/redirect.test.js \
-    $(NULL)
-
-webv2staticsitepageserror404dir=$(webv2staticdir)/site/pages/error-404
-dist_webv2staticsitepageserror404_DATA = \
-    $(srcdir)/static/site/pages/error-404/error-404.css \
-    $(srcdir)/static/site/pages/error-404/error-404.svg \
-    $(srcdir)/static/site/pages/error-404/index.html \
-    $(NULL)
-
-webv2staticsitepageserror500dir=$(webv2staticdir)/site/pages/error-500
-dist_webv2staticsitepageserror500_DATA = \
-    $(srcdir)/static/site/pages/error-500/error-500.css \
-    $(srcdir)/static/site/pages/error-500/error-500.svg \
-    $(srcdir)/static/site/pages/error-500/index.html \
-    $(NULL)
-
-webv2staticsitepageserror501dir=$(webv2staticdir)/site/pages/error-501
-dist_webv2staticsitepageserror501_DATA = \
-    $(srcdir)/static/site/pages/error-501/error-501.css \
-    $(srcdir)/static/site/pages/error-501/error-501.svg \
-    $(srcdir)/static/site/pages/error-501/index.html \
-    $(NULL)
-
-webv2staticsitepageserror502dir=$(webv2staticdir)/site/pages/error-502
-dist_webv2staticsitepageserror502_DATA = \
-    $(srcdir)/static/site/pages/error-502/error-502.css \
-    $(srcdir)/static/site/pages/error-502/error-502.svg \
-    $(srcdir)/static/site/pages/error-502/index.html \
-    $(NULL)
-
-webv2staticsitepageserror503dir=$(webv2staticdir)/site/pages/error-503
-dist_webv2staticsitepageserror503_DATA = \
-    $(srcdir)/static/site/pages/error-503/error-503.css \
-    $(srcdir)/static/site/pages/error-503/error-503.svg \
-    $(srcdir)/static/site/pages/error-503/index.html \
-    $(NULL)
-
-webv2staticsitepageserror5xxdir=$(webv2staticdir)/site/pages/error-5xx
-dist_webv2staticsitepageserror5xx_DATA = \
-    $(srcdir)/static/site/pages/error-5xx/error-5xx.css \
-    $(srcdir)/static/site/pages/error-5xx/error-5xx.svg \
-    $(srcdir)/static/site/pages/error-5xx/index.html \
     $(NULL)
 
 webv2staticsitepagesholding503dir=$(webv2staticdir)/site/pages/holding-page-503

@@ -1,6 +1,62 @@
-module_name: timex.plugin
-plugin_name: timex.plugin
-alerts: []
+meta:
+  plugin_name: timex.plugin
+  module_name: timex.plugin
+  monitored_instance:
+    name: timex
+    link: ''
+    categories: []
+    icon_filename: ''
+  related_resources:
+    integrations:
+      list: []
+  info_provided_to_referring_integrations:
+    description: ''
+  keywords: []
+  most_popular: false
+overview:
+  data_collection:
+    metrics_description: ''
+    method_description: ''
+  supported_platforms:
+    include: []
+    exclude: []
+  multi-instance: true
+  additional_permissions:
+    description: ''
+  default_behavior:
+    auto_detection:
+      description: ''
+    limits:
+      description: ''
+    performance_impact:
+      description: ''
+setup:
+  prerequisites:
+    list: []
+  configuration:
+    file:
+      name: ''
+      description: ''
+    options:
+      description: ''
+      folding:
+        title: ''
+        enabled: true
+      list: []
+    examples:
+      folding:
+        enabled: true
+        title: ''
+      list: []
+troubleshooting:
+  problems:
+    list: []
+alerts:
+  - name: system_clock_sync_state
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/timex.conf
+    metric: system.clock_sync_state
+    info: when set to 0, the system kernel believes the system clock is not properly synchronized to a reliable server
+    os: "linux"
 metrics:
   folding:
     title: Metrics

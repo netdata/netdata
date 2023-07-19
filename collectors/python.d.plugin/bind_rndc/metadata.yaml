@@ -1,6 +1,61 @@
-module_name: bind_rndc
-plugin_name: python.d.plugin
-alerts: []
+meta:
+  plugin_name: python.d.plugin
+  module_name: bind_rndc
+  monitored_instance:
+    name: python.d bind_rndc
+    link: ''
+    categories: []
+    icon_filename: ''
+  related_resources:
+    integrations:
+      list: []
+  info_provided_to_referring_integrations:
+    description: ''
+  keywords: []
+  most_popular: false
+overview:
+  data_collection:
+    metrics_description: ''
+    method_description: ''
+  supported_platforms:
+    include: []
+    exclude: []
+  multi-instance: true
+  additional_permissions:
+    description: ''
+  default_behavior:
+    auto_detection:
+      description: ''
+    limits:
+      description: ''
+    performance_impact:
+      description: ''
+setup:
+  prerequisites:
+    list: []
+  configuration:
+    file:
+      name: ''
+      description: ''
+    options:
+      description: ''
+      folding:
+        title: ''
+        enabled: true
+      list: []
+    examples:
+      folding:
+        enabled: true
+        title: ''
+      list: []
+troubleshooting:
+  problems:
+    list: []
+alerts:
+  - name: bind_rndc_stats_file_size
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/bind_rndc.conf
+    metric: bind_rndc.stats_size
+    info: BIND statistics-file size
 metrics:
   folding:
     title: Metrics

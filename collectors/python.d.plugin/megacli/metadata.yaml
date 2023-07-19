@@ -1,27 +1,77 @@
-module_name: megacli
-plugin_name: python.d.plugin
+meta:
+  plugin_name: python.d.plugin
+  module_name: megacli
+  monitored_instance:
+    name: python.d megacli
+    link: ''
+    categories: []
+    icon_filename: ''
+  related_resources:
+    integrations:
+      list: []
+  info_provided_to_referring_integrations:
+    description: ''
+  keywords: []
+  most_popular: false
+overview:
+  data_collection:
+    metrics_description: ''
+    method_description: ''
+  supported_platforms:
+    include: []
+    exclude: []
+  multi-instance: true
+  additional_permissions:
+    description: ''
+  default_behavior:
+    auto_detection:
+      description: ''
+    limits:
+      description: ''
+    performance_impact:
+      description: ''
+setup:
+  prerequisites:
+    list: []
+  configuration:
+    file:
+      name: ''
+      description: ''
+    options:
+      description: ''
+      folding:
+        title: ''
+        enabled: true
+      list: []
+    examples:
+      folding:
+        enabled: true
+        title: ''
+      list: []
+troubleshooting:
+  problems:
+    list: []
 alerts:
   - name: megacli_adapter_state
     link: https://github.com/netdata/netdata/blob/master/health/health.d/megacli.conf
     metric: megacli.adapter_degraded
     info: 'adapter is in the degraded state (0: false, 1: true)'
-    os: "linux"
   - name: megacli_pd_media_errors
     link: https://github.com/netdata/netdata/blob/master/health/health.d/megacli.conf
     metric: megacli.pd_media_error
     info: number of physical drive media errors
-    os: "linux"
   - name: megacli_pd_predictive_failures
     link: https://github.com/netdata/netdata/blob/master/health/health.d/megacli.conf
     metric: megacli.pd_predictive_failure
     info: number of physical drive predictive failures
-    os: "linux"
   - name: megacli_bbu_relative_charge
     link: https://github.com/netdata/netdata/blob/master/health/health.d/megacli.conf
     metric: megacli.bbu_relative_charge
-    info: average battery backup unit (BBU) relative state of charge over the last
-      10 seconds
-    os: "linux"
+    info: average battery backup unit (BBU) relative state of charge over the last 10 seconds
+  - name: megacli_bbu_cycle_count
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/megacli.conf
+    metric: megacli.bbu_cycle_count
+    info: average battery backup unit (BBU) charge cycles count over the last 10 seconds
 metrics:
   folding:
     title: Metrics

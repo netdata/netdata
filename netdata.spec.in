@@ -530,6 +530,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_libexecdir}/%{name}/plugins.d/system-info.sh
 %{_libexecdir}/%{name}/plugins.d/tc-qos-helper.sh
 %{_libexecdir}/%{name}/plugins.d/template_dim.sh
+%{_libexecdir}/%{name}/plugins.d/ebpf_thread_function.sh
 
 # cgroup-network detects the network interfaces of CGROUPs
 # it must be able to use setns() and run cgroup-network-helper.sh as root

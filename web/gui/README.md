@@ -9,6 +9,9 @@ learn_rel_path: "Operations"
 
 # Local Agent dashboard
 
+> ⚠️ You're checking the documentation for the legacy Agent dashboard. For the current version please check [Accessing Netdata Dashboards](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/accessing-netdata-dashboards.md).
+
+
 The local Netdata Agent dashboard is the heart of Netdata's performance troubleshooting toolkit. You've probably seen it
 before:
 
