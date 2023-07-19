@@ -16,6 +16,8 @@ The scope defines the instance that the metric belongs to. An instance is unique
 [[ scope.description ]]
 
 [% if scope.labels %]
+Labels:
+
 | Label       | Description      |
 |-------------|------------------|
 [% for label in scope.labels %]
@@ -24,6 +26,8 @@ The scope defines the instance that the metric belongs to. An instance is unique
 [% else %]
 This scope has no labels.
 [% endif %]
+
+Metrics:
 
 | Metric | Dimensions | Unit |[% for a in entry.metrics.availability %] [[ a ]] |[% endfor %]
 
