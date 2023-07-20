@@ -17,6 +17,7 @@
 #include "percentile/percentile.h"
 #include "trimmed_mean/trimmed_mean.h"
 
+#define QUERY_PLAN_MIN_POINTS 400
 #define POINTS_TO_EXPAND_QUERY 5
 
 // ----------------------------------------------------------------------------
@@ -995,6 +996,10 @@ static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t afte
 
     if(unlikely(after_wanted == before_wanted || points_wanted <= 0))
         return query_metric_first_working_tier(qm);
+
+    if(points_wanted < QUERY_PLAN_MIN_POINTS)
+        // when selecting tiers, aim for a resolution of at least QUERY_PLAN_MIN_POINTS points
+        points_wanted = (before_wanted - after_wanted) > QUERY_PLAN_MIN_POINTS ? QUERY_PLAN_MIN_POINTS : before_wanted - after_wanted;
 
     time_t min_first_time_s = 0;
     time_t max_last_time_s = 0;

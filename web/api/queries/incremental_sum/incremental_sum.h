@@ -12,17 +12,18 @@ struct tg_incremental_sum {
     size_t count;
 };
 
-static inline void tg_incremental_sum_create(RRDR *r, const char *options __maybe_unused) {
-    r->time_grouping.data = onewayalloc_callocz(r->internal.owa, 1, sizeof(struct tg_incremental_sum));
-}
-
 // resets when switches dimensions
 // so, clear everything to restart
 static inline void tg_incremental_sum_reset(RRDR *r) {
     struct tg_incremental_sum *g = (struct tg_incremental_sum *)r->time_grouping.data;
-    g->first = 0;
-    g->last = 0;
+    g->first = NAN;
+    g->last = NAN;
     g->count = 0;
+}
+
+static inline void tg_incremental_sum_create(RRDR *r, const char *options __maybe_unused) {
+    r->time_grouping.data = onewayalloc_mallocz(r->internal.owa, sizeof(struct tg_incremental_sum));
+    tg_incremental_sum_reset(r);
 }
 
 static inline void tg_incremental_sum_free(RRDR *r) {
@@ -34,7 +35,11 @@ static inline void tg_incremental_sum_add(RRDR *r, NETDATA_DOUBLE value) {
     struct tg_incremental_sum *g = (struct tg_incremental_sum *)r->time_grouping.data;
 
     if(unlikely(!g->count)) {
-        g->first = value;
+        if(isnan(g->first))
+            g->first = value;
+        else
+            g->last = value;
+
         g->count++;
     }
     else {
@@ -48,19 +53,16 @@ static inline NETDATA_DOUBLE tg_incremental_sum_flush(RRDR *r, RRDR_VALUE_FLAGS 
 
     NETDATA_DOUBLE value;
 
-    if(unlikely(!g->count)) {
+    if(unlikely(!g->count || isnan(g->first) || isnan(g->last))) {
         value = 0.0;
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
-    }
-    else if(unlikely(g->count == 1)) {
-        value = 0.0;
     }
     else {
         value = g->last - g->first;
     }
 
-    g->first = 0.0;
-    g->last = 0.0;
+    g->first = g->last;
+    g->last = NAN;
     g->count = 0;
 
     return value;
