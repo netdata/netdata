@@ -2052,7 +2052,7 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/mdstat
       monitored_instance:
-        name: Software RAID devices
+        name: MD RAID
         link: ''
         categories:
          - data-collection.linux-systems.disk-metrics
@@ -2063,12 +2063,14 @@ modules:
       info_provided_to_referring_integrations:
         description: ''
       keywords:
-       - software raid devices
+        - raid
+        - mdadm
+        - mdstat
        - raid
       most_popular: false
     overview:
       data_collection:
-        metrics_description: 'This integration monitors the status of software RAID devices.'
+        metrics_description: 'This integration monitors the status of MD RAID devices.'
         method_description: ''
       supported_platforms:
         include: []
@@ -2540,7 +2542,8 @@ modules:
       info_provided_to_referring_integrations:
         description: ''
       keywords:
-       - infiniband
+        - infiniband
+        - rdma
       most_popular: false
     overview:
       data_collection:
@@ -3596,11 +3599,12 @@ modules:
       info_provided_to_referring_integrations:
         description: ''
       keywords:
-       - nfs client
+        - nfs client
+        - filesystem
       most_popular: false
     overview:
       data_collection:
-        metrics_description: 'This integration provides statistics from the NFS Client.'
+        metrics_description: 'This integration provides statistics from the Linux kernel\'s NFS Client.'
         method_description: ''
       supported_platforms:
         include: []
@@ -3696,11 +3700,12 @@ modules:
       info_provided_to_referring_integrations:
         description: ''
       keywords:
-       - nfs server
+        - nfs server
+        - filesystem
       most_popular: false
     overview:
       data_collection:
-        metrics_description: 'This integration provides statistics from the NFS Server.'
+        metrics_description: 'This integration provides statistics from the Linux kernel\'s NFS Server.'
         method_description: ''
       supported_platforms:
         include: []
@@ -4222,7 +4227,7 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/spl/kstat/zfs/arcstats
       monitored_instance:
-        name: Adaptive Replacement Cache
+        name: ZFS Adaptive Replacement Cache
         link: ''
         categories:
          - data-collection.linux-systems.filesystem-metrics.zfs
@@ -4240,7 +4245,7 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: 'This integration monitors Adadptive Replacement Cache (ARC) statistics.'
+        metrics_description: 'This integration monitors  ZFS Adadptive Replacement Cache (ARC) statistics.'
         method_description: ''
       supported_platforms:
         include: []
@@ -4504,7 +4509,7 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: 'This integration provides statistics from the BTRFS filesystem.'
+        metrics_description: 'This integration provides usage and error statistics from the BTRFS filesystem.'
         method_description: ''
       supported_platforms:
         include: []
