@@ -6,53 +6,54 @@ modules:
       module_name: sensors
       monitored_instance:
         name: IPMI
-        link: 'https://www.ibm.com/docs/en/power9/0009-ESS?topic=ipmi-overview'
+        link: "https://www.ibm.com/docs/en/power9/0009-ESS?topic=ipmi-overview"
         categories:
           - data-collection.hardware-devices-and-sensors
-        icon_filename: 'netdata.png'
+        icon_filename: "netdata.png"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords:
-       - sensors
-       - ipmi
+        - sensors
+        - ipmi
       most_popular: true
     overview:
       data_collection:
-        metrics_description: 'Monitor enterprise server sensor readings, event log entries, and hardware statuses to ensure reliable server operations.'
-        method_description: ''
+        metrics_description:
+          "Monitor enterprise server sensor readings, event log entries, and hardware statuses to ensure reliable server operations."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -141,46 +142,47 @@ modules:
       <<: *meta
       monitored_instance:
         name: FreeIPMI
-        link: 'https://www.gnu.org/software/freeipmi/'
-        icon_filename: 'freeipmi.jpg'
+        link: "https://www.gnu.org/software/freeipmi/"
+        icon_filename: "freeipmi.jpg"
       keywords:
-       - sensors
-       - freeipmi
+        - sensors
+        - freeipmi
       most_popular: true
     overview:
       data_collection:
-        metrics_description: 'Monitor enterprise server sensor readings, event log entries, and hardware statuses to ensure reliable server operations.'
-        method_description: ''
+        metrics_description:
+          "Monitor enterprise server sensor readings, event log entries, and hardware statuses to ensure reliable server operations."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
