@@ -4,6 +4,40 @@
 #include "ebpf_functions.h"
 
 /*****************************************************************
+ *  EBPF FUNCTION COMMON
+ *****************************************************************/
+
+/**
+ * Function Start thread
+ *
+ * Start a specific thread after user request.
+ *
+ * @param em           The structure with thread information
+ * @param period
+ * @return
+ */
+static int ebpf_function_start_thread(ebpf_module_t *em, int period)
+{
+    struct netdata_static_thread *st = em->thread;
+    // another request for thread that already ran, cleanup and restart
+    if (st->thread)
+        freez(st->thread);
+
+    if (period <= 0)
+        period = EBPF_DEFAULT_LIFETIME;
+
+    st->thread = mallocz(sizeof(netdata_thread_t));
+    em->enabled = NETDATA_THREAD_EBPF_FUNCTION_RUNNING;
+    em->lifetime = period;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    netdata_log_info("Starting thread %s with lifetime = %d", em->info.thread_name, period);
+#endif
+
+    return netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, em);
+}
+
+/*****************************************************************
  *  EBPF SELECT MODULE
  *****************************************************************/
 
@@ -139,27 +173,15 @@ static void ebpf_function_thread_manipulation(const char *transaction,
 
             pthread_mutex_lock(&ebpf_exit_cleanup);
             if (lem->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
-                struct netdata_static_thread *st = lem->thread;
                 // Load configuration again
                 ebpf_update_module(lem, default_btf, running_on_kernel, isrh);
 
-                // another request for thread that already ran, cleanup and restart
-                if (st->thread)
-                    freez(st->thread);
-
-                if (period <= 0)
-                    period = EBPF_DEFAULT_LIFETIME;
-
-                st->thread = mallocz(sizeof(netdata_thread_t));
-                lem->enabled = NETDATA_THREAD_EBPF_FUNCTION_RUNNING;
-                lem->lifetime = period;
-
-#ifdef NETDATA_INTERNAL_CHECKS
-                netdata_log_info("Starting thread %s with lifetime = %d", thread_name, period);
-#endif
-
-                netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT,
-                                      st->start_routine, lem);
+                if (ebpf_function_start_thread(lem, period)) {
+                    ebpf_function_error(transaction,
+                                        HTTP_RESP_INTERNAL_SERVER_ERROR,
+                                        "Cannot start thread.");
+                    return;
+                }
             } else {
                 lem->running_time = 0;
                 if (period > 0) // user is modifying period to run
@@ -427,16 +449,17 @@ static void ebpf_function_socket_manipulation(const char *transaction,
 
     network_viewer_opt.enabled = CONFIG_BOOLEAN_YES;
 
-    char *words[PLUGINSD_MAX_WORDS] = { NULL };
+    char *words[PLUGINSD_MAX_WORDS] = {NULL};
     size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
     char *separator;
     const char *name;
-    for(int i = 1; i < PLUGINSD_MAX_WORDS ; i++) {
+    int period = -1;
+    for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
         const char *keyword = get_word(words, num_words, i);
         if (!keyword)
             break;
 
-        if (strncmp(keyword, EBPF_FUNCTION_SOCKET_FAMILY, sizeof(EBPF_FUNCTION_SOCKET_FAMILY) -1) == 0) {
+        if (strncmp(keyword, EBPF_FUNCTION_SOCKET_FAMILY, sizeof(EBPF_FUNCTION_SOCKET_FAMILY) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_FAMILY) - 1];
             separator = strchr(name, ':');
             if (separator) {
@@ -450,8 +473,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             } else {
                 network_viewer_opt.family = AF_UNSPEC;
             }
-        } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_PERIOD, sizeof(EBPF_FUNCTION_SOCKET_PERIOD) -1) == 0) {
-            int period = -1;
+        } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_PERIOD, sizeof(EBPF_FUNCTION_SOCKET_PERIOD) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_PERIOD) - 1];
             separator = strchr(name, ':');
             pthread_mutex_lock(&ebpf_exit_cleanup);
@@ -464,31 +486,45 @@ static void ebpf_function_socket_manipulation(const char *transaction,
                 em->lifetime = EBPF_DEFAULT_LIFETIME;
 
             pthread_mutex_unlock(&ebpf_exit_cleanup);
-        } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_RESOLVE, sizeof(EBPF_FUNCTION_SOCKET_RESOLVE) -1) == 0) {
+        } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_RESOLVE, sizeof(EBPF_FUNCTION_SOCKET_RESOLVE) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_RESOLVE) - 1];
             separator = strchr(name, ':');
             if (separator)
-                network_viewer_opt.hostname_resolution_enabled = (!strcmp(++separator, "NO")) ? CONFIG_BOOLEAN_NO :
-                                                                                                CONFIG_BOOLEAN_YES;
+                network_viewer_opt.hostname_resolution_enabled =
+                    (!strcmp(++separator, "NO")) ? CONFIG_BOOLEAN_NO : CONFIG_BOOLEAN_YES;
             else
                 network_viewer_opt.hostname_resolution_enabled = CONFIG_BOOLEAN_NO;
-        } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_RANGE, sizeof(EBPF_FUNCTION_SOCKET_RANGE) -1) == 0) {
+        } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_RANGE, sizeof(EBPF_FUNCTION_SOCKET_RANGE) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_RANGE) - 1];
             separator = strchr(name, ':');
             if (separator) {
                 ebpf_parse_ips(++separator);
             }
-        } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_PORT, sizeof(EBPF_FUNCTION_SOCKET_PORT) -1) == 0) {
+        } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_PORT, sizeof(EBPF_FUNCTION_SOCKET_PORT) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_PORT) - 1];
             separator = strchr(name, ':');
             if (separator) {
                 ebpf_parse_ports(++separator);
             }
-        } else if(strncmp(keyword, "help", 4) == 0) {
+        } else if (strncmp(keyword, "help", 4) == 0) {
             ebpf_function_socket_help(transaction);
             return;
         }
     }
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    if (em->enabled < NETDATA_THREAD_EBPF_STOPPING) {
+        if (ebpf_function_start_thread(em, period)) {
+            ebpf_function_error(transaction,
+                                HTTP_RESP_INTERNAL_SERVER_ERROR,
+                                "Cannot start thread.");
+            return;
+        }
+    } else {
+        if (period > 0) // user is modifying period to run
+            em->lifetime = period;
+    }
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************
