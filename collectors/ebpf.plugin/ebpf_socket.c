@@ -1986,6 +1986,50 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
 }
 
 /**
+ * Fill function buffer
+ *
+ * Fill buffer with data to be shown on cloud.
+ *
+ * @param wb          buffer where we store data.
+ * @param key         socket information
+ * @param values      data read from hash table
+ */
+static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_idx_t *key, netdata_socket_t *values)
+{
+    buffer_json_add_array_item_array(wb);
+
+    // IMPORTANT!
+    // THE ORDER SHOULD BE THE SAME WITH THE FIELDS!
+
+    // SRC IP
+    struct in_addr ip = { .s_addr = key->saddr.addr32[0] };
+    char *ptr = inet_ntoa(ip);
+    buffer_json_add_array_item_string(wb, ptr);
+
+    // SRC Port
+    buffer_json_add_array_item_uint64(wb, (uint64_t) ntohs(key->sport));
+
+    // DST IP
+    ip.s_addr = key->daddr.addr32[0];
+    ptr = inet_ntoa(ip);
+    buffer_json_add_array_item_string(wb, ptr);
+
+    // DST Port
+    buffer_json_add_array_item_uint64(wb, (uint64_t) ntohs(key->dport));
+
+    // Protocol
+    buffer_json_add_array_item_string(wb, (values->protocol == IPPROTO_TCP) ? "TCP": "UDP");
+
+    // Traffic received
+    buffer_json_add_array_item_uint64(wb, (uint64_t) values->recv_bytes);
+
+    // Traffic sent
+    buffer_json_add_array_item_uint64(wb, (uint64_t) values->sent_bytes);
+
+    buffer_json_array_close(wb);
+}
+
+/**
  * Read socket hash table
  *
  * Read data from hash tables created on kernel ring.
@@ -2132,8 +2176,13 @@ static void read_listen_table()
 void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
 {
     // thread was not initialized
-    if (!em->maps || (em->maps && em->maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED))
+    if (!em->maps || (em->maps && em->maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED)){
+        netdata_socket_idx_t key = {.daddr.addr32[0] = 2130706433, .dport = 0,
+                                    .saddr.addr32[0] = 2130706433, .sport = 0};
+        netdata_socket_t val = {};
+        ebpf_fill_function_buffer(buf, &key, &val);
         return;
+    }
 
     int fd = em->maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd;
     int maps_per_core = em->maps_per_core;
