@@ -370,6 +370,7 @@ void ebpf_fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_
 void parse_service_name_section(struct config *cfg);
 void ebpf_parse_ips(char *ptr);
 void ebpf_parse_ports(char *ptr);
+void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em);
 
 extern struct config socket_config;
 extern netdata_ebpf_targets_t socket_targets[];

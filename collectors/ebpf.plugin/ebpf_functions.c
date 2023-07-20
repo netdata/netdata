@@ -537,7 +537,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
 
     // Collect data
     buffer_json_member_add_array(wb, "data");
-    // MODIFY FUNCTION ebpf_socket_read_hash AND ADD A CALL FOR IT HERE
+    ebpf_socket_read_open_connections(wb, em);
     buffer_json_array_close(wb); // data
 
     buffer_json_member_add_object(wb, "columns");

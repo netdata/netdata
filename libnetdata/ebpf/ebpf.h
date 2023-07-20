@@ -312,7 +312,9 @@ typedef struct ebpf_module {
     struct {
         void *(*start_routine)(void *);                             // the thread function
         void (*apps_routine)(struct ebpf_module *em, void *ptr);    // the apps charts
-        void (*fnct_routine)(BUFFER *bf);                           // the function used for exteernal requests
+        void (*fnct_routine)(BUFFER *bf, struct ebpf_module *em);      // the function used for exteernal requests
+        const char *fcnt_name;
+        const char *fcnt_desc;
     } functions;
 
     enum ebpf_threads_status enabled;

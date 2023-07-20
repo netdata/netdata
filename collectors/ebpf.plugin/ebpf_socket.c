@@ -110,17 +110,6 @@ netdata_ebpf_targets_t socket_targets[] = { {.name = "inet_csk_accept", .mode = 
                                             {.name = "tcp_v6_connect", .mode = EBPF_LOAD_TRAMPOLINE},
                                             {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
-struct netdata_static_thread socket_threads = {
-    .name = "EBPF SOCKET READ",
-    .config_section = NULL,
-    .config_name = NULL,
-    .env_name = NULL,
-    .enabled = 1,
-    .thread = NULL,
-    .init_routine = NULL,
-    .start_routine = NULL
-};
-
 #ifdef NETDATA_DEV_MODE
 int socket_disable_priority;
 #endif
@@ -640,10 +629,6 @@ static void ebpf_socket_free(ebpf_module_t *em )
 static void ebpf_socket_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    pthread_mutex_lock(&nv_mutex);
-    if (socket_threads.thread)
-        netdata_thread_cancel(*socket_threads.thread);
-    pthread_mutex_unlock(&nv_mutex);
     ebpf_socket_free(em);
 }
 
@@ -2145,34 +2130,22 @@ static void read_listen_table()
  * This is the thread callback.
  * This thread is necessary, because we cannot freeze the whole plugin to read the data on very busy socket.
  *
- * @param ptr It is a NULL value for this thread.
+ * @param buf the buffer to store data;
  *
  * @return It always returns NULL.
  */
-void *ebpf_socket_read_hash(void *ptr)
+void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
 {
-    netdata_thread_cleanup_push(ebpf_socket_cleanup, ptr);
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    // thread was not initialized
+    if (!em->maps || (em->maps && em->maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED))
+        return;
 
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    int fd = socket_maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd;
+    int fd = em->maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd;
     int maps_per_core = em->maps_per_core;
-    // This thread is cancelled from another thread
-    uint32_t running_time;
-    uint32_t lifetime = em->lifetime;
-    for (running_time = 0;!ebpf_exit_plugin && running_time < lifetime; running_time++) {
-        (void)heartbeat_next(&hb, USEC_PER_SEC);
-        if (ebpf_exit_plugin)
-           break;
 
-        pthread_mutex_lock(&nv_mutex);
-        ebpf_read_socket_hash_table(fd, AF_INET6, maps_per_core);
-        pthread_mutex_unlock(&nv_mutex);
-    }
-
-    netdata_thread_cleanup_pop(1);
-    return NULL;
+    pthread_mutex_lock(&nv_mutex);
+    ebpf_read_socket_hash_table(fd, AF_INET6, maps_per_core);
+    pthread_mutex_unlock(&nv_mutex);
 }
 
 /**
@@ -2876,14 +2849,6 @@ static void socket_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb);
     uint32_t network_connection = network_viewer_opt.enabled;
-
-    if (network_connection) {
-        socket_threads.thread = mallocz(sizeof(netdata_thread_t));
-        socket_threads.start_routine = ebpf_socket_read_hash;
-
-        netdata_thread_create(socket_threads.thread, socket_threads.name,
-                              NETDATA_THREAD_OPTION_DEFAULT, ebpf_socket_read_hash, em);
-    }
 
     int cgroups = em->cgroup_charts;
     if (cgroups)
