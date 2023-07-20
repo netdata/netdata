@@ -67,7 +67,7 @@ With both Parent Agents connected to Cloud, Cloud will route queries to either P
 
 ### Stand-alone Deployment
 
-The stand-alone setup is configured out of the box with reasonable defaults, but please consult our [configuration documentation](https://github.com/netdata/netdata/blob/master/docs/cloud/cheatsheet.md) for details, including the overview of [common configuration changes](https://github.com/netdata/netdata/blob/gmaster/docs/configure/common-changes.md).
+The stand-alone setup is configured out of the box with reasonable defaults, but please consult our [configuration documentation](https://github.com/netdata/netdata/blob/master/docs/cloud/cheatsheet.md) for details, including the overview of [common configuration changes](https://github.com/netdata/netdata/blob/master/docs/configure/common-changes.md).
 
 ### Parent – Child Deployment
 
@@ -130,7 +130,7 @@ Set the following parameters:
 
 #### Parent config
 
-For the Parent, besides setting up streaming, the example will also provide an example configuration of multiple [tiers](https://github.com/netdata/netdata/blob/master/database/engine/README.md#tiering) of metrics [storage](https://github.com/netdata/netdata/blob/gmaster/docs/store/change-metrics-storage.md), for 10 children, with about 2k metrics each.
+For the Parent, besides setting up streaming, the example will also provide an example configuration of multiple [tiers](https://github.com/netdata/netdata/blob/master/database/engine/README.md#tiering) of metrics [storage](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md), for 10 children, with about 2k metrics each.
 
 - 1s granularity at tier 0 for 1 week
 - 1m granularity at tier 1 for 1 month
