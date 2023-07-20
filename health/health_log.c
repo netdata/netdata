@@ -20,6 +20,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     STRING *name,
     STRING *chart,
     STRING *chart_context,
+    STRING *chart_name,
     STRING *family,
     STRING *class,
     STRING *component,
@@ -43,6 +44,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     ae->name = string_dup(name);
     ae->chart = string_dup(chart);
     ae->chart_context = string_dup(chart_context);
+    ae->chart_name = string_dup(chart_name);
 
     uuid_copy(ae->config_hash_id, *((uuid_t *) config_hash_id));
 
