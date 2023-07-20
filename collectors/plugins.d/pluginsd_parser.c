@@ -2058,7 +2058,7 @@ static inline PARSER_RC pluginsd_register_module(char **words __maybe_unused, si
 
     mod->set_config_cb = set_module_config_cb;
     mod->get_config_cb = get_module_config_cb;
-    mod->set_config_cb_usr_ctx = parser;
+    mod->config_cb_usr_ctx = parser;
 
     mod->get_job_config_cb = get_job_config_cb;
     mod->set_job_config_cb = set_job_config_cb;

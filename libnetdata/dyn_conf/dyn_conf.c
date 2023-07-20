@@ -133,13 +133,13 @@ int remove_job(struct module *module, struct job *job)
 {
     // as we are going to do unlink here we better make sure we have all to build proper path
     if (unlikely(job->name == NULL || module == NULL || module->name == NULL || module->plugin == NULL || module->plugin->name == NULL))
-        return -1;
+        return 0;
 
     enum set_config_result rc = module->delete_job_cb(module->job_config_cb_usr_ctx, module->name, job->name);
 
     if (rc != SET_CONFIG_ACCEPTED) {
         error_report("DYNCFG module \"%s\" rejected delete job for \"%s\"", module->name, job->name);
-        return 1;
+        return 0;
     }
 
     BUFFER *buffer = buffer_create(DYN_CONF_PATH_MAX, NULL);
@@ -250,7 +250,7 @@ static const char *set_module_config(struct module *mod, dyncfg_config_t cfg)
 {
     struct configurable_plugin *plugin = mod->plugin;
 
-    enum set_config_result rc = mod->set_config_cb(mod->set_config_cb_usr_ctx, mod->name, &cfg);
+    enum set_config_result rc = mod->set_config_cb(mod->config_cb_usr_ctx, mod->name, &cfg);
     if (rc != SET_CONFIG_ACCEPTED) {
         error_report("DYNCFG module \"%s\" rejected config", plugin->name);
         return "module rejected config";
@@ -411,24 +411,255 @@ int register_module(struct configurable_plugin *plugin, struct module *module)
     return 0;
 }
 
-static dyncfg_config_t get_plugin_config(struct configurable_plugin *plugin)
+
+void handle_dyncfg_root(struct uni_http_response *resp, int method)
 {
-        return plugin->get_config_cb(plugin->cb_usr_ctx);
+        if (method != HTTP_METHOD_GET) {
+        resp->content = "method not allowed";
+        resp->content_length = strlen(resp->content);
+        resp->status = HTTP_RESP_METHOD_NOT_ALLOWED;
+        return;
+        }
+        json_object *obj = get_list_of_plugins_json();
+        json_object *wrapper = json_object_new_object();
+        json_object_object_add(wrapper, "configurable_plugins", obj);
+    resp->content = strdupz(json_object_to_json_string_ext(wrapper, JSON_C_TO_STRING_PRETTY));
+        json_object_put(wrapper);
+    resp->status = HTTP_RESP_OK;
+    resp->content_type = CT_APPLICATION_JSON;
+    resp->content_free = freez;
+    resp->content_length = strlen(resp->content);
+    }
+
+void handle_plugin_root(struct uni_http_response *resp, int method, struct configurable_plugin *plugin, void *post_payload, size_t post_payload_size)
+{
+    switch(method) {
+        case HTTP_METHOD_GET:
+        {
+            dyncfg_config_t cfg = plugin->get_config_cb(plugin->cb_usr_ctx);
+            resp->content = mallocz(cfg.data_size);
+            memcpy(resp->content, cfg.data, cfg.data_size);
+            resp->status = HTTP_RESP_OK;
+            resp->content_free = free;
+            resp->content_length = cfg.data_size;
+            return;
+    }
+        case HTTP_METHOD_PUT:
+        {
+            const char *response;
+            if (post_payload == NULL) {
+                resp->content = "no payload";
+                resp->content_length = strlen(resp->content);
+                resp->status = HTTP_RESP_BAD_REQUEST;
+                return;
+            }
+            dyncfg_config_t cont = {
+                .data = post_payload,
+                .data_size = post_payload_size
+            };
+            response = set_plugin_config(plugin, cont);
+            if (response == NULL) {
+                resp->status = HTTP_RESP_OK;
+                resp->content = "OK";
+                resp->content_length = strlen(resp->content);
+            } else {
+                resp->status = HTTP_RESP_BAD_REQUEST;
+                resp->content = response;
+                resp->content_length = strlen(resp->content);
+            }
+            return;
+        }
+        default:
+            resp->content = "method not allowed";
+            resp->content_length = strlen(resp->content);
+            resp->status = HTTP_RESP_METHOD_NOT_ALLOWED;
+            return;
+    }
 }
 
-static dyncfg_config_t get_module_config(struct module *module)
+void handle_module_root(struct uni_http_response *resp, int method, struct configurable_plugin *plugin, const char *module, void *post_payload, size_t post_payload_size)
 {
-        return module->get_config_cb(module->set_config_cb_usr_ctx, module->name);
-}
+    if (strncmp(module, DYN_CONF_SCHEMA, strlen(DYN_CONF_SCHEMA)) == 0) {
+        resp->content = "not implemented yet";
+        resp->content_length = strlen(resp->content);
+        resp->status = HTTP_RESP_NOT_FOUND;
+        return;
+    }
+    if (strncmp(module, DYN_CONF_MODULE_LIST, strlen(DYN_CONF_MODULE_LIST)) == 0) {
+        if (method != HTTP_METHOD_GET) {
+            resp->content = "method not allowed (only GET)";
+            resp->content_length = strlen(resp->content);
+            resp->status = HTTP_RESP_METHOD_NOT_ALLOWED;
+            return;
+        }
+        json_object *obj = get_list_of_modules_json(plugin);
+        json_object *wrapper = json_object_new_object();
+        json_object_object_add(wrapper, "modules", obj);
+        resp->content = strdupz(json_object_to_json_string_ext(wrapper, JSON_C_TO_STRING_PRETTY));
+        json_object_put(wrapper);
+        resp->status = HTTP_RESP_OK;
+        resp->content_type = CT_APPLICATION_JSON;
+        resp->content_free = freez;
+        resp->content_length = strlen(resp->content);
+        return;
+    }
+    struct module *mod = get_module_by_name(plugin, module);
+    if (mod == NULL) {
+        resp->content = "module not found";
+        resp->content_length = strlen(resp->content);
+        resp->status = HTTP_RESP_NOT_FOUND;
+        return;
+    }
+        if (method == HTTP_METHOD_GET) {
+        dyncfg_config_t cfg = mod->get_config_cb(mod->config_cb_usr_ctx, mod->name);
+        resp->content = mallocz(cfg.data_size);
+        memcpy(resp->content, cfg.data, cfg.data_size);
+        resp->status = HTTP_RESP_OK;
+        resp->content_free = free;
+        resp->content_length = cfg.data_size;
+        return;
+        } else if (method == HTTP_METHOD_PUT) {
+        const char *response;
+            if (post_payload == NULL) {
+            resp->content = "no payload";
+            resp->content_length = strlen(resp->content);
+            resp->status = HTTP_RESP_BAD_REQUEST;
+            return;
+            }
+            dyncfg_config_t cont = {
+                .data = post_payload,
+                .data_size = post_payload_size
+            };
+        response = set_module_config(mod, cont);
+        if (response == NULL) {
+            resp->status = HTTP_RESP_OK;
+            resp->content = "OK";
+            resp->content_length = strlen(resp->content);
+        } else {
+            resp->status = HTTP_RESP_BAD_REQUEST;
+            resp->content = response;
+            resp->content_length = strlen(resp->content);
+        }
+        return;
+    }
+    resp->content = "method not allowed";
+    resp->content_length = strlen(resp->content);
+    resp->status = HTTP_RESP_METHOD_NOT_ALLOWED;
+    }
 
-static dyncfg_config_t get_job_config(struct job *job)
+void handle_job_root(struct uni_http_response *resp, int method, struct module *mod, const char *job_id, void *post_payload, size_t post_payload_size)
 {
-        return job->module->get_job_config_cb(job->module->job_config_cb_usr_ctx, job->module->name, job->name);
+    if (strncmp(job_id, DYN_CONF_JOB_LIST, strlen(DYN_CONF_JOB_LIST)) == 0) {
+        if (method != HTTP_METHOD_GET) {
+            resp->content = "method not allowed (only GET)";
+            resp->content_length = strlen(resp->content);
+            resp->status = HTTP_RESP_METHOD_NOT_ALLOWED;
+            return;
+        }
+        json_object *obj = get_list_of_jobs_json(mod);
+        json_object *wrapper = json_object_new_object();
+        json_object_object_add(wrapper, "jobs", obj);
+        resp->content = strdupz(json_object_to_json_string_ext(wrapper, JSON_C_TO_STRING_PRETTY));
+        json_object_put(wrapper);
+        resp->status = HTTP_RESP_OK;
+        resp->content_type = CT_APPLICATION_JSON;
+        resp->content_free = freez;
+        resp->content_length = strlen(resp->content);
+        return;
+    }
+        struct job *job = get_job_by_name(mod, job_id);
+    if (method == HTTP_METHOD_POST) {
+        if (job != NULL) {
+            resp->content = "can't POST, job already exists (use PUT to update?)";
+            resp->content_length = strlen(resp->content);
+            resp->status = HTTP_RESP_BAD_REQUEST;
+            return;
+        }
+        if (post_payload == NULL) {
+            resp->content = "no payload";
+            resp->content_length = strlen(resp->content);
+            resp->status = HTTP_RESP_BAD_REQUEST;
+            return;
+        }
+        dyncfg_config_t cont = {
+            .data = post_payload,
+            .data_size = post_payload_size
+        };
+        job = add_job(mod, job_id, cont);
+        if (job == NULL) {
+            resp->content = "failed to add job";
+            resp->content_length = strlen(resp->content);
+            resp->status = HTTP_RESP_INTERNAL_SERVER_ERROR;
+            return;
+        }
+        resp->status = HTTP_RESP_OK;
+        resp->content = "OK";
+        resp->content_length = strlen(resp->content);
+        return;
+    }
+    if (job == NULL) {
+        resp->content = "job not found";
+        resp->content_length = strlen(resp->content);
+        resp->status = HTTP_RESP_NOT_FOUND;
+        return;
+    }
+    switch (method) {
+        case HTTP_METHOD_GET:
+        {
+            dyncfg_config_t cfg = mod->get_job_config_cb(mod->job_config_cb_usr_ctx, mod->name, job->name);
+            resp->content = mallocz(cfg.data_size);
+            memcpy(resp->content, cfg.data, cfg.data_size);
+            resp->status = HTTP_RESP_OK;
+            resp->content_free = freez;
+            resp->content_length = cfg.data_size;
+            return;
+        }
+        case HTTP_METHOD_PUT:
+        {
+        if (post_payload == NULL) {
+                resp->content = "missing payload";
+                resp->content_length = strlen(resp->content);
+                resp->status = HTTP_RESP_BAD_REQUEST;
+                return;
+        }
+        dyncfg_config_t cont = {
+            .data = post_payload,
+            .data_size = post_payload_size
+        };
+            if(set_job_config(job, cont)) {
+                resp->status = HTTP_RESP_BAD_REQUEST;
+                resp->content = "failed to set job config";
+                resp->content_length = strlen(resp->content);
+                return;
+            }
+            resp->status = HTTP_RESP_OK;
+            resp->content = "OK";
+            resp->content_length = strlen(resp->content);
+            return;
+        }
+        case HTTP_METHOD_DELETE:
+        {
+            if (!remove_job(mod, job)) {
+                resp->content = "failed to remove job";
+                resp->content_length = strlen(resp->content);
+                resp->status = HTTP_RESP_INTERNAL_SERVER_ERROR;
+                return;
+            }
+            resp->status = HTTP_RESP_OK;
+            resp->content = "OK";
+            resp->content_length = strlen(resp->content);
+            return;
+        }
+        default:
+            resp->content = "method not allowed (only GET, PUT, DELETE)";
+            resp->content_length = strlen(resp->content);
+            resp->status = HTTP_RESP_METHOD_NOT_ALLOWED;
+            return;
+    }
 }
 
 struct uni_http_response dyn_conf_process_http_request(int method, const char *plugin, const char *module, const char *job_id, void *post_payload, size_t post_payload_size)
 {
-    const char *response;
     struct uni_http_response resp = {
         .status = HTTP_RESP_INTERNAL_SERVER_ERROR,
         .content_type = CT_TEXT_PLAIN,
@@ -437,221 +668,42 @@ struct uni_http_response dyn_conf_process_http_request(int method, const char *p
         .content_length = 0
     };
     if (plugin == NULL) {
-        if (method != HTTP_METHOD_GET) {
-            resp.content = "method not allowed";
-            resp.content_length = strlen(resp.content);
-            resp.status = HTTP_RESP_METHOD_NOT_ALLOWED;
-            return resp;
-        }
-        json_object *obj = get_list_of_plugins_json();
-        json_object *wrapper = json_object_new_object();
-        json_object_object_add(wrapper, "configurable_plugins", obj);
-        resp.content = strdupz(json_object_to_json_string_ext(wrapper, JSON_C_TO_STRING_PRETTY));
-        json_object_put(wrapper);
-        resp.status = HTTP_RESP_OK;
-        resp.content_type = CT_APPLICATION_JSON;
-        resp.content_free = freez;
-        resp.content_length = strlen(resp.content);
+        handle_dyncfg_root(&resp, method);
         return resp;
     }
-    struct configurable_plugin *plug = get_plugin_by_name(plugin);
-    if (plug == NULL) {
+    DICTIONARY_ITEM *plugin_item = dictionary_get_and_acquire_item(plugins_dict, plugin);
+    if (plugin_item == NULL) {
         resp.content = "plugin not found";
         resp.content_length = strlen(resp.content);
         resp.status = HTTP_RESP_NOT_FOUND;
         return resp;
     }
+    struct configurable_plugin *plug = dictionary_acquired_item_value(plugin_item);
     if (module == NULL) {
-        if (method == HTTP_METHOD_GET) {
-            dyncfg_config_t cfg = get_plugin_config(plug);
-            resp.content = mallocz(cfg.data_size);
-            memcpy(resp.content, cfg.data, cfg.data_size);
-            resp.status = HTTP_RESP_OK;
-            resp.content_free = free;
-            resp.content_length = cfg.data_size;
-            return resp;
-        } else if (method == HTTP_METHOD_PUT) {
-            if (post_payload == NULL) {
-                resp.content = "no payload";
-                resp.content_length = strlen(resp.content);
-                resp.status = HTTP_RESP_BAD_REQUEST;
-                return resp;
-            }
-            dyncfg_config_t cont = {
-                .data = post_payload,
-                .data_size = post_payload_size
-            };
-            response = set_plugin_config(plug, cont);
-            if (response == NULL) {
-                resp.status = HTTP_RESP_OK;
-                resp.content = "OK";
-                resp.content_length = strlen(resp.content);
-            } else {
-                resp.status = HTTP_RESP_BAD_REQUEST;
-                resp.content = response;
-                resp.content_length = strlen(resp.content);
-            }
-            return resp;
-        }
-        resp.content = "method not allowed";
-        resp.content_length = strlen(resp.content);
-        resp.status = HTTP_RESP_METHOD_NOT_ALLOWED;
-        return resp;
+        handle_plugin_root(&resp, method, plug, post_payload, post_payload_size);
+        goto EXIT_PLUGIN;
     }
-    if (strncmp(module, DYN_CONF_SCHEMA, strlen(DYN_CONF_SCHEMA)) == 0) {
-        resp.content = "not implemented yet";
-        resp.content_length = strlen(resp.content);
-        resp.status = HTTP_RESP_NOT_FOUND;
-        return resp;
-    }
-    if (strncmp(module, DYN_CONF_MODULE_LIST, strlen(DYN_CONF_MODULE_LIST)) == 0) {
-        if (method != HTTP_METHOD_GET) {
-            resp.content = "method not allowed";
-            resp.status = HTTP_RESP_METHOD_NOT_ALLOWED;
-            return resp;
-        }
-        json_object *obj = get_list_of_modules_json(plug);
-        json_object *wrapper = json_object_new_object();
-        json_object_object_add(wrapper, "modules", obj);
-        resp.content = strdupz(json_object_to_json_string_ext(wrapper, JSON_C_TO_STRING_PRETTY));
-        json_object_put(wrapper);
-        resp.status = HTTP_RESP_OK;
-        resp.content_type = CT_APPLICATION_JSON;
-        resp.content_free = freez;
-        resp.content_length = strlen(resp.content);
-        return resp;
+    if (job_id == NULL) {
+        handle_module_root(&resp, method, plug, module, post_payload, post_payload_size);
+        goto EXIT_PLUGIN;
     }
     struct module *mod = get_module_by_name(plug, module);
     if (mod == NULL) {
         resp.content = "module not found";
         resp.content_length = strlen(resp.content);
         resp.status = HTTP_RESP_NOT_FOUND;
-        return resp;
-    }
-    if (job_id == NULL) {
-        if (method == HTTP_METHOD_GET) {
-            dyncfg_config_t cfg = get_module_config(mod);
-            resp.content = mallocz(cfg.data_size);
-            memcpy(resp.content, cfg.data, cfg.data_size);
-            resp.status = HTTP_RESP_OK;
-            resp.content_free = free;
-            resp.content_length = cfg.data_size;
-            return resp;
-        } else if (method == HTTP_METHOD_PUT) {
-            if (post_payload == NULL) {
-                resp.content = "no payload";
-                resp.content_length = strlen(resp.content);
-                resp.status = HTTP_RESP_BAD_REQUEST;
-                return resp;
-            }
-            dyncfg_config_t cont = {
-                .data = post_payload,
-                .data_size = post_payload_size
-            };
-            set_module_config(mod, cont);
-            resp.status = HTTP_RESP_OK;
-            resp.content = "OK";
-            resp.content_length = strlen(resp.content);
-            return resp;
-        }
-        resp.content = "method not allowed";
-        resp.content_length = strlen(resp.content);
-        resp.status = HTTP_RESP_METHOD_NOT_ALLOWED;
-        return resp;
+        goto EXIT_PLUGIN;
     }
     if (mod->type != MOD_TYPE_ARRAY) {
-        resp.content = "module is not an array";
-        resp.content_length = strlen(resp.content);
-        resp.status = HTTP_RESP_BAD_REQUEST;
-        return resp;
-    }
-    if (method == HTTP_METHOD_POST) {
-        struct job *job = get_job_by_name(mod, job_id);
-        if (job != NULL) {
-            resp.content = "job already exists";
-            resp.content_length = strlen(resp.content);
-            resp.status = HTTP_RESP_BAD_REQUEST;
-            return resp;
-        }
-        if (post_payload == NULL) {
-            resp.content = "no payload";
-            resp.content_length = strlen(resp.content);
-            resp.status = HTTP_RESP_BAD_REQUEST;
-            return resp;
-        }
-        dyncfg_config_t cont = {
-            .data = post_payload,
-            .data_size = post_payload_size
-        };
-        job = add_job(mod, job_id, cont);
-        if (job == NULL) {
-            resp.content = "failed to add job";
-            resp.content_length = strlen(resp.content);
-            resp.status = HTTP_RESP_INTERNAL_SERVER_ERROR;
-            return resp;
-        }
-        resp.status = HTTP_RESP_OK;
-        resp.content = "OK";
-        resp.content_length = strlen(resp.content);
-        return resp;
-    }
-    if (strncmp(job_id, DYN_CONF_JOB_LIST, strlen(DYN_CONF_JOB_LIST)) == 0) {
-        if (method != HTTP_METHOD_GET) {
-            resp.content = "method not allowed";
-            resp.status = HTTP_RESP_METHOD_NOT_ALLOWED;
-            return resp;
-        }
-        json_object *obj = get_list_of_jobs_json(mod);
-        json_object *wrapper = json_object_new_object();
-        json_object_object_add(wrapper, "jobs", obj);
-        resp.content = strdupz(json_object_to_json_string_ext(wrapper, JSON_C_TO_STRING_PRETTY));
-        json_object_put(wrapper);
-        resp.status = HTTP_RESP_OK;
-        resp.content_type = CT_APPLICATION_JSON;
-        resp.content_free = freez;
-        resp.content_length = strlen(resp.content);
-        return resp;
-    }
-    struct job *job = get_job_by_name(mod, job_id);
-    if (job == NULL) {
-        resp.content = "job not found";
+        resp.content = "module is not array";
         resp.content_length = strlen(resp.content);
         resp.status = HTTP_RESP_NOT_FOUND;
-        return resp;
+        goto EXIT_PLUGIN;
     }
-    if (method == HTTP_METHOD_GET) {
-        dyncfg_config_t cfg = get_job_config(job);
+    handle_job_root(&resp, method, mod, job_id, post_payload, post_payload_size);
 
-        resp.content = mallocz(cfg.data_size);
-        memcpy(resp.content, cfg.data, cfg.data_size);
-        resp.status = HTTP_RESP_OK;
-        resp.content_free = free;
-        resp.content_length = cfg.data_size;
-    } else if (method == HTTP_METHOD_PUT) {
-        if (post_payload == NULL) {
-            resp.content = "no payload";
-            resp.content_length = strlen(resp.content);
-            resp.status = HTTP_RESP_BAD_REQUEST;
-            return resp;
-        }
-        dyncfg_config_t cont = {
-            .data = post_payload,
-            .data_size = post_payload_size
-        };
-        set_job_config(job, cont);
-        resp.status = HTTP_RESP_OK;
-        resp.content = "OK";
-        resp.content_length = strlen(resp.content);
-    } else if (method == HTTP_METHOD_DELETE) {
-        remove_job(mod, job);
-        resp.status = HTTP_RESP_OK;
-        resp.content = "OK";
-        resp.content_length = strlen(resp.content);
-    } else {
-        resp.content = "method not allowed";
-        resp.content_length = strlen(resp.content);
-        resp.status = HTTP_RESP_METHOD_NOT_ALLOWED;
-    }
+EXIT_PLUGIN:
+    dictionary_acquired_item_release(plugins_dict, plugin_item);
     return resp;
 }
 

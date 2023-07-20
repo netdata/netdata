@@ -61,14 +61,14 @@ struct module
 
     struct configurable_plugin *plugin;
 
+    // module config
+    enum set_config_result (*set_config_cb)(void *usr_ctx, const char *module_name, dyncfg_config_t *cfg);
+    dyncfg_config_t (*get_config_cb)(void *usr_ctx, const char* name);
+    void *config_cb_usr_ctx;
+
     DICTIONARY *jobs;
 
-    enum set_config_result (*set_config_cb)(void *usr_ctx, const char *module_name, dyncfg_config_t *cfg);
-
-    dyncfg_config_t (*get_config_cb)(void *usr_ctx, const char* name);
-
-    void *set_config_cb_usr_ctx;
-
+    // jobs config
     dyncfg_config_t (*get_job_config_cb)(void *usr_ctx, const char *module_name, const char *job_name);
     enum set_config_result (*set_job_config_cb)(void *usr_ctx, const char *module_name, const char *job_name, dyncfg_config_t *cfg);
     enum set_config_result (*delete_job_cb)(void *usr_ctx, const char *module_name, const char *job_name);
