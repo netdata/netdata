@@ -327,6 +327,47 @@ void format_host_labels_prometheus(struct instance *instance, RRDHOST *host)
 }
 
 /**
+ * Check the input buffer for the label name and maybe remove the label.
+ *
+ * @param b the buffer to check.
+ * @param name the label name to search for.
+ * @param keepExistingLabel zero to delete the existing label, non-zero otherwise.
+ * @return Returns 1 if the label exists and is kept. Returns 0 in all other cases.
+ */
+static int check_existing_label(BUFFER *b, const char *name, int keepExistingLabel) {
+    char k[PROMETHEUS_ELEMENT_MAX + 2];
+    size_t len = prometheus_name_copy(k, name, PROMETHEUS_ELEMENT_MAX);
+    k[len++] = '=';
+    k[len] = '\0';
+    const char *end = b->buffer + b->len;
+    char *match = strstr(b->buffer, k);
+    if (match == NULL)
+        return 0;
+    else if (keepExistingLabel)
+        return 1;
+    const char *matchEnd = strchr(match, ',');
+    if (matchEnd != NULL) {
+        // Have subsequent label(s), shift them to discard the matched label.
+        ++matchEnd;
+        memmove(match, matchEnd, end - matchEnd);
+        match[end - matchEnd] = '\0';
+        b->len -= matchEnd - match;
+    } else if (unlikely(match == b->buffer)) {
+        // Match is the only label in the buffer, set length to 0.
+        match[0] = '\0';
+        b->len = 0;
+    } else {
+        // Matched label is the last label, just reduce the length.
+        if (likely(*(match - 1) == ',')) {
+            --match;
+        }
+        match[0] = '\0';
+        b->len -= end - match;
+    }
+    return 0;
+}
+
+/**
  * Format host labels for the Prometheus exporter
  * We are using a structure instead a direct buffer to expand options quickly.
  *
@@ -335,34 +376,42 @@ void format_host_labels_prometheus(struct instance *instance, RRDHOST *host)
 
 struct format_prometheus_chart_label_callback {
     BUFFER *labels_buffer;
+    EXPORTING_OPTIONS exporting_options;
 };
 
 static int format_prometheus_chart_label_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
     struct format_prometheus_chart_label_callback *d = (struct format_prometheus_chart_label_callback *)data;
 
     (void)ls;
+    int checkExistingLabel = 0;
+    int keepExistingLabel = !(d->exporting_options & EXPORTING_OPTION_PREFER_CHART_LABELS);
 
     switch (name[0]) {
         case '_':
             return 1;
         case 'c':
             if (!strcmp(name, "chart"))
-                return 1;
+                checkExistingLabel = 1;
             break;
         case 'd':
             if (!strcmp(name, "dimension"))
-                return 1;
+                checkExistingLabel = 1;
             break;
         case 'f':
             if (!strcmp(name, "family"))
-                return 1;
+                checkExistingLabel = 1;
             break;
         case 'i':
-            if (!strcmp(name, "instance"))
+            if (!strcmp(name, "instance") && keepExistingLabel)
                 return 1;
             break;
         default:
             break;
+    }
+
+    if (checkExistingLabel &&
+        check_existing_label(d->labels_buffer, name, keepExistingLabel)) {
+        return 1;
     }
 
     char k[PROMETHEUS_ELEMENT_MAX + 1];
@@ -372,7 +421,10 @@ static int format_prometheus_chart_label_callback(const char *name, const char *
     prometheus_label_copy(v, value, PROMETHEUS_ELEMENT_MAX);
 
     if (*k && *v) {
-        buffer_sprintf(d->labels_buffer, ",%s=\"%s\"", k, v);
+        const char *comma = ",";
+        if (unlikely(d->labels_buffer->len == 0))
+            comma = "";
+        buffer_sprintf(d->labels_buffer, "%s%s=\"%s\"", comma, k, v);
     }
     return 1;
 }
@@ -644,8 +696,9 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     // for each chart
     RRDSET *st;
 
-    static struct format_prometheus_chart_label_callback plabels = {
+    struct format_prometheus_chart_label_callback plabels = {
         .labels_buffer = NULL,
+        .exporting_options = exporting_options,
     };
 
     STRING *prometheus = string_strdupz("prometheus");
@@ -798,6 +851,10 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
                                 buffer_sprintf(wb, "# TYPE %s_%s%s%s gauge\n", prefix, context, units, suffix);
+
+                            if (exporting_options & EXPORTING_OPTION_PREFER_CHART_LABELS &&
+                                check_existing_label(plabels.labels_buffer, "instance", 1))
+                                labels[0] = '\0';
 
                             if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
                                 buffer_sprintf(

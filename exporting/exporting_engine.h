@@ -26,6 +26,8 @@ typedef enum exporting_options {
     EXPORTING_OPTION_SEND_AUTOMATIC_LABELS  = (1 << 4),
     EXPORTING_OPTION_USE_TLS                = (1 << 5),
 
+    EXPORTING_OPTION_PREFER_CHART_LABELS    = (1 << 6),
+
     EXPORTING_OPTION_SEND_NAMES             = (1 << 16),
     EXPORTING_OPTION_SEND_VARIABLES         = (1 << 17)
 } EXPORTING_OPTIONS;
