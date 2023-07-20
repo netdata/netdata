@@ -4,91 +4,66 @@ modules:
       plugin_name: macos.plugin
       module_name: mach_smi
       monitored_instance:
-        name: macos mach_smi
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: MacOS
+        link: "https://www.apple.com/macos"
+        categories:
+          - data-collection.macos-systems
+        icon_filename: "apple.svg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - macos
+        - apple
+        - darwin
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "Monitor MacOS metrics for efficient operating system performance."
+        method_description: ""
       supported_platforms:
-        include: []
+        include:
+          - macOS
         exclude: []
-      multi-instance: true
+      multi-instance: false
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
         list: []
     alerts:
-      - name: 10min_cpu_usage
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
-        metric: system.cpu
-        info: average CPU utilization over the last 10 minutes (excluding iowait, nice and steal)
-        os: "linux"
-      - name: 10min_cpu_iowait
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
-        metric: system.cpu
-        info: average CPU iowait time over the last 10 minutes
-        os: "linux"
-      - name: 20min_steal_cpu
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
-        metric: system.cpu
-        info: average CPU steal time over the last 20 minutes
-        os: "linux"
-      - name: 10min_cpu_usage
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
-        metric: system.cpu
-        info: average CPU utilization over the last 10 minutes (excluding nice)
-        os: "freebsd"
-      - name: ram_in_use
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
-        metric: system.ram
-        info: system memory utilization
-        os: "linux"
-      - name: ram_in_use
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
-        metric: system.ram
-        info: system memory utilization
-        os: "freebsd"
-      - name: 30min_ram_swapped_out
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/swap.conf
-        metric: system.swapio
-        info: percentage of the system RAM swapped in the last 30 minutes
-        os: "linux freebsd"
+      - name: interface_speed
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.net
+        info: network interface ${label:device} current speed
+        os: "*"
     metrics:
       folding:
         title: Metrics
@@ -143,126 +118,6 @@ modules:
                 - name: zero_fill
                 - name: reactivate
                 - name: purge
-  - meta:
-      plugin_name: macos.plugin
-      module_name: sysctl
-      monitored_instance:
-        name: macos sysctl
-        link: ''
-        categories: []
-        icon_filename: ''
-      related_resources:
-        integrations:
-          list: []
-      info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
-      most_popular: false
-    overview:
-      data_collection:
-        metrics_description: ''
-        method_description: ''
-      supported_platforms:
-        include: []
-        exclude: []
-      multi-instance: true
-      additional_permissions:
-        description: ''
-      default_behavior:
-        auto_detection:
-          description: ''
-        limits:
-          description: ''
-        performance_impact:
-          description: ''
-    setup:
-      prerequisites:
-        list: []
-      configuration:
-        file:
-          name: ''
-          description: ''
-        options:
-          description: ''
-          folding:
-            title: ''
-            enabled: true
-          list: []
-        examples:
-          folding:
-            enabled: true
-            title: ''
-          list: []
-    troubleshooting:
-      problems:
-        list: []
-    alerts:
-      - name: load_cpu_number
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
-        metric: system.load
-        info: number of active CPU cores in the system
-        os: "linux"
-      - name: load_average_15
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
-        metric: system.load
-        info: system fifteen-minute load average
-        os: "linux"
-      - name: load_average_5
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
-        metric: system.load
-        info: system five-minute load average
-        os: "linux"
-      - name: load_average_1
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
-        metric: system.load
-        info: system one-minute load average
-        os: "linux"
-      - name: used_swap
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/swap.conf
-        metric: system.swap
-        info: swap memory utilization
-        os: "linux freebsd"
-      - name: 1m_ipv4_tcp_resets_sent
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
-        metric: ipv4.tcphandshake
-        info: average number of sent TCP RESETS over the last minute
-        os: "linux"
-      - name: 10s_ipv4_tcp_resets_sent
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
-        metric: ipv4.tcphandshake
-        info: average number of sent TCP RESETS over the last 10 seconds. This can indicate a port scan, or that a service running on this host has crashed. Netdata will not send a clear notification for this alarm.
-        os: "linux"
-      - name: 1m_ipv4_tcp_resets_received
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
-        metric: ipv4.tcphandshake
-        info: average number of received TCP RESETS over the last minute
-        os: "linux freebsd"
-      - name: 10s_ipv4_tcp_resets_received
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
-        metric: ipv4.tcphandshake
-        info: average number of received TCP RESETS over the last 10 seconds. This can be an indication that a service this host needs has crashed. Netdata will not send a clear notification for this alarm.
-        os: "linux freebsd"
-      - name: 1m_ipv4_udp_receive_buffer_errors
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf
-        metric: ipv4.udperrors
-        info: average number of UDP receive buffer errors over the last minute
-        os: "linux freebsd"
-      - name: 1m_ipv4_udp_send_buffer_errors
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf
-        metric: ipv4.udperrors
-        info: average number of UDP send buffer errors over the last minute
-        os: "linux"
-    metrics:
-      folding:
-        title: Metrics
-        enabled: false
-      description: ""
-      availability: []
-      scopes:
-        - name: global
-          description: ""
-          labels: []
-          metrics:
             - name: system.load
               description: System Load Average
               unit: "load"
@@ -531,147 +386,13 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
-  - meta:
-      plugin_name: macos.plugin
-      module_name: iokit
-      monitored_instance:
-        name: macos iokit
-        link: ''
-        categories: []
-        icon_filename: ''
-      related_resources:
-        integrations:
-          list: []
-      info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
-      most_popular: false
-    overview:
-      data_collection:
-        metrics_description: ''
-        method_description: ''
-      supported_platforms:
-        include: []
-        exclude: []
-      multi-instance: true
-      additional_permissions:
-        description: ''
-      default_behavior:
-        auto_detection:
-          description: ''
-        limits:
-          description: ''
-        performance_impact:
-          description: ''
-    setup:
-      prerequisites:
-        list: []
-      configuration:
-        file:
-          name: ''
-          description: ''
-        options:
-          description: ''
-          folding:
-            title: ''
-            enabled: true
-          list: []
-        examples:
-          folding:
-            enabled: true
-            title: ''
-          list: []
-    troubleshooting:
-      problems:
-        list: []
-    alerts:
-      - name: 10min_disk_utilization
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
-        metric: disk.util
-        info: average percentage of time ${label:device} disk was busy over the last 10 minutes
-        os: "linux freebsd"
-      - name: disk_space_usage
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
-        metric: disk.space
-        info: disk ${label:mount_point} space utilization
-        os: "linux freebsd"
-      - name: disk_inode_usage
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
-        metric: disk.inodes
-        info: disk ${label:mount_point} inode utilization
-        os: "linux freebsd"
-      - name: interface_speed
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
-        metric: net.net
-        info: network interface ${label:device} current speed
-        os: "*"
-      - name: 1m_received_traffic_overflow
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
-        metric: net.net
-        info: average inbound utilization for the network interface ${label:device} over the last minute
-        os: "linux"
-      - name: 1m_sent_traffic_overflow
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
-        metric: net.net
-        info: average outbound utilization for the network interface ${label:device} over the last minute
-        os: "linux"
-      - name: inbound_packets_dropped_ratio
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
-        metric: net.packets
-        info: ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes
-        os: "linux"
-      - name: outbound_packets_dropped_ratio
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
-        metric: net.packets
-        info: ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes
-        os: "linux"
-      - name: wifi_inbound_packets_dropped_ratio
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
-        metric: net.packets
-        info: ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes
-        os: "linux"
-      - name: wifi_outbound_packets_dropped_ratio
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
-        metric: net.packets
-        info: ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes
-        os: "linux"
-      - name: 1m_received_packets_rate
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
-        metric: net.packets
-        info: average number of packets received by the network interface ${label:device} over the last minute
-        os: "linux freebsd"
-      - name: 10s_received_packets_storm
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
-        metric: net.packets
-        info: ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over the last minute
-        os: "linux freebsd"
-      - name: interface_inbound_errors
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
-        metric: net.errors
-        info: number of inbound errors for the network interface ${label:device} in the last 10 minutes
-        os: "freebsd"
-      - name: interface_outbound_errors
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
-        metric: net.errors
-        info: number of outbound errors for the network interface ${label:device} in the last 10 minutes
-        os: "freebsd"
-      - name: inbound_packets_dropped
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
-        metric: net.drops
-        info: number of inbound dropped packets for the network interface ${label:device} in the last 10 minutes
-        os: "linux"
-      - name: outbound_packets_dropped
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
-        metric: net.drops
-        info: number of outbound dropped packets for the network interface ${label:device} in the last 10 minutes
-        os: "linux"
-    metrics:
-      folding:
-        title: Metrics
-        enabled: false
-      description: ""
-      availability: []
-      scopes:
+            - name: system.io
+              description: Disk I/O
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out
         - name: disk
           description: ""
           labels: []
@@ -723,17 +444,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: svctm
-        - name: global
-          description: ""
-          labels: []
-          metrics:
-            - name: system.io
-              description: Disk I/O
-              unit: "KiB/s"
-              chart_type: area
-              dimensions:
-                - name: in
-                - name: out
         - name: mount point
           description: ""
           labels: []
