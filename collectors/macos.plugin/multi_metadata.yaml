@@ -17,15 +17,17 @@ modules:
       keywords:
         - macos
         - apple
+        - darwin
       most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor MacOS metrics for efficient operating system performance."
         method_description: ""
       supported_platforms:
-        include: []
+        include:
+         - macOS
         exclude: []
-      multi-instance: true
+      multi-instance: false
       additional_permissions:
         description: ""
       default_behavior:
