@@ -20,7 +20,7 @@ modules:
       most_popular: true
     overview:
       data_collection:
-        metrics_description: ""
+        metrics_description: "Monitor Containers for performance, resource usage, and health status."
         method_description: ""
       supported_platforms:
         include: []
@@ -398,7 +398,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: mtu
-
   - <<: *module
     meta:
       <<: *meta
@@ -414,6 +413,9 @@ modules:
         - kubernetes
         - pods
         - containers
+    overview:
+      data-collection:
+        metrics_description: Monitor Kubernetes Clusters for performance, resource usage, and health status.
     alerts:
       - name: k8s_cgroup_10min_cpu_usage
         link: https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf
@@ -792,7 +794,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: mtu
-
   - <<: *module
     meta:
       <<: *meta
@@ -802,6 +803,12 @@ modules:
         icon_filename: systemd.png
         categories:
           - data-collection.systemd
+        keywords:
+          - systemd
+          - services
+    overview:
+      data-collection:
+        metrics_desctiption: "Monitor Systemd Services for performance, resource usage, and health status."
     alerts: []
     metrics:
       folding:
@@ -964,14 +971,16 @@ modules:
       monitored_instance:
         name: Virtual Machines
         link: ""
-        icon_filename: k8s.png
+        icon_filename: netdata.png
         categories:
           - data-collection.containers-vms
-          - data-collection.kubernetes
       keywords:
         - vms
         - virtualization
         - container
+    overview:
+      data_collection:
+        metrics_description: "Monitor Virtual Machines for performance, resource usage, and health status."
   - <<: *module
     meta:
       <<: *meta
@@ -985,6 +994,9 @@ modules:
         - lxc
         - lxd
         - container
+    overview:
+      data_collection:
+        metrics_description: "Monitor LXC Containers for performance, resource usage, and health status."
   - <<: *module
     meta:
       <<: *meta
@@ -997,6 +1009,9 @@ modules:
       keywords:
         - libvirt
         - container
+    overview:
+      data_collection:
+        metrics_description: "Monitor Libvirt for performance, resource usage, and health status."
   - <<: *module
     meta:
       <<: *meta
@@ -1009,6 +1024,9 @@ modules:
       keywords:
         - ovirt
         - container
+    overview:
+      data_collection:
+        metrics_description: "Monitor oVirt for performance, resource usage, and health status."
   - <<: *module
     meta:
       <<: *meta
@@ -1021,3 +1039,6 @@ modules:
       keywords:
         - proxmox
         - container
+    overview:
+      data_collection:
+        metrics_description: "Monitor Proxmox for performance, resource usage, and health status."
