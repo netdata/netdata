@@ -171,7 +171,7 @@
             "exclude"
           ]
         },
-        "multi-instance": {
+        "multi_instance": {
           "type": "boolean",
           "description": "Whether this collector supports collecting metrics from multiple (for example, local and remote) instances."
         },
@@ -238,7 +238,7 @@
       "required": [
         "data_collection",
         "supported_platforms",
-        "multi-instance",
+        "multi_instance",
         "additional_permissions",
         "default_behavior"
       ]
