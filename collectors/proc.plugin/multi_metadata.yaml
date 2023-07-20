@@ -227,7 +227,7 @@ modules:
       - name: lowest_entropy
         link: https://github.com/netdata/netdata/blob/master/health/health.d/entropy.conf
         metric: system.entropy
-        info: minimum number of entries in the random numbers pool in the last 5 minutes
+        info: minimum number of bits of entropy available for the kernel’s random number generator
     metrics:
       folding:
         title: Metrics
@@ -605,7 +605,7 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/loadavg
       monitored_instance:
-        name: Load
+        name: System Load Average
         link: ''
         categories:
          - data-collection.linux-systems.system-metrics
@@ -711,7 +711,7 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/pressure
       monitored_instance:
-        name: Pressure
+        name: Pressure Stall Information
         link: ''
         categories:
          - data-collection.linux-systems.pressure-metrics
@@ -862,7 +862,7 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/softirqs
       monitored_instance:
-        name: Software Interrupt Request
+        name: SoftIRQ statistics
         link: ''
         categories:
          - data-collection.linux-systems.cpu-metrics
@@ -1305,7 +1305,7 @@ modules:
       plugin_name: proc.plugin
       module_name: /sys/devices/system/edac/mc
       monitored_instance:
-        name: EDAC Controllers
+        name: System Memory Errors
         link: ''
         categories:
          - data-collection.linux-systems.memory-metrics
@@ -1323,7 +1323,7 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: 'This integration monitors Error Detection and Correlation memory controllers.'
+        metrics_description: 'This integration monitors system memory errors detected and corrected by ECC RAM.'
         method_description: ''
       supported_platforms:
         include: []
@@ -1492,7 +1492,7 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: 'Examine KSM metrics for insights into memory saving operations.'
+        metrics_description: 'Examine KSM metrics for insights into memory deduplication operations.'
         method_description: ''
       supported_platforms:
         include: []
@@ -1566,7 +1566,7 @@ modules:
       plugin_name: proc.plugin
       module_name: /sys/block/zram
       monitored_instance:
-        name: zRAM
+        name: ZRAM
         link: ''
         categories:
          - data-collection.linux-systems.memory-metrics
@@ -1581,7 +1581,7 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: 'This integration monitors zRAM usage, savings and more.'
+        metrics_description: 'This integration monitors ZRAM usage, compression ratios, and more.'
         method_description: ''
       supported_platforms:
         include: []
