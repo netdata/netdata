@@ -1,125 +1,59 @@
 name: freeipmi.plugin
 modules:
-  - meta:
-      plugin_name: freeipmi.plugin
-      module_name: sel
-      monitored_instance:
-        name: freeipmi sel
-        link: ''
-        categories: []
-        icon_filename: ''
-      related_resources:
-        integrations:
-          list: []
-      info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
-      most_popular: false
-    overview:
-      data_collection:
-        metrics_description: ''
-        method_description: ''
-      supported_platforms:
-        include: []
-        exclude: []
-      multi-instance: true
-      additional_permissions:
-        description: ''
-      default_behavior:
-        auto_detection:
-          description: ''
-        limits:
-          description: ''
-        performance_impact:
-          description: ''
-    setup:
-      prerequisites:
-        list: []
-      configuration:
-        file:
-          name: ''
-          description: ''
-        options:
-          description: ''
-          folding:
-            title: ''
-            enabled: true
-          list: []
-        examples:
-          folding:
-            enabled: true
-            title: ''
-          list: []
-    troubleshooting:
-      problems:
-        list: []
-    alerts: []
-    metrics:
-      folding:
-        title: Metrics
-        enabled: false
-      description: ""
-      availability: []
-      scopes:
-        - name: global
-          description: ""
-          labels: []
-          metrics:
-            - name: ipmi.sel
-              description: IPMI Events
-              unit: "events"
-              chart_type: area
-              dimensions:
-                - name: events
-  - meta:
+  - &module
+    meta: &meta
       plugin_name: freeipmi.plugin
       module_name: sensors
       monitored_instance:
-        name: freeipmi sensors
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: IPMI
+        link: "https://www.ibm.com/docs/en/power9/0009-ESS?topic=ipmi-overview"
+        categories:
+          - data-collection.hardware-devices-and-sensors
+        icon_filename: "netdata.png"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
-      most_popular: false
+        description: ""
+      keywords:
+        - sensors
+        - ipmi
+      most_popular: true
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description:
+          "Monitor enterprise server sensor readings, event log entries, and hardware statuses to ensure reliable server operations."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -146,6 +80,141 @@ modules:
             - name: component
               description: TBD
           metrics:
+            - name: ipmi.sel
+              description: IPMI Events
+              unit: "events"
+              chart_type: area
+              dimensions:
+                - name: events
+            - name: ipmi.sensor_state
+              description: IPMI Sensors State
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: nominal
+                - name: critical
+                - name: warning
+                - name: unknown
+            - name: ipmi.sensor_temperature_c
+              description: IPMI Sensor Temperature Celsius
+              unit: "Celsius"
+              chart_type: line
+              dimensions:
+                - name: temperature
+            - name: ipmi.sensor_temperature_f
+              description: IPMI Sensor Temperature Fahrenheit
+              unit: "Fahrenheit"
+              chart_type: line
+              dimensions:
+                - name: temperature
+            - name: ipmi.sensor_voltage
+              description: IPMI Sensor Voltage
+              unit: "Volts"
+              chart_type: line
+              dimensions:
+                - name: voltage
+            - name: ipmi.sensor_ampere
+              description: IPMI Sensor Current
+              unit: "Amps"
+              chart_type: line
+              dimensions:
+                - name: ampere
+            - name: ipmi.sensor_fan_speed
+              description: IPMI Sensor Fans Speed
+              unit: "RPM"
+              chart_type: line
+              dimensions:
+                - name: rotations
+            - name: ipmi.sensor_power
+              description: IPMI Sensor Power
+              unit: "Watts"
+              chart_type: line
+              dimensions:
+                - name: power
+            - name: ipmi.sensor_reading_percent
+              description: IPMI Sensor Reading Percentage
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: percentage
+  - <<: *module
+    meta:
+      <<: *meta
+      monitored_instance:
+        name: FreeIPMI
+        link: "https://www.gnu.org/software/freeipmi/"
+        icon_filename: "freeipmi.jpg"
+      keywords:
+        - sensors
+        - freeipmi
+      most_popular: true
+    overview:
+      data_collection:
+        metrics_description:
+          "Monitor enterprise server sensor readings, event log entries, and hardware statuses to ensure reliable server operations."
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi-instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: ipmi_sensor_state
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/ipmi.conf
+        metric: ipmi.sensor_state
+        info: IPMI sensor ${label:sensor} (${label:component}) state
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: sensor
+          description: ""
+          labels:
+            - name: sensor
+              description: TBD
+            - name: type
+              description: TBD
+            - name: component
+              description: TBD
+          metrics:
+            - name: ipmi.sel
+              description: IPMI Events
+              unit: "events"
+              chart_type: area
+              dimensions:
+                - name: events
             - name: ipmi.sensor_state
               description: IPMI Sensors State
               unit: "state"
