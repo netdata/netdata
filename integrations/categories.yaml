@@ -96,7 +96,72 @@
       name: Linux Systems
       description: ""
       most-popular: false
-      children: []
+      children:
+        - id: data-collection.linux-systems.system-metrics
+          name: System Metrics
+          description: ""
+          most-popular: false
+          children: []
+        - id: data-collection.linux-systems.memory-metrics
+          name: Memory Metrics
+          description: ""
+          most-popular: false
+          children: []
+        - id: data-collection.linux-systems.cpu-metrics
+          name: CPU Metrics
+          description: ""
+          most-popular: false
+          children: []
+        - id: data-collection.linux-systems.pressure-metrics
+          name: Pressure Metrics
+          description: ""
+          most-popular: false
+          children: []
+        - id: data-collection.linux-systems.network-metrics
+          name: Network Metrics
+          description: ""
+          most-popular: false
+          children: []
+        - id: data-collection.linux-systems.ipc-metrics
+          name: IPC Metrics
+          description: ""
+          most-popular: false
+          children: []
+        - id: data-collection.linux-systems.disk-metrics
+          name: Disk Metrics
+          description: ""
+          most-popular: false
+          children: []
+        - id: data-collection.linux-systems.firewall-metrics
+          name: Firewall Metrics
+          description: ""
+          most-popular: false
+          children: []
+        - id: data-collection.linux-systems.power-supply-metrics
+          name: Power Supply Metrics
+          description: ""
+          most-popular: false
+          children: []
+        - id: data-collection.linux-systems.filesystem-metrics
+          name: Filesystem Metrics
+          description: ""
+          most-popular: false
+          children:
+            - id: data-collection.linux-systems.filesystem-metrics.zfs
+              name: ZFS
+              description: ""
+              most-popular: false
+              children: []
+            - id: data-collection.linux-systems.filesystem-metrics.btrfs
+              name: BTRFS
+              description: ""
+              most-popular: false
+              children: []
+            - id: data-collection.linux-systems.filesystem-metrics.nfs
+              name: NFS
+              description: ""
+              most-popular: false
+              children: []
     - id: data-collection.notifications
       name: Notifications
       description: ""

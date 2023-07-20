@@ -4,51 +4,54 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/stat
       monitored_instance:
-        name: proc /proc/stat
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: System statistics
+        link: ""
+        categories:
+          - data-collection.linux-systems.system-metrics
+        icon_filename: "syslog.png"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - cpu utilization
+        - process counts
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration provides a collection of statistics about the system such as CPU utilization, process counts and more."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -69,11 +72,6 @@ modules:
         metric: system.cpu
         info: average CPU steal time over the last 20 minutes
         os: "linux"
-      - name: 10min_cpu_usage
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
-        metric: system.cpu
-        info: average CPU utilization over the last 10 minutes (excluding nice)
-        os: "freebsd"
     metrics:
       folding:
         title: Metrics
@@ -174,51 +172,53 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/sys/kernel/random/entropy_avail
       monitored_instance:
-        name: proc /proc/sys/kernel/random/entropy_avail
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: Entropy
+        link: ""
+        categories:
+          - data-collection.linux-systems.system-metrics
+        icon_filename: "syslog.png"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - entropy
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -227,8 +227,7 @@ modules:
       - name: lowest_entropy
         link: https://github.com/netdata/netdata/blob/master/health/health.d/entropy.conf
         metric: system.entropy
-        info: minimum number of entries in the random numbers pool in the last 5 minutes
-        os: "linux"
+        info: minimum number of bits of entropy available for the kernel’s random number generator
     metrics:
       folding:
         title: Metrics
@@ -250,51 +249,53 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/uptime
       monitored_instance:
-        name: proc /proc/uptime
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: System Uptime
+        link: ""
+        categories:
+          - data-collection.linux-systems.system-metrics
+        icon_filename: "syslog.png"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - uptime
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration provides the amount of time the system has been up (running)."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -321,51 +322,56 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/vmstat
       monitored_instance:
-        name: proc /proc/vmstat
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: Memory Statistics
+        link: ""
+        categories:
+          - data-collection.linux-systems.memory-metrics
+        icon_filename: "microchip.svg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - swap
+        - page faults
+        - oom
+        - numa
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration provides information about process, memory, swap space utilization and many more."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -514,51 +520,53 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/interrupts
       monitored_instance:
-        name: proc /proc/interrupts
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: Interrupts
+        link: ""
+        categories:
+          - data-collection.linux-systems.cpu-metrics
+        icon_filename: "syslog.png"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - interrupts
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "Monitor Interrupts metrics for efficient processor interrupt handling."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -597,51 +605,54 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/loadavg
       monitored_instance:
-        name: proc /proc/loadavg
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: System Load Average
+        link: ""
+        categories:
+          - data-collection.linux-systems.system-metrics
+        icon_filename: "syslog.png"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - load
+        - load average
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration provides the system load average for the last 1, 5, and 15 minutes."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -700,51 +711,53 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/pressure
       monitored_instance:
-        name: proc /proc/pressure
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: Pressure Stall Information
+        link: ""
+        categories:
+          - data-collection.linux-systems.pressure-metrics
+        icon_filename: "syslog.png"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - pressure
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration measures system pressure, which can indicate resource shortages in CPU, memory, or I/O."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -849,51 +862,54 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/softirqs
       monitored_instance:
-        name: proc /proc/softirqs
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: SoftIRQ statistics
+        link: ""
+        categories:
+          - data-collection.linux-systems.cpu-metrics
+        icon_filename: "syslog.png"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - softirqs
+        - interrupts
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "Monitor SoftIRQs metrics for efficient software interrupt operations."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -932,51 +948,53 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/net/softnet_stat
       monitored_instance:
-        name: proc /proc/net/softnet_stat
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: Softnet Statistics
+        link: ""
+        categories:
+          - data-collection.linux-systems.network-metrics
+        icon_filename: "syslog.png"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - softnet
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration provides statistics on Softnet, such as processed events, dropped events and more."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -990,13 +1008,10 @@ modules:
       - name: 1min_netdev_budget_ran_outs
         link: https://github.com/netdata/netdata/blob/master/health/health.d/softnet.conf
         metric: system.softnet_stat
-        info: average number of times ksoftirq ran out of sysctl net.core.netdev_budget or net.core.netdev_budget_usecs with work remaining over the last minute (this can be a cause for dropped packets)
+        info:
+          average number of times ksoftirq ran out of sysctl net.core.netdev_budget or net.core.netdev_budget_usecs with work remaining over the last
+          minute (this can be a cause for dropped packets)
         os: "linux"
-      - name: 10min_netisr_backlog_exceeded
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/softnet.conf
-        metric: system.softnet_stat
-        info: average number of drops in the last minute due to exceeded sysctl net.route.netisr_maxqlen (this can be a cause for dropped packets)
-        os: "freebsd"
     metrics:
       folding:
         title: Metrics
@@ -1036,51 +1051,56 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/meminfo
       monitored_instance:
-        name: proc /proc/meminfo
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: Memory Usage
+        link: ""
+        categories:
+          - data-collection.linux-systems.memory-metrics
+        icon_filename: "microchip.svg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - memory
+        - ram
+        - available
+        - committed
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "Monitor memory usage metrics for efficient system memory management."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1091,21 +1111,11 @@ modules:
         metric: system.ram
         info: system memory utilization
         os: "linux"
-      - name: ram_in_use
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
-        metric: system.ram
-        info: system memory utilization
-        os: "freebsd"
       - name: ram_available
         link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
         metric: mem.available
         info: percentage of estimated amount of RAM available for userspace processes, without causing swapping
         os: "linux"
-      - name: ram_available
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
-        metric: mem.available
-        info: percentage of estimated amount of RAM available for userspace processes, without causing swapping
-        os: "freebsd"
       - name: used_swap
         link: https://github.com/netdata/netdata/blob/master/health/health.d/swap.conf
         metric: system.swap
@@ -1208,51 +1218,53 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/pagetypeinfo
       monitored_instance:
-        name: proc /proc/pagetypeinfo
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: Page types
+        link: ""
+        categories:
+          - data-collection.linux-systems.memory-metrics
+        icon_filename: "microchip.svg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - memory page types
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration provides metrics about the system's memory page types"
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1295,51 +1307,56 @@ modules:
       plugin_name: proc.plugin
       module_name: /sys/devices/system/edac/mc
       monitored_instance:
-        name: proc /sys/devices/system/edac/mc
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: System Memory Errors
+        link: ""
+        categories:
+          - data-collection.linux-systems.memory-metrics
+        icon_filename: "microchip.svg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - edac
+        - error detection and correction memory controllers
+        - ecc
+        - ram
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration monitors system memory errors detected and corrected by ECC RAM."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1382,51 +1399,53 @@ modules:
       plugin_name: proc.plugin
       module_name: /sys/devices/system/node
       monitored_instance:
-        name: proc /sys/devices/system/node
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: Non-Uniform Memory Access
+        link: ""
+        categories:
+          - data-collection.linux-systems.memory-metrics
+        icon_filename: "syslog.png"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - numa
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "Monitor NUMA metrics for efficient non-uniform memory access operations."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1460,51 +1479,53 @@ modules:
       plugin_name: proc.plugin
       module_name: /sys/kernel/mm/ksm
       monitored_instance:
-        name: proc /sys/kernel/mm/ksm
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: Kernel Same-Page Merging
+        link: ""
+        categories:
+          - data-collection.linux-systems.memory-metrics
+        icon_filename: "microchip.svg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - ksm
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "Examine KSM metrics for insights into memory deduplication operations."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1547,51 +1568,53 @@ modules:
       plugin_name: proc.plugin
       module_name: /sys/block/zram
       monitored_instance:
-        name: proc /sys/block/zram
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: ZRAM
+        link: ""
+        categories:
+          - data-collection.linux-systems.memory-metrics
+        icon_filename: "microchip.svg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - zram
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration monitors ZRAM usage, compression ratios, and more."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1640,51 +1663,54 @@ modules:
       plugin_name: proc.plugin
       module_name: ipc
       monitored_instance:
-        name: proc ipc
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: Inter Process Communication
+        link: ""
+        categories:
+          - data-collection.linux-systems.ipc-metrics
+        icon_filename: "syslog.png"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - ipc
+        - semaphores
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "Monitor Inter Process Communication performance for optimal process interaction."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1751,51 +1777,56 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/diskstats
       monitored_instance:
-        name: proc /proc/diskstats
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: Disk Statistics
+        link: ""
+        categories:
+          - data-collection.linux-systems.disk-metrics
+        icon_filename: "hard-drive.svg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - disk
+        - io
+        - bcache
+        - block devices
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration provides statistics about disk and Bcache I/O."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1818,7 +1849,9 @@ modules:
       - name: bcache_cache_errors
         link: https://github.com/netdata/netdata/blob/master/health/health.d/bcache.conf
         metric: disk.bcache_cache_read_races
-        info: number of times data was read from the cache, the bucket was reused and invalidated in the last 10 minutes (when this occurs the data is reread from the backing device)
+        info:
+          number of times data was read from the cache, the bucket was reused and invalidated in the last 10 minutes (when this occurs the data is
+          reread from the backing device)
     metrics:
       folding:
         title: Metrics
@@ -2023,51 +2056,56 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/mdstat
       monitored_instance:
-        name: proc /proc/mdstat
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: MD RAID
+        link: ""
+        categories:
+          - data-collection.linux-systems.disk-metrics
+        icon_filename: "hard-drive.svg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - raid
+        - mdadm
+        - mdstat
+        - raid
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration monitors the status of MD RAID devices."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -2080,7 +2118,8 @@ modules:
       - name: mdstat_disks
         link: https://github.com/netdata/netdata/blob/master/health/health.d/mdstat.conf
         metric: md.disks
-        info: number of devices in the down state for the ${label:device} ${label:raid_level} array. Any number > 0 indicates that the array is degraded.
+        info:
+          number of devices in the down state for the ${label:device} ${label:raid_level} array. Any number > 0 indicates that the array is degraded.
       - name: mdstat_mismatch_cnt
         link: https://github.com/netdata/netdata/blob/master/health/health.d/mdstat.conf
         metric: md.mismatch_cnt
@@ -2158,51 +2197,53 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/net/dev
       monitored_instance:
-        name: proc /proc/net/dev
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: Network interfaces
+        link: ""
+        categories:
+          - data-collection.linux-systems.network-metrics
+        icon_filename: "network-wired.svg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - network interfaces
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "Monitor network interface metrics about bandwidth, state, errors and more."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -2251,18 +2292,10 @@ modules:
       - name: 10s_received_packets_storm
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
         metric: net.packets
-        info: ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over the last minute
+        info:
+          ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over
+          the last minute
         os: "linux freebsd"
-      - name: interface_inbound_errors
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
-        metric: net.errors
-        info: number of inbound errors for the network interface ${label:device} in the last 10 minutes
-        os: "freebsd"
-      - name: interface_outbound_errors
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
-        metric: net.errors
-        info: number of outbound errors for the network interface ${label:device} in the last 10 minutes
-        os: "freebsd"
       - name: inbound_packets_dropped
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
         metric: net.drops
@@ -2398,51 +2431,53 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/net/wireless
       monitored_instance:
-        name: proc /proc/net/wireless
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: Wireless network interfaces
+        link: ""
+        categories:
+          - data-collection.linux-systems.network-metrics
+        icon_filename: "network-wired.svg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - wireless devices
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "Monitor wireless devices with metrics about status, link quality, signal level, noise level and more."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -2472,13 +2507,16 @@ modules:
               dimensions:
                 - name: link_quality
             - name: wireless.signal_level
-              description: The signal level is the wireless signal power level received by the wireless client. The closer the value is to 0, the stronger the signal.
+              description:
+                The signal level is the wireless signal power level received by the wireless client. The closer the value is to 0, the stronger the
+                signal.
               unit: "dBm"
               chart_type: line
               dimensions:
                 - name: signal_level
             - name: wireless.noise_level
-              description: The noise level indicates the amount of background noise in your environment. The closer the value to 0, the greater the noise level.
+              description:
+                The noise level indicates the amount of background noise in your environment. The closer the value to 0, the greater the noise level.
               unit: "dBm"
               chart_type: line
               dimensions:
@@ -2503,51 +2541,54 @@ modules:
       plugin_name: proc.plugin
       module_name: /sys/class/infiniband
       monitored_instance:
-        name: proc /sys/class/infiniband
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: InfiniBand
+        link: ""
+        categories:
+          - data-collection.linux-systems.network-metrics
+        icon_filename: "network-wired.svg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - infiniband
+        - rdma
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration monitors InfiniBand network inteface statistics."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -2643,51 +2684,58 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/net/netstat
       monitored_instance:
-        name: proc /proc/net/netstat
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: Network statistics
+        link: ""
+        categories:
+          - data-collection.linux-systems.network-metrics
+        icon_filename: "network-wired.svg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - ip
+        - udp
+        - udplite
+        - icmp
+        - netstat
+        - snmp
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration provides metrics from the `netstat`, `snmp` and `snmp6` modules."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -2726,7 +2774,9 @@ modules:
       - name: 10s_ipv4_tcp_resets_sent
         link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
         metric: ipv4.tcphandshake
-        info: average number of sent TCP RESETS over the last 10 seconds. This can indicate a port scan, or that a service running on this host has crashed. Netdata will not send a clear notification for this alarm.
+        info:
+          average number of sent TCP RESETS over the last 10 seconds. This can indicate a port scan, or that a service running on this host has
+          crashed. Netdata will not send a clear notification for this alarm.
         os: "linux"
       - name: 1m_ipv4_tcp_resets_received
         link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
@@ -2736,7 +2786,9 @@ modules:
       - name: 10s_ipv4_tcp_resets_received
         link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
         metric: ipv4.tcphandshake
-        info: average number of received TCP RESETS over the last 10 seconds. This can be an indication that a service this host needs has crashed. Netdata will not send a clear notification for this alarm.
+        info:
+          average number of received TCP RESETS over the last 10 seconds. This can be an indication that a service this host needs has crashed.
+          Netdata will not send a clear notification for this alarm.
         os: "linux freebsd"
       - name: 1m_ipv4_udp_receive_buffer_errors
         link: https://github.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf
@@ -3232,51 +3284,53 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/net/sockstat
       monitored_instance:
-        name: proc /proc/net/sockstat
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: Socket statistics
+        link: ""
+        categories:
+          - data-collection.linux-systems.network-metrics
+        icon_filename: "network-wired.svg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - sockets
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration provides socket statistics."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -3364,51 +3418,53 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/net/sockstat6
       monitored_instance:
-        name: proc /proc/net/sockstat6
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: IPv6 Socket Statistics
+        link: ""
+        categories:
+          - data-collection.linux-systems.network-metrics
+        icon_filename: "network-wired.svg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - ipv6 sockets
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration provides IPv6 socket statistics."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -3459,51 +3515,53 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/net/ip_vs_stats
       monitored_instance:
-        name: proc /proc/net/ip_vs_stats
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: IP Virtual Server
+        link: ""
+        categories:
+          - data-collection.linux-systems.network-metrics
+        icon_filename: "network-wired.svg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - ip virtual server
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration monitors IP Virtual Server statistics"
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -3544,51 +3602,54 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/net/rpc/nfs
       monitored_instance:
-        name: proc /proc/net/rpc/nfs
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: NFS Client
+        link: ""
+        categories:
+          - data-collection.linux-systems.filesystem-metrics.nfs
+        icon_filename: "nfs.png"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - nfs client
+        - filesystem
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration provides statistics from the Linux kernel's NFS Client."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -3642,51 +3703,54 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/net/rpc/nfsd
       monitored_instance:
-        name: proc /proc/net/rpc/nfsd
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: NFS Server
+        link: ""
+        categories:
+          - data-collection.linux-systems.filesystem-metrics.nfs
+        icon_filename: "nfs.png"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - nfs server
+        - filesystem
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration provides statistics from the Linux kernel's NFS Server."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -3773,51 +3837,54 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/net/sctp/snmp
       monitored_instance:
-        name: proc /proc/net/sctp/snmp
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: SCTP Statistics
+        link: ""
+        categories:
+          - data-collection.linux-systems.filesystem-metrics.nfs
+        icon_filename: "network-wired.svg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - sctp
+        - stream control transmission protocol
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration provides statistics about the Stream Control Transmission Protocol (SCTP)."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -3874,51 +3941,55 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/net/stat/nf_conntrack
       monitored_instance:
-        name: proc /proc/net/stat/nf_conntrack
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: Conntrack
+        link: ""
+        categories:
+          - data-collection.linux-systems.firewall-metrics
+        icon_filename: "syslog.png"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - connection tracking mechanism
+        - netfilter
+        - conntrack
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration monitors the connection tracking mechanism of Netfilter in the Linux Kernel."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -3991,51 +4062,53 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/net/stat/synproxy
       monitored_instance:
-        name: proc /proc/net/stat/synproxy
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: Synproxy
+        link: ""
+        categories:
+          - data-collection.linux-systems.firewall-metrics
+        icon_filename: "syslog.png"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - synproxy
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration provides statistics about the Synproxy netfilter module."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -4076,51 +4149,56 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/spl/kstat/zfs
       monitored_instance:
-        name: proc /proc/spl/kstat/zfs
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: ZFS Pools
+        link: ""
+        categories:
+          - data-collection.linux-systems.filesystem-metrics.zfs
+        icon_filename: "zfs.svg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - zfs pools
+        - pools
+        - zfs
+        - filesystem
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration provides metrics about the state of ZFS pools."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -4163,51 +4241,56 @@ modules:
       plugin_name: proc.plugin
       module_name: /proc/spl/kstat/zfs/arcstats
       monitored_instance:
-        name: proc /proc/spl/kstat/zfs/arcstats
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: ZFS Adaptive Replacement Cache
+        link: ""
+        categories:
+          - data-collection.linux-systems.filesystem-metrics.zfs
+        icon_filename: "microchip.svg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - zfs arc
+        - arc
+        - zfs
+        - filesystem
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration monitors  ZFS Adadptive Replacement Cache (ARC) statistics."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -4424,51 +4507,54 @@ modules:
       plugin_name: proc.plugin
       module_name: /sys/fs/btrfs
       monitored_instance:
-        name: proc /sys/fs/btrfs
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: BTRFS
+        link: ""
+        categories:
+          - data-collection.linux-systems.filesystem-metrics.btrfs
+        icon_filename: "btrfs.svg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - btrfs
+        - filesystem
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration provides usage and error statistics from the BTRFS filesystem."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -4611,51 +4697,54 @@ modules:
       plugin_name: proc.plugin
       module_name: /sys/class/power_supply
       monitored_instance:
-        name: proc /sys/class/power_supply
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: Power Supply
+        link: ""
+        categories:
+          - data-collection.linux-systems.power-supply-metrics
+        icon_filename: "microchip.svg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - psu
+        - power supply
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration monitors Power supply metrics, such as battery status, AC power status and more."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi-instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
