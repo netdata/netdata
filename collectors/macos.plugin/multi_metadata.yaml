@@ -25,7 +25,7 @@ modules:
         method_description: ""
       supported_platforms:
         include:
-         - macOS
+          - macOS
         exclude: []
       multi-instance: false
       additional_permissions:
