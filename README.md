@@ -413,7 +413,7 @@ So, although it is not required, you can get the most out of your Netdata instal
 
 ### :office: Who uses Netdata?
 
-Netdata is a popular project. Almost everyone uses it.
+Netdata is a popular project...
 
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
