@@ -108,6 +108,10 @@
         "most_popular": {
           "type": "boolean",
           "description": "Whether or not the integration is to be flagged as most-popular, meaning it will show up at the top of the menu."
+        },
+        "community": {
+          "type": "boolean",
+          "description": "Whether or not the integration should be flagged as community."
         }
       },
       "required": [
