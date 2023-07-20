@@ -187,7 +187,7 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: 'Examine Entropy metrics for insights into random number generation.'
+        metrics_description: ''
         method_description: ''
       supported_platforms:
         include: []
@@ -621,7 +621,7 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: "This integration provides the number of service requests that have been sent to the system's various interrupt lines."
+        metrics_description: "This integration provides the system load average for the last 1, 5, and 15 minutes."
         method_description: ''
       supported_platforms:
         include: []
@@ -3592,7 +3592,7 @@ modules:
         link: ''
         categories:
          - data-collection.linux-systems.filesystem-metrics.nfs
-        icon_filename: 'syslog.png'
+        icon_filename: 'nfs.png'
       related_resources:
         integrations:
           list: []
@@ -3693,7 +3693,7 @@ modules:
         link: ''
         categories:
          - data-collection.linux-systems.filesystem-metrics.nfs
-        icon_filename: 'syslog.png'
+        icon_filename: 'nfs.png'
       related_resources:
         integrations:
           list: []
@@ -4139,7 +4139,7 @@ modules:
         link: ''
         categories:
          - data-collection.linux-systems.filesystem-metrics.zfs
-        icon_filename: 'microchip.svg'
+        icon_filename: 'zfs.svg'
       related_resources:
         integrations:
           list: []
@@ -4497,7 +4497,7 @@ modules:
         link: ''
         categories:
          - data-collection.linux-systems.filesystem-metrics.btrfs
-        icon_filename: 'microchip.svg'
+        icon_filename: 'btrfs.svg'
       related_resources:
         integrations:
           list: []
