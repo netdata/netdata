@@ -83,6 +83,7 @@ struct plugind {
 
     time_t started_t;
 
+    DICTIONARY_ITEM *cfg_dict_item;
     struct configurable_plugin *configuration;
 
     struct plugind *prev;

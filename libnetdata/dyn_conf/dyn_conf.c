@@ -250,25 +250,15 @@ static const char *set_module_config(struct module *mod, dyncfg_config_t cfg)
 {
     struct configurable_plugin *plugin = mod->plugin;
 
+    enum set_config_result rc = mod->set_config_cb(mod->set_config_cb_usr_ctx, mod->name, &cfg);
+    if (rc != SET_CONFIG_ACCEPTED) {
+        error_report("DYNCFG module \"%s\" rejected config", plugin->name);
+        return "module rejected config";
+    }
+
     if (store_config(plugin->name, mod->name, NULL, cfg)) {
         error_report("DYNCFG could not store config for module \"%s\"", mod->name);
         return "could not store config on disk";
-    }
-
-/*    if (mod->set_config_cb == NULL) {
-        error_report("DYNCFG module \"%s\" has no set_module_config_cb", plugin->name);
-        return "module has no set_config_cb callback";
-    } */
-
-    pthread_mutex_lock(&plugin->lock);
-    mod->config.data_size = cfg.data_size;
-    mod->config.data = mallocz(cfg.data_size);
-    memcpy(mod->config.data, cfg.data, cfg.data_size);
-    pthread_mutex_unlock(&plugin->lock);
-
-    if (mod->set_config_cb != NULL && mod->set_config_cb(mod->set_config_cb_usr_ctx, mod->name, &cfg)) {
-        error_report("DYNCFG module \"%s\" set_module_config_cb failed", plugin->name);
-        return "set_module_config_cb failed";
     }
 
     return NULL;
@@ -318,36 +308,54 @@ struct job *add_job(struct module *mod, const char *job_id, dyncfg_config_t cfg)
 
 }
 
-int register_plugin(struct configurable_plugin *plugin)
+void module_del_cb(const DICTIONARY_ITEM *item, void *value, void *data)
+{
+    UNUSED(item);
+    UNUSED(data);
+    struct module *mod = (struct module *)value;
+    dictionary_destroy(mod->jobs);
+    freez(mod->name);
+    freez(mod);
+}
+
+
+DICTIONARY_ITEM *register_plugin(struct configurable_plugin *plugin)
 {
     if (get_plugin_by_name(plugin->name) != NULL) {
         error_report("DYNCFG plugin \"%s\" already registered", plugin->name);
-        return 1;
+        return NULL;
     }
 
     if (plugin->set_config_cb == NULL) {
         error_report("DYNCFG plugin \"%s\" has no set_config_cb", plugin->name);
-        return 1;
+        return NULL;
     }
 
     pthread_mutex_init(&plugin->lock, NULL);
 
-    if (!plugin->plugins_d) {
-        plugin->config = load_config(plugin->name, NULL, NULL);
-        if (plugin->config.data == NULL) {
-            plugin->config = plugin->default_config;
-            if (plugin->config.data == NULL) {
-                error_report("DYNCFG module \"%s\" has no default config", plugin->name);
-                return 1;
-            }
-        }
-    }
-
     plugin->modules = dictionary_create(DICT_OPTION_VALUE_LINK_DONT_CLONE);
+    dictionary_register_delete_callback(plugin->modules, module_del_cb, NULL);
 
     dictionary_set(plugins_dict, plugin->name, plugin, sizeof(plugin));
 
-    return 0;
+    // the plugin keeps the pointer to the dictionary item, so we need to acquire it
+    return dictionary_get_and_acquire_item(plugins_dict, plugin->name);
+}
+
+void unregister_plugin(DICTIONARY_ITEM *plugin)
+{
+    struct configurable_plugin *plug = dictionary_acquired_item_value(plugin);
+    dictionary_acquired_item_release(plugins_dict, plugin);
+    dictionary_del(plugins_dict, plug->name);
+}
+
+void job_del_cb(const DICTIONARY_ITEM *item, void *value, void *data)
+{
+    UNUSED(item);
+    UNUSED(data);
+    struct job *job = (struct job *)value;
+    freez(job->name);
+    freez(job);
 }
 
 int register_module(struct configurable_plugin *plugin, struct module *module)
@@ -361,19 +369,9 @@ int register_module(struct configurable_plugin *plugin, struct module *module)
 
     module->plugin = plugin;
 
-    if (!plugin->plugins_d) {
-        module->config = load_config(plugin->name, module->name, NULL);
-        if (module->config.data == NULL) {
-            module->config = module->default_config;
-            if (module->config.data == NULL) {
-                error_report("DYNCFG module \"%s\" has no default config", module->name);
-                return 1;
-            }
-        }
-    }
-
     if (module->type == MOD_TYPE_ARRAY) {
         module->jobs = dictionary_create(DICT_OPTION_VALUE_LINK_DONT_CLONE);
+        dictionary_register_delete_callback(module->jobs, job_del_cb, NULL);
 
         // load all jobs from disk
         BUFFER *path = buffer_create(DYN_CONF_PATH_MAX, NULL);
@@ -415,34 +413,17 @@ int register_module(struct configurable_plugin *plugin, struct module *module)
 
 static dyncfg_config_t get_plugin_config(struct configurable_plugin *plugin)
 {
-    if (plugin->plugins_d)
         return plugin->get_config_cb(plugin->cb_usr_ctx);
-
-    //TODO
-    return plugin->config;
 }
 
 static dyncfg_config_t get_module_config(struct module *module)
 {
-    if (module->plugin->plugins_d)
         return module->get_config_cb(module->set_config_cb_usr_ctx, module->name);
-
-    //TODO
-    return module->config;
 }
 
 static dyncfg_config_t get_job_config(struct job *job)
 {
-    if (job->module->plugin->plugins_d)
         return job->module->get_job_config_cb(job->module->job_config_cb_usr_ctx, job->module->name, job->name);
-
-    //TODO
-
-    dyncfg_config_t ret = {
-        .data = NULL,
-        .data_size = 0
-    };
-    return ret;
 }
 
 struct uni_http_response dyn_conf_process_http_request(int method, const char *plugin, const char *module, const char *job_id, void *post_payload, size_t post_payload_size)
@@ -639,12 +620,13 @@ struct uni_http_response dyn_conf_process_http_request(int method, const char *p
         return resp;
     }
     if (method == HTTP_METHOD_GET) {
-        resp.content = mallocz(job->config.data_size);
-        memcpy(resp.content, job->config.data, job->config.data_size);
-        resp.status = HTTP_RESP_OK;
+        dyncfg_config_t cfg = get_job_config(job);
 
+        resp.content = mallocz(cfg.data_size);
+        memcpy(resp.content, cfg.data, cfg.data_size);
+        resp.status = HTTP_RESP_OK;
         resp.content_free = free;
-        resp.content_length = job->config.data_size;
+        resp.content_length = cfg.data_size;
     } else if (method == HTTP_METHOD_PUT) {
         if (post_payload == NULL) {
             resp.content = "no payload";
@@ -661,7 +643,7 @@ struct uni_http_response dyn_conf_process_http_request(int method, const char *p
         resp.content = "OK";
         resp.content_length = strlen(resp.content);
     } else if (method == HTTP_METHOD_DELETE) {
-        remove_job(mod, job_id);
+        remove_job(mod, job);
         resp.status = HTTP_RESP_OK;
         resp.content = "OK";
         resp.content_length = strlen(resp.content);
@@ -725,6 +707,16 @@ void register_dummy_plugin()
 
 #endif
 
+void plugin_del_cb(const DICTIONARY_ITEM *item, void *value, void *data)
+{
+    UNUSED(item);
+    UNUSED(data);
+    struct configurable_plugin *plugin = (struct configurable_plugin *)value;
+    dictionary_destroy(plugin->modules);
+    freez(plugin->name);
+    freez(plugin);
+}
+
 int dyn_conf_init(void)
 {
     if (mkdir(DYN_CONF_DIR, 0755) == -1) {
@@ -735,6 +727,7 @@ int dyn_conf_init(void)
     }
 
     plugins_dict = dictionary_create(DICT_OPTION_VALUE_LINK_DONT_CLONE);
+    dictionary_register_delete_callback(plugins_dict, plugin_del_cb, NULL);
 
 #ifdef DYNCFG_DUMMY_PLUGIN
     register_dummy_plugin();

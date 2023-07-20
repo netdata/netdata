@@ -1856,11 +1856,6 @@ static inline PARSER_RC pluginsd_exit(char **words __maybe_unused, size_t num_wo
     return PARSER_RC_STOP;
 }
 
-static enum set_config_result _plugin_set_config_cb(void *usr_ctx, dyncfg_config_t *cfg)
-{
-
-}
-
 struct mutex_cond {
     pthread_mutex_t lock;
     pthread_cond_t cond;
@@ -2023,15 +2018,21 @@ static inline PARSER_RC pluginsd_register_plugin(char **words __maybe_unused, si
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_ENABLE, "missing name parameter");
 
     struct configurable_plugin *cfg = callocz(1, sizeof(struct configurable_plugin));
-    parser->user.cd->configuration = cfg;
 
     cfg->name = strdupz(words[1]);
-    cfg->plugins_d = 1;
     cfg->set_config_cb = set_plugin_config_cb;
     cfg->get_config_cb = get_plugin_config_cb;
     cfg->cb_usr_ctx = parser;
 
-    register_plugin(parser->user.cd->configuration);
+    parser->user.cd->cfg_dict_item = register_plugin(cfg);
+
+    if (unlikely(parser->user.cd->cfg_dict_item == NULL)) {
+        freez(cfg->name);
+        freez(cfg);
+        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_ENABLE, "error registering plugin");
+    }
+
+    parser->user.cd->configuration = cfg;
     return PARSER_RC_OK;
 }
 
@@ -2397,6 +2398,11 @@ void parser_init_repertoire(PARSER *parser, PARSER_REPERTOIRE repertoire) {
 void parser_destroy(PARSER *parser) {
     if (unlikely(!parser))
         return;
+
+    if (parser->user.cd->configuration != NULL) {
+        unregister_plugin(parser->user.cd->cfg_dict_item);
+        parser->user.cd->configuration = NULL;
+    }
 
     dictionary_destroy(parser->inflight.functions);
     freez(parser);

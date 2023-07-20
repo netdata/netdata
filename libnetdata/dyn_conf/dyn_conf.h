@@ -58,10 +58,6 @@ struct module
     pthread_mutex_t lock;
     char *name;
     enum module_type type;
-    const char *schema;
-
-    dyncfg_config_t config;
-    dyncfg_config_t default_config;
 
     struct configurable_plugin *plugin;
 
@@ -85,22 +81,15 @@ struct configurable_plugin {
     DICTIONARY *modules;
     const char *schema;
 
-    dyncfg_config_t config;
-    dyncfg_config_t default_config;
-
     dyncfg_config_t (*get_config_cb)(void *usr_ctx);
     enum set_config_result (*set_config_cb)(void *usr_ctx, dyncfg_config_t *cfg);
     void *cb_usr_ctx; // context for all callbacks (split if needed in future)
-
-    unsigned int plugins_d:1;
 };
 
-//int has_module
-
 // API to be used by plugins
-int register_plugin(struct configurable_plugin *plugin);
+DICTIONARY_ITEM *register_plugin(struct configurable_plugin *plugin);
+void unregister_plugin(DICTIONARY_ITEM *plugin);
 int register_module(struct configurable_plugin *plugin, struct module *module);
-
 
 // API to be used by the web server(s)
 json_object *get_list_of_plugins_json();
