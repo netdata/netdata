@@ -89,8 +89,6 @@ ALARM_ENTRY* health_create_alarm_entry(
 void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae);
 
 void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath);
-char *health_user_config_dir(void);
-char *health_stock_config_dir(void);
 void health_alarm_log_free(RRDHOST *host);
 
 void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae);
