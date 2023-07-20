@@ -144,12 +144,13 @@ static const char *proc_states[] = {
 // log each problem once per process
 // log flood protection flags (log_thrown)
 typedef enum __attribute__((packed)) {
-    PID_LOG_IO      = (1 << 0),
-    PID_LOG_STATUS  = (1 << 1),
-    PID_LOG_CMDLINE = (1 << 2),
-    PID_LOG_FDS     = (1 << 3),
-    PID_LOG_STAT    = (1 << 4),
-    PID_LOG_LIMITS  = (1 << 5),
+    PID_LOG_IO              = (1 << 0),
+    PID_LOG_STATUS          = (1 << 1),
+    PID_LOG_CMDLINE         = (1 << 2),
+    PID_LOG_FDS             = (1 << 3),
+    PID_LOG_STAT            = (1 << 4),
+    PID_LOG_LIMITS          = (1 << 5),
+    PID_LOG_LIMITS_DETAIL   = (1 << 6),
 } PID_LOG;
 
 static int
@@ -1373,11 +1374,16 @@ static inline int read_proc_pid_limits(struct pid_stat *p, void *ptr) {
 #else
     static char proc_pid_limits_buffer[MAX_PROC_PID_LIMITS + 1];
     int ret = 0;
+    bool read_limits = false;
+
+    errno = 0;
 
     kernel_uint_t all_fds = pid_openfds_sum(p);
-    if(all_fds < p->limits.max_open_files / 2 && p->io_collected_usec > p->last_limits_collected_usec && p->io_collected_usec - p->last_limits_collected_usec <= 60 * USEC_PER_SEC)
+    if(all_fds < p->limits.max_open_files / 2 && p->io_collected_usec > p->last_limits_collected_usec && p->io_collected_usec - p->last_limits_collected_usec <= 60 * USEC_PER_SEC) {
         // too frequent, we want to collect limits once per minute
+        ret = 1;
         goto cleanup;
+    }
 
     if(unlikely(!p->limits_filename)) {
         char filename[FILENAME_MAX + 1];
@@ -1394,6 +1400,7 @@ static inline int read_proc_pid_limits(struct pid_stat *p, void *ptr) {
     if(bytes <= 0)
         goto cleanup;
 
+    read_limits = true;
     p->limits.max_open_files = get_proc_pid_limits_limit(proc_pid_limits_buffer, PROC_PID_LIMITS_MAX_OPEN_FILES_KEY, sizeof(PROC_PID_LIMITS_MAX_OPEN_FILES_KEY) - 1, 0);
     p->last_limits_collected_usec = p->io_collected_usec;
 
@@ -1404,6 +1411,43 @@ cleanup:
         p->openfds_limits_percent = (NETDATA_DOUBLE)all_fds * 100.0 / (NETDATA_DOUBLE)p->limits.max_open_files;
     else
         p->openfds_limits_percent = 0.0;
+
+    if(p->openfds_limits_percent > 100.0) {
+        if(!(p->log_thrown & PID_LOG_LIMITS_DETAIL)) {
+            netdata_log_info(
+                    "FDS_LIMITS: PID %d (%s) is using "
+                    "%0.2d %% of its fds limits, "
+                    "open fds = %llu ("
+                    "files = %llu, "
+                    "pipes = %llu, "
+                    "sockets = %llu, "
+                    "inotifies = %llu, "
+                    "eventfds = %llu, "
+                    "timerfds = %llu, "
+                    "signalfds = %llu, "
+                    "eventpolls = %llu "
+                    "other = %llu "
+                    "), open fds limit = %llu, "
+                    "%s",
+                    p->pid, p->comm, p->openfds_limits_percent, all_fds,
+                    p->openfds.files,
+                    p->openfds.pipes,
+                    p->openfds.sockets,
+                    p->openfds.inotifies,
+                    p->openfds.eventfds,
+                    p->openfds.timerfds,
+                    p->openfds.signalfds,
+                    p->openfds.eventpolls,
+                    p->openfds.other,
+                    p->limits.max_open_files,
+                    read_limits ? "and we have read the limits AFTER counting the fds"
+                                : "but we have read the limits BEFORE counting the fds");
+
+            p->log_thrown |= PID_LOG_LIMITS_DETAIL;
+        }
+    }
+    else
+        p->log_thrown &= ~PID_LOG_LIMITS_DETAIL;
 
     return ret;
 #endif
