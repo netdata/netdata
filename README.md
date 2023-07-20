@@ -25,6 +25,9 @@
   <a href="https://community.netdata.cloud"><img alt="Discourse topics" src="https://img.shields.io/discourse/topics?server=https%3A%2F%2Fcommunity.netdata.cloud%2F&logo=discourse&label=discourse%20forum"></a>
   <a href="https://github.com/netdata/netdata/discussions"><img alt="GitHub Discussions" src="https://img.shields.io/github/discussions/netdata/netdata?logo=github&label=github%20discussions"></a>
 </p>
+
+<p align="center"><b>Visit the <a href="https://www.netdata.cloud">Project's Home Page</a></b></p>
+
 <hr class="solid">
 
 Netdata collects metrics per second and presents them in beautiful low-latency dashboards. It is designed to run on all of your physical and virtual servers, cloud deployments, Kubernetes clusters, and edge/IoT devices, to monitor your systems, containers and applications.
@@ -445,8 +448,13 @@ Join the Netdata community:
 - Start a discussion on [Github discussions](https://github.com/netdata/netdata/discussions).
 - Open a topic to our [community forums](https://community.netdata.cloud).
 
-> You can also find Netdata on:<br/>
-> [Twitter](https://twitter.com/linuxnetdata) | [YouTube](https://www.youtube.com/c/Netdata) | [Reddit](https://www.reddit.com/r/netdata/) | [LinkedIn](https://www.linkedin.com/company/netdata-cloud/) | [StackShare](https://stackshare.io/netdata) | [Product Hunt](https://www.producthunt.com/posts/netdata-monitoring-agent/) | [Repology](https://repology.org/metapackage/netdata/versions) | [Facebook](https://www.facebook.com/linuxnetdata/)
+> **Meet Up** :people_holding_hands::people_holding_hands::people_holding_hands:<br/>
+> The Netdata team and community members have regular meetups.<br/>
+> **You are invited to join us!**
+> Click [here](https://www.meetup.com/netdata-infrastructure-monitoring-meetup-group/events/) for the schedule.
+
+You can also find Netdata on:<br/>
+[Twitter](https://twitter.com/linuxnetdata) | [YouTube](https://www.youtube.com/c/Netdata) | [Reddit](https://www.reddit.com/r/netdata/) | [LinkedIn](https://www.linkedin.com/company/netdata-cloud/) | [StackShare](https://stackshare.io/netdata) | [Product Hunt](https://www.producthunt.com/posts/netdata-monitoring-agent/) | [Repology](https://repology.org/metapackage/netdata/versions) | [Facebook](https://www.facebook.com/linuxnetdata/)
 
 ## :pray: Contribute
 
