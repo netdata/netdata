@@ -971,10 +971,9 @@ modules:
       monitored_instance:
         name: Virtual Machines
         link: ""
-        icon_filename: k8s.png
+        icon_filename: netdata.png
         categories:
           - data-collection.containers-vms
-          - data-collection.kubernetes
       keywords:
         - vms
         - virtualization
@@ -1010,6 +1009,9 @@ modules:
       keywords:
         - libvirt
         - container
+    overview:
+      data_collection:
+        metrics_description: "Monitor Libvirt for performance, resource usage, and health status."
   - <<: *module
     meta:
       <<: *meta
