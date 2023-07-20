@@ -267,26 +267,22 @@ void ebpf_process_send_apps_data(struct ebpf_target *root, ebpf_module_t *em)
  *
  * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_read_process_hash_global_tables(int maps_per_core)
+static void ebpf_read_process_hash_global_tables(netdata_idx_t *stats, int maps_per_core)
 {
-    uint64_t idx;
     netdata_idx_t res[NETDATA_KEY_END_VECTOR];
+    ebpf_read_global_table_stats(res,
+                                 process_hash_values,
+                                 process_maps[NETDATA_PROCESS_GLOBAL_TABLE].map_fd,
+                                 maps_per_core,
+                                 0,
+                                 NETDATA_KEY_END_VECTOR);
 
-    netdata_idx_t *val = process_hash_values;
-    int fd = process_maps[NETDATA_PROCESS_GLOBAL_TABLE].map_fd;
-    for (idx = 0; idx < NETDATA_KEY_END_VECTOR; idx++) {
-        if (!bpf_map_lookup_elem(fd, &idx, val)) {
-            uint64_t total = 0;
-            int i;
-            int end = (maps_per_core) ? ebpf_nprocs : 1;
-            for (i = 0; i < end; i++)
-                total += val[i];
-
-            res[idx] = total;
-        } else {
-            res[idx] = 0;
-        }
-    }
+    ebpf_read_global_table_stats(stats,
+                                 process_hash_values,
+                                 process_maps[NETDATA_PROCESS_CTRL_TABLE].map_fd,
+                                 maps_per_core,
+                                 NETDATA_CONTROLLER_PID_TABLE_ADD,
+                                 NETDATA_CONTROLLER_END);
 
     process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_EXIT].call = res[NETDATA_KEY_CALLS_DO_EXIT];
     process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_RELEASE_TASK].call = res[NETDATA_KEY_CALLS_RELEASE_TASK];
@@ -747,7 +743,6 @@ static void ebpf_process_exit(void *ptr)
         ebpf_statistic_obsolete_aral_chart(em, process_disable_priority);
 #endif
 
-
         fflush(stdout);
         pthread_mutex_unlock(&lock);
     }
@@ -1121,6 +1116,8 @@ static void process_collector(ebpf_module_t *em)
     int maps_per_core = em->maps_per_core;
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
+    netdata_idx_t *stats = em->hash_table_stats;
+    memset(stats, 0, sizeof(em->hash_table_stats));
     while (!ebpf_exit_plugin && running_time < lifetime) {
         usec_t dt = heartbeat_next(&hb, USEC_PER_SEC);
         (void)dt;
@@ -1130,7 +1127,7 @@ static void process_collector(ebpf_module_t *em)
         if (++counter == update_every) {
             counter = 0;
 
-            ebpf_read_process_hash_global_tables(maps_per_core);
+            ebpf_read_process_hash_global_tables(stats, maps_per_core);
 
             netdata_apps_integration_flags_t apps_enabled = em->apps_charts;
             pthread_mutex_lock(&collect_data_mutex);

@@ -419,6 +419,7 @@ static void oomkill_collector(ebpf_module_t *em)
     int counter = update_every - 1;
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
+    netdata_idx_t *stats = em->hash_table_stats;
     while (!ebpf_exit_plugin && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_exit_plugin || ++counter != update_every)
@@ -431,6 +432,9 @@ static void oomkill_collector(ebpf_module_t *em)
             running_time = ebpf_update_oomkill_period(running_time, em);
             continue;
         }
+
+        stats[NETDATA_CONTROLLER_PID_TABLE_ADD] += (uint64_t) count;
+        stats[NETDATA_CONTROLLER_PID_TABLE_DEL] += (uint64_t) count;
 
         pthread_mutex_lock(&collect_data_mutex);
         pthread_mutex_lock(&lock);
