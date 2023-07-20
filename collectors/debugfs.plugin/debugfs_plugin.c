@@ -20,6 +20,9 @@ static struct debugfs_module {
       .func = do_debugfs_extfrag},
     { .name = "/sys/kernel/debug/zswap", .enabled = CONFIG_BOOLEAN_YES,
       .func = do_debugfs_zswap},
+    // Linux powercap metrics is here because it needs privilege to read each RAPL zone
+    { .name = "/sys/devices/virtual/powercap", .enabled = CONFIG_BOOLEAN_YES,
+      .func = do_sys_devices_virtual_powercap},
 
     // The terminator
     { .name = NULL, .enabled = CONFIG_BOOLEAN_NO, .func = NULL}

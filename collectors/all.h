@@ -367,6 +367,9 @@
 #define NETDATA_CHART_PRIO_POWER_SUPPLY_ENERGY        9502
 #define NETDATA_CHART_PRIO_POWER_SUPPLY_VOLTAGE       9503
 
+// Linux powercap
+
+#define NETDATA_CHART_PRIO_POWERCAP        9600
 
 // Wireless
 
