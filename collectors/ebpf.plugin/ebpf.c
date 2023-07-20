@@ -2632,6 +2632,9 @@ void ebpf_send_statistic_data()
     int i;
     for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
         ebpf_module_t *wem = &ebpf_modules[i];
+        if (wem->functions.fnct_routine)
+            continue;
+
         write_chart_dimension((char *)wem->info.thread_name, (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ? 1 : 0);
     }
     write_end_chart();
@@ -2641,6 +2644,9 @@ void ebpf_send_statistic_data()
         ebpf_module_t *wem = &ebpf_modules[i];
         // Threads like VFS is slow to load and this can create an invalid number, this is the motive
         // we are also testing wem->lifetime value.
+        if (wem->functions.fnct_routine)
+            continue;
+
         write_chart_dimension((char *)wem->info.thread_name,
                               (wem->lifetime && wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ?
                               (long long) (wem->lifetime - wem->running_time):
@@ -2728,10 +2734,12 @@ static void ebpf_create_thread_chart(char *name,
     int i;
     for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
         ebpf_module_t *em = &ebpf_modules[i];
-        if (!em->functions.fnct_routine)
-            ebpf_write_global_dimension((char *)em->info.thread_name,
-                                        (char *)em->info.thread_name,
-                                        ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+        if (em->functions.fnct_routine)
+            continue;
+
+        ebpf_write_global_dimension((char *)em->info.thread_name,
+                                    (char *)em->info.thread_name,
+                                    ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
     }
 }
 
