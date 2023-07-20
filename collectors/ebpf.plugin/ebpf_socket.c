@@ -86,7 +86,6 @@ static netdata_publish_syscall_t socket_publish_aggregated[NETDATA_MAX_SOCKET_VE
 
 static ebpf_bandwidth_t *bandwidth_vector = NULL;
 
-pthread_mutex_t nv_mutex;
 netdata_vector_plot_t inbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_vector_plot_t outbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_socket_t *socket_values;
@@ -610,8 +609,6 @@ static void ebpf_socket_free(ebpf_module_t *em )
     clean_hostnames(network_viewer_opt.excluded_hostnames);
      */
 
-    pthread_mutex_destroy(&nv_mutex);
-
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     ebpf_update_stats(&plugin_statistics, em);
@@ -727,7 +724,6 @@ static inline void update_nv_plot_data(netdata_plot_values_t *plot, netdata_sock
  */
 static inline void calculate_nv_plot()
 {
-    pthread_mutex_lock(&nv_mutex);
     uint32_t i;
     uint32_t end = inbound_vectors.next;
     for (i = 0; i < end; i++) {
@@ -750,7 +746,6 @@ static inline void calculate_nv_plot()
     update_nv_plot_data(&outbound_vectors.plot[outbound_vectors.last].plot,
                         &outbound_vectors.plot[outbound_vectors.last].sock);
                         */
-    pthread_mutex_unlock(&nv_mutex);
 }
 
 /**
@@ -2143,9 +2138,7 @@ void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
     int fd = em->maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd;
     int maps_per_core = em->maps_per_core;
 
-    pthread_mutex_lock(&nv_mutex);
     ebpf_read_socket_hash_table(fd, AF_INET6, maps_per_core);
-    pthread_mutex_unlock(&nv_mutex);
 }
 
 /**
@@ -2848,7 +2841,6 @@ static void socket_collector(ebpf_module_t *em)
 {
     heartbeat_t hb;
     heartbeat_init(&hb);
-    uint32_t network_connection = network_viewer_opt.enabled;
 
     int cgroups = em->cgroup_charts;
     if (cgroups)
@@ -2881,9 +2873,6 @@ static void socket_collector(ebpf_module_t *em)
         if (cgroups)
             ebpf_update_socket_cgroup(maps_per_core);
 
-        if (network_connection)
-            calculate_nv_plot();
-
         pthread_mutex_lock(&lock);
         if (socket_global_enabled)
             ebpf_socket_send_data(em);
@@ -2901,20 +2890,6 @@ static void socket_collector(ebpf_module_t *em)
 
         fflush(stdout);
 
-        if (network_connection) {
-            // We are calling fflush many times, because when we have a lot of dimensions
-            // we began to have not expected outputs and Netdata closed the plugin.
-            pthread_mutex_lock(&nv_mutex);
-            ebpf_socket_create_nv_charts(&inbound_vectors, update_every);
-            fflush(stdout);
-            ebpf_socket_send_nv_data(&inbound_vectors);
-
-            ebpf_socket_create_nv_charts(&outbound_vectors, update_every);
-            fflush(stdout);
-            ebpf_socket_send_nv_data(&outbound_vectors);
-            pthread_mutex_unlock(&nv_mutex);
-
-        }
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
 
@@ -3923,11 +3898,6 @@ void *ebpf_socket_thread(void *ptr)
     em->maps = socket_maps;
 
     parse_table_size_options(&socket_config);
-
-    if (pthread_mutex_init(&nv_mutex, NULL)) {
-        netdata_log_error("Cannot initialize local mutex");
-        goto endsocket;
-    }
 
     ebpf_socket_allocate_global_vectors(em->apps_charts);
 
