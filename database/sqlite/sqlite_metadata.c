@@ -111,9 +111,6 @@ struct metadata_wc {
     time_t check_hosts_after;
     volatile unsigned queue_size;
     METADATA_FLAG flags;
-//    uint64_t dimension_row_id;
-//    uint64_t chart_row_id;
-//    uint64_t chart_label_row_id;
     struct completion init_complete;
     /* FIFO command queue */
     uv_mutex_t cmd_mutex;
@@ -835,8 +832,7 @@ static void check_dimension_metadata(struct metadata_wc *wc)
         next_execution_t = now + METADATA_DIM_CHECK_INTERVAL;
     }
 
-    internal_error(
-        true,
+    netdata_log_info(
         "METADATA: Dimensions checked %u, deleted %u -- will resume after row %" PRIu64 " in %lld seconds",
         total_checked,
         total_deleted,
@@ -882,9 +878,7 @@ static void check_chart_metadata(struct metadata_wc *wc)
         next_execution_t = now + METADATA_CHART_CHECK_INTERVAL;
     }
 
-    internal_error(
-        true,
-        "METADATA: Charts checked %u, deleted %u -- will resume after row %" PRIu64 " in %lld seconds",
+    netdata_log_info("METADATA: Charts checked %u, deleted %u -- will resume after row %" PRIu64 " in %lld seconds",
         total_checked,
         total_deleted,
         last_row_id,
@@ -930,8 +924,7 @@ static void check_label_metadata(struct metadata_wc *wc)
         next_execution_t = now + METADATA_LABEL_CHECK_INTERVAL;
     }
 
-    internal_error(
-        true,
+    netdata_log_info(
         "METADATA: Charts labels checked %u, deleted %u -- will resume after row %" PRIu64 " in %lld seconds",
         total_checked,
         total_deleted,
@@ -1146,11 +1139,8 @@ static void start_metadata_cleanup(uv_work_t *req)
        char sql[512];
        int do_free_pages = (int) (free_pages * METADATA_FREE_PAGES_VACUUM_PC / 100);
 
-       internal_error(true,
-           "METADATA: Total pages %d, free pages %d -- attempting to release %d pages",
-           total_pages,
-           free_pages,
-           do_free_pages);
+       netdata_log_info(
+           "METADATA: Total pages %d, free pages %d (releasing %d pages)", total_pages, free_pages, do_free_pages);
 
        snprintfz(sql, 511, "PRAGMA incremental_vacuum(%d)", do_free_pages);
        (void) db_execute(db_meta, sql);
@@ -1537,9 +1527,6 @@ static void metadata_event_loop(void *arg)
     wc->check_hosts_after    = now_realtime_sec() + METADATA_HOST_CHECK_FIRST_CHECK;
 
     int shutdown = 0;
-//    wc->dimension_row_id = 0;
-//    wc->chart_row_id = 0;
-//    wc->chart_label_row_id = 0;
     completion_mark_complete(&wc->init_complete);
     BUFFER *work_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
     struct scan_metadata_payload *data;
