@@ -46,15 +46,11 @@ enum set_config_result {
 struct job
 {
     char *name;
-    dyncfg_config_t config;
 
     enum job_state state;
     usec_t last_state_update;
 
     struct module *module;
-
-//    set_config_cb_t set_config_cb;
-    void *set_config_cb_usr_ctx;
 };
 
 struct module
@@ -76,6 +72,11 @@ struct module
     dyncfg_config_t (*get_config_cb)(void *usr_ctx, const char* name);
 
     void *set_config_cb_usr_ctx;
+
+    dyncfg_config_t (*get_job_config_cb)(void *usr_ctx, const char *module_name, const char *job_name);
+    enum set_config_result (*set_job_config_cb)(void *usr_ctx, const char *module_name, const char *job_name, dyncfg_config_t *cfg);
+    enum set_config_result (*delete_job_cb)(void *usr_ctx, const char *module_name, const char *job_name);
+    void *job_config_cb_usr_ctx;
 };
 
 struct configurable_plugin {

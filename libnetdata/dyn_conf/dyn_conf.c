@@ -129,17 +129,24 @@ struct job *get_job_by_name(struct module *module, const char *job_name)
     return dictionary_get(module->jobs, job_name);
 }
 
-int remove_job(struct module *module, const char *job_name)
+int remove_job(struct module *module, struct job *job)
 {
     // as we are going to do unlink here we better make sure we have all to build proper path
-    if (unlikely(job_name == NULL || module == NULL || module->name == NULL || module->plugin == NULL || module->plugin->name == NULL))
+    if (unlikely(job->name == NULL || module == NULL || module->name == NULL || module->plugin == NULL || module->plugin->name == NULL))
         return -1;
 
+    enum set_config_result rc = module->delete_job_cb(module->job_config_cb_usr_ctx, module->name, job->name);
+
+    if (rc != SET_CONFIG_ACCEPTED) {
+        error_report("DYNCFG module \"%s\" rejected delete job for \"%s\"", module->name, job->name);
+        return 1;
+    }
+
     BUFFER *buffer = buffer_create(DYN_CONF_PATH_MAX, NULL);
-    buffer_sprintf(buffer, DYN_CONF_DIR "/%s/%s/%s" DYN_CONF_CFG_EXT, module->plugin->name, module->name, job_name);
+    buffer_sprintf(buffer, DYN_CONF_DIR "/%s/%s/%s" DYN_CONF_CFG_EXT, module->plugin->name, module->name, job->name);
     unlink(buffer_tostring(buffer));
     buffer_free(buffer);
-    return dictionary_del(module->jobs, job_name);
+    return dictionary_del(module->jobs, job->name);
 }
 
 struct module *get_module_by_name(struct configurable_plugin *plugin, const char *module_name)
@@ -267,22 +274,6 @@ static const char *set_module_config(struct module *mod, dyncfg_config_t cfg)
     return NULL;
 }
 
-static void set_job_config(struct job *job, dyncfg_config_t cfg)
-{
-    struct configurable_plugin *plugin = job->module->plugin;
-
-    if (store_config(plugin->name, job->module->name, job->name, cfg)) {
-        error_report("DYNCFG could not store config for module \"%s\"", job->module->name);
-        return;
-    }
-
-    pthread_mutex_lock(&plugin->lock);
-    job->config.data_size = cfg.data_size;
-    job->config.data = mallocz(cfg.data_size);
-    memcpy(job->config.data, cfg.data, cfg.data_size);
-    pthread_mutex_unlock(&plugin->lock);
-}
-
 struct job *job_new()
 {
     struct job *job = callocz(1, sizeof(struct job));
@@ -291,20 +282,37 @@ struct job *job_new()
     return job;
 }
 
+static int set_job_config(struct job *job, dyncfg_config_t cfg)
+{
+    struct module *mod = job->module;
+    enum set_config_result rt = mod->set_job_config_cb(mod->job_config_cb_usr_ctx, mod->name, job->name, &cfg);
+
+    if (rt != SET_CONFIG_ACCEPTED) {
+        error_report("DYNCFG module \"%s\" rejected config for job \"%s\"", mod->name, job->name);
+        return 1;
+    }
+
+    if (store_config(mod->plugin->name, mod->name, job->name, cfg)) {
+        error_report("DYNCFG could not store config for module \"%s\"", mod->name);
+        return 1;
+    }
+
+    return 0;
+}
+
 struct job *add_job(struct module *mod, const char *job_id, dyncfg_config_t cfg)
 {
     struct job *job = job_new();
     job->name = strdupz(job_id);
     job->module = mod;
 
-    set_job_config(job, cfg);
-
-    dictionary_set(mod->jobs, job->name, job, sizeof(job));
-
-    if (store_config(mod->plugin->name, mod->name, job->name, cfg)) {
-        error_report("DYNCFG could not store config for module \"%s\"", mod->name);
+    if (set_job_config(job, cfg)) {
+        freez(job->name);
+        freez(job);
         return NULL;
     }
+
+    dictionary_set(mod->jobs, job->name, job, sizeof(job));
 
     return job;
 
@@ -421,6 +429,20 @@ static dyncfg_config_t get_module_config(struct module *module)
 
     //TODO
     return module->config;
+}
+
+static dyncfg_config_t get_job_config(struct job *job)
+{
+    if (job->module->plugin->plugins_d)
+        return job->module->get_job_config_cb(job->module->job_config_cb_usr_ctx, job->module->name, job->name);
+
+    //TODO
+
+    dyncfg_config_t ret = {
+        .data = NULL,
+        .data_size = 0
+    };
+    return ret;
 }
 
 struct uni_http_response dyn_conf_process_http_request(int method, const char *plugin, const char *module, const char *job_id, void *post_payload, size_t post_payload_size)

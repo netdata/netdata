@@ -1947,11 +1947,19 @@ static dyncfg_config_t get_plugin_config_cb(void *usr_ctx)
     return call_virtual_function_blocking(parser, "get_plugin_config", NULL, NULL);
 }
 
-static dyncfg_config_t get_module_config_cb(void *usr_ctx, const char *modulename)
+static dyncfg_config_t get_module_config_cb(void *usr_ctx, const char *module_name)
 {
     PARSER *parser = usr_ctx;
     char buf[1024];
-    snprintfz(buf, sizeof(buf), "get_module_config %s", modulename);
+    snprintfz(buf, sizeof(buf), "get_module_config %s", module_name);
+    return call_virtual_function_blocking(parser, buf, NULL, NULL);
+}
+
+static dyncfg_config_t get_job_config_cb(void *usr_ctx, const char *module_name, const char* job_name)
+{
+    PARSER *parser = usr_ctx;
+    char buf[1024];
+    snprintfz(buf, sizeof(buf), "get_job_config %s %s", module_name, job_name);
     return call_virtual_function_blocking(parser, buf, NULL, NULL);
 }
 
@@ -1978,6 +1986,35 @@ enum set_config_result set_module_config_cb(void *usr_ctx, const char *module_na
         return SET_CONFIG_REJECTED;
     return SET_CONFIG_ACCEPTED;
 }
+
+enum set_config_result set_job_config_cb(void *usr_ctx, const char *module_name, const char *job_name, dyncfg_config_t *cfg)
+{
+    PARSER *parser = usr_ctx;
+    int rc;
+
+    char buf[1024];
+    snprintfz(buf, sizeof(buf), "set_job_config %s %s", module_name, job_name);
+    call_virtual_function_blocking(parser, buf, &rc, cfg->data);
+
+    if(rc != 1)
+        return SET_CONFIG_REJECTED;
+    return SET_CONFIG_ACCEPTED;
+}
+
+enum set_config_result delete_job_cb(void *usr_ctx, const char *module_name, const char *job_name)
+{
+    PARSER *parser = usr_ctx;
+    int rc;
+
+    char buf[1024];
+    snprintfz(buf, sizeof(buf), "delete_job %s %s", module_name, job_name);
+    call_virtual_function_blocking(parser, buf, &rc, NULL);
+
+    if(rc != 1)
+        return SET_CONFIG_REJECTED;
+    return SET_CONFIG_ACCEPTED;
+}
+
 
 static inline PARSER_RC pluginsd_register_plugin(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser __maybe_unused) {
     netdata_log_info("PLUGINSD: DYNCFG_ENABLE");
@@ -2021,6 +2058,11 @@ static inline PARSER_RC pluginsd_register_module(char **words __maybe_unused, si
     mod->set_config_cb = set_module_config_cb;
     mod->get_config_cb = get_module_config_cb;
     mod->set_config_cb_usr_ctx = parser;
+
+    mod->get_job_config_cb = get_job_config_cb;
+    mod->set_job_config_cb = set_job_config_cb;
+    mod->delete_job_cb = delete_job_cb;
+    mod->job_config_cb_usr_ctx = parser;
 
     register_module(plug_cfg, mod);
     return PARSER_RC_OK;
