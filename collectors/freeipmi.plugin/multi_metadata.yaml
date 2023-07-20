@@ -2,93 +2,25 @@ name: freeipmi.plugin
 modules:
   - meta:
       plugin_name: freeipmi.plugin
-      module_name: sel
-      monitored_instance:
-        name: freeipmi sel
-        link: ''
-        categories: []
-        icon_filename: ''
-      related_resources:
-        integrations:
-          list: []
-      info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
-      most_popular: false
-    overview:
-      data_collection:
-        metrics_description: ''
-        method_description: ''
-      supported_platforms:
-        include: []
-        exclude: []
-      multi-instance: true
-      additional_permissions:
-        description: ''
-      default_behavior:
-        auto_detection:
-          description: ''
-        limits:
-          description: ''
-        performance_impact:
-          description: ''
-    setup:
-      prerequisites:
-        list: []
-      configuration:
-        file:
-          name: ''
-          description: ''
-        options:
-          description: ''
-          folding:
-            title: ''
-            enabled: true
-          list: []
-        examples:
-          folding:
-            enabled: true
-            title: ''
-          list: []
-    troubleshooting:
-      problems:
-        list: []
-    alerts: []
-    metrics:
-      folding:
-        title: Metrics
-        enabled: false
-      description: ""
-      availability: []
-      scopes:
-        - name: global
-          description: ""
-          labels: []
-          metrics:
-            - name: ipmi.sel
-              description: IPMI Events
-              unit: "events"
-              chart_type: area
-              dimensions:
-                - name: events
-  - meta:
-      plugin_name: freeipmi.plugin
       module_name: sensors
       monitored_instance:
-        name: freeipmi sensors
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: FreeIPMI
+        link: 'https://www.gnu.org/software/freeipmi/'
+        categories:
+          - data-collection.hardware-devices-and-sensors
+        icon_filename: 'freeipmi.jpg'
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ''
-      keywords: []
-      most_popular: false
+      keywords:
+       - sensors
+       - freeipmi
+      most_popular: true
     overview:
       data_collection:
-        metrics_description: ''
+        metrics_description: 'Monitor enterprise server sensor readings, event log entries, and hardware statuses to ensure reliable server operations.'
         method_description: ''
       supported_platforms:
         include: []
@@ -146,6 +78,12 @@ modules:
             - name: component
               description: TBD
           metrics:
+            - name: ipmi.sel
+              description: IPMI Events
+              unit: "events"
+              chart_type: area
+              dimensions:
+                - name: events
             - name: ipmi.sensor_state
               description: IPMI Sensors State
               unit: "state"
