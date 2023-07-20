@@ -4,10 +4,9 @@
 #define NETDATA_EBPF_FUNCTIONS_H 1
 
 // Common
-#define EBPF_PLUGIN_FUNCTIONS(NAME, DESC) do { \
-fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " \"" NAME "\" 10 \"%s\"\n", DESC); \
-} while(0)
-
+inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC) {
+    fprintf(stdout, "%s \"%s\" 10 \"%s\"\n", PLUGINSD_KEYWORD_FUNCTION, NAME, DESC);
+}
 
 // configuration file & description
 #define NETDATA_DIRECTORY_FUNCTIONS_CONFIG_FILE "functions.conf"

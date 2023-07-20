@@ -71,7 +71,9 @@ ebpf_module_t ebpf_modules[] = {
                    .apps_routine = ebpf_socket_create_apps_charts,
                    .fnct_routine = ebpf_socket_read_open_connections,
                    .fcnt_name = EBPF_FUNCTION_SOCKET,
-                   .fcnt_desc = EBPF_PLUGIN_SOCKET_FUNCTION_DESCRIPTION},
+                   .fcnt_desc = EBPF_PLUGIN_SOCKET_FUNCTION_DESCRIPTION,
+                   .fcnt_thread_chart_name = NULL,
+                   .fcnt_thread_lifetime_name = NULL},
       .enabled = 0,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
@@ -2676,6 +2678,23 @@ void ebpf_send_statistic_data()
 
     ebpf_send_hash_table_pid_data(NETDATA_EBPF_HASH_TABLES_INSERT_PID_ELEMENTS, NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_ADD);
     ebpf_send_hash_table_pid_data(NETDATA_EBPF_HASH_TABLES_REMOVE_PID_ELEMENTS, NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_DEL);
+
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
+        ebpf_module_t *wem = &ebpf_modules[i];
+        if (!wem->functions.fnct_routine)
+            continue;
+
+        write_begin_chart(NETDATA_MONITORING_FAMILY, (char *)wem->functions.fcnt_thread_chart_name);
+        write_chart_dimension((char *)wem->info.thread_name, (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ? 1 : 0);
+        write_end_chart();
+
+        write_begin_chart(NETDATA_MONITORING_FAMILY, (char *)wem->functions.fcnt_thread_lifetime_name);
+        write_chart_dimension((char *)wem->info.thread_name,
+                              (wem->lifetime && wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ?
+                              (long long) (wem->lifetime - wem->running_time):
+                              0) ;
+        write_end_chart();
+    }
 }
 
 /**
@@ -2950,6 +2969,40 @@ static void ebpf_create_statistic_charts(int update_every)
 #ifdef NETDATA_DEV_MODE
     EBPF_PLUGIN_FUNCTIONS(EBPF_FUNCTION_THREAD, EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
 #endif
+
+    int i,j;
+    char name[256];
+    for (i = 0, j = NETDATA_EBPF_ORDER_FUNCTION_PER_THREAD; i < EBPF_MODULE_FUNCTION_IDX; i++) {
+        ebpf_module_t *em = &ebpf_modules[i];
+        if (!em->functions.fnct_routine)
+            continue;
+
+        em->functions.order_thread_chart = j;
+        snprintfz(name, 255,"%s_%s", NETDATA_EBPF_THREADS, em->info.thread_name);
+        em->functions.fcnt_thread_chart_name = strdupz(name);
+        ebpf_create_thread_chart(name,
+                                 "Threads running.",
+                                 "boolean",
+                                 j++,
+                                 update_every,
+                                 em);
+#ifdef NETDATA_DEV_MODE
+        EBPF_PLUGIN_FUNCTIONS(em->functions.fcnt_name, em->functions.fcnt_desc);
+#endif
+
+        em->functions.order_thread_lifetime = j;
+        snprintfz(name, 255,"%s_%s", NETDATA_EBPF_LIFE_TIME, em->info.thread_name);
+        em->functions.fcnt_thread_lifetime_name = strdupz(name);
+        ebpf_create_thread_chart(name,
+                                 "Time remaining for thread.",
+                                 "seconds",
+                                 j++,
+                                 update_every,
+                                 em);
+#ifdef NETDATA_DEV_MODE
+        EBPF_PLUGIN_FUNCTIONS(em->functions.fcnt_name, em->functions.fcnt_desc);
+#endif
+    }
 
     ebpf_create_statistic_load_chart(update_every);
 
