@@ -451,7 +451,7 @@ Join the Netdata community:
 > **Meet Up** :people_holding_hands::people_holding_hands::people_holding_hands:<br/>
 > The Netdata team and community members have regular online meetups, usually every a couple of weeks.<br/>
 > **You are welcome to join us!**
-> Click [here](https://www.meetup.com/netdata-infrastructure-monitoring-meetup-group/events/) for the schedule.
+> [Click here for the schedule](https://www.meetup.com/netdata-infrastructure-monitoring-meetup-group/events/).
 
 You can also find Netdata on:<br/>
 [Twitter](https://twitter.com/linuxnetdata) | [YouTube](https://www.youtube.com/c/Netdata) | [Reddit](https://www.reddit.com/r/netdata/) | [LinkedIn](https://www.linkedin.com/company/netdata-cloud/) | [StackShare](https://stackshare.io/netdata) | [Product Hunt](https://www.producthunt.com/posts/netdata-monitoring-agent/) | [Repology](https://repology.org/metapackage/netdata/versions) | [Facebook](https://www.facebook.com/linuxnetdata/)
