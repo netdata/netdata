@@ -449,8 +449,8 @@ Join the Netdata community:
 - Open a topic to our [community forums](https://community.netdata.cloud).
 
 > **Meet Up** :people_holding_hands::people_holding_hands::people_holding_hands:<br/>
-> The Netdata team and community members have regular meetups.<br/>
-> **You are invited to join us!**
+> The Netdata team and community members have regular online meetups, usually every a couple of weeks.<br/>
+> **You are welcome to join us!**
 > Click [here](https://www.meetup.com/netdata-infrastructure-monitoring-meetup-group/events/) for the schedule.
 
 You can also find Netdata on:<br/>
