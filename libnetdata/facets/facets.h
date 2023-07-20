@@ -3,8 +3,32 @@
 
 #include "../libnetdata.h"
 
+typedef enum __attribute__((packed)) {
+    FACET_KEY_OPTION_FACET    = (1 << 0), // filterable values
+    FACET_KEY_OPTION_NO_FACET = (1 << 1), // non-filterable value
+    FACET_KEY_OPTION_STICKY   = (1 << 2), // should be sticky in the table
+    FACET_KEY_OPTION_VISIBLE  = (1 << 3), // should be in the default table
+} FACET_KEY_OPTIONS;
+
+typedef struct facet_row_key_value {
+    const char *tmp;
+    BUFFER *wb;
+} FACET_ROW_KEY_VALUE;
+
+typedef struct facet_row {
+    usec_t usec;
+    DICTIONARY *dict;
+    struct facet_row *prev, *next;
+} FACET_ROW;
+
 typedef struct facets FACETS;
 typedef struct facet_key FACET_KEY;
+
+#define FACET_STRING_HASH_SIZE 19
+void facets_string_hash(const char *src, char *out);
+
+typedef void (*facet_dynamic_row_t)(FACETS *facets, BUFFER *wb, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row, void *data);
+FACET_KEY *facets_register_dynamic_key(FACETS *facets, const char *key, FACET_KEY_OPTIONS options, facet_dynamic_row_t cb, void *data);
 
 typedef enum __attribute__((packed)) {
     FACETS_OPTION_ALL_FACETS_VISIBLE    = (1 << 0), // all facets, should be visible by default in the table
@@ -17,13 +41,6 @@ void facets_accepted_param(FACETS *facets, const char *param);
 
 void facets_rows_begin(FACETS *facets);
 void facets_row_finished(FACETS *facets, usec_t usec);
-
-typedef enum __attribute__((packed)) {
-    FACET_KEY_OPTION_FACET    = (1 << 0), // filterable values
-    FACET_KEY_OPTION_NO_FACET = (1 << 1), // non-filterable value
-    FACET_KEY_OPTION_STICKY   = (1 << 2), // should be sticky in the table
-    FACET_KEY_OPTION_VISIBLE  = (1 << 3), // should be in the default table
-} FACET_KEY_OPTIONS;
 
 FACET_KEY *facets_register_key(FACETS *facets, const char *param, FACET_KEY_OPTIONS options);
 void facets_set_items(FACETS *facets, uint32_t items);

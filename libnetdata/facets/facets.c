@@ -33,8 +33,6 @@ time_t calculate_bar_width(time_t before, time_t after) {
 
 // ----------------------------------------------------------------------------
 
-#define FACET_HASH_SIZE 19
-
 static inline void uint32_to_char(uint32_t num, char *out) {
     static char id_encoding_characters[64 + 1] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ.abcdefghijklmnopqrstuvwxyz_0123456789";
 
@@ -46,7 +44,7 @@ static inline void uint32_to_char(uint32_t num, char *out) {
     out[6] = '\0';
 }
 
-static inline void hash_keys_and_values(const char *src, char *out) {
+inline void facets_string_hash(const char *src, char *out) {
     uint32_t hash1 = fnv1a_hash32(src);
     uint32_t hash2 = djb2_hash32(src);
     uint32_t hash3 = larson_hash32(src);
@@ -82,18 +80,10 @@ struct facet_key {
     uint32_t key_found_in_row;
     uint32_t key_values_selected_in_row;
     BUFFER *current_value;
+
+    facet_dynamic_row_t cb;
+    void *cb_data;
 };
-
-typedef struct facet_row_key_value {
-    const char *tmp;
-    BUFFER *wb;
-} FACET_ROW_KEY_VALUE;
-
-typedef struct facet_row {
-    usec_t usec;
-    DICTIONARY *dict;
-    struct facet_row *prev, *next;
-} FACET_ROW;
 
 struct facets {
     SIMPLE_PATTERN *visible_keys;
@@ -311,9 +301,16 @@ inline FACET_KEY *facets_register_key(FACETS *facets, const char *key, FACET_KEY
             .options = options,
             .default_selected_for_values = true,
     };
-    char hash[FACET_HASH_SIZE];
-    hash_keys_and_values(tk.name, hash);
+    char hash[FACET_STRING_HASH_SIZE];
+    facets_string_hash(tk.name, hash);
     return dictionary_set(facets->keys, hash, &tk, sizeof(tk));
+}
+
+inline FACET_KEY *facets_register_dynamic_key(FACETS *facets, const char *key, FACET_KEY_OPTIONS options, facet_dynamic_row_t cb, void *data) {
+    FACET_KEY *k = facets_register_key(facets, key, options);
+    k->cb = cb;
+    k->cb_data = data;
+    return k;
 }
 
 void facets_set_items(FACETS *facets, uint32_t items) {
@@ -351,8 +348,8 @@ static inline void facets_check_value(FACETS *facets __maybe_unused, FACET_KEY *
         FACET_VALUE tk = {
             .name = buffer_tostring(k->current_value),
         };
-        char hash[FACET_HASH_SIZE];
-        hash_keys_and_values(tk.name, hash);
+        char hash[FACET_STRING_HASH_SIZE];
+        facets_string_hash(tk.name, hash);
         dictionary_set(k->values, hash, &tk, sizeof(tk));
     }
     else {
@@ -570,8 +567,8 @@ void facets_row_finished(FACETS *facets, usec_t usec) {
 
             if(counted_by == total_keys) {
                 if(k->values) {
-                    char hash[FACET_HASH_SIZE];
-                    hash_keys_and_values(buffer_tostring(k->current_value), hash);
+                    char hash[FACET_STRING_HASH_SIZE];
+                    facets_string_hash(buffer_tostring(k->current_value), hash);
                     FACET_VALUE *v = dictionary_get(k->values, hash);
                     v->final_facet_value_counter++;
                 }
@@ -710,7 +707,15 @@ void facets_report(FACETS *facets, BUFFER *wb) {
             dfe_start_read(facets->keys, k)
             {
                 FACET_ROW_KEY_VALUE *rkv = dictionary_get(row->dict, k->name);
-                buffer_json_add_array_item_string(wb, rkv ? buffer_tostring(rkv->wb) : FACET_VALUE_UNSET);
+
+                if(unlikely(k->cb)) {
+                    if(unlikely(!rkv))
+                        rkv = dictionary_set(row->dict, k->name, NULL, sizeof(*rkv));
+
+                    k->cb(facets, wb, rkv, row, k->cb_data);
+                }
+                else
+                	buffer_json_add_array_item_string(wb, rkv ? buffer_tostring(rkv->wb) : FACET_VALUE_UNSET);
             }
             dfe_done(k);
             buffer_json_array_close(wb); // each row

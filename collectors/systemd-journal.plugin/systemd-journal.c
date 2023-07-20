@@ -162,6 +162,19 @@ static void systemd_journal_function_help(const char *transaction) {
     pluginsd_function_result_end_to_stdout();
 }
 
+static void systemd_journal_dynamic_row_id(FACETS *facets __maybe_unused, BUFFER *wb, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row, void *data __maybe_unused) {
+    FACET_ROW_KEY_VALUE *syslog_identifier_rkv = dictionary_get(row->dict, "SYSLOG_IDENTIFIER");
+    FACET_ROW_KEY_VALUE *pid_rkv = dictionary_get(row->dict, "_PID");
+
+    const char *identifier = syslog_identifier_rkv ? buffer_tostring(syslog_identifier_rkv->wb) : "UNKNOWN";
+    const char *pid = pid_rkv ? buffer_tostring(pid_rkv->wb) : "UNKNOWN";
+
+    buffer_flush(rkv->wb);
+    buffer_sprintf(rkv->wb, "%s[%s]", identifier, pid);
+
+    buffer_json_add_array_item_string(wb, buffer_tostring(rkv->wb));
+}
+
 static void function_systemd_journal(const char *transaction, char *function __maybe_unused, char *line_buffer __maybe_unused, int line_max __maybe_unused, int timeout __maybe_unused) {
     char *words[SYSTEMD_JOURNAL_MAX_PARAMS] = { NULL };
     size_t num_words = quoted_strings_splitter_pluginsd(function, words, SYSTEMD_JOURNAL_MAX_PARAMS);
@@ -182,11 +195,8 @@ static void function_systemd_journal(const char *transaction, char *function __m
 
     // register the fields in the order you want them on the dashboard
 
-    facets_register_key(facets, "SYSLOG_IDENTIFIER",
-                        FACET_KEY_OPTION_FACET|FACET_KEY_OPTION_VISIBLE);
-
-    facets_register_key(facets, "_PID",
-                        FACET_KEY_OPTION_FACET|FACET_KEY_OPTION_VISIBLE);
+    facets_register_dynamic_key(facets, "ND_JOURNAL_PROCESS", FACET_KEY_OPTION_VISIBLE,
+                                systemd_journal_dynamic_row_id, NULL);
 
     facets_register_key(facets, "MESSAGE",
                         FACET_KEY_OPTION_NO_FACET|FACET_KEY_OPTION_VISIBLE);
@@ -356,8 +366,9 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
 
-
+    // ------------------------------------------------------------------------
     // debug
+
     if(argc == 2 && strcmp(argv[1], "debug") == 0) {
         function_systemd_journal("123", "", "", 0, 30);
         exit(1);
