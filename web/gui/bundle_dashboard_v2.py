@@ -29,7 +29,8 @@ MAKEFILETEMPLATE = '''
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 dist_noinst_DATA = \\
-    $(srcdir)/README.md
+    $(srcdir)/README.md \\
+    $(srcdir)/LICENSE.md
 
 webv2dir=$(webdir)/v2
 
