@@ -23,7 +23,7 @@ overview:
   supported_platforms:
     include: []
     exclude: []
-  multi-instance: true
+  multi_instance: true
   additional_permissions:
     description: ""
   default_behavior:
@@ -92,6 +92,6 @@ metrics:
             - ""
           description: ""
           unit: ""
-          chart_type: ""
+          chart_type: line
           dimensions:
             - name: ""
