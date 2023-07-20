@@ -449,7 +449,7 @@ Join the Netdata community:
 - Open a topic to our [community forums](https://community.netdata.cloud).
 
 > **Meet Up** :people_holding_hands::people_holding_hands::people_holding_hands:<br/>
-> The Netdata team and community members have regular online meetups, usually every a couple of weeks.<br/>
+> The Netdata team and community members have regular online meetups, usually every 2 weeks.<br/>
 > **You are welcome to join us!**
 > [Click here for the schedule](https://www.meetup.com/netdata-infrastructure-monitoring-meetup-group/events/).
 
