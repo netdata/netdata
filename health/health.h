@@ -70,6 +70,7 @@ ALARM_ENTRY* health_create_alarm_entry(
     STRING *name,
     STRING *chart,
     STRING *chart_context,
+    STRING *chart_id,
     STRING *family,
     STRING *classification,
     STRING *component,

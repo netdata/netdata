@@ -83,8 +83,8 @@ failed:
    Inserts an entry in the table
 */
 #define SQL_INSERT_HEALTH_LOG "INSERT INTO health_log (host_id, alarm_id, " \
-    "config_hash_id, name, chart, family, exec, recipient, units, chart_context, last_transition_id) " \
-    "VALUES (?,?,?,?,?,?,?,?,?,?,?) " \
+    "config_hash_id, name, chart, family, exec, recipient, units, chart_context, last_transition_id, chart_name) " \
+    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?) " \
     "ON CONFLICT (host_id, alarm_id) DO UPDATE SET last_transition_id = excluded.last_transition_id RETURNING health_log_id; "
 
 #define SQL_INSERT_HEALTH_LOG_DETAIL "INSERT INTO health_log_detail (health_log_id, unique_id, alarm_id, alarm_event_id, " \
@@ -171,6 +171,12 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
     rc = sqlite3_bind_blob(res, 11, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind transition_id parameter for SQL_INSERT_HEALTH_LOG");
+        goto failed;
+    }
+
+    rc = sqlite3_bind_string_or_null(res, ae->chart_name, 12);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind chart_name parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
@@ -766,7 +772,7 @@ void sql_check_removed_alerts_state(RRDHOST *host)
             "hld.updates_id, hld.when_key, hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, " \
             "hld.delay_up_to_timestamp, hl.name, hl.chart, hl.family, hl.exec, hl.recipient, ah.source, hl.units, " \
             "hld.info, hld.exec_code, hld.new_status, hld.old_status, hld.delay, hld.new_value, hld.old_value, " \
-            "hld.last_repeat, ah.class, ah.component, ah.type, hl.chart_context, hld.transition_id, hld.global_id " \
+            "hld.last_repeat, ah.class, ah.component, ah.type, hl.chart_context, hld.transition_id, hld.global_id, hl.chart_name " \
             "FROM health_log hl, alert_hash ah, health_log_detail hld " \
             "WHERE hl.config_hash_id = ah.hash_id and hl.host_id = @host_id and hl.last_transition_id = hld.transition_id;"
 void sql_health_alarm_log_load(RRDHOST *host) {
@@ -944,6 +950,11 @@ void sql_health_alarm_log_load(RRDHOST *host) {
 
         if (sqlite3_column_type(res, 32) != SQLITE_NULL)
             ae->global_id = sqlite3_column_int64(res, 32);
+
+        if (sqlite3_column_type(res, 33) != SQLITE_NULL)
+            ae->chart_name = string_strdupz((char *) sqlite3_column_text(res, 33));
+        else
+            ae->chart_name = NULL;
 
         char value_string[100 + 1];
         string_freez(ae->old_value_string);
@@ -1767,7 +1778,7 @@ fail:
 #define SQL_POPULATE_TEMP_ALERT_TRANSITION_TABLE "INSERT INTO v_%p (host_id) VALUES (@host_id)"
 
 #define SQL_SEARCH_ALERT_TRANSITION_SELECT "SELECT " \
-    "h.host_id, h.alarm_id, h.config_hash_id, h.name, h.chart, h.family, h.recipient, h.units, h.exec, " \
+    "h.host_id, h.alarm_id, h.config_hash_id, h.name, h.chart, h.chart_name, h.family, h.recipient, h.units, h.exec, " \
     "h.chart_context,  d.when_key, d.duration, d.non_clear_duration, d.flags, d.delay_up_to_timestamp, " \
     "d.info, d.exec_code, d.new_status, d.old_status, d.delay, d.new_value, d.old_value, d.last_repeat, " \
     "d.transition_id, d.global_id, ah.class, ah.type, ah.component, d.exec_run_timestamp"
@@ -1913,31 +1924,31 @@ run_query:;
         atd.config_hash_id = (uuid_t *)sqlite3_column_blob(res, 2);
         atd.alert_name = (const char *) sqlite3_column_text(res, 3);
         atd.chart = (const char *) sqlite3_column_text(res, 4);
-        atd.chart_name = (const char *) sqlite3_column_text(res, 4); // FIXME don't copy the id, find the name
-        atd.family = (const char *) sqlite3_column_text(res, 5);
-        atd.recipient = (const char *) sqlite3_column_text(res, 6);
-        atd.units = (const char *) sqlite3_column_text(res, 7);
-        atd.exec = (const char *) sqlite3_column_text(res, 8);
-        atd.chart_context = (const char *) sqlite3_column_text(res, 9);
-        atd.when_key = sqlite3_column_int64(res, 10);
-        atd.duration = sqlite3_column_int64(res, 11);
-        atd.non_clear_duration = sqlite3_column_int64(res, 12);
-        atd.flags = sqlite3_column_int64(res, 13);
-        atd.delay_up_to_timestamp = sqlite3_column_int64(res, 14);
-        atd.info = (const char *) sqlite3_column_text(res, 15);
-        atd.exec_code = sqlite3_column_int(res, 16);
-        atd.new_status = sqlite3_column_int(res, 17);
-        atd.old_status = sqlite3_column_int(res, 18);
-        atd.delay = (int) sqlite3_column_int(res, 19);
-        atd.new_value = (NETDATA_DOUBLE) sqlite3_column_double(res, 20);
-        atd.old_value = (NETDATA_DOUBLE) sqlite3_column_double(res, 21);
-        atd.last_repeat = sqlite3_column_int64(res, 22);
-        atd.transition_id = (uuid_t *) sqlite3_column_blob(res, 23);
-        atd.global_id = sqlite3_column_int64(res, 24);
-        atd.classification = (const char *) sqlite3_column_text(res, 25);
-        atd.type = (const char *) sqlite3_column_text(res, 26);
-        atd.component = (const char *) sqlite3_column_text(res, 27);
-        atd.exec_run_timestamp = sqlite3_column_int64(res, 28);
+        atd.chart_name = (const char *) sqlite3_column_text(res, 5);
+        atd.family = (const char *) sqlite3_column_text(res, 6);
+        atd.recipient = (const char *) sqlite3_column_text(res, 7);
+        atd.units = (const char *) sqlite3_column_text(res, 8);
+        atd.exec = (const char *) sqlite3_column_text(res, 9);
+        atd.chart_context = (const char *) sqlite3_column_text(res, 10);
+        atd.when_key = sqlite3_column_int64(res, 11);
+        atd.duration = sqlite3_column_int64(res, 12);
+        atd.non_clear_duration = sqlite3_column_int64(res, 13);
+        atd.flags = sqlite3_column_int64(res, 14);
+        atd.delay_up_to_timestamp = sqlite3_column_int64(res, 15);
+        atd.info = (const char *) sqlite3_column_text(res, 16);
+        atd.exec_code = sqlite3_column_int(res, 17);
+        atd.new_status = sqlite3_column_int(res, 18);
+        atd.old_status = sqlite3_column_int(res, 19);
+        atd.delay = (int) sqlite3_column_int(res, 20);
+        atd.new_value = (NETDATA_DOUBLE) sqlite3_column_double(res, 21);
+        atd.old_value = (NETDATA_DOUBLE) sqlite3_column_double(res, 22);
+        atd.last_repeat = sqlite3_column_int64(res, 23);
+        atd.transition_id = (uuid_t *) sqlite3_column_blob(res, 24);
+        atd.global_id = sqlite3_column_int64(res, 25);
+        atd.classification = (const char *) sqlite3_column_text(res, 26);
+        atd.type = (const char *) sqlite3_column_text(res, 27);
+        atd.component = (const char *) sqlite3_column_text(res, 28);
+        atd.exec_run_timestamp = sqlite3_column_int64(res, 29);
 
         cb(&atd, data);
     }
@@ -2087,3 +2098,68 @@ fail_only_drop:
     return added;
 }
 
+#define SQL_FETCH_CHART_NAME "SELECT chart_name FROM health_log where host_id = @host_id LIMIT 1;"
+bool is_chart_name_populated(uuid_t  *host_uuid)
+{
+    sqlite3_stmt *res = NULL;
+    int rc;
+
+    bool status = true;
+
+    rc = sqlite3_prepare_v2(db_meta, SQL_FETCH_CHART_NAME, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to check health_log chart_name");
+        return true;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id for health_log chart_name check");
+        goto fail;
+    }
+
+    rc = sqlite3_step_monitored(res);
+    if (likely(rc == SQLITE_ROW))
+        status = sqlite3_column_type(res, 0) != SQLITE_NULL;
+fail:
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement for health_log chart_name check");
+
+    return status;
+}
+
+#define SQL_POPULATE_CHART_NAME " UPDATE health_log SET chart_name = upd.chart_name FROM " \
+    "(SELECT c.type || '.' || IFNULL(c.name, c.id) AS chart_name, hl.host_id, hl.health_log_id FROM " \
+    "chart c, health_log hl WHERE (c.type || '.' || c.id) = hl.chart AND c.host_id = hl.host_id " \
+    "AND hl.host_id = @host_id) AS upd WHERE health_log.host_id = upd.host_id " \
+    "AND health_log.health_log_id = upd.health_log_id"
+
+void chart_name_populate(uuid_t *host_uuid)
+{
+    sqlite3_stmt *res = NULL;
+    int rc;
+
+    rc = sqlite3_prepare_v2(db_meta, SQL_POPULATE_CHART_NAME, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to update health_log chart_name");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id for health_log chart_name update");
+        goto fail;
+    }
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to update chart name in health_log, rc = %d", rc);
+
+fail:
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement for health_log chart_name update");
+}

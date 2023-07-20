@@ -73,6 +73,7 @@ struct alarm_log_entry {
     char *rendered_info;
 
     char *chart_context;
+    char *chart_name;
 
     uint64_t event_id;
     char *transition_id;  

@@ -3,7 +3,7 @@
 #include "sqlite_functions.h"
 #include "sqlite_db_migration.h"
 
-#define DB_METADATA_VERSION 10
+#define DB_METADATA_VERSION 11
 
 const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS host(host_id BLOB PRIMARY KEY, hostname TEXT NOT NULL, "
@@ -47,7 +47,7 @@ const char *database_config[] = {
 
     "CREATE TABLE IF NOT EXISTS health_log (health_log_id INTEGER PRIMARY KEY, host_id blob, alarm_id int, "
     "config_hash_id blob, name text, chart text, family text, recipient text, units text, exec text, "
-    "chart_context text, last_transition_id blob, UNIQUE (host_id, alarm_id)) ;",
+    "chart_context text, last_transition_id blob, chart_name text, UNIQUE (host_id, alarm_id)) ;",
 
     "CREATE INDEX IF NOT EXISTS health_log_ind_1 ON health_log (host_id);",
 
