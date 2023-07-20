@@ -25,7 +25,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -192,7 +192,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -269,7 +269,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -345,7 +345,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -540,7 +540,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -626,7 +626,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -731,7 +731,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -883,7 +883,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -968,7 +968,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -1074,7 +1074,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -1238,7 +1238,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -1330,7 +1330,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -1419,7 +1419,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -1499,7 +1499,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -1588,7 +1588,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -1684,7 +1684,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -1800,7 +1800,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -2079,7 +2079,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -2217,7 +2217,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -2451,7 +2451,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -2562,7 +2562,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -2709,7 +2709,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -3304,7 +3304,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -3438,7 +3438,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -3535,7 +3535,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -3623,7 +3623,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -3724,7 +3724,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -3858,7 +3858,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -3963,7 +3963,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -4082,7 +4082,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -4172,7 +4172,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -4264,7 +4264,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -4528,7 +4528,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -4718,7 +4718,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
