@@ -8,17 +8,17 @@ modules:
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords: ["file", "eBPF"]
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
+        metrics_description: "Monitor calls for functions responsible to open or close a file descriptor and possible errors."
         method_description: ""
       supported_platforms:
         include: []
