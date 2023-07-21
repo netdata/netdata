@@ -1168,10 +1168,11 @@ return_error:
  */
 void db_search(logs_query_params_t *const p_query_params, struct File_info *const p_file_infos[]) {
 
-    BUFFER *res_buff = p_query_params->results_buff;
+    BUFFER *const res_buff = p_query_params->results_buff;
     int rc = 0;
     sqlite3_stmt *stmt_retrieve_log_msg_metadata;
     Circ_buff_item_t tmp_itm = {0};
+    size_t text_compressed_size_max = 0;
     logs_query_res_hdr_t res_hdr = {0}; // results header
     uv_fs_t read_req;
 
@@ -1181,10 +1182,8 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
     if(!p_file_infos[1]){ /* Single DB to be searched */
         stmt_retrieve_log_msg_metadata = p_file_infos[0]->stmt_retrieve_log_msg_metadata;
         if(unlikely(
-            SQLITE_OK != (rc = sqlite3_bind_int64(stmt_retrieve_log_msg_metadata, 1, 
-                                                    (sqlite3_int64)p_query_params->start_timestamp)) ||
-            SQLITE_OK != (rc = sqlite3_bind_int64(stmt_retrieve_log_msg_metadata, 2, 
-                                                    (sqlite3_int64)p_query_params->end_timestamp)) ||
+            SQLITE_OK != (rc = sqlite3_bind_int64(stmt_retrieve_log_msg_metadata, 1, p_query_params->start_timestamp)) ||
+            SQLITE_OK != (rc = sqlite3_bind_int64(stmt_retrieve_log_msg_metadata, 2, p_query_params->end_timestamp)) ||
             (SQLITE_ROW != (rc = sqlite3_step(stmt_retrieve_log_msg_metadata)) && (SQLITE_DONE != rc))
         )){
             throw_error(p_file_infos[0]->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
@@ -1237,7 +1236,7 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
                             sizeof(TMP_VIEW_QUERY_POSTFIX) + 50] = TMP_VIEW_QUERY_PREFIX; // +50 bytes - play it safe
         int n = sizeof(TMP_VIEW_QUERY_PREFIX) - 1;
         for(pfi_off = 1; p_file_infos[pfi_off]; pfi_off++){ // Skip p_file_infos[0]
-            n += snprintf(&tmp_view_query[n], sizeof(tmp_view_query), "%s%d%s%d%s", 
+            n += snprintf(  &tmp_view_query[n], sizeof(tmp_view_query), "%s%d%s%d%s", 
                             TMP_VIEW_QUERY_BODY_1, pfi_off, 
                             TMP_VIEW_QUERY_BODY_2, pfi_off, TMP_VIEW_QUERY_BODY_3);
         }
@@ -1276,13 +1275,15 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
         int db_off = p_file_infos[1] ? sqlite3_column_int(stmt_retrieve_log_msg_metadata, 6) : 0;
 
         /* Retrieve compressed log messages from BLOB file */
-        tmp_itm.text_compressed = mallocz(tmp_itm.text_compressed_size);
+        if(tmp_itm.text_compressed_size > text_compressed_size_max){
+            text_compressed_size_max = tmp_itm.text_compressed_size;
+            tmp_itm.text_compressed = reallocz(tmp_itm.text_compressed, text_compressed_size_max);
+        }
         uv_buf_t uv_buf = uv_buf_init(tmp_itm.text_compressed, tmp_itm.text_compressed_size);
         rc = uv_fs_read(NULL, &read_req, p_file_infos[db_off]->blob_handles[blob_handles_offset], &uv_buf, 1, blob_offset, NULL);
         uv_fs_req_cleanup(&read_req);
         if (unlikely(rc < 0)){
             throw_error(NULL, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
-            freez(tmp_itm.text_compressed);
             break;
         }
         
@@ -1313,7 +1314,6 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
             else if(unlikely(res_hdr.matches == 0)) m_assert(res_hdr.text_size == 0, "res_hdr.text_size must be == 0");
             else{ /* res_hdr.matches < 0 - error during keyword search */
                 throw_error(p_file_infos[db_off]->chart_name, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
-                freez(tmp_itm.text_compressed);
                 break; 
             } 
         }
@@ -1322,16 +1322,14 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
             memcpy(&res_buff->buffer[res_buff->len], &res_hdr, sizeof(res_hdr));
             res_buff->len += sizeof(res_hdr) + res_hdr.text_size; 
             p_query_params->num_lines += res_hdr.matches;
-        }
-        
-        freez(tmp_itm.text_compressed);
-        tmp_itm = (Circ_buff_item_t){0};
-        res_hdr = (logs_query_res_hdr_t){0};
+        }        
         
         if(res_buff->len >= p_query_params->quota){
             p_query_params->end_timestamp = tmp_itm.timestamp;
             break;
         }
+
+        res_hdr = (logs_query_res_hdr_t){0};
 
         rc = sqlite3_step(stmt_retrieve_log_msg_metadata);
         if (unlikely(rc != SQLITE_ROW && rc != SQLITE_DONE)){
@@ -1340,6 +1338,8 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
             break;
         }
     }
+
+    if(tmp_itm.text_compressed) freez(tmp_itm.text_compressed);
 
     if(p_file_infos[1]) rc = sqlite3_close(dbt);
     else rc = sqlite3_reset(stmt_retrieve_log_msg_metadata);
