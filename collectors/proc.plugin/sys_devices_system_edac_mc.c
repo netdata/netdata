@@ -93,7 +93,10 @@ static void find_all_mc() {
         }
 
         while((de = readdir(dir))) {
-            if(de->d_type == DT_DIR && strncmp(de->d_name, "rank", 4) == 0 && isdigit(de->d_name[4])) {
+            if(de->d_type == DT_DIR &&
+            ((strncmp(de->d_name, "rank", 4) == 0 && isdigit(de->d_name[4])) ||
+            (strncmp(de->d_name, "dimm", 4) == 0 && isdigit(de->d_name[4])))) {
+
                 struct edac_dimm *d = callocz(1, sizeof(struct edac_dimm));
                 d->name = strdupz(de->d_name);
 
