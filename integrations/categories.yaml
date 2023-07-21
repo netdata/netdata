@@ -1,329 +1,329 @@
 - name: deploy
   description: ""
-  most-popular: false
+  most_popular: false
   children:
     - id: deploy.operating-systems
       name: Operating Systems
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: deploy.docker-kubernetes
       name: Docker & Kubernetes
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: deploy.provisioning-systems
       parent: deploy
       name: Provisioning Systems
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
 - name: data-collection
   description: ""
-  most-popular: false
+  most_popular: false
   children:
     - id: data-collection.other
       name: Other
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.containers-and-vms
       name: Containers and VMs
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.database-servers
       name: Database Servers
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.kubernetes
       name: Kubernetes
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.service-discovery-registry
       name: Service Discovery / Registry
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.web-servers-and-web-proxies
       name: Web Servers and Web Proxies
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.cloud-provider-managed
       name: Cloud Provider Managed
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.windows-systems
       name: Windows Systems
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.apm
       name: APM
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.hardware-devices-and-sensors
       name: Hardware Devices and Sensors
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.macos-systems
       name: macOS Systems
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.message-brokers
       name: Message Brokers
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.provisioning-systems
       name: Provisioning Systems
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.search-engines
       name: Search Engines
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.linux-systems
       name: Linux Systems
       description: ""
-      most-popular: false
+      most_popular: false
       children:
         - id: data-collection.linux-systems.system-metrics
           name: System Metrics
           description: ""
-          most-popular: false
+          most_popular: false
           children: []
         - id: data-collection.linux-systems.memory-metrics
           name: Memory Metrics
           description: ""
-          most-popular: false
+          most_popular: false
           children: []
         - id: data-collection.linux-systems.cpu-metrics
           name: CPU Metrics
           description: ""
-          most-popular: false
+          most_popular: false
           children: []
         - id: data-collection.linux-systems.pressure-metrics
           name: Pressure Metrics
           description: ""
-          most-popular: false
+          most_popular: false
           children: []
         - id: data-collection.linux-systems.network-metrics
           name: Network Metrics
           description: ""
-          most-popular: false
+          most_popular: false
           children: []
         - id: data-collection.linux-systems.ipc-metrics
           name: IPC Metrics
           description: ""
-          most-popular: false
+          most_popular: false
           children: []
         - id: data-collection.linux-systems.disk-metrics
           name: Disk Metrics
           description: ""
-          most-popular: false
+          most_popular: false
           children: []
         - id: data-collection.linux-systems.firewall-metrics
           name: Firewall Metrics
           description: ""
-          most-popular: false
+          most_popular: false
           children: []
         - id: data-collection.linux-systems.power-supply-metrics
           name: Power Supply Metrics
           description: ""
-          most-popular: false
+          most_popular: false
           children: []
         - id: data-collection.linux-systems.filesystem-metrics
           name: Filesystem Metrics
           description: ""
-          most-popular: false
+          most_popular: false
           children:
             - id: data-collection.linux-systems.filesystem-metrics.zfs
               name: ZFS
               description: ""
-              most-popular: false
+              most_popular: false
               children: []
             - id: data-collection.linux-systems.filesystem-metrics.btrfs
               name: BTRFS
               description: ""
-              most-popular: false
+              most_popular: false
               children: []
             - id: data-collection.linux-systems.filesystem-metrics.nfs
               name: NFS
               description: ""
-              most-popular: false
+              most_popular: false
               children: []
     - id: data-collection.notifications
       name: Notifications
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.networking-stack-and-network-interfaces
       name: Networking Stack and Network Interfaces
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.synthetic-checks
       name: Synthetic Checks
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.ci-cd-systems
       name: CI/CD Systems
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.ups
       name: UPS
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.freebsd-systems
       name: FreeBSD Systems
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.logs-servers
       name: Logs Servers
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.security-systems
       name: Security Systems
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.observability
       name: Observability
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.gaming
       name: Gaming
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.iot-devices
       name: IoT Devices
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.media-streaming-servers
       name: Media Streaming Servers
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.authentication-and-authorization
       name: Authentication and Authorization
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.project-management
       name: Project Management
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.application-servers
       name: Application Servers
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.export
       name: Export
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.dns-and-dhcp-servers
       name: DNS and DHCP Servers
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.mail-servers
       name: Mail Servers
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.processes-and-system-services
       name: Processes and System Services
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.storage-mount-points-and-filesystems
       name: Storage, Mount Points and Filesystems
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.systemd
       name: Systemd
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.telephony-servers
       name: Telephony Servers
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.vpns
       name: VPNs
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.blockchain-servers
       name: Blockchain Servers
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.distributed-computing-systems
       name: Distributed Computing Systems
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.generic-data-collection
       name: Generic Data Collection
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.p2p
       name: P2P
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.snmp-and-networked-devices
       name: SNMP and Networked Devices
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.system-clock-and-ntp
       name: System Clock and NTP
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.nas
       name: NAS
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.api-gateways
       name: API Gateways
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.task-queues
       name: Task Queues
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
     - id: data-collection.ftp-servers
       name: FTP Servers
       description: ""
-      most-popular: false
+      most_popular: false
       children: []
