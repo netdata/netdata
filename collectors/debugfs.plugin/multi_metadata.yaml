@@ -4,30 +4,42 @@ modules:
       plugin_name: debugfs.plugin
       module_name: /sys/kernel/debug/extfrag
       monitored_instance:
-        name: debugfs /sys/kernel/debug/extfrag
+        name: System Memory Fragmentation
         link: ''
-        categories: []
-        icon_filename: ''
+        categories:
+          - data-collection.linux-systems.memory-metrics
+        icon_filename: 'microchip.png'
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ''
-      keywords: []
+      keywords:
+        - extfrag
+        - extfrag_threshold
+        - memory fragmentation
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
+        metrics_description: 'Collects memory fragmentation statistics from the Linux kernel'
         method_description: ''
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
-      multi_instance: true
+      multi_instance: false
       additional_permissions:
-        description: ''
+        description: >
+          This integration requires read access to files under `/sys/kernel/debug/extfrag`, which are accessible
+          only to the root user by default. Netdata uses Linux Capabilities to give the plugin access to
+          debugfs. `CAP_DAC_READ_SEARCH` is added automatically during installation. This capability allows bypassing
+          file read permission checks and directory read and execute permission checks. If file capabilities are not
+          usable, then the plugin is instead installed with the SUID bit set in permissions so that it runs as root.
       default_behavior:
         auto_detection:
-          description: ''
+          description: >
+            Assuming that debugfs is mounted and the required permissions are available, this integration will
+            automatically run by default.
         limits:
           description: ''
         performance_impact:
@@ -58,14 +70,14 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ""
+      description: "Monitor the overall memory fragmentation of the system."
       availability: []
       scopes:
         - name: node
-          description: ""
+          description: "Memory fragmentation statistics for each NUMA node in the system."
           labels:
             - name: numa_node
-              description: TBD
+              description: The NUMA node the metrics are associated with.
           metrics:
             - name: mem.fragmentation_index_dma
               description: Memory fragmentation index for each order
@@ -119,30 +131,44 @@ modules:
       plugin_name: debugfs.plugin
       module_name: /sys/kernel/debug/zswap
       monitored_instance:
-        name: debugfs /sys/kernel/debug/zswap
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: Linux ZSwap
+        link: 'https://www.kernel.org/doc/html/latest/admin-guide/mm/zswap.html'
+        categories:
+          - data-collection.linux-systems.memory-metrics
+        icon_filename: 'microchip.png'
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ''
-      keywords: []
+      keywords:
+        - swap
+        - zswap
+        - frontswap
+        - swap cache
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
+        metrics_description: >
+          Collects zswap performance metrics on Linux systems.
         method_description: ''
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
-      multi_instance: true
+      multi_instance: false
       additional_permissions:
-        description: ''
+        description: >
+          This integration requires read access to files under `/sys/kernel/debug/zswap`, which are accessible
+          only to the root user by default. Netdata uses Linux Capabilities to give the plugin access to
+          debugfs. `CAP_DAC_READ_SEARCH` is added automatically during installation. This capability allows bypassing
+          file read permission checks and directory read and execute permission checks. If file capabilities are not
+          usable, then the plugin is instead installed with the SUID bit set in permissions so that it runs as root.
       default_behavior:
         auto_detection:
-          description: ''
+          description: >
+            Assuming that debugfs is mounted and the required permissions are available, this integration will
+            automatically detect whether or not the system is using zswap.
         limits:
           description: ''
         performance_impact:
@@ -153,7 +179,7 @@ modules:
       configuration:
         file:
           name: ''
-          description: ''
+          section_name: ''
         options:
           description: ''
           folding:
@@ -173,11 +199,11 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ""
+      description: "Monitor the performance statistics of zswap."
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "Global zswap performance metrics."
           labels: []
           metrics:
             - name: system.zswap_pool_compression_ratio
