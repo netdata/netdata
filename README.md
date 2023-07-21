@@ -118,6 +118,8 @@ It scales nicely from just a single server to thousands of servers, even in comp
 |Database Tiering|Netdata gets unlimited retention!|Aug<br/>2022|[v1.36](https://github.com/netdata/netdata/releases/tag/v1.36.0#v1360-tiering)|
 |Kubernetes|Monitor your kubernetes workloads.|Aug<br/>2022|[v1.36](https://github.com/netdata/netdata/releases/tag/v1.36.0#v1360-kubernetes)|
 |Machine Learning|Anomaly Rate information on every chart.|Aug<br/>2022|[v1.36](https://github.com/netdata/netdata/releases/tag/v1.36.0#v1360-anomaly-rate-on-charts)|
+|Machine Learning|Anomaly Advisor! Bottom up unsupervised anomaly detection.|Jun<br/>2022|[v1.35](https://github.com/netdata/netdata/releases/tag/v1.35.0#v1350-anomaly-advisor-ml)|
+|Machine Learning|Metrics Correlation on the Agent.|Jun<br/>2022|[v1.35](https://github.com/netdata/netdata/releases/tag/v1.35.0#v1350-metric-correlation-agent)|
 
 </details>
 
