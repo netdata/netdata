@@ -12,7 +12,12 @@ meta:
       list: []
   info_provided_to_referring_integrations:
     description: ''
-  keywords: []
+  keywords:
+    - sensors
+    - sysfs
+    - hwmon
+    - rpi
+    - raspberry pi
   most_popular: false
 overview:
   data_collection:
