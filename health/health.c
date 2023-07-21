@@ -844,8 +844,8 @@ static void initialize_health(RRDHOST *host)
     host->health.health_default_exec = string_strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
     host->health.health_default_recipient = string_strdupz("root");
 
-    if (!is_chart_name_populated(&host->host_uuid))
-        chart_name_populate(&host->host_uuid);
+    //if (!is_chart_name_populated(&host->host_uuid))
+    //    chart_name_populate(&host->host_uuid);
 
     sql_health_alarm_log_load(host);
 

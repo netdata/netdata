@@ -85,7 +85,8 @@ failed:
 #define SQL_INSERT_HEALTH_LOG "INSERT INTO health_log (host_id, alarm_id, " \
     "config_hash_id, name, chart, family, exec, recipient, units, chart_context, last_transition_id, chart_name) " \
     "VALUES (?,?,?,?,?,?,?,?,?,?,?,?) " \
-    "ON CONFLICT (host_id, alarm_id) DO UPDATE SET last_transition_id = excluded.last_transition_id RETURNING health_log_id; "
+    "ON CONFLICT (host_id, alarm_id) DO UPDATE SET last_transition_id = excluded.last_transition_id, " \
+    "chart_name = excluded.chart_name RETURNING health_log_id; "
 
 #define SQL_INSERT_HEALTH_LOG_DETAIL "INSERT INTO health_log_detail (health_log_id, unique_id, alarm_id, alarm_event_id, " \
     "updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, " \
