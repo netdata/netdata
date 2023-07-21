@@ -263,7 +263,7 @@ struct engine *read_exporting_config()
         else
             prometheus_exporter_instance->config.options &= ~EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
 
-        if (prometheus_config_get_boolean("prefer chart labels", CONFIG_BOOLEAN_NO))
+        if (prometheus_config_get_boolean("prefer external chart labels", CONFIG_BOOLEAN_NO))
             prometheus_exporter_instance->config.options |= EXPORTING_OPTION_PREFER_CHART_LABELS;
         else
             prometheus_exporter_instance->config.options &= ~EXPORTING_OPTION_PREFER_CHART_LABELS;
