@@ -10,6 +10,17 @@ struct edac_count {
     RRDDIM *rd;
 };
 
+struct edac_dimm {
+	char *name;
+
+    struct edac_count ce;
+    struct edac_count ue;
+
+    RRDSET *st;
+
+    struct edac_dimm *prev, *next;
+};
+
 struct mc {
     char *name;
 
@@ -19,6 +30,8 @@ struct mc {
     struct edac_count ue_noinfo;
 
     RRDSET *st;
+
+    struct edac_dimm *dimms;
 
     struct mc *prev, *next;
 };
@@ -33,7 +46,7 @@ static void find_all_mc() {
 
     DIR *dir = opendir(mc_dirname);
     if(unlikely(!dir)) {
-        collector_error("Cannot read ECC memory errors directory '%s'", mc_dirname);
+        collector_error("Cannot read EDAC memory errors directory '%s'", mc_dirname);
         return;
     }
 
@@ -69,8 +82,40 @@ static void find_all_mc() {
                 DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(mc_root, m, prev, next);
         }
     }
-
     closedir(dir);
+
+    for(struct mc *m = mc_root; m ;m = m->next) {
+        snprintfz(name, FILENAME_MAX, "%s/%s", mc_dirname, m->name);
+        dir = opendir(name);
+        if(!dir) {
+            collector_error("Cannot read EDAC memory errors directory '%s'", name);
+            continue;
+        }
+
+        while((de = readdir(dir))) {
+            if(de->d_type == DT_DIR && strncmp(de->d_name, "rank", 4) == 0 && isdigit(de->d_name[4])) {
+                struct edac_dimm *d = callocz(1, sizeof(struct edac_dimm));
+                d->name = strdupz(de->d_name);
+
+                struct stat st;
+
+                snprintfz(name, FILENAME_MAX, "%s/%s/%s/dimm_ce_count", mc_dirname, m->name, de->d_name);
+                if(stat(name, &st) != -1)
+                    d->ce.filename = strdupz(name);
+
+                snprintfz(name, FILENAME_MAX, "%s/%s/%s/dimm_ue_count", mc_dirname, m->name, de->d_name);
+                if(stat(name, &st) != -1)
+                    d->ue.filename = strdupz(name);
+
+                if(!d->ce.filename && !d->ue.filename) {
+                    freez(d->name);
+                    freez(d);
+                }
+                else
+                    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(m->dimms, d, prev, next);
+            }
+        }
+    }
 }
 
 static kernel_uint_t read_edac_count(struct edac_count *t) {
@@ -95,9 +140,15 @@ static kernel_uint_t read_edac_count(struct edac_count *t) {
     return t->count;
 }
 
-static bool read_edac_mc_file(char *mc, const char *filename, char *out, size_t out_size) {
+static bool read_edac_mc_file(const char *mc, const char *filename, char *out, size_t out_size) {
     char f[FILENAME_MAX + 1];
     snprintfz(f, FILENAME_MAX, "%s/%s/filename", mc_dirname, mc, filename);
+    return read_file(f, out, out_size) == 0;
+}
+
+static bool read_edac_mc_rank_file(const char *mc, const char *rank, const char *filename, char *out, size_t out_size) {
+    char f[FILENAME_MAX + 1];
+    snprintfz(f, FILENAME_MAX, "%s/%s/%s/filename", mc_dirname, mc, rank, filename);
     return read_file(f, out, out_size) == 0;
 }
 
@@ -115,20 +166,28 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt __maybe_unuse
         read_edac_count(&m->ce_noinfo);
         read_edac_count(&m->ue);
         read_edac_count(&m->ue_noinfo);
+
+        for(struct edac_dimm *d = m->dimms; d ;d = d->next) {
+            read_edac_count(&d->ce);
+            read_edac_count(&d->ue);
+        }
     }
 
     // --------------------------------------------------------------------
 
     for(struct mc *m = mc_root; m ; m = m->next) {
+        if(unlikely(!m->ce.updated && !m->ue.updated && !m->ce_noinfo.updated && !m->ue_noinfo.updated))
+            continue;
+
         if(unlikely(!m->st)) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "mc_edac_%s", m->name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "edac_%s", m->name);
             m->st = rrdset_create_localhost(
                     "mem"
                     , id
                     , NULL
                     , "edac"
-                    , "mem.mc_edac"
+                    , "mem.edac_mc"
                     , "Memory Controller (MC) Error Detection And Correction (EDAC) Errors"
                     , "errors"
                     , PLUGIN_PROC_NAME
@@ -161,6 +220,63 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt __maybe_unuse
         rrddim_set_by_pointer(m->st, m->ue.rd, (collected_number)m->ue.count);
         rrddim_set_by_pointer(m->st, m->ce_noinfo.rd, (collected_number)m->ce_noinfo.count);
         rrddim_set_by_pointer(m->st, m->ue_noinfo.rd, (collected_number)m->ue_noinfo.count);
+
+        rrdset_done(m->st);
+
+        for(struct edac_dimm *d = m->dimms; d ;d = d->next) {
+            if(unlikely(!d->ce.updated && !d->ue.updated))
+                continue;
+
+            if(unlikely(!d->st)) {
+                char id[RRD_ID_LENGTH_MAX + 1];
+                snprintfz(id, RRD_ID_LENGTH_MAX, "edac_%s_%s", m->name, d->name);
+                d->st = rrdset_create_localhost(
+                        "mem"
+                		, id
+                		, NULL
+                		, "edac"
+                        , "mem.edac_mc_dimm"
+                		, "DIMM Error Detection And Correction (EDAC) Errors"
+                        , "errors"
+                        , PLUGIN_PROC_NAME
+                        , "/sys/devices/system/edac/mc"
+                        , NETDATA_CHART_PRIO_MEM_HW_ECC_CE + 1
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
+
+                rrdlabels_add(d->st->rrdlabels, "controller", m->name, RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->st->rrdlabels, "rank", d->name, RRDLABEL_SRC_AUTO);
+
+                char buffer[1024 + 1];
+
+                if(read_edac_mc_rank_file(m->name, d->name, "dimm_dev_type", buffer, 1024))
+                    rrdlabels_add(d->st->rrdlabels, "dimm_dev_type", buffer, RRDLABEL_SRC_AUTO);
+
+                if(read_edac_mc_rank_file(m->name, d->name, "dimm_edac_mode", buffer, 1024))
+                    rrdlabels_add(d->st->rrdlabels, "dimm_edac_mode", buffer, RRDLABEL_SRC_AUTO);
+
+                if(read_edac_mc_rank_file(m->name, d->name, "dimm_label", buffer, 1024))
+                    rrdlabels_add(d->st->rrdlabels, "dimm_label", buffer, RRDLABEL_SRC_AUTO);
+
+                if(read_edac_mc_rank_file(m->name, d->name, "dimm_location", buffer, 1024))
+                    rrdlabels_add(d->st->rrdlabels, "dimm_location", buffer, RRDLABEL_SRC_AUTO);
+
+                if(read_edac_mc_rank_file(m->name, d->name, "dimm_mem_type", buffer, 1024))
+                    rrdlabels_add(d->st->rrdlabels, "dimm_mem_type", buffer, RRDLABEL_SRC_AUTO);
+
+                if(read_edac_mc_rank_file(m->name, d->name, "size", buffer, 1024))
+                    rrdlabels_add(d->st->rrdlabels, "size", buffer, RRDLABEL_SRC_AUTO);
+
+                d->ce.rd = rrddim_add(d->st, "correctable", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                d->ue.rd = rrddim_add(d->st, "uncorrectable", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+
+            rrddim_set_by_pointer(d->st, d->ce.rd, (collected_number)d->ce.count);
+            rrddim_set_by_pointer(d->st, d->ue.rd, (collected_number)d->ue.count);
+
+            rrdset_done(d->st);
+        }
     }
 
     return 0;
