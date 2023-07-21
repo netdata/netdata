@@ -162,21 +162,25 @@ modules:
       plugin_name: ebpf.plugin
       module_name: processes
       monitored_instance:
-        name: ebpf processes
+        name: eBPF Processes
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - thread
+        - fork
+        - process
+        - eBPF
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
+        metrics_description: "Monitor calls for function creating tasks (threads and processes) inside Linux kernel."
         method_description: ""
       supported_platforms:
         include: []
