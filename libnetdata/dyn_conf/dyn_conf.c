@@ -12,6 +12,58 @@
 
 DICTIONARY *plugins_dict = NULL;
 
+struct deferred_cfg_send {
+    char *plugin_name;
+    char *module_name;
+    char *job_name;
+    struct deferred_cfg_send *next;
+};
+
+struct deferred_cfg_send *deferred_configs = NULL;
+pthread_mutex_t deferred_configs_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t deferred_configs_cond = PTHREAD_COND_INITIALIZER;
+
+static void deferred_config_push_back(const char *plugin_name, const char *module_name, const char *job_name)
+{
+    struct deferred_cfg_send *deferred = callocz(1, sizeof(struct deferred_cfg_send));
+    deferred->plugin_name = strdupz(plugin_name);
+    if (module_name != NULL) {
+        deferred->module_name = strdupz(module_name);
+        if (job_name != NULL)
+            deferred->job_name = strdupz(job_name);
+    }
+    pthread_mutex_lock(&deferred_configs_lock);
+    struct deferred_cfg_send *last = deferred_configs;
+    if (last == NULL)
+        deferred_configs = deferred;
+    else {
+        while (last->next != NULL)
+            last = last->next;
+        last->next = deferred;
+    }
+    pthread_cond_signal(&deferred_configs_cond);
+    pthread_mutex_unlock(&deferred_configs_lock);
+}
+
+static struct deferred_cfg_send *deferred_config_pop()
+{
+    pthread_mutex_lock(&deferred_configs_lock);
+    while (deferred_configs == NULL)
+        pthread_cond_wait(&deferred_configs_cond, &deferred_configs_lock);
+    struct deferred_cfg_send *deferred = deferred_configs;
+    deferred_configs = deferred_configs->next;
+    pthread_mutex_unlock(&deferred_configs_lock);
+    return deferred;
+}
+
+static void deferred_config_free(struct deferred_cfg_send *dcs)
+{
+    freez(dcs->plugin_name);
+    freez(dcs->module_name);
+    freez(dcs->job_name);
+    freez(dcs);
+}
+
 static int _get_list_of_plugins_json_cb(const DICTIONARY_ITEM *item, void *entry, void *data)
 {
     UNUSED(item);
@@ -336,6 +388,8 @@ DICTIONARY_ITEM *register_plugin(struct configurable_plugin *plugin)
     plugin->modules = dictionary_create(DICT_OPTION_VALUE_LINK_DONT_CLONE);
     dictionary_register_delete_callback(plugin->modules, module_del_cb, NULL);
 
+    deferred_config_push_back(plugin->name, NULL, NULL);
+
     dictionary_set(plugins_dict, plugin->name, plugin, sizeof(plugin));
 
     // the plugin keeps the pointer to the dictionary item, so we need to acquire it
@@ -367,6 +421,8 @@ int register_module(struct configurable_plugin *plugin, struct module *module)
 
     pthread_mutex_init(&module->lock, NULL);
 
+    deferred_config_push_back(plugin->name, module->name, NULL);
+
     module->plugin = plugin;
 
     if (module->type == MOD_TYPE_ARRAY) {
@@ -394,12 +450,9 @@ int register_module(struct configurable_plugin *plugin, struct module *module)
                 struct job *job = job_new();
                 job->name = strdupz(ent->d_name);
                 job->module = module;
-                job->config = load_config(plugin->name, module->name, job->name);
-                if (job->config.data == NULL) {
-                    error_report("DYNCFG could not load config for job \"%s\"", job->name);
-                    continue;
-                }
                 dictionary_set(module->jobs, job->name, job, sizeof(job));
+
+                deferred_config_push_back(plugin->name, module->name, job->name);
             }
             closedir(dir);
         }
@@ -795,4 +848,43 @@ int dyn_conf_init(void)
 #endif
 
     return 0;
+}
+
+void *dyncfg_main(void *in)
+{
+    while (!netdata_exit) {
+        struct deferred_cfg_send *dcs = deferred_config_pop();
+//        error_report("DYNCFG, deferred cfg send for %s %s %s", dcs->plugin_name, dcs->module_name, dcs->job_name);
+        DICTIONARY_ITEM *plugin_item = dictionary_get_and_acquire_item(plugins_dict, dcs->plugin_name);
+        if (plugin_item == NULL) {
+            error_report("DYNCFG, plugin %s not found", dcs->plugin_name);
+            deferred_config_free(dcs);
+            continue;
+        }
+        struct configurable_plugin *plugin = dictionary_acquired_item_value(plugin_item);
+        if (dcs->module_name == NULL) {
+            dyncfg_config_t cfg = load_config(dcs->plugin_name, NULL, NULL);
+            if (cfg.data != NULL) {
+                plugin->set_config_cb(plugin->cb_usr_ctx, &cfg);
+                freez(cfg.data);
+            }
+        } else if (dcs->job_name == NULL) {
+            dyncfg_config_t cfg = load_config(dcs->plugin_name, dcs->module_name, NULL);
+            if (cfg.data != NULL) {
+                struct module *mod = get_module_by_name(plugin, dcs->module_name);
+                mod->set_config_cb(mod->config_cb_usr_ctx, mod->name, &cfg);
+                freez(cfg.data);
+            }
+        } else {
+            dyncfg_config_t cfg = load_config(dcs->plugin_name, dcs->module_name, dcs->job_name);
+            if (cfg.data != NULL) {
+                struct module *mod = get_module_by_name(plugin, dcs->module_name);
+                mod->set_job_config_cb(mod->job_config_cb_usr_ctx, mod->name, dcs->job_name, &cfg);
+                freez(cfg.data);
+            }
+        }
+        deferred_config_free(dcs);
+        dictionary_acquired_item_release(plugins_dict, plugin_item);
+    }
+    return NULL;
 }
