@@ -299,7 +299,7 @@ static inline size_t dictionary_hooks_free(DICTIONARY *dict) {
 }
 
 void dictionary_register_insert_callback(DICTIONARY *dict, void (*ins_callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data) {
-    if(unlikely(is_view_dictionary(dict)))
+    if(is_view_dictionary(dict))
         fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
 
     dictionary_hooks_allocate(dict);
@@ -308,7 +308,7 @@ void dictionary_register_insert_callback(DICTIONARY *dict, void (*ins_callback)(
 }
 
 void dictionary_register_conflict_callback(DICTIONARY *dict, bool (*conflict_callback)(const DICTIONARY_ITEM *item, void *old_value, void *new_value, void *data), void *data) {
-    if(unlikely(is_view_dictionary(dict)))
+    if(is_view_dictionary(dict))
         fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
 
     internal_error(!(dict->options & DICT_OPTION_DONT_OVERWRITE_VALUE), "DICTIONARY: registering conflict callback without DICT_OPTION_DONT_OVERWRITE_VALUE");
@@ -320,7 +320,7 @@ void dictionary_register_conflict_callback(DICTIONARY *dict, bool (*conflict_cal
 }
 
 void dictionary_register_react_callback(DICTIONARY *dict, void (*react_callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data) {
-    if(unlikely(is_view_dictionary(dict)))
+    if(is_view_dictionary(dict))
         fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
 
     dictionary_hooks_allocate(dict);
@@ -329,7 +329,7 @@ void dictionary_register_react_callback(DICTIONARY *dict, void (*react_callback)
 }
 
 void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data) {
-    if(unlikely(is_view_dictionary(dict)))
+    if(is_view_dictionary(dict))
         fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
 
     dictionary_hooks_allocate(dict);
@@ -341,7 +341,7 @@ void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_callback)(
 // dictionary statistics API
 
 size_t dictionary_version(DICTIONARY *dict) {
-    if(unlikely(!dict)) return 0;
+    if(!dict) return 0;
 
     // this is required for views to return the right number
     // garbage_collect_pending_deletes(dict);
@@ -349,7 +349,7 @@ size_t dictionary_version(DICTIONARY *dict) {
     return __atomic_load_n(&dict->version, __ATOMIC_RELAXED);
 }
 size_t dictionary_entries(DICTIONARY *dict) {
-    if(unlikely(!dict)) return 0;
+    if(!dict) return 0;
 
     // this is required for views to return the right number
     // garbage_collect_pending_deletes(dict);
@@ -360,7 +360,7 @@ size_t dictionary_entries(DICTIONARY *dict) {
     return entries;
 }
 size_t dictionary_referenced_items(DICTIONARY *dict) {
-    if(unlikely(!dict)) return 0;
+    if(!dict) return 0;
 
     long int referenced_items = __atomic_load_n(&dict->referenced_items, __ATOMIC_RELAXED);
     if(referenced_items < 0)
@@ -385,7 +385,7 @@ static inline void DICTIONARY_ENTRIES_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->items.referenced, 1, __ATOMIC_RELAXED);
     __atomic_fetch_add(&dict->stats->ops.inserts, 1, __ATOMIC_RELAXED);
 
-    if(unlikely(is_dictionary_single_threaded(dict))) {
+    if(is_dictionary_single_threaded(dict)) {
         dict->version++;
         dict->entries++;
         dict->referenced_items++;
@@ -403,7 +403,7 @@ static inline void DICTIONARY_ENTRIES_MINUS1(DICTIONARY *dict) {
     __atomic_fetch_sub(&dict->stats->items.entries, 1, __ATOMIC_RELAXED);
 
     size_t entries; (void)entries;
-    if(unlikely(is_dictionary_single_threaded(dict))) {
+    if(is_dictionary_single_threaded(dict)) {
         dict->version++;
         entries = dict->entries++;
     }
@@ -421,7 +421,7 @@ static inline void DICTIONARY_ENTRIES_MINUS1(DICTIONARY *dict) {
 static inline void DICTIONARY_VALUE_RESETS_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->ops.resets, 1, __ATOMIC_RELAXED);
 
-    if(unlikely(is_dictionary_single_threaded(dict)))
+    if(is_dictionary_single_threaded(dict))
         dict->version++;
     else
         __atomic_fetch_add(&dict->version, 1, __ATOMIC_RELAXED);
@@ -480,7 +480,7 @@ static inline void DICTIONARY_STATS_DICT_FLUSHES_PLUS1(DICTIONARY *dict) {
 static inline void DICTIONARY_REFERENCED_ITEMS_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->items.referenced, 1, __ATOMIC_RELAXED);
 
-    if(unlikely(is_dictionary_single_threaded(dict)))
+    if(is_dictionary_single_threaded(dict))
         ++dict->referenced_items;
     else
         __atomic_add_fetch(&dict->referenced_items, 1, __ATOMIC_RELAXED);
@@ -490,7 +490,7 @@ static inline void DICTIONARY_REFERENCED_ITEMS_MINUS1(DICTIONARY *dict) {
     __atomic_fetch_sub(&dict->stats->items.referenced, 1, __ATOMIC_RELAXED);
 
     long int referenced_items; (void)referenced_items;
-    if(unlikely(is_dictionary_single_threaded(dict)))
+    if(is_dictionary_single_threaded(dict))
         referenced_items = --dict->referenced_items;
     else
         referenced_items = __atomic_sub_fetch(&dict->referenced_items, 1, __ATOMIC_SEQ_CST);
@@ -506,7 +506,7 @@ static inline void DICTIONARY_REFERENCED_ITEMS_MINUS1(DICTIONARY *dict) {
 static inline void DICTIONARY_PENDING_DELETES_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->items.pending_deletion, 1, __ATOMIC_RELAXED);
 
-    if(unlikely(is_dictionary_single_threaded(dict)))
+    if(is_dictionary_single_threaded(dict))
         ++dict->pending_deletion_items;
     else
         __atomic_add_fetch(&dict->pending_deletion_items, 1, __ATOMIC_RELEASE);
@@ -515,21 +515,21 @@ static inline void DICTIONARY_PENDING_DELETES_PLUS1(DICTIONARY *dict) {
 static inline long int DICTIONARY_PENDING_DELETES_MINUS1(DICTIONARY *dict) {
     __atomic_fetch_sub(&dict->stats->items.pending_deletion, 1, __ATOMIC_RELEASE);
 
-    if(unlikely(is_dictionary_single_threaded(dict)))
+    if(is_dictionary_single_threaded(dict))
         return --dict->pending_deletion_items;
     else
         return __atomic_sub_fetch(&dict->pending_deletion_items, 1, __ATOMIC_ACQUIRE);
 }
 
 static inline long int DICTIONARY_PENDING_DELETES_GET(DICTIONARY *dict) {
-    if(unlikely(is_dictionary_single_threaded(dict)))
+    if(is_dictionary_single_threaded(dict))
         return dict->pending_deletion_items;
     else
         return __atomic_load_n(&dict->pending_deletion_items, __ATOMIC_SEQ_CST);
 }
 
 static inline REFCOUNT DICTIONARY_ITEM_REFCOUNT_GET(DICTIONARY *dict, DICTIONARY_ITEM *item) {
-    if(unlikely(dict && is_dictionary_single_threaded(dict))) // this is an exception, dict can be null
+    if(dict && is_dictionary_single_threaded(dict)) // this is an exception, dict can be null
         return item->refcount;
     else
         return (REFCOUNT)__atomic_load_n(&item->refcount, __ATOMIC_ACQUIRE);
@@ -543,10 +543,10 @@ static inline REFCOUNT DICTIONARY_ITEM_REFCOUNT_GET_SOLE(DICTIONARY_ITEM *item) 
 // callbacks execution
 
 static void dictionary_execute_insert_callback(DICTIONARY *dict, DICTIONARY_ITEM *item, void *constructor_data) {
-    if(likely(!dict->hooks || !dict->hooks->ins_callback))
+    if(!dict->hooks || !dict->hooks->ins_callback)
         return;
 
-    if(unlikely(is_view_dictionary(dict)))
+    if(is_view_dictionary(dict))
         fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
 
     internal_error(false,
@@ -561,10 +561,10 @@ static void dictionary_execute_insert_callback(DICTIONARY *dict, DICTIONARY_ITEM
 }
 
 static bool dictionary_execute_conflict_callback(DICTIONARY *dict, DICTIONARY_ITEM *item, void *new_value, void *constructor_data) {
-    if(likely(!dict->hooks || !dict->hooks->conflict_callback))
+    if(!dict->hooks || !dict->hooks->conflict_callback)
         return false;
 
-    if(unlikely(is_view_dictionary(dict)))
+    if(is_view_dictionary(dict))
         fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
 
     internal_error(false,
@@ -584,10 +584,10 @@ static bool dictionary_execute_conflict_callback(DICTIONARY *dict, DICTIONARY_IT
 }
 
 static void dictionary_execute_react_callback(DICTIONARY *dict, DICTIONARY_ITEM *item, void *constructor_data) {
-    if(likely(!dict->hooks || !dict->hooks->react_callback))
+    if(!dict->hooks || !dict->hooks->react_callback)
         return;
 
-    if(unlikely(is_view_dictionary(dict)))
+    if(is_view_dictionary(dict))
         fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
 
     internal_error(false,
@@ -604,7 +604,7 @@ static void dictionary_execute_react_callback(DICTIONARY *dict, DICTIONARY_ITEM 
 }
 
 static void dictionary_execute_delete_callback(DICTIONARY *dict, DICTIONARY_ITEM *item) {
-    if(likely(!dict->hooks || !dict->hooks->del_callback))
+    if(!dict->hooks || !dict->hooks->del_callback)
         return;
 
     // We may execute delete callback on items deleted from a view,
@@ -627,7 +627,7 @@ static void dictionary_execute_delete_callback(DICTIONARY *dict, DICTIONARY_ITEM
 // dictionary locks
 
 static inline size_t dictionary_locks_init(DICTIONARY *dict) {
-    if(likely(!is_dictionary_single_threaded(dict))) {
+    if(!is_dictionary_single_threaded(dict)) {
         rw_spinlock_init(&dict->index.rw_spinlock);
         rw_spinlock_init(&dict->items.rw_spinlock);
     }
@@ -657,7 +657,7 @@ static inline bool ll_recursive_lock_is_thread_the_writer(DICTIONARY *dict) {
 }
 
 static inline void ll_recursive_lock(DICTIONARY *dict, char rw) {
-    if(unlikely(is_dictionary_single_threaded(dict)))
+    if(is_dictionary_single_threaded(dict))
         return;
 
     if(ll_recursive_lock_is_thread_the_writer(dict)) {
@@ -677,7 +677,7 @@ static inline void ll_recursive_lock(DICTIONARY *dict, char rw) {
 }
 
 static inline void ll_recursive_unlock(DICTIONARY *dict, char rw) {
-    if(unlikely(is_dictionary_single_threaded(dict)))
+    if(is_dictionary_single_threaded(dict))
         return;
 
     if(ll_recursive_lock_is_thread_the_writer(dict) && dict->items.writer_depth > 0) {
@@ -707,27 +707,27 @@ inline void dictionary_write_unlock(DICTIONARY *dict) {
 }
 
 static inline void dictionary_index_lock_rdlock(DICTIONARY *dict) {
-    if(unlikely(is_dictionary_single_threaded(dict)))
+    if(is_dictionary_single_threaded(dict))
         return;
 
     rw_spinlock_read_lock(&dict->index.rw_spinlock);
 }
 
 static inline void dictionary_index_rdlock_unlock(DICTIONARY *dict) {
-    if(unlikely(is_dictionary_single_threaded(dict)))
+    if(is_dictionary_single_threaded(dict))
         return;
 
     rw_spinlock_read_unlock(&dict->index.rw_spinlock);
 }
 
 static inline void dictionary_index_lock_wrlock(DICTIONARY *dict) {
-    if(unlikely(is_dictionary_single_threaded(dict)))
+    if(is_dictionary_single_threaded(dict))
         return;
 
     rw_spinlock_write_lock(&dict->index.rw_spinlock);
 }
 static inline void dictionary_index_wrlock_unlock(DICTIONARY *dict) {
-    if(unlikely(is_dictionary_single_threaded(dict)))
+    if(is_dictionary_single_threaded(dict))
         return;
 
     rw_spinlock_write_unlock(&dict->index.rw_spinlock);
@@ -742,10 +742,10 @@ static void garbage_collect_pending_deletes(DICTIONARY *dict) {
 
     bool is_view = is_view_dictionary(dict);
 
-    if(likely(!(
+    if(!(
             DICTIONARY_PENDING_DELETES_GET(dict) > 0 ||
             (is_view && last_master_deletion_us > last_gc_run_us)
-            )))
+            ))
         return;
 
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
@@ -825,7 +825,7 @@ static inline size_t reference_counter_free(DICTIONARY *dict __maybe_unused) {
 static void item_acquire(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     REFCOUNT refcount;
 
-    if(unlikely(is_dictionary_single_threaded(dict)))
+    if(is_dictionary_single_threaded(dict))
         refcount = ++item->refcount;
 
     else
@@ -869,7 +869,7 @@ static void item_release(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     bool is_deleted;
     REFCOUNT refcount;
 
-    if(unlikely(is_dictionary_single_threaded(dict))) {
+    if(is_dictionary_single_threaded(dict)) {
         is_deleted = item->flags & ITEM_FLAG_DELETED;
         refcount = --item->refcount;
     }
@@ -940,9 +940,9 @@ static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *it
     // if ret == ITEM_OK, we acquired the item
 
     if(ret == RC_ITEM_OK) {
-        if (unlikely(is_view_dictionary(dict) &&
+        if (is_view_dictionary(dict) &&
             item_shared_flag_check(item, ITEM_FLAG_DELETED) &&
-            !item_flag_check(item, ITEM_FLAG_DELETED))) {
+            !item_flag_check(item, ITEM_FLAG_DELETED)) {
             // but, we can't use this item
 
             if (having_index_lock) {
@@ -977,7 +977,7 @@ static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *it
             DICTIONARY_REFERENCED_ITEMS_PLUS1(dict);
     }
 
-    if(unlikely(spins > 1 && dict->stats))
+    if(spins > 1 && dict->stats)
         DICTIONARY_STATS_CHECK_SPINS_PLUS(dict, spins - 1);
 
     return ret;
@@ -1022,7 +1022,7 @@ static inline int item_is_not_referenced_and_can_be_removed_advanced(DICTIONARY 
         item->deleter_pid = gettid();
 #endif
 
-    if(unlikely(spins > 1 && dict->stats))
+    if(spins > 1 && dict->stats)
         DICTIONARY_STATS_DELETE_SPINS_PLUS(dict, spins - 1);
 
     return ret;
@@ -1054,13 +1054,13 @@ static size_t hashtable_init_unsafe(DICTIONARY *dict) {
 }
 
 static size_t hashtable_destroy_unsafe(DICTIONARY *dict) {
-    if(unlikely(!dict->index.JudyHSArray)) return 0;
+    if(!dict->index.JudyHSArray) return 0;
 
     pointer_destroy_index(dict);
 
     JError_t J_Error;
     Word_t ret = JudyHSFreeArray(&dict->index.JudyHSArray, &J_Error);
-    if(unlikely(ret == (Word_t) JERR)) {
+    if(ret == (Word_t) JERR) {
         netdata_log_error("DICTIONARY: Cannot destroy JudyHS, JU_ERRNO_* == %u, ID == %d",
                           JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
     }
@@ -1074,7 +1074,7 @@ static size_t hashtable_destroy_unsafe(DICTIONARY *dict) {
 static inline void **hashtable_insert_unsafe(DICTIONARY *dict, const char *name, size_t name_len) {
     JError_t J_Error;
     Pvoid_t *Rc = JudyHSIns(&dict->index.JudyHSArray, (void *)name, name_len, &J_Error);
-    if (unlikely(Rc == PJERR)) {
+    if (Rc == PJERR) {
         netdata_log_error("DICTIONARY: Cannot insert entry with name '%s' to JudyHS, JU_ERRNO_* == %u, ID == %d",
                           name, JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
     }
@@ -1091,11 +1091,11 @@ static inline void **hashtable_insert_unsafe(DICTIONARY *dict, const char *name,
 
 static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, size_t name_len, void *item) {
     (void)item;
-    if(unlikely(!dict->index.JudyHSArray)) return 0;
+    if(!dict->index.JudyHSArray) return 0;
 
     JError_t J_Error;
     int ret = JudyHSDel(&dict->index.JudyHSArray, (void *)name, name_len, &J_Error);
-    if(unlikely(ret == JERR)) {
+    if(ret == JERR) {
         netdata_log_error("DICTIONARY: Cannot delete entry with name '%s' from JudyHS, JU_ERRNO_* == %u, ID == %d",
                           name,
                           JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
@@ -1105,7 +1105,7 @@ static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, si
     // Hey, this is problematic! We need the value back, not just an int with a status!
     // https://sourceforge.net/p/judy/feature-requests/23/
 
-    if(unlikely(ret == 0)) {
+    if(ret == 0) {
         // not found in the dictionary
         return 0;
     }
@@ -1116,13 +1116,13 @@ static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, si
 }
 
 static inline DICTIONARY_ITEM *hashtable_get_unsafe(DICTIONARY *dict, const char *name, size_t name_len) {
-    if(unlikely(!dict->index.JudyHSArray)) return NULL;
+    if(!dict->index.JudyHSArray) return NULL;
 
     DICTIONARY_STATS_SEARCHES_PLUS1(dict);
 
     Pvoid_t *Rc;
     Rc = JudyHSGet(dict->index.JudyHSArray, (void *)name, name_len);
-    if(likely(Rc)) {
+    if(Rc) {
         // found in the hash table
         pointer_check(dict, (DICTIONARY_ITEM *)*Rc);
         return (DICTIONARY_ITEM *)*Rc;
@@ -1183,7 +1183,7 @@ static inline void item_linked_list_remove(DICTIONARY *dict, DICTIONARY_ITEM *it
 // ITEM initialization and updates
 
 static inline size_t item_set_name(DICTIONARY *dict, DICTIONARY_ITEM *item, const char *name, size_t name_len) {
-    if(likely(dict->options & DICT_OPTION_NAME_LINK_DONT_CLONE)) {
+    if(dict->options & DICT_OPTION_NAME_LINK_DONT_CLONE) {
         item->caller_name = (char *)name;
         item->key_len = name_len;
     }
@@ -1197,7 +1197,7 @@ static inline size_t item_set_name(DICTIONARY *dict, DICTIONARY_ITEM *item, cons
 }
 
 static inline size_t item_free_name(DICTIONARY *dict, DICTIONARY_ITEM *item) {
-    if(likely(!(dict->options & DICT_OPTION_NAME_LINK_DONT_CLONE)))
+    if(!(dict->options & DICT_OPTION_NAME_LINK_DONT_CLONE))
         string_freez(item->string_name);
 
     return item->key_len;
@@ -1223,7 +1223,7 @@ static ARAL *dict_shared_items_aral = NULL;
 void dictionary_static_items_aral_init(void) {
     static SPINLOCK spinlock;
 
-    if(unlikely(!dict_items_aral || !dict_shared_items_aral)) {
+    if(!dict_items_aral || !dict_shared_items_aral) {
         spinlock_lock(&spinlock);
 
         // we have to check again
@@ -1269,7 +1269,7 @@ static DICTIONARY_ITEM *dict_item_create(DICTIONARY *dict __maybe_unused, size_t
     if(master_item) {
         item->shared = master_item->shared;
 
-        if(unlikely(__atomic_add_fetch(&item->shared->links, 1, __ATOMIC_ACQUIRE) <= 1))
+        if(__atomic_add_fetch(&item->shared->links, 1, __ATOMIC_ACQUIRE) <= 1)
             fatal("DICTIONARY: attempted to link to a shared item structure that had zero references");
     }
     else {
@@ -1308,8 +1308,8 @@ static inline void dict_item_value_freez(DICTIONARY *dict, void *ptr) {
 static void *dict_item_value_create(DICTIONARY *dict, void *value, size_t value_len) {
     void *ptr = NULL;
 
-    if(likely(value_len)) {
-        if (likely(value)) {
+    if(value_len) {
+        if (value) {
             // a value has been supplied
             // copy it
             ptr =  dict_item_value_mallocz(dict, value_len);
@@ -1330,10 +1330,10 @@ static void *dict_item_value_create(DICTIONARY *dict, void *value, size_t value_
 
 static DICTIONARY_ITEM *dict_item_create_with_hooks(DICTIONARY *dict, const char *name, size_t name_len, void *value, size_t value_len, void *constructor_data, DICTIONARY_ITEM *master_item) {
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(name_len > KEY_LEN_MAX))
+    if(name_len > KEY_LEN_MAX)
         fatal("DICTIONARY: tried to index a key of size %zu, but the maximum acceptable is %zu", name_len, (size_t)KEY_LEN_MAX);
 
-    if(unlikely(value_len > VALUE_LEN_MAX))
+    if(value_len > VALUE_LEN_MAX)
         fatal("DICTIONARY: tried to add an item of size %zu, but the maximum acceptable is %zu", value_len, (size_t)VALUE_LEN_MAX);
 #endif
 
@@ -1342,20 +1342,20 @@ static DICTIONARY_ITEM *dict_item_create_with_hooks(DICTIONARY *dict, const char
     DICTIONARY_ITEM *item = dict_item_create(dict, &item_size, master_item);
     key_size += item_set_name(dict, item, name, name_len);
 
-    if(unlikely(is_view_dictionary(dict))) {
+    if(is_view_dictionary(dict)) {
         // we are on a view dictionary
         // do not touch the value
         ;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-        if(unlikely(!master_item))
+        if(!master_item)
             fatal("DICTIONARY: cannot add an item to a view without a master item.");
 #endif
     }
     else {
         // we are on the master dictionary
 
-        if(unlikely(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE))
+        if(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE)
             item->shared->value = value;
         else
             item->shared->value = dict_item_value_create(dict, value, value_len);
@@ -1373,7 +1373,7 @@ static DICTIONARY_ITEM *dict_item_create_with_hooks(DICTIONARY *dict, const char
 }
 
 static void dict_item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item, void *value, size_t value_len, void *constructor_data) {
-    if(unlikely(is_view_dictionary(dict)))
+    if(is_view_dictionary(dict))
         fatal("DICTIONARY: %s() should never be called on views.", __FUNCTION__ );
 
     netdata_log_debug(D_DICTIONARY, "Dictionary entry with name '%s' found. Changing its value.", item_get_name(item));
@@ -1387,7 +1387,7 @@ static void dict_item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *
 
     dictionary_execute_delete_callback(dict, item);
 
-    if(likely(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE)) {
+    if(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE) {
         netdata_log_debug(D_DICTIONARY, "Dictionary: linking value to '%s'", item_get_name(item));
         item->shared->value = value;
         item->shared->value_len = value_len;
@@ -1421,13 +1421,13 @@ static size_t dict_item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item)
     size_t item_size = 0, key_size = 0, value_size = 0;
 
     key_size += item->key_len;
-    if(unlikely(!(dict->options & DICT_OPTION_NAME_LINK_DONT_CLONE)))
+    if(!(dict->options & DICT_OPTION_NAME_LINK_DONT_CLONE))
         item_free_name(dict, item);
 
     if(item_shared_release_and_check_if_it_can_be_freed(dict, item)) {
         dictionary_execute_delete_callback(dict, item);
 
-        if(unlikely(!(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE))) {
+        if(!(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE)) {
             netdata_log_debug(D_DICTIONARY, "Dictionary freeing value of '%s'", item_get_name(item));
             dict_item_value_freez(dict, item->shared->value);
             item->shared->value = NULL;
@@ -1535,7 +1535,7 @@ static inline void dict_item_release_and_check_if_it_is_deleted_and_can_be_remov
 }
 
 static bool dict_item_del(DICTIONARY *dict, const char *name, ssize_t name_len) {
-    if(unlikely(!name || !*name)) {
+    if(!name || !*name) {
         internal_error(
             true,
             "DICTIONARY: attempted to %s() without a name on a dictionary created from %s() %zu@%s.",
@@ -1546,7 +1546,7 @@ static bool dict_item_del(DICTIONARY *dict, const char *name, ssize_t name_len) 
         return false;
     }
 
-    if(unlikely(is_dictionary_destroyed(dict))) {
+    if(is_dictionary_destroyed(dict)) {
         internal_error(true, "DICTIONARY: attempted to dictionary_del() on a destroyed dictionary");
         return false;
     }
@@ -1564,7 +1564,7 @@ static bool dict_item_del(DICTIONARY *dict, const char *name, ssize_t name_len) 
 
     int ret;
     DICTIONARY_ITEM *item = hashtable_get_unsafe(dict, name, name_len);
-    if(unlikely(!item)) {
+    if(!item) {
         dictionary_index_wrlock_unlock(dict);
         ret = false;
     }
@@ -1586,7 +1586,7 @@ static bool dict_item_del(DICTIONARY *dict, const char *name, ssize_t name_len) 
 }
 
 static DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data, DICTIONARY_ITEM *master_item) {
-    if(unlikely(!name || !*name)) {
+    if(!name || !*name) {
         internal_error(
             true,
             "DICTIONARY: attempted to %s() without a name on a dictionary created from %s() %zu@%s.",
@@ -1597,7 +1597,7 @@ static DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONARY *dic
         return NULL;
     }
 
-    if(unlikely(is_dictionary_destroyed(dict))) {
+    if(is_dictionary_destroyed(dict)) {
         internal_error(true, "DICTIONARY: attempted to dictionary_set() on a destroyed dictionary");
         return NULL;
     }
@@ -1625,7 +1625,7 @@ static DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONARY *dic
     DICTIONARY_ITEM *item = NULL;
     do {
         DICTIONARY_ITEM **item_pptr = (DICTIONARY_ITEM **)hashtable_insert_unsafe(dict, name, name_len);
-        if (likely(*item_pptr == NULL)) {
+        if (*item_pptr == NULL) {
             // a new item added to the index
 
             // create the dictionary item
@@ -1695,7 +1695,7 @@ static DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONARY *dic
     } while(!item);
 
 
-    if(unlikely(spins > 0 && dict->stats))
+    if(spins > 0 && dict->stats)
         DICTIONARY_STATS_INSERT_SPINS_PLUS(dict, spins);
 
     if(is_master_dictionary(dict) && added_or_updated)
@@ -1705,7 +1705,7 @@ static DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONARY *dic
 }
 
 static DICTIONARY_ITEM *dict_item_find_and_acquire(DICTIONARY *dict, const char *name, ssize_t name_len) {
-    if(unlikely(!name || !*name)) {
+    if(!name || !*name) {
         internal_error(
             true,
             "DICTIONARY: attempted to %s() without a name on a dictionary created from %s() %zu@%s.",
@@ -1716,7 +1716,7 @@ static DICTIONARY_ITEM *dict_item_find_and_acquire(DICTIONARY *dict, const char 
         return NULL;
     }
 
-    if(unlikely(is_dictionary_destroyed(dict))) {
+    if(is_dictionary_destroyed(dict)) {
         internal_error(true, "DICTIONARY: attempted to dictionary_get() on a destroyed dictionary");
         return NULL;
     }
@@ -1729,7 +1729,7 @@ static DICTIONARY_ITEM *dict_item_find_and_acquire(DICTIONARY *dict, const char 
     dictionary_index_lock_rdlock(dict);
 
     DICTIONARY_ITEM *item = hashtable_get_unsafe(dict, name, name_len);
-    if(unlikely(item && !item_check_and_acquire(dict, item))) {
+    if(item && !item_check_and_acquire(dict, item)) {
         item = NULL;
         DICTIONARY_STATS_SEARCH_IGNORES_PLUS1(dict);
     }
@@ -1909,7 +1909,7 @@ static inline void api_internal_check_with_trace(DICTIONARY *dict, DICTIONARY_IT
 
     if(item) {
         REFCOUNT refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
-        if (unlikely(refcount <= 0)) {
+        if (refcount <= 0) {
             internal_error(
                 true,
                 "DICTIONARY: attempted to %s() of an item with reference counter = %d on a dictionary created from %s() %zu@%s",
@@ -1928,7 +1928,7 @@ static inline void api_internal_check_with_trace(DICTIONARY *dict, DICTIONARY_IT
 
 #define api_is_name_good(dict, name, name_len) api_is_name_good_with_trace(dict, name, name_len, __FUNCTION__)
 static bool api_is_name_good_with_trace(DICTIONARY *dict __maybe_unused, const char *name, ssize_t name_len __maybe_unused, const char *function __maybe_unused) {
-    if(unlikely(!name)) {
+    if(!name) {
         internal_error(
             true,
             "DICTIONARY: attempted to %s() with name = NULL on a dictionary created from %s() %zu@%s.",
@@ -1939,7 +1939,7 @@ static bool api_is_name_good_with_trace(DICTIONARY *dict __maybe_unused, const c
         return false;
     }
 
-    if(unlikely(!*name)) {
+    if(!*name) {
         internal_error(
             true,
             "DICTIONARY: attempted to %s() with empty name on a dictionary created from %s() %zu@%s.",
@@ -2044,7 +2044,7 @@ DICTIONARY *dictionary_create_view(DICTIONARY *master) {
 
     dictionary_hooks_allocate(master);
 
-    if(unlikely(__atomic_load_n(&master->hooks->links, __ATOMIC_RELAXED)) < 1)
+    if(__atomic_load_n(&master->hooks->links, __ATOMIC_RELAXED) < 1)
         fatal("DICTIONARY: attempted to create a view that has %d links", master->hooks->links);
 
     dict->hooks = master->hooks;
@@ -2061,7 +2061,7 @@ DICTIONARY *dictionary_create_view(DICTIONARY *master) {
 }
 
 void dictionary_flush(DICTIONARY *dict) {
-    if(unlikely(!dict))
+    if(!dict)
         return;
 
     void *value;
@@ -2113,12 +2113,12 @@ size_t dictionary_destroy(DICTIONARY *dict) {
 // SET an item to the dictionary
 
 DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
-    if(unlikely(!api_is_name_good(dict, name, name_len)))
+    if(!api_is_name_good(dict, name, name_len))
         return NULL;
 
     api_internal_check(dict, NULL, false, true);
 
-    if(unlikely(is_view_dictionary(dict)))
+    if(is_view_dictionary(dict))
         fatal("DICTIONARY: this dictionary is a view, you cannot add items other than the ones from the master dictionary.");
 
     DICTIONARY_ITEM *item =
@@ -2130,7 +2130,7 @@ DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIO
 void *dictionary_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
     DICTIONARY_ITEM *item = dictionary_set_and_acquire_item_advanced(dict, name, name_len, value, value_len, constructor_data);
 
-    if(likely(item)) {
+    if(item) {
         void *v = item->shared->value;
         item_release(dict, item);
         return v;
@@ -2140,12 +2140,12 @@ void *dictionary_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_l
 }
 
 DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_view_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, DICTIONARY_ITEM *master_item) {
-    if(unlikely(!api_is_name_good(dict, name, name_len)))
+    if(!api_is_name_good(dict, name, name_len))
         return NULL;
 
     api_internal_check(dict, NULL, false, true);
 
-    if(unlikely(is_master_dictionary(dict)))
+    if(is_master_dictionary(dict))
         fatal("DICTIONARY: this dictionary is a master, you cannot add items from other dictionaries.");
 
     garbage_collect_pending_deletes(dict);
@@ -2161,7 +2161,7 @@ DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_view_set_and_acquire_item_advanced(D
 void *dictionary_view_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, DICTIONARY_ITEM *master_item) {
     DICTIONARY_ITEM *item = dictionary_view_set_and_acquire_item_advanced(dict, name, name_len, master_item);
 
-    if(likely(item)) {
+    if(item) {
         void *v = item->shared->value;
         item_release(dict, item);
         return v;
@@ -2174,7 +2174,7 @@ void *dictionary_view_set_advanced(DICTIONARY *dict, const char *name, ssize_t n
 // GET an item from the dictionary
 
 DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
-    if(unlikely(!api_is_name_good(dict, name, name_len)))
+    if(!api_is_name_good(dict, name, name_len))
         return NULL;
 
     api_internal_check(dict, NULL, false, true);
@@ -2186,7 +2186,7 @@ DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced(DICTIO
 void *dictionary_get_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
     DICTIONARY_ITEM *item = dictionary_get_and_acquire_item_advanced(dict, name, name_len);
 
-    if(likely(item)) {
+    if(item) {
         void *v = item->shared->value;
         item_release(dict, item);
         return v;
@@ -2202,7 +2202,7 @@ DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY *dict, 
     // we allow the item to be NULL here
     api_internal_check(dict, item, false, true);
 
-    if(likely(item)) {
+    if(item) {
         item_acquire(dict, item);
         api_internal_check(dict, item, false, false);
     }
@@ -2218,7 +2218,7 @@ void dictionary_acquired_item_release(DICTIONARY *dict, DICT_ITEM_CONST DICTIONA
     // we pass the last parameter to reference_counter_release() as true
     // so that the release may get a write-lock if required to clean up
 
-    if(likely(item))
+    if(item)
         item_release(dict, item);
 }
 
@@ -2230,14 +2230,14 @@ const char *dictionary_acquired_item_name(DICT_ITEM_CONST DICTIONARY_ITEM *item)
 }
 
 void *dictionary_acquired_item_value(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
-    if(likely(item))
+    if(item)
         return item->shared->value;
 
     return NULL;
 }
 
 size_t dictionary_acquired_item_references(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
-    if(likely(item))
+    if(item)
         return DICTIONARY_ITEM_REFCOUNT_GET_SOLE(item);
 
     return 0;
@@ -2247,7 +2247,7 @@ size_t dictionary_acquired_item_references(DICT_ITEM_CONST DICTIONARY_ITEM *item
 // DEL an item
 
 bool dictionary_del_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
-    if(unlikely(!api_is_name_good(dict, name, name_len)))
+    if(!api_is_name_good(dict, name, name_len))
         return false;
 
     api_internal_check(dict, NULL, false, true);
@@ -2258,9 +2258,9 @@ bool dictionary_del_advanced(DICTIONARY *dict, const char *name, ssize_t name_le
 // traversal with loop
 
 void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw) {
-    if(unlikely(!dfe || !dict)) return NULL;
+    if(!dfe || !dict) return NULL;
 
-    if(unlikely(is_dictionary_destroyed(dict))) {
+    if(is_dictionary_destroyed(dict)) {
         internal_error(true, "DICTIONARY: attempted to dictionary_foreach_start_rw() on a destroyed dictionary");
         dfe->counter = 0;
         dfe->item = NULL;
@@ -2284,7 +2284,7 @@ void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw) {
     while(item && !item_check_and_acquire(dict, item))
         item = item->next;
 
-    if(likely(item)) {
+    if(item) {
         dfe->item = item;
         dfe->name = (char *)item_get_name(item);
         dfe->value = item->shared->value;
@@ -2295,7 +2295,7 @@ void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw) {
         dfe->value = NULL;
     }
 
-    if(unlikely(dfe->rw == DICTIONARY_LOCK_REENTRANT)) {
+    if(dfe->rw == DICTIONARY_LOCK_REENTRANT) {
         ll_recursive_unlock(dfe->dict, dfe->rw);
         dfe->locked = false;
     }
@@ -2304,9 +2304,9 @@ void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw) {
 }
 
 void *dictionary_foreach_next(DICTFE *dfe) {
-    if(unlikely(!dfe || !dfe->dict)) return NULL;
+    if(!dfe || !dfe->dict) return NULL;
 
-    if(unlikely(is_dictionary_destroyed(dfe->dict))) {
+    if(is_dictionary_destroyed(dfe->dict)) {
         internal_error(true, "DICTIONARY: attempted to dictionary_foreach_next() on a destroyed dictionary");
         dfe->item = NULL;
         dfe->name = NULL;
@@ -2314,7 +2314,7 @@ void *dictionary_foreach_next(DICTFE *dfe) {
         return NULL;
     }
 
-    if(unlikely(dfe->rw == DICTIONARY_LOCK_REENTRANT) || !dfe->locked) {
+    if(dfe->rw == DICTIONARY_LOCK_REENTRANT || !dfe->locked) {
         ll_recursive_lock(dfe->dict, dfe->rw);
         dfe->locked = true;
     }
@@ -2329,13 +2329,13 @@ void *dictionary_foreach_next(DICTFE *dfe) {
     while(item_next && !item_check_and_acquire(dfe->dict, item_next))
         item_next = item_next->next;
 
-    if(likely(item)) {
+    if(item) {
         dict_item_release_and_check_if_it_is_deleted_and_can_be_removed_under_this_lock_mode(dfe->dict, item, dfe->rw);
         // item_release(dfe->dict, item);
     }
 
     item = item_next;
-    if(likely(item)) {
+    if(item) {
         dfe->item = item;
         dfe->name = (char *)item_get_name(item);
         dfe->value = item->shared->value;
@@ -2347,7 +2347,7 @@ void *dictionary_foreach_next(DICTFE *dfe) {
         dfe->value = NULL;
     }
 
-    if(unlikely(dfe->rw == DICTIONARY_LOCK_REENTRANT)) {
+    if(dfe->rw == DICTIONARY_LOCK_REENTRANT) {
         ll_recursive_unlock(dfe->dict, dfe->rw);
         dfe->locked = false;
     }
@@ -2363,9 +2363,9 @@ void dictionary_foreach_unlock(DICTFE *dfe) {
 }
 
 void dictionary_foreach_done(DICTFE *dfe) {
-    if(unlikely(!dfe || !dfe->dict)) return;
+    if(!dfe || !dfe->dict) return;
 
-    if(unlikely(is_dictionary_destroyed(dfe->dict))) {
+    if(is_dictionary_destroyed(dfe->dict)) {
         internal_error(true, "DICTIONARY: attempted to dictionary_foreach_next() on a destroyed dictionary");
         return;
     }
@@ -2374,12 +2374,12 @@ void dictionary_foreach_done(DICTFE *dfe) {
     DICTIONARY_ITEM *item = dfe->item;
 
     // release it, so that it can possibly be deleted
-    if(likely(item)) {
+    if(item) {
         dict_item_release_and_check_if_it_is_deleted_and_can_be_removed_under_this_lock_mode(dfe->dict, item, dfe->rw);
         // item_release(dfe->dict, item);
     }
 
-    if(likely(dfe->rw != DICTIONARY_LOCK_REENTRANT) && dfe->locked) {
+    if(dfe->rw != DICTIONARY_LOCK_REENTRANT && dfe->locked) {
         ll_recursive_unlock(dfe->dict, dfe->rw);
         dfe->locked = false;
     }
@@ -2397,9 +2397,9 @@ void dictionary_foreach_done(DICTFE *dfe) {
 // do not use other dictionary calls while walking the dictionary - deadlock!
 
 int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const DICTIONARY_ITEM *item, void *entry, void *data), void *data) {
-    if(unlikely(!dict || !callback)) return 0;
+    if(!dict || !callback) return 0;
 
-    if(unlikely(is_dictionary_destroyed(dict))) {
+    if(is_dictionary_destroyed(dict)) {
         internal_error(true, "DICTIONARY: attempted to dictionary_walkthrough_rw() on a destroyed dictionary");
         return 0;
     }
@@ -2415,17 +2415,17 @@ int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const D
     while(item) {
 
         // skip the deleted items
-        if(unlikely(!item_check_and_acquire(dict, item))) {
+        if(!item_check_and_acquire(dict, item)) {
             item = item->next;
             continue;
         }
 
-        if(unlikely(rw == DICTIONARY_LOCK_REENTRANT))
+        if(rw == DICTIONARY_LOCK_REENTRANT)
             ll_recursive_unlock(dict, rw);
 
         int r = callback(item, item->shared->value, data);
 
-        if(unlikely(rw == DICTIONARY_LOCK_REENTRANT))
+        if(rw == DICTIONARY_LOCK_REENTRANT)
             ll_recursive_lock(dict, rw);
 
         // since we have a reference counter, this item cannot be deleted
@@ -2435,7 +2435,7 @@ int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const D
         dict_item_release_and_check_if_it_is_deleted_and_can_be_removed_under_this_lock_mode(dict, item, rw);
         // item_release(dict, item);
 
-        if(unlikely(r < 0)) {
+        if(r < 0) {
             ret = r;
             break;
         }
@@ -2460,9 +2460,9 @@ static int dictionary_sort_compar(const void *item1, const void *item2) {
 }
 
 int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const DICTIONARY_ITEM *item, void *entry, void *data), void *data, dictionary_sorted_compar compar) {
-    if(unlikely(!dict || !callback)) return 0;
+    if(!dict || !callback) return 0;
 
-    if(unlikely(is_dictionary_destroyed(dict))) {
+    if(is_dictionary_destroyed(dict)) {
         internal_error(true, "DICTIONARY: attempted to dictionary_sorted_walkthrough_rw() on a destroyed dictionary");
         return 0;
     }
@@ -2476,12 +2476,12 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
     size_t i;
     DICTIONARY_ITEM *item;
     for(item = dict->items.list, i = 0; item && i < entries; item = item->next) {
-        if(likely(item_check_and_acquire(dict, item)))
+        if(item_check_and_acquire(dict, item))
             array[i++] = item;
     }
     ll_recursive_unlock(dict, rw);
 
-    if(unlikely(i != entries))
+    if(i != entries)
         entries = i;
 
     if(compar)
@@ -2527,14 +2527,14 @@ void *thread_cache_entry_get_or_set(void *key,
                                     void *value,
                                     void *(*transform_the_value_before_insert)(void *key, size_t key_length, void *value)
                                     ) {
-    if(unlikely(!key || !key_length)) return NULL;
+    if(!key || !key_length) return NULL;
 
     if(key_length == -1)
         key_length = (ssize_t)strlen((char *)key) + 1;
 
     JError_t J_Error;
     Pvoid_t *Rc = JudyHSIns(&thread_cache_judy_array, key, key_length, &J_Error);
-    if (unlikely(Rc == PJERR)) {
+    if (Rc == PJERR) {
         fatal("THREAD_CACHE: Cannot insert entry to JudyHS, JU_ERRNO_* == %u, ID == %d",
               JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
     }
@@ -2549,11 +2549,11 @@ void *thread_cache_entry_get_or_set(void *key,
 }
 
 void thread_cache_destroy(void) {
-    if(unlikely(!thread_cache_judy_array)) return;
+    if(!thread_cache_judy_array) return;
 
     JError_t J_Error;
     Word_t ret = JudyHSFreeArray(&thread_cache_judy_array, &J_Error);
-    if(unlikely(ret == (Word_t) JERR)) {
+    if(ret == (Word_t) JERR) {
         netdata_log_error("THREAD_CACHE: Cannot destroy JudyHS, JU_ERRNO_* == %u, ID == %d",
                           JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
     }

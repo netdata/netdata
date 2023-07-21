@@ -740,7 +740,7 @@ static void ebpf_update_fd_cgroup(int maps_per_core)
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_fd_stat_t *out = &pids->fd;
-            if (likely(fd_pid) && fd_pid[pid]) {
+            if (fd_pid && fd_pid[pid]) {
                 netdata_fd_stat_t *in = fd_pid[pid];
 
                 memcpy(out, in, sizeof(netdata_fd_stat_t));
@@ -802,14 +802,14 @@ void ebpf_fd_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
 {
     struct ebpf_target *w;
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             ebpf_fd_sum_pids(&w->fd, w->root_pid);
         }
     }
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_OPEN);
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             write_chart_dimension(w->name, w->fd.open_call);
         }
     }
@@ -818,7 +818,7 @@ void ebpf_fd_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
     if (em->mode < MODE_ENTRY) {
         write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes)) {
+            if (w->exposed && w->processes) {
                 write_chart_dimension(w->name, w->fd.open_err);
             }
         }
@@ -827,7 +827,7 @@ void ebpf_fd_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_CLOSED);
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             write_chart_dimension(w->name, w->fd.close_call);
         }
     }
@@ -836,7 +836,7 @@ void ebpf_fd_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
     if (em->mode < MODE_ENTRY) {
         write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes)) {
+            if (w->exposed && w->processes) {
                 write_chart_dimension(w->name, w->fd.close_err);
             }
         }
@@ -1039,7 +1039,7 @@ static void ebpf_send_systemd_fd_charts(ebpf_module_t *em)
     ebpf_cgroup_target_t *ect;
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SYSCALL_APPS_FILE_OPEN);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+        if (ect->systemd && ect->updated) {
             write_chart_dimension(ect->name, ect->publish_systemd_fd.open_call);
         }
     }
@@ -1048,7 +1048,7 @@ static void ebpf_send_systemd_fd_charts(ebpf_module_t *em)
     if (em->mode < MODE_ENTRY) {
         write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR);
         for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-            if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+            if (ect->systemd && ect->updated) {
                 write_chart_dimension(ect->name, ect->publish_systemd_fd.open_err);
             }
         }
@@ -1057,7 +1057,7 @@ static void ebpf_send_systemd_fd_charts(ebpf_module_t *em)
 
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SYSCALL_APPS_FILE_CLOSED);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+        if (ect->systemd && ect->updated) {
             write_chart_dimension(ect->name, ect->publish_systemd_fd.close_call);
         }
     }
@@ -1066,7 +1066,7 @@ static void ebpf_send_systemd_fd_charts(ebpf_module_t *em)
     if (em->mode < MODE_ENTRY) {
         write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR);
         for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-            if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+            if (ect->systemd && ect->updated) {
                 write_chart_dimension(ect->name, ect->publish_systemd_fd.close_err);
             }
         }

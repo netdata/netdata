@@ -83,12 +83,12 @@ storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags) {
     // bit 25 SN_ANOMALY_BIT = 0: anomalous, 1: not anomalous
     // bit 24 to bit 1 = the value
 
-    if(unlikely(fpclassify(value) == FP_NAN || fpclassify(value) == FP_INFINITE))
+    if(fpclassify(value) == FP_NAN || fpclassify(value) == FP_INFINITE)
         return SN_EMPTY_SLOT;
 
     storage_number r = flags & SN_USER_FLAGS;
 
-    if(unlikely(fpclassify(value) == FP_ZERO || fpclassify(value) == FP_SUBNORMAL))
+    if(fpclassify(value) == FP_ZERO || fpclassify(value) == FP_SUBNORMAL)
         return r;
 
     int m = 0;
@@ -138,7 +138,7 @@ storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags) {
             m++;
         }
 
-        if (unlikely(n > (NETDATA_DOUBLE)0x00ffffff)) {
+        if (n > (NETDATA_DOUBLE)0x00ffffff) {
             n /= 10;
             m--;
         }

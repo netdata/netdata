@@ -31,11 +31,11 @@ static void build_node_collectors(char *node_id __maybe_unused)
 
     RRDHOST *host = find_host_by_node_id(node_id);
 
-    if (unlikely(!host))
+    if (!host)
         return;
 
     struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *) host->aclk_sync_host_config;
-    if (unlikely(!wc))
+    if (!wc)
         return;
 
     struct update_node_collectors upd_node_collectors;
@@ -61,14 +61,14 @@ static void build_node_info(char *node_id __maybe_unused)
 
     RRDHOST *host = find_host_by_node_id(node_id);
 
-    if (unlikely((!host))) {
+    if ((!host)) {
         freez(node_id);
         return;
     }
 
     struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *) host->aclk_sync_host_config;
 
-    if (unlikely(!wc)) {
+    if (!wc) {
         freez(node_id);
         return;
     }
@@ -141,17 +141,17 @@ void aclk_check_node_info_and_collectors(void)
 {
     RRDHOST *host;
 
-    if (unlikely(!aclk_connected))
+    if (!aclk_connected)
         return;
 
     size_t pending = 0;
     dfe_start_reentrant(rrdhost_root_index, host) {
 
         struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
-        if (unlikely(!wc))
+        if (!wc)
             continue;
 
-        if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
+        if (rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)) {
             internal_error(true, "ACLK SYNC: Context still pending for %s", rrdhost_hostname(host));
             pending++;
             continue;

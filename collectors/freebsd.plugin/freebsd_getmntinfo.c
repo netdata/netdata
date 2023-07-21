@@ -38,9 +38,9 @@ static struct mount_point *mount_points_root = NULL, *mount_points_last_used = N
 static size_t mount_points_added = 0, mount_points_found = 0;
 
 static void mount_point_free(struct mount_point *m) {
-    if (likely(m->st_space))
+    if (m->st_space)
         rrdset_is_obsolete(m->st_space);
-    if (likely(m->st_inodes))
+    if (m->st_inodes)
         rrdset_is_obsolete(m->st_inodes);
 
     mount_points_added--;
@@ -49,11 +49,11 @@ static void mount_point_free(struct mount_point *m) {
 }
 
 static void mount_points_cleanup() {
-    if (likely(mount_points_found == mount_points_added)) return;
+    if (mount_points_found == mount_points_added) return;
 
     struct mount_point *m = mount_points_root, *last = NULL;
     while(m) {
-        if (unlikely(!m->updated)) {
+        if (!m->updated) {
             // collector_info("Removing mount point '%s', linked after '%s'", m->name, last?last->name:"ROOT");
 
             if (mount_points_last_used == m)
@@ -85,7 +85,7 @@ static struct mount_point *get_mount_point(const char *name) {
 
     // search it, from the last position to the end
     for(m = mount_points_last_used ; m ; m = m->next) {
-        if (unlikely(hash == m->hash && !strcmp(name, m->name))) {
+        if (hash == m->hash && !strcmp(name, m->name)) {
             mount_points_last_used = m->next;
             return m;
         }
@@ -93,7 +93,7 @@ static struct mount_point *get_mount_point(const char *name) {
 
     // search it from the beginning to the last position we used
     for(m = mount_points_root ; m != mount_points_last_used ; m = m->next) {
-        if (unlikely(hash == m->hash && !strcmp(name, m->name))) {
+        if (hash == m->hash && !strcmp(name, m->name)) {
             mount_points_last_used = m->next;
             return m;
         }
@@ -134,7 +134,7 @@ int do_getmntinfo(int update_every, usec_t dt) {
     static SIMPLE_PATTERN *excluded_mountpoints = NULL;
     static SIMPLE_PATTERN *excluded_filesystems = NULL;
 
-    if (unlikely(enable_new_mount_points == -1)) {
+    if (enable_new_mount_points == -1) {
         enable_new_mount_points = config_get_boolean_ondemand(CONFIG_SECTION_GETMNTINFO,
                                                               "enable new mount points detected at runtime",
                                                               CONFIG_BOOLEAN_AUTO);
@@ -155,12 +155,12 @@ int do_getmntinfo(int update_every, usec_t dt) {
             true);
     }
 
-    if (likely(do_space || do_inodes)) {
+    if (do_space || do_inodes) {
         struct statfs *mntbuf;
         int mntsize;
 
         // there is no mount info in sysctl MIBs
-        if (unlikely(!(mntsize = getmntinfo(&mntbuf, MNT_NOWAIT)))) {
+        if (!(mntsize = getmntinfo(&mntbuf, MNT_NOWAIT))) {
             collector_error("FREEBSD: getmntinfo() failed");
             do_space = 0;
             collector_error("DISABLED: disk_space.* charts");
@@ -180,7 +180,7 @@ int do_getmntinfo(int update_every, usec_t dt) {
                 m->updated = 1;
                 mount_points_found++;
 
-                if (unlikely(!m->configured)) {
+                if (!m->configured) {
                     char var_name[4096 + 1];
 
                     // this is the first time we see this filesystem
@@ -190,24 +190,24 @@ int do_getmntinfo(int update_every, usec_t dt) {
 
                     m->enabled = enable_new_mount_points;
 
-                    if (likely(m->enabled))
+                    if (m->enabled)
                         m->enabled = !(simple_pattern_matches(excluded_mountpoints, mntbuf[i].f_mntonname)
                                        || simple_pattern_matches(excluded_filesystems, mntbuf[i].f_fstypename));
 
                     snprintfz(var_name, 4096, "%s:%s", CONFIG_SECTION_GETMNTINFO, mntbuf[i].f_mntonname);
                     m->enabled = config_get_boolean_ondemand(var_name, "enabled", m->enabled);
 
-                    if (unlikely(m->enabled == CONFIG_BOOLEAN_NO))
+                    if (m->enabled == CONFIG_BOOLEAN_NO)
                         continue;
 
                     m->do_space  = config_get_boolean_ondemand(var_name, "space usage",  do_space);
                     m->do_inodes = config_get_boolean_ondemand(var_name, "inodes usage", do_inodes);
                 }
 
-                if (unlikely(!m->enabled))
+                if (!m->enabled)
                     continue;
 
-                if (unlikely(mntbuf[i].f_flags & MNT_RDONLY && !m->collected))
+                if (mntbuf[i].f_flags & MNT_RDONLY && !m->collected)
                     continue;
 
                 int rendered = 0;
@@ -215,7 +215,7 @@ int do_getmntinfo(int update_every, usec_t dt) {
                 if (m->do_space == CONFIG_BOOLEAN_YES || (m->do_space == CONFIG_BOOLEAN_AUTO &&
                                                           (mntbuf[i].f_blocks > 2 ||
                                                            netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                    if (unlikely(!m->st_space)) {
+                    if (!m->st_space) {
                         snprintfz(title, 4096, "Disk Space Usage for %s [%s]",
                                   mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
                         m->st_space = rrdset_create_localhost("disk_space",
@@ -253,7 +253,7 @@ int do_getmntinfo(int update_every, usec_t dt) {
                 if (m->do_inodes == CONFIG_BOOLEAN_YES || (m->do_inodes == CONFIG_BOOLEAN_AUTO &&
                                                            (mntbuf[i].f_files > 1 ||
                                                             netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                    if (unlikely(!m->st_inodes)) {
+                    if (!m->st_inodes) {
                         snprintfz(title, 4096, "Disk Files (inodes) Usage for %s [%s]",
                                   mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
                         m->st_inodes = rrdset_create_localhost("disk_inodes",
@@ -282,7 +282,7 @@ int do_getmntinfo(int update_every, usec_t dt) {
                     rendered++;
                 }
 
-                if (likely(rendered))
+                if (rendered)
                     m->collected++;
             }
         }

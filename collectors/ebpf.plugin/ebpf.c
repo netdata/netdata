@@ -852,7 +852,7 @@ static inline void ebpf_create_apps_for_module(ebpf_module_t *em, struct ebpf_ta
  */
 static void ebpf_create_apps_charts(struct ebpf_target *root)
 {
-    if (unlikely(!ebpf_all_pids))
+    if (!ebpf_all_pids)
         return;
 
     struct ebpf_target *w;
@@ -862,7 +862,7 @@ static void ebpf_create_apps_charts(struct ebpf_target *root)
         if (w->target)
             continue;
 
-        if (unlikely(w->processes && (debug_enabled || w->debug_enabled))) {
+        if (w->processes && (debug_enabled || w->debug_enabled)) {
             struct ebpf_pid_on_target *pid_on_target;
 
             fprintf(
@@ -1188,7 +1188,7 @@ void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family
                          update_every, module);
 
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed))
+        if (w->exposed)
             fprintf(stdout, "DIMENSION %s '' %s 1 1\n", w->name, algorithm);
     }
 }
@@ -1684,7 +1684,7 @@ static void read_local_ports(char *filename, uint8_t proto)
     for(l = 0; l < lines ;l++) {
         size_t words = procfile_linewords(ff, l);
         // This is header or end of file
-        if (unlikely(words < 14))
+        if (words < 14)
             continue;
 
         // https://elixir.bootlin.com/linux/v5.7.8/source/include/net/tcp_states.h
@@ -2921,13 +2921,13 @@ static char *ebpf_get_process_name(pid_t pid)
     snprintfz(filename, FILENAME_MAX, "/proc/%d/status", pid);
 
     procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
-    if(unlikely(!ff)) {
+    if(!ff) {
         netdata_log_error("Cannot open %s", filename);
         return name;
     }
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff))
+    if(!ff)
         return name;
 
     unsigned long i, lines = procfile_lines(ff);

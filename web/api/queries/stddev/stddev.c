@@ -14,7 +14,7 @@ NETDATA_DOUBLE grouping_flush_mean(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options
 
     NETDATA_DOUBLE value;
 
-    if(unlikely(!g->count)) {
+    if(!g->count) {
         value = 0.0;
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
@@ -41,7 +41,7 @@ NETDATA_DOUBLE grouping_flush_variance(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_opt
 
     NETDATA_DOUBLE value;
 
-    if(unlikely(!g->count)) {
+    if(!g->count) {
         value = 0.0;
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }

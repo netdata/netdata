@@ -52,7 +52,7 @@ SILENCER *health_silencers_addparam(SILENCER *silencer, char *key, char *value) 
             hash_host = 0,
             hash_families = 0;
 
-    if (unlikely(!hash_alarm)) {
+    if (!hash_alarm) {
         hash_alarm = simple_uhash(HEALTH_ALARM_KEY);
         hash_template = simple_uhash(HEALTH_TEMPLATE_KEY);
         hash_chart = simple_uhash(HEALTH_CHART_KEY);
@@ -62,7 +62,7 @@ SILENCER *health_silencers_addparam(SILENCER *silencer, char *key, char *value) 
     }
 
     uint32_t hash = simple_uhash(key);
-    if (unlikely(silencer == NULL)) {
+    if (silencer == NULL) {
         if (
                 (hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) ||
                 (hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY)) ||

@@ -170,7 +170,7 @@ void send_job_charts_definitions_to_netdata(const char *name, uint32_t job_id, b
 struct job_metrics *get_job_metrics(char *dest) {
     struct job_metrics *jm = dictionary_get(dict_dest_job_metrics, dest);
 
-    if (unlikely(!jm)) {
+    if (!jm) {
         static uint32_t job_id = 0;
         struct job_metrics new_job_metrics = { .id = ++job_id };
         jm = dictionary_set(dict_dest_job_metrics, dest, &new_job_metrics, sizeof(struct job_metrics));
@@ -262,7 +262,7 @@ int main(int argc, char **argv) {
     for (iteration = 0; 1; iteration++) {
         heartbeat_next(&hb, step);
 
-        if (unlikely(netdata_exit))
+        if (netdata_exit)
             break;
 
         reset_metrics();
@@ -270,7 +270,7 @@ int main(int argc, char **argv) {
         cups_dest_t *dests;
         num_dest_total = cupsGetDests2(http, &dests);
 
-        if(unlikely(num_dest_total == 0)) {
+        if(num_dest_total == 0) {
             // reconnect to cups to check if the server is down.
             httpClose(http);
             http = httpConnect2(cupsServer(), ippPort(), NULL, AF_UNSPEC, cupsEncryption(), 0, netdata_update_every * 1000, NULL);
@@ -334,7 +334,7 @@ int main(int argc, char **argv) {
         }
         cupsFreeDests(num_dest_total, dests);
 
-        if (unlikely(netdata_exit))
+        if (netdata_exit)
             break;
 
         cups_job_t *jobs, *curr_job;
@@ -374,7 +374,7 @@ int main(int argc, char **argv) {
         dictionary_garbage_collect(dict_dest_job_metrics);
 
         static int cups_printer_by_option_created = 0;
-        if (unlikely(!cups_printer_by_option_created))
+        if (!cups_printer_by_option_created)
         {
             cups_printer_by_option_created = 1;
             printf("CHART cups.dest_state '' 'Destinations by state' dests overview cups.dests_state stacked 100000 %i\n", netdata_update_every);
@@ -429,7 +429,7 @@ int main(int argc, char **argv) {
 
         fflush(stdout);
 
-        if (unlikely(netdata_exit))
+        if (netdata_exit)
             break;
 
         // restart check (14400 seconds)

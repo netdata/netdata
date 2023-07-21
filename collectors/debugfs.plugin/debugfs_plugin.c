@@ -230,11 +230,11 @@ int main(int argc, char **argv)
 
         for (int i = 0; debugfs_modules[i].name; i++) {
             struct debugfs_module *pm = &debugfs_modules[i];
-            if (unlikely(!pm->enabled))
+            if (!pm->enabled)
                 continue;
 
             pm->enabled = !pm->func(update_every, pm->name);
-            if (likely(pm->enabled))
+            if (pm->enabled)
                 enabled++;
         }
         if (!enabled) {

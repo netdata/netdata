@@ -74,7 +74,7 @@ static inline uint32_t fnv1a_uhash32(const char *name) {
     unsigned char *s = (unsigned char *) name;
     uint32_t hash = 0x811c9dc5, c;
     while ((c = *s++)) {
-        if (unlikely(c >= 'A' && c <= 'Z')) c += 'a' - 'A';
+        if (c >= 'A' && c <= 'Z') c += 'a' - 'A';
         hash ^= c;
         hash *= 0x01000193; // 16777619
     }
@@ -127,12 +127,12 @@ static inline unsigned int str2u(const char *s) {
 }
 
 static inline int str2i(const char *s) {
-    if(unlikely(*s == '-')) {
+    if(*s == '-') {
         s++;
         return -(int) str2u(s);
     }
     else {
-        if(unlikely(*s == '+')) s++;
+        if(*s == '+') s++;
         return (int) str2u(s);
     }
 }
@@ -147,12 +147,12 @@ static inline unsigned long str2ul(const char *s) {
 }
 
 static inline long str2l(const char *s) {
-    if(unlikely(*s == '-')) {
+    if(*s == '-') {
         s++;
         return -(long) str2ul(s);
     }
     else {
-        if(unlikely(*s == '+')) s++;
+        if(*s == '+') s++;
         return (long) str2ul(s);
     }
 }
@@ -163,7 +163,7 @@ static inline uint32_t str2uint32_t(const char *s, char **endptr) {
     while(*s >= '0' && *s <= '9')
         n = n * 10 + (*s++ - '0');
 
-    if(unlikely(endptr))
+    if(endptr)
         *endptr = (char *)s;
 
     return n;
@@ -183,7 +183,7 @@ static inline uint64_t str2uint64_t(const char *s, char **endptr) {
     while(*s >= '0' && *s <= '9')
         n = n * 10 + (*s++ - '0');
 
-    if(unlikely(endptr))
+    if(endptr)
         *endptr = (char *)s;
 
     return n;
@@ -194,12 +194,12 @@ static inline unsigned long long int str2ull(const char *s, char **endptr) {
 }
 
 static inline long long str2ll(const char *s, char **endptr) {
-    if(unlikely(*s == '-')) {
+    if(*s == '-') {
         s++;
         return -(long long) str2uint64_t(s, endptr);
     }
     else {
-        if(unlikely(*s == '+')) s++;
+        if(*s == '+') s++;
         return (long long) str2uint64_t(s, endptr);
     }
 }
@@ -305,13 +305,13 @@ static inline NETDATA_DOUBLE str2ndd(const char *src, char **endptr) {
     result = str2ndd_parse_double_decimal_digits_internal(s, &integral_digits);
     s += integral_digits;
 
-    if(unlikely(*s == '.')) {
+    if(*s == '.') {
         s++;
         fractional = str2ndd_parse_double_decimal_digits_internal(s, &fractional_digits);
         s += fractional_digits;
     }
 
-    if (unlikely(*s == 'e' || *s == 'E')) {
+    if (*s == 'e' || *s == 'E') {
         const char *e_ptr = s;
         s++;
 
@@ -324,7 +324,7 @@ static inline NETDATA_DOUBLE str2ndd(const char *src, char **endptr) {
             s++;
 
         exponent = str2ndd_parse_double_decimal_digits_internal(s, &exponent_digits);
-        if(unlikely(!exponent_digits)) {
+        if(!exponent_digits) {
             exponent = 0;
             s = e_ptr;
         }
@@ -334,13 +334,13 @@ static inline NETDATA_DOUBLE str2ndd(const char *src, char **endptr) {
         }
     }
 
-    if(unlikely(endptr))
+    if(endptr)
         *endptr = (char *)s;
 
-    if (unlikely(exponent_digits))
+    if (exponent_digits)
         result *= powndd(10.0, exponent);
 
-    if (unlikely(fractional_digits))
+    if (fractional_digits)
         result += fractional / powndd(10.0, fractional_digits) * (exponent_digits ? powndd(10.0, exponent) : 1.0);
 
     return sign * result;
@@ -385,10 +385,10 @@ static inline NETDATA_DOUBLE str2ndd_encoded(const char *src, char **endptr) {
         src++;
     }
 
-    if(unlikely(*src == IEEE754_UINT64_B64_PREFIX[0]))
+    if(*src == IEEE754_UINT64_B64_PREFIX[0])
         return (NETDATA_DOUBLE) str2uint64_base64(src + sizeof(IEEE754_UINT64_B64_PREFIX) - 1, endptr) * sign;
 
-    if(unlikely(*src == HEX_PREFIX[0] && src[1] == HEX_PREFIX[1]))
+    if(*src == HEX_PREFIX[0] && src[1] == HEX_PREFIX[1])
         return (NETDATA_DOUBLE) str2uint64_hex(src + sizeof(HEX_PREFIX) - 1, endptr) * sign;
 
     return str2ndd(src, endptr) * sign;
@@ -462,16 +462,16 @@ static inline bool sanitize_command_argument_string(char *dst, const char *src, 
 }
 
 static inline int read_file(const char *filename, char *buffer, size_t size) {
-    if(unlikely(!size)) return 3;
+    if(!size) return 3;
 
     int fd = open(filename, O_RDONLY, 0666);
-    if(unlikely(fd == -1)) {
+    if(fd == -1) {
         buffer[0] = '\0';
         return 1;
     }
 
     ssize_t r = read(fd, buffer, size);
-    if(unlikely(r == -1)) {
+    if(r == -1) {
         buffer[0] = '\0';
         close(fd);
         return 2;
@@ -486,7 +486,7 @@ static inline int read_single_number_file(const char *filename, unsigned long lo
     char buffer[30 + 1];
 
     int ret = read_file(filename, buffer, 30);
-    if(unlikely(ret)) {
+    if(ret) {
         *result = 0;
         return ret;
     }
@@ -500,7 +500,7 @@ static inline int read_single_signed_number_file(const char *filename, long long
     char buffer[30 + 1];
 
     int ret = read_file(filename, buffer, 30);
-    if(unlikely(ret)) {
+    if(ret) {
         *result = 0;
         return ret;
     }

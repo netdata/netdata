@@ -58,7 +58,7 @@ static inline int rrdmetric_to_json_callback(const DICTIONARY_ITEM *item, void *
     time_t after = t->after;
     time_t before = t->before;
 
-    if(unlikely(rrd_flag_is_deleted(rm) && !(options & RRDCONTEXT_OPTION_SHOW_DELETED)))
+    if(rrd_flag_is_deleted(rm) && !(options & RRDCONTEXT_OPTION_SHOW_DELETED))
         return 0;
 
     if(after && (!rm->last_time_s || after > rm->last_time_s))
@@ -122,7 +122,7 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
     time_t before = t_parent->before;
     bool has_filter = t_parent->chart_label_key || t_parent->chart_labels_filter || t_parent->chart_dimensions;
 
-    if(unlikely(rrd_flag_is_deleted(ri) && !(options & RRDCONTEXT_OPTION_SHOW_DELETED)))
+    if(rrd_flag_is_deleted(ri) && !(options & RRDCONTEXT_OPTION_SHOW_DELETED))
         return 0;
 
     if(after && (!ri->last_time_s || after > ri->last_time_s))
@@ -242,10 +242,10 @@ static inline int rrdcontext_to_json_callback(const DICTIONARY_ITEM *item, void 
     time_t before = t_parent->before;
     bool has_filter = t_parent->chart_label_key || t_parent->chart_labels_filter || t_parent->chart_dimensions;
 
-    if(unlikely(rrd_flag_check(rc, RRD_FLAG_HIDDEN) && !(options & RRDCONTEXT_OPTION_SHOW_HIDDEN)))
+    if(rrd_flag_check(rc, RRD_FLAG_HIDDEN) && !(options & RRDCONTEXT_OPTION_SHOW_HIDDEN))
         return 0;
 
-    if(unlikely(rrd_flag_is_deleted(rc) && !(options & RRDCONTEXT_OPTION_SHOW_DELETED)))
+    if(rrd_flag_is_deleted(rc) && !(options & RRDCONTEXT_OPTION_SHOW_DELETED))
         return 0;
 
     if(options & RRDCONTEXT_OPTION_DEEPSCAN)

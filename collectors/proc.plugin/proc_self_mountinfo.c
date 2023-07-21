@@ -53,11 +53,11 @@ struct mountinfo *mountinfo_find(struct mountinfo *root, unsigned long major, un
     uint32_t hash = simple_hash(device);
 
     for(mi = root; mi ; mi = mi->next)
-        if (unlikely(
+        if (
                 mi->major == major &&
                 mi->minor == minor &&
                 mi->mount_source_name_hash == hash &&
-                !strcmp(mi->mount_source_name, device)))
+                !strcmp(mi->mount_source_name, device))
             return mi;
 
     return NULL;
@@ -70,12 +70,12 @@ struct mountinfo *mountinfo_find_by_filesystem_mount_source(struct mountinfo *ro
     uint32_t filesystem_hash = simple_hash(filesystem), mount_source_hash = simple_hash(mount_source);
 
     for(mi = root; mi ; mi = mi->next)
-        if(unlikely(mi->filesystem
+        if(mi->filesystem
                 && mi->mount_source
                 && mi->filesystem_hash == filesystem_hash
                 && mi->mount_source_hash == mount_source_hash
                 && !strcmp(mi->filesystem, filesystem)
-                && !strcmp(mi->mount_source, mount_source)))
+                && !strcmp(mi->mount_source, mount_source))
             return mi;
 
     return NULL;
@@ -88,10 +88,10 @@ struct mountinfo *mountinfo_find_by_filesystem_super_option(struct mountinfo *ro
     size_t solen = strlen(super_options);
 
     for(mi = root; mi ; mi = mi->next)
-        if(unlikely(mi->filesystem
+        if(mi->filesystem
                 && mi->super_options
                 && mi->filesystem_hash == filesystem_hash
-                && !strcmp(mi->filesystem, filesystem))) {
+                && !strcmp(mi->filesystem, filesystem)) {
 
             // super_options is a comma separated list
             char *s = mi->super_options, *e;
@@ -100,7 +100,7 @@ struct mountinfo *mountinfo_find_by_filesystem_super_option(struct mountinfo *ro
                 while(*e && *e != ',') e++;
 
                 size_t len = e - s;
-                if(unlikely(len == solen && !strncmp(s, super_options, len)))
+                if(len == solen && !strncmp(s, super_options, len))
                     return mi;
 
                 if(*e == ',') s = ++e;
@@ -148,9 +148,9 @@ static char *strdupz_decoding_octal(const char *string) {
     const char *s = string;
 
     while(*s) {
-        if(unlikely(*s == '\\')) {
+        if(*s == '\\') {
             s++;
-            if(likely(isdigit(*s) && isdigit(s[1]) && isdigit(s[2]))) {
+            if(isdigit(*s) && isdigit(s[1]) && isdigit(s[2])) {
                 char c = *s++ - '0';
                 c <<= 3;
                 c |= *s++ - '0';
@@ -214,14 +214,14 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/proc/self/mountinfo", netdata_configured_host_prefix);
     procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
-    if(unlikely(!ff)) {
+    if(!ff) {
         snprintfz(filename, FILENAME_MAX, "%s/proc/1/mountinfo", netdata_configured_host_prefix);
         ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff)) return NULL;
+        if(!ff) return NULL;
     }
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff))
+    if(!ff)
         return NULL;
 
     struct mountinfo *root = NULL, *last = NULL, *mi = NULL;
@@ -233,7 +233,7 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
 
     unsigned long l, lines = procfile_lines(ff);
     for(l = 0; l < lines ;l++) {
-        if(unlikely(procfile_linewords(ff, l) < 5))
+        if(procfile_linewords(ff, l) < 5)
             continue;
 
         // make sure we don't add the same item twice
@@ -252,7 +252,7 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
         char *major = procfile_lineword(ff, l, w), *minor; w++;
         for(minor = major; *minor && *minor != ':' ;minor++) ;
 
-        if(unlikely(!*minor)) {
+        if(!*minor) {
             collector_error("Cannot parse major:minor on '%s' at line %lu of '%s'", major, l + 1, filename);
             freez(mi);
             continue;
@@ -278,10 +278,10 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
 
         mi->mount_options = strdupz(procfile_lineword(ff, l, w)); w++;
 
-        if(unlikely(is_read_only(mi->mount_options)))
+        if(is_read_only(mi->mount_options))
             mi->flags |= MOUNTINFO_READONLY;
 
-        if(unlikely(mount_point_is_protected(mi->mount_point)))
+        if(mount_point_is_protected(mi->mount_point))
            mi->flags |= MOUNTINFO_IS_IN_SYSD_PROTECTED_LIST;
 
         // count the optional fields
@@ -297,7 +297,7 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
         }
 
 /*
-        if(unlikely(mi->optional_fields_count)) {
+        if(mi->optional_fields_count) {
             // we have some optional fields
             // read them into a new array of pointers;
 
@@ -313,7 +313,7 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
             mi->optional_fields = NULL;
 */
 
-        if(likely(*s == '-')) {
+        if(*s == '-') {
             w++;
 
             mi->filesystem = strdupz(procfile_lineword(ff, l, w)); w++;
@@ -327,19 +327,19 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
 
             mi->super_options = strdupz(procfile_lineword(ff, l, w)); w++;
 
-            if(unlikely(is_read_only(mi->super_options)))
+            if(is_read_only(mi->super_options))
                 mi->flags |= MOUNTINFO_READONLY;
 
-            if(unlikely(ME_DUMMY(mi->mount_source, mi->filesystem)))
+            if(ME_DUMMY(mi->mount_source, mi->filesystem))
                 mi->flags |= MOUNTINFO_IS_DUMMY;
 
-            if(unlikely(ME_REMOTE(mi->mount_source, mi->filesystem)))
+            if(ME_REMOTE(mi->mount_source, mi->filesystem))
                 mi->flags |= MOUNTINFO_IS_REMOTE;
 
             // mark as BIND the duplicates (i.e. same filesystem + same source)
             if(do_statvfs) {
                 struct stat buf;
-                if(unlikely(stat(mi->mount_point, &buf) == -1)) {
+                if(stat(mi->mount_point, &buf) == -1) {
                     mi->st_dev = 0;
                     mi->flags |= MOUNTINFO_NO_STAT;
                 }
@@ -348,7 +348,7 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
 
                     struct mountinfo *mt;
                     for(mt = root; mt; mt = mt->next) {
-                        if(unlikely(mt->st_dev == mi->st_dev && !(mt->flags & MOUNTINFO_IS_SAME_DEV))) {
+                        if(mt->st_dev == mi->st_dev && !(mt->flags & MOUNTINFO_IS_SAME_DEV)) {
                             if(strlen(mi->mount_point) < strlen(mt->mount_point))
                                 mt->flags |= MOUNTINFO_IS_SAME_DEV;
                             else
@@ -365,7 +365,7 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
             //the larger mount point is considered a bind.
             struct mountinfo *mt;
             for(mt = root; mt; mt = mt->next) {
-                if(unlikely(mt->major == mi->major && mt->minor == mi->minor && !(mi->flags & MOUNTINFO_IS_BIND))) {
+                if(mt->major == mi->major && mt->minor == mi->minor && !(mi->flags & MOUNTINFO_IS_BIND)) {
                     if(strlen(mi->root) < strlen(mt->root))
                         mt->flags |= MOUNTINFO_IS_BIND;
                     else
@@ -391,16 +391,16 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
         // check if it has size
         if(do_statvfs && !(mi->flags & MOUNTINFO_IS_DUMMY)) {
             struct statvfs buff_statvfs;
-            if(unlikely(statvfs(mi->mount_point, &buff_statvfs) < 0)) {
+            if(statvfs(mi->mount_point, &buff_statvfs) < 0) {
                 mi->flags |= MOUNTINFO_NO_STAT;
             }
-            else if(unlikely(!buff_statvfs.f_blocks /* || !buff_statvfs.f_files */)) {
+            else if(!buff_statvfs.f_blocks /* || !buff_statvfs.f_files */) {
                 mi->flags |= MOUNTINFO_NO_SIZE;
             }
         }
 
         // link it
-        if(unlikely(!root))
+        if(!root)
             root = mi;
         else
             last->next = mi;
@@ -443,10 +443,10 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
 
             while ((mnt = getmntent_r(fp, &mntbuf, buf, 4096))) {
                 char *bind = hasmntopt(mnt, "bind");
-                if(unlikely(bind)) {
+                if(bind) {
                     struct mountinfo *mi;
                     for(mi = root; mi ; mi = mi->next) {
-                        if(unlikely(strcmp(mnt->mnt_dir, mi->mount_point) == 0)) {
+                        if(strcmp(mnt->mnt_dir, mi->mount_point) == 0) {
                             fprintf(stderr, "Mount point '%s' is BIND\n", mi->mount_point);
                             mi->flags |= MOUNTINFO_IS_BIND;
                             break;
@@ -454,7 +454,7 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
                     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-                    if(unlikely(!mi)) {
+                    if(!mi) {
                         collector_error("Mount point '%s' not found in /proc/self/mountinfo", mnt->mnt_dir);
                     }
 #endif

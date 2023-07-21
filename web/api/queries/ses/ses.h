@@ -71,7 +71,7 @@ static inline void tg_ses_free(RRDR *r) {
 static inline void tg_ses_add(RRDR *r, NETDATA_DOUBLE value) {
     struct tg_ses *g = (struct tg_ses *)r->time_grouping.data;
 
-    if(unlikely(!g->count))
+    if(!g->count)
         g->level = value;
 
     g->level = g->alpha * value + g->alpha_other * g->level;
@@ -81,7 +81,7 @@ static inline void tg_ses_add(RRDR *r, NETDATA_DOUBLE value) {
 static inline NETDATA_DOUBLE tg_ses_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct tg_ses *g = (struct tg_ses *)r->time_grouping.data;
 
-    if(unlikely(!g->count || !netdata_double_isnumber(g->level))) {
+    if(!g->count || !netdata_double_isnumber(g->level)) {
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
         return 0.0;
     }

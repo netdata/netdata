@@ -158,7 +158,7 @@ REGISTRY_PERSON *registry_person_find_or_create(const char *person_guid, time_t 
 
     if(person_guid && *person_guid) {
         // validate it is a GUID
-        if(unlikely(regenerate_guid(person_guid, buf) == -1)) {
+        if(regenerate_guid(person_guid, buf) == -1) {
             netdata_log_info("Registry: person guid '%s' is not a valid guid. Ignoring it.", person_guid);
             person_guid = NULL;
         }
@@ -192,7 +192,7 @@ REGISTRY_PERSON_URL *registry_person_link_to_url(REGISTRY_PERSON *p, REGISTRY_MA
     else {
         netdata_log_debug(D_REGISTRY, "registry_person_link_to_url('%s', '%s', '%s'): found", p->guid, m->guid, string2str(url));
         pu->usages++;
-        if(likely(pu->last_t < (uint32_t)when)) pu->last_t = (uint32_t)when;
+        if(pu->last_t < (uint32_t)when) pu->last_t = (uint32_t)when;
 
         if(pu->machine != m) {
             REGISTRY_MACHINE_URL *mu = registry_machine_url_find(pu->machine, url);
@@ -217,7 +217,7 @@ REGISTRY_PERSON_URL *registry_person_link_to_url(REGISTRY_PERSON *p, REGISTRY_MA
     }
 
     p->usages++;
-    if(likely(p->last_t < (uint32_t)when)) p->last_t = (uint32_t)when;
+    if(p->last_t < (uint32_t)when) p->last_t = (uint32_t)when;
 
     if(pu->flags & REGISTRY_URL_FLAGS_EXPIRED) {
         netdata_log_debug(D_REGISTRY, "registry_person_link_to_url('%s', '%s', '%s'): accessing an expired URL. Re-enabling URL.", p->guid, m->guid, string2str(url));

@@ -162,14 +162,14 @@ void rrdpush_decompressor_reset(struct decompressor_state *state);
 size_t rrdpush_decompress(struct decompressor_state *state, const char *compressed_data, size_t compressed_size);
 
 static inline size_t rrdpush_decompress_decode_header(const char *data, size_t data_size) {
-    if (unlikely(!data || !data_size))
+    if (!data || !data_size)
         return 0;
 
-    if (unlikely(data_size != RRDPUSH_COMPRESSION_SIGNATURE_SIZE))
+    if (data_size != RRDPUSH_COMPRESSION_SIGNATURE_SIZE)
         return 0;
 
     uint32_t sign = *(uint32_t *)data;
-    if (unlikely((sign & RRDPUSH_COMPRESSION_SIGNATURE_MASK) != RRDPUSH_COMPRESSION_SIGNATURE))
+    if ((sign & RRDPUSH_COMPRESSION_SIGNATURE_MASK) != RRDPUSH_COMPRESSION_SIGNATURE)
         return 0;
 
     size_t length = ((sign >> 8) & 0x7f) | ((sign >> 9) & (0x7f << 7));
@@ -177,26 +177,26 @@ static inline size_t rrdpush_decompress_decode_header(const char *data, size_t d
 }
 
 static inline size_t rrdpush_decompressor_start(struct decompressor_state *state, const char *header, size_t header_size) {
-    if(unlikely(state->stream.read_at != state->stream.write_at))
+    if(state->stream.read_at != state->stream.write_at)
         fatal("RRDPUSH DECOMPRESS: asked to decompress new data, while there are unread data in the decompression buffer!");
 
     return rrdpush_decompress_decode_header(header, header_size);
 }
 
 static inline size_t rrdpush_decompressed_bytes_in_buffer(struct decompressor_state *state) {
-    if(unlikely(state->stream.read_at > state->stream.write_at))
+    if(state->stream.read_at > state->stream.write_at)
         fatal("RRDPUSH DECOMPRESS: invalid read/write stream positions");
 
     return state->stream.write_at - state->stream.read_at;
 }
 
 static inline size_t rrdpush_decompressor_get(struct decompressor_state *state, char *dst, size_t size) {
-    if (unlikely(!state || !size || !dst))
+    if (!state || !size || !dst)
         return 0;
 
     size_t remaining = rrdpush_decompressed_bytes_in_buffer(state);
 
-    if(unlikely(!remaining))
+    if(!remaining)
         return 0;
 
     size_t bytes_to_return = size;
@@ -206,7 +206,7 @@ static inline size_t rrdpush_decompressor_get(struct decompressor_state *state, 
     memcpy(dst, state->stream.buffer + state->stream.read_at, bytes_to_return);
     state->stream.read_at += bytes_to_return;
 
-    if(unlikely(state->stream.read_at > state->stream.write_at))
+    if(state->stream.read_at > state->stream.write_at)
         fatal("RRDPUSH DECOMPRESS: invalid read/write stream positions");
 
     return bytes_to_return;

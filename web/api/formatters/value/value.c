@@ -22,7 +22,7 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
 
         NETDATA_DOUBLE n = cn[c];
 
-        if(unlikely(init)) {
+        if(init) {
             if(n > 0) {
                 min = 0;
                 max = n;
@@ -34,7 +34,7 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
             init = 0;
         }
 
-        if(likely(!(co[c] & RRDR_VALUE_EMPTY))) {
+        if(!(co[c] & RRDR_VALUE_EMPTY)) {
             all_null = 0;
             sum += n;
         }
@@ -50,13 +50,13 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
         else *anomaly_rate = total_anomaly_rate / (NETDATA_DOUBLE)r->d;
     }
 
-    if(unlikely(all_null)) {
-        if(likely(all_values_are_null))
+    if(all_null) {
+        if(all_values_are_null)
             *all_values_are_null = 1;
         return 0;
     }
     else {
-        if(likely(all_values_are_null))
+        if(all_values_are_null)
             *all_values_are_null = 0;
     }
 

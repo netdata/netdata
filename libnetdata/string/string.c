@@ -116,10 +116,10 @@ static inline bool string_entry_check_and_acquire(STRING *se) {
 }
 
 STRING *string_dup(STRING *string) {
-    if(unlikely(!string)) return NULL;
+    if(!string) return NULL;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(__atomic_load_n(&string->refcount, __ATOMIC_SEQ_CST) <= 0))
+    if(__atomic_load_n(&string->refcount, __ATOMIC_SEQ_CST) <= 0)
         fatal("STRING: tried to %s() a string that is freed (it has %d references).", __FUNCTION__, string->refcount);
 #endif
 
@@ -147,7 +147,7 @@ static inline STRING *string_index_search(const char *str, size_t length) {
 
     Pvoid_t *Rc;
     Rc = JudyHSGet(string_base[partition].JudyHSArray, (void *)str, length - 1);
-    if(likely(Rc)) {
+    if(Rc) {
         // found in the hash table
         string = *Rc;
 
@@ -189,7 +189,7 @@ static inline STRING *string_index_insert(const char *str, size_t length) {
     {
         JError_t J_Error;
         Pvoid_t *Rc = JudyHSIns(&string_base[partition].JudyHSArray, (void *)str, length - 1, &J_Error);
-        if (unlikely(Rc == PJERR)) {
+        if (Rc == PJERR) {
             fatal(
                 "STRING: Cannot insert entry with name '%s' to JudyHS, JU_ERRNO_* == %u, ID == %d",
                 str,
@@ -199,7 +199,7 @@ static inline STRING *string_index_insert(const char *str, size_t length) {
         ptr = (STRING **)Rc;
     }
 
-    if (likely(*ptr == 0)) {
+    if (*ptr == 0) {
         // a new item added to the index
         size_t mem_size = sizeof(STRING) + length;
         string = mallocz(mem_size);
@@ -240,16 +240,16 @@ static inline void string_index_delete(STRING *string) {
     rw_spinlock_write_lock(&string_base[partition].spinlock);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(__atomic_load_n(&string->refcount, __ATOMIC_SEQ_CST) != 0))
+    if(__atomic_load_n(&string->refcount, __ATOMIC_SEQ_CST) != 0)
         fatal("STRING: tried to delete a string at %s() that is already freed (it has %d references).", __FUNCTION__, string->refcount);
 #endif
 
     bool deleted = false;
 
-    if (likely(string_base[partition].JudyHSArray)) {
+    if (string_base[partition].JudyHSArray) {
         JError_t J_Error;
         int ret = JudyHSDel(&string_base[partition].JudyHSArray, (void *)string->str, string->length - 1, &J_Error);
-        if (unlikely(ret == JERR)) {
+        if (ret == JERR) {
             netdata_log_error(
                 "STRING: Cannot delete entry with name '%s' from JudyHS, JU_ERRNO_* == %u, ID == %d",
                 string->str,
@@ -259,7 +259,7 @@ static inline void string_index_delete(STRING *string) {
             deleted = true;
     }
 
-    if (unlikely(!deleted))
+    if (!deleted)
         netdata_log_error("STRING: tried to delete '%s' that is not in the index. Ignoring it.", string->str);
     else {
         size_t mem_size = sizeof(STRING) + string->length;
@@ -273,7 +273,7 @@ static inline void string_index_delete(STRING *string) {
 }
 
 STRING *string_strdupz(const char *str) {
-    if(unlikely(!str || !*str)) return NULL;
+    if(!str || !*str) return NULL;
 
     uint8_t partition = string_partition_str(str);
 
@@ -295,17 +295,17 @@ STRING *string_strdupz(const char *str) {
 }
 
 void string_freez(STRING *string) {
-    if(unlikely(!string)) return;
+    if(!string) return;
 
     uint8_t partition = string_partition(string);
     REFCOUNT refcount = string_entry_release(string);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(refcount < 0))
+    if(refcount < 0)
         fatal("STRING: tried to %s() a string that is already freed (it has %d references).", __FUNCTION__, string->refcount);
 #endif
 
-    if(unlikely(refcount == 0))
+    if(refcount == 0)
         string_index_delete(string);
 
     // statistics
@@ -314,12 +314,12 @@ void string_freez(STRING *string) {
 }
 
 inline size_t string_strlen(STRING *string) {
-    if(unlikely(!string)) return 0;
+    if(!string) return 0;
     return string->length - 1;
 }
 
 inline const char *string2str(STRING *string) {
-    if(unlikely(!string)) return "";
+    if(!string) return "";
     return string->str;
 }
 
@@ -330,15 +330,15 @@ int string_strcmp(STRING *string, const char *s) {
 STRING *string_2way_merge(STRING *a, STRING *b) {
     static STRING *X = NULL;
 
-    if(unlikely(!X)) {
+    if(!X) {
         X = string_strdupz("[x]");
     }
 
-    if(unlikely(a == b)) return string_dup(a);
-    if(unlikely(a == X)) return string_dup(a);
-    if(unlikely(b == X)) return string_dup(b);
-    if(unlikely(!a)) return string_dup(X);
-    if(unlikely(!b)) return string_dup(X);
+    if(a == b) return string_dup(a);
+    if(a == X) return string_dup(a);
+    if(b == X) return string_dup(b);
+    if(!a) return string_dup(X);
+    if(!b) return string_dup(X);
 
     size_t alen = string_strlen(a);
     size_t blen = string_strlen(b);

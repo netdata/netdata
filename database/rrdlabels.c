@@ -370,9 +370,9 @@ __attribute__((constructor)) void initialize_labels_keys_char_map(void) {
 }
 
 size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_size, unsigned char *char_map, bool utf, const char *empty, size_t *multibyte_length) {
-    if(unlikely(!dst_size)) return 0;
+    if(!dst_size) return 0;
 
-    if(unlikely(!src || !*src)) {
+    if(!src || !*src) {
         strncpyz((char *)dst, empty, dst_size);
         dst[dst_size - 1] = '\0';
         size_t len = strlen((char *)dst);
@@ -454,13 +454,13 @@ size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_si
     if(*dst == '_') {
         unsigned char *t = dst;
         while (*t == '_') t++;
-        if (unlikely(*t == '\0')) {
+        if (*t == '\0') {
             *dst = '\0';
             mblen = 0;
         }
     }
 
-    if(unlikely(*dst == '\0')) {
+    if(*dst == '\0') {
         strncpyz((char *)dst, empty, dst_size);
         dst[dst_size - 1] = '\0';
         mblen = strlen((char *)dst);
@@ -591,24 +591,24 @@ static const char *get_quoted_string_up_to(char *dst, size_t dst_size, const cha
     size_t len = 0;
     char *d = dst, quote = 0;
     while(*string && len++ < dst_size) {
-        if(unlikely(!quote && (*string == '\'' || *string == '"'))) {
+        if(!quote && (*string == '\'' || *string == '"')) {
             quote = *string++;
             continue;
         }
 
-        if(unlikely(quote && *string == quote)) {
+        if(quote && *string == quote) {
             quote = 0;
             string++;
             continue;
         }
 
-        if(unlikely(quote && *string == '\\' && string[1])) {
+        if(quote && *string == '\\' && string[1]) {
             string++;
             *d++ = *string++;
             continue;
         }
 
-        if(unlikely(!quote && (*string == upto1 || *string == upto2))) break;
+        if(!quote && (*string == upto1 || *string == upto2)) break;
 
         *d++ = *string++;
     }

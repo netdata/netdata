@@ -76,7 +76,7 @@ void aclk_queue_lock(void);
 void aclk_queue_unlock(void);
 
 #define QUEUE_IF_PAYLOAD_PRESENT(query)                                                                                \
-    if (likely(query->data.bin_payload.payload)) {                                                                     \
+    if (query->data.bin_payload.payload) {                                                                     \
         aclk_queue_query(query);                                                                                       \
     } else {                                                                                                           \
         netdata_log_error("Failed to generate payload (%s)", __FUNCTION__);                                            \

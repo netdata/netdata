@@ -134,7 +134,7 @@ static int do_migration_v3_v4(sqlite3 *database, const char *name)
     }
 
     rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         error_report("Failed to finalize statement when altering health_log tables, rc = %d", rc);
 
     return 0;
@@ -184,7 +184,7 @@ static int do_migration_v6_v7(sqlite3 *database, const char *name)
     }
 
     rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         error_report("Failed to finalize statement when altering aclk_alert tables, rc = %d", rc);
 
     return 0;
@@ -216,7 +216,7 @@ static int do_migration_v7_v8(sqlite3 *database, const char *name)
     }
 
     rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         error_report("Failed to finalize statement when altering health_log tables, rc = %d", rc);
 
     return 0;
@@ -280,7 +280,7 @@ static int do_migration_v8_v9(sqlite3 *database, const char *name)
     }
 
     rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         error_report("Failed to finalize statement when copying health_log tables, rc = %d", rc);
 
     char *table = NULL;
@@ -340,7 +340,7 @@ static int migrate_database(sqlite3 *database, int target_version, char *db_name
         sqlite3_free(err_msg);
     }
 
-    if (likely(user_version == target_version)) {
+    if (user_version == target_version) {
         netdata_log_info("%s database version is %d (no migration needed)", db_name, target_version);
         return target_version;
     }
@@ -348,7 +348,7 @@ static int migrate_database(sqlite3 *database, int target_version, char *db_name
     netdata_log_info("Database version is %d, current version is %d. Running migration for %s ...", user_version, target_version, db_name);
     for (int i = user_version; i < target_version && migration_list[i].func; i++) {
         rc = (migration_list[i].func)(database, migration_list[i].name);
-        if (unlikely(rc)) {
+        if (rc) {
             error_report("Database %s migration from version %d to version %d failed", db_name, i, i + 1);
             return i;
         }

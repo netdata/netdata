@@ -98,10 +98,10 @@ static inline void tg_des_free(RRDR *r) {
 static inline void tg_des_add(RRDR *r, NETDATA_DOUBLE value) {
     struct tg_des *g = (struct tg_des *)r->time_grouping.data;
 
-    if(likely(g->count > 0)) {
+    if(g->count > 0) {
         // we have at least a number so far
 
-        if(unlikely(g->count == 1)) {
+        if(g->count == 1) {
             // the second value we got
             g->trend = value - g->trend;
             g->level = value;
@@ -125,7 +125,7 @@ static inline void tg_des_add(RRDR *r, NETDATA_DOUBLE value) {
 static inline NETDATA_DOUBLE tg_des_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct tg_des *g = (struct tg_des *)r->time_grouping.data;
 
-    if(unlikely(!g->count || !netdata_double_isnumber(g->level))) {
+    if(!g->count || !netdata_double_isnumber(g->level)) {
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
         return 0.0;
     }

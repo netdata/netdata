@@ -63,7 +63,7 @@ void api_listen_sockets_setup(void) {
 	if(!socks)
 		fatal("LISTENER: Cannot listen on any API socket. Exiting...");
 
-	if(unlikely(debug_flags & D_WEB_CLIENT))
+	if(debug_flags & D_WEB_CLIENT)
 		debug_sockets();
 
 	return;

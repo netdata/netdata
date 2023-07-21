@@ -200,8 +200,8 @@ static void rrdmetric_react_callback(const DICTIONARY_ITEM *item __maybe_unused,
 }
 
 void rrdmetrics_create_in_rrdinstance(RRDINSTANCE *ri) {
-    if(unlikely(!ri)) return;
-    if(likely(ri->rrdmetrics)) return;
+    if(!ri) return;
+    if(ri->rrdmetrics) return;
 
     ri->rrdmetrics = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
                                                 &dictionary_stats_category_rrdcontext, sizeof(RRDMETRIC));
@@ -213,14 +213,14 @@ void rrdmetrics_create_in_rrdinstance(RRDINSTANCE *ri) {
 }
 
 void rrdmetrics_destroy_from_rrdinstance(RRDINSTANCE *ri) {
-    if(unlikely(!ri || !ri->rrdmetrics)) return;
+    if(!ri || !ri->rrdmetrics) return;
     dictionary_destroy(ri->rrdmetrics);
     ri->rrdmetrics = NULL;
 }
 
 // trigger post-processing of the rrdmetric, escalating changes to the rrdinstance it belongs
 static void rrdmetric_trigger_updates(RRDMETRIC *rm, const char *function) {
-    if(unlikely(rrd_flag_is_collected(rm)) && (!rm->rrddim || rrd_flag_check(rm, RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD)))
+    if(rrd_flag_is_collected(rm) && (!rm->rrddim || rrd_flag_check(rm, RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD)))
         rrd_flag_set_archived(rm);
 
     if(rrd_flag_is_updated(rm) || !rrd_flag_check(rm, RRD_FLAG_LIVE_RETENTION)) {
@@ -233,13 +233,13 @@ static void rrdmetric_trigger_updates(RRDMETRIC *rm, const char *function) {
 // RRDMETRIC HOOKS ON RRDDIM
 
 void rrdmetric_from_rrddim(RRDDIM *rd) {
-    if(unlikely(!rd->rrdset))
+    if(!rd->rrdset)
         fatal("RRDMETRIC: rrddim '%s' does not have a rrdset.", rrddim_id(rd));
 
-    if(unlikely(!rd->rrdset->rrdhost))
+    if(!rd->rrdset->rrdhost)
         fatal("RRDMETRIC: rrdset '%s' does not have a rrdhost", rrdset_id(rd->rrdset));
 
-    if(unlikely(!rd->rrdset->rrdinstance))
+    if(!rd->rrdset->rrdinstance)
         fatal("RRDMETRIC: rrdset '%s' does not have a rrdinstance", rrdset_id(rd->rrdset));
 
     RRDINSTANCE *ri = rrdinstance_acquired_value(rd->rrdset->rrdinstance);
@@ -262,18 +262,18 @@ void rrdmetric_from_rrddim(RRDDIM *rd) {
 
 #define rrddim_get_rrdmetric(rd) rrddim_get_rrdmetric_with_trace(rd, __FUNCTION__)
 static inline RRDMETRIC *rrddim_get_rrdmetric_with_trace(RRDDIM *rd, const char *function) {
-    if(unlikely(!rd->rrdmetric)) {
+    if(!rd->rrdmetric) {
         netdata_log_error("RRDMETRIC: RRDDIM '%s' is not linked to an RRDMETRIC at %s()", rrddim_id(rd), function);
         return NULL;
     }
 
     RRDMETRIC *rm = rrdmetric_acquired_value(rd->rrdmetric);
-    if(unlikely(!rm)) {
+    if(!rm) {
         netdata_log_error("RRDMETRIC: RRDDIM '%s' lost the link to its RRDMETRIC at %s()", rrddim_id(rd), function);
         return NULL;
     }
 
-    if(unlikely(rm->rrddim != rd))
+    if(rm->rrddim != rd)
         fatal("RRDMETRIC: '%s' is not linked to RRDDIM '%s' at %s()", string2str(rm->id), rrddim_id(rd), function);
 
     return rm;
@@ -281,9 +281,9 @@ static inline RRDMETRIC *rrddim_get_rrdmetric_with_trace(RRDDIM *rd, const char 
 
 inline void rrdmetric_rrddim_is_freed(RRDDIM *rd) {
     RRDMETRIC *rm = rrddim_get_rrdmetric(rd);
-    if(unlikely(!rm)) return;
+    if(!rm) return;
 
-    if(unlikely(rrd_flag_is_collected(rm)))
+    if(rrd_flag_is_collected(rm))
         rrd_flag_set_archived(rm);
 
     rm->rrddim = NULL;
@@ -294,10 +294,10 @@ inline void rrdmetric_rrddim_is_freed(RRDDIM *rd) {
 
 inline void rrdmetric_updated_rrddim_flags(RRDDIM *rd) {
     RRDMETRIC *rm = rrddim_get_rrdmetric(rd);
-    if(unlikely(!rm)) return;
+    if(!rm) return;
 
-    if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED|RRDDIM_FLAG_OBSOLETE))) {
-        if(unlikely(rrd_flag_is_collected(rm)))
+    if(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED|RRDDIM_FLAG_OBSOLETE)) {
+        if(rrd_flag_is_collected(rm))
             rrd_flag_set_archived(rm);
     }
 
@@ -306,9 +306,9 @@ inline void rrdmetric_updated_rrddim_flags(RRDDIM *rd) {
 
 inline void rrdmetric_collected_rrddim(RRDDIM *rd) {
     RRDMETRIC *rm = rrddim_get_rrdmetric(rd);
-    if(unlikely(!rm)) return;
+    if(!rm) return;
 
-    if(unlikely(!rrd_flag_is_collected(rm)))
+    if(!rrd_flag_is_collected(rm))
         rrd_flag_set_collected(rm);
 
     // we use this variable to detect BEGIN/END without SET

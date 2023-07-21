@@ -9,7 +9,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
 
     static int do_cpu = -1, do_ram = - 1, do_swapio = -1, do_pgfaults = -1;
 
-    if (unlikely(do_cpu == -1)) {
+    if (do_cpu == -1) {
         do_cpu                  = config_get_boolean("plugin:macos:mach_smi", "cpu utilization", 1);
         do_ram                  = config_get_boolean("plugin:macos:mach_smi", "system ram", 1);
         do_swapio               = config_get_boolean("plugin:macos:mach_smi", "swap i/o", 1);
@@ -36,25 +36,25 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
 
     host = mach_host_self();
     kr = host_page_size(host, &system_pagesize);
-    if (unlikely(kr != KERN_SUCCESS))
+    if (kr != KERN_SUCCESS)
         return -1;
 
-    if (likely(do_cpu)) {
-        if (unlikely(HOST_CPU_LOAD_INFO_COUNT != 4)) {
+    if (do_cpu) {
+        if (HOST_CPU_LOAD_INFO_COUNT != 4) {
             collector_error("MACOS: There are %d CPU states (4 was expected)", HOST_CPU_LOAD_INFO_COUNT);
             do_cpu = 0;
             collector_error("DISABLED: system.cpu");
         } else {
             count = HOST_CPU_LOAD_INFO_COUNT;
             kr = host_statistics(host, HOST_CPU_LOAD_INFO, (host_info_t)cp_time, &count);
-            if (unlikely(kr != KERN_SUCCESS)) {
+            if (kr != KERN_SUCCESS) {
                 collector_error("MACOS: host_statistics() failed: %s", mach_error_string(kr));
                 do_cpu = 0;
                 collector_error("DISABLED: system.cpu");
             } else {
 
                 st = rrdset_find_active_bytype_localhost("system", "cpu");
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "system"
                             , "cpu"
@@ -86,7 +86,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
         }
     }
 
-    if (likely(do_ram || do_swapio || do_pgfaults)) {
+    if (do_ram || do_swapio || do_pgfaults) {
 #if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
         count = sizeof(vm_statistics64_data_t);
         kr = host_statistics64(host, HOST_VM_INFO64, (host_info64_t)&vm_statistics, &count);
@@ -94,7 +94,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
         count = sizeof(vm_statistics_data_t);
         kr = host_statistics(host, HOST_VM_INFO, (host_info_t)&vm_statistics, &count);
 #endif
-        if (unlikely(kr != KERN_SUCCESS)) {
+        if (kr != KERN_SUCCESS) {
             collector_error("MACOS: host_statistics64() failed: %s", mach_error_string(kr));
             do_ram = 0;
             collector_error("DISABLED: system.ram");
@@ -103,9 +103,9 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
             do_pgfaults = 0;
             collector_error("DISABLED: mem.pgfaults");
         } else {
-            if (likely(do_ram)) {
+            if (do_ram) {
                 st = rrdset_find_active_localhost("system.ram");
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "system"
                             , "ram"
@@ -147,9 +147,9 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
             }
 
 #if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
-            if (likely(do_swapio)) {
+            if (do_swapio) {
                 st = rrdset_find_active_localhost("system.swapio");
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "system"
                             , "swapio"
@@ -175,9 +175,9 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
             }
 #endif
 
-            if (likely(do_pgfaults)) {
+            if (do_pgfaults) {
                 st = rrdset_find_active_localhost("mem.pgfaults");
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "mem"
                             , "pgfaults"

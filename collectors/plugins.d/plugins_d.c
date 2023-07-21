@@ -12,7 +12,7 @@ inline size_t pluginsd_initialize_plugin_directories()
     static char *plugins_dir_list = NULL;
 
     // Get the configuration entry
-    if (likely(!plugins_dir_list)) {
+    if (!plugins_dir_list) {
         snprintfz(plugins_dirs, FILENAME_MAX * 2, "\"%s\" \"%s/custom-plugins.d\"", PLUGINS_DIR, CONFIG_DIR);
         plugins_dir_list = strdupz(config_get(CONFIG_SECTION_DIRECTORIES, "plugins", plugins_dirs));
     }
@@ -79,12 +79,12 @@ static void pluginsd_worker_thread_cleanup(void *arg)
 
 #define SERIAL_FAILURES_THRESHOLD 10
 static void pluginsd_worker_thread_handle_success(struct plugind *cd) {
-    if (likely(cd->successful_collections)) {
+    if (cd->successful_collections) {
         sleep((unsigned int)cd->update_every);
         return;
     }
 
-    if (likely(cd->serial_failures <= SERIAL_FAILURES_THRESHOLD)) {
+    if (cd->serial_failures <= SERIAL_FAILURES_THRESHOLD) {
         netdata_log_info("PLUGINSD: 'host:%s', '%s' (pid %d) does not generate useful output but it reports success (exits with 0). %s.",
              rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid,
              plugin_is_enabled(cd) ? "Waiting a bit before starting it again." : "Will not start it again - it is now disabled.");
@@ -152,7 +152,7 @@ static void *pluginsd_worker_thread(void *arg) {
         FILE *fp_child_input = NULL;
         FILE *fp_child_output = netdata_popen(cd->cmd, &cd->unsafe.pid, &fp_child_input);
 
-        if (unlikely(!fp_child_input || !fp_child_output)) {
+        if (!fp_child_input || !fp_child_output) {
             netdata_log_error("PLUGINSD: 'host:%s', cannot popen(\"%s\", \"r\").", rrdhost_hostname(cd->host), cd->cmd);
             break;
         }
@@ -169,13 +169,13 @@ static void *pluginsd_worker_thread(void *arg) {
 
         int worker_ret_code = netdata_pclose(fp_child_input, fp_child_output, cd->unsafe.pid);
 
-        if (likely(worker_ret_code == 0))
+        if (worker_ret_code == 0)
             pluginsd_worker_thread_handle_success(cd);
         else
             pluginsd_worker_thread_handle_error(cd, worker_ret_code);
 
         cd->unsafe.pid = 0;
-        if (unlikely(!plugin_is_enabled(cd)))
+        if (!plugin_is_enabled(cd))
             break;
     }
 
@@ -227,12 +227,12 @@ void *pluginsd_main(void *ptr)
         const char *directory_name;
 
         for (idx = 0; idx < PLUGINSD_MAX_DIRECTORIES && (directory_name = plugin_directories[idx]); idx++) {
-            if (unlikely(!service_running(SERVICE_COLLECTORS)))
+            if (!service_running(SERVICE_COLLECTORS))
                 break;
 
             errno = 0;
             DIR *dir = opendir(directory_name);
-            if (unlikely(!dir)) {
+            if (!dir) {
                 if (directory_errors[idx] != errno) {
                     directory_errors[idx] = errno;
                     netdata_log_error("cannot open plugins directory '%s'", directory_name);
@@ -241,19 +241,19 @@ void *pluginsd_main(void *ptr)
             }
 
             struct dirent *file = NULL;
-            while (likely((file = readdir(dir)))) {
-                if (unlikely(!service_running(SERVICE_COLLECTORS)))
+            while ((file = readdir(dir))) {
+                if (!service_running(SERVICE_COLLECTORS))
                     break;
 
                 netdata_log_debug(D_PLUGINSD, "examining file '%s'", file->d_name);
 
-                if (unlikely(strcmp(file->d_name, ".") == 0 || strcmp(file->d_name, "..") == 0))
+                if (strcmp(file->d_name, ".") == 0 || strcmp(file->d_name, "..") == 0)
                     continue;
 
                 int len = (int)strlen(file->d_name);
-                if (unlikely(len <= (int)PLUGINSD_FILE_SUFFIX_LEN))
+                if (len <= (int)PLUGINSD_FILE_SUFFIX_LEN)
                     continue;
-                if (unlikely(strcmp(PLUGINSD_FILE_SUFFIX, &file->d_name[len - (int)PLUGINSD_FILE_SUFFIX_LEN]) != 0)) {
+                if (strcmp(PLUGINSD_FILE_SUFFIX, &file->d_name[len - (int)PLUGINSD_FILE_SUFFIX_LEN]) != 0) {
                     netdata_log_debug(D_PLUGINSD, "file '%s' does not end in '%s'", file->d_name, PLUGINSD_FILE_SUFFIX);
                     continue;
                 }
@@ -262,7 +262,7 @@ void *pluginsd_main(void *ptr)
                 snprintfz(pluginname, CONFIG_MAX_NAME, "%.*s", (int)(len - PLUGINSD_FILE_SUFFIX_LEN), file->d_name);
                 int enabled = config_get_boolean(CONFIG_SECTION_PLUGINS, pluginname, automatic_run);
 
-                if (unlikely(!enabled)) {
+                if (!enabled) {
                     netdata_log_debug(D_PLUGINSD, "plugin '%s' is not enabled", file->d_name);
                     continue;
                 }
@@ -270,17 +270,17 @@ void *pluginsd_main(void *ptr)
                 // check if it runs already
                 struct plugind *cd;
                 for (cd = pluginsd_root; cd; cd = cd->next)
-                    if (unlikely(strcmp(cd->filename, file->d_name) == 0))
+                    if (strcmp(cd->filename, file->d_name) == 0)
                         break;
 
-                if (likely(cd && plugin_is_running(cd))) {
+                if (cd && plugin_is_running(cd)) {
                     netdata_log_debug(D_PLUGINSD, "plugin '%s' is already running", cd->filename);
                     continue;
                 }
 
                 // it is not running
                 // allocate a new one, or use the obsolete one
-                if (unlikely(!cd)) {
+                if (!cd) {
                     cd = callocz(sizeof(struct plugind), 1);
 
                     snprintfz(cd->id, CONFIG_MAX_NAME, "plugin:%s", pluginname);

@@ -225,8 +225,8 @@ static bool rrdcontext_post_processing_queue_conflict_callback(const DICTIONARY_
 
 
 void rrdhost_create_rrdcontexts(RRDHOST *host) {
-    if(unlikely(!host)) return;
-    if(likely(host->rrdctx.contexts)) return;
+    if(!host) return;
+    if(host->rrdctx.contexts) return;
 
     host->rrdctx.contexts = dictionary_create_advanced(
             DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
@@ -249,8 +249,8 @@ void rrdhost_create_rrdcontexts(RRDHOST *host) {
 }
 
 void rrdhost_destroy_rrdcontexts(RRDHOST *host) {
-    if(unlikely(!host)) return;
-    if(unlikely(!host->rrdctx.contexts)) return;
+    if(!host) return;
+    if(!host->rrdctx.contexts) return;
 
     DICTIONARY *old;
 

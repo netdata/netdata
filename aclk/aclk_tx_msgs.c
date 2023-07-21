@@ -31,7 +31,7 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
     uint16_t packet_id;
     const char *topic = aclk_get_topic(subtopic);
 
-    if (unlikely(!topic)) {
+    if (!topic) {
         netdata_log_error("Couldn't get topic. Aborting message send.");
         return 0;
     }
@@ -60,7 +60,7 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
     char *full_msg = NULL;
     int len;
 
-    if (unlikely(!topic || topic[0] != '/')) {
+    if (!topic || topic[0] != '/') {
         netdata_log_error("Full topic required!");
         json_object_put(msg);
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
@@ -109,7 +109,7 @@ static struct json_object *create_hdr(const char *type, const char *msg_id, time
     tmp = json_object_new_string(type);
     json_object_object_add(obj, "type", tmp);
 
-    if (unlikely(!msg_id)) {
+    if (!msg_id) {
         uuid_generate(uuid);
         uuid_unparse(uuid, uuid_str);
         msg_id = uuid_str;
@@ -219,7 +219,7 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
     };
 
     rrdhost_aclk_state_lock(localhost);
-    if (unlikely(!localhost->aclk_state.claimed_id)) {
+    if (!localhost->aclk_state.claimed_id) {
         netdata_log_error("Internal error. Should not come here if not claimed");
         rrdhost_aclk_state_unlock(localhost);
         return 0;
@@ -254,7 +254,7 @@ char *aclk_generate_lwt(size_t *size) {
     };
 
     rrdhost_aclk_state_lock(localhost);
-    if (unlikely(!localhost->aclk_state.claimed_id)) {
+    if (!localhost->aclk_state.claimed_id) {
         netdata_log_error("Internal error. Should not come here if not claimed");
         rrdhost_aclk_state_unlock(localhost);
         return NULL;

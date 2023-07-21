@@ -128,19 +128,19 @@ int do_proc_vmstat(int update_every, usec_t dt) {
 //    static unsigned long long direct_map_level3_splits = 0ULL;
 //    static unsigned long long nr_unstable = 0ULL;
 
-    if(unlikely(!ff)) {
+    if(!ff) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/vmstat");
         ff = procfile_open(config_get("plugin:proc:/proc/vmstat", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff)) return 1;
+        if(!ff) return 1;
     }
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
+    if(!ff) return 0; // we return 0, so that we will retry to open it next time
 
     size_t lines = procfile_lines(ff), l;
 
-    if(unlikely(!arl_base)) {
+    if(!arl_base) {
         do_swapio = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "swap i/o", CONFIG_BOOLEAN_AUTO);
         do_io = config_get_boolean("plugin:proc:/proc/vmstat", "disk i/o", CONFIG_BOOLEAN_YES);
         do_pgfaults = config_get_boolean("plugin:proc:/proc/vmstat", "memory page faults", CONFIG_BOOLEAN_YES);
@@ -249,14 +249,14 @@ int do_proc_vmstat(int update_every, usec_t dt) {
     arl_begin(arl_base);
     for(l = 0; l < lines ;l++) {
         size_t words = procfile_linewords(ff, l);
-        if(unlikely(words < 2)) {
-            if(unlikely(words)) collector_error("Cannot read /proc/vmstat line %zu. Expected 2 params, read %zu.", l, words);
+        if(words < 2) {
+            if(words) collector_error("Cannot read /proc/vmstat line %zu. Expected 2 params, read %zu.", l, words);
             continue;
         }
 
-        if(unlikely(arl_check(arl_base,
+        if(arl_check(arl_base,
                 procfile_lineword(ff, l, 0),
-                procfile_lineword(ff, l, 1)))) break;
+                procfile_lineword(ff, l, 1))) break;
     }
 
     // --------------------------------------------------------------------
@@ -269,7 +269,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         static RRDSET *st_swapio = NULL;
         static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
-        if(unlikely(!st_swapio)) {
+        if(!st_swapio) {
             st_swapio = rrdset_create_localhost(
                     "system"
                     , "swapio"
@@ -300,7 +300,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         static RRDSET *st_io = NULL;
         static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
-        if(unlikely(!st_io)) {
+        if(!st_io) {
             st_io = rrdset_create_localhost(
                     "system"
                     , "pgpgio"
@@ -331,7 +331,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         static RRDSET *st_pgfaults = NULL;
         static RRDDIM *rd_minor = NULL, *rd_major = NULL;
 
-        if(unlikely(!st_pgfaults)) {
+        if(!st_pgfaults) {
             st_pgfaults = rrdset_create_localhost(
                     "mem"
                     , "pgfaults"
@@ -367,7 +367,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
 
         do_oom_kill = CONFIG_BOOLEAN_YES;
 
-        if(unlikely(!st_oom_kill)) {
+        if(!st_oom_kill) {
             st_oom_kill = rrdset_create_localhost(
                     "mem"
                     , "oom_kill"
@@ -398,7 +398,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
     // check it only once. We check whether the node count is >= 2 because
     // single-node systems have uninteresting statistics (since all accesses
     // are local).
-    if(unlikely(has_numa == -1))
+    if(has_numa == -1)
 
         has_numa = (numa_local || numa_foreign || numa_interleave || numa_other || numa_pte_updates ||
                      numa_huge_pte_updates || numa_hint_faults || numa_hint_faults_local || numa_pages_migrated) ? 1 : 0;
@@ -409,7 +409,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         static RRDSET *st_numa = NULL;
         static RRDDIM *rd_local = NULL, *rd_foreign = NULL, *rd_interleave = NULL, *rd_other = NULL, *rd_pte_updates = NULL, *rd_huge_pte_updates = NULL, *rd_hint_faults = NULL, *rd_hint_faults_local = NULL, *rd_pages_migrated = NULL;
 
-        if(unlikely(!st_numa)) {
+        if(!st_numa) {
             st_numa = rrdset_create_localhost(
                     "mem"
                     , "numa"
@@ -465,7 +465,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         static RRDSET *st_balloon = NULL;
         static RRDDIM *rd_inflate = NULL, *rd_deflate = NULL, *rd_migrate = NULL;
 
-        if(unlikely(!st_balloon)) {
+        if(!st_balloon) {
             st_balloon = rrdset_create_localhost(
                     "mem"
                     , "balloon"
@@ -503,7 +503,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         static RRDSET *st_zswapio = NULL;
         static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
-        if(unlikely(!st_zswapio)) {
+        if(!st_zswapio) {
             st_zswapio = rrdset_create_localhost(
                     "system"
                     , "zswapio"
@@ -538,7 +538,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         static RRDSET *st_ksm_cow = NULL;
         static RRDDIM *rd_swapin = NULL, *rd_write = NULL;
 
-        if(unlikely(!st_ksm_cow)) {
+        if(!st_ksm_cow) {
             st_ksm_cow = rrdset_create_localhost(
                     "mem"
             , "ksm_cow"
@@ -574,7 +574,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
             static RRDSET *st_thp_fault = NULL;
             static RRDDIM *rd_alloc = NULL, *rd_fallback = NULL, *rd_fallback_charge = NULL;
 
-            if(unlikely(!st_thp_fault)) {
+            if(!st_thp_fault) {
                 st_thp_fault = rrdset_create_localhost(
                         "mem"
                         , "thp_faults"
@@ -608,7 +608,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
             static RRDSET *st_thp_file = NULL;
             static RRDDIM *rd_alloc = NULL, *rd_fallback = NULL, *rd_fallback_charge = NULL, *rd_mapped = NULL;
 
-            if(unlikely(!st_thp_file)) {
+            if(!st_thp_file) {
                 st_thp_file = rrdset_create_localhost(
                         "mem"
                         , "thp_file"
@@ -644,7 +644,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
             static RRDSET *st_thp_zero = NULL;
             static RRDDIM *rd_alloc = NULL, *rd_failed = NULL;
 
-            if(unlikely(!st_thp_zero)) {
+            if(!st_thp_zero) {
                 st_thp_zero = rrdset_create_localhost(
                         "mem"
                         , "thp_zero"
@@ -676,7 +676,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
             static RRDSET *st_khugepaged = NULL;
             static RRDDIM *rd_alloc = NULL, *rd_failed = NULL;
 
-            if(unlikely(!st_khugepaged)) {
+            if(!st_khugepaged) {
                 st_khugepaged = rrdset_create_localhost(
                         "mem"
                         , "thp_collapse"
@@ -708,7 +708,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
             static RRDSET *st_thp_split = NULL;
             static RRDDIM *rd_split = NULL, *rd_failed = NULL, *rd_deferred_split = NULL, *rd_split_pmd = NULL;
 
-            if(unlikely(!st_thp_split)) {
+            if(!st_thp_split) {
                 st_thp_split = rrdset_create_localhost(
                         "mem"
                         , "thp_split"
@@ -744,7 +744,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
             static RRDSET *st_tmp_swapout = NULL;
             static RRDDIM *rd_swapout = NULL, *rd_fallback = NULL;
 
-            if(unlikely(!st_tmp_swapout)) {
+            if(!st_tmp_swapout) {
                 st_tmp_swapout = rrdset_create_localhost(
                         "mem"
                         , "thp_swapout"
@@ -776,7 +776,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
             static RRDSET *st_thp_compact = NULL;
             static RRDDIM *rd_success = NULL, *rd_fail = NULL, *rd_stall = NULL;
 
-            if(unlikely(!st_thp_compact)) {
+            if(!st_thp_compact) {
                 st_thp_compact = rrdset_create_localhost(
                         "mem"
                         , "thp_compact"

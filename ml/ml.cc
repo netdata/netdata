@@ -443,37 +443,37 @@ ml_dimension_add_model(const uuid_t *metric_uuid, const ml_kmeans_t *km)
     int param = 0;
     int rc = 0;
 
-    if (unlikely(!db)) {
+    if (!db) {
         error_report("Database has not been initialized");
         return 1;
     }
 
-    if (unlikely(!res)) {
+    if (!res) {
         rc = prepare_statement(db, db_models_add_model, &res);
-        if (unlikely(rc != SQLITE_OK)) {
+        if (rc != SQLITE_OK) {
             error_report("Failed to prepare statement to store model, rc = %d", rc);
             return 1;
         }
     }
 
     rc = sqlite3_bind_blob(res, ++param, metric_uuid, sizeof(*metric_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         goto bind_fail;
 
     rc = sqlite3_bind_int(res, ++param, (int) km->after);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         goto bind_fail;
 
     rc = sqlite3_bind_int(res, ++param, (int) km->before);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         goto bind_fail;
 
     rc = sqlite3_bind_double(res, ++param, km->min_dist);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         goto bind_fail;
 
     rc = sqlite3_bind_double(res, ++param, km->max_dist);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         goto bind_fail;
 
     if (km->cluster_centers.size() != 2)
@@ -486,19 +486,19 @@ ml_dimension_add_model(const uuid_t *metric_uuid, const ml_kmeans_t *km)
         for (long idx = 0; idx != ds.size(); idx++) {
             calculated_number_t cn = ds(idx);
             int rc = sqlite3_bind_double(res, ++param, cn);
-            if (unlikely(rc != SQLITE_OK))
+            if (rc != SQLITE_OK)
                 goto bind_fail;
         }
     }
 
     rc = execute_insert(res);
-    if (unlikely(rc != SQLITE_DONE)) {
+    if (rc != SQLITE_DONE) {
         error_report("Failed to store model, rc = %d", rc);
         return rc;
     }
 
     rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to reset statement when storing model, rc = %d", rc);
         return rc;
     }
@@ -508,7 +508,7 @@ ml_dimension_add_model(const uuid_t *metric_uuid, const ml_kmeans_t *km)
 bind_fail:
     error_report("Failed to bind parameter %d to store model, rc = %d", param, rc);
     rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         error_report("Failed to reset statement to store model, rc = %d", rc);
     return rc;
 }
@@ -520,35 +520,35 @@ ml_dimension_delete_models(const uuid_t *metric_uuid, time_t before)
     int rc = 0;
     int param = 0;
 
-    if (unlikely(!db)) {
+    if (!db) {
         error_report("Database has not been initialized");
         return 1;
     }
 
-    if (unlikely(!res)) {
+    if (!res) {
         rc = prepare_statement(db, db_models_delete, &res);
-        if (unlikely(rc != SQLITE_OK)) {
+        if (rc != SQLITE_OK) {
             error_report("Failed to prepare statement to delete models, rc = %d", rc);
             return rc;
         }
     }
 
     rc = sqlite3_bind_blob(res, ++param, metric_uuid, sizeof(*metric_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         goto bind_fail;
 
     rc = sqlite3_bind_int(res, ++param, (int) before);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         goto bind_fail;
 
     rc = execute_insert(res);
-    if (unlikely(rc != SQLITE_DONE)) {
+    if (rc != SQLITE_DONE) {
         error_report("Failed to delete models, rc = %d", rc);
         return rc;
     }
 
     rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to reset statement when deleting models, rc = %d", rc);
         return rc;
     }
@@ -558,7 +558,7 @@ ml_dimension_delete_models(const uuid_t *metric_uuid, time_t before)
 bind_fail:
     error_report("Failed to bind parameter %d to delete models, rc = %d", param, rc);
     rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         error_report("Failed to reset statement to delete models, rc = %d", rc);
     return rc;
 }
@@ -581,25 +581,25 @@ int ml_dimension_load_models(RRDDIM *rd) {
     int rc = 0;
     int param = 0;
 
-    if (unlikely(!db)) {
+    if (!db) {
         error_report("Database has not been initialized");
         return 1;
     }
 
-    if (unlikely(!res)) {
+    if (!res) {
         rc = prepare_statement(db, db_models_load, &res);
-        if (unlikely(rc != SQLITE_OK)) {
+        if (rc != SQLITE_OK) {
             error_report("Failed to prepare statement to load models, rc = %d", rc);
             return 1;
         }
     }
 
     rc = sqlite3_bind_blob(res, ++param, &dim->rd->metric_uuid, sizeof(dim->rd->metric_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         goto bind_fail;
 
     rc = sqlite3_bind_int(res, ++param, now_realtime_usec() - (Cfg.num_models_to_use * Cfg.max_train_samples));
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         goto bind_fail;
 
     spinlock_lock(&dim->slock);
@@ -641,11 +641,11 @@ int ml_dimension_load_models(RRDDIM *rd) {
 
     spinlock_unlock(&dim->slock);
 
-    if (unlikely(rc != SQLITE_DONE))
+    if (rc != SQLITE_DONE)
         error_report("Failed to load models, rc = %d", rc);
 
     rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         error_report("Failed to reset statement when loading models, rc = %d", rc);
 
     return 0;
@@ -653,7 +653,7 @@ int ml_dimension_load_models(RRDDIM *rd) {
 bind_fail:
     error_report("Failed to bind parameter %d to load models, rc = %d", param, rc);
     rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         error_report("Failed to reset statement to load models, rc = %d", rc);
     return 1;
 }
@@ -1693,7 +1693,7 @@ void ml_fini() {
         return;
 
     int rc = sqlite3_close_v2(db);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         error_report("Error %d while closing the SQLite database, %s", rc, sqlite3_errstr(rc));
 }
 

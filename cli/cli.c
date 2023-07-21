@@ -31,7 +31,7 @@ void fatal_int( const char *file __maybe_unused, const char *function __maybe_un
 void *callocz_int(size_t nmemb, size_t size, const char *file __maybe_unused, const char *function __maybe_unused, size_t line __maybe_unused)
 {
     void *p = calloc(nmemb, size);
-    if (unlikely(!p)) {
+    if (!p) {
         netdata_log_error("Cannot allocate %zu bytes of memory.", nmemb * size);
         exit(1);
     }
@@ -41,7 +41,7 @@ void *callocz_int(size_t nmemb, size_t size, const char *file __maybe_unused, co
 void *mallocz_int(size_t size, const char *file __maybe_unused, const char *function __maybe_unused, size_t line __maybe_unused)
 {
     void *p = malloc(size);
-    if (unlikely(!p)) {
+    if (!p) {
         netdata_log_error("Cannot allocate %zu bytes of memory.", size);
         exit(1);
     }
@@ -51,7 +51,7 @@ void *mallocz_int(size_t size, const char *file __maybe_unused, const char *func
 void *reallocz_int(void *ptr, size_t size, const char *file __maybe_unused, const char *function __maybe_unused, size_t line __maybe_unused)
 {
     void *p = realloc(ptr, size);
-    if (unlikely(!p)) {
+    if (!p) {
         netdata_log_error("Cannot allocate %zu bytes of memory.", size);
         exit(1);
     }
@@ -69,7 +69,7 @@ void freez(void *ptr) {
 
 void *mallocz(size_t size) {
     void *p = malloc(size);
-    if (unlikely(!p)) {
+    if (!p) {
         netdata_log_error("Cannot allocate %zu bytes of memory.", size);
         exit(1);
     }
@@ -78,7 +78,7 @@ void *mallocz(size_t size) {
 
 void *callocz(size_t nmemb, size_t size) {
     void *p = calloc(nmemb, size);
-    if (unlikely(!p)) {
+    if (!p) {
         netdata_log_error("Cannot allocate %zu bytes of memory.", nmemb * size);
         exit(1);
     }
@@ -87,7 +87,7 @@ void *callocz(size_t nmemb, size_t size) {
 
 void *reallocz(void *ptr, size_t size) {
     void *p = realloc(ptr, size);
-    if (unlikely(!p)) {
+    if (!p) {
         netdata_log_error("Cannot allocate %zu bytes of memory.", size);
         exit(1);
     }
@@ -96,12 +96,12 @@ void *reallocz(void *ptr, size_t size) {
 #endif
 
 int vsnprintfz(char *dst, size_t n, const char *fmt, va_list args) {
-    if(unlikely(!n)) return 0;
+    if(!n) return 0;
 
     int size = vsnprintf(dst, n, fmt, args);
     dst[n - 1] = '\0';
 
-    if (unlikely((size_t) size > n)) size = (int)n;
+    if ((size_t) size > n) size = (int)n;
 
     return size;
 }

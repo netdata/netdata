@@ -37,7 +37,7 @@ static void signal_handler(int signo) {
     // find the entry in the list
     int i;
     for(i = 0; signals_waiting[i].action != NETDATA_SIGNAL_END_OF_LIST ; i++) {
-        if(unlikely(signals_waiting[i].signo == signo)) {
+        if(signals_waiting[i].signo == signo) {
             signals_waiting[i].count++;
 
             if(signals_waiting[i].action == NETDATA_SIGNAL_FATAL) {

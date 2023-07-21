@@ -13,29 +13,29 @@ int do_proc_loadavg(int update_every, usec_t dt) {
     static int do_loadavg = -1, do_all_processes = -1;
     static usec_t next_loadavg_dt = 0;
 
-    if(unlikely(!ff)) {
+    if(!ff) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/loadavg");
 
         ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_LOADAVG, "filename to monitor", filename), " \t,:|/", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff))
+        if(!ff)
             return 1;
     }
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff))
+    if(!ff)
         return 0; // we return 0, so that we will retry to open it next time
 
-    if(unlikely(do_loadavg == -1)) {
+    if(do_loadavg == -1) {
         do_loadavg          = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_LOADAVG, "enable load average", 1);
         do_all_processes    = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_LOADAVG, "enable total processes", 1);
     }
 
-    if(unlikely(procfile_lines(ff) < 1)) {
+    if(procfile_lines(ff) < 1) {
         collector_error("/proc/loadavg has no lines.");
         return 1;
     }
-    if(unlikely(procfile_linewords(ff, 0) < 6)) {
+    if(procfile_linewords(ff, 0) < 6) {
         collector_error("/proc/loadavg has less than 6 words in it.");
         return 1;
     }
@@ -53,11 +53,11 @@ int do_proc_loadavg(int update_every, usec_t dt) {
     //unsigned long long next_pid           = str2ull(procfile_lineword(ff, 0, 5));
 
     if(next_loadavg_dt <= dt) {
-        if(likely(do_loadavg)) {
+        if(do_loadavg) {
             static RRDSET *load_chart = NULL;
             static RRDDIM *rd_load1 = NULL, *rd_load5 = NULL, *rd_load15 = NULL;
 
-            if(unlikely(!load_chart)) {
+            if(!load_chart) {
                 load_chart = rrdset_create_localhost(
                         "system"
                         , "load"
@@ -92,12 +92,12 @@ int do_proc_loadavg(int update_every, usec_t dt) {
         next_loadavg_dt -= dt;
 
 
-    if(likely(do_all_processes)) {
+    if(do_all_processes) {
         static RRDSET *processes_chart = NULL;
         static RRDDIM *rd_active = NULL;
         static const RRDSETVAR_ACQUIRED *rd_pidmax;
 
-        if(unlikely(!processes_chart)) {
+        if(!processes_chart) {
             processes_chart = rrdset_create_localhost(
                     "system"
                     , "active_processes"

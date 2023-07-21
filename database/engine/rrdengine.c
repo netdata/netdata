@@ -377,7 +377,7 @@ WAL *wal_get(struct rrdengine_instance *ctx, unsigned size) {
 
     spinlock_lock(&wal_globals.protected.spinlock);
 
-    if(likely(wal_globals.protected.available_items)) {
+    if(wal_globals.protected.available_items) {
         wal = wal_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
         wal_globals.protected.available--;
@@ -386,11 +386,11 @@ WAL *wal_get(struct rrdengine_instance *ctx, unsigned size) {
     uint64_t transaction_id = __atomic_fetch_add(&ctx->atomic.transaction_id, 1, __ATOMIC_RELAXED);
     spinlock_unlock(&wal_globals.protected.spinlock);
 
-    if(unlikely(!wal)) {
+    if(!wal) {
         wal = mallocz(sizeof(WAL));
         wal->buf_size = RRDENG_BLOCK_SIZE;
         int ret = posix_memalign((void *)&wal->buf, RRDFILE_ALIGNMENT, wal->buf_size);
-        if (unlikely(ret))
+        if (ret)
             fatal("DBENGINE: posix_memalign:%s", strerror(ret));
         __atomic_add_fetch(&wal_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
     }
@@ -414,7 +414,7 @@ WAL *wal_get(struct rrdengine_instance *ctx, unsigned size) {
 }
 
 void wal_release(WAL *wal) {
-    if(unlikely(!wal)) return;
+    if(!wal) return;
 
     spinlock_lock(&wal_globals.protected.spinlock);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
@@ -435,7 +435,7 @@ static void rrdeng_cmd_queue_init(void) {
 }
 
 static inline STORAGE_PRIORITY rrdeng_enq_cmd_map_opcode_to_priority(enum rrdeng_opcode opcode, STORAGE_PRIORITY priority) {
-    if(unlikely(priority >= STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE))
+    if(priority >= STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE)
         priority = STORAGE_PRIORITY_BEST_EFFORT;
 
     switch(opcode) {
@@ -538,10 +538,10 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(bool from_worker) {
         if(cmd) {
 
             // avoid starvation of lower priorities
-            if(unlikely(priority >= STORAGE_PRIORITY_HIGH &&
+            if(priority >= STORAGE_PRIORITY_HIGH &&
                         priority < STORAGE_PRIORITY_BEST_EFFORT &&
                         ++rrdeng_main.cmd_queue.unsafe.executed_by_priority[priority] % 50 == 0 &&
-                        rrdeng_cmd_has_waiting_opcodes_in_lower_priorities(priority + 1, max_priority))) {
+                        rrdeng_cmd_has_waiting_opcodes_in_lower_priorities(priority + 1, max_priority)) {
                 // let the others run 2% of the requests
                 cmd = NULL;
                 continue;
@@ -614,7 +614,7 @@ void *dbengine_page_alloc(size_t size) {
 }
 
 void dbengine_page_free(void *page, size_t size __maybe_unused) {
-    if(unlikely(!page || page == DBENGINE_EMPTY_PAGE))
+    if(!page || page == DBENGINE_EMPTY_PAGE)
         return;
 
     ARAL *ar = page_size_lookup(size);
@@ -696,7 +696,7 @@ static void *extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx __m
     for (i = 0 ; i < xt_io_descr->descr_count ; ++i) {
         descr = xt_io_descr->descr_array[i];
 
-        if (likely(still_running))
+        if (still_running)
             pgc_open_add_hot_page(
                     (Word_t)ctx, descr->metric_id,
                     (time_t) (descr->start_time_ut / USEC_PER_SEC),
@@ -870,7 +870,7 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
     }
 
     ret = posix_memalign((void *)&xt_io_descr->buf, RRDFILE_ALIGNMENT, ALIGN_BYTES_CEILING(size_bytes));
-    if (unlikely(ret)) {
+    if (ret) {
         fatal("DBENGINE: posix_memalign:%s", strerror(ret));
         /* freez(xt_io_descr);*/
     }
@@ -899,7 +899,7 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
         pos += descr->page_length;
     }
 
-    if(likely(compression_algorithm == RRD_LZ4)) {
+    if(compression_algorithm == RRD_LZ4) {
         compressed_size = LZ4_compress_default(
                 xt_io_descr->buf + payload_offset,
                 compressed_buf,
@@ -1012,7 +1012,7 @@ time_t find_uuid_first_time(
         datafile = datafile->next;
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
-    if (unlikely(!datafile))
+    if (!datafile)
         return global_first_time_s;
 
     unsigned journalfile_count = 0;
@@ -1096,7 +1096,7 @@ time_t find_uuid_first_time(
 
         not_needed_bsearches += uuid_first_t_entry->df_matched - uuid_first_t_entry->df_index_oldest;
 
-        if (unlikely(!uuid_first_t_entry->metric)) {
+        if (!uuid_first_t_entry->metric) {
             without_metric++;
             continue;
         }
@@ -1156,7 +1156,7 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     struct rrdengine_journalfile *journalfile = datafile_to_delete->journalfile;
     struct journal_v2_header *j2_header = journalfile_v2_data_acquire(journalfile, NULL, 0, 0);
 
-    if (unlikely(!j2_header)) {
+    if (!j2_header) {
         if (worker)
             worker_is_idle();
         return;
@@ -1205,7 +1205,7 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     size_t deleted_metrics = 0, zero_retention_referenced = 0, zero_disk_retention = 0, zero_disk_but_live = 0;
     for (size_t index = 0; index < added; ++index) {
         uuid_first_t_entry = &uuid_first_entry_list[index];
-        if (likely(uuid_first_t_entry->first_time_s != LONG_MAX)) {
+        if (uuid_first_t_entry->first_time_s != LONG_MAX) {
             mrg_metric_set_first_time_s_if_bigger(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s);
             mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
         }
@@ -1527,7 +1527,7 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __mayb
 
         datafile = datafile->next;
 
-        if (unlikely(!ctx_is_available_for_queries(ctx)))
+        if (!ctx_is_available_for_queries(ctx))
             break;
     }
 
@@ -1745,7 +1745,7 @@ void dbengine_event_loop(void* arg) {
     fatal_assert(0 == uv_timer_start(&main->timer, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
 
     bool shutdown = false;
-    while (likely(!shutdown)) {
+    while (!shutdown) {
         worker_is_idle();
         uv_run(&main->loop, UV_RUN_DEFAULT);
 

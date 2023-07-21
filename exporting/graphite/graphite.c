@@ -97,7 +97,7 @@ int format_host_labels_graphite_plaintext(struct instance *instance, RRDHOST *ho
     if (!instance->labels_buffer)
         instance->labels_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_exporters);
 
-    if (unlikely(!sending_labels_configured(instance)))
+    if (!sending_labels_configured(instance))
         return 0;
 
     rrdlabels_to_buffer(host->rrdlabels, instance->labels_buffer, ";", "=", "", "",

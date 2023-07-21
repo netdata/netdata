@@ -145,7 +145,7 @@ void analytics_set_data_str(char **name, char *value)
  */
 void analytics_log_prometheus(void)
 {
-    if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.prometheus_hits < ANALYTICS_MAX_PROMETHEUS_HITS)) {
+    if (netdata_anonymous_statistics_enabled == 1 && analytics_data.prometheus_hits < ANALYTICS_MAX_PROMETHEUS_HITS) {
         analytics_data.prometheus_hits++;
         char b[21];
         snprintfz(b, 20, "%zu", analytics_data.prometheus_hits);
@@ -158,7 +158,7 @@ void analytics_log_prometheus(void)
  */
 void analytics_log_shell(void)
 {
-    if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.shell_hits < ANALYTICS_MAX_SHELL_HITS)) {
+    if (netdata_anonymous_statistics_enabled == 1 && analytics_data.shell_hits < ANALYTICS_MAX_SHELL_HITS) {
         analytics_data.shell_hits++;
         char b[21];
         snprintfz(b, 20, "%zu", analytics_data.shell_hits);
@@ -171,7 +171,7 @@ void analytics_log_shell(void)
  */
 void analytics_log_json(void)
 {
-    if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.json_hits < ANALYTICS_MAX_JSON_HITS)) {
+    if (netdata_anonymous_statistics_enabled == 1 && analytics_data.json_hits < ANALYTICS_MAX_JSON_HITS) {
         analytics_data.json_hits++;
         char b[21];
         snprintfz(b, 20, "%zu", analytics_data.json_hits);
@@ -184,7 +184,7 @@ void analytics_log_json(void)
  */
 void analytics_log_dashboard(void)
 {
-    if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.dashboard_hits < ANALYTICS_MAX_DASHBOARD_HITS)) {
+    if (netdata_anonymous_statistics_enabled == 1 && analytics_data.dashboard_hits < ANALYTICS_MAX_DASHBOARD_HITS) {
         analytics_data.dashboard_hits++;
         char b[21];
         snprintfz(b, 20, "%zu", analytics_data.dashboard_hits);
@@ -246,7 +246,7 @@ int collector_counter_callb(const DICTIONARY_ITEM *item __maybe_unused, void *en
 
     BUFFER *bt = ap->both;
 
-    if (likely(ap->c)) {
+    if (ap->c) {
         buffer_strcat(bt, ",");
     }
 
@@ -313,7 +313,7 @@ void analytics_alarms_notifications(void)
     script = mallocz(
         sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("alarm-notify.sh dump_methods") + 2));
     sprintf(script, "%s/%s", netdata_configured_primary_plugins_dir, "alarm-notify.sh");
-    if (unlikely(access(script, R_OK) != 0)) {
+    if (access(script, R_OK) != 0) {
         netdata_log_info("Alarm notify script %s not found.", script);
         freez(script);
         return;
@@ -338,7 +338,7 @@ void analytics_alarms_notifications(void)
                 end++;
             *end = '\0';
 
-            if (likely(cnt))
+            if (cnt)
                 buffer_strcat(b, "|");
 
             buffer_strcat(b, line);
@@ -437,7 +437,7 @@ void analytics_alarms(void)
     char b[21];
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(localhost, rc) {
-        if (unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+        if (!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec)
             continue;
 
         switch (rc->status) {
@@ -584,12 +584,12 @@ void *analytics_main(void *ptr)
     netdata_log_debug(D_ANALYTICS, "Analytics thread starts");
 
     //first delay after agent start
-    while (service_running(SERVICE_ANALYTICS) && likely(sec <= ANALYTICS_INIT_SLEEP_SEC)) {
+    while (service_running(SERVICE_ANALYTICS) && sec <= ANALYTICS_INIT_SLEEP_SEC) {
         heartbeat_next(&hb, step_ut);
         sec++;
     }
 
-    if (unlikely(!service_running(SERVICE_ANALYTICS)))
+    if (!service_running(SERVICE_ANALYTICS))
         goto cleanup;
 
     analytics_gather_immutable_meta_data();
@@ -602,10 +602,10 @@ void *analytics_main(void *ptr)
         heartbeat_next(&hb, step_ut * 2);
         sec += 2;
 
-        if (unlikely(!service_running(SERVICE_ANALYTICS)))
+        if (!service_running(SERVICE_ANALYTICS))
             break;
 
-        if (likely(sec < ANALYTICS_HEARTBEAT))
+        if (sec < ANALYTICS_HEARTBEAT)
             continue;
 
         analytics_gather_mutable_meta_data();
@@ -948,12 +948,12 @@ void send_statistics(const char *action, const char *action_result, const char *
             sizeof(char) *
             (strlen(netdata_configured_user_config_dir) + strlen(".opt-out-from-anonymous-statistics") + 2));
         sprintf(optout_file, "%s/%s", netdata_configured_user_config_dir, ".opt-out-from-anonymous-statistics");
-        if (likely(access(optout_file, R_OK) != 0)) {
+        if (access(optout_file, R_OK) != 0) {
             as_script = mallocz(
                 sizeof(char) *
                 (strlen(netdata_configured_primary_plugins_dir) + strlen("anonymous-statistics.sh") + 2));
             sprintf(as_script, "%s/%s", netdata_configured_primary_plugins_dir, "anonymous-statistics.sh");
-            if (unlikely(access(as_script, R_OK) != 0)) {
+            if (access(as_script, R_OK) != 0) {
                 netdata_anonymous_statistics_enabled = 0;
                 netdata_log_info("Anonymous statistics script %s not found.", as_script);
                 freez(as_script);

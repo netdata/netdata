@@ -35,7 +35,7 @@ static void aclk_stats_collect(struct aclk_metrics_per_sample *per_sample, struc
     static RRDSET *st_aclkstats = NULL;
     static RRDDIM *rd_online_status = NULL;
 
-    if (unlikely(!st_aclkstats)) {
+    if (!st_aclkstats) {
         st_aclkstats = rrdset_create_localhost(
             "netdata", "aclk_status", NULL, "aclk", NULL, "ACLK/Cloud connection status",
             "connected", "netdata", "stats", 200000, localhost->rrd_update_every, RRDSET_TYPE_LINE);
@@ -54,7 +54,7 @@ static void aclk_stats_query_queue(struct aclk_metrics_per_sample *per_sample)
     static RRDDIM *rd_queued = NULL;
     static RRDDIM *rd_dispatched = NULL;
 
-    if (unlikely(!st_query_thread)) {
+    if (!st_query_thread) {
         st_query_thread = rrdset_create_localhost(
             "netdata", "aclk_query_per_second", NULL, "aclk", NULL, "ACLK Queries per second", "queries/s",
             "netdata", "stats", 200001, localhost->rrd_update_every, RRDSET_TYPE_AREA);
@@ -76,7 +76,7 @@ static void aclk_stats_latency(struct aclk_metrics_per_sample *per_sample)
     static RRDDIM *rd_avg = NULL;
     static RRDDIM *rd_max = NULL;
 
-    if (unlikely(!st)) {
+    if (!st) {
         st = rrdset_create_localhost(
             "netdata", "aclk_latency_mqtt", NULL, "aclk", NULL, "ACLK Message Publish Latency", "ms",
             "netdata", "stats", 200002, localhost->rrd_update_every, RRDSET_TYPE_LINE);
@@ -102,7 +102,7 @@ static void aclk_stats_cloud_req(struct aclk_metrics_per_sample *per_sample)
     static RRDDIM *rd_rq_rcvd = NULL;
     static RRDDIM *rd_rq_err = NULL;
 
-    if (unlikely(!st)) {
+    if (!st) {
         st = rrdset_create_localhost(
             "netdata", "aclk_cloud_req", NULL, "aclk", NULL, "Requests received from cloud", "req/s",
             "netdata", "stats", 200005, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
@@ -122,7 +122,7 @@ static void aclk_stats_cloud_req_type(struct aclk_metrics_per_sample *per_sample
     static RRDSET *st = NULL;
     static RRDDIM *dims[ACLK_QUERY_TYPE_COUNT];
 
-    if (unlikely(!st)) {
+    if (!st) {
         st = rrdset_create_localhost(
             "netdata", "aclk_processed_query_type", NULL, "aclk", NULL, "Query thread commands processed by their type", "cmd/s",
             "netdata", "stats", 200006, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
@@ -164,7 +164,7 @@ static void aclk_stats_cloud_req_http_type(struct aclk_metrics_per_sample *per_s
     static RRDSET *st = NULL;
     static RRDDIM *rd_rq_types[ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT];
 
-    if (unlikely(!st)) {
+    if (!st) {
         st = rrdset_create_localhost(
             "netdata", "aclk_cloud_req_http_type", NULL, "aclk", NULL, "Requests received from cloud via HTTP by their type", "req/s",
             "netdata", "stats", 200007, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
@@ -186,7 +186,7 @@ static void aclk_stats_query_threads(uint32_t *queries_per_thread)
 
     char dim_name[MAX_DIM_NAME];
 
-    if (unlikely(!st)) {
+    if (!st) {
         st = rrdset_create_localhost(
             "netdata", "aclk_query_threads", NULL, "aclk", NULL, "Queries Processed Per Thread", "req/s",
             "netdata", "stats", 200009, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
@@ -212,7 +212,7 @@ static void aclk_stats_query_time(struct aclk_metrics_per_sample *per_sample)
     static RRDDIM *rd_rq_max = NULL;
     static RRDDIM *rd_rq_total = NULL;
 
-    if (unlikely(!st)) {
+    if (!st) {
         st = rrdset_create_localhost(
             "netdata", "aclk_query_time", NULL, "aclk", NULL, "Time it took to process cloud requested DB queries", "us",
             "netdata", "stats", 200008, localhost->rrd_update_every, RRDSET_TYPE_LINE);
@@ -237,7 +237,7 @@ static void aclk_stats_newproto_rx(uint32_t *rx_msgs_sample)
 {
     static RRDSET *st = NULL;
 
-    if (unlikely(!st)) {
+    if (!st) {
         st = rrdset_create_localhost(
             "netdata", "aclk_protobuf_rx_types", NULL, "aclk", NULL, "Received new cloud architecture messages by their type.", "msg/s",
             "netdata", "stats", 200010, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
@@ -281,7 +281,7 @@ static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
     sent += stats->bytes_tx;
     recvd += stats->bytes_rx;
 
-    if (unlikely(!st)) {
+    if (!st) {
         st = rrdset_create_localhost(
             "netdata", "aclk_openssl_bytes", NULL, "aclk", NULL, "Received and Sent bytes.", "B/s",
             "netdata", "stats", 200011, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
@@ -290,7 +290,7 @@ static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
         rd_recvd = rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    if (unlikely(!st_txbuf_perc)) {
+    if (!st_txbuf_perc) {
         st_txbuf_perc = rrdset_create_localhost(
             "netdata", "aclk_mqtt_tx_perc", NULL, "aclk", NULL, "Actively used percentage of MQTT Tx Buffer,", "%",
             "netdata", "stats", 200012, localhost->rrd_update_every, RRDSET_TYPE_LINE);
@@ -298,7 +298,7 @@ static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
         rd_txbuf_perc = rrddim_add(st_txbuf_perc, "used", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    if (unlikely(!st_txbuf)) {
+    if (!st_txbuf) {
         st_txbuf = rrdset_create_localhost(
             "netdata", "aclk_mqtt_tx_queue", NULL, "aclk", NULL, "State of transmit MQTT queue.", "B",
             "netdata", "stats", 200013, localhost->rrd_update_every, RRDSET_TYPE_LINE);
@@ -310,7 +310,7 @@ static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
         rd_tx_buffer_size = rrddim_add(st_txbuf, "size", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    if (unlikely(!st_timing)) {
+    if (!st_timing) {
         st_timing = rrdset_create_localhost(
             "netdata", "aclk_mqtt_wss_time", NULL, "aclk", NULL, "Time spent handling MQTT, WSS, SSL and network communication.", "us",
             "netdata", "stats", 200014, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
@@ -461,7 +461,7 @@ void aclk_stats_msg_puback(uint16_t id)
         return;
     }
 
-    if (unlikely(!pub_time[id])) {
+    if (!pub_time[id]) {
         ACLK_STATS_UNLOCK;
         netdata_log_error("Received PUBACK for unknown message?!");
         return;

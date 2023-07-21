@@ -8,7 +8,7 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
     static int do_arc_size = -1, do_l2_size = -1, do_reads = -1, do_l2bytes = -1, do_ahits = -1, do_dhits = -1, \
                do_phits = -1, do_mhits = -1, do_l2hits = -1, do_list_hits = -1;
 
-    if(unlikely(do_arc_size == -1))
+    if(do_arc_size == -1)
         do_arc_size = do_l2_size = do_reads = do_l2bytes = do_ahits = do_dhits = do_phits = do_mhits \
         = do_l2hits = do_list_hits = show_zero_charts;
 
@@ -46,7 +46,7 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
         static RRDDIM *rd_arc_target_min_size = NULL;
         static RRDDIM *rd_arc_target_max_size = NULL;
 
-        if (unlikely(!st_arc_size)) {
+        if (!st_arc_size) {
             st_arc_size = rrdset_create_localhost(
                     "zfs"
                     , "arc_size"
@@ -77,14 +77,14 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
 
     // --------------------------------------------------------------------
 
-    if(likely(arcstats.l2exist) && (do_l2_size == CONFIG_BOOLEAN_YES || arcstats.l2_size || arcstats.l2_asize)) {
+    if(arcstats.l2exist && (do_l2_size == CONFIG_BOOLEAN_YES || arcstats.l2_size || arcstats.l2_asize)) {
         do_l2_size = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_l2_size = NULL;
         static RRDDIM *rd_l2_size = NULL;
         static RRDDIM *rd_l2_asize = NULL;
 
-        if (unlikely(!st_l2_size)) {
+        if (!st_l2_size) {
             st_l2_size = rrdset_create_localhost(
                     "zfs"
                     , "l2_size"
@@ -111,7 +111,7 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
 
     // --------------------------------------------------------------------
 
-    if(likely(do_reads == CONFIG_BOOLEAN_YES || aread || dread || pread || mread || l2read)) {
+    if(do_reads == CONFIG_BOOLEAN_YES || aread || dread || pread || mread || l2read) {
         do_reads = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_reads = NULL;
@@ -121,7 +121,7 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
         static RRDDIM *rd_mread = NULL;
         static RRDDIM *rd_l2read = NULL;
 
-        if (unlikely(!st_reads)) {
+        if (!st_reads) {
             st_reads = rrdset_create_localhost(
                     "zfs"
                     , "reads"
@@ -159,14 +159,14 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
 
     // --------------------------------------------------------------------
 
-    if(likely(arcstats.l2exist && (do_l2bytes == CONFIG_BOOLEAN_YES || arcstats.l2_read_bytes || arcstats.l2_write_bytes))) {
+    if(arcstats.l2exist && (do_l2bytes == CONFIG_BOOLEAN_YES || arcstats.l2_read_bytes || arcstats.l2_write_bytes)) {
         do_l2bytes = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_l2bytes = NULL;
         static RRDDIM *rd_l2_read_bytes = NULL;
         static RRDDIM *rd_l2_write_bytes = NULL;
 
-        if (unlikely(!st_l2bytes)) {
+        if (!st_l2bytes) {
             st_l2bytes = rrdset_create_localhost(
                     "zfs"
                     , "bytes"
@@ -193,14 +193,14 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
 
     // --------------------------------------------------------------------
 
-    if(likely(do_ahits == CONFIG_BOOLEAN_YES || arcstats.hits || arcstats.misses)) {
+    if(do_ahits == CONFIG_BOOLEAN_YES || arcstats.hits || arcstats.misses) {
         do_ahits = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_ahits = NULL;
         static RRDDIM *rd_ahits = NULL;
         static RRDDIM *rd_amisses = NULL;
 
-        if (unlikely(!st_ahits)) {
+        if (!st_ahits) {
             st_ahits = rrdset_create_localhost(
                     "zfs"
                     , "hits"
@@ -228,7 +228,7 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
         static RRDDIM *rd_ahits_rate = NULL;
         static RRDDIM *rd_amisses_rate = NULL;
 
-        if (unlikely(!st_ahits_rate)) {
+        if (!st_ahits_rate) {
             st_ahits_rate = rrdset_create_localhost(
                     "zfs"
                     , "hits_rate"
@@ -255,14 +255,14 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
 
     // --------------------------------------------------------------------
 
-    if(likely(do_dhits == CONFIG_BOOLEAN_YES || dhit || dmiss)) {
+    if(do_dhits == CONFIG_BOOLEAN_YES || dhit || dmiss) {
         do_dhits = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_dhits = NULL;
         static RRDDIM *rd_dhits = NULL;
         static RRDDIM *rd_dmisses = NULL;
 
-        if (unlikely(!st_dhits)) {
+        if (!st_dhits) {
             st_dhits = rrdset_create_localhost(
                     "zfs"
                     , "dhits"
@@ -290,7 +290,7 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
         static RRDDIM *rd_dhits_rate = NULL;
         static RRDDIM *rd_dmisses_rate = NULL;
 
-        if (unlikely(!st_dhits_rate)) {
+        if (!st_dhits_rate) {
             st_dhits_rate = rrdset_create_localhost(
                     "zfs"
                     , "dhits_rate"
@@ -317,14 +317,14 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
 
     // --------------------------------------------------------------------
 
-    if(likely(do_phits == CONFIG_BOOLEAN_YES || phit || pmiss)) {
+    if(do_phits == CONFIG_BOOLEAN_YES || phit || pmiss) {
         do_phits = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_phits = NULL;
         static RRDDIM *rd_phits = NULL;
         static RRDDIM *rd_pmisses = NULL;
 
-        if (unlikely(!st_phits)) {
+        if (!st_phits) {
             st_phits = rrdset_create_localhost(
                     "zfs"
                     , "phits"
@@ -352,7 +352,7 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
         static RRDDIM *rd_phits_rate = NULL;
         static RRDDIM *rd_pmisses_rate = NULL;
 
-        if (unlikely(!st_phits_rate)) {
+        if (!st_phits_rate) {
             st_phits_rate = rrdset_create_localhost(
                     "zfs"
                     , "phits_rate"
@@ -379,14 +379,14 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
 
     // --------------------------------------------------------------------
 
-    if(likely(do_mhits == CONFIG_BOOLEAN_YES || mhit || mmiss)) {
+    if(do_mhits == CONFIG_BOOLEAN_YES || mhit || mmiss) {
         do_mhits = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_mhits = NULL;
         static RRDDIM *rd_mhits = NULL;
         static RRDDIM *rd_mmisses = NULL;
 
-        if (unlikely(!st_mhits)) {
+        if (!st_mhits) {
             st_mhits = rrdset_create_localhost(
                     "zfs"
                     , "mhits"
@@ -414,7 +414,7 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
         static RRDDIM *rd_mhits_rate = NULL;
         static RRDDIM *rd_mmisses_rate = NULL;
 
-        if (unlikely(!st_mhits_rate)) {
+        if (!st_mhits_rate) {
             st_mhits_rate = rrdset_create_localhost(
                     "zfs"
                     , "mhits_rate"
@@ -441,14 +441,14 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
 
     // --------------------------------------------------------------------
 
-    if(likely(arcstats.l2exist && (do_l2hits == CONFIG_BOOLEAN_YES || l2hit || l2miss))) {
+    if(arcstats.l2exist && (do_l2hits == CONFIG_BOOLEAN_YES || l2hit || l2miss)) {
         do_l2hits = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_l2hits = NULL;
         static RRDDIM *rd_l2hits = NULL;
         static RRDDIM *rd_l2misses = NULL;
 
-        if (unlikely(!st_l2hits)) {
+        if (!st_l2hits) {
             st_l2hits = rrdset_create_localhost(
                     "zfs"
                     , "l2hits"
@@ -476,7 +476,7 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
         static RRDDIM *rd_l2hits_rate = NULL;
         static RRDDIM *rd_l2misses_rate = NULL;
 
-        if (unlikely(!st_l2hits_rate)) {
+        if (!st_l2hits_rate) {
             st_l2hits_rate = rrdset_create_localhost(
                     "zfs"
                     , "l2hits_rate"
@@ -503,10 +503,10 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
 
     // --------------------------------------------------------------------
 
-    if(likely(do_list_hits == CONFIG_BOOLEAN_YES || arcstats.mfu_hits \
+    if(do_list_hits == CONFIG_BOOLEAN_YES || arcstats.mfu_hits \
                                                  || arcstats.mru_hits \
                                                  || arcstats.mfu_ghost_hits \
-                                                 || arcstats.mru_ghost_hits)) {
+                                                 || arcstats.mru_ghost_hits) {
         do_list_hits = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_list_hits = NULL;
@@ -515,7 +515,7 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
         static RRDDIM *rd_mfug = NULL;
         static RRDDIM *rd_mrug = NULL;
 
-        if (unlikely(!st_list_hits)) {
+        if (!st_list_hits) {
             st_list_hits = rrdset_create_localhost(
                     "zfs"
                     , "list_hits"
@@ -549,7 +549,7 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
     static int do_arc_size_breakdown = -1, do_memory = -1, do_important_ops = -1, do_actual_hits = -1, \
                do_demand_data_hits = -1, do_prefetch_data_hits = -1, do_hash_elements = -1, do_hash_chains = -1;
 
-    if(unlikely(do_arc_size_breakdown == -1))
+    if(do_arc_size_breakdown == -1)
         do_arc_size_breakdown = do_memory = do_important_ops = do_actual_hits = do_demand_data_hits \
         = do_prefetch_data_hits = do_hash_elements = do_hash_chains = show_zero_charts;
 
@@ -574,14 +574,14 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
 
     // --------------------------------------------------------------------
 
-    if(likely(do_arc_size_breakdown == CONFIG_BOOLEAN_YES || mru_size || mfu_size)) {
+    if(do_arc_size_breakdown == CONFIG_BOOLEAN_YES || mru_size || mfu_size) {
         do_arc_size_breakdown = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_arc_size_breakdown = NULL;
         static RRDDIM *rd_most_recent = NULL;
         static RRDDIM *rd_most_frequent = NULL;
 
-        if (unlikely(!st_arc_size_breakdown)) {
+        if (!st_arc_size_breakdown) {
             st_arc_size_breakdown = rrdset_create_localhost(
                     "zfs"
                     , "arc_size_breakdown"
@@ -608,9 +608,9 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
 
     // --------------------------------------------------------------------
 
-    if(likely(do_memory == CONFIG_BOOLEAN_YES || arcstats.memory_direct_count \
+    if(do_memory == CONFIG_BOOLEAN_YES || arcstats.memory_direct_count \
                                               || arcstats.memory_throttle_count \
-                                              || arcstats.memory_indirect_count)) {
+                                              || arcstats.memory_indirect_count) {
         do_memory = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_memory = NULL;
@@ -622,7 +622,7 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
         static RRDDIM *rd_indirect = NULL;
 #endif
 
-        if (unlikely(!st_memory)) {
+        if (!st_memory) {
             st_memory = rrdset_create_localhost(
                     "zfs"
                     , "memory_ops"
@@ -659,10 +659,10 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
 
     // --------------------------------------------------------------------
 
-    if(likely(do_important_ops == CONFIG_BOOLEAN_YES || arcstats.deleted \
+    if(do_important_ops == CONFIG_BOOLEAN_YES || arcstats.deleted \
                                                      || arcstats.evict_skip \
                                                      || arcstats.mutex_miss \
-                                                     || arcstats.hash_collisions)) {
+                                                     || arcstats.hash_collisions) {
         do_important_ops = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_important_ops = NULL;
@@ -671,7 +671,7 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
         static RRDDIM *rd_evict_skips = NULL;
         static RRDDIM *rd_hash_collisions = NULL;
 
-        if (unlikely(!st_important_ops)) {
+        if (!st_important_ops) {
             st_important_ops = rrdset_create_localhost(
                     "zfs"
                     , "important_ops"
@@ -702,14 +702,14 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
 
     // --------------------------------------------------------------------
 
-    if(likely(do_actual_hits == CONFIG_BOOLEAN_YES || real_hits || real_misses)) {
+    if(do_actual_hits == CONFIG_BOOLEAN_YES || real_hits || real_misses) {
         do_actual_hits = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_actual_hits = NULL;
         static RRDDIM *rd_actual_hits = NULL;
         static RRDDIM *rd_actual_misses = NULL;
 
-        if (unlikely(!st_actual_hits)) {
+        if (!st_actual_hits) {
             st_actual_hits = rrdset_create_localhost(
                     "zfs"
                     , "actual_hits"
@@ -737,7 +737,7 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
         static RRDDIM *rd_actual_hits_rate = NULL;
         static RRDDIM *rd_actual_misses_rate = NULL;
 
-        if (unlikely(!st_actual_hits_rate)) {
+        if (!st_actual_hits_rate) {
             st_actual_hits_rate = rrdset_create_localhost(
                     "zfs"
                     , "actual_hits_rate"
@@ -764,14 +764,14 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
 
     // --------------------------------------------------------------------
 
-    if(likely(do_demand_data_hits == CONFIG_BOOLEAN_YES || arcstats.demand_data_hits || arcstats.demand_data_misses)) {
+    if(do_demand_data_hits == CONFIG_BOOLEAN_YES || arcstats.demand_data_hits || arcstats.demand_data_misses) {
         do_demand_data_hits = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_demand_data_hits = NULL;
         static RRDDIM *rd_demand_data_hits = NULL;
         static RRDDIM *rd_demand_data_misses = NULL;
 
-        if (unlikely(!st_demand_data_hits)) {
+        if (!st_demand_data_hits) {
             st_demand_data_hits = rrdset_create_localhost(
                     "zfs"
                     , "demand_data_hits"
@@ -799,7 +799,7 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
         static RRDDIM *rd_demand_data_hits_rate = NULL;
         static RRDDIM *rd_demand_data_misses_rate = NULL;
 
-        if (unlikely(!st_demand_data_hits_rate)) {
+        if (!st_demand_data_hits_rate) {
             st_demand_data_hits_rate = rrdset_create_localhost(
                     "zfs"
                     , "demand_data_hits_rate"
@@ -826,15 +826,15 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
 
     // --------------------------------------------------------------------
 
-    if(likely(do_prefetch_data_hits == CONFIG_BOOLEAN_YES || arcstats.prefetch_data_hits \
-                                                          || arcstats.prefetch_data_misses)) {
+    if(do_prefetch_data_hits == CONFIG_BOOLEAN_YES || arcstats.prefetch_data_hits \
+                                                          || arcstats.prefetch_data_misses) {
         do_prefetch_data_hits = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_prefetch_data_hits = NULL;
         static RRDDIM *rd_prefetch_data_hits = NULL;
         static RRDDIM *rd_prefetch_data_misses = NULL;
 
-        if (unlikely(!st_prefetch_data_hits)) {
+        if (!st_prefetch_data_hits) {
             st_prefetch_data_hits = rrdset_create_localhost(
                     "zfs"
                     , "prefetch_data_hits"
@@ -862,7 +862,7 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
         static RRDDIM *rd_prefetch_data_hits_rate = NULL;
         static RRDDIM *rd_prefetch_data_misses_rate = NULL;
 
-        if (unlikely(!st_prefetch_data_hits_rate)) {
+        if (!st_prefetch_data_hits_rate) {
             st_prefetch_data_hits_rate = rrdset_create_localhost(
                     "zfs"
                     , "prefetch_data_hits_rate"
@@ -889,14 +889,14 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
 
     // --------------------------------------------------------------------
 
-    if(likely(do_hash_elements == CONFIG_BOOLEAN_YES || arcstats.hash_elements || arcstats.hash_elements_max)) {
+    if(do_hash_elements == CONFIG_BOOLEAN_YES || arcstats.hash_elements || arcstats.hash_elements_max) {
         do_hash_elements = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_hash_elements = NULL;
         static RRDDIM *rd_hash_elements_current = NULL;
         static RRDDIM *rd_hash_elements_max = NULL;
 
-        if (unlikely(!st_hash_elements)) {
+        if (!st_hash_elements) {
             st_hash_elements = rrdset_create_localhost(
                     "zfs"
                     , "hash_elements"
@@ -923,14 +923,14 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
 
     // --------------------------------------------------------------------
 
-    if(likely(do_hash_chains == CONFIG_BOOLEAN_YES || arcstats.hash_chains || arcstats.hash_chain_max)) {
+    if(do_hash_chains == CONFIG_BOOLEAN_YES || arcstats.hash_chains || arcstats.hash_chain_max) {
         do_hash_chains = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_hash_chains = NULL;
         static RRDDIM *rd_hash_chains_current = NULL;
         static RRDDIM *rd_hash_chains_max = NULL;
 
-        if (unlikely(!st_hash_chains)) {
+        if (!st_hash_chains) {
             st_hash_chains = rrdset_create_localhost(
                     "zfs"
                     , "hash_chains"

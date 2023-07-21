@@ -133,22 +133,22 @@ static inline NETDATA_DOUBLE unpack_storage_number(storage_number value) __attri
 static inline NETDATA_DOUBLE unpack_storage_number(storage_number value) {
     extern NETDATA_DOUBLE unpack_storage_number_lut10x[4 * 8];
 
-    if(unlikely(value == SN_EMPTY_SLOT))
+    if(value == SN_EMPTY_SLOT)
         return NAN;
 
     int sign = 1, exp = 0;
     int factor = 0;
 
     // bit 32 = 0:positive, 1:negative
-    if(unlikely(value & SN_FLAG_NEGATIVE))
+    if(value & SN_FLAG_NEGATIVE)
         sign = -1;
 
     // bit 31 = 0:divide, 1:multiply
-    if(unlikely(value & SN_FLAG_MULTIPLY))
+    if(value & SN_FLAG_MULTIPLY)
         exp = 1;
 
     // bit 27 SN_FLAG_NOT_EXISTS_MUL100
-    if(unlikely(value & SN_FLAG_NOT_EXISTS_MUL100))
+    if(value & SN_FLAG_NOT_EXISTS_MUL100)
         factor = 1;
 
     // bit 26 SN_FLAG_RESET

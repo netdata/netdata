@@ -7,7 +7,7 @@
 void register_libuv_worker_jobs() {
     static __thread bool registered = false;
 
-    if(likely(registered))
+    if(registered)
         return;
 
     registered = true;

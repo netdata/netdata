@@ -100,12 +100,12 @@ int freebsd_plugin_init()
         return 1;
     }
 
-    if (unlikely(GETSYSCTL_BY_NAME("kern.smp.cpus", number_of_cpus))) {
+    if (GETSYSCTL_BY_NAME("kern.smp.cpus", number_of_cpus)) {
         collector_error("FREEBSD: can't get number of cpus");
         return 1;
     }
 
-    if (unlikely(!number_of_cpus)) {
+    if (!number_of_cpus) {
         collector_error("FREEBSD: wrong number of cpus");
         return 1;
     }
@@ -125,7 +125,7 @@ int do_vm_loadavg(int update_every, usec_t dt){
         static int mib[2] = {0, 0};
         struct loadavg sysload;
 
-        if (unlikely(GETSYSCTL_SIMPLE("vm.loadavg", mib, sysload))) {
+        if (GETSYSCTL_SIMPLE("vm.loadavg", mib, sysload)) {
             collector_error("DISABLED: system.load chart");
             collector_error("DISABLED: vm.loadavg module");
             return 1;
@@ -133,7 +133,7 @@ int do_vm_loadavg(int update_every, usec_t dt){
             static RRDSET *st = NULL;
             static RRDDIM *rd_load1 = NULL, *rd_load2 = NULL, *rd_load3 = NULL;
 
-            if (unlikely(!st)) {
+            if (!st) {
                 st = rrdset_create_localhost(
                         "system",
                         "load",
@@ -173,17 +173,17 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
     (void)dt;
     static int do_all_processes = -1, do_processes = -1, do_mem_real = -1;
 
-    if (unlikely(do_all_processes == -1)) {
+    if (do_all_processes == -1) {
         do_all_processes    = config_get_boolean("plugin:freebsd:vm.vmtotal", "enable total processes", 1);
         do_processes        = config_get_boolean("plugin:freebsd:vm.vmtotal", "processes running", 1);
         do_mem_real         = config_get_boolean("plugin:freebsd:vm.vmtotal", "real memory", 1);
     }
 
-    if (likely(do_all_processes | do_processes | do_mem_real)) {
+    if (do_all_processes | do_processes | do_mem_real) {
         static int mib[2] = {0, 0};
         struct vmtotal vmtotal_data;
 
-        if (unlikely(GETSYSCTL_SIMPLE("vm.vmtotal", mib, vmtotal_data))) {
+        if (GETSYSCTL_SIMPLE("vm.vmtotal", mib, vmtotal_data)) {
             do_all_processes = 0;
             collector_error("DISABLED: system.active_processes chart");
             do_processes = 0;
@@ -193,11 +193,11 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
             collector_error("DISABLED: vm.vmtotal module");
             return 1;
         } else {
-            if (likely(do_all_processes)) {
+            if (do_all_processes) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "system",
                             "active_processes",
@@ -219,11 +219,11 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (likely(do_processes)) {
+            if (do_processes) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_running = NULL, *rd_blocked = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "system",
                             "processes",
@@ -248,11 +248,11 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (likely(do_mem_real)) {
+            if (do_mem_real) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "mem",
                             "real",
@@ -289,7 +289,7 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
 int do_kern_cp_time(int update_every, usec_t dt) {
     (void)dt;
 
-    if (unlikely(CPUSTATES != 5)) {
+    if (CPUSTATES != 5) {
         collector_error("FREEBSD: There are %d CPU states (5 was expected)", CPUSTATES);
         collector_error("DISABLED: system.cpu chart");
         collector_error("DISABLED: kern.cp_time module");
@@ -298,7 +298,7 @@ int do_kern_cp_time(int update_every, usec_t dt) {
         static int mib[2] = {0, 0};
         long cp_time[CPUSTATES];
 
-        if (unlikely(GETSYSCTL_SIMPLE("kern.cp_time", mib, cp_time))) {
+        if (GETSYSCTL_SIMPLE("kern.cp_time", mib, cp_time)) {
             collector_error("DISABLED: system.cpu chart");
             collector_error("DISABLED: kern.cp_time module");
             return 1;
@@ -306,7 +306,7 @@ int do_kern_cp_time(int update_every, usec_t dt) {
             static RRDSET *st = NULL;
             static RRDDIM *rd_nice = NULL, *rd_system = NULL, *rd_user = NULL, *rd_interrupt = NULL, *rd_idle = NULL;
 
-            if (unlikely(!st)) {
+            if (!st) {
                 st = rrdset_create_localhost(
                         "system",
                         "cpu",
@@ -347,7 +347,7 @@ int do_kern_cp_time(int update_every, usec_t dt) {
 int do_kern_cp_times(int update_every, usec_t dt) {
     (void)dt;
 
-    if (unlikely(CPUSTATES != 5)) {
+    if (CPUSTATES != 5) {
         collector_error("FREEBSD: There are %d CPU states (5 was expected)", CPUSTATES);
         collector_error("DISABLED: cpu.cpuXX charts");
         collector_error("DISABLED: kern.cp_times module");
@@ -358,9 +358,9 @@ int do_kern_cp_times(int update_every, usec_t dt) {
         static long *pcpu_cp_time = NULL;
         static int old_number_of_cpus = 0;
 
-        if(unlikely(number_of_cpus != old_number_of_cpus))
+        if(number_of_cpus != old_number_of_cpus)
             pcpu_cp_time = reallocz(pcpu_cp_time, sizeof(cp_time) * number_of_cpus);
-        if (unlikely(GETSYSCTL_WSIZE("kern.cp_times", mib, pcpu_cp_time, sizeof(cp_time) * number_of_cpus))) {
+        if (GETSYSCTL_WSIZE("kern.cp_times", mib, pcpu_cp_time, sizeof(cp_time) * number_of_cpus)) {
             collector_error("DISABLED: cpu.cpuXX charts");
             collector_error("DISABLED: kern.cp_times module");
             return 1;
@@ -376,13 +376,13 @@ int do_kern_cp_times(int update_every, usec_t dt) {
                 RRDDIM *rd_idle;
             } *all_cpu_charts = NULL;
 
-            if(unlikely(number_of_cpus > old_number_of_cpus)) {
+            if(number_of_cpus > old_number_of_cpus) {
                 all_cpu_charts = reallocz(all_cpu_charts, sizeof(struct cpu_chart) * number_of_cpus);
                 memset(&all_cpu_charts[old_number_of_cpus], 0, sizeof(struct cpu_chart) * (number_of_cpus - old_number_of_cpus));
             }
 
             for (i = 0; i < number_of_cpus; i++) {
-                if (unlikely(!all_cpu_charts[i].st)) {
+                if (!all_cpu_charts[i].st) {
                     snprintfz(all_cpu_charts[i].cpuid, MAX_INT_DIGITS, "cpu%d", i);
                     all_cpu_charts[i].st = rrdset_create_localhost(
                             "cpu",
@@ -439,16 +439,16 @@ int do_dev_cpu_temperature(int update_every, usec_t dt) {
     char char_mib[MAX_INT_DIGITS + 21];
     char char_rd[MAX_INT_DIGITS + 9];
 
-    if (unlikely(number_of_cpus != old_number_of_cpus)) {
+    if (number_of_cpus != old_number_of_cpus) {
         pcpu_temperature = reallocz(pcpu_temperature, sizeof(int) * number_of_cpus);
         mib = reallocz(mib, sizeof(int) * number_of_cpus * 4);
-        if (unlikely(number_of_cpus > old_number_of_cpus))
+        if (number_of_cpus > old_number_of_cpus)
             memset(&mib[old_number_of_cpus * 4], 0, sizeof(int) * (number_of_cpus - old_number_of_cpus) * 4);
     }
     for (i = 0; i < number_of_cpus; i++) {
-        if (unlikely(!(mib[i * 4])))
+        if (!(mib[i * 4]))
             sprintf(char_mib, "dev.cpu.%d.temperature", i);
-        if (unlikely(getsysctl_simple(char_mib, &mib[i * 4], 4, &pcpu_temperature[i], sizeof(int)))) {
+        if (getsysctl_simple(char_mib, &mib[i * 4], 4, &pcpu_temperature[i], sizeof(int))) {
             collector_error("DISABLED: cpu.temperature chart");
             collector_error("DISABLED: dev.cpu.temperature module");
             return 1;
@@ -458,13 +458,13 @@ int do_dev_cpu_temperature(int update_every, usec_t dt) {
     static RRDSET *st;
     static RRDDIM **rd_pcpu_temperature;
 
-    if (unlikely(number_of_cpus != old_number_of_cpus)) {
+    if (number_of_cpus != old_number_of_cpus) {
         rd_pcpu_temperature = reallocz(rd_pcpu_temperature, sizeof(RRDDIM *) * number_of_cpus);
-        if (unlikely(number_of_cpus > old_number_of_cpus))
+        if (number_of_cpus > old_number_of_cpus)
             memset(&rd_pcpu_temperature[old_number_of_cpus], 0, sizeof(RRDDIM *) * (number_of_cpus - old_number_of_cpus));
     }
 
-    if (unlikely(!st)) {
+    if (!st) {
         st = rrdset_create_localhost(
                 "cpu",
                 "temperature",
@@ -482,7 +482,7 @@ int do_dev_cpu_temperature(int update_every, usec_t dt) {
     }
 
     for (i = 0; i < number_of_cpus; i++) {
-        if (unlikely(!rd_pcpu_temperature[i])) {
+        if (!rd_pcpu_temperature[i]) {
             sprintf(char_rd, "cpu%d.temp", i);
             rd_pcpu_temperature[i] = rrddim_add(st, char_rd, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
@@ -504,7 +504,7 @@ int do_dev_cpu_0_freq(int update_every, usec_t dt) {
     static int mib[4] = {0, 0, 0, 0};
     int cpufreq;
 
-    if (unlikely(GETSYSCTL_SIMPLE("dev.cpu.0.freq", mib, cpufreq))) {
+    if (GETSYSCTL_SIMPLE("dev.cpu.0.freq", mib, cpufreq)) {
         collector_error("DISABLED: cpu.scaling_cur_freq chart");
         collector_error("DISABLED: dev.cpu.0.freq module");
         return 1;
@@ -512,7 +512,7 @@ int do_dev_cpu_0_freq(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd = NULL;
 
-        if (unlikely(!st)) {
+        if (!st) {
             st = rrdset_create_localhost(
                     "cpu",
                     "scaling_cur_freq",
@@ -546,7 +546,7 @@ int do_hw_intcnt(int update_every, usec_t dt) {
     static int mib_hw_intrcnt[2] = {0, 0};
     size_t intrcnt_size = 0;
 
-    if (unlikely(GETSYSCTL_SIZE("hw.intrcnt", mib_hw_intrcnt, intrcnt_size))) {
+    if (GETSYSCTL_SIZE("hw.intrcnt", mib_hw_intrcnt, intrcnt_size)) {
         collector_error("DISABLED: system.intr chart");
         collector_error("DISABLED: system.interrupts chart");
         collector_error("DISABLED: hw.intrcnt module");
@@ -557,9 +557,9 @@ int do_hw_intcnt(int update_every, usec_t dt) {
         static unsigned long *intrcnt = NULL;
 
         nintr = intrcnt_size / sizeof(u_long);
-        if (unlikely(nintr != old_nintr))
+        if (nintr != old_nintr)
             intrcnt = reallocz(intrcnt, nintr * sizeof(u_long));
-        if (unlikely(GETSYSCTL_WSIZE("hw.intrcnt", mib_hw_intrcnt, intrcnt, nintr * sizeof(u_long)))) {
+        if (GETSYSCTL_WSIZE("hw.intrcnt", mib_hw_intrcnt, intrcnt, nintr * sizeof(u_long))) {
             collector_error("DISABLED: system.intr chart");
             collector_error("DISABLED: system.interrupts chart");
             collector_error("DISABLED: hw.intrcnt module");
@@ -574,7 +574,7 @@ int do_hw_intcnt(int update_every, usec_t dt) {
             static RRDSET *st_intr = NULL;
             static RRDDIM *rd_intr = NULL;
 
-            if (unlikely(!st_intr)) {
+            if (!st_intr) {
                 st_intr = rrdset_create_localhost(
                         "system",
                         "intr",
@@ -601,15 +601,15 @@ int do_hw_intcnt(int update_every, usec_t dt) {
             static int mib_hw_intrnames[2] = {0, 0};
             static char *intrnames = NULL;
 
-            if (unlikely(GETSYSCTL_SIZE("hw.intrnames", mib_hw_intrnames, size))) {
+            if (GETSYSCTL_SIZE("hw.intrnames", mib_hw_intrnames, size)) {
                 collector_error("DISABLED: system.intr chart");
                 collector_error("DISABLED: system.interrupts chart");
                 collector_error("DISABLED: hw.intrcnt module");
                 return 1;
             } else {
-                if (unlikely(nintr != old_nintr))
+                if (nintr != old_nintr)
                     intrnames = reallocz(intrnames, size);
-                if (unlikely(GETSYSCTL_WSIZE("hw.intrnames", mib_hw_intrnames, intrnames, size))) {
+                if (GETSYSCTL_WSIZE("hw.intrnames", mib_hw_intrnames, intrnames, size)) {
                     collector_error("DISABLED: system.intr chart");
                     collector_error("DISABLED: system.interrupts chart");
                     collector_error("DISABLED: hw.intrcnt module");
@@ -617,7 +617,7 @@ int do_hw_intcnt(int update_every, usec_t dt) {
                 } else {
                     static RRDSET *st_interrupts = NULL;
 
-                    if (unlikely(!st_interrupts)) {
+                    if (!st_interrupts) {
                         st_interrupts = rrdset_create_localhost(
                                 "system",
                                 "interrupts",
@@ -638,10 +638,10 @@ int do_hw_intcnt(int update_every, usec_t dt) {
                         void *p;
 
                         p = intrnames + i * (strlen(intrnames) + 1);
-                        if (unlikely((intrcnt[i] != 0) && (*(char *) p != 0))) {
+                        if ((intrcnt[i] != 0) && (*(char *) p != 0)) {
                             RRDDIM *rd_interrupts = rrddim_find_active(st_interrupts, p);
 
-                            if (unlikely(!rd_interrupts))
+                            if (!rd_interrupts)
                                 rd_interrupts = rrddim_add(st_interrupts, p, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                             rrddim_set_by_pointer(st_interrupts, rd_interrupts, intrcnt[i]);
@@ -665,7 +665,7 @@ int do_vm_stats_sys_v_intr(int update_every, usec_t dt) {
     static int mib[4] = {0, 0, 0, 0};
     u_int int_number;
 
-    if (unlikely(GETSYSCTL_SIMPLE("vm.stats.sys.v_intr", mib, int_number))) {
+    if (GETSYSCTL_SIMPLE("vm.stats.sys.v_intr", mib, int_number)) {
         collector_error("DISABLED: system.dev_intr chart");
         collector_error("DISABLED: vm.stats.sys.v_intr module");
         return 1;
@@ -673,7 +673,7 @@ int do_vm_stats_sys_v_intr(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd = NULL;
 
-        if (unlikely(!st)) {
+        if (!st) {
             st = rrdset_create_localhost(
                     "system",
                     "dev_intr",
@@ -706,7 +706,7 @@ int do_vm_stats_sys_v_soft(int update_every, usec_t dt) {
     static int mib[4] = {0, 0, 0, 0};
     u_int soft_intr_number;
 
-    if (unlikely(GETSYSCTL_SIMPLE("vm.stats.sys.v_soft", mib, soft_intr_number))) {
+    if (GETSYSCTL_SIMPLE("vm.stats.sys.v_soft", mib, soft_intr_number)) {
         collector_error("DISABLED: system.dev_intr chart");
         collector_error("DISABLED: vm.stats.sys.v_soft module");
         return 1;
@@ -714,7 +714,7 @@ int do_vm_stats_sys_v_soft(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd = NULL;
 
-        if (unlikely(!st)) {
+        if (!st) {
             st = rrdset_create_localhost(
                     "system",
                     "soft_intr",
@@ -747,7 +747,7 @@ int do_vm_stats_sys_v_swtch(int update_every, usec_t dt) {
     static int mib[4] = {0, 0, 0, 0};
     u_int ctxt_number;
 
-    if (unlikely(GETSYSCTL_SIMPLE("vm.stats.sys.v_swtch", mib, ctxt_number))) {
+    if (GETSYSCTL_SIMPLE("vm.stats.sys.v_swtch", mib, ctxt_number)) {
         collector_error("DISABLED: system.ctxt chart");
         collector_error("DISABLED: vm.stats.sys.v_swtch module");
         return 1;
@@ -755,7 +755,7 @@ int do_vm_stats_sys_v_swtch(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd = NULL;
 
-        if (unlikely(!st)) {
+        if (!st) {
             st = rrdset_create_localhost(
                     "system",
                     "ctxt",
@@ -788,7 +788,7 @@ int do_vm_stats_sys_v_forks(int update_every, usec_t dt) {
     static int mib[4] = {0, 0, 0, 0};
     u_int forks_number;
 
-    if (unlikely(GETSYSCTL_SIMPLE("vm.stats.vm.v_forks", mib, forks_number))) {
+    if (GETSYSCTL_SIMPLE("vm.stats.vm.v_forks", mib, forks_number)) {
         collector_error("DISABLED: system.forks chart");
         collector_error("DISABLED: vm.stats.sys.v_swtch module");
         return 1;
@@ -799,7 +799,7 @@ int do_vm_stats_sys_v_forks(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd = NULL;
 
-        if (unlikely(!st)) {
+        if (!st) {
             st = rrdset_create_localhost(
                     "system",
                     "forks",
@@ -833,7 +833,7 @@ int do_vm_swap_info(int update_every, usec_t dt) {
     (void)dt;
     static int mib[3] = {0, 0, 0};
 
-    if (unlikely(getsysctl_mib("vm.swap_info", mib, 2))) {
+    if (getsysctl_mib("vm.swap_info", mib, 2)) {
         collector_error("DISABLED: system.swap chart");
         collector_error("DISABLED: vm.swap_info module");
         return 1;
@@ -850,14 +850,14 @@ int do_vm_swap_info(int update_every, usec_t dt) {
 
             mib[2] = i;
             size = sizeof(xsw);
-            if (unlikely(sysctl(mib, 3, &xsw, &size, NULL, 0) == -1 )) {
-                if (unlikely(errno != ENOENT)) {
+            if (sysctl(mib, 3, &xsw, &size, NULL, 0) == -1 ) {
+                if (errno != ENOENT) {
                     collector_error("FREEBSD: sysctl(%s...) failed: %s", "vm.swap_info", strerror(errno));
                     collector_error("DISABLED: system.swap chart");
                     collector_error("DISABLED: vm.swap_info module");
                     return 1;
                 } else {
-                    if (unlikely(size != sizeof(xsw))) {
+                    if (size != sizeof(xsw)) {
                         collector_error("FREEBSD: sysctl(%s...) expected %lu, got %lu", "vm.swap_info", (unsigned long)sizeof(xsw), (unsigned long)size);
                         collector_error("DISABLED: system.swap chart");
                         collector_error("DISABLED: vm.swap_info module");
@@ -872,7 +872,7 @@ int do_vm_swap_info(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_free = NULL, *rd_used = NULL;
 
-        if (unlikely(!st)) {
+        if (!st) {
             st = rrdset_create_localhost(
                     "system",
                     "swap",
@@ -921,7 +921,7 @@ int do_system_ram(int update_every, usec_t dt) {
     static int mib_laundry_count[4] = {0, 0, 0, 0};
 #endif
 
-    if (unlikely(GETSYSCTL_SIMPLE("vm.stats.vm.v_active_count",   mib_active_count,   vmmeter_data.v_active_count) ||
+    if (GETSYSCTL_SIMPLE("vm.stats.vm.v_active_count",   mib_active_count,   vmmeter_data.v_active_count) ||
                  GETSYSCTL_SIMPLE("vm.stats.vm.v_inactive_count", mib_inactive_count, vmmeter_data.v_inactive_count) ||
                  GETSYSCTL_SIMPLE("vm.stats.vm.v_wire_count",     mib_wire_count,     vmmeter_data.v_wire_count) ||
 #if __FreeBSD_version < 1200016
@@ -931,7 +931,7 @@ int do_system_ram(int update_every, usec_t dt) {
                  GETSYSCTL_SIMPLE("vm.stats.vm.v_laundry_count",  mib_laundry_count,  vmmeter_data.v_laundry_count) ||
 #endif
                  GETSYSCTL_SIMPLE("vfs.bufspace",                 mib_vfs_bufspace,     vfs_bufspace_count) ||
-                 GETSYSCTL_SIMPLE("vm.stats.vm.v_free_count",     mib_free_count,     vmmeter_data.v_free_count))) {
+                 GETSYSCTL_SIMPLE("vm.stats.vm.v_free_count",     mib_free_count,     vmmeter_data.v_free_count)) {
         collector_error("DISABLED: system.ram chart");
         collector_error("DISABLED: system.ram module");
         return 1;
@@ -944,7 +944,7 @@ int do_system_ram(int update_every, usec_t dt) {
         static RRDDIM *rd_laundry = NULL;
 #endif
 
-        if (unlikely(!st)) {
+        if (!st) {
             st = rrdset_create_localhost(
                     "system",
                     "ram",
@@ -986,7 +986,7 @@ int do_system_ram(int update_every, usec_t dt) {
         rrddim_set_by_pointer(st, rd_buffers,  vfs_bufspace_count);
         rrdset_done(st);
 
-        if (unlikely(!st_mem_available)) {
+        if (!st_mem_available) {
             st_mem_available = rrdset_create_localhost(
                     "mem",
                     "available",
@@ -1024,8 +1024,8 @@ int do_vm_stats_sys_v_swappgs(int update_every, usec_t dt) {
     static int mib_swappgsin[4] = {0, 0, 0, 0}, mib_swappgsout[4] = {0, 0, 0, 0};
     vmmeter_t vmmeter_data;
 
-    if (unlikely(GETSYSCTL_SIMPLE("vm.stats.vm.v_swappgsin", mib_swappgsin, vmmeter_data.v_swappgsin) ||
-                 GETSYSCTL_SIMPLE("vm.stats.vm.v_swappgsout", mib_swappgsout, vmmeter_data.v_swappgsout))) {
+    if (GETSYSCTL_SIMPLE("vm.stats.vm.v_swappgsin", mib_swappgsin, vmmeter_data.v_swappgsin) ||
+                 GETSYSCTL_SIMPLE("vm.stats.vm.v_swappgsout", mib_swappgsout, vmmeter_data.v_swappgsout)) {
         collector_error("DISABLED: system.swapio chart");
         collector_error("DISABLED: vm.stats.vm.v_swappgs module");
         return 1;
@@ -1033,7 +1033,7 @@ int do_vm_stats_sys_v_swappgs(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
-        if (unlikely(!st)) {
+        if (!st) {
             st = rrdset_create_localhost(
                     "system",
                     "swapio",
@@ -1069,11 +1069,11 @@ int do_vm_stats_sys_v_pgfaults(int update_every, usec_t dt) {
                mib_cow_optim[4] = {0, 0, 0, 0}, mib_intrans[4] = {0, 0, 0, 0};
     vmmeter_t vmmeter_data;
 
-    if (unlikely(GETSYSCTL_SIMPLE("vm.stats.vm.v_vm_faults",  mib_vm_faults,  vmmeter_data.v_vm_faults) ||
+    if (GETSYSCTL_SIMPLE("vm.stats.vm.v_vm_faults",  mib_vm_faults,  vmmeter_data.v_vm_faults) ||
                  GETSYSCTL_SIMPLE("vm.stats.vm.v_io_faults",  mib_io_faults,  vmmeter_data.v_io_faults) ||
                  GETSYSCTL_SIMPLE("vm.stats.vm.v_cow_faults", mib_cow_faults, vmmeter_data.v_cow_faults) ||
                  GETSYSCTL_SIMPLE("vm.stats.vm.v_cow_optim",  mib_cow_optim,  vmmeter_data.v_cow_optim) ||
-                 GETSYSCTL_SIMPLE("vm.stats.vm.v_intrans",    mib_intrans,    vmmeter_data.v_intrans))) {
+                 GETSYSCTL_SIMPLE("vm.stats.vm.v_intrans",    mib_intrans,    vmmeter_data.v_intrans)) {
         collector_error("DISABLED: mem.pgfaults chart");
         collector_error("DISABLED: vm.stats.vm.v_pgfaults module");
         return 1;
@@ -1082,7 +1082,7 @@ int do_vm_stats_sys_v_pgfaults(int update_every, usec_t dt) {
         static RRDDIM *rd_memory = NULL, *rd_io_requiring = NULL, *rd_cow = NULL,
                       *rd_cow_optimized = NULL, *rd_in_transit = NULL;
 
-        if (unlikely(!st)) {
+        if (!st) {
             st = rrdset_create_localhost(
                     "mem",
                     "pgfaults",
@@ -1130,7 +1130,7 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
         collected_number semaphores;
     } ipc_sem = {0, 0, 0};
 
-    if (unlikely(GETSYSCTL_SIMPLE("kern.ipc.semmni", mib_semmni, ipc_sem.semmni))) {
+    if (GETSYSCTL_SIMPLE("kern.ipc.semmni", mib_semmni, ipc_sem.semmni)) {
         collector_error("DISABLED: system.ipc_semaphores chart");
         collector_error("DISABLED: system.ipc_semaphore_arrays chart");
         collector_error("DISABLED: kern.ipc.sem module");
@@ -1140,11 +1140,11 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
         static int old_semmni = 0;
         static int mib_sema[3] = {0, 0, 0};
 
-        if (unlikely(ipc_sem.semmni != old_semmni)) {
+        if (ipc_sem.semmni != old_semmni) {
             ipc_sem_data = reallocz(ipc_sem_data, sizeof(struct semid_kernel) * ipc_sem.semmni);
             old_semmni = ipc_sem.semmni;
         }
-        if (unlikely(GETSYSCTL_WSIZE("kern.ipc.sema", mib_sema, ipc_sem_data, sizeof(struct semid_kernel) * ipc_sem.semmni))) {
+        if (GETSYSCTL_WSIZE("kern.ipc.sema", mib_sema, ipc_sem_data, sizeof(struct semid_kernel) * ipc_sem.semmni)) {
             collector_error("DISABLED: system.ipc_semaphores chart");
             collector_error("DISABLED: system.ipc_semaphore_arrays chart");
             collector_error("DISABLED: kern.ipc.sem module");
@@ -1153,7 +1153,7 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
             int i;
 
             for (i = 0; i < ipc_sem.semmni; i++) {
-                if (unlikely(ipc_sem_data[i].u.sem_perm.mode & SEM_ALLOC)) {
+                if (ipc_sem_data[i].u.sem_perm.mode & SEM_ALLOC) {
                     ipc_sem.sets += 1;
                     ipc_sem.semaphores += ipc_sem_data[i].u.sem_nsems;
                 }
@@ -1162,7 +1162,7 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
             static RRDSET *st_semaphores = NULL, *st_semaphore_arrays = NULL;
             static RRDDIM *rd_semaphores = NULL, *rd_semaphore_arrays = NULL;
 
-            if (unlikely(!st_semaphores)) {
+            if (!st_semaphores) {
                 st_semaphores = rrdset_create_localhost(
                         "system",
                         "ipc_semaphores",
@@ -1184,7 +1184,7 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
             rrddim_set_by_pointer(st_semaphores, rd_semaphores, ipc_sem.semaphores);
             rrdset_done(st_semaphores);
 
-            if (unlikely(!st_semaphore_arrays)) {
+            if (!st_semaphore_arrays) {
                 st_semaphore_arrays = rrdset_create_localhost(
                         "system",
                         "ipc_semaphore_arrays",
@@ -1222,7 +1222,7 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
         collected_number segsize;
     } ipc_shm = {0, 0, 0};
 
-    if (unlikely(GETSYSCTL_SIMPLE("kern.ipc.shmmni", mib_shmmni, ipc_shm.shmmni))) {
+    if (GETSYSCTL_SIMPLE("kern.ipc.shmmni", mib_shmmni, ipc_shm.shmmni)) {
         collector_error("DISABLED: system.ipc_shared_mem_segs chart");
         collector_error("DISABLED: system.ipc_shared_mem_size chart");
         collector_error("DISABLED: kern.ipc.shmmodule");
@@ -1232,12 +1232,12 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
         static u_long old_shmmni = 0;
         static int mib_shmsegs[3] = {0, 0, 0};
 
-        if (unlikely(ipc_shm.shmmni != old_shmmni)) {
+        if (ipc_shm.shmmni != old_shmmni) {
             ipc_shm_data = reallocz(ipc_shm_data, sizeof(struct shmid_kernel) * ipc_shm.shmmni);
             old_shmmni = ipc_shm.shmmni;
         }
-        if (unlikely(
-                GETSYSCTL_WSIZE("kern.ipc.shmsegs", mib_shmsegs, ipc_shm_data, sizeof(struct shmid_kernel) * ipc_shm.shmmni))) {
+        if (
+                GETSYSCTL_WSIZE("kern.ipc.shmsegs", mib_shmsegs, ipc_shm_data, sizeof(struct shmid_kernel) * ipc_shm.shmmni)) {
             collector_error("DISABLED: system.ipc_shared_mem_segs chart");
             collector_error("DISABLED: system.ipc_shared_mem_size chart");
             collector_error("DISABLED: kern.ipc.shmmodule");
@@ -1246,7 +1246,7 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
             unsigned long i;
 
             for (i = 0; i < ipc_shm.shmmni; i++) {
-                if (unlikely(ipc_shm_data[i].u.shm_perm.mode & 0x0800)) {
+                if (ipc_shm_data[i].u.shm_perm.mode & 0x0800) {
                     ipc_shm.segs += 1;
                     ipc_shm.segsize += ipc_shm_data[i].u.shm_segsz;
                 }
@@ -1255,7 +1255,7 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
             static RRDSET *st_segs = NULL, *st_size = NULL;
             static RRDDIM *rd_segments = NULL, *rd_allocated = NULL;
 
-            if (unlikely(!st_segs)) {
+            if (!st_segs) {
                 st_segs = rrdset_create_localhost(
                         "system",
                         "ipc_shared_mem_segs",
@@ -1277,7 +1277,7 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
             rrddim_set_by_pointer(st_segs, rd_segments, ipc_shm.segs);
             rrdset_done(st_segs);
 
-            if (unlikely(!st_size)) {
+            if (!st_size) {
                 st_size = rrdset_create_localhost(
                         "system",
                         "ipc_shared_mem_size",
@@ -1317,7 +1317,7 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
         collected_number allocsize;
     } ipc_msq = {0, 0, 0, 0, 0};
 
-    if (unlikely(GETSYSCTL_SIMPLE("kern.ipc.msgmni", mib_msgmni, ipc_msq.msgmni))) {
+    if (GETSYSCTL_SIMPLE("kern.ipc.msgmni", mib_msgmni, ipc_msq.msgmni)) {
         collector_error("DISABLED: system.ipc_msq_queues chart");
         collector_error("DISABLED: system.ipc_msq_messages chart");
         collector_error("DISABLED: system.ipc_msq_size chart");
@@ -1328,12 +1328,12 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
         static int old_msgmni = 0;
         static int mib_msqids[3] = {0, 0, 0};
 
-        if (unlikely(ipc_msq.msgmni != old_msgmni)) {
+        if (ipc_msq.msgmni != old_msgmni) {
             ipc_msq_data = reallocz(ipc_msq_data, sizeof(struct msqid_kernel) * ipc_msq.msgmni);
             old_msgmni = ipc_msq.msgmni;
         }
-        if (unlikely(
-                GETSYSCTL_WSIZE("kern.ipc.msqids", mib_msqids, ipc_msq_data, sizeof(struct msqid_kernel) * ipc_msq.msgmni))) {
+        if (
+                GETSYSCTL_WSIZE("kern.ipc.msqids", mib_msqids, ipc_msq_data, sizeof(struct msqid_kernel) * ipc_msq.msgmni)) {
             collector_error("DISABLED: system.ipc_msq_queues chart");
             collector_error("DISABLED: system.ipc_msq_messages chart");
             collector_error("DISABLED: system.ipc_msq_size chart");
@@ -1343,7 +1343,7 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
             int i;
 
             for (i = 0; i < ipc_msq.msgmni; i++) {
-                if (unlikely(ipc_msq_data[i].u.msg_qbytes != 0)) {
+                if (ipc_msq_data[i].u.msg_qbytes != 0) {
                     ipc_msq.queues += 1;
                     ipc_msq.messages += ipc_msq_data[i].u.msg_qnum;
                     ipc_msq.usedsize += ipc_msq_data[i].u.msg_cbytes;
@@ -1354,7 +1354,7 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
             static RRDSET *st_queues = NULL, *st_messages = NULL, *st_size = NULL;
             static RRDDIM *rd_queues = NULL, *rd_messages = NULL, *rd_allocated = NULL, *rd_used = NULL;
 
-            if (unlikely(!st_queues)) {
+            if (!st_queues) {
                 st_queues = rrdset_create_localhost(
                         "system",
                         "ipc_msq_queues",
@@ -1376,7 +1376,7 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
             rrddim_set_by_pointer(st_queues, rd_queues, ipc_msq.queues);
             rrdset_done(st_queues);
 
-            if (unlikely(!st_messages)) {
+            if (!st_messages) {
                 st_messages = rrdset_create_localhost(
                         "system",
                         "ipc_msq_messages",
@@ -1398,7 +1398,7 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
             rrddim_set_by_pointer(st_messages, rd_messages, ipc_msq.messages);
             rrdset_done(st_messages);
 
-            if (unlikely(!st_size)) {
+            if (!st_size) {
                 st_size = rrdset_create_localhost(
                         "system",
                         "ipc_msq_size",
@@ -1438,7 +1438,7 @@ int do_uptime(int update_every, usec_t dt) {
     static RRDSET *st = NULL;
     static RRDDIM *rd = NULL;
 
-    if(unlikely(!st)) {
+    if(!st) {
         st = rrdset_create_localhost(
                 "system",
                 "uptime",
@@ -1468,7 +1468,7 @@ int do_net_isr(int update_every, usec_t dt) {
     (void)dt;
     static int do_netisr = -1, do_netisr_per_core = -1;
 
-    if (unlikely(do_netisr == -1)) {
+    if (do_netisr == -1) {
         do_netisr =          config_get_boolean("plugin:freebsd:net.isr", "netisr",          1);
         do_netisr_per_core = config_get_boolean("plugin:freebsd:net.isr", "netisr per core", 1);
     }
@@ -1480,7 +1480,7 @@ int do_net_isr(int update_every, usec_t dt) {
         collected_number queued;
     } *netisr_stats = NULL;
 
-    if (likely(do_netisr || do_netisr_per_core)) {
+    if (do_netisr || do_netisr_per_core) {
         static int mib_workstream[3] = {0, 0, 0}, mib_work[3] = {0, 0, 0};
         size_t netisr_workstream_size = 0, netisr_work_size = 0;
         static struct sysctl_netisr_workstream *netisr_workstream = NULL;
@@ -1488,37 +1488,37 @@ int do_net_isr(int update_every, usec_t dt) {
         unsigned long num_netisr_workstreams = 0, num_netisr_works = 0;
         int common_error = 0;
 
-        if (unlikely(GETSYSCTL_SIZE("net.isr.workstream", mib_workstream, netisr_workstream_size))) {
+        if (GETSYSCTL_SIZE("net.isr.workstream", mib_workstream, netisr_workstream_size)) {
             common_error = 1;
-        } else if (unlikely(GETSYSCTL_SIZE("net.isr.work", mib_work, netisr_work_size))) {
+        } else if (GETSYSCTL_SIZE("net.isr.work", mib_work, netisr_work_size)) {
             common_error = 1;
         } else {
             static size_t old_netisr_workstream_size = 0;
 
             num_netisr_workstreams = netisr_workstream_size / sizeof(struct sysctl_netisr_workstream);
-            if (unlikely(netisr_workstream_size != old_netisr_workstream_size)) {
+            if (netisr_workstream_size != old_netisr_workstream_size) {
                 netisr_workstream = reallocz(netisr_workstream,
                                              num_netisr_workstreams * sizeof(struct sysctl_netisr_workstream));
                 old_netisr_workstream_size = netisr_workstream_size;
             }
-            if (unlikely(GETSYSCTL_WSIZE("net.isr.workstream", mib_workstream, netisr_workstream,
-                                           num_netisr_workstreams * sizeof(struct sysctl_netisr_workstream)))){
+            if (GETSYSCTL_WSIZE("net.isr.workstream", mib_workstream, netisr_workstream,
+                                           num_netisr_workstreams * sizeof(struct sysctl_netisr_workstream))){
                 common_error = 1;
             } else {
                 static size_t old_netisr_work_size = 0;
 
                 num_netisr_works = netisr_work_size / sizeof(struct sysctl_netisr_work);
-                if (unlikely(netisr_work_size != old_netisr_work_size)) {
+                if (netisr_work_size != old_netisr_work_size) {
                     netisr_work = reallocz(netisr_work, num_netisr_works * sizeof(struct sysctl_netisr_work));
                     old_netisr_work_size = netisr_work_size;
                 }
-                if (unlikely(GETSYSCTL_WSIZE("net.isr.work", mib_work, netisr_work,
-                                               num_netisr_works * sizeof(struct sysctl_netisr_work)))){
+                if (GETSYSCTL_WSIZE("net.isr.work", mib_work, netisr_work,
+                                               num_netisr_works * sizeof(struct sysctl_netisr_work))){
                     common_error = 1;
                 }
             }
         }
-        if (unlikely(common_error)) {
+        if (common_error) {
             do_netisr = 0;
             collector_error("DISABLED: system.softnet_stat chart");
             do_netisr_per_core = 0;
@@ -1531,7 +1531,7 @@ int do_net_isr(int update_every, usec_t dt) {
             int j;
             static int old_number_of_cpus = 0;
 
-            if (unlikely(number_of_cpus != old_number_of_cpus)) {
+            if (number_of_cpus != old_number_of_cpus) {
                 netisr_stats = reallocz(netisr_stats, (number_of_cpus + 1) * sizeof(struct netisr_stats));
                 old_number_of_cpus = number_of_cpus;
             }
@@ -1558,11 +1558,11 @@ int do_net_isr(int update_every, usec_t dt) {
         return 1;
     }
 
-    if (likely(do_netisr)) {
+    if (do_netisr) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_dispatched = NULL, *rd_hybrid_dispatched = NULL, *rd_qdrops = NULL, *rd_queued = NULL;
 
-        if (unlikely(!st)) {
+        if (!st) {
             st = rrdset_create_localhost(
                     "system",
                     "softnet_stat",
@@ -1591,7 +1591,7 @@ int do_net_isr(int update_every, usec_t dt) {
         rrdset_done(st);
     }
 
-    if (likely(do_netisr_per_core)) {
+    if (do_netisr_per_core) {
         static struct softnet_chart {
             char netisr_cpuid[MAX_INT_DIGITS + 17];
             RRDSET *st;
@@ -1603,7 +1603,7 @@ int do_net_isr(int update_every, usec_t dt) {
         static int old_number_of_cpus = 0;
         int i;
 
-        if(unlikely(number_of_cpus > old_number_of_cpus)) {
+        if(number_of_cpus > old_number_of_cpus) {
             all_softnet_charts = reallocz(all_softnet_charts, sizeof(struct softnet_chart) * number_of_cpus);
             memset(&all_softnet_charts[old_number_of_cpus], 0, sizeof(struct softnet_chart) * (number_of_cpus - old_number_of_cpus));
             old_number_of_cpus = number_of_cpus;
@@ -1612,7 +1612,7 @@ int do_net_isr(int update_every, usec_t dt) {
         for (i = 0; i < number_of_cpus ;i++) {
             snprintfz(all_softnet_charts[i].netisr_cpuid, MAX_INT_DIGITS + 17, "cpu%d_softnet_stat", i);
 
-            if (unlikely(!all_softnet_charts[i].st)) {
+            if (!all_softnet_charts[i].st) {
                 all_softnet_charts[i].st = rrdset_create_localhost(
                         "cpu",
                         all_softnet_charts[i].netisr_cpuid,
@@ -1661,7 +1661,7 @@ int do_net_inet_tcp_states(int update_every, usec_t dt) {
     uint64_t tcps_states[TCP_NSTATES];
 
     // see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
-    if (unlikely(GETSYSCTL_SIMPLE("net.inet.tcp.states", mib, tcps_states))) {
+    if (GETSYSCTL_SIMPLE("net.inet.tcp.states", mib, tcps_states)) {
         collector_error("DISABLED: ipv4.tcpsock chart");
         collector_error("DISABLED: net.inet.tcp.states module");
         return 1;
@@ -1669,7 +1669,7 @@ int do_net_inet_tcp_states(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd = NULL;
 
-        if (unlikely(!st)) {
+        if (!st) {
             st = rrdset_create_localhost(
                     "ipv4",
                     "tcpsock",
@@ -1702,7 +1702,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
     static int do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1, do_tcpext_connaborts = -1, do_tcpext_ofo = -1,
                do_tcpext_syncookies = -1, do_tcpext_listen = -1, do_ecn = -1;
 
-    if (unlikely(do_tcp_packets == -1)) {
+    if (do_tcp_packets == -1) {
         do_tcp_packets       = config_get_boolean("plugin:freebsd:net.inet.tcp.stats", "ipv4 TCP packets",          1);
         do_tcp_errors        = config_get_boolean("plugin:freebsd:net.inet.tcp.stats", "ipv4 TCP errors",           1);
         do_tcp_handshake     = config_get_boolean("plugin:freebsd:net.inet.tcp.stats", "ipv4 TCP handshake issues", 1);
@@ -1719,12 +1719,12 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
     }
 
     // see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
-    if (likely(do_tcp_packets || do_tcp_errors || do_tcp_handshake || do_tcpext_connaborts || do_tcpext_ofo ||
-               do_tcpext_syncookies || do_tcpext_listen || do_ecn)) {
+    if (do_tcp_packets || do_tcp_errors || do_tcp_handshake || do_tcpext_connaborts || do_tcpext_ofo ||
+               do_tcpext_syncookies || do_tcpext_listen || do_ecn) {
         static int mib[4] = {0, 0, 0, 0};
         struct tcpstat tcpstat;
 
-        if (unlikely(GETSYSCTL_SIMPLE("net.inet.tcp.stats", mib, tcpstat))) {
+        if (GETSYSCTL_SIMPLE("net.inet.tcp.stats", mib, tcpstat)) {
             do_tcp_packets = 0;
             collector_error("DISABLED: ipv4.tcppackets chart");
             do_tcp_errors = 0;
@@ -1744,11 +1744,11 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
             collector_error("DISABLED: net.inet.tcp.stats module");
             return 1;
         } else {
-            if (likely(do_tcp_packets)) {
+            if (do_tcp_packets) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_in_segs = NULL, *rd_out_segs = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv4",
                             "tcppackets",
@@ -1773,11 +1773,11 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (likely(do_tcp_errors)) {
+            if (do_tcp_errors) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_in_errs = NULL, *rd_in_csum_errs = NULL, *rd_retrans_segs = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv4",
                             "tcperrors",
@@ -1811,12 +1811,12 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (likely(do_tcp_handshake)) {
+            if (do_tcp_handshake) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_estab_resets = NULL, *rd_active_opens = NULL, *rd_passive_opens = NULL,
                               *rd_attempt_fails = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv4",
                             "tcphandshake",
@@ -1860,7 +1860,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                 static RRDDIM *rd_on_data = NULL, *rd_on_close = NULL, *rd_on_memory = NULL,
                               *rd_on_timeout = NULL, *rd_on_linger = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv4",
                             "tcpconnaborts",
@@ -1899,7 +1899,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_ofo_queue = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv4",
                             "tcpofo",
@@ -1932,7 +1932,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_recv = NULL, *rd_send = NULL, *rd_failed = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv4",
                             "tcpsyncookies",
@@ -1967,7 +1967,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                 static RRDSET *st_listen = NULL;
                 static RRDDIM *rd_overflows = NULL;
 
-                if(unlikely(!st_listen)) {
+                if(!st_listen) {
 
                     st_listen = rrdset_create_localhost(
                             "ipv4",
@@ -2020,7 +2020,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                               *rd_sndect1 = NULL;
 #endif                                                              
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv4",
                             "ecnpkts",
@@ -2079,17 +2079,17 @@ int do_net_inet_udp_stats(int update_every, usec_t dt) {
     (void)dt;
     static int do_udp_packets = -1, do_udp_errors = -1;
 
-    if (unlikely(do_udp_packets == -1)) {
+    if (do_udp_packets == -1) {
         do_udp_packets = config_get_boolean("plugin:freebsd:net.inet.udp.stats", "ipv4 UDP packets", 1);
         do_udp_errors  = config_get_boolean("plugin:freebsd:net.inet.udp.stats", "ipv4 UDP errors", 1);
     }
 
     // see http://net-snmp.sourceforge.net/docs/mibs/udp.html
-    if (likely(do_udp_packets || do_udp_errors)) {
+    if (do_udp_packets || do_udp_errors) {
         static int mib[4] = {0, 0, 0, 0};
         struct udpstat udpstat;
 
-        if (unlikely(GETSYSCTL_SIMPLE("net.inet.udp.stats", mib, udpstat))) {
+        if (GETSYSCTL_SIMPLE("net.inet.udp.stats", mib, udpstat)) {
             do_udp_packets = 0;
             collector_error("DISABLED: ipv4.udppackets chart");
             do_udp_errors = 0;
@@ -2097,11 +2097,11 @@ int do_net_inet_udp_stats(int update_every, usec_t dt) {
             collector_error("DISABLED: net.inet.udp.stats module");
             return 1;
         } else {
-            if (likely(do_udp_packets)) {
+            if (do_udp_packets) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv4",
                             "udppackets",
@@ -2126,12 +2126,12 @@ int do_net_inet_udp_stats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (likely(do_udp_errors)) {
+            if (do_udp_errors) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_in_errors = NULL, *rd_no_ports = NULL, *rd_recv_buf_errors = NULL,
                               *rd_in_csum_errors = NULL, *rd_ignored_multi = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv4",
                             "udperrors",
@@ -2178,13 +2178,13 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
     (void)dt;
     static int do_icmp_packets = -1, do_icmp_errors = -1, do_icmpmsg = -1;
 
-    if (unlikely(do_icmp_packets == -1)) {
+    if (do_icmp_packets == -1) {
         do_icmp_packets = config_get_boolean("plugin:freebsd:net.inet.icmp.stats", "ipv4 ICMP packets",  1);
         do_icmp_errors  = config_get_boolean("plugin:freebsd:net.inet.icmp.stats", "ipv4 ICMP errors",   1);
         do_icmpmsg      = config_get_boolean("plugin:freebsd:net.inet.icmp.stats", "ipv4 ICMP messages", 1);
     }
 
-    if (likely(do_icmp_packets || do_icmp_errors || do_icmpmsg)) {
+    if (do_icmp_packets || do_icmp_errors || do_icmpmsg) {
         static int mib[4] = {0, 0, 0, 0};
         struct icmpstat icmpstat;
         struct icmp_total {
@@ -2192,7 +2192,7 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
             u_long  msgs_out;
         } icmp_total = {0, 0};
 
-        if (unlikely(GETSYSCTL_SIMPLE("net.inet.icmp.stats", mib, icmpstat))) {
+        if (GETSYSCTL_SIMPLE("net.inet.icmp.stats", mib, icmpstat)) {
             do_icmp_packets = 0;
             collector_error("DISABLED: ipv4.icmp chart");
             do_icmp_errors = 0;
@@ -2210,11 +2210,11 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
             }
             icmp_total.msgs_in += icmpstat.icps_badcode + icmpstat.icps_badlen + icmpstat.icps_checksum + icmpstat.icps_tooshort;
 
-            if (likely(do_icmp_packets)) {
+            if (do_icmp_packets) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv4"
                             , "icmp"
@@ -2239,11 +2239,11 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (likely(do_icmp_errors)) {
+            if (do_icmp_errors) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_in = NULL, *rd_out = NULL, *rd_in_csum = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv4"
                             , "icmp_errors"
@@ -2272,11 +2272,11 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (likely(do_icmpmsg)) {
+            if (do_icmpmsg) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_in_reps = NULL, *rd_out_reps = NULL, *rd_in = NULL, *rd_out = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv4"
                             , "icmpmsg"
@@ -2319,7 +2319,7 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
     (void)dt;
     static int do_ip_packets = -1, do_ip_fragsout = -1, do_ip_fragsin = -1, do_ip_errors = -1;
 
-    if (unlikely(do_ip_packets == -1)) {
+    if (do_ip_packets == -1) {
         do_ip_packets  = config_get_boolean("plugin:freebsd:net.inet.ip.stats", "ipv4 packets", 1);
         do_ip_fragsout = config_get_boolean("plugin:freebsd:net.inet.ip.stats", "ipv4 fragments sent", 1);
         do_ip_fragsin  = config_get_boolean("plugin:freebsd:net.inet.ip.stats", "ipv4 fragments assembly", 1);
@@ -2327,11 +2327,11 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
     }
 
     // see also http://net-snmp.sourceforge.net/docs/mibs/ip.html
-    if (likely(do_ip_packets || do_ip_fragsout || do_ip_fragsin || do_ip_errors)) {
+    if (do_ip_packets || do_ip_fragsout || do_ip_fragsin || do_ip_errors) {
         static int mib[4] = {0, 0, 0, 0};
         struct ipstat ipstat;
 
-        if (unlikely(GETSYSCTL_SIMPLE("net.inet.ip.stats", mib, ipstat))) {
+        if (GETSYSCTL_SIMPLE("net.inet.ip.stats", mib, ipstat)) {
             do_ip_packets = 0;
             collector_error("DISABLED: ipv4.packets chart");
             do_ip_fragsout = 0;
@@ -2343,12 +2343,12 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
             collector_error("DISABLED: net.inet.ip.stats module");
             return 1;
         } else {
-            if (likely(do_ip_packets)) {
+            if (do_ip_packets) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_in_receives = NULL, *rd_out_requests = NULL, *rd_forward_datagrams = NULL,
                               *rd_in_delivers = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv4",
                             "packets",
@@ -2377,11 +2377,11 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (likely(do_ip_fragsout)) {
+            if (do_ip_fragsout) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_ok = NULL, *rd_fails = NULL, *rd_created = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv4",
                             "fragsout",
@@ -2410,11 +2410,11 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (likely(do_ip_fragsin)) {
+            if (do_ip_fragsin) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_ok = NULL, *rd_failed = NULL, *rd_all = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv4",
                             "fragsin",
@@ -2443,13 +2443,13 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (likely(do_ip_errors)) {
+            if (do_ip_errors) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_in_discards = NULL, *rd_out_discards = NULL,
                               *rd_in_hdr_errors = NULL, *rd_out_no_routes = NULL,
                               *rd_in_addr_errors = NULL, *rd_in_unknown_protos = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv4",
                             "errors",
@@ -2500,7 +2500,7 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
     (void)dt;
     static int do_ip6_packets = -1, do_ip6_fragsout = -1, do_ip6_fragsin = -1, do_ip6_errors = -1;
 
-    if (unlikely(do_ip6_packets == -1)) {
+    if (do_ip6_packets == -1) {
         do_ip6_packets  = config_get_boolean_ondemand("plugin:freebsd:net.inet6.ip6.stats", "ipv6 packets",
                                                       CONFIG_BOOLEAN_AUTO);
         do_ip6_fragsout = config_get_boolean_ondemand("plugin:freebsd:net.inet6.ip6.stats", "ipv6 fragments sent",
@@ -2511,11 +2511,11 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                                                       CONFIG_BOOLEAN_AUTO);
     }
 
-    if (likely(do_ip6_packets || do_ip6_fragsout || do_ip6_fragsin || do_ip6_errors)) {
+    if (do_ip6_packets || do_ip6_fragsout || do_ip6_fragsin || do_ip6_errors) {
         static int mib[4] = {0, 0, 0, 0};
         struct ip6stat ip6stat;
 
-        if (unlikely(GETSYSCTL_SIMPLE("net.inet6.ip6.stats", mib, ip6stat))) {
+        if (GETSYSCTL_SIMPLE("net.inet6.ip6.stats", mib, ip6stat)) {
             do_ip6_packets = 0;
             collector_error("DISABLED: ipv6.packets chart");
             do_ip6_fragsout = 0;
@@ -2538,7 +2538,7 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_received = NULL, *rd_sent = NULL, *rd_forwarded = NULL, *rd_delivers = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv6",
                             "packets",
@@ -2577,7 +2577,7 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_ok = NULL, *rd_failed = NULL, *rd_all = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv6",
                              "fragsout",
@@ -2617,7 +2617,7 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_ok = NULL, *rd_failed = NULL, *rd_timeout = NULL, *rd_all = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv6",
                             "fragsin",
@@ -2666,7 +2666,7 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                               *rd_in_hdr_errors = NULL, *rd_in_addr_errors = NULL, *rd_in_truncated_pkts = NULL,
                               *rd_in_no_routes = NULL, *rd_out_no_routes = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv6",
                             "errors",
@@ -2719,7 +2719,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
     static int do_icmp6 = -1, do_icmp6_redir = -1, do_icmp6_errors = -1, do_icmp6_echos = -1, do_icmp6_router = -1,
             do_icmp6_neighbor = -1, do_icmp6_types = -1;
 
-    if (unlikely(do_icmp6 == -1)) {
+    if (do_icmp6 == -1) {
         do_icmp6          = config_get_boolean_ondemand("plugin:freebsd:net.inet6.icmp6.stats", "icmp",
                                                         CONFIG_BOOLEAN_AUTO);
         do_icmp6_redir    = config_get_boolean_ondemand("plugin:freebsd:net.inet6.icmp6.stats", "icmp redirects",
@@ -2736,11 +2736,11 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                                                         CONFIG_BOOLEAN_AUTO);
     }
 
-    if (likely(do_icmp6 || do_icmp6_redir || do_icmp6_errors || do_icmp6_echos || do_icmp6_router || do_icmp6_neighbor || do_icmp6_types)) {
+    if (do_icmp6 || do_icmp6_redir || do_icmp6_errors || do_icmp6_echos || do_icmp6_router || do_icmp6_neighbor || do_icmp6_types) {
         static int mib[4] = {0, 0, 0, 0};
         struct icmp6stat icmp6stat;
 
-        if (unlikely(GETSYSCTL_SIMPLE("net.inet6.icmp6.stats", mib, icmp6stat))) {
+        if (GETSYSCTL_SIMPLE("net.inet6.icmp6.stats", mib, icmp6stat)) {
             do_icmp6 = 0;
             collector_error("DISABLED: ipv6.icmp chart");
             do_icmp6_redir = 0;
@@ -2781,7 +2781,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_received = NULL, *rd_sent = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv6",
                             "icmp",
@@ -2815,7 +2815,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_received = NULL, *rd_sent = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv6",
                             "icmpredir",
@@ -2861,7 +2861,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                               *rd_in_parm_problems = NULL, *rd_out_dest_unreachs = NULL, *rd_out_time_excds = NULL,
                               *rd_out_parm_problems = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv6",
                             "icmperrors",
@@ -2913,7 +2913,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_in = NULL, *rd_out = NULL, *rd_in_replies = NULL, *rd_out_replies = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv6",
                             "icmpechos",
@@ -2954,7 +2954,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                 static RRDDIM *rd_in_solicits = NULL, *rd_out_solicits = NULL,
                               *rd_in_advertisements = NULL, *rd_out_advertisements = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv6",
                             "icmprouter",
@@ -2995,7 +2995,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                 static RRDDIM *rd_in_solicits = NULL, *rd_out_solicits = NULL,
                               *rd_in_advertisements = NULL, *rd_out_advertisements = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv6",
                             "icmpneighbor",
@@ -3043,7 +3043,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                               *rd_out_1 = NULL, *rd_out_128 = NULL, *rd_out_129 = NULL, *rd_out_133 = NULL,
                               *rd_out_135 = NULL, *rd_out_143 = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "ipv6",
                             "icmptypes",

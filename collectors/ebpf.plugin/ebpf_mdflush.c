@@ -227,7 +227,7 @@ static void mdflush_read_count_map(int maps_per_core)
 
         // get val for this key.
         int test = bpf_map_lookup_elem(mapfd, &key, mdflush_ebpf_vals);
-        if (unlikely(test < 0)) {
+        if (test < 0) {
             continue;
         }
 
@@ -250,7 +250,7 @@ static void mdflush_read_count_map(int maps_per_core)
             &mdflush_pub,
             (avl_t *)&search_v
         );
-        if (unlikely(v == NULL)) {
+        if (v == NULL) {
             // flush count can only be added reliably at a later time.
             // when they're added, only then will we AVL insert.
             v = callocz(1, sizeof(netdata_mdflush_t));

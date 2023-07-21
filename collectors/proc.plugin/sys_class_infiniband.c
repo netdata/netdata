@@ -239,7 +239,7 @@ static struct ibport *get_ibport(const char *dev, const char *port)
 
     // search it, resuming from the last position in sequence
     for (p = ibport_last_used; p; p = p->next) {
-        if (unlikely(!strcmp(name, p->name))) {
+        if (!strcmp(name, p->name)) {
             ibport_last_used = p->next;
             return p;
         }
@@ -247,7 +247,7 @@ static struct ibport *get_ibport(const char *dev, const char *port)
 
     // new round, from the beginning to the last position used this time
     for (p = ibport_root; p != ibport_last_used; p = p->next) {
-        if (unlikely(!strcmp(name, p->name))) {
+        if (!strcmp(name, p->name)) {
             ibport_last_used = p->next;
             return p;
         }
@@ -306,7 +306,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
 
     static long long int dt_to_refresh_ports = 0, last_refresh_ports_usec = 0;
 
-    if (unlikely(enable_new_ports == -1)) {
+    if (enable_new_ports == -1) {
         char dirname[FILENAME_MAX + 1];
 
         snprintfz(dirname, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/infiniband");
@@ -339,10 +339,10 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
     }
 
     // init listing of /sys/class/infiniband/ (or rediscovery)
-    if (unlikely(!initialized) || unlikely(last_refresh_ports_usec >= dt_to_refresh_ports)) {
+    if (!initialized || last_refresh_ports_usec >= dt_to_refresh_ports) {
         // If folder does not exists, return 1 to disable
         DIR *devices_dir = opendir(sys_class_infiniband_dirname);
-        if (unlikely(!devices_dir))
+        if (!devices_dir)
             return 1;
 
         // Work on all device available
@@ -357,7 +357,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
             snprintfz(ports_dirname, FILENAME_MAX, "%s/%s/%s", sys_class_infiniband_dirname, dev_dent->d_name, "ports");
 
             DIR *ports_dir = opendir(ports_dirname);
-            if (unlikely(!ports_dir))
+            if (!ports_dir)
                 continue;
 
             struct dirent *port_dent;
@@ -524,7 +524,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
             FOREACH_COUNTER_BYTES(GEN_DO_COUNTER_READ, port)
 
             // First creation of RRD Set (charts)
-            if (unlikely(!port->st_bytes)) {
+            if (!port->st_bytes) {
                 port->st_bytes = rrdset_create_localhost(
                     "Infiniband",
                     port->chart_id_bytes,
@@ -562,7 +562,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
             FOREACH_COUNTER_PACKETS(GEN_DO_COUNTER_READ, port)
 
             // First creation of RRD Set (charts)
-            if (unlikely(!port->st_packets)) {
+            if (!port->st_packets) {
                 port->st_packets = rrdset_create_localhost(
                     "Infiniband",
                     port->chart_id_packets,
@@ -591,7 +591,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
             FOREACH_COUNTER_ERRORS(GEN_DO_COUNTER_READ, port)
 
             // First creation of RRD Set (charts)
-            if (unlikely(!port->st_errors)) {
+            if (!port->st_errors) {
                 port->st_errors = rrdset_create_localhost(
                     "Infiniband",
                     port->chart_id_errors,
@@ -626,7 +626,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
 
             if (port->do_hwerrors != CONFIG_BOOLEAN_NO) {
                 // First creation of RRD Set (charts)
-                if (unlikely(!port->st_hwerrors)) {
+                if (!port->st_hwerrors) {
                     port->st_hwerrors = rrdset_create_localhost(
                         "Infiniband",
                         port->chart_id_hwerrors,
@@ -662,7 +662,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
 
             if (port->do_hwpackets != CONFIG_BOOLEAN_NO) {
                 // First creation of RRD Set (charts)
-                if (unlikely(!port->st_hwpackets)) {
+                if (!port->st_hwpackets) {
                     port->st_hwpackets = rrdset_create_localhost(
                         "Infiniband",
                         port->chart_id_hwpackets,

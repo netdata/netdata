@@ -77,7 +77,7 @@ static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *
 
     NETDATA_DOUBLE n;
 
-    if(unlikely(this_string == NULL)) {
+    if(this_string == NULL) {
         this_string = string_strdupz("this");
         now_string = string_strdupz("now");
         after_string = string_strdupz("after");
@@ -91,7 +91,7 @@ static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *
         critical_string = string_strdupz("CRITICAL");
     }
 
-    if(unlikely(v->name == this_string)) {
+    if(v->name == this_string) {
         n = (exp->myself)?*exp->myself:NAN;
         buffer_strcat(exp->error_msg, "[ $this = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -99,7 +99,7 @@ static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *
         return n;
     }
 
-    if(unlikely(v->name == after_string)) {
+    if(v->name == after_string) {
         n = (exp->after && *exp->after)?*exp->after:NAN;
         buffer_strcat(exp->error_msg, "[ $after = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -107,7 +107,7 @@ static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *
         return n;
     }
 
-    if(unlikely(v->name == before_string)) {
+    if(v->name == before_string) {
         n = (exp->before && *exp->before)?*exp->before:NAN;
         buffer_strcat(exp->error_msg, "[ $before = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -115,7 +115,7 @@ static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *
         return n;
     }
 
-    if(unlikely(v->name == now_string)) {
+    if(v->name == now_string) {
         n = (NETDATA_DOUBLE)now_realtime_sec();
         buffer_strcat(exp->error_msg, "[ $now = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -123,7 +123,7 @@ static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *
         return n;
     }
 
-    if(unlikely(v->name == status_string)) {
+    if(v->name == status_string) {
         n = (exp->status)?*exp->status:RRDCALC_STATUS_UNINITIALIZED;
         buffer_strcat(exp->error_msg, "[ $status = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -131,7 +131,7 @@ static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *
         return n;
     }
 
-    if(unlikely(v->name == removed_string)) {
+    if(v->name == removed_string) {
         n = RRDCALC_STATUS_REMOVED;
         buffer_strcat(exp->error_msg, "[ $REMOVED = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -139,7 +139,7 @@ static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *
         return n;
     }
 
-    if(unlikely(v->name == uninitialized_string)) {
+    if(v->name == uninitialized_string) {
         n = RRDCALC_STATUS_UNINITIALIZED;
         buffer_strcat(exp->error_msg, "[ $UNINITIALIZED = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -147,7 +147,7 @@ static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *
         return n;
     }
 
-    if(unlikely(v->name == undefined_string)) {
+    if(v->name == undefined_string) {
         n = RRDCALC_STATUS_UNDEFINED;
         buffer_strcat(exp->error_msg, "[ $UNDEFINED = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -155,7 +155,7 @@ static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *
         return n;
     }
 
-    if(unlikely(v->name == clear_string)) {
+    if(v->name == clear_string) {
         n = RRDCALC_STATUS_CLEAR;
         buffer_strcat(exp->error_msg, "[ $CLEAR = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -163,7 +163,7 @@ static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *
         return n;
     }
 
-    if(unlikely(v->name == warning_string)) {
+    if(v->name == warning_string) {
         n = RRDCALC_STATUS_WARNING;
         buffer_strcat(exp->error_msg, "[ $WARNING = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -171,7 +171,7 @@ static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *
         return n;
     }
 
-    if(unlikely(v->name == critical_string)) {
+    if(v->name == critical_string) {
         n = RRDCALC_STATUS_CRITICAL;
         buffer_strcat(exp->error_msg, "[ $CRITICAL = ");
         print_parsed_as_constant(exp->error_msg, n);
@@ -354,7 +354,7 @@ static struct operator {
 #define eval_precedence(operator) (operators[(unsigned char)(operator)].precedence)
 
 static inline NETDATA_DOUBLE eval_node(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
-    if(unlikely(op->count != operators[op->operator].parameters)) {
+    if(op->count != operators[op->operator].parameters) {
         *error = EVAL_ERROR_INVALID_NUMBER_OF_OPERANDS;
         return 0;
     }
@@ -373,12 +373,12 @@ static inline void print_parsed_as_variable(BUFFER *out, EVAL_VARIABLE *v, int *
 }
 
 static inline void print_parsed_as_constant(BUFFER *out, NETDATA_DOUBLE n) {
-    if(unlikely(isnan(n))) {
+    if(isnan(n)) {
         buffer_strcat(out, "nan");
         return;
     }
 
-    if(unlikely(isinf(n))) {
+    if(isinf(n)) {
         buffer_strcat(out, "inf");
         return;
     }
@@ -419,7 +419,7 @@ static inline void print_parsed_as_value(BUFFER *out, EVAL_VALUE *v, int *error)
 }
 
 static inline void print_parsed_as_node(BUFFER *out, EVAL_NODE *op, int *error) {
-    if(unlikely(op->count != operators[op->operator].parameters)) {
+    if(op->count != operators[op->operator].parameters) {
         *error = EVAL_ERROR_INVALID_NUMBER_OF_OPERANDS;
         return;
     }
@@ -752,7 +752,7 @@ static inline int parse_variable(const char **string, char *buffer, size_t len) 
 static inline int parse_constant(const char **string, NETDATA_DOUBLE *number) {
     char *end = NULL;
     NETDATA_DOUBLE n = str2ndd(*string, &end);
-    if(unlikely(!end || *string == end)) {
+    if(!end || *string == end) {
         *number = 0;
         return 0;
     }
@@ -1076,15 +1076,15 @@ int expression_evaluate(EVAL_EXPRESSION *expression) {
     buffer_reset(expression->error_msg);
     expression->result = eval_node(expression, (EVAL_NODE *)expression->nodes, &expression->error);
 
-    if(unlikely(isnan(expression->result))) {
+    if(isnan(expression->result)) {
         if(expression->error == EVAL_ERROR_OK)
             expression->error = EVAL_ERROR_VALUE_IS_NAN;
     }
-    else if(unlikely(isinf(expression->result))) {
+    else if(isinf(expression->result)) {
         if(expression->error == EVAL_ERROR_OK)
             expression->error = EVAL_ERROR_VALUE_IS_INFINITE;
     }
-    else if(unlikely(expression->error == EVAL_ERROR_UNKNOWN_VARIABLE)) {
+    else if(expression->error == EVAL_ERROR_UNKNOWN_VARIABLE) {
         // although there is an unknown variable
         // the expression was evaluated successfully
         expression->error = EVAL_ERROR_OK;

@@ -139,12 +139,12 @@ static int init_devices(DICTIONARY *devices, unsigned int zram_id, int update_ev
     snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/dev");
     DIR *dir = opendir(filename);
 
-    if (unlikely(!dir))
+    if (!dir)
         return 0;
     while ((de = readdir(dir)))
     {
         snprintfz(filename, FILENAME_MAX, "%s/dev/%s", netdata_configured_host_prefix, de->d_name);
-        if (unlikely(stat(filename, &st) != 0))
+        if (stat(filename, &st) != 0)
         {
             collector_error("ZRAM : Unable to stat %s: %s", filename, strerror(errno));
             continue;
@@ -211,7 +211,7 @@ static int collect_zram_metrics(const DICTIONARY_ITEM *item, void *entry, void *
     MM_STAT mm;
     int value;
 
-    if (unlikely(read_mm_stat(dev->file, &mm) < 0)) {
+    if (read_mm_stat(dev->file, &mm) < 0) {
         free_device(dict, name);
         return -1;
     }
@@ -248,7 +248,7 @@ int do_sys_block_zram(int update_every, usec_t dt) {
 
     (void)dt;
 
-    if (unlikely(!initialized))
+    if (!initialized)
     {
         initialized = 1;
 
@@ -277,7 +277,7 @@ int do_sys_block_zram(int update_every, usec_t dt) {
         device_count = init_devices(devices, (unsigned int)zram_id, update_every);
     }
 
-    if (unlikely(device_count < 1))
+    if (device_count < 1)
         return 1;
 
     dictionary_walkthrough_write(devices, collect_zram_metrics, devices);

@@ -24,7 +24,7 @@ int rrdhost_is_exportable(struct instance *instance, RRDHOST *host)
 
     RRDHOST_FLAGS *flags = &host->exporting_flags[instance->index];
 
-    if (unlikely((*flags & (RRDHOST_FLAG_EXPORTING_SEND | RRDHOST_FLAG_EXPORTING_DONT_SEND)) == 0)) {
+    if ((*flags & (RRDHOST_FLAG_EXPORTING_SEND | RRDHOST_FLAG_EXPORTING_DONT_SEND)) == 0) {
         const char *host_name = (host == localhost) ? "localhost" : rrdhost_hostname(host);
 
         if (!instance->config.hosts_pattern || simple_pattern_matches(instance->config.hosts_pattern, host_name)) {
@@ -36,7 +36,7 @@ int rrdhost_is_exportable(struct instance *instance, RRDHOST *host)
         }
     }
 
-    if (likely(*flags & RRDHOST_FLAG_EXPORTING_SEND))
+    if (*flags & RRDHOST_FLAG_EXPORTING_SEND)
         return 1;
     else
         return 0;
@@ -60,10 +60,10 @@ int rrdset_is_exportable(struct instance *instance, RRDSET *st)
 
     RRDSET_FLAGS *flags = &st->exporting_flags[instance->index];
 
-    if(unlikely(*flags & RRDSET_FLAG_EXPORTING_IGNORE))
+    if(*flags & RRDSET_FLAG_EXPORTING_IGNORE)
         return 0;
 
-    if(unlikely(!(*flags & RRDSET_FLAG_EXPORTING_SEND))) {
+    if(!(*flags & RRDSET_FLAG_EXPORTING_SEND)) {
         // we have not checked this chart
         if(simple_pattern_matches_string(instance->config.charts_pattern, st->id) || simple_pattern_matches_string(instance->config.charts_pattern, st->name))
             *flags |= RRDSET_FLAG_EXPORTING_SEND;
@@ -74,12 +74,12 @@ int rrdset_is_exportable(struct instance *instance, RRDSET *st)
         }
     }
 
-    if(unlikely(!rrdset_is_available_for_exporting_and_alarms(st))) {
+    if(!rrdset_is_available_for_exporting_and_alarms(st)) {
         netdata_log_debug(D_EXPORTING, "EXPORTING: not sending chart '%s' of host '%s', because it is not available for exporting.", rrdset_id(st), rrdhost_hostname(host));
         return 0;
     }
 
-    if(unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE && !(EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED))) {
+    if(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE && !(EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED)) {
         netdata_log_debug(D_EXPORTING, "EXPORTING: not sending chart '%s' of host '%s' because its memory mode is '%s' and the exporting engine requires database access.", rrdset_id(st), rrdhost_hostname(host), rrd_memory_mode_name(host->rrd_memory_mode));
         return 0;
     }

@@ -272,7 +272,7 @@ static int perf_init() {
 
     for(cpu = 0; cpu < number_of_cpus; cpu++) {
         for(current_event = &perf_events[0]; current_event->id != EV_ID_END; current_event++) {
-            if(unlikely(current_event->disabled)) continue;
+            if(current_event->disabled) continue;
 
             perf_event_attr.type = current_event->type;
             perf_event_attr.config = current_event->config;
@@ -289,9 +289,9 @@ static int perf_init() {
                 flags
             );
 
-            if(unlikely(group_leader_fd == NO_FD)) group_leader_fd = fd;
+            if(group_leader_fd == NO_FD) group_leader_fd = fd;
 
-            if(unlikely(fd < 0)) {
+            if(fd < 0) {
                 switch errno {
                     case EACCES:
                         collector_error("Cannot access to the PMU: Permission denied");
@@ -309,7 +309,7 @@ static int perf_init() {
             *(current_event->fd + cpu) = fd;
             *(*current_event->group_leader_fd + cpu) = group_leader_fd;
 
-            if(unlikely(debug)) fprintf(stderr, "perf.plugin: event id = %u, cpu = %d, fd = %d, leader_fd = %d\n", current_event->id, cpu, fd, group_leader_fd);
+            if(debug) fprintf(stderr, "perf.plugin: event id = %u, cpu = %d, fd = %d, leader_fd = %d\n", current_event->id, cpu, fd, group_leader_fd);
         }
     }
 
@@ -341,7 +341,7 @@ static void reenable_events() {
         for(cpu = 0; cpu < number_of_cpus; cpu++) {
             int current_fd = *(group_leader_fds[group] + cpu);
 
-            if(unlikely(current_fd == NO_FD)) continue;
+            if(current_fd == NO_FD) continue;
 
             if(ioctl(current_fd, PERF_EVENT_IOC_DISABLE, PERF_IOC_FLAG_GROUP) == -1
                || ioctl(current_fd, PERF_EVENT_IOC_ENABLE, PERF_IOC_FLAG_GROUP) == -1)
@@ -366,16 +366,16 @@ static int perf_collect() {
         current_event->updated = 0;
         current_event->value = 0;
 
-        if(unlikely(current_event->disabled)) continue;
+        if(current_event->disabled) continue;
 
         for(cpu = 0; cpu < number_of_cpus; cpu++) {
 
             ssize_t read_size = read(current_event->fd[cpu], &read_result, sizeof(read_result));
 
-            if(likely(read_size == sizeof(read_result))) {
-                if (likely(read_result.time_running
+            if(read_size == sizeof(read_result)) {
+                if (read_result.time_running
                            && read_result.time_running != *(current_event->prev_time_running + cpu)
-                           && (read_result.time_enabled / read_result.time_running < RUNNING_THRESHOLD))) {
+                           && (read_result.time_enabled / read_result.time_running < RUNNING_THRESHOLD)) {
                     current_event->value += (read_result.value - *(current_event->prev_value + cpu)) \
                                              * (read_result.time_enabled - *(current_event->prev_time_enabled + cpu)) \
                                              / (read_result.time_running - *(current_event->prev_time_running + cpu));
@@ -393,10 +393,10 @@ static int perf_collect() {
             }
         }
 
-        if(unlikely(debug)) fprintf(stderr, "perf.plugin: successfully read event id = %u, value = %"PRIu64"\n", current_event->id, current_event->value);
+        if(debug) fprintf(stderr, "perf.plugin: successfully read event id = %u, value = %"PRIu64"\n", current_event->id, current_event->value);
     }
 
-    if(unlikely(perf_events[EV_ID_CPU_CYCLES].value == prev_cpu_cycles_value))
+    if(perf_events[EV_ID_CPU_CYCLES].value == prev_cpu_cycles_value)
         reenable_events();
     prev_cpu_cycles_value = perf_events[EV_ID_CPU_CYCLES].value;
 
@@ -429,8 +429,8 @@ static void perf_send_metrics() {
 
     // ------------------------------------------------------------------------
 
-    if(likely(perf_events[EV_ID_CPU_CYCLES].updated || perf_events[EV_ID_REF_CPU_CYCLES].updated)) {
-        if(unlikely(!cpu_cycles_chart_generated)) {
+    if(perf_events[EV_ID_CPU_CYCLES].updated || perf_events[EV_ID_REF_CPU_CYCLES].updated) {
+        if(!cpu_cycles_chart_generated) {
             cpu_cycles_chart_generated = 1;
 
             printf("CHART %s.%s '' 'CPU cycles' 'cycles/s' %s '' line %d %d '' %s\n"
@@ -450,14 +450,14 @@ static void perf_send_metrics() {
                , RRD_TYPE_PERF
                , "cpu_cycles"
         );
-        if(likely(perf_events[EV_ID_CPU_CYCLES].updated)) {
+        if(perf_events[EV_ID_CPU_CYCLES].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "cpu"
                    , (collected_number) perf_events[EV_ID_CPU_CYCLES].value
             );
         }
-        if(likely(perf_events[EV_ID_REF_CPU_CYCLES].updated)) {
+        if(perf_events[EV_ID_REF_CPU_CYCLES].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "ref_cpu"
@@ -469,8 +469,8 @@ static void perf_send_metrics() {
 
     // ------------------------------------------------------------------------
 
-    if(likely(perf_events[EV_ID_INSTRUCTIONS].updated)) {
-        if(unlikely(!instructions_chart_generated)) {
+    if(perf_events[EV_ID_INSTRUCTIONS].updated) {
+        if(!instructions_chart_generated) {
             instructions_chart_generated = 1;
 
             printf("CHART %s.%s '' 'Instructions' 'instructions/s' %s '' line %d %d '' %s\n"
@@ -499,8 +499,8 @@ static void perf_send_metrics() {
 
     // ------------------------------------------------------------------------
 
-    if(likely(perf_events[EV_ID_INSTRUCTIONS].updated) && likely(perf_events[EV_ID_CPU_CYCLES].updated)) {
-        if(unlikely(!ipc_chart_generated)) {
+    if(perf_events[EV_ID_INSTRUCTIONS].updated && perf_events[EV_ID_CPU_CYCLES].updated) {
+        if(!ipc_chart_generated) {
             ipc_chart_generated = 1;
 
             printf("CHART %s.%s '' '%s' 'instructions/cycle' %s '' line %d %d '' %s\n"
@@ -531,8 +531,8 @@ static void perf_send_metrics() {
 
     // ------------------------------------------------------------------------
 
-    if(likely(perf_events[EV_ID_BRANCH_INSTRUCTIONS].updated || perf_events[EV_ID_BRANCH_MISSES].updated)) {
-        if(unlikely(!branch_chart_generated)) {
+    if(perf_events[EV_ID_BRANCH_INSTRUCTIONS].updated || perf_events[EV_ID_BRANCH_MISSES].updated) {
+        if(!branch_chart_generated) {
             branch_chart_generated = 1;
 
             printf("CHART %s.%s '' 'Branch instructions' 'instructions/s' %s '' line %d %d '' %s\n"
@@ -552,14 +552,14 @@ static void perf_send_metrics() {
                , RRD_TYPE_PERF
                , "branch_instructions"
         );
-        if(likely(perf_events[EV_ID_BRANCH_INSTRUCTIONS].updated)) {
+        if(perf_events[EV_ID_BRANCH_INSTRUCTIONS].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "instructions"
                    , (collected_number) perf_events[EV_ID_BRANCH_INSTRUCTIONS].value
             );
         }
-        if(likely(perf_events[EV_ID_BRANCH_MISSES].updated)) {
+        if(perf_events[EV_ID_BRANCH_MISSES].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "misses"
@@ -571,8 +571,8 @@ static void perf_send_metrics() {
 
     // ------------------------------------------------------------------------
 
-    if(likely(perf_events[EV_ID_CACHE_REFERENCES].updated || perf_events[EV_ID_CACHE_MISSES].updated)) {
-        if(unlikely(!cache_chart_generated)) {
+    if(perf_events[EV_ID_CACHE_REFERENCES].updated || perf_events[EV_ID_CACHE_MISSES].updated) {
+        if(!cache_chart_generated) {
             cache_chart_generated = 1;
 
             printf("CHART %s.%s '' 'Cache operations' 'operations/s' %s '' line %d %d '' %s\n"
@@ -592,14 +592,14 @@ static void perf_send_metrics() {
                , RRD_TYPE_PERF
                , "cache"
         );
-        if(likely(perf_events[EV_ID_CACHE_REFERENCES].updated)) {
+        if(perf_events[EV_ID_CACHE_REFERENCES].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "references"
                    , (collected_number) perf_events[EV_ID_CACHE_REFERENCES].value
             );
         }
-        if(likely(perf_events[EV_ID_CACHE_MISSES].updated)) {
+        if(perf_events[EV_ID_CACHE_MISSES].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "misses"
@@ -611,8 +611,8 @@ static void perf_send_metrics() {
 
     // ------------------------------------------------------------------------
 
-    if(likely(perf_events[EV_ID_BUS_CYCLES].updated)) {
-        if(unlikely(!bus_cycles_chart_generated)) {
+    if(perf_events[EV_ID_BUS_CYCLES].updated) {
+        if(!bus_cycles_chart_generated) {
             bus_cycles_chart_generated = 1;
 
             printf("CHART %s.%s '' 'Bus cycles' 'cycles/s' %s '' line %d %d '' %s\n"
@@ -641,8 +641,8 @@ static void perf_send_metrics() {
 
     // ------------------------------------------------------------------------
 
-    if(likely(perf_events[EV_ID_STALLED_CYCLES_FRONTEND].updated || perf_events[EV_ID_STALLED_CYCLES_BACKEND].updated)) {
-        if(unlikely(!stalled_cycles_chart_generated)) {
+    if(perf_events[EV_ID_STALLED_CYCLES_FRONTEND].updated || perf_events[EV_ID_STALLED_CYCLES_BACKEND].updated) {
+        if(!stalled_cycles_chart_generated) {
             stalled_cycles_chart_generated = 1;
 
             printf("CHART %s.%s '' 'Stalled frontend and backend cycles' 'cycles/s' %s '' line %d %d '' %s\n"
@@ -662,14 +662,14 @@ static void perf_send_metrics() {
                , RRD_TYPE_PERF
                , "stalled_cycles"
         );
-        if(likely(perf_events[EV_ID_STALLED_CYCLES_FRONTEND].updated)) {
+        if(perf_events[EV_ID_STALLED_CYCLES_FRONTEND].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "frontend"
                    , (collected_number) perf_events[EV_ID_STALLED_CYCLES_FRONTEND].value
             );
         }
-        if(likely(perf_events[EV_ID_STALLED_CYCLES_BACKEND].updated)) {
+        if(perf_events[EV_ID_STALLED_CYCLES_BACKEND].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "backend"
@@ -681,8 +681,8 @@ static void perf_send_metrics() {
 
     // ------------------------------------------------------------------------
 
-    if(likely(perf_events[EV_ID_CPU_MIGRATIONS].updated)) {
-        if(unlikely(!migrations_chart_generated)) {
+    if(perf_events[EV_ID_CPU_MIGRATIONS].updated) {
+        if(!migrations_chart_generated) {
             migrations_chart_generated = 1;
 
             printf("CHART %s.%s '' 'CPU migrations' 'migrations' %s '' line %d %d '' %s\n"
@@ -711,8 +711,8 @@ static void perf_send_metrics() {
 
     // ------------------------------------------------------------------------
 
-    if(likely(perf_events[EV_ID_ALIGNMENT_FAULTS].updated)) {
-        if(unlikely(!alignment_chart_generated)) {
+    if(perf_events[EV_ID_ALIGNMENT_FAULTS].updated) {
+        if(!alignment_chart_generated) {
             alignment_chart_generated = 1;
 
             printf("CHART %s.%s '' 'Alignment faults' 'faults' %s '' line %d %d '' %s\n"
@@ -741,8 +741,8 @@ static void perf_send_metrics() {
 
     // ------------------------------------------------------------------------
 
-    if(likely(perf_events[EV_ID_EMULATION_FAULTS].updated)) {
-        if(unlikely(!emulation_chart_generated)) {
+    if(perf_events[EV_ID_EMULATION_FAULTS].updated) {
+        if(!emulation_chart_generated) {
             emulation_chart_generated = 1;
 
             printf("CHART %s.%s '' 'Emulation faults' 'faults' %s '' line %d %d '' %s\n"
@@ -771,9 +771,9 @@ static void perf_send_metrics() {
 
     // ------------------------------------------------------------------------
 
-    if(likely(perf_events[EV_ID_L1D_READ_ACCESS].updated || perf_events[EV_ID_L1D_READ_MISS].updated
-              || perf_events[EV_ID_L1D_WRITE_ACCESS].updated || perf_events[EV_ID_L1D_WRITE_MISS].updated)) {
-        if(unlikely(!L1D_chart_generated)) {
+    if(perf_events[EV_ID_L1D_READ_ACCESS].updated || perf_events[EV_ID_L1D_READ_MISS].updated
+              || perf_events[EV_ID_L1D_WRITE_ACCESS].updated || perf_events[EV_ID_L1D_WRITE_MISS].updated) {
+        if(!L1D_chart_generated) {
             L1D_chart_generated = 1;
 
             printf("CHART %s.%s '' 'L1D cache operations' 'events/s' %s '' line %d %d '' %s\n"
@@ -795,28 +795,28 @@ static void perf_send_metrics() {
                , RRD_TYPE_PERF
                , "l1d_cache"
         );
-        if(likely(perf_events[EV_ID_L1D_READ_ACCESS].updated)) {
+        if(perf_events[EV_ID_L1D_READ_ACCESS].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "read_access"
                    , (collected_number) perf_events[EV_ID_L1D_READ_ACCESS].value
             );
         }
-        if(likely(perf_events[EV_ID_L1D_READ_MISS].updated)) {
+        if(perf_events[EV_ID_L1D_READ_MISS].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "read_misses"
                    , (collected_number) perf_events[EV_ID_L1D_READ_MISS].value
             );
         }
-        if(likely(perf_events[EV_ID_L1D_WRITE_ACCESS].updated)) {
+        if(perf_events[EV_ID_L1D_WRITE_ACCESS].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "write_access"
                    , (collected_number) perf_events[EV_ID_L1D_WRITE_ACCESS].value
             );
         }
-        if(likely(perf_events[EV_ID_L1D_WRITE_MISS].updated)) {
+        if(perf_events[EV_ID_L1D_WRITE_MISS].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "write_misses"
@@ -828,8 +828,8 @@ static void perf_send_metrics() {
 
     // ------------------------------------------------------------------------
 
-    if(likely(perf_events[EV_ID_L1D_PREFETCH_ACCESS].updated)) {
-        if(unlikely(!L1D_prefetch_chart_generated)) {
+    if(perf_events[EV_ID_L1D_PREFETCH_ACCESS].updated) {
+        if(!L1D_prefetch_chart_generated) {
             L1D_prefetch_chart_generated = 1;
 
             printf("CHART %s.%s '' 'L1D prefetch cache operations' 'prefetches/s' %s '' line %d %d '' %s\n"
@@ -858,8 +858,8 @@ static void perf_send_metrics() {
 
     // ------------------------------------------------------------------------
 
-    if(likely(perf_events[EV_ID_L1I_READ_ACCESS].updated || perf_events[EV_ID_L1I_READ_MISS].updated)) {
-        if(unlikely(!L1I_chart_generated)) {
+    if(perf_events[EV_ID_L1I_READ_ACCESS].updated || perf_events[EV_ID_L1I_READ_MISS].updated) {
+        if(!L1I_chart_generated) {
             L1I_chart_generated = 1;
 
             printf("CHART %s.%s '' 'L1I cache operations' 'events/s' %s '' line %d %d '' %s\n"
@@ -879,14 +879,14 @@ static void perf_send_metrics() {
                , RRD_TYPE_PERF
                , "l1i_cache"
         );
-        if(likely(perf_events[EV_ID_L1I_READ_ACCESS].updated)) {
+        if(perf_events[EV_ID_L1I_READ_ACCESS].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "read_access"
                    , (collected_number) perf_events[EV_ID_L1I_READ_ACCESS].value
             );
         }
-        if(likely(perf_events[EV_ID_L1I_READ_MISS].updated)) {
+        if(perf_events[EV_ID_L1I_READ_MISS].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "read_misses"
@@ -898,9 +898,9 @@ static void perf_send_metrics() {
 
     // ------------------------------------------------------------------------
 
-    if(likely(perf_events[EV_ID_LL_READ_ACCESS].updated || perf_events[EV_ID_LL_READ_MISS].updated
-              || perf_events[EV_ID_LL_WRITE_ACCESS].updated || perf_events[EV_ID_LL_WRITE_MISS].updated)) {
-        if(unlikely(!LL_chart_generated)) {
+    if(perf_events[EV_ID_LL_READ_ACCESS].updated || perf_events[EV_ID_LL_READ_MISS].updated
+              || perf_events[EV_ID_LL_WRITE_ACCESS].updated || perf_events[EV_ID_LL_WRITE_MISS].updated) {
+        if(!LL_chart_generated) {
             LL_chart_generated = 1;
 
             printf("CHART %s.%s '' 'LL cache operations' 'events/s' %s '' line %d %d '' %s\n"
@@ -922,28 +922,28 @@ static void perf_send_metrics() {
                , RRD_TYPE_PERF
                , "ll_cache"
         );
-        if(likely(perf_events[EV_ID_LL_READ_ACCESS].updated)) {
+        if(perf_events[EV_ID_LL_READ_ACCESS].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "read_access"
                    , (collected_number) perf_events[EV_ID_LL_READ_ACCESS].value
             );
         }
-        if(likely(perf_events[EV_ID_LL_READ_MISS].updated)) {
+        if(perf_events[EV_ID_LL_READ_MISS].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "read_misses"
                    , (collected_number) perf_events[EV_ID_LL_READ_MISS].value
             );
         }
-        if(likely(perf_events[EV_ID_LL_WRITE_ACCESS].updated)) {
+        if(perf_events[EV_ID_LL_WRITE_ACCESS].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "write_access"
                    , (collected_number) perf_events[EV_ID_LL_WRITE_ACCESS].value
             );
         }
-        if(likely(perf_events[EV_ID_LL_WRITE_MISS].updated)) {
+        if(perf_events[EV_ID_LL_WRITE_MISS].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "write_misses"
@@ -955,9 +955,9 @@ static void perf_send_metrics() {
 
     // ------------------------------------------------------------------------
 
-    if(likely(perf_events[EV_ID_DTLB_READ_ACCESS].updated || perf_events[EV_ID_DTLB_READ_MISS].updated
-              || perf_events[EV_ID_DTLB_WRITE_ACCESS].updated || perf_events[EV_ID_DTLB_WRITE_MISS].updated)) {
-        if(unlikely(!DTLB_chart_generated)) {
+    if(perf_events[EV_ID_DTLB_READ_ACCESS].updated || perf_events[EV_ID_DTLB_READ_MISS].updated
+              || perf_events[EV_ID_DTLB_WRITE_ACCESS].updated || perf_events[EV_ID_DTLB_WRITE_MISS].updated) {
+        if(!DTLB_chart_generated) {
             DTLB_chart_generated = 1;
 
             printf("CHART %s.%s '' 'DTLB cache operations' 'events/s' %s '' line %d %d '' %s\n"
@@ -979,28 +979,28 @@ static void perf_send_metrics() {
                , RRD_TYPE_PERF
                , "dtlb_cache"
         );
-        if(likely(perf_events[EV_ID_DTLB_READ_ACCESS].updated)) {
+        if(perf_events[EV_ID_DTLB_READ_ACCESS].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "read_access"
                    , (collected_number) perf_events[EV_ID_DTLB_READ_ACCESS].value
             );
         }
-        if(likely(perf_events[EV_ID_DTLB_READ_MISS].updated)) {
+        if(perf_events[EV_ID_DTLB_READ_MISS].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "read_misses"
                    , (collected_number) perf_events[EV_ID_DTLB_READ_MISS].value
             );
         }
-        if(likely(perf_events[EV_ID_DTLB_WRITE_ACCESS].updated)) {
+        if(perf_events[EV_ID_DTLB_WRITE_ACCESS].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "write_access"
                    , (collected_number) perf_events[EV_ID_DTLB_WRITE_ACCESS].value
             );
         }
-        if(likely(perf_events[EV_ID_DTLB_WRITE_MISS].updated)) {
+        if(perf_events[EV_ID_DTLB_WRITE_MISS].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "write_misses"
@@ -1012,8 +1012,8 @@ static void perf_send_metrics() {
 
     // ------------------------------------------------------------------------
 
-    if(likely(perf_events[EV_ID_ITLB_READ_ACCESS].updated || perf_events[EV_ID_ITLB_READ_MISS].updated)) {
-        if(unlikely(!ITLB_chart_generated)) {
+    if(perf_events[EV_ID_ITLB_READ_ACCESS].updated || perf_events[EV_ID_ITLB_READ_MISS].updated) {
+        if(!ITLB_chart_generated) {
             ITLB_chart_generated = 1;
 
             printf("CHART %s.%s '' 'ITLB cache operations' 'events/s' %s '' line %d %d '' %s\n"
@@ -1033,14 +1033,14 @@ static void perf_send_metrics() {
                , RRD_TYPE_PERF
                , "itlb_cache"
         );
-        if(likely(perf_events[EV_ID_ITLB_READ_ACCESS].updated)) {
+        if(perf_events[EV_ID_ITLB_READ_ACCESS].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "read_access"
                    , (collected_number) perf_events[EV_ID_ITLB_READ_ACCESS].value
             );
         }
-        if(likely(perf_events[EV_ID_ITLB_READ_MISS].updated)) {
+        if(perf_events[EV_ID_ITLB_READ_MISS].updated) {
             printf(
                    "SET %s = %lld\n"
                    , "read_misses"
@@ -1052,8 +1052,8 @@ static void perf_send_metrics() {
 
     // ------------------------------------------------------------------------
 
-    if(likely(perf_events[EV_ID_PBU_READ_ACCESS].updated)) {
-        if(unlikely(!PBU_chart_generated)) {
+    if(perf_events[EV_ID_PBU_READ_ACCESS].updated) {
+        if(!PBU_chart_generated) {
             PBU_chart_generated = 1;
 
             printf("CHART %s.%s '' 'PBU cache operations' 'events/s' %s '' line %d %d '' %s\n"
@@ -1307,13 +1307,13 @@ int main(int argc, char **argv) {
     else if(freq)
         collector_error("update frequency %d seconds is too small for PERF. Using %d.", freq, update_every);
 
-    if(unlikely(debug)) fprintf(stderr, "perf.plugin: calling perf_init()\n");
+    if(debug) fprintf(stderr, "perf.plugin: calling perf_init()\n");
     int perf = !perf_init();
 
     // ------------------------------------------------------------------------
     // the main loop
 
-    if(unlikely(debug)) fprintf(stderr, "perf.plugin: starting data collection\n");
+    if(debug) fprintf(stderr, "perf.plugin: starting data collection\n");
 
     time_t started_t = now_monotonic_sec();
 
@@ -1325,20 +1325,20 @@ int main(int argc, char **argv) {
     for(iteration = 0; 1; iteration++) {
         usec_t dt = heartbeat_next(&hb, step);
 
-        if(unlikely(netdata_exit)) break;
+        if(netdata_exit) break;
 
-        if(unlikely(debug && iteration))
+        if(debug && iteration)
             fprintf(stderr, "perf.plugin: iteration %zu, dt %llu usec\n"
                     , iteration
                     , dt
             );
 
-        if(likely(perf)) {
-            if(unlikely(debug)) fprintf(stderr, "perf.plugin: calling perf_collect()\n");
+        if(perf) {
+            if(debug) fprintf(stderr, "perf.plugin: calling perf_collect()\n");
             perf = !perf_collect();
 
-            if(likely(perf)) {
-                if(unlikely(debug)) fprintf(stderr, "perf.plugin: calling perf_send_metrics()\n");
+            if(perf) {
+                if(debug) fprintf(stderr, "perf.plugin: calling perf_send_metrics()\n");
                 perf_send_metrics();
             }
         }

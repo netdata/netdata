@@ -259,7 +259,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
     __atomic_add_fetch(&ctx->stats.datafile_creations, 1, __ATOMIC_RELAXED);
 
     ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
-    if (unlikely(ret)) {
+    if (ret) {
         fatal("DBENGINE: posix_memalign:%s", strerror(ret));
     }
     memset(superblock, 0, sizeof(*superblock));
@@ -296,7 +296,7 @@ static int check_data_file_superblock(uv_file file)
     uv_fs_t req;
 
     ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
-    if (unlikely(ret)) {
+    if (ret) {
         fatal("DBENGINE: posix_memalign:%s", strerror(ret));
     }
     iov = uv_buf_init((void *)superblock, sizeof(*superblock));

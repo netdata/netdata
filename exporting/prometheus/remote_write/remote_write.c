@@ -46,7 +46,7 @@ void prometheus_remote_write_prepare_header(struct instance *instance)
  */
 int process_prometheus_remote_write_response(BUFFER *buffer, struct instance *instance)
 {
-    if (unlikely(!buffer))
+    if (!buffer)
         return 1;
 
     const char *s = buffer_tostring(buffer);
@@ -61,7 +61,7 @@ int process_prometheus_remote_write_response(BUFFER *buffer, struct instance *in
     s++;
     len--;
 
-    if (likely(len > 4 && (!strncmp(s, "200 ", 4) || !strncmp(s, "204 ", 4))))
+    if (len > 4 && (!strncmp(s, "200 ", 4) || !strncmp(s, "204 ", 4)))
         return 0;
     else
         return exporting_discard_response(buffer, instance);
@@ -177,7 +177,7 @@ int format_host_prometheus_remote_write(struct instance *instance, RRDHOST *host
         connector_specific_data->write_request,
         "netdata_info", hostname, rrdhost_program_name(host), rrdhost_program_version(host), now_realtime_usec() / USEC_PER_MS);
     
-    if (unlikely(sending_labels_configured(instance))) {
+    if (sending_labels_configured(instance)) {
         struct format_remote_write_label_callback tmp = {
             .write_request = connector_specific_data->write_request,
             .instance = instance
@@ -243,7 +243,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
         if (as_collected) {
             // we need as-collected / raw data
 
-            if (unlikely(rd->collector.last_collected_time.tv_sec < instance->after)) {
+            if (rd->collector.last_collected_time.tv_sec < instance->after) {
                 netdata_log_debug(
                     D_EXPORTING,
                     "EXPORTING: not sending dimension '%s' of chart '%s' from host '%s', "
@@ -385,7 +385,7 @@ int format_batch_prometheus_remote_write(struct instance *instance)
 
     size_t data_size = get_write_request_size(connector_specific_data->write_request);
 
-    if (unlikely(!data_size)) {
+    if (!data_size) {
         netdata_log_error("EXPORTING: write request size is out of range");
         return 1;
     }
@@ -393,7 +393,7 @@ int format_batch_prometheus_remote_write(struct instance *instance)
     BUFFER *buffer = instance->buffer;
 
     buffer_need_bytes(buffer, data_size);
-    if (unlikely(pack_and_clear_write_request(connector_specific_data->write_request, buffer->buffer, &data_size))) {
+    if (pack_and_clear_write_request(connector_specific_data->write_request, buffer->buffer, &data_size)) {
         netdata_log_error("EXPORTING: cannot pack write request");
         return 1;
     }

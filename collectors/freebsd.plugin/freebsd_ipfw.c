@@ -21,7 +21,7 @@ int do_ipfw(int update_every, usec_t dt) {
 
     static int do_static = -1, do_dynamic = -1, do_mem = -1;
 
-    if (unlikely(do_static == -1)) {
+    if (do_static == -1) {
         do_static  = config_get_boolean("plugin:freebsd:ipfw", "counters for static rules", 1);
         do_dynamic = config_get_boolean("plugin:freebsd:ipfw", "number of dynamic rules", 1);
         do_mem     = config_get_boolean("plugin:freebsd:ipfw", "allocated memory", 1);
@@ -68,11 +68,11 @@ int do_ipfw(int update_every, usec_t dt) {
 
     uint32_t *dyn_rules_counter;
 
-    if (likely(do_static | do_dynamic | do_mem)) {
+    if (do_static | do_dynamic | do_mem) {
 
         // initialize the smallest ipfw_cfg_lheader possible
 
-        if (unlikely((optlen == NULL) || (cfg == NULL))) {
+        if ((optlen == NULL) || (cfg == NULL)) {
             optlen = reallocz(optlen, sizeof(socklen_t));
             *optlen = cfg_size = 32;
             cfg = reallocz(cfg, *optlen);
@@ -80,9 +80,9 @@ int do_ipfw(int update_every, usec_t dt) {
 
         // get socket descriptor and initialize ipfw_cfg_lheader structure
 
-        if (unlikely(ipfw_socket == -1))
+        if (ipfw_socket == -1)
             ipfw_socket = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
-        if (unlikely(ipfw_socket == -1)) {
+        if (ipfw_socket == -1) {
             collector_error("FREEBSD: can't get socket for ipfw configuration");
             collector_error("FREEBSD: run netdata as root to get access to ipfw data");
             COMMON_IPFW_ERROR();
@@ -149,12 +149,12 @@ int do_ipfw(int update_every, usec_t dt) {
                 dynsz = 0;
         }
 
-        if (likely(do_mem)) {
+        if (do_mem) {
             static RRDSET *st_mem = NULL;
             static RRDDIM *rd_dyn_mem = NULL;
             static RRDDIM *rd_stat_mem = NULL;
 
-            if (unlikely(!st_mem)) {
+            if (!st_mem) {
                 st_mem = rrdset_create_localhost("ipfw",
                                                  "mem",
                                                  NULL,
@@ -182,9 +182,9 @@ int do_ipfw(int update_every, usec_t dt) {
         static RRDSET *st_packets = NULL, *st_bytes = NULL;
         RRDDIM *rd_packets = NULL, *rd_bytes = NULL;
 
-        if (likely(do_static || do_dynamic)) {
-            if (likely(do_static)) {
-                if (unlikely(!st_packets)) {
+        if (do_static || do_dynamic) {
+            if (do_static) {
+                if (!st_packets) {
                     st_packets = rrdset_create_localhost("ipfw",
                                                          "packets",
                                                          NULL,
@@ -200,7 +200,7 @@ int do_ipfw(int update_every, usec_t dt) {
                     );
                 }
 
-                if (unlikely(!st_bytes)) {
+                if (!st_bytes) {
                     st_bytes = rrdset_create_localhost("ipfw",
                                                        "bytes",
                                                        NULL,
@@ -225,16 +225,16 @@ int do_ipfw(int update_every, usec_t dt) {
                 if (rule->rulenum > IPFW_DEFAULT_RULE)
                     break;
 
-                if (likely(do_static)) {
+                if (do_static) {
                     sprintf(rule_num_str, "%"PRIu32"_%"PRIu32"", (uint32_t)rule->rulenum, (uint32_t)rule->id);
 
                     rd_packets = rrddim_find_active(st_packets, rule_num_str);
-                    if (unlikely(!rd_packets))
+                    if (!rd_packets)
                         rd_packets = rrddim_add(st_packets, rule_num_str, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_set_by_pointer(st_packets, rd_packets, cntr->pcnt);
 
                     rd_bytes = rrddim_find_active(st_bytes, rule_num_str);
-                    if (unlikely(!rd_bytes))
+                    if (!rd_bytes)
                         rd_bytes = rrddim_add(st_bytes, rule_num_str, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_set_by_pointer(st_bytes, rd_bytes, cntr->bcnt);
                 }
@@ -243,7 +243,7 @@ int do_ipfw(int update_every, usec_t dt) {
                 seen++;
             }
 
-            if (likely(do_static)) {
+            if (do_static) {
                 rrdset_done(st_packets);
                 rrdset_done(st_bytes);
             }
@@ -251,7 +251,7 @@ int do_ipfw(int update_every, usec_t dt) {
 
         // go through dynamic rules configuration structures
 
-        if (likely(do_dynamic && (dynsz > 0))) {
+        if (do_dynamic && (dynsz > 0)) {
             if ((dyn_rules_num_size < sizeof(struct dyn_rule_num) * static_rules_num) ||
                 ((dyn_rules_num_size - sizeof(struct dyn_rule_num) * static_rules_num) >
                  sizeof(struct dyn_rule_num) * FREE_MEM_THRESHOLD)) {
@@ -299,7 +299,7 @@ int do_ipfw(int update_every, usec_t dt) {
             static RRDSET *st_active = NULL, *st_expired = NULL;
             RRDDIM *rd_active = NULL, *rd_expired = NULL;
 
-            if (unlikely(!st_active)) {
+            if (!st_active) {
                 st_active = rrdset_create_localhost("ipfw",
                                                     "active",
                                                     NULL,
@@ -315,7 +315,7 @@ int do_ipfw(int update_every, usec_t dt) {
                 );
             }
 
-            if (unlikely(!st_expired)) {
+            if (!st_expired) {
                 st_expired = rrdset_create_localhost("ipfw",
                                                      "expired",
                                                      NULL,
@@ -335,12 +335,12 @@ int do_ipfw(int update_every, usec_t dt) {
                 sprintf(rule_num_str, "%d", dyn_rules_num[srn].rule_num);
 
                 rd_active = rrddim_find_active(st_active, rule_num_str);
-                if (unlikely(!rd_active))
+                if (!rd_active)
                     rd_active = rrddim_add(st_active, rule_num_str, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rrddim_set_by_pointer(st_active, rd_active, dyn_rules_num[srn].active_rules);
 
                 rd_expired = rrddim_find_active(st_expired, rule_num_str);
-                if (unlikely(!rd_expired))
+                if (!rd_expired)
                     rd_expired = rrddim_add(st_expired, rule_num_str, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rrddim_set_by_pointer(st_expired, rd_expired, dyn_rules_num[srn].expired_rules);
             }

@@ -74,7 +74,7 @@ ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN 
 
 ssize_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, SIMPLE_PATTERN *scope_contexts_sp,
                                    SIMPLE_PATTERN *contexts_sp, foreach_context_cb_t cb, bool queryable_host, void *data) {
-    if(unlikely(!host->rrdctx.contexts))
+    if(!host->rrdctx.contexts)
         return 0;
 
     ssize_t added = 0;
@@ -84,7 +84,7 @@ ssize_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, S
     if(scope_contexts)
         rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdctx.contexts, scope_contexts);
 
-    if(likely(rca)) {
+    if(rca) {
         // we found it!
 
         bool queryable_context = queryable_host;

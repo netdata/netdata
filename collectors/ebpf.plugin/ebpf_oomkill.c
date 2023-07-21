@@ -150,7 +150,7 @@ static void oomkill_write_data(int32_t *keys, uint32_t total)
     // for each app, see if it was OOM killed. record as 1 if so otherwise 0.
     struct ebpf_target *w;
     for (w = apps_groups_root_target; w != NULL; w = w->next) {
-        if (likely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             bool was_oomkilled = false;
             struct ebpf_pid_on_target *pids = w->root_pid;
             while (pids) {
@@ -233,7 +233,7 @@ static void ebpf_send_systemd_oomkill_charts()
     ebpf_cgroup_target_t *ect;
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_OOMKILL_CHART);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+        if (ect->systemd && ect->updated) {
             write_chart_dimension(ect->name, (long long) ect->oomkill);
             ect->oomkill = 0;
         }
@@ -340,7 +340,7 @@ static uint32_t oomkill_read_data(int32_t *keys)
         // delete this key now that we've recorded its existence. there's no
         // race here, as the same PID will only get OOM killed once.
         int test = bpf_map_delete_elem(mapfd, &key);
-        if (unlikely(test < 0)) {
+        if (test < 0) {
             // since there's only 1 thread doing these deletions, it should be
             // impossible to get this condition.
             netdata_log_error("key unexpectedly not available for deletion.");
@@ -492,7 +492,7 @@ void *ebpf_oomkill_thread(void *ptr)
     em->maps = oomkill_maps;
 
 #define NETDATA_DEFAULT_OOM_DISABLED_MSG "Disabling OOMKILL thread, because"
-    if (unlikely(!ebpf_all_pids || !em->apps_charts)) {
+    if (!ebpf_all_pids || !em->apps_charts) {
         // When we are not running integration with apps, we won't fill necessary variables for this thread to run, so
         // we need to disable it.
         pthread_mutex_lock(&ebpf_exit_cleanup);

@@ -285,7 +285,7 @@ void rrdsetvar_print_to_streaming_custom_chart_variables(RRDSET *st, BUFFER *wb)
     // send the chart local custom variables
     RRDSETVAR *rs;
     dfe_start_read(st->rrdsetvar_root_index, rs) {
-        if(unlikely(rs->type == RRDVAR_TYPE_CALCULATED && rs->flags & RRDVAR_FLAG_CUSTOM_CHART_VAR)) {
+        if(rs->type == RRDVAR_TYPE_CALCULATED && rs->flags & RRDVAR_FLAG_CUSTOM_CHART_VAR) {
             NETDATA_DOUBLE *value = (NETDATA_DOUBLE *) rs->value;
 
             buffer_sprintf(wb

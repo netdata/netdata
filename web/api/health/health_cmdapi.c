@@ -68,7 +68,7 @@ void health_silencers2json(BUFFER *wb) {
     SILENCER *silencer;
     int i = 0, j = 0;
     for(silencer = silencers->silencers; silencer ; silencer = silencer->next) {
-        if(likely(i)) buffer_strcat(wb, ",");
+        if(i) buffer_strcat(wb, ",");
         buffer_strcat(wb, "\n\t\t{");
         j=health_silencers2json_entry(wb, HEALTH_ALARM_KEY, silencer->alarms, j);
         j=health_silencers2json_entry(wb, HEALTH_CHART_KEY, silencer->charts, j);
@@ -79,7 +79,7 @@ void health_silencers2json(BUFFER *wb) {
         buffer_strcat(wb, "\n\t\t}");
         i++;
     }
-    if(likely(i)) buffer_strcat(wb, "\n\t");
+    if(i) buffer_strcat(wb, "\n\t");
     buffer_strcat(wb, "]\n}\n");
 }
 
@@ -180,14 +180,14 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                 }
             }
 
-            if (likely(silencer)) {
+            if (silencer) {
                 health_silencers_add(silencer);
                 buffer_strcat(wb, HEALTH_CMDAPI_MSG_ADDED);
                 if (silencers->stype == STYPE_NONE) {
                     buffer_strcat(wb, HEALTH_CMDAPI_MSG_STYPEWARNING);
                 }
             }
-            if (unlikely(silencers->stype != STYPE_NONE && !silencers->all_alarms && !silencers->silencers)) {
+            if (silencers->stype != STYPE_NONE && !silencers->all_alarms && !silencers->silencers) {
                 buffer_strcat(wb, HEALTH_CMDAPI_MSG_NOSELECTORWARNING);
             }
             ret = HTTP_RESP_OK;

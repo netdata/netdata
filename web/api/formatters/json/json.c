@@ -162,49 +162,49 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
             if(!tm) {
                 netdata_log_error("localtime_r() failed."); continue; }
 
-            if(likely(i != start)) buffer_fast_strcat(wb, ",\n", 2);
+            if(i != start) buffer_fast_strcat(wb, ",\n", 2);
             buffer_fast_strcat(wb, pre_date, pre_date_len);
 
             if( options & RRDR_OPTION_OBJECTSROWS )
                 buffer_fast_strcat(wb, object_rows_time, object_rows_time_len);
 
-            if(unlikely(dates_with_new))
+            if(dates_with_new)
                 buffer_fast_strcat(wb, "new ", 4);
 
             buffer_jsdate(wb, tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
 
             buffer_fast_strcat(wb, post_date, post_date_len);
 
-            if(unlikely(row_annotations)) {
+            if(row_annotations) {
                 // google supports one annotation per row
                 int annotation_found = 0;
                 for(c = 0; c < used ; c++) {
-                    if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
+                    if(!(r->od[c] & RRDR_DIMENSION_QUERIED)) continue;
 
-                    if(unlikely(co[c] & RRDR_VALUE_RESET)) {
+                    if(co[c] & RRDR_VALUE_RESET) {
                         buffer_fast_strcat(wb, overflow_annotation, overflow_annotation_len);
                         annotation_found = 1;
                         break;
                     }
                 }
-                if(likely(!annotation_found))
+                if(!annotation_found)
                     buffer_fast_strcat(wb, normal_annotation, normal_annotation_len);
             }
         }
         else {
             // print the timestamp of the line
-            if(likely(i != start))
+            if(i != start)
                 buffer_fast_strcat(wb, ",\n", 2);
 
             buffer_fast_strcat(wb, pre_date, pre_date_len);
 
-            if(unlikely( options & RRDR_OPTION_OBJECTSROWS ))
+            if( options & RRDR_OPTION_OBJECTSROWS )
                 buffer_fast_strcat(wb, object_rows_time, object_rows_time_len);
 
             buffer_print_netdata_double(wb, (NETDATA_DOUBLE) r->t[i]);
 
             // in ms
-            if(unlikely(options & RRDR_OPTION_MILLISECONDS))
+            if(options & RRDR_OPTION_MILLISECONDS)
                 buffer_fast_strcat(wb, "000", 3);
 
             buffer_fast_strcat(wb, post_date, post_date_len);
@@ -216,18 +216,18 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
                 continue;
 
             NETDATA_DOUBLE n;
-            if(unlikely(options & RRDR_OPTION_INTERNAL_AR))
+            if(options & RRDR_OPTION_INTERNAL_AR)
                 n = ar[c];
             else
                 n = cn[c];
 
             buffer_fast_strcat(wb, pre_value, pre_value_len);
 
-            if(unlikely( options & RRDR_OPTION_OBJECTSROWS ))
+            if( options & RRDR_OPTION_OBJECTSROWS )
                 buffer_sprintf(wb, "%s%s%s: ", kq, string2str(r->dn[c]), kq);
 
             if(co[c] & RRDR_VALUE_EMPTY && !(options & (RRDR_OPTION_INTERNAL_AR))) {
-                if(unlikely(options & RRDR_OPTION_NULL2ZERO))
+                if(options & RRDR_OPTION_NULL2ZERO)
                     buffer_fast_strcat(wb, "0", 1);
                 else
                     buffer_fast_strcat(wb, "null", 4);
@@ -317,7 +317,7 @@ void rrdr2json_v2(RRDR *r, BUFFER *wb) {
                 NETDATA_DOUBLE n = cn[d];
 
                 if(o & RRDR_VALUE_EMPTY) {
-                    if (unlikely(options & RRDR_OPTION_NULL2ZERO))
+                    if (options & RRDR_OPTION_NULL2ZERO)
                         buffer_json_add_array_item_double(wb, 0);
                     else
                         buffer_json_add_array_item_double(wb, NAN);

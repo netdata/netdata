@@ -626,7 +626,7 @@ static void myGatheringStateCallback(int pc __maybe_unused, rtcGatheringState st
 }
 
 int webrtc_new_connection(const char *sdp, BUFFER *wb) {
-    if(unlikely(!webrtc_base.enabled)) {
+    if(!webrtc_base.enabled) {
         buffer_flush(wb);
         buffer_strcat(wb, "WebRTC is not enabled on this agent.");
         wb->content_type = CT_TEXT_PLAIN;
@@ -635,7 +635,7 @@ int webrtc_new_connection(const char *sdp, BUFFER *wb) {
 
     cleanupConnections();
 
-    if(unlikely(!sdp || !*sdp)) {
+    if(!sdp || !*sdp) {
         buffer_flush(wb);
         buffer_strcat(wb, "No SDP message posted with the request");
         wb->content_type = CT_TEXT_PLAIN;

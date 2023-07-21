@@ -528,7 +528,7 @@ static inline void netdev_rename_cgroup(struct netdev *d, struct netdev_rename *
 
 static inline void netdev_rename(struct netdev *d) {
     struct netdev_rename *r = netdev_rename_find(d->name, d->hash);
-    if(unlikely(r && !r->processed)) {
+    if(r && !r->processed) {
         netdev_rename_cgroup(d, r);
         r->processed = 1;
         d->discover_time = 0;
@@ -557,12 +557,12 @@ static inline void netdev_rename_all_lock(void) {
 // netdev data collection
 
 static void netdev_cleanup() {
-    if(likely(netdev_found == netdev_added)) return;
+    if(netdev_found == netdev_added) return;
 
     netdev_added = 0;
     struct netdev *d = netdev_root, *last = NULL;
     while(d) {
-        if(unlikely(!d->updated)) {
+        if(!d->updated) {
             // collector_info("Removing network device '%s', linked after '%s'", d->name, last?last->name:"ROOT");
 
             if(netdev_last_used == d)
@@ -595,7 +595,7 @@ static struct netdev *get_netdev(const char *name) {
 
     // search it, from the last position to the end
     for(d = netdev_last_used ; d ; d = d->next) {
-        if(unlikely(hash == d->hash && !strcmp(name, d->name))) {
+        if(hash == d->hash && !strcmp(name, d->name)) {
             netdev_last_used = d->next;
             return d;
         }
@@ -603,7 +603,7 @@ static struct netdev *get_netdev(const char *name) {
 
     // search it from the beginning to the last position we used
     for(d = netdev_root ; d != netdev_last_used ; d = d->next) {
-        if(unlikely(hash == d->hash && !strcmp(name, d->name))) {
+        if(hash == d->hash && !strcmp(name, d->name)) {
             netdev_last_used = d->next;
             return d;
         }
@@ -690,7 +690,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     static char *path_to_sys_class_net_carrier = NULL;
     static char *path_to_sys_class_net_mtu = NULL;
 
-    if(unlikely(enable_new_interfaces == -1)) {
+    if(enable_new_interfaces == -1) {
         char filename[FILENAME_MAX + 1];
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, (*netdata_configured_host_prefix)?"/proc/1/net/dev":"/proc/net/dev");
@@ -735,16 +735,16 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                            "lo fireqos* *-ifb fwpr* fwbr* fwln*"), NULL, SIMPLE_PATTERN_EXACT, true);
     }
 
-    if(unlikely(!ff)) {
+    if(!ff) {
         ff = procfile_open(proc_net_dev_filename, " \t,|", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff)) return 1;
+        if(!ff) return 1;
     }
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
+    if(!ff) return 0; // we return 0, so that we will retry to open it next time
 
     // rename all the devices, if we have pending renames
-    if(unlikely(netdev_pending_renames))
+    if(netdev_pending_renames)
         netdev_rename_all_lock();
 
     netdev_found = 0;
@@ -757,7 +757,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     size_t lines = procfile_lines(ff), l;
     for(l = 2; l < lines ;l++) {
         // require 17 words on each line
-        if(unlikely(procfile_linewords(ff, l) < 17)) continue;
+        if(procfile_linewords(ff, l) < 17) continue;
 
         char *name = procfile_lineword(ff, l, 0);
         size_t len = strlen(name);
@@ -767,7 +767,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         d->updated = 1;
         netdev_found++;
 
-        if(unlikely(!d->configured)) {
+        if(!d->configured) {
             // this is the first time we see this interface
 
             // remember we configured it
@@ -782,7 +782,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             char buffer[FILENAME_MAX + 1];
 
             snprintfz(buffer, FILENAME_MAX, path_to_sys_devices_virtual_net, d->name);
-            if (likely(access(buffer, R_OK) == 0)) {
+            if (access(buffer, R_OK) == 0) {
                 d->virtual = 1;
                 rrdlabels_add(d->chart_labels, "interface_type", "virtual", RRDLABEL_SRC_AUTO|RRDLABEL_FLAG_PERMANENT);
             }
@@ -792,7 +792,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             }
             rrdlabels_add(d->chart_labels, "device", name, RRDLABEL_SRC_AUTO|RRDLABEL_FLAG_PERMANENT);
 
-            if(likely(!d->virtual)) {
+            if(!d->virtual) {
                 // set the filename to get the interface speed
                 snprintfz(buffer, FILENAME_MAX, path_to_sys_class_net_speed, d->name);
                 d->filename_speed = strdupz(buffer);
@@ -831,7 +831,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             d->do_mtu        = config_get_boolean_ondemand(buffer, "mtu",        do_mtu);
         }
 
-        if(unlikely(!d->enabled))
+        if(!d->enabled)
             continue;
 
         // See https://github.com/netdata/netdata/issues/15206
@@ -842,43 +842,43 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             continue;
         }
 
-        if(likely(d->do_bandwidth != CONFIG_BOOLEAN_NO || !d->virtual)) {
+        if(d->do_bandwidth != CONFIG_BOOLEAN_NO || !d->virtual) {
             d->rbytes      = str2kernel_uint_t(procfile_lineword(ff, l, 1));
             d->tbytes      = str2kernel_uint_t(procfile_lineword(ff, l, 9));
 
-            if(likely(!d->virtual)) {
+            if(!d->virtual) {
                 system_rbytes += d->rbytes;
                 system_tbytes += d->tbytes;
             }
         }
 
-        if(likely(d->do_packets != CONFIG_BOOLEAN_NO)) {
+        if(d->do_packets != CONFIG_BOOLEAN_NO) {
             d->rpackets    = str2kernel_uint_t(procfile_lineword(ff, l, 2));
             d->rmulticast  = str2kernel_uint_t(procfile_lineword(ff, l, 8));
             d->tpackets    = str2kernel_uint_t(procfile_lineword(ff, l, 10));
         }
 
-        if(likely(d->do_errors != CONFIG_BOOLEAN_NO)) {
+        if(d->do_errors != CONFIG_BOOLEAN_NO) {
             d->rerrors     = str2kernel_uint_t(procfile_lineword(ff, l, 3));
             d->terrors     = str2kernel_uint_t(procfile_lineword(ff, l, 11));
         }
 
-        if(likely(d->do_drops != CONFIG_BOOLEAN_NO)) {
+        if(d->do_drops != CONFIG_BOOLEAN_NO) {
             d->rdrops      = str2kernel_uint_t(procfile_lineword(ff, l, 4));
             d->tdrops      = str2kernel_uint_t(procfile_lineword(ff, l, 12));
         }
 
-        if(likely(d->do_fifo != CONFIG_BOOLEAN_NO)) {
+        if(d->do_fifo != CONFIG_BOOLEAN_NO) {
             d->rfifo       = str2kernel_uint_t(procfile_lineword(ff, l, 5));
             d->tfifo       = str2kernel_uint_t(procfile_lineword(ff, l, 13));
         }
 
-        if(likely(d->do_compressed != CONFIG_BOOLEAN_NO)) {
+        if(d->do_compressed != CONFIG_BOOLEAN_NO) {
             d->rcompressed = str2kernel_uint_t(procfile_lineword(ff, l, 7));
             d->tcompressed = str2kernel_uint_t(procfile_lineword(ff, l, 16));
         }
 
-        if(likely(d->do_events != CONFIG_BOOLEAN_NO)) {
+        if(d->do_events != CONFIG_BOOLEAN_NO) {
             d->rframe      = str2kernel_uint_t(procfile_lineword(ff, l, 6));
             d->tcollisions = str2kernel_uint_t(procfile_lineword(ff, l, 14));
             d->tcarrier    = str2kernel_uint_t(procfile_lineword(ff, l, 15));
@@ -968,12 +968,12 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         //        , d->rframe, d->tcollisions, d->tcarrier
         //        );
 
-        if(unlikely(d->do_bandwidth == CONFIG_BOOLEAN_AUTO &&
-                    (d->rbytes || d->tbytes || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
+        if(d->do_bandwidth == CONFIG_BOOLEAN_AUTO &&
+                    (d->rbytes || d->tbytes || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))
             d->do_bandwidth = CONFIG_BOOLEAN_YES;
 
         if(d->do_bandwidth == CONFIG_BOOLEAN_YES) {
-            if(unlikely(!d->st_bandwidth)) {
+            if(!d->st_bandwidth) {
 
                 d->st_bandwidth = rrdset_create_localhost(
                         d->chart_type_net_bytes
@@ -1010,7 +1010,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
             // update the interface speed
             if(d->filename_speed) {
-                if(unlikely(!d->chart_var_speed)) {
+                if(!d->chart_var_speed) {
                     d->chart_var_speed =
                         rrdsetvar_custom_chart_variable_add_and_acquire(d->st_bandwidth, "nic_speed_max");
                     if(!d->chart_var_speed) {
@@ -1040,7 +1040,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                     }
                     else {
                         if(d->do_speed != CONFIG_BOOLEAN_NO) {
-                            if(unlikely(!d->st_speed)) {
+                            if(!d->st_speed) {
                                 d->st_speed = rrdset_create_localhost(
                                         d->chart_type_net_speed
                                         , d->chart_id_net_speed
@@ -1080,7 +1080,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         }
 
         if(d->do_duplex != CONFIG_BOOLEAN_NO && d->filename_duplex) {
-            if(unlikely(!d->st_duplex)) {
+            if(!d->st_duplex) {
                 d->st_duplex = rrdset_create_localhost(
                         d->chart_type_net_duplex
                         , d->chart_id_net_duplex
@@ -1112,7 +1112,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         }
 
         if(d->do_operstate != CONFIG_BOOLEAN_NO && d->filename_operstate) {
-            if(unlikely(!d->st_operstate)) {
+            if(!d->st_operstate) {
                 d->st_operstate = rrdset_create_localhost(
                         d->chart_type_net_operstate
                         , d->chart_id_net_operstate
@@ -1152,7 +1152,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         }
 
         if(d->do_carrier != CONFIG_BOOLEAN_NO && d->carrier_file_exists) {
-            if(unlikely(!d->st_carrier)) {
+            if(!d->st_carrier) {
                 d->st_carrier = rrdset_create_localhost(
                         d->chart_type_net_carrier
                         , d->chart_id_net_carrier
@@ -1182,7 +1182,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         }
 
         if(d->do_mtu != CONFIG_BOOLEAN_NO && d->filename_mtu) {
-            if(unlikely(!d->st_mtu)) {
+            if(!d->st_mtu) {
                 d->st_mtu = rrdset_create_localhost(
                         d->chart_type_net_mtu
                         , d->chart_id_net_mtu
@@ -1209,12 +1209,12 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrdset_done(d->st_mtu);
         }
 
-        if(unlikely(d->do_packets == CONFIG_BOOLEAN_AUTO &&
-           (d->rpackets || d->tpackets || d->rmulticast || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
+        if(d->do_packets == CONFIG_BOOLEAN_AUTO &&
+           (d->rpackets || d->tpackets || d->rmulticast || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))
             d->do_packets = CONFIG_BOOLEAN_YES;
 
         if(d->do_packets == CONFIG_BOOLEAN_YES) {
-            if(unlikely(!d->st_packets)) {
+            if(!d->st_packets) {
 
                 d->st_packets = rrdset_create_localhost(
                         d->chart_type_net_packets
@@ -1254,12 +1254,12 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrdset_done(d->st_packets);
         }
 
-        if(unlikely(d->do_errors == CONFIG_BOOLEAN_AUTO &&
-                    (d->rerrors || d->terrors || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
+        if(d->do_errors == CONFIG_BOOLEAN_AUTO &&
+                    (d->rerrors || d->terrors || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))
             d->do_errors = CONFIG_BOOLEAN_YES;
 
         if(d->do_errors == CONFIG_BOOLEAN_YES) {
-            if(unlikely(!d->st_errors)) {
+            if(!d->st_errors) {
 
                 d->st_errors = rrdset_create_localhost(
                         d->chart_type_net_errors
@@ -1297,12 +1297,12 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrdset_done(d->st_errors);
         }
 
-        if(unlikely(d->do_drops == CONFIG_BOOLEAN_AUTO &&
-                    (d->rdrops || d->tdrops || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
+        if(d->do_drops == CONFIG_BOOLEAN_AUTO &&
+                    (d->rdrops || d->tdrops || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))
             d->do_drops = CONFIG_BOOLEAN_YES;
 
         if(d->do_drops == CONFIG_BOOLEAN_YES) {
-            if(unlikely(!d->st_drops)) {
+            if(!d->st_drops) {
 
                 d->st_drops = rrdset_create_localhost(
                         d->chart_type_net_drops
@@ -1340,12 +1340,12 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrdset_done(d->st_drops);
         }
 
-        if(unlikely(d->do_fifo == CONFIG_BOOLEAN_AUTO &&
-                    (d->rfifo || d->tfifo || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
+        if(d->do_fifo == CONFIG_BOOLEAN_AUTO &&
+                    (d->rfifo || d->tfifo || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))
             d->do_fifo = CONFIG_BOOLEAN_YES;
 
         if(d->do_fifo == CONFIG_BOOLEAN_YES) {
-            if(unlikely(!d->st_fifo)) {
+            if(!d->st_fifo) {
 
                 d->st_fifo = rrdset_create_localhost(
                         d->chart_type_net_fifo
@@ -1383,12 +1383,12 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrdset_done(d->st_fifo);
         }
 
-        if(unlikely(d->do_compressed == CONFIG_BOOLEAN_AUTO &&
-                    (d->rcompressed || d->tcompressed || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
+        if(d->do_compressed == CONFIG_BOOLEAN_AUTO &&
+                    (d->rcompressed || d->tcompressed || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))
             d->do_compressed = CONFIG_BOOLEAN_YES;
 
         if(d->do_compressed == CONFIG_BOOLEAN_YES) {
-            if(unlikely(!d->st_compressed)) {
+            if(!d->st_compressed) {
 
                 d->st_compressed = rrdset_create_localhost(
                         d->chart_type_net_compressed
@@ -1426,12 +1426,12 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrdset_done(d->st_compressed);
         }
 
-        if(unlikely(d->do_events == CONFIG_BOOLEAN_AUTO &&
-                    (d->rframe || d->tcollisions || d->tcarrier || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
+        if(d->do_events == CONFIG_BOOLEAN_AUTO &&
+                    (d->rframe || d->tcollisions || d->tcarrier || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))
             d->do_events = CONFIG_BOOLEAN_YES;
 
         if(d->do_events == CONFIG_BOOLEAN_YES) {
-            if(unlikely(!d->st_events)) {
+            if(!d->st_events) {
 
                 d->st_events = rrdset_create_localhost(
                         d->chart_type_net_events
@@ -1471,7 +1471,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         static RRDSET *st_system_net = NULL;
         static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
-        if(unlikely(!st_system_net)) {
+        if(!st_system_net) {
             st_system_net = rrdset_create_localhost(
                     "system"
                     , "net"
@@ -1526,7 +1526,7 @@ void *netdev_main(void *ptr)
         worker_is_idle();
         usec_t hb_dt = heartbeat_next(&hb, step);
 
-        if (unlikely(!service_running(SERVICE_COLLECTORS)))
+        if (!service_running(SERVICE_COLLECTORS))
             break;
 
         worker_is_busy(0);

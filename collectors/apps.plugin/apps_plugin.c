@@ -34,7 +34,7 @@ static inline void debug_log_int(const char *fmt, ... ) {
 
 #ifdef NETDATA_INTERNAL_CHECKS
 
-#define debug_log(fmt, args...) do { if(unlikely(debug_enabled)) debug_log_int(fmt, ##args); } while(0)
+#define debug_log(fmt, args...) do { if(debug_enabled) debug_log_int(fmt, ##args); } while(0)
 
 #else
 
@@ -640,8 +640,8 @@ struct user_or_group_ids all_group_ids = {
 };
 
 int file_changed(const struct stat *statbuf, struct timespec *last_modification_time) {
-    if(likely(statbuf->st_mtim.tv_sec == last_modification_time->tv_sec &&
-       statbuf->st_mtim.tv_nsec == last_modification_time->tv_nsec)) return 0;
+    if(statbuf->st_mtim.tv_sec == last_modification_time->tv_sec &&
+       statbuf->st_mtim.tv_nsec == last_modification_time->tv_nsec) return 0;
 
     last_modification_time->tv_sec = statbuf->st_mtim.tv_sec;
     last_modification_time->tv_nsec = statbuf->st_mtim.tv_nsec;
@@ -651,28 +651,28 @@ int file_changed(const struct stat *statbuf, struct timespec *last_modification_
 
 int read_user_or_group_ids(struct user_or_group_ids *ids, struct timespec *last_modification_time) {
     struct stat statbuf;
-    if(unlikely(stat(ids->filename, &statbuf)))
+    if(stat(ids->filename, &statbuf))
         return 1;
     else
-        if(likely(!file_changed(&statbuf, last_modification_time))) return 0;
+        if(!file_changed(&statbuf, last_modification_time)) return 0;
 
     procfile *ff = procfile_open(ids->filename, " :\t", PROCFILE_FLAG_DEFAULT);
-    if(unlikely(!ff)) return 1;
+    if(!ff) return 1;
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff)) return 1;
+    if(!ff) return 1;
 
     size_t line, lines = procfile_lines(ff);
 
     for(line = 0; line < lines ;line++) {
         size_t words = procfile_linewords(ff, line);
-        if(unlikely(words < 3)) continue;
+        if(words < 3) continue;
 
         char *name = procfile_lineword(ff, line, 0);
-        if(unlikely(!name || !*name)) continue;
+        if(!name || !*name) continue;
 
         char *id_string = procfile_lineword(ff, line, 2);
-        if(unlikely(!id_string || !*id_string)) continue;
+        if(!id_string || !*id_string) continue;
 
 
         struct user_or_group_id *user_or_group_id = callocz(1, sizeof(struct user_or_group_id));
@@ -687,17 +687,17 @@ int read_user_or_group_ids(struct user_or_group_ids *ids, struct timespec *last_
 
         struct user_or_group_id *existing_user_id = NULL;
 
-        if(likely(ids->root))
+        if(ids->root)
             existing_user_id = (struct user_or_group_id *)avl_search(&ids->index, (avl_t *) user_or_group_id);
 
-        if(unlikely(existing_user_id)) {
+        if(existing_user_id) {
             freez(existing_user_id->name);
             existing_user_id->name = user_or_group_id->name;
             existing_user_id->updated = 1;
             freez(user_or_group_id);
         }
         else {
-            if(unlikely(avl_insert(&ids->index, (avl_t *) user_or_group_id) != (void *) user_or_group_id)) {
+            if(avl_insert(&ids->index, (avl_t *) user_or_group_id) != (void *) user_or_group_id) {
                 netdata_log_error("INTERNAL ERROR: duplicate indexing of id during realloc");
             };
 
@@ -712,8 +712,8 @@ int read_user_or_group_ids(struct user_or_group_ids *ids, struct timespec *last_
     struct user_or_group_id *user_or_group_id = ids->root, *prev_user_id = NULL;
 
     while(user_or_group_id) {
-        if(unlikely(!user_or_group_id->updated)) {
-            if(unlikely((struct user_or_group_id *)avl_remove(&ids->index, (avl_t *) user_or_group_id) != user_or_group_id))
+        if(!user_or_group_id->updated) {
+            if((struct user_or_group_id *)avl_remove(&ids->index, (avl_t *) user_or_group_id) != user_or_group_id)
                 netdata_log_error("INTERNAL ERROR: removal of unused id from index, removed a different id");
 
             if(prev_user_id)
@@ -764,7 +764,7 @@ static struct target *get_users_target(uid_t uid) {
         static struct timespec last_passwd_modification_time;
         int ret = read_user_or_group_ids(&all_user_ids, &last_passwd_modification_time);
 
-        if(likely(!ret && all_user_ids.index.root))
+        if(!ret && all_user_ids.index.root)
                 user_or_group_id = (struct user_or_group_id *)avl_search(&all_user_ids.index, (avl_t *) &user_id_to_find);
     }
 
@@ -812,7 +812,7 @@ struct target *get_groups_target(gid_t gid)
         static struct timespec last_group_modification_time;
         int ret = read_user_or_group_ids(&all_group_ids, &last_group_modification_time);
 
-        if(likely(!ret && all_group_ids.index.root))
+        if(!ret && all_group_ids.index.root)
                 group_id = (struct user_or_group_id *)avl_search(&all_group_ids.index, (avl_t *) &group_id_to_find);
     }
 
@@ -864,7 +864,7 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
     }
 
     // find an existing target
-    if(unlikely(!target)) {
+    if(!target) {
         while(*name == '-') {
             if(*name == '-') thidden = 1;
             name++;
@@ -875,8 +875,8 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
                 break;
         }
 
-        if(unlikely(debug_enabled)) {
-            if(unlikely(target))
+        if(debug_enabled) {
+            if(target)
                 debug_log("REUSING TARGET NAME '%s' on ID '%s'", target->name, target->id);
             else
                 debug_log("NEW TARGET NAME '%s' on ID '%s'", name, id);
@@ -890,7 +890,7 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
     strncpyz(w->id, nid, MAX_NAME);
     w->idhash = simple_hash(w->id);
 
-    if(unlikely(!target))
+    if(!target)
         // copy the name
         strncpyz(w->name, name, MAX_NAME);
     else
@@ -1008,7 +1008,7 @@ static int read_apps_groups_conf(const char *path, const char *file)
 static inline void init_pid_fds(struct pid_stat *p, size_t first, size_t size);
 
 static inline struct pid_stat *get_pid_entry(pid_t pid) {
-    if(unlikely(all_pids[pid]))
+    if(all_pids[pid])
         return all_pids[pid];
 
     struct pid_stat *p = callocz(sizeof(struct pid_stat), 1);
@@ -1028,7 +1028,7 @@ static inline struct pid_stat *get_pid_entry(pid_t pid) {
 static inline void del_pid_entry(pid_t pid) {
     struct pid_stat *p = all_pids[pid];
 
-    if(unlikely(!p)) {
+    if(!p) {
         netdata_log_error("attempted to free pid %d that is not allocated.", pid);
         return;
     }
@@ -1067,11 +1067,11 @@ static inline void del_pid_entry(pid_t pid) {
 // ----------------------------------------------------------------------------
 
 static inline int managed_log(struct pid_stat *p, PID_LOG log, int status) {
-    if(unlikely(!status)) {
+    if(!status) {
         // netdata_log_error("command failed log %u, errno %d", log, errno);
 
-        if(unlikely(debug_enabled || errno != ENOENT)) {
-            if(unlikely(debug_enabled || !(p->log_thrown & log))) {
+        if(debug_enabled || errno != ENOENT) {
+            if(debug_enabled || !(p->log_thrown & log)) {
                 p->log_thrown |= log;
                 switch(log) {
                     case PID_LOG_IO:
@@ -1124,7 +1124,7 @@ static inline int managed_log(struct pid_stat *p, PID_LOG log, int status) {
         }
         errno = 0;
     }
-    else if(unlikely(p->log_thrown & log)) {
+    else if(p->log_thrown & log) {
         // netdata_log_error("unsetting log %u on pid %d", log, p->pid);
         p->log_thrown &= ~log;
     }
@@ -1148,11 +1148,11 @@ static inline void assign_target_to_pid(struct pid_stat *p) {
         // 3. the target has the suffix
         // 4. the target is something inside cmdline
 
-        if(unlikely(( (!w->starts_with && !w->ends_with && w->comparehash == hash && !strcmp(w->compare, p->comm))
+        if(( (!w->starts_with && !w->ends_with && w->comparehash == hash && !strcmp(w->compare, p->comm))
                       || (w->starts_with && !w->ends_with && !strncmp(w->compare, p->comm, w->comparelen))
                       || (!w->starts_with && w->ends_with && pclen >= w->comparelen && !strcmp(w->compare, &p->comm[pclen - w->comparelen]))
                       || (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && p->cmdline && strstr(p->cmdline, w->compare))
-                    ))) {
+                    )) {
 
             p->matched_by_config = true;
             if(w->target) p->target = w->target;
@@ -1181,27 +1181,27 @@ static inline int read_proc_pid_cmdline(struct pid_stat *p) {
     mib[1] = KERN_PROC;
     mib[2] = KERN_PROC_ARGS;
     mib[3] = p->pid;
-    if (unlikely(sysctl(mib, 4, cmdline, &bytes, NULL, 0)))
+    if (sysctl(mib, 4, cmdline, &bytes, NULL, 0))
         goto cleanup;
 #else
-    if(unlikely(!p->cmdline_filename)) {
+    if(!p->cmdline_filename) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cmdline", netdata_configured_host_prefix, p->pid);
         p->cmdline_filename = strdupz(filename);
     }
 
     int fd = open(p->cmdline_filename, procfile_open_flags, 0666);
-    if(unlikely(fd == -1)) goto cleanup;
+    if(fd == -1) goto cleanup;
 
     ssize_t i, bytes = read(fd, cmdline, MAX_CMDLINE);
     close(fd);
 
-    if(unlikely(bytes < 0)) goto cleanup;
+    if(bytes < 0) goto cleanup;
 #endif
 
     cmdline[bytes] = '\0';
     for(i = 0; i < bytes ; i++) {
-        if(unlikely(!cmdline[i])) cmdline[i] = ' ';
+        if(!cmdline[i]) cmdline[i] = ' ';
     }
 
     if(p->cmdline) freez(p->cmdline);
@@ -1246,35 +1246,35 @@ struct arl_callback_ptr {
 void arl_callback_status_uid(const char *name, uint32_t hash, const char *value, void *dst) {
     (void)name; (void)hash; (void)value;
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
-    if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 5)) return;
+    if(procfile_linewords(aptr->ff, aptr->line) < 5) return;
 
     //const char *real_uid = procfile_lineword(aptr->ff, aptr->line, 1);
     const char *effective_uid = procfile_lineword(aptr->ff, aptr->line, 2);
     //const char *saved_uid = procfile_lineword(aptr->ff, aptr->line, 3);
     //const char *filesystem_uid = procfile_lineword(aptr->ff, aptr->line, 4);
 
-    if(likely(effective_uid && *effective_uid))
+    if(effective_uid && *effective_uid)
         aptr->p->uid = (uid_t)str2l(effective_uid);
 }
 
 void arl_callback_status_gid(const char *name, uint32_t hash, const char *value, void *dst) {
     (void)name; (void)hash; (void)value;
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
-    if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 5)) return;
+    if(procfile_linewords(aptr->ff, aptr->line) < 5) return;
 
     //const char *real_gid = procfile_lineword(aptr->ff, aptr->line, 1);
     const char *effective_gid = procfile_lineword(aptr->ff, aptr->line, 2);
     //const char *saved_gid = procfile_lineword(aptr->ff, aptr->line, 3);
     //const char *filesystem_gid = procfile_lineword(aptr->ff, aptr->line, 4);
 
-    if(likely(effective_gid && *effective_gid))
+    if(effective_gid && *effective_gid)
         aptr->p->gid = (uid_t)str2l(effective_gid);
 }
 
 void arl_callback_status_vmsize(const char *name, uint32_t hash, const char *value, void *dst) {
     (void)name; (void)hash; (void)value;
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
-    if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
+    if(procfile_linewords(aptr->ff, aptr->line) < 3) return;
 
     aptr->p->status_vmsize = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
 }
@@ -1282,7 +1282,7 @@ void arl_callback_status_vmsize(const char *name, uint32_t hash, const char *val
 void arl_callback_status_vmswap(const char *name, uint32_t hash, const char *value, void *dst) {
     (void)name; (void)hash; (void)value;
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
-    if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
+    if(procfile_linewords(aptr->ff, aptr->line) < 3) return;
 
     aptr->p->status_vmswap = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
 }
@@ -1290,7 +1290,7 @@ void arl_callback_status_vmswap(const char *name, uint32_t hash, const char *val
 void arl_callback_status_vmrss(const char *name, uint32_t hash, const char *value, void *dst) {
     (void)name; (void)hash; (void)value;
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
-    if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
+    if(procfile_linewords(aptr->ff, aptr->line) < 3) return;
 
     aptr->p->status_vmrss = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
 }
@@ -1298,7 +1298,7 @@ void arl_callback_status_vmrss(const char *name, uint32_t hash, const char *valu
 void arl_callback_status_rssfile(const char *name, uint32_t hash, const char *value, void *dst) {
     (void)name; (void)hash; (void)value;
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
-    if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
+    if(procfile_linewords(aptr->ff, aptr->line) < 3) return;
 
     aptr->p->status_rssfile = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
 }
@@ -1306,7 +1306,7 @@ void arl_callback_status_rssfile(const char *name, uint32_t hash, const char *va
 void arl_callback_status_rssshmem(const char *name, uint32_t hash, const char *value, void *dst) {
     (void)name; (void)hash; (void)value;
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
-    if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
+    if(procfile_linewords(aptr->ff, aptr->line) < 3) return;
 
     aptr->p->status_rssshmem = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
 }
@@ -1314,7 +1314,7 @@ void arl_callback_status_rssshmem(const char *name, uint32_t hash, const char *v
 void arl_callback_status_voluntary_ctxt_switches(const char *name, uint32_t hash, const char *value, void *dst) {
     (void)name; (void)hash; (void)value;
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
-    if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 2)) return;
+    if(procfile_linewords(aptr->ff, aptr->line) < 2) return;
 
     struct pid_stat *p = aptr->p;
     pid_incremental_rate(stat, p->status_voluntary_ctxt_switches, str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)));
@@ -1323,7 +1323,7 @@ void arl_callback_status_voluntary_ctxt_switches(const char *name, uint32_t hash
 void arl_callback_status_nonvoluntary_ctxt_switches(const char *name, uint32_t hash, const char *value, void *dst) {
     (void)name; (void)hash; (void)value;
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
-    if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 2)) return;
+    if(procfile_linewords(aptr->ff, aptr->line) < 2) return;
 
     struct pid_stat *p = aptr->p;
     pid_incremental_rate(stat, p->status_nonvoluntary_ctxt_switches, str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)));
@@ -1385,14 +1385,14 @@ static inline int read_proc_pid_limits(struct pid_stat *p, void *ptr) {
         goto cleanup;
     }
 
-    if(unlikely(!p->limits_filename)) {
+    if(!p->limits_filename) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/proc/%d/limits", netdata_configured_host_prefix, p->pid);
         p->limits_filename = strdupz(filename);
     }
 
     int fd = open(p->limits_filename, procfile_open_flags, 0666);
-    if(unlikely(fd == -1)) goto cleanup;
+    if(fd == -1) goto cleanup;
 
     ssize_t bytes = read(fd, proc_pid_limits_buffer, MAX_PROC_PID_LIMITS);
     close(fd);
@@ -1478,7 +1478,7 @@ static inline int read_proc_pid_status(struct pid_stat *p, void *ptr) {
     static struct arl_callback_ptr arl_ptr;
     static procfile *ff = NULL;
 
-    if(unlikely(!p->status_arl)) {
+    if(!p->status_arl) {
         p->status_arl = arl_create("/proc/pid/status", NULL, 60);
         arl_expect_custom(p->status_arl, "Uid", arl_callback_status_uid, &arl_ptr);
         arl_expect_custom(p->status_arl, "Gid", arl_callback_status_gid, &arl_ptr);
@@ -1492,17 +1492,17 @@ static inline int read_proc_pid_status(struct pid_stat *p, void *ptr) {
     }
 
 
-    if(unlikely(!p->status_filename)) {
+    if(!p->status_filename) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/proc/%d/status", netdata_configured_host_prefix, p->pid);
         p->status_filename = strdupz(filename);
     }
 
     ff = procfile_reopen(ff, p->status_filename, (!ff)?" \t:,-()/":NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
-    if(unlikely(!ff)) return 0;
+    if(!ff) return 0;
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff)) return 0;
+    if(!ff) return 0;
 
     calls_counter++;
 
@@ -1516,9 +1516,9 @@ static inline int read_proc_pid_status(struct pid_stat *p, void *ptr) {
     for(l = 0; l < lines ;l++) {
         // debug_log("CHECK: line %zu of %zu, key '%s' = '%s'", l, lines, procfile_lineword(ff, l, 0), procfile_lineword(ff, l, 1));
         arl_ptr.line = l;
-        if(unlikely(arl_check(p->status_arl,
+        if(arl_check(p->status_arl,
                 procfile_lineword(ff, l, 0),
-                procfile_lineword(ff, l, 1)))) break;
+                procfile_lineword(ff, l, 1))) break;
     }
 
     p->status_vmshared = p->status_rssfile + p->status_rssshmem;
@@ -1537,12 +1537,12 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
 
 #ifdef __FreeBSD__
     struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
-    if (unlikely(proc_info->ki_tdflags & TDF_IDLETD))
+    if (proc_info->ki_tdflags & TDF_IDLETD)
         goto cleanup;
 #else
     static procfile *ff = NULL;
 
-    if(unlikely(!p->stat_filename)) {
+    if(!p->stat_filename) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/proc/%d/stat", netdata_configured_host_prefix, p->pid);
         p->stat_filename = strdupz(filename);
@@ -1551,14 +1551,14 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     int set_quotes = (!ff)?1:0;
 
     ff = procfile_reopen(ff, p->stat_filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
-    if(unlikely(!ff)) goto cleanup;
+    if(!ff) goto cleanup;
 
     // if(set_quotes) procfile_set_quotes(ff, "()");
-    if(unlikely(set_quotes))
+    if(set_quotes)
         procfile_set_open_close(ff, "(", ")");
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff)) goto cleanup;
+    if(!ff) goto cleanup;
 #endif
 
     p->last_stat_collected_usec = p->stat_collected_usec;
@@ -1580,7 +1580,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     // p->flags         = str2uint64_t(procfile_lineword(ff, 0, 8));
 #endif
     if(strcmp(p->comm, comm) != 0) {
-        if(unlikely(debug_enabled)) {
+        if(debug_enabled) {
             if(p->comm[0])
                 debug_log("\tpid %d (%s) changed name to '%s'", p->pid, p->comm, comm);
             else
@@ -1590,7 +1590,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
         strncpyz(p->comm, comm, MAX_COMPARE_NAME);
 
         // /proc/<pid>/cmdline
-        if(likely(proc_pid_cmdline_is_needed))
+        if(proc_pid_cmdline_is_needed)
             managed_log(p, PID_LOG_CMDLINE, read_proc_pid_cmdline(p));
 
         assign_target_to_pid(p);
@@ -1661,10 +1661,10 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     }
 #endif
 
-    if(unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
+    if(debug_enabled || (p->target && p->target->debug_enabled))
         debug_log_int("READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT ", threads=%d", netdata_configured_host_prefix, p->pid, p->comm, (p->target)?p->target->name:"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
 
-    if(unlikely(global_iterations_counter == 1)) {
+    if(global_iterations_counter == 1) {
         p->minflt           = 0;
         p->cminflt          = 0;
         p->majflt           = 0;
@@ -1706,7 +1706,7 @@ static inline int read_proc_pid_io(struct pid_stat *p, void *ptr) {
 #else
     static procfile *ff = NULL;
 
-    if(unlikely(!p->io_filename)) {
+    if(!p->io_filename) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/proc/%d/io", netdata_configured_host_prefix, p->pid);
         p->io_filename = strdupz(filename);
@@ -1714,10 +1714,10 @@ static inline int read_proc_pid_io(struct pid_stat *p, void *ptr) {
 
     // open the file
     ff = procfile_reopen(ff, p->io_filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
-    if(unlikely(!ff)) goto cleanup;
+    if(!ff) goto cleanup;
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff)) goto cleanup;
+    if(!ff) goto cleanup;
 #endif
 
     calls_counter++;
@@ -1738,7 +1738,7 @@ static inline int read_proc_pid_io(struct pid_stat *p, void *ptr) {
     pid_incremental_rate(io, p->io_cancelled_write_bytes,    str2kernel_uint_t(procfile_lineword(ff, 6,  1)));
 #endif
 
-    if(unlikely(global_iterations_counter == 1)) {
+    if(global_iterations_counter == 1) {
         p->io_logical_bytes_read        = 0;
         p->io_logical_bytes_written     = 0;
         p->io_read_calls                = 0;
@@ -1770,14 +1770,14 @@ static inline int read_global_time() {
     static kernel_uint_t utime_raw = 0, stime_raw = 0, gtime_raw = 0, gntime_raw = 0, ntime_raw = 0;
     static usec_t collected_usec = 0, last_collected_usec = 0;
 
-    if(unlikely(!ff)) {
+    if(!ff) {
         snprintfz(filename, FILENAME_MAX, "%s/proc/stat", netdata_configured_host_prefix);
         ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff)) goto cleanup;
+        if(!ff) goto cleanup;
     }
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff)) goto cleanup;
+    if(!ff) goto cleanup;
 
     last_collected_usec = collected_usec;
     collected_usec = now_monotonic_usec();
@@ -1807,7 +1807,7 @@ static inline int read_global_time() {
         global_utime -= (global_utime > global_gtime) ? global_gtime : global_utime;
     }
 
-    if(unlikely(global_iterations_counter == 1)) {
+    if(global_iterations_counter == 1) {
         global_utime = 0;
         global_stime = 0;
         global_gtime = 0;
@@ -1827,12 +1827,12 @@ static inline int read_global_time() {
     static usec_t collected_usec = 0, last_collected_usec = 0;
     long cp_time[CPUSTATES];
 
-    if (unlikely(CPUSTATES != 5)) {
+    if (CPUSTATES != 5) {
         goto cleanup;
     } else {
         static int mib[2] = {0, 0};
 
-        if (unlikely(GETSYSCTL_SIMPLE("kern.cp_time", mib, cp_time))) {
+        if (GETSYSCTL_SIMPLE("kern.cp_time", mib, cp_time)) {
             goto cleanup;
         }
     }
@@ -1851,7 +1851,7 @@ static inline int read_global_time() {
 
     global_utime += global_ntime;
 
-    if(unlikely(global_iterations_counter == 1)) {
+    if(global_iterations_counter == 1) {
         global_utime = 0;
         global_stime = 0;
         global_gtime = 0;
@@ -1929,7 +1929,7 @@ static inline void file_descriptor_not_used(int id)
             if(!all_files[id].count) {
                 debug_log("  >> slot %d is empty.", id);
 
-                if(unlikely(file_descriptor_remove(&all_files[id]) != (void *)&all_files[id]))
+                if(file_descriptor_remove(&all_files[id]) != (void *)&all_files[id])
                     netdata_log_error("INTERNAL ERROR: removal of unused fd from index, removed a different fd");
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1961,13 +1961,13 @@ static inline void all_files_grow() {
     // if the address changed, we have to rebuild the index
     // since all pointers are now invalid
 
-    if(unlikely(old && old != (void *)all_files)) {
+    if(old && old != (void *)all_files) {
         debug_log("  >> re-indexing.");
 
         all_files_index.root = NULL;
         for(i = 0; i < all_files_size; i++) {
             if(!all_files[i].count) continue;
-            if(unlikely(file_descriptor_add(&all_files[i]) != (void *)&all_files[i]))
+            if(file_descriptor_add(&all_files[i]) != (void *)&all_files[i])
                 netdata_log_error("INTERNAL ERROR: duplicate indexing of fd during realloc.");
         }
 
@@ -1985,7 +1985,7 @@ static inline void all_files_grow() {
         all_files[i].pos = i;
     }
 
-    if(unlikely(!all_files_size)) all_files_len = 1;
+    if(!all_files_size) all_files_len = 1;
     all_files_size += FILE_DESCRIPTORS_INCREASE_STEP;
 }
 
@@ -2039,7 +2039,7 @@ static inline int file_descriptor_set_on_empty_slot(const char *name, uint32_t h
 #ifdef NETDATA_INTERNAL_CHECKS
     all_files[c].magic = 0x0BADCAFE;
 #endif /* NETDATA_INTERNAL_CHECKS */
-    if(unlikely(file_descriptor_add(&all_files[c]) != (void *)&all_files[c]))
+    if(file_descriptor_add(&all_files[c]) != (void *)&all_files[c])
         netdata_log_error("INTERNAL ERROR: duplicate indexing of fd.");
 
     debug_log("using fd position %d (name: %s)", c, all_files[c].name);
@@ -2048,7 +2048,7 @@ static inline int file_descriptor_set_on_empty_slot(const char *name, uint32_t h
 }
 
 static inline int file_descriptor_find_or_add(const char *name, uint32_t hash) {
-    if(unlikely(!hash))
+    if(!hash)
         hash = simple_hash(name);
 
     debug_log("adding or finding name '%s' with hash %u", name, hash);
@@ -2064,10 +2064,10 @@ static inline int file_descriptor_find_or_add(const char *name, uint32_t hash) {
     // not found
 
     FD_FILETYPE type;
-    if(likely(name[0] == '/')) type = FILETYPE_FILE;
-    else if(likely(strncmp(name, "pipe:", 5) == 0)) type = FILETYPE_PIPE;
-    else if(likely(strncmp(name, "socket:", 7) == 0)) type = FILETYPE_SOCKET;
-    else if(likely(strncmp(name, "anon_inode:", 11) == 0)) {
+    if(name[0] == '/') type = FILETYPE_FILE;
+    else if(strncmp(name, "pipe:", 5) == 0) type = FILETYPE_PIPE;
+    else if(strncmp(name, "socket:", 7) == 0) type = FILETYPE_SOCKET;
+    else if(strncmp(name, "anon_inode:", 11) == 0) {
         const char *t = &name[11];
 
         if(strcmp(t, "inotify") == 0) type = FILETYPE_INOTIFY;
@@ -2080,7 +2080,7 @@ static inline int file_descriptor_find_or_add(const char *name, uint32_t hash) {
             type = FILETYPE_OTHER;
         }
     }
-    else if(likely(strcmp(name, "inotify") == 0)) type = FILETYPE_INOTIFY;
+    else if(strcmp(name, "inotify") == 0) type = FILETYPE_INOTIFY;
     else {
         debug_log("UNKNOWN linkname: %s", name);
         type = FILETYPE_OTHER;
@@ -2114,7 +2114,7 @@ static inline void cleanup_negative_pid_fds(struct pid_stat *p) {
     while(pfd < pfdend) {
         int fd = pfd->fd;
 
-        if(unlikely(fd < 0)) {
+        if(fd < 0) {
             file_descriptor_not_used(-(fd));
             clear_pid_fd(pfd);
         }
@@ -2157,13 +2157,13 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
     mib[2] = KERN_PROC_FILEDESC;
     mib[3] = p->pid;
 
-    if (unlikely(sysctl(mib, 4, NULL, &size, NULL, 0))) {
+    if (sysctl(mib, 4, NULL, &size, NULL, 0)) {
         netdata_log_error("sysctl error: Can't get file descriptors data size for pid %d", p->pid);
         return 0;
     }
-    if (likely(size > 0))
+    if (size > 0)
         fdsbuf = reallocz(fdsbuf, size);
-    if (unlikely(sysctl(mib, 4, fdsbuf, &size, NULL, 0))) {
+    if (sysctl(mib, 4, fdsbuf, &size, NULL, 0)) {
         netdata_log_error("sysctl error: Can't get file descriptors data for pid %d", p->pid);
         return 0;
     }
@@ -2172,12 +2172,12 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
     efdsbuf = fdsbuf + size;
     while (bfdsbuf < efdsbuf) {
         fds = (struct kinfo_file *)(uintptr_t)bfdsbuf;
-        if (unlikely(fds->kf_structsize == 0))
+        if (fds->kf_structsize == 0)
             break;
 
         // do not process file descriptors for current working directory, root directory,
         // jail directory, ktrace vnode, text vnode and controlling terminal
-        if (unlikely(fds->kf_fd < 0)) {
+        if (fds->kf_fd < 0) {
             bfdsbuf += fds->kf_structsize;
             continue;
         }
@@ -2186,7 +2186,7 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
         size_t fdid = fds->kf_fd;
 
         // check if the fds array is small
-        if (unlikely(fdid >= p->fds_size)) {
+        if (fdid >= p->fds_size) {
             // it is small, extend it
 
             debug_log("extending fd memory slots for %s from %d to %d", p->comm, p->fds_size, fdid + MAX_SPARE_FDS);
@@ -2198,13 +2198,13 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
             p->fds_size = fdid + MAX_SPARE_FDS;
         }
 
-        if (unlikely(p->fds[fdid].fd == 0)) {
+        if (p->fds[fdid].fd == 0) {
             // we don't know this fd, get it
 
             switch (fds->kf_type) {
                 case KF_TYPE_FIFO:
                 case KF_TYPE_VNODE:
-                    if (unlikely(!fds->kf_path[0])) {
+                    if (!fds->kf_path[0]) {
                         sprintf(fdsname, "other: inode: %lu", fds->kf_un.kf_file.kf_file_fileid);
                         break;
                     }
@@ -2267,14 +2267,14 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
         bfdsbuf += fds->kf_structsize;
     }
 #else
-    if(unlikely(!p->fds_dirname)) {
+    if(!p->fds_dirname) {
         char dirname[FILENAME_MAX+1];
         snprintfz(dirname, FILENAME_MAX, "%s/proc/%d/fd", netdata_configured_host_prefix, p->pid);
         p->fds_dirname = strdupz(dirname);
     }
 
     DIR *fds = opendir(p->fds_dirname);
-    if(unlikely(!fds)) return 0;
+    if(!fds) return 0;
 
     struct dirent *de;
     char linkname[FILENAME_MAX + 1];
@@ -2287,15 +2287,15 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
     while((de = readdir(fds))) {
         // we need only files with numeric names
 
-        if(unlikely(de->d_name[0] < '0' || de->d_name[0] > '9'))
+        if(de->d_name[0] < '0' || de->d_name[0] > '9')
             continue;
 
         // get its number
         int fdid = (int) str2l(de->d_name);
-        if(unlikely(fdid < 0)) continue;
+        if(fdid < 0) continue;
 
         // check if the fds array is small
-        if(unlikely((size_t)fdid >= p->fds_size)) {
+        if((size_t)fdid >= p->fds_size) {
             // it is small, extend it
 
             debug_log("extending fd memory slots for %s from %d to %d"
@@ -2311,7 +2311,7 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
             p->fds_size = (size_t)fdid + MAX_SPARE_FDS;
         }
 
-        if(unlikely(p->fds[fdid].fd < 0 && de->d_ino != p->fds[fdid].inode)) {
+        if(p->fds[fdid].fd < 0 && de->d_ino != p->fds[fdid].inode) {
             // inodes do not match, clear the previous entry
             inodes_changed_counter++;
             file_descriptor_not_used(-p->fds[fdid].fd);
@@ -2324,7 +2324,7 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
             continue;
         }
 
-        if(unlikely(!p->fds[fdid].filename)) {
+        if(!p->fds[fdid].filename) {
             filenames_allocated_counter++;
             char fdname[FILENAME_MAX + 1];
             snprintfz(fdname, FILENAME_MAX, "%s/proc/%d/fd/%s", netdata_configured_host_prefix, p->pid, de->d_name);
@@ -2333,13 +2333,13 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
 
         file_counter++;
         ssize_t l = readlink(p->fds[fdid].filename, linkname, FILENAME_MAX);
-        if(unlikely(l == -1)) {
+        if(l == -1) {
             // cannot read the link
 
             if(debug_enabled || (p->target && p->target->debug_enabled))
                 netdata_log_error("Cannot read link %s", p->fds[fdid].filename);
 
-            if(unlikely(p->fds[fdid].fd < 0)) {
+            if(p->fds[fdid].fd < 0) {
                 file_descriptor_not_used(-p->fds[fdid].fd);
                 clear_pid_fd(&p->fds[fdid]);
             }
@@ -2351,14 +2351,14 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
 
         uint32_t link_hash = simple_hash(linkname);
 
-        if(unlikely(p->fds[fdid].fd < 0 && p->fds[fdid].link_hash != link_hash)) {
+        if(p->fds[fdid].fd < 0 && p->fds[fdid].link_hash != link_hash) {
             // the link changed
             links_changed_counter++;
             file_descriptor_not_used(-p->fds[fdid].fd);
             clear_pid_fd(&p->fds[fdid]);
         }
 
-        if(unlikely(p->fds[fdid].fd == 0)) {
+        if(p->fds[fdid].fd == 0) {
             // we don't know this fd, get it
 
             // if another process already has this, we will get
@@ -2381,11 +2381,11 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
             size_t max = ((size_t) max_fds_cache_seconds + (fdid % spread)) / (size_t) update_every;
             p->fds[fdid].cache_iterations_reset++;
 
-            if(unlikely(p->fds[fdid].cache_iterations_reset % spread == (size_t) fdid % spread))
+            if(p->fds[fdid].cache_iterations_reset % spread == (size_t) fdid % spread)
                 p->fds[fdid].cache_iterations_reset++;
 
-            if(unlikely((fdid <= 2 && p->fds[fdid].cache_iterations_reset > 5) ||
-                        p->fds[fdid].cache_iterations_reset > max)) {
+            if((fdid <= 2 && p->fds[fdid].cache_iterations_reset > 5) ||
+                        p->fds[fdid].cache_iterations_reset > max) {
                 // for stdin, stdout, stderr (fdid <= 2) we have checked a few times, or if it goes above the max, goto max
                 p->fds[fdid].cache_iterations_reset = max;
             }
@@ -2550,7 +2550,7 @@ static inline void process_exited_processes() {
         if(utime + stime + gtime + minflt + majflt == 0)
             continue;
 
-        if(unlikely(debug_enabled)) {
+        if(debug_enabled) {
             debug_log("Absorb %s (%d %s total resources: utime=" KERNEL_UINT_FORMAT " stime=" KERNEL_UINT_FORMAT " gtime=" KERNEL_UINT_FORMAT " minflt=" KERNEL_UINT_FORMAT " majflt=" KERNEL_UINT_FORMAT ")"
                 , p->comm
                 , p->pid
@@ -2570,28 +2570,28 @@ static inline void process_exited_processes() {
 
             kernel_uint_t absorbed;
             absorbed = remove_exited_child_from_parent(&utime,  &pp->cutime);
-            if(unlikely(debug_enabled && absorbed))
+            if(debug_enabled && absorbed)
                 debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " utime (remaining: " KERNEL_UINT_FORMAT ")", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, utime);
 
             absorbed = remove_exited_child_from_parent(&stime,  &pp->cstime);
-            if(unlikely(debug_enabled && absorbed))
+            if(debug_enabled && absorbed)
                 debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " stime (remaining: " KERNEL_UINT_FORMAT ")", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, stime);
 
             absorbed = remove_exited_child_from_parent(&gtime,  &pp->cgtime);
-            if(unlikely(debug_enabled && absorbed))
+            if(debug_enabled && absorbed)
                 debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " gtime (remaining: " KERNEL_UINT_FORMAT ")", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, gtime);
 
             absorbed = remove_exited_child_from_parent(&minflt, &pp->cminflt);
-            if(unlikely(debug_enabled && absorbed))
+            if(debug_enabled && absorbed)
                 debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " minflt (remaining: " KERNEL_UINT_FORMAT ")", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, minflt);
 
             absorbed = remove_exited_child_from_parent(&majflt, &pp->cmajflt);
-            if(unlikely(debug_enabled && absorbed))
+            if(debug_enabled && absorbed)
                 debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " majflt (remaining: " KERNEL_UINT_FORMAT ")", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, majflt);
         }
 
-        if(unlikely(utime + stime + gtime + minflt + majflt > 0)) {
-            if(unlikely(debug_enabled)) {
+        if(utime + stime + gtime + minflt + majflt > 0) {
+            if(debug_enabled) {
                 if(utime) debug_find_lost_child(p, utime, 3);
                 if(stime) debug_find_lost_child(p, stime, 4);
                 if(gtime) debug_find_lost_child(p, gtime, 5);
@@ -2652,18 +2652,18 @@ static inline void link_all_processes_to_their_parents(void) {
         p->sortlist = 0;
         p->parent = NULL;
 
-        if(unlikely(!p->ppid)) {
+        if(!p->ppid) {
             //unnecessary code from apps_plugin.c
             //p->parent = NULL;
             continue;
         }
 
         pp = all_pids[p->ppid];
-        if(likely(pp)) {
+        if(pp) {
             p->parent = pp;
             pp->children_count++;
 
-            if(unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
+            if(debug_enabled || (p->target && p->target->debug_enabled))
                 debug_log_int("child %d (%s, %s) on target '%s' has parent %d (%s, %s). Parent: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", gtime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", cgtime=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT "", p->pid, p->comm, p->updated?"running":"exited", (p->target)?p->target->name:"UNSET", pp->pid, pp->comm, pp->updated?"running":"exited", pp->utime, pp->stime, pp->gtime, pp->minflt, pp->majflt, pp->cutime, pp->cstime, pp->cgtime, pp->cminflt, pp->cmajflt);
         }
         else {
@@ -2705,13 +2705,13 @@ static int compar_pid(const void *pid1, const void *pid2) {
 #endif
 
 static inline int collect_data_for_pid(pid_t pid, void *ptr) {
-    if(unlikely(pid < 0 || pid > pid_max)) {
+    if(pid < 0 || pid > pid_max) {
         netdata_log_error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, 0, pid_max);
         return 0;
     }
 
     struct pid_stat *p = get_pid_entry(pid);
-    if(unlikely(!p || p->read)) return 0;
+    if(!p || p->read) return 0;
     p->read = true;
 
     // debug_log("Reading process %d (%s), sortlist %d", p->pid, p->comm, p->sortlist);
@@ -2719,12 +2719,12 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
     // --------------------------------------------------------------------
     // /proc/<pid>/stat
 
-    if(unlikely(!managed_log(p, PID_LOG_STAT, read_proc_pid_stat(p, ptr))))
+    if(!managed_log(p, PID_LOG_STAT, read_proc_pid_stat(p, ptr)))
         // there is no reason to proceed if we cannot get its status
         return 0;
 
     // check its parent pid
-    if(unlikely(p->ppid < 0 || p->ppid > pid_max)) {
+    if(p->ppid < 0 || p->ppid > pid_max) {
         netdata_log_error("Pid %d (command '%s') states invalid parent pid %d. Using 0.", pid, p->comm, p->ppid);
         p->ppid = 0;
     }
@@ -2737,7 +2737,7 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
     // --------------------------------------------------------------------
     // /proc/<pid>/status
 
-    if(unlikely(!managed_log(p, PID_LOG_STATUS, read_proc_pid_status(p, ptr))))
+    if(!managed_log(p, PID_LOG_STATUS, read_proc_pid_status(p, ptr)))
         // there is no reason to proceed if we cannot get its status
         return 0;
 
@@ -2752,7 +2752,7 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
     // --------------------------------------------------------------------
     // done!
 
-    if(unlikely(debug_enabled && include_exited_childs && all_pids_count && p->ppid && all_pids[p->ppid] && !all_pids[p->ppid]->read))
+    if(debug_enabled && include_exited_childs && all_pids_count && p->ppid && all_pids[p->ppid] && !all_pids[p->ppid]->read)
         debug_log("Read process %d (%s) sortlisted %d, but its parent %d (%s) sortlisted %d, is not read", p->pid, p->comm, p->sortlist, all_pids[p->ppid]->pid, all_pids[p->ppid]->comm, all_pids[p->ppid]->sortlist);
 
     // mark it as updated
@@ -2778,7 +2778,7 @@ static int collect_data_for_all_processes(void) {
     size_t new_procbase_size;
 
     int mib[3] = { CTL_KERN, KERN_PROC, KERN_PROC_PROC };
-    if (unlikely(sysctl(mib, 3, NULL, &new_procbase_size, NULL, 0))) {
+    if (sysctl(mib, 3, NULL, &new_procbase_size, NULL, 0)) {
         netdata_log_error("sysctl error: Can't get processes data size");
         return 0;
     }
@@ -2798,7 +2798,7 @@ static int collect_data_for_all_processes(void) {
     new_procbase_size = procbase_size;
 
     // get the processes from the system
-    if (unlikely(sysctl(mib, 3, procbase, &new_procbase_size, NULL, 0))) {
+    if (sysctl(mib, 3, procbase, &new_procbase_size, NULL, 0)) {
         netdata_log_error("sysctl error: Can't get processes data");
         return 0;
     }
@@ -2826,7 +2826,7 @@ static int collect_data_for_all_processes(void) {
         }
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
-        if(unlikely(slc != all_pids_count)) {
+        if(slc != all_pids_count) {
             netdata_log_error("Internal error: I was thinking I had %zu processes in my arrays, but it seems there are %zu.", all_pids_count, slc);
             all_pids_count = slc;
         }
@@ -2873,13 +2873,13 @@ static int collect_data_for_all_processes(void) {
     while((de = readdir(dir))) {
         char *endptr = de->d_name;
 
-        if(unlikely(de->d_type != DT_DIR || de->d_name[0] < '0' || de->d_name[0] > '9'))
+        if(de->d_type != DT_DIR || de->d_name[0] < '0' || de->d_name[0] > '9')
             continue;
 
         pid_t pid = (pid_t) strtoul(de->d_name, &endptr, 10);
 
         // make sure we read a valid number
-        if(unlikely(endptr == de->d_name || *endptr != '\0'))
+        if(endptr == de->d_name || *endptr != '\0')
             continue;
 
         collect_data_for_pid(pid, NULL);
@@ -2927,7 +2927,7 @@ static void cleanup_exited_pids(void) {
 
     for(p = root_of_pids; p ;) {
         if(!p->updated && (!p->keep || p->keeploops > 0)) {
-            if(unlikely(debug_enabled && (p->keep || p->keeploops)))
+            if(debug_enabled && (p->keep || p->keeploops))
                 debug_log(" > CLEANUP cannot keep exited process %d (%s) anymore - removing it.", p->pid, p->comm);
 
             for(c = 0; c < p->fds_size; c++)
@@ -2941,7 +2941,7 @@ static void cleanup_exited_pids(void) {
             del_pid_entry(r);
         }
         else {
-            if(unlikely(p->keep)) p->keeploops++;
+            if(p->keep) p->keeploops++;
             p->keep = false;
             p = p->next;
         }
@@ -2955,14 +2955,14 @@ static void apply_apps_groups_targets_inheritance(void) {
     // inherit their target from their parent
     int found = 1, loops = 0;
     while(found) {
-        if(unlikely(debug_enabled)) loops++;
+        if(debug_enabled) loops++;
         found = 0;
         for(p = root_of_pids; p ; p = p->next) {
             // if this process does not have a target,
             // and it has a parent
             // and its parent has a target
             // then, set the parent's target to this process
-            if(unlikely(!p->target && p->parent && p->parent->target)) {
+            if(!p->target && p->parent && p->parent->target) {
                 p->target = p->parent->target;
                 found++;
 
@@ -2977,14 +2977,14 @@ static void apply_apps_groups_targets_inheritance(void) {
     int sortlist = 1;
     found = 1;
     while(found) {
-        if(unlikely(debug_enabled)) loops++;
+        if(debug_enabled) loops++;
         found = 0;
 
         for(p = root_of_pids; p ; p = p->next) {
-            if(unlikely(!p->sortlist && !p->children_count))
+            if(!p->sortlist && !p->children_count)
                 p->sortlist = sortlist++;
 
-            if(unlikely(
+            if(
                     !p->children_count            // if this process does not have any children
                     && !p->merged                 // and is not already merged
                     && p->parent                  // and has a parent
@@ -2993,13 +2993,13 @@ static void apply_apps_groups_targets_inheritance(void) {
                                                   // or the parent does not have a target
                     && (p->target == p->parent->target || !p->parent->target)
                     && p->ppid != INIT_PID        // and its parent is not init
-                )) {
+                ) {
                 // mark it as merged
                 p->parent->children_count--;
                 p->merged = true;
 
                 // the parent inherits the child's target, if it does not have a target itself
-                if(unlikely(p->target && !p->parent->target)) {
+                if(p->target && !p->parent->target) {
                     p->parent->target = p->target;
 
                     if(debug_enabled || (p->target && p->target->debug_enabled))
@@ -3022,15 +3022,15 @@ static void apply_apps_groups_targets_inheritance(void) {
         all_pids[0]->target = apps_groups_default_target;
 
     // give a default target on all top level processes
-    if(unlikely(debug_enabled)) loops++;
+    if(debug_enabled) loops++;
     for(p = root_of_pids; p ; p = p->next) {
         // if the process is not merged itself
         // then it is a top level process
-        if(unlikely(!p->merged && !p->target))
+        if(!p->merged && !p->target)
             p->target = apps_groups_default_target;
 
         // make sure all processes have a sortlist
-        if(unlikely(!p->sortlist))
+        if(!p->sortlist)
             p->sortlist = sortlist++;
     }
 
@@ -3040,10 +3040,10 @@ static void apply_apps_groups_targets_inheritance(void) {
     // give a target to all merged child processes
     found = 1;
     while(found) {
-        if(unlikely(debug_enabled)) loops++;
+        if(debug_enabled) loops++;
         found = 0;
         for(p = root_of_pids; p ; p = p->next) {
-            if(unlikely(!p->target && p->merged && p->parent && p->parent->target)) {
+            if(!p->target && p->merged && p->parent && p->parent->target) {
                 p->target = p->parent->target;
                 found++;
 
@@ -3115,7 +3115,7 @@ static size_t zero_all_targets(struct target *root) {
         w->uptime_sum = 0;
         w->uptime_max = 0;
 
-        if(unlikely(w->root_pid)) {
+        if(w->root_pid) {
             struct pid_on_target *pid_on_target_to_free, *pid_on_target = w->root_pid;
 
             while(pid_on_target) {
@@ -3132,10 +3132,10 @@ static size_t zero_all_targets(struct target *root) {
 }
 
 static inline void reallocate_target_fds(struct target *w) {
-    if(unlikely(!w))
+    if(!w)
         return;
 
-    if(unlikely(!w->target_fds || w->target_fds_size < all_files_size)) {
+    if(!w->target_fds || w->target_fds_size < all_files_size) {
         w->target_fds = reallocz(w->target_fds, sizeof(int) * all_files_size);
         memset(&w->target_fds[w->target_fds_size], 0, sizeof(int) * (all_files_size - w->target_fds_size));
         w->target_fds_size = all_files_size;
@@ -3183,10 +3183,10 @@ static void aggregage_fd_type_on_openfds(FD_FILETYPE type, struct openfds *openf
 }
 
 static inline void aggregate_fd_on_target(int fd, struct target *w) {
-    if(unlikely(!w))
+    if(!w)
         return;
 
-    if(unlikely(w->target_fds[fd])) {
+    if(w->target_fds[fd]) {
         // it is already aggregated
         // just increase its usage counter
         w->target_fds[fd]++;
@@ -3202,7 +3202,7 @@ static inline void aggregate_fd_on_target(int fd, struct target *w) {
 
 static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
 
-    if(unlikely(!p->updated)) {
+    if(!p->updated) {
         // the process is not running
         return;
     }
@@ -3229,7 +3229,7 @@ static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
     for(c = 0; c < size ;c++) {
         int fd = fds[c].fd;
 
-        if(likely(fd <= 0 || fd >= all_files_size))
+        if(fd <= 0 || fd >= all_files_size)
             continue;
 
         currentfds++;
@@ -3244,12 +3244,12 @@ static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
 static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o) {
     (void)o;
 
-    if(unlikely(!p->updated)) {
+    if(!p->updated) {
         // the process is not running
         return;
     }
 
-    if(unlikely(!w)) {
+    if(!w) {
         netdata_log_error("pid %d %s was left without a target!", p->pid, p->comm);
         return;
     }
@@ -3296,7 +3296,7 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
     w->uptime_sum += p->uptime;
     if(!w->uptime_max || w->uptime_max < p->uptime) w->uptime_max = p->uptime;
 
-    if(unlikely(debug_enabled || w->debug_enabled)) {
+    if(debug_enabled || w->debug_enabled) {
         debug_log_int("aggregating '%s' pid %d on target '%s' utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", gtime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", cgtime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT "", p->comm, p->pid, w->name, p->utime, p->stime, p->gtime, p->cutime, p->cstime, p->cgtime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
 
         struct pid_on_target *pid_on_target = mallocz(sizeof(struct pid_on_target));
@@ -3344,10 +3344,10 @@ static void calculate_netdata_statistics(void) {
         // user target
 
         o = p->user_target;
-        if(likely(p->user_target && p->user_target->uid == p->uid))
+        if(p->user_target && p->user_target->uid == p->uid)
             w = p->user_target;
         else {
-            if(unlikely(debug_enabled && p->user_target))
+            if(debug_enabled && p->user_target)
                 debug_log("pid %d (%s) switched user from %u (%s) to %u.", p->pid, p->comm, p->user_target->uid, p->user_target->name, p->uid);
 
             w = p->user_target = get_users_target(p->uid);
@@ -3360,10 +3360,10 @@ static void calculate_netdata_statistics(void) {
         // user group target
 
         o = p->group_target;
-        if(likely(p->group_target && p->group_target->gid == p->gid))
+        if(p->group_target && p->group_target->gid == p->gid)
             w = p->group_target;
         else {
-            if(unlikely(debug_enabled && p->group_target))
+            if(debug_enabled && p->group_target)
                 debug_log("pid %d (%s) switched group from %u (%s) to %u.", p->pid, p->comm, p->group_target->gid, p->group_target->name, p->gid);
 
             w = p->group_target = get_groups_target(p->gid);
@@ -3430,7 +3430,7 @@ void send_resource_usage_to_netdata(usec_t dt) {
     }
 
     static char created_charts = 0;
-    if(unlikely(!created_charts)) {
+    if(!created_charts) {
         created_charts = 1;
 
         fprintf(stdout,
@@ -3696,21 +3696,21 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 
     send_BEGIN(type, "cpu", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
+        if(w->exposed && w->processes)
             send_SET(w->name, (kernel_uint_t)(w->utime * utime_fix_ratio) + (kernel_uint_t)(w->stime * stime_fix_ratio) + (kernel_uint_t)(w->gtime * gtime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cutime * cutime_fix_ratio) + (kernel_uint_t)(w->cstime * cstime_fix_ratio) + (kernel_uint_t)(w->cgtime * cgtime_fix_ratio)):0ULL));
     }
     send_END();
 
     send_BEGIN(type, "cpu_user", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
+        if(w->exposed && w->processes)
             send_SET(w->name, (kernel_uint_t)(w->utime * utime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cutime * cutime_fix_ratio)):0ULL));
     }
     send_END();
 
     send_BEGIN(type, "cpu_system", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
+        if(w->exposed && w->processes)
             send_SET(w->name, (kernel_uint_t)(w->stime * stime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cstime * cstime_fix_ratio)):0ULL));
     }
     send_END();
@@ -3718,7 +3718,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     if(show_guest_time) {
         send_BEGIN(type, "cpu_guest", dt);
         for (w = root; w ; w = w->next) {
-            if(unlikely(w->exposed && w->processes))
+            if(w->exposed && w->processes)
                 send_SET(w->name, (kernel_uint_t)(w->gtime * gtime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cgtime * cgtime_fix_ratio)):0ULL));
         }
         send_END();
@@ -3727,14 +3727,14 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 #ifndef __FreeBSD__
     send_BEGIN(type, "voluntary_ctxt_switches", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
+        if(w->exposed && w->processes)
             send_SET(w->name, w->status_voluntary_ctxt_switches);
     }
     send_END();
 
     send_BEGIN(type, "involuntary_ctxt_switches", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
+        if(w->exposed && w->processes)
             send_SET(w->name, w->status_nonvoluntary_ctxt_switches);
     }
     send_END();
@@ -3742,14 +3742,14 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 
     send_BEGIN(type, "threads", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(w->exposed)
             send_SET(w->name, w->num_threads);
     }
     send_END();
 
     send_BEGIN(type, "processes", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(w->exposed)
             send_SET(w->name, w->processes);
     }
     send_END();
@@ -3757,7 +3757,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 #ifndef __FreeBSD__
     send_BEGIN(type, "uptime", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
+        if(w->exposed && w->processes)
             send_SET(w->name, (global_uptime > w->starttime)?(global_uptime - w->starttime):0);
     }
     send_END();
@@ -3765,21 +3765,21 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     if (enable_detailed_uptime_charts) {
         send_BEGIN(type, "uptime_min", dt);
         for (w = root; w ; w = w->next) {
-            if(unlikely(w->exposed && w->processes))
+            if(w->exposed && w->processes)
                 send_SET(w->name, w->uptime_min);
         }
         send_END();
 
         send_BEGIN(type, "uptime_avg", dt);
         for (w = root; w ; w = w->next) {
-            if(unlikely(w->exposed && w->processes))
+            if(w->exposed && w->processes)
                 send_SET(w->name, w->uptime_sum / w->processes);
         }
         send_END();
 
         send_BEGIN(type, "uptime_max", dt);
         for (w = root; w ; w = w->next) {
-            if(unlikely(w->exposed && w->processes))
+            if(w->exposed && w->processes)
                 send_SET(w->name, w->uptime_max);
         }
         send_END();
@@ -3788,21 +3788,21 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 
     send_BEGIN(type, "mem", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
+        if(w->exposed && w->processes)
             send_SET(w->name, (w->status_vmrss > w->status_vmshared)?(w->status_vmrss - w->status_vmshared):0ULL);
     }
     send_END();
 
     send_BEGIN(type, "rss", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
+        if(w->exposed && w->processes)
             send_SET(w->name, w->status_vmrss);
     }
     send_END();
 
     send_BEGIN(type, "vmem", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
+        if(w->exposed && w->processes)
             send_SET(w->name, w->status_vmsize);
     }
     send_END();
@@ -3810,7 +3810,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 #ifndef __FreeBSD__
     send_BEGIN(type, "swap", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
+        if(w->exposed && w->processes)
             send_SET(w->name, w->status_vmswap);
     }
     send_END();
@@ -3818,14 +3818,14 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 
     send_BEGIN(type, "minor_faults", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
+        if(w->exposed && w->processes)
             send_SET(w->name, (kernel_uint_t)(w->minflt * minflt_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cminflt * cminflt_fix_ratio)):0ULL));
     }
     send_END();
 
     send_BEGIN(type, "major_faults", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
+        if(w->exposed && w->processes)
             send_SET(w->name, (kernel_uint_t)(w->majflt * majflt_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cmajflt * cmajflt_fix_ratio)):0ULL));
     }
     send_END();
@@ -3833,14 +3833,14 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 #ifndef __FreeBSD__
     send_BEGIN(type, "lreads", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
+        if(w->exposed && w->processes)
             send_SET(w->name, w->io_logical_bytes_read);
     }
     send_END();
 
     send_BEGIN(type, "lwrites", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
+        if(w->exposed && w->processes)
             send_SET(w->name, w->io_logical_bytes_written);
     }
     send_END();
@@ -3848,14 +3848,14 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 
     send_BEGIN(type, "preads", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
+        if(w->exposed && w->processes)
             send_SET(w->name, w->io_storage_bytes_read);
     }
     send_END();
 
     send_BEGIN(type, "pwrites", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
+        if(w->exposed && w->processes)
             send_SET(w->name, w->io_storage_bytes_written);
     }
     send_END();
@@ -3863,77 +3863,77 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     if(enable_file_charts) {
         send_BEGIN(type, "fds_open_limit", dt);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes))
+            if (w->exposed && w->processes)
                 send_SET(w->name, w->max_open_files_percent * 100.0);
         }
         send_END();
 
         send_BEGIN(type, "fds_open", dt);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes))
+            if (w->exposed && w->processes)
                 send_SET(w->name, pid_openfds_sum(w));
         }
         send_END();
 
         send_BEGIN(type, "fds_files", dt);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes))
+            if (w->exposed && w->processes)
                 send_SET(w->name, w->openfds.files);
         }
         send_END();
 
         send_BEGIN(type, "fds_sockets", dt);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes))
+            if (w->exposed && w->processes)
                 send_SET(w->name, w->openfds.sockets);
         }
         send_END();
 
         send_BEGIN(type, "fds_pipes", dt);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes))
+            if (w->exposed && w->processes)
                 send_SET(w->name, w->openfds.pipes);
         }
         send_END();
 
         send_BEGIN(type, "fds_inotifies", dt);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes))
+            if (w->exposed && w->processes)
                 send_SET(w->name, w->openfds.inotifies);
         }
         send_END();
 
         send_BEGIN(type, "fds_eventfds", dt);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes))
+            if (w->exposed && w->processes)
                 send_SET(w->name, w->openfds.eventfds);
         }
         send_END();
 
         send_BEGIN(type, "fds_timerfds", dt);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes))
+            if (w->exposed && w->processes)
                 send_SET(w->name, w->openfds.timerfds);
         }
         send_END();
 
         send_BEGIN(type, "fds_signalfds", dt);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes))
+            if (w->exposed && w->processes)
                 send_SET(w->name, w->openfds.signalfds);
         }
         send_END();
 
         send_BEGIN(type, "fds_eventpolls", dt);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes))
+            if (w->exposed && w->processes)
                 send_SET(w->name, w->openfds.eventpolls);
         }
         send_END();
 
         send_BEGIN(type, "fds_other", dt);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes))
+            if (w->exposed && w->processes)
                 send_SET(w->name, w->openfds.other);
         }
         send_END();
@@ -3952,7 +3952,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     for(w = root ; w ; w = w->next) {
         if (w->target) continue;
 
-        if(unlikely(w->processes && (debug_enabled || w->debug_enabled))) {
+        if(w->processes && (debug_enabled || w->debug_enabled)) {
             struct pid_on_target *pid_on_target;
 
             fprintf(stderr, "apps.plugin: target '%s' has aggregated %u process%s:", w->name, w->processes, (w->processes == 1)?"":"es");
@@ -3979,42 +3979,42 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     // update the charts
     fprintf(stdout, "CHART %s.cpu '' '%s CPU Time (100%% = 1 core)' 'percentage' cpu %s.cpu stacked 20001 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(w->exposed)
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu %s\n", w->name, time_factor * RATES_DETAIL / 100, w->hidden ? "hidden" : "");
     }
     APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.mem '' '%s Real Memory (w/o shared)' 'MiB' mem %s.mem stacked 20003 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(w->exposed)
             fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, 1L, 1024L);
     }
     APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.rss '' '%s Resident Set Size (w/shared)' 'MiB' mem %s.rss stacked 20004 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(w->exposed)
             fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, 1L, 1024L);
     }
     APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.vmem '' '%s Virtual Memory Size' 'MiB' mem %s.vmem stacked 20005 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(w->exposed)
             fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, 1L, 1024L);
     }
     APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.threads '' '%s Threads' 'threads' processes %s.threads stacked 20006 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(w->exposed)
             fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
     }
     APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.processes '' '%s Processes' 'processes' processes %s.processes stacked 20007 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(w->exposed)
             fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
     }
     APPS_PLUGIN_FUNCTIONS();
@@ -4022,7 +4022,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
 #ifndef __FreeBSD__
     fprintf(stdout, "CHART %s.uptime '' '%s Carried Over Uptime' 'seconds' processes %s.uptime line 20008 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(w->exposed)
             fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
     }
     APPS_PLUGIN_FUNCTIONS();
@@ -4030,21 +4030,21 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     if (enable_detailed_uptime_charts) {
         fprintf(stdout, "CHART %s.uptime_min '' '%s Minimum Uptime' 'seconds' processes %s.uptime_min line 20009 %d\n", type, title, type, update_every);
         for (w = root; w ; w = w->next) {
-            if(unlikely(w->exposed))
+            if(w->exposed)
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
         APPS_PLUGIN_FUNCTIONS();
 
         fprintf(stdout, "CHART %s.uptime_avg '' '%s Average Uptime' 'seconds' processes %s.uptime_avg line 20010 %d\n", type, title, type, update_every);
         for (w = root; w ; w = w->next) {
-            if(unlikely(w->exposed))
+            if(w->exposed)
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
         APPS_PLUGIN_FUNCTIONS();
 
         fprintf(stdout, "CHART %s.uptime_max '' '%s Maximum Uptime' 'seconds' processes %s.uptime_max line 20011 %d\n", type, title, type, update_every);
         for (w = root; w ; w = w->next) {
-            if(unlikely(w->exposed))
+            if(w->exposed)
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
         APPS_PLUGIN_FUNCTIONS();
@@ -4053,14 +4053,14 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
 
     fprintf(stdout, "CHART %s.cpu_user '' '%s CPU User Time (100%% = 1 core)' 'percentage' cpu %s.cpu_user stacked 20020 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(w->exposed)
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, time_factor * RATES_DETAIL / 100LLU);
     }
     APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.cpu_system '' '%s CPU System Time (100%% = 1 core)' 'percentage' cpu %s.cpu_system stacked 20021 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(w->exposed)
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, time_factor * RATES_DETAIL / 100LLU);
     }
     APPS_PLUGIN_FUNCTIONS();
@@ -4068,7 +4068,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     if(show_guest_time) {
         fprintf(stdout, "CHART %s.cpu_guest '' '%s CPU Guest Time (100%% = 1 core)' 'percentage' cpu %s.cpu_guest stacked 20022 %d\n", type, title, type, update_every);
         for (w = root; w; w = w->next) {
-            if(unlikely(w->exposed))
+            if(w->exposed)
                 fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, time_factor * RATES_DETAIL / 100LLU);
         }
         APPS_PLUGIN_FUNCTIONS();
@@ -4077,14 +4077,14 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
 #ifndef __FreeBSD__
     fprintf(stdout, "CHART %s.voluntary_ctxt_switches '' '%s Voluntary Context Switches' 'switches/s' cpu %s.voluntary_ctxt_switches stacked 20023 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(w->exposed)
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
     }
     APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.involuntary_ctxt_switches '' '%s Involuntary Context Switches' 'switches/s' cpu %s.involuntary_ctxt_switches stacked 20024 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(w->exposed)
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
     }
     APPS_PLUGIN_FUNCTIONS();
@@ -4093,7 +4093,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
 #ifndef __FreeBSD__
     fprintf(stdout, "CHART %s.swap '' '%s Swap Memory' 'MiB' swap %s.swap stacked 20011 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(w->exposed)
             fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, 1L, 1024L);
     }
     APPS_PLUGIN_FUNCTIONS();
@@ -4101,14 +4101,14 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
 
     fprintf(stdout, "CHART %s.major_faults '' '%s Major Page Faults (swap read)' 'page faults/s' swap %s.major_faults stacked 20012 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(w->exposed)
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
     }
     APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.minor_faults '' '%s Minor Page Faults' 'page faults/s' mem %s.minor_faults stacked 20011 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(w->exposed)
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
     }
     APPS_PLUGIN_FUNCTIONS();
@@ -4117,42 +4117,42 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     // FIXME: same metric name as in Linux but different units.
     fprintf(stdout, "CHART %s.preads '' '%s Disk Reads' 'blocks/s' disk %s.preads stacked 20002 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(w->exposed)
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
     }
     APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.pwrites '' '%s Disk Writes' 'blocks/s' disk %s.pwrites stacked 20002 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(w->exposed)
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
     }
     APPS_PLUGIN_FUNCTIONS();
 #else
     fprintf(stdout, "CHART %s.preads '' '%s Disk Reads' 'KiB/s' disk %s.preads stacked 20002 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(w->exposed)
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
     }
     APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.pwrites '' '%s Disk Writes' 'KiB/s' disk %s.pwrites stacked 20002 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(w->exposed)
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
     }
     APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.lreads '' '%s Disk Logical Reads' 'KiB/s' disk %s.lreads stacked 20042 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(w->exposed)
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
     }
     APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.lwrites '' '%s I/O Logical Writes' 'KiB/s' disk %s.lwrites stacked 20042 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(w->exposed)
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
     }
     APPS_PLUGIN_FUNCTIONS();
@@ -4162,7 +4162,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         fprintf(stdout, "CHART %s.fds_open_limit '' '%s Open File Descriptors Limit' '%%' fds %s.fds_open_limit line 20050 %d\n", type,
                 title, type, update_every);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
+            if (w->exposed)
                 fprintf(stdout, "DIMENSION %s '' absolute 1 100\n", w->name);
         }
         APPS_PLUGIN_FUNCTIONS();
@@ -4170,7 +4170,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         fprintf(stdout, "CHART %s.fds_open '' '%s Open File Descriptors' 'fds' fds %s.fds_open stacked 20051 %d\n", type,
                 title, type, update_every);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
+            if (w->exposed)
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
         APPS_PLUGIN_FUNCTIONS();
@@ -4178,7 +4178,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         fprintf(stdout, "CHART %s.fds_files '' '%s Open Files' 'fds' fds %s.fds_files stacked 20052 %d\n", type,
                        title, type, update_every);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
+            if (w->exposed)
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
         APPS_PLUGIN_FUNCTIONS();
@@ -4186,7 +4186,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         fprintf(stdout, "CHART %s.fds_sockets '' '%s Open Sockets' 'fds' fds %s.fds_sockets stacked 20053 %d\n",
                        type, title, type, update_every);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
+            if (w->exposed)
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
         APPS_PLUGIN_FUNCTIONS();
@@ -4194,7 +4194,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         fprintf(stdout, "CHART %s.fds_pipes '' '%s Pipes' 'fds' fds %s.fds_pipes stacked 20054 %d\n", type,
                        title, type, update_every);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
+            if (w->exposed)
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
         APPS_PLUGIN_FUNCTIONS();
@@ -4202,7 +4202,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         fprintf(stdout, "CHART %s.fds_inotifies '' '%s iNotify File Descriptors' 'fds' fds %s.fds_inotifies stacked 20055 %d\n", type,
                 title, type, update_every);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
+            if (w->exposed)
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
         APPS_PLUGIN_FUNCTIONS();
@@ -4210,7 +4210,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         fprintf(stdout, "CHART %s.fds_eventfds '' '%s Event File Descriptors' 'fds' fds %s.fds_eventfds stacked 20056 %d\n", type,
                 title, type, update_every);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
+            if (w->exposed)
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
         APPS_PLUGIN_FUNCTIONS();
@@ -4218,7 +4218,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         fprintf(stdout, "CHART %s.fds_timerfds '' '%s Timer File Descriptors' 'fds' fds %s.fds_timerfds stacked 20057 %d\n", type,
                 title, type, update_every);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
+            if (w->exposed)
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
         APPS_PLUGIN_FUNCTIONS();
@@ -4226,7 +4226,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         fprintf(stdout, "CHART %s.fds_signalfds '' '%s Signal File Descriptors' 'fds' fds %s.fds_signalfds stacked 20058 %d\n", type,
                 title, type, update_every);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
+            if (w->exposed)
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
         APPS_PLUGIN_FUNCTIONS();
@@ -4234,7 +4234,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         fprintf(stdout, "CHART %s.fds_eventpolls '' '%s Event Poll File Descriptors' 'fds' fds %s.fds_eventpolls stacked 20059 %d\n", type,
                 title, type, update_every);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
+            if (w->exposed)
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
         APPS_PLUGIN_FUNCTIONS();
@@ -4242,7 +4242,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         fprintf(stdout, "CHART %s.fds_other '' '%s Other File Descriptors' 'fds' fds %s.fds_other stacked 20060 %d\n", type,
                 title, type, update_every);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
+            if (w->exposed)
                 fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
         APPS_PLUGIN_FUNCTIONS();
@@ -5668,7 +5668,7 @@ int main(int argc, char **argv) {
 #warning "compiling for profiling"
         static int profiling_count=0;
         profiling_count++;
-        if(unlikely(profiling_count > 2000)) exit(0);
+        if(profiling_count > 2000) exit(0);
         usec_t dt = update_every * USEC_PER_SEC;
 #else
         usec_t dt = heartbeat_next(&hb, step);
@@ -5676,12 +5676,12 @@ int main(int argc, char **argv) {
         netdata_mutex_lock(&mutex);
 
         struct pollfd pollfd = { .fd = fileno(stdout), .events = POLLERR };
-        if (unlikely(poll(&pollfd, 1, 0) < 0)) {
+        if (poll(&pollfd, 1, 0) < 0) {
             netdata_mutex_unlock(&mutex);
             netdata_thread_cancel(reader_thread);
             fatal("Cannot check if a pipe is available");
         }
-        if (unlikely(pollfd.revents & POLLERR)) {
+        if (pollfd.revents & POLLERR) {
             netdata_mutex_unlock(&mutex);
             netdata_thread_cancel(reader_thread);
             fatal("Received error on read pipe.");
@@ -5710,18 +5710,18 @@ int main(int argc, char **argv) {
 
         // this is smart enough to show only newly added apps, when needed
         send_charts_updates_to_netdata(apps_groups_root_target, "apps", "Apps");
-        if(likely(enable_users_charts))
+        if(enable_users_charts)
             send_charts_updates_to_netdata(users_root_target, "users", "Users");
 
-        if(likely(enable_groups_charts))
+        if(enable_groups_charts)
             send_charts_updates_to_netdata(groups_root_target, "groups", "User Groups");
 
         send_collected_data_to_netdata(apps_groups_root_target, "apps", dt);
 
-        if(likely(enable_users_charts))
+        if(enable_users_charts)
             send_collected_data_to_netdata(users_root_target, "users", dt);
 
-        if(likely(enable_groups_charts))
+        if(enable_groups_charts)
             send_collected_data_to_netdata(groups_root_target, "groups", dt);
 
         fflush(stdout);

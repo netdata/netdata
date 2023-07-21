@@ -174,7 +174,7 @@ static int wait_till_agent_claimed(void)
 {
     //TODO prevent malloc and freez
     char *agent_id = get_agent_claimid();
-    while (likely(!agent_id)) {
+    while (!agent_id) {
         sleep_usec(USEC_PER_SEC * 1);
         if (!service_running(SERVICE_ACLK))
             return 1;
@@ -260,12 +260,12 @@ static void msg_callback(const char *topic, const void *msg, size_t msglen, int 
     }
 
     const char *msgtype = strrchr(topic, '/');
-    if (unlikely(!msgtype)) {
+    if (!msgtype) {
         error_report("Cannot get message type from topic. Ignoring message from topic \"%s\"", topic);
         return;
     }
     msgtype++;
-    if (unlikely(!*msgtype)) {
+    if (!*msgtype) {
         error_report("Message type empty. Ignoring message from topic \"%s\"", topic);
         return;
     }
@@ -850,7 +850,7 @@ void *aclk_main(void *ptr)
         if (aclk_attempt_to_connect(mqttwss_client))
             goto exit_full;
 
-        if (unlikely(!query_threads.thread_list))
+        if (!query_threads.thread_list)
             aclk_query_threads_start(&query_threads, mqttwss_client);
 
         if (handle_connection(mqttwss_client)) {
@@ -959,7 +959,7 @@ void aclk_send_node_instances()
 {
     struct node_instance_list *list_head = get_node_list();
     struct node_instance_list *list = list_head;
-    if (unlikely(!list)) {
+    if (!list) {
         error_report("Failure to get_node_list from DB!");
         return;
     }
@@ -979,7 +979,7 @@ void aclk_send_node_instances()
             uuid_unparse_lower(list->host_id, host_id);
 
             RRDHOST *host = rrdhost_find_by_guid(host_id);
-            if (unlikely(!host)) {
+            if (!host) {
                 freez((void*)node_state_update.node_id);
                 freez(query);
                 continue;
@@ -1323,6 +1323,6 @@ void add_aclk_host_labels(void) {
 void aclk_queue_node_info(RRDHOST *host, bool immediate)
 {
     struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *) host->aclk_sync_host_config;
-    if (likely(wc))
+    if (wc)
         wc->node_info_send_time = (host == localhost || immediate) ? 1 : now_realtime_sec();
 }

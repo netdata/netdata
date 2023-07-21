@@ -13,27 +13,27 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
     static int do_cookies = -1, do_syns = -1, do_reopened = -1;
     static procfile *ff = NULL;
 
-    if(unlikely(do_cookies == -1)) {
+    if(do_cookies == -1) {
         do_cookies  = config_get_boolean_ondemand("plugin:proc:/proc/net/stat/synproxy", "SYNPROXY cookies", CONFIG_BOOLEAN_AUTO);
         do_syns     = config_get_boolean_ondemand("plugin:proc:/proc/net/stat/synproxy", "SYNPROXY SYN received", CONFIG_BOOLEAN_AUTO);
         do_reopened = config_get_boolean_ondemand("plugin:proc:/proc/net/stat/synproxy", "SYNPROXY connections reopened", CONFIG_BOOLEAN_AUTO);
     }
 
-    if(unlikely(!ff)) {
+    if(!ff) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/stat/synproxy");
         ff = procfile_open(config_get("plugin:proc:/proc/net/stat/synproxy", "filename to monitor", filename), " \t,:|", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff))
+        if(!ff)
             return 1;
     }
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff))
+    if(!ff)
         return 0; // we return 0, so that we will retry to open it next time
 
     // make sure we have 3 lines
     size_t lines = procfile_lines(ff), l;
-    if(unlikely(lines < 2)) {
+    if(lines < 2) {
         collector_error("/proc/net/stat/synproxy has %zu lines, expected no less than 2. Disabling it.", lines);
         return 1;
     }
@@ -43,7 +43,7 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
     // synproxy gives its values per CPU
     for(l = 1; l < lines ;l++) {
         size_t words = procfile_linewords(ff, l);
-        if(unlikely(words < 6))
+        if(words < 6)
             continue;
 
         syn_received    += strtoull(procfile_lineword(ff, l, 1), NULL, 16);
@@ -62,7 +62,7 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
         do_syns = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st = NULL;
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_STAT_NETFILTER
                     , RRD_TYPE_NET_STAT_SYNPROXY "_syn_received"
@@ -92,7 +92,7 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
         do_reopened = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st = NULL;
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_STAT_NETFILTER
                     , RRD_TYPE_NET_STAT_SYNPROXY "_conn_reopened"
@@ -122,7 +122,7 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
         do_cookies = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st = NULL;
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_STAT_NETFILTER
                     , RRD_TYPE_NET_STAT_SYNPROXY "_cookies"

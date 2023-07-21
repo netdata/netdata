@@ -167,14 +167,14 @@ void rrdcontext_host_child_disconnected(RRDHOST *host) {
 }
 
 int rrdcontext_foreach_instance_with_rrdset_in_context(RRDHOST *host, const char *context, int (*callback)(RRDSET *st, void *data), void *data) {
-    if(unlikely(!host || !context || !*context || !callback))
+    if(!host || !context || !*context || !callback)
         return -1;
 
     RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdctx.contexts, context);
-    if(unlikely(!rca)) return -1;
+    if(!rca) return -1;
 
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
-    if(unlikely(!rc)) return -1;
+    if(!rc) return -1;
 
     int ret = 0;
     RRDINSTANCE *ri;
@@ -314,7 +314,7 @@ void rrdcontext_hub_stop_streaming_command(void *ptr) {
 }
 
 bool rrdcontext_retention_match(RRDCONTEXT_ACQUIRED *rca, time_t after, time_t before) {
-    if(unlikely(!rca)) return false;
+    if(!rca) return false;
 
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
 

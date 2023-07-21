@@ -228,17 +228,17 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     static int do_rc = -1, do_fh = -1, do_io = -1, do_th = -1, do_net = -1, do_rpc = -1, do_proc2 = -1, do_proc3 = -1, do_proc4 = -1, do_proc4ops = -1;
     static int proc2_warning = 0, proc3_warning = 0, proc4_warning = 0, proc4ops_warning = 0;
 
-    if(unlikely(!ff)) {
+    if(!ff) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/rpc/nfsd");
         ff = procfile_open(config_get("plugin:proc:/proc/net/rpc/nfsd", "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff)) return 1;
+        if(!ff) return 1;
     }
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
+    if(!ff) return 0; // we return 0, so that we will retry to open it next time
 
-    if(unlikely(do_rc == -1)) {
+    if(do_rc == -1) {
         do_rc = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "read cache", 1);
         do_fh = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "file handles", 1);
         do_io = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "I/O", 1);
@@ -276,12 +276,12 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
     for(l = 0; l < lines ;l++) {
         size_t words = procfile_linewords(ff, l);
-        if(unlikely(!words)) continue;
+        if(!words) continue;
 
         type = procfile_lineword(ff, l, 0);
 
         if(do_rc == 1 && strcmp(type, "rc") == 0) {
-            if(unlikely(words < 4)) {
+            if(words < 4) {
                 collector_error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 4);
                 continue;
             }
@@ -295,7 +295,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             else do_rc = 2;
         }
         else if(do_fh == 1 && strcmp(type, "fh") == 0) {
-            if(unlikely(words < 6)) {
+            if(words < 6) {
                 collector_error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 6);
                 continue;
             }
@@ -308,7 +308,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             else do_fh = 2;
         }
         else if(do_io == 1 && strcmp(type, "io") == 0) {
-            if(unlikely(words < 3)) {
+            if(words < 3) {
                 collector_error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 3);
                 continue;
             }
@@ -321,7 +321,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             else do_io = 2;
         }
         else if(do_th == 1 && strcmp(type, "th") == 0) {
-            if(unlikely(words < 13)) {
+            if(words < 13) {
                 collector_error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 13);
                 continue;
             }
@@ -334,7 +334,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             do_th = 2;
         }
         else if(do_net == 1 && strcmp(type, "net") == 0) {
-            if(unlikely(words < 5)) {
+            if(words < 5) {
                 collector_error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 5);
                 continue;
             }
@@ -349,7 +349,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             else do_net = 2;
         }
         else if(do_rpc == 1 && strcmp(type, "rpc") == 0) {
-            if(unlikely(words < 6)) {
+            if(words < 6) {
                 collector_error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 6);
                 continue;
             }
@@ -455,7 +455,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                       *rd_misses  = NULL,
                       *rd_nocache = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "nfsd"
                     , "readcache"
@@ -486,7 +486,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_stale                 = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "nfsd"
                     , "filehandles"
@@ -515,7 +515,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         static RRDDIM *rd_read  = NULL,
                       *rd_write = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "nfsd"
                     , "io"
@@ -544,7 +544,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_threads = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "nfsd"
                     , "threads"
@@ -572,7 +572,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         static RRDDIM *rd_udp = NULL,
                       *rd_tcp = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "nfsd"
                     , "net"
@@ -608,7 +608,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                       *rd_bad_format = NULL,
                       *rd_bad_auth   = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "nfsd"
                     , "rpc"
@@ -641,7 +641,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
     if(do_proc2 == 2) {
         static RRDSET *st = NULL;
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "nfsd"
                     , "proc2"
@@ -660,7 +660,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
         size_t i;
         for(i = 0; nfsd_proc2_values[i].present ; i++) {
-            if(unlikely(!nfsd_proc2_values[i].rd))
+            if(!nfsd_proc2_values[i].rd)
                 nfsd_proc2_values[i].rd = rrddim_add(st, nfsd_proc2_values[i].name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st, nfsd_proc2_values[i].rd, nfsd_proc2_values[i].value);
@@ -671,7 +671,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
     if(do_proc3 == 2) {
         static RRDSET *st = NULL;
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "nfsd"
                     , "proc3"
@@ -690,7 +690,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
         size_t i;
         for(i = 0; nfsd_proc3_values[i].present ; i++) {
-            if(unlikely(!nfsd_proc3_values[i].rd))
+            if(!nfsd_proc3_values[i].rd)
                 nfsd_proc3_values[i].rd = rrddim_add(st, nfsd_proc3_values[i].name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st, nfsd_proc3_values[i].rd, nfsd_proc3_values[i].value);
@@ -701,7 +701,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
     if(do_proc4 == 2) {
         static RRDSET *st = NULL;
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "nfsd"
                     , "proc4"
@@ -720,7 +720,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
         size_t i;
         for(i = 0; nfsd_proc4_values[i].present ; i++) {
-            if(unlikely(!nfsd_proc4_values[i].rd))
+            if(!nfsd_proc4_values[i].rd)
                 nfsd_proc4_values[i].rd = rrddim_add(st, nfsd_proc4_values[i].name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st, nfsd_proc4_values[i].rd, nfsd_proc4_values[i].value);
@@ -731,7 +731,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
     if(do_proc4ops == 2) {
         static RRDSET *st = NULL;
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "nfsd"
                     , "proc4ops"
@@ -750,7 +750,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
         size_t i;
         for(i = 0; nfsd4_ops_values[i].present ; i++) {
-            if(unlikely(!nfsd4_ops_values[i].rd))
+            if(!nfsd4_ops_values[i].rd)
                 nfsd4_ops_values[i].rd = rrddim_add(st, nfsd4_ops_values[i].name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st, nfsd4_ops_values[i].rd, nfsd4_ops_values[i].value);

@@ -526,7 +526,7 @@ static void clean_allocated_socket_plot()
  * @param ptr a pointer to the link list.
 static void clean_network_ports(ebpf_network_viewer_port_list_t *ptr)
 {
-    if (unlikely(!ptr))
+    if (!ptr)
         return;
 
     while (ptr) {
@@ -546,7 +546,7 @@ static void clean_network_ports(ebpf_network_viewer_port_list_t *ptr)
  * @param names the link list.
 static void clean_service_names(ebpf_network_viewer_dim_name_t *names)
 {
-    if (unlikely(!names))
+    if (!names)
         return;
 
     while (names) {
@@ -564,7 +564,7 @@ static void clean_service_names(ebpf_network_viewer_dim_name_t *names)
  * @param hostnames the hostnames to clean
 static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
 {
-    if (unlikely(!hostnames))
+    if (!hostnames)
         return;
 
     while (hostnames) {
@@ -1007,7 +1007,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_CONNECTION_TCP_V4);
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
                                                                           call_tcp_v4_connection));
             write_chart_dimension(w->name, value);
@@ -1017,7 +1017,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_CONNECTION_TCP_V6);
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
                                                                           call_tcp_v6_connection));
             write_chart_dimension(w->name, value);
@@ -1027,7 +1027,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_BANDWIDTH_SENT);
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
                                                                           bytes_sent));
             // We multiply by 0.008, because we read bytes, but we display bits
@@ -1038,7 +1038,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_BANDWIDTH_RECV);
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
                                                                           bytes_received));
             // We multiply by 0.008, because we read bytes, but we display bits
@@ -1049,7 +1049,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS);
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
                                                                           call_tcp_sent));
             write_chart_dimension(w->name, value);
@@ -1059,7 +1059,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS);
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
                                                                           call_tcp_received));
             write_chart_dimension(w->name, value);
@@ -1069,7 +1069,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT);
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
                                                                           retransmit));
             write_chart_dimension(w->name, value);
@@ -1079,7 +1079,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS);
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
                                                                           call_udp_sent));
             write_chart_dimension(w->name, value);
@@ -1089,7 +1089,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS);
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
                                                                           call_udp_received));
             write_chart_dimension(w->name, value);
@@ -2104,7 +2104,7 @@ static inline void fill_nv_port_list(ebpf_network_viewer_port_list_t *out, uint1
 void update_listen_table(uint16_t value, uint16_t proto, netdata_passive_connection_t *in)
 {
     ebpf_network_viewer_port_list_t *w;
-    if (likely(listen_ports)) {
+    if (listen_ports) {
         ebpf_network_viewer_port_list_t *move = listen_ports, *store = listen_ports;
         while (move) {
             if (move->protocol == proto && move->first == value) {
@@ -2354,7 +2354,7 @@ static void ebpf_update_socket_cgroup(int maps_per_core)
             int pid = pids->pid;
             ebpf_bandwidth_t *out = &pids->socket;
             ebpf_socket_publish_apps_t *publish = &ect->publish_socket;
-            if (likely(socket_bandwidth_curr) && socket_bandwidth_curr[pid]) {
+            if (socket_bandwidth_curr && socket_bandwidth_curr[pid]) {
                 ebpf_socket_publish_apps_t *in = socket_bandwidth_curr[pid];
 
                 publish->bytes_sent = in->bytes_sent;
@@ -2758,7 +2758,7 @@ static void ebpf_send_systemd_socket_charts()
     ebpf_cgroup_target_t *ect;
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_CONNECTION_TCP_V4);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+        if (ect->systemd && ect->updated) {
             write_chart_dimension(ect->name, (long long)ect->publish_socket.call_tcp_v4_connection);
         }
     }
@@ -2766,7 +2766,7 @@ static void ebpf_send_systemd_socket_charts()
 
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_CONNECTION_TCP_V6);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+        if (ect->systemd && ect->updated) {
             write_chart_dimension(ect->name, (long long)ect->publish_socket.call_tcp_v6_connection);
         }
     }
@@ -2774,7 +2774,7 @@ static void ebpf_send_systemd_socket_charts()
 
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_BANDWIDTH_SENT);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+        if (ect->systemd && ect->updated) {
             write_chart_dimension(ect->name, (long long)ect->publish_socket.bytes_sent);
         }
     }
@@ -2782,7 +2782,7 @@ static void ebpf_send_systemd_socket_charts()
 
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_BANDWIDTH_RECV);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+        if (ect->systemd && ect->updated) {
             write_chart_dimension(ect->name, (long long)ect->publish_socket.bytes_received);
         }
     }
@@ -2790,7 +2790,7 @@ static void ebpf_send_systemd_socket_charts()
 
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+        if (ect->systemd && ect->updated) {
             write_chart_dimension(ect->name, (long long)ect->publish_socket.call_tcp_sent);
         }
     }
@@ -2798,7 +2798,7 @@ static void ebpf_send_systemd_socket_charts()
 
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+        if (ect->systemd && ect->updated) {
             write_chart_dimension(ect->name, (long long)ect->publish_socket.call_tcp_received);
         }
     }
@@ -2806,7 +2806,7 @@ static void ebpf_send_systemd_socket_charts()
 
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+        if (ect->systemd && ect->updated) {
             write_chart_dimension(ect->name, (long long)ect->publish_socket.retransmit);
         }
     }
@@ -2814,7 +2814,7 @@ static void ebpf_send_systemd_socket_charts()
 
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+        if (ect->systemd && ect->updated) {
             write_chart_dimension(ect->name, (long long)ect->publish_socket.call_udp_sent);
         }
     }
@@ -2822,7 +2822,7 @@ static void ebpf_send_systemd_socket_charts()
 
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+        if (ect->systemd && ect->updated) {
             write_chart_dimension(ect->name, (long long)ect->publish_socket.call_udp_received);
         }
     }
@@ -3050,7 +3050,7 @@ static void initialize_inbound_outbound()
  */
 static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, ebpf_network_viewer_port_list_t *in)
 {
-    if (likely(*out)) {
+    if (*out) {
         ebpf_network_viewer_port_list_t *move = *out, *store = *out;
         uint16_t first = ntohs(in->first);
         uint16_t last = ntohs(in->last);
@@ -3311,7 +3311,7 @@ void ebpf_fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_
         in->first.addr32[0] = ntohl(in->first.addr32[0]);
         in->last.addr32[0] = ntohl(in->last.addr32[0]);
     }
-    if (likely(*out)) {
+    if (*out) {
         ebpf_network_viewer_ip_list_t *move = *out, *store = *out;
         while (move) {
             if (in->ver == move->ver &&
@@ -3530,15 +3530,15 @@ cleanipdup:
 static void ebpf_parse_ips(char *ptr)
 {
     // No value
-    if (unlikely(!ptr))
+    if (!ptr)
         return;
 
-    while (likely(ptr)) {
+    while (ptr) {
         // Move forward until next valid character
         while (isspace(*ptr)) ptr++;
 
         // No valid value found
-        if (unlikely(!*ptr))
+        if (!*ptr)
             return;
 
         // Find space that ends the list
@@ -3592,7 +3592,7 @@ static void parse_port_list(void **out, char *range)
     while (*end && *end != ':' && *end != '-') end++;
 
     //It has a range
-    if (likely(*end)) {
+    if (*end) {
         *end++ = '\0';
         if (*end == '!') {
             netdata_log_info("The exclusion cannot be in the second part of the range, the range %s will be ignored.", copied);
@@ -3679,15 +3679,15 @@ static void read_max_dimension(struct config *cfg)
 static void parse_ports(char *ptr)
 {
     // No value
-    if (unlikely(!ptr))
+    if (!ptr)
         return;
 
-    while (likely(ptr)) {
+    while (ptr) {
         // Move forward until next valid character
         while (isspace(*ptr)) ptr++;
 
         // No valid value found
-        if (unlikely(!*ptr))
+        if (!*ptr)
             return;
 
         // Find space that ends the list
@@ -3725,7 +3725,7 @@ static void parse_ports(char *ptr)
  */
 static void link_hostname(ebpf_network_viewer_hostname_list_t **out, ebpf_network_viewer_hostname_list_t *in)
 {
-    if (likely(*out)) {
+    if (*out) {
         ebpf_network_viewer_hostname_list_t *move = *out;
         for (; move->next ; move = move->next ) {
             if (move->hash == in->hash && !strcmp(move->value, in->value)) {
@@ -3760,15 +3760,15 @@ static void link_hostname(ebpf_network_viewer_hostname_list_t **out, ebpf_networ
 static void link_hostnames(char *parse)
 {
     // No value
-    if (unlikely(!parse))
+    if (!parse)
         return;
 
-    while (likely(parse)) {
+    while (parse) {
         // Find the first valid value
         while (isspace(*parse)) parse++;
 
         // No valid value found
-        if (unlikely(!*parse))
+        if (!*parse)
             return;
 
         // Find space that ends the list
@@ -3855,7 +3855,7 @@ static void link_dimension_name(char *port, uint32_t hash, char *value)
     w->port = (uint16_t) htons(test);
 
     ebpf_network_viewer_dim_name_t *names = network_viewer_opt.names;
-    if (unlikely(!names)) {
+    if (!names) {
         network_viewer_opt.names = w;
     } else {
         for (; names->next; names = names->next) {

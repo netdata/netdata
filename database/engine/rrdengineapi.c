@@ -51,12 +51,12 @@ int default_rrdeng_extent_cache_mb = 0;
 // metrics groups
 
 static inline void rrdeng_page_alignment_acquire(struct pg_alignment *pa) {
-    if(unlikely(!pa)) return;
+    if(!pa) return;
     __atomic_add_fetch(&pa->refcount, 1, __ATOMIC_SEQ_CST);
 }
 
 static inline bool rrdeng_page_alignment_release(struct pg_alignment *pa) {
-    if(unlikely(!pa)) return true;
+    if(!pa) return true;
 
     if(__atomic_sub_fetch(&pa->refcount, 1, __ATOMIC_SEQ_CST) == 0) {
         freez(pa);
@@ -75,7 +75,7 @@ STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *db_instance __
 
 // charts call this
 void rrdeng_metrics_group_release(STORAGE_INSTANCE *db_instance __maybe_unused, STORAGE_METRICS_GROUP *smg) {
-    if(unlikely(!smg)) return;
+    if(!smg) return;
 
     struct pg_alignment *pa = (struct pg_alignment *)smg;
     rrdeng_page_alignment_release(pa);
@@ -148,8 +148,8 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
 
     metric = mrg_metric_get_and_acquire(main_mrg, &rd->metric_uuid, (Word_t) ctx);
 
-    if(unlikely(!metric)) {
-        if(unlikely(ctx->config.legacy)) {
+    if(!metric) {
+        if(ctx->config.legacy) {
             // this is a single host database
             // generate uuid from the chart and dimensions ids
             // and overwrite the one supplied by rrddim
@@ -158,7 +158,7 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
                 uuid_copy(rd->metric_uuid, *mrg_metric_uuid(main_mrg, metric));
         }
 
-        if(likely(!metric))
+        if(!metric)
             metric = rrdeng_metric_create(db_instance, &rd->metric_uuid);
     }
 
@@ -185,11 +185,11 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
 // collect ops
 
 static inline void check_and_fix_mrg_update_every(struct rrdeng_collect_handle *handle) {
-    if(unlikely((time_t)(handle->update_every_ut / USEC_PER_SEC) != mrg_metric_get_update_every_s(main_mrg, handle->metric))) {
+    if((time_t)(handle->update_every_ut / USEC_PER_SEC) != mrg_metric_get_update_every_s(main_mrg, handle->metric)) {
         internal_error(true, "DBENGINE: collection handle has update every %ld, but the metric registry has %ld. Fixing it.",
               (time_t)(handle->update_every_ut / USEC_PER_SEC), mrg_metric_get_update_every_s(main_mrg, handle->metric));
 
-        if(unlikely(!handle->update_every_ut))
+        if(!handle->update_every_ut)
             handle->update_every_ut = (usec_t)mrg_metric_get_update_every_s(main_mrg, handle->metric) * USEC_PER_SEC;
         else
             mrg_metric_set_update_every(main_mrg, handle->metric, (time_t)(handle->update_every_ut / USEC_PER_SEC));
@@ -198,7 +198,7 @@ static inline void check_and_fix_mrg_update_every(struct rrdeng_collect_handle *
 
 static inline bool check_completed_page_consistency(struct rrdeng_collect_handle *handle __maybe_unused) {
 #ifdef NETDATA_INTERNAL_CHECKS
-    if (unlikely(!handle->page || !handle->page_entries_max || !handle->page_position || !handle->page_end_time_ut))
+    if (!handle->page || !handle->page_entries_max || !handle->page_position || !handle->page_end_time_ut)
         return false;
 
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
@@ -325,7 +325,7 @@ static bool page_has_only_empty_metrics(struct rrdeng_collect_handle *handle) {
 void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle) {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
 
-    if (unlikely(!handle->page))
+    if (!handle->page)
         return;
 
     if(!handle->page_position || page_has_only_empty_metrics(handle))
@@ -379,7 +379,7 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
     size_t conflicts = 0;
     bool added = true;
     PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
-    while (unlikely(!added)) {
+    while (!added) {
         conflicts++;
 
         char uuid[UUID_STR_LEN + 1];
@@ -486,16 +486,16 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
-    if(unlikely(!handle->data))
+    if(!handle->data)
         handle->data = rrdeng_alloc_new_metric_data(handle, &handle->data_size, point_in_time_ut);
 
     timing_step(TIMING_STEP_DBENGINE_CHECK_DATA);
 
-    if(likely(ctx->config.page_type == PAGE_METRICS)) {
+    if(ctx->config.page_type == PAGE_METRICS) {
         storage_number *tier0_metric_data = handle->data;
         tier0_metric_data[handle->page_position] = pack_storage_number(n, flags);
     }
-    else if(likely(ctx->config.page_type == PAGE_TIER)) {
+    else if(ctx->config.page_type == PAGE_TIER) {
         storage_number_tier1_t *tier12_metric_data = handle->data;
         storage_number_tier1_t number_tier1;
         number_tier1.sum_value = (float) n;
@@ -510,7 +510,7 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
 
     timing_step(TIMING_STEP_DBENGINE_PACK);
 
-    if(unlikely(!handle->page)){
+    if(!handle->page){
         rrdeng_store_metric_create_new_page(handle, ctx, point_in_time_ut, handle->data, handle->data_size);
         // handle->position is set to 1 already
     }
@@ -519,7 +519,7 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
         pgc_page_hot_set_end_time_s(main_cache, handle->page, (time_t) (point_in_time_ut / USEC_PER_SEC));
         handle->page_end_time_ut = point_in_time_ut;
 
-        if(unlikely(++handle->page_position >= handle->page_entries_max)) {
+        if(++handle->page_position >= handle->page_entries_max) {
             internal_fatal(handle->page_position > handle->page_entries_max, "DBENGINE: exceeded page max number of points");
             handle->page_flags |= RRDENG_PAGE_FULL;
             rrdeng_store_metric_flush_current_page(collection_handle);
@@ -578,23 +578,23 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(point_in_time_ut > (usec_t)max_acceptable_collected_time() * USEC_PER_SEC))
+    if(point_in_time_ut > (usec_t)max_acceptable_collected_time() * USEC_PER_SEC)
         handle->page_flags |= RRDENG_PAGE_FUTURE_POINT;
 #endif
 
     usec_t delta_ut = point_in_time_ut - handle->page_end_time_ut;
 
-    if(likely(delta_ut == handle->update_every_ut)) {
+    if(delta_ut == handle->update_every_ut) {
         // happy path
         ;
     }
-    else if(unlikely(point_in_time_ut > handle->page_end_time_ut)) {
+    else if(point_in_time_ut > handle->page_end_time_ut) {
         if(handle->page) {
-            if (unlikely(delta_ut < handle->update_every_ut)) {
+            if (delta_ut < handle->update_every_ut) {
                 handle->page_flags |= RRDENG_PAGE_STEP_TOO_SMALL;
                 rrdeng_store_metric_flush_current_page(collection_handle);
             }
-            else if (unlikely(delta_ut % handle->update_every_ut)) {
+            else if (delta_ut % handle->update_every_ut) {
                 handle->page_flags |= RRDENG_PAGE_STEP_UNALIGNED;
                 rrdeng_store_metric_flush_current_page(collection_handle);
             }
@@ -625,13 +625,13 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
             }
         }
     }
-    else if(unlikely(point_in_time_ut < handle->page_end_time_ut)) {
+    else if(point_in_time_ut < handle->page_end_time_ut) {
         handle->page_flags |= RRDENG_PAGE_PAST_COLLECTION;
         store_metric_next_error_log(handle, point_in_time_ut, "is older than the");
         return;
     }
 
-    else /* if(unlikely(point_in_time_ut == handle->page_end_time_ut)) */ {
+    else /* if(point_in_time_ut == handle->page_end_time_ut) */ {
         handle->page_flags |= RRDENG_PAGE_REPEATED_COLLECTION;
         store_metric_next_error_log(handle, point_in_time_ut, "is at the same time as the");
         return;
@@ -742,9 +742,9 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle,
     handle = rrdeng_query_handle_get();
     register_query_handle(handle);
 
-    if (unlikely(priority < STORAGE_PRIORITY_HIGH))
+    if (priority < STORAGE_PRIORITY_HIGH)
         priority = STORAGE_PRIORITY_HIGH;
-    else if (unlikely(priority >= STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE))
+    else if (priority >= STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE)
         priority = STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE - 1;
 
     handle->ctx = ctx;
@@ -799,18 +799,18 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_han
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrddim_handle->handle;
     struct rrdengine_instance *ctx = handle->ctx;
 
-    if (likely(handle->page)) {
+    if (handle->page) {
         // we have a page to release
         pgc_page_release(main_cache, handle->page);
         handle->page = NULL;
     }
 
-    if (unlikely(handle->now_s > rrddim_handle->end_time_s))
+    if (handle->now_s > rrddim_handle->end_time_s)
         return false;
 
     size_t entries;
     handle->page = pg_cache_lookup_next(ctx, handle->pdc, handle->now_s, handle->dt_s, &entries);
-    if (unlikely(!handle->page))
+    if (!handle->page)
         return false;
 
     internal_fatal(pgc_page_data(handle->page) == DBENGINE_EMPTY_PAGE, "Empty page returned");
@@ -820,9 +820,9 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_han
     time_t page_update_every_s = pgc_page_update_every_s(handle->page);
 
     unsigned position;
-    if(likely(handle->now_s >= page_start_time_s && handle->now_s <= page_end_time_s)) {
+    if(handle->now_s >= page_start_time_s && handle->now_s <= page_end_time_s) {
 
-        if(unlikely(entries == 1 || page_start_time_s == page_end_time_s || !page_update_every_s)) {
+        if(entries == 1 || page_start_time_s == page_end_time_s || !page_update_every_s) {
             position = 0;
             handle->now_s = page_start_time_s;
         }
@@ -865,12 +865,12 @@ STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrddim_handle->handle;
     STORAGE_POINT sp;
 
-    if (unlikely(handle->now_s > rrddim_handle->end_time_s)) {
+    if (handle->now_s > rrddim_handle->end_time_s) {
         storage_point_empty(sp, handle->now_s - handle->dt_s, handle->now_s);
         goto prepare_for_next_iteration;
     }
 
-    if (unlikely(!handle->page || handle->position >= handle->entries)) {
+    if (!handle->page || handle->position >= handle->entries) {
         // We need to get a new page
 
         if (!rrdeng_load_page_next(rrddim_handle, false)) {
@@ -985,13 +985,13 @@ time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
 bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *db_instance, uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s)
 {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
-    if (unlikely(!ctx)) {
+    if (!ctx) {
         netdata_log_error("DBENGINE: invalid STORAGE INSTANCE to %s()", __FUNCTION__);
         return false;
     }
 
     METRIC *metric = mrg_metric_get_and_acquire(main_mrg, dim_uuid, (Word_t) ctx);
-    if (unlikely(!metric))
+    if (!metric)
         return false;
 
     time_t update_every_s;
@@ -1272,7 +1272,7 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
     struct journal_v2_header *j2_header = journalfile_v2_data_acquire(datafile->journalfile, NULL, 0, 0);
     void *data_start = (void *)j2_header;
 
-    if(unlikely(!j2_header))
+    if(!j2_header)
         return;
 
     stats->extents += j2_header->extent_count;
@@ -1303,7 +1303,7 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
             time_t start_time_s = journal_start_time_s + descr->delta_start_s;
             time_t end_time_s = journal_start_time_s + descr->delta_end_s;
 
-            if(likely(points > 1))
+            if(points > 1)
                 update_every_s = (time_t) ((end_time_s - start_time_s) / (points - 1));
             else {
                 update_every_s = (time_t) (default_rrd_update_every * get_tier_grouping(datafile->ctx->config.tier));

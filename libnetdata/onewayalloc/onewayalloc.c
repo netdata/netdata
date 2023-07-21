@@ -23,7 +23,7 @@ size_t onewayalloc_allocated_memory(void) {
 // allocations need to be aligned to CPU register width
 // https://en.wikipedia.org/wiki/Data_structure_alignment
 static inline size_t natural_alignment(size_t size) {
-    if(unlikely(size % OWA_NATURAL_ALIGNMENT))
+    if(size % OWA_NATURAL_ALIGNMENT)
         size = size + OWA_NATURAL_ALIGNMENT - (size % OWA_NATURAL_ALIGNMENT);
 
     return size;
@@ -36,9 +36,9 @@ static inline size_t natural_alignment(size_t size) {
 static OWA_PAGE *onewayalloc_create_internal(OWA_PAGE *head, size_t size_hint) {
     static size_t OWA_NATURAL_PAGE_SIZE = 0;
 
-    if(unlikely(!OWA_NATURAL_PAGE_SIZE)) {
+    if(!OWA_NATURAL_PAGE_SIZE) {
         long int page_size = sysconf(_SC_PAGE_SIZE);
-        if (unlikely(page_size == -1))
+        if (page_size == -1)
             OWA_NATURAL_PAGE_SIZE = 4096;
         else
             OWA_NATURAL_PAGE_SIZE = page_size;
@@ -55,7 +55,7 @@ static OWA_PAGE *onewayalloc_create_internal(OWA_PAGE *head, size_t size_hint) {
     if(size_hint > size) size = size_hint;
 
     // try to allocate half of the total we have allocated already
-    if(likely(head)) {
+    if(head) {
         size_t optimal_size = head->stats_pages_size / 2;
         if(optimal_size > size) size = optimal_size;
     }
@@ -64,7 +64,7 @@ static OWA_PAGE *onewayalloc_create_internal(OWA_PAGE *head, size_t size_hint) {
     if(size % OWA_NATURAL_PAGE_SIZE) size = size + OWA_NATURAL_PAGE_SIZE - (size % OWA_NATURAL_PAGE_SIZE);
 
     // OWA_PAGE *page = (OWA_PAGE *)netdata_mmap(NULL, size, MAP_ANONYMOUS|MAP_PRIVATE, 0);
-    // if(unlikely(!page)) fatal("Cannot allocate onewayalloc buffer of size %zu", size);
+    // if(!page) fatal("Cannot allocate onewayalloc buffer of size %zu", size);
     OWA_PAGE *page = (OWA_PAGE *)mallocz(size);
     __atomic_add_fetch(&onewayalloc_total_memory, size, __ATOMIC_RELAXED);
 
@@ -72,7 +72,7 @@ static OWA_PAGE *onewayalloc_create_internal(OWA_PAGE *head, size_t size_hint) {
     page->offset = natural_alignment(sizeof(OWA_PAGE));
     page->next = page->last = NULL;
 
-    if(unlikely(!head)) {
+    if(!head) {
         // this is the first time we are called
         head = page;
         head->stats_pages = 0;
@@ -111,7 +111,7 @@ void *onewayalloc_mallocz(ONEWAYALLOC *owa, size_t size) {
     // make sure the size is aligned
     size = natural_alignment(size);
 
-    if(unlikely(page->size - page->offset < size)) {
+    if(page->size - page->offset < size) {
         // we don't have enough space to fit the data
         // let's get another page
         page = onewayalloc_create_internal(head, (size > page->size)?size:page->size);
@@ -156,7 +156,7 @@ void onewayalloc_freez(ONEWAYALLOC *owa __maybe_unused, const void *ptr __maybe_
     // so try to find it in our memory and if it is not there
     // log an error
 
-    if (unlikely(!ptr))
+    if (!ptr)
         return;
 
     OWA_PAGE *head = (OWA_PAGE *)owa;

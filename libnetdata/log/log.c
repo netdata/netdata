@@ -134,7 +134,7 @@ static int log_facility_id(const char *facility_name)
         hash_local6 = 0,
         hash_local7 = 0;
 
-    if(unlikely(!hash_auth))
+    if(!hash_auth)
     {
         hash_auth = simple_hash(LOG_AUTH_KEY);
         hash_authpriv = simple_hash(LOG_AUTHPRIV_KEY);
@@ -466,7 +466,7 @@ void syslog_init() {
 }
 
 void log_date(char *buffer, size_t len, time_t now) {
-    if(unlikely(!buffer || !len))
+    if(!buffer || !len)
         return;
 
     time_t t = now;
@@ -479,7 +479,7 @@ void log_date(char *buffer, size_t len, time_t now) {
         return;
     }
 
-    if (unlikely(strftime(buffer, len, "%Y-%m-%d %H:%M:%S", tmp) == 0))
+    if (strftime(buffer, len, "%Y-%m-%d %H:%M:%S", tmp) == 0)
         buffer[0] = '\0';
 
     buffer[len - 1] = '\0';

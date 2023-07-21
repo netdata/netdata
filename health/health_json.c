@@ -112,7 +112,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , (unsigned long)rc->times_repeat
     );
 
-    if(unlikely(rc->options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)) {
+    if(rc->options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION) {
         buffer_strcat(wb, "\t\t\t\"no_clear_notification\": true,\n");
     }
 
@@ -181,13 +181,13 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
             STRING *tok_string = string_strdupz(tok);
 
             foreach_rrdcalc_in_rrdhost_read(host, rc) {
-                if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+                if(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec)
                     continue;
-                if (unlikely(!rrdset_is_available_for_exporting_and_alarms(rc->rrdset)))
+                if (!rrdset_is_available_for_exporting_and_alarms(rc->rrdset))
                     continue;
-                if(unlikely(rc->rrdset
+                if(rc->rrdset
                              && rc->rrdset->context == tok_string
-                             && ((status==RRDCALC_STATUS_RAISED)?(rc->status >= RRDCALC_STATUS_WARNING):rc->status == status)))
+                             && ((status==RRDCALC_STATUS_RAISED)?(rc->status >= RRDCALC_STATUS_WARNING):rc->status == status))
                     numberOfAlarms++;
             }
             foreach_rrdcalc_in_rrdhost_done(rc);
@@ -197,11 +197,11 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
     }
     else {
         foreach_rrdcalc_in_rrdhost_read(host, rc) {
-            if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+            if(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec)
                 continue;
-            if (unlikely(!rrdset_is_available_for_exporting_and_alarms(rc->rrdset)))
+            if (!rrdset_is_available_for_exporting_and_alarms(rc->rrdset))
                 continue;
-            if(unlikely((status==RRDCALC_STATUS_RAISED)?(rc->status >= RRDCALC_STATUS_WARNING):rc->status == status))
+            if((status==RRDCALC_STATUS_RAISED)?(rc->status >= RRDCALC_STATUS_WARNING):rc->status == status)
                 numberOfAlarms++;
         }
         foreach_rrdcalc_in_rrdhost_done(rc);
@@ -214,16 +214,16 @@ static void health_alarms2json_fill_alarms(RRDHOST *host, BUFFER *wb, int all, v
     RRDCALC *rc;
     int i = 0;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
-        if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+        if(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec)
             continue;
 
-        if (unlikely(!rrdset_is_available_for_exporting_and_alarms(rc->rrdset)))
+        if (!rrdset_is_available_for_exporting_and_alarms(rc->rrdset))
             continue;
 
-        if(likely(!all && !(rc->status == RRDCALC_STATUS_WARNING || rc->status == RRDCALC_STATUS_CRITICAL)))
+        if(!all && !(rc->status == RRDCALC_STATUS_WARNING || rc->status == RRDCALC_STATUS_CRITICAL))
             continue;
 
-        if(likely(i)) buffer_strcat(wb, ",\n");
+        if(i) buffer_strcat(wb, ",\n");
         fp(host, wb, rc);
         i++;
     }

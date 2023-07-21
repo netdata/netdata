@@ -666,7 +666,7 @@ static void ebpf_update_dc_cgroup(int maps_per_core)
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_dcstat_pid_t *out = &pids->dc;
-            if (likely(dcstat_pid) && dcstat_pid[pid]) {
+            if (dcstat_pid && dcstat_pid[pid]) {
                 netdata_publish_dcstat_t *in = dcstat_pid[pid];
 
                 memcpy(out, &in->curr, sizeof(netdata_dcstat_pid_t));
@@ -748,7 +748,7 @@ void ebpf_dcache_send_apps_data(struct ebpf_target *root)
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_HIT_CHART);
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             ebpf_dcstat_sum_pids(&w->dcstat, w->root_pid);
 
             uint64_t cache = w->dcstat.curr.cache_access;
@@ -763,7 +763,7 @@ void ebpf_dcache_send_apps_data(struct ebpf_target *root)
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_REFERENCE_CHART);
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             if (w->dcstat.curr.cache_access < w->dcstat.prev.cache_access) {
                 w->dcstat.prev.cache_access = 0;
             }
@@ -778,7 +778,7 @@ void ebpf_dcache_send_apps_data(struct ebpf_target *root)
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_REQUEST_NOT_CACHE_CHART);
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             if (w->dcstat.curr.file_system < w->dcstat.prev.file_system) {
                 w->dcstat.prev.file_system = 0;
             }
@@ -793,7 +793,7 @@ void ebpf_dcache_send_apps_data(struct ebpf_target *root)
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_REQUEST_NOT_FOUND_CHART);
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             if (w->dcstat.curr.not_found < w->dcstat.prev.not_found) {
                 w->dcstat.prev.not_found = 0;
             }
@@ -1031,7 +1031,7 @@ static void ebpf_send_systemd_dc_charts()
     ebpf_cgroup_target_t *ect;
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_DC_HIT_CHART);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+        if (ect->systemd && ect->updated) {
             write_chart_dimension(ect->name, (long long) ect->publish_dc.ratio);
         }
     }
@@ -1039,7 +1039,7 @@ static void ebpf_send_systemd_dc_charts()
 
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_DC_REFERENCE_CHART);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+        if (ect->systemd && ect->updated) {
             write_chart_dimension(ect->name, (long long) ect->publish_dc.cache_access);
         }
     }
@@ -1047,7 +1047,7 @@ static void ebpf_send_systemd_dc_charts()
 
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_DC_REQUEST_NOT_CACHE_CHART);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+        if (ect->systemd && ect->updated) {
             value = (collected_number) (!ect->publish_dc.cache_access) ? 0 :
                 (long long )ect->publish_dc.curr.file_system - (long long)ect->publish_dc.prev.file_system;
             ect->publish_dc.prev.file_system = ect->publish_dc.curr.file_system;
@@ -1059,7 +1059,7 @@ static void ebpf_send_systemd_dc_charts()
 
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_DC_REQUEST_NOT_FOUND_CHART);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+        if (ect->systemd && ect->updated) {
             value = (collected_number) (!ect->publish_dc.cache_access) ? 0 :
                 (long long)ect->publish_dc.curr.not_found - (long long)ect->publish_dc.prev.not_found;
 

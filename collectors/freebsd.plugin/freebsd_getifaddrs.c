@@ -51,15 +51,15 @@ static struct cgroup_network_interface *network_interfaces_root = NULL, *network
 static size_t network_interfaces_added = 0, network_interfaces_found = 0;
 
 static void network_interface_free(struct cgroup_network_interface *ifm) {
-    if (likely(ifm->st_bandwidth))
+    if (ifm->st_bandwidth)
         rrdset_is_obsolete(ifm->st_bandwidth);
-    if (likely(ifm->st_packets))
+    if (ifm->st_packets)
         rrdset_is_obsolete(ifm->st_packets);
-    if (likely(ifm->st_errors))
+    if (ifm->st_errors)
         rrdset_is_obsolete(ifm->st_errors);
-    if (likely(ifm->st_drops))
+    if (ifm->st_drops)
         rrdset_is_obsolete(ifm->st_drops);
-    if (likely(ifm->st_events))
+    if (ifm->st_events)
         rrdset_is_obsolete(ifm->st_events);
 
     network_interfaces_added--;
@@ -68,11 +68,11 @@ static void network_interface_free(struct cgroup_network_interface *ifm) {
 }
 
 static void network_interfaces_cleanup() {
-    if (likely(network_interfaces_found == network_interfaces_added)) return;
+    if (network_interfaces_found == network_interfaces_added) return;
 
     struct cgroup_network_interface *ifm = network_interfaces_root, *last = NULL;
     while(ifm) {
-        if (unlikely(!ifm->updated)) {
+        if (!ifm->updated) {
             // collector_info("Removing network interface '%s', linked after '%s'", ifm->name, last?last->name:"ROOT");
 
             if (network_interfaces_last_used == ifm)
@@ -104,7 +104,7 @@ static struct cgroup_network_interface *get_network_interface(const char *name) 
 
     // search it, from the last position to the end
     for(ifm = network_interfaces_last_used ; ifm ; ifm = ifm->next) {
-        if (unlikely(hash == ifm->hash && !strcmp(name, ifm->name))) {
+        if (hash == ifm->hash && !strcmp(name, ifm->name)) {
             network_interfaces_last_used = ifm->next;
             return ifm;
         }
@@ -112,7 +112,7 @@ static struct cgroup_network_interface *get_network_interface(const char *name) 
 
     // search it from the beginning to the last position we used
     for(ifm = network_interfaces_root ; ifm != network_interfaces_last_used ; ifm = ifm->next) {
-        if (unlikely(hash == ifm->hash && !strcmp(name, ifm->name))) {
+        if (hash == ifm->hash && !strcmp(name, ifm->name)) {
             network_interfaces_last_used = ifm->next;
             return ifm;
         }
@@ -152,7 +152,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
             do_errors = -1, do_drops = -1, do_events = -1;
     static SIMPLE_PATTERN *excluded_interfaces = NULL, *physical_interfaces = NULL;
 
-    if (unlikely(enable_new_interfaces == -1)) {
+    if (enable_new_interfaces == -1) {
         enable_new_interfaces = config_get_boolean_ondemand(CONFIG_SECTION_GETIFADDRS,
                                                               "enable new interfaces detected at runtime",
                                                               CONFIG_BOOLEAN_AUTO);
@@ -188,11 +188,11 @@ int do_getifaddrs(int update_every, usec_t dt) {
             true);
     }
 
-    if (likely(do_bandwidth_ipv4 || do_bandwidth_ipv6 || do_bandwidth || do_packets || do_errors || do_bandwidth_net || do_packets_net ||
-               do_drops || do_events)) {
+    if (do_bandwidth_ipv4 || do_bandwidth_ipv6 || do_bandwidth || do_packets || do_errors || do_bandwidth_net || do_packets_net ||
+               do_drops || do_events) {
         struct ifaddrs *ifap;
 
-        if (unlikely(getifaddrs(&ifap))) {
+        if (getifaddrs(&ifap)) {
             collector_error("FREEBSD: getifaddrs() failed");
             do_bandwidth_net = 0;
             collector_error("DISABLED: system.net chart");
@@ -226,7 +226,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
                 u_long  ift_omcasts;
             } iftot = {0, 0, 0, 0, 0, 0};
 
-            if (likely(do_bandwidth_net)) {
+            if (do_bandwidth_net) {
 
                 iftot.ift_ibytes = iftot.ift_obytes = 0;
                 for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
@@ -241,7 +241,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost("system",
                                                  "net",
                                                  NULL,
@@ -265,7 +265,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (likely(do_packets_net)) {
+            if (do_packets_net) {
                 iftot.ift_ipackets = iftot.ift_opackets = iftot.ift_imcasts = iftot.ift_omcasts = 0;
 
                 for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
@@ -282,7 +282,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_packets_in = NULL, *rd_packets_out = NULL, *rd_packets_m_in = NULL, *rd_packets_m_out = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost("system",
                                                  "packets",
                                                  NULL,
@@ -312,7 +312,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (likely(do_bandwidth_ipv4)) {
+            if (do_bandwidth_ipv4) {
                 iftot.ift_ibytes = iftot.ift_obytes = 0;
                 for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
                     if (ifa->ifa_addr->sa_family != AF_INET)
@@ -324,7 +324,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost("system",
                                                  "ipv4",
                                                  NULL,
@@ -348,7 +348,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if (likely(do_bandwidth_ipv6)) {
+            if (do_bandwidth_ipv6) {
                 iftot.ift_ibytes = iftot.ift_obytes = 0;
                 for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
                     if (ifa->ifa_addr->sa_family != AF_INET6)
@@ -360,7 +360,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost("system",
                                                  "ipv6",
                                                  NULL,
@@ -394,7 +394,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
                 ifm->updated = 1;
                 network_interfaces_found++;
 
-                if (unlikely(!ifm->configured)) {
+                if (!ifm->configured) {
                     char var_name[4096 + 1];
 
                     // this is the first time we see this network interface
@@ -404,13 +404,13 @@ int do_getifaddrs(int update_every, usec_t dt) {
 
                     ifm->enabled = enable_new_interfaces;
 
-                    if (likely(ifm->enabled))
+                    if (ifm->enabled)
                         ifm->enabled = !simple_pattern_matches(excluded_interfaces, ifa->ifa_name);
 
                     snprintfz(var_name, 4096, "%s:%s", CONFIG_SECTION_GETIFADDRS, ifa->ifa_name);
                     ifm->enabled = config_get_boolean_ondemand(var_name, "enabled", ifm->enabled);
 
-                    if (unlikely(ifm->enabled == CONFIG_BOOLEAN_NO))
+                    if (ifm->enabled == CONFIG_BOOLEAN_NO)
                         continue;
 
                     ifm->do_bandwidth = config_get_boolean_ondemand(var_name, "bandwidth", do_bandwidth);
@@ -420,14 +420,14 @@ int do_getifaddrs(int update_every, usec_t dt) {
                     ifm->do_events    = config_get_boolean_ondemand(var_name, "events",    do_events);
                 }
 
-                if (unlikely(!ifm->enabled))
+                if (!ifm->enabled)
                     continue;
 
                 if (ifm->do_bandwidth == CONFIG_BOOLEAN_YES || (ifm->do_bandwidth == CONFIG_BOOLEAN_AUTO &&
                                                                 (IFA_DATA(ibytes) ||
                                                                  IFA_DATA(obytes) ||
                                                                  netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                    if (unlikely(!ifm->st_bandwidth)) {
+                    if (!ifm->st_bandwidth) {
                         ifm->st_bandwidth = rrdset_create_localhost("net",
                                                                     ifa->ifa_name,
                                                                     NULL,
@@ -457,7 +457,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                                IFA_DATA(imcasts) ||
                                                                IFA_DATA(omcasts) ||
                                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                    if (unlikely(!ifm->st_packets)) {
+                    if (!ifm->st_packets) {
                         ifm->st_packets = rrdset_create_localhost("net_packets",
                                                                   ifa->ifa_name,
                                                                   NULL,
@@ -495,7 +495,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                              (IFA_DATA(ierrors) ||
                                                               IFA_DATA(oerrors) ||
                                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                    if (unlikely(!ifm->st_errors)) {
+                    if (!ifm->st_errors) {
                         ifm->st_errors = rrdset_create_localhost("net_errors",
                                                                  ifa->ifa_name,
                                                                  NULL,
@@ -527,7 +527,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                              IFA_DATA(oqdrops) ||
                                                              #endif
                                                              netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                    if (unlikely(!ifm->st_drops)) {
+                    if (!ifm->st_drops) {
                         ifm->st_drops = rrdset_create_localhost("net_drops",
                                                                 ifa->ifa_name,
                                                                 NULL,
@@ -560,7 +560,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
                 if (ifm->do_events == CONFIG_BOOLEAN_YES || (ifm->do_events == CONFIG_BOOLEAN_AUTO &&
                                                              (IFA_DATA(collisions) ||
                                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                    if (unlikely(!ifm->st_events)) {
+                    if (!ifm->st_events) {
                         ifm->st_events = rrdset_create_localhost("net_events",
                                                                  ifa->ifa_name,
                                                                  NULL,

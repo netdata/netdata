@@ -35,16 +35,16 @@ static struct web_client *web_client_create_on_fd(POLLINFO *pi) {
     strncpyz(w->client_port, pi->client_port, sizeof(w->client_port) - 1);
     strncpyz(w->client_host, pi->client_host, sizeof(w->client_host) - 1);
 
-    if(unlikely(!*w->client_ip))   strcpy(w->client_ip,   "-");
-    if(unlikely(!*w->client_port)) strcpy(w->client_port, "-");
+    if(!*w->client_ip)   strcpy(w->client_ip,   "-");
+    if(!*w->client_port) strcpy(w->client_port, "-");
 	w->port_acl = pi->port_acl;
 
     int flag = 1;
-    if(unlikely(web_client_check_tcp(w) && setsockopt(w->ifd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0))
+    if(web_client_check_tcp(w) && setsockopt(w->ifd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0)
         netdata_log_debug(D_WEB_CLIENT, "%llu: failed to enable TCP_NODELAY on socket fd %d.", w->id, w->ifd);
 
     flag = 1;
-    if(unlikely(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0))
+    if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0)
         netdata_log_debug(D_WEB_CLIENT, "%llu: failed to enable SO_KEEPALIVE on socket fd %d.", w->id, w->ifd);
 
     web_client_update_acl_matches(w);
@@ -85,7 +85,7 @@ static __thread struct web_server_static_threaded_worker *worker_private = NULL;
 // ----------------------------------------------------------------------------
 
 static inline int web_server_check_client_status(struct web_client *w) {
-    if(unlikely(web_client_check_dead(w) || (!web_client_has_wait_receive(w) && !web_client_has_wait_send(w))))
+    if(web_client_check_dead(w) || (!web_client_has_wait_receive(w) && !web_client_has_wait_send(w)))
         return -1;
 
     return 0;
@@ -117,7 +117,7 @@ static void web_server_file_del_callback(POLLINFO *pi) {
 
     w->pollinfo_filecopy_slot = 0;
 
-    if(unlikely(!w->pollinfo_slot)) {
+    if(!w->pollinfo_slot) {
         netdata_log_debug(D_WEB_CLIENT, "%llu: CROSS WEB CLIENT CLEANUP (iFD %d, oFD %d)", w->id, pi->fd, w->ofd);
         web_server_log_connection(w, "DISCONNECTED");
         web_client_request_done(w);
@@ -136,13 +136,13 @@ static int web_server_file_read_callback(POLLINFO *pi, short int *events) {
 
     // if there is no POLLINFO linked to this, it means the client disconnected
     // stop the file reading too
-    if(unlikely(!w->pollinfo_slot)) {
+    if(!w->pollinfo_slot) {
         netdata_log_debug(D_WEB_CLIENT, "%llu: PREVENTED ATTEMPT TO READ FILE ON FD %d, ON CLOSED WEB CLIENT", w->id, pi->fd);
         retval = -1;
         goto cleanup;
     }
 
-    if(unlikely(w->mode != WEB_CLIENT_MODE_FILECOPY || w->ifd == w->ofd)) {
+    if(w->mode != WEB_CLIENT_MODE_FILECOPY || w->ifd == w->ofd) {
         netdata_log_debug(D_WEB_CLIENT, "%llu: PREVENTED ATTEMPT TO READ FILE ON FD %d, ON NON-FILECOPY WEB CLIENT", w->id, pi->fd);
         retval = -1;
         goto cleanup;
@@ -151,9 +151,9 @@ static int web_server_file_read_callback(POLLINFO *pi, short int *events) {
     netdata_log_debug(D_WEB_CLIENT, "%llu: READING FILE ON FD %d", w->id, pi->fd);
 
     worker_private->file_reads++;
-    ssize_t ret = unlikely(web_client_read_file(w));
+    ssize_t ret = web_client_read_file(w);
 
-    if(likely(web_client_has_wait_send(w))) {
+    if(web_client_has_wait_send(w)) {
         POLLJOB *p = pi->p;                                        // our POLLJOB
         POLLINFO *wpi = pollinfo_from_slot(p, w->pollinfo_slot);  // POLLINFO of the client socket
 
@@ -161,7 +161,7 @@ static int web_server_file_read_callback(POLLINFO *pi, short int *events) {
         p->fds[wpi->slot].events |= POLLOUT;
     }
 
-    if(unlikely(ret <= 0 || w->ifd == w->ofd)) {
+    if(ret <= 0 || w->ifd == w->ofd) {
         netdata_log_debug(D_WEB_CLIENT, "%llu: DONE READING FILE ON FD %d", w->id, pi->fd);
         retval = -1;
         goto cleanup;
@@ -196,7 +196,7 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
     worker_private->connected++;
 
     size_t concurrent = worker_private->connected - worker_private->disconnected;
-    if(unlikely(concurrent > worker_private->max_concurrent))
+    if(concurrent > worker_private->max_concurrent)
         worker_private->max_concurrent = concurrent;
 
     *events = POLLIN;
@@ -256,7 +256,7 @@ static void web_server_del_callback(POLLINFO *pi) {
     struct web_client *w = (struct web_client *)pi->data;
 
     w->pollinfo_slot = 0;
-    if(unlikely(w->pollinfo_filecopy_slot)) {
+    if(w->pollinfo_filecopy_slot) {
         POLLINFO *fpi = pollinfo_from_slot(pi->p, w->pollinfo_filecopy_slot);  // POLLINFO of the client socket
         (void)fpi;
 
@@ -288,21 +288,21 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
     ssize_t bytes;
     bytes = web_client_receive(w);
 
-    if (likely(bytes > 0)) {
+    if (bytes > 0) {
         netdata_log_debug(D_WEB_CLIENT, "%llu: processing received data on fd %d.", w->id, fd);
         worker_is_idle();
         worker_is_busy(WORKER_JOB_PROCESS);
         web_client_process_request(w);
 
-        if (unlikely(w->mode == WEB_CLIENT_MODE_STREAM)) {
+        if (w->mode == WEB_CLIENT_MODE_STREAM) {
             web_client_send(w);
         }
 
-        else if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
+        else if(w->mode == WEB_CLIENT_MODE_FILECOPY) {
             if(w->pollinfo_filecopy_slot == 0) {
                 netdata_log_debug(D_WEB_CLIENT, "%llu: FILECOPY DETECTED ON FD %d", w->id, pi->fd);
 
-                if (unlikely(w->ifd != -1 && w->ifd != w->ofd && w->ifd != fd)) {
+                if (w->ifd != -1 && w->ifd != w->ofd && w->ifd != fd) {
                     // add a new socket to poll_events, with the same
                     netdata_log_debug(D_WEB_CLIENT, "%llu: CREATING FILECOPY SLOT ON FD %d", w->id, pi->fd);
 
@@ -333,20 +333,20 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
             }
         }
         else {
-            if(unlikely(w->ifd == fd && web_client_has_wait_receive(w)))
+            if(w->ifd == fd && web_client_has_wait_receive(w))
                 *events |= POLLIN;
         }
 
-        if(unlikely(w->ofd == fd && web_client_has_wait_send(w)))
+        if(w->ofd == fd && web_client_has_wait_send(w))
             *events |= POLLOUT;
-    } else if(unlikely(bytes < 0)) {
+    } else if(bytes < 0) {
         ret = -1;
         goto cleanup;
-    } else if (unlikely(bytes == 0)) {
-        if(unlikely(w->ifd == fd && web_client_has_ssl_wait_receive(w)))
+    } else if (bytes == 0) {
+        if(w->ifd == fd && web_client_has_ssl_wait_receive(w))
             *events |= POLLIN;
 
-        if(unlikely(w->ofd == fd && web_client_has_ssl_wait_send(w)))
+        if(w->ofd == fd && web_client_has_ssl_wait_send(w))
             *events |= POLLOUT;
     }
 
@@ -370,15 +370,15 @@ static int web_server_snd_callback(POLLINFO *pi, short int *events) {
 
     int ret = web_client_send(w);
 
-    if(unlikely(ret < 0)) {
+    if(ret < 0) {
         retval = -1;
         goto cleanup;
     }
 
-    if(unlikely(w->ifd == fd && web_client_has_wait_receive(w)))
+    if(w->ifd == fd && web_client_has_wait_receive(w))
         *events |= POLLIN;
 
-    if(unlikely(w->ofd == fd && web_client_has_wait_send(w)))
+    if(w->ofd == fd && web_client_has_wait_send(w))
         *events |= POLLOUT;
 
     retval = web_server_check_client_status(w);

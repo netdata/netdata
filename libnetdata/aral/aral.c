@@ -123,7 +123,7 @@ struct aral_statistics *aral_statistics(ARAL *ar) {
 
 #define ARAL_NATURAL_ALIGNMENT  (sizeof(uintptr_t) * 2)
 static inline size_t natural_alignment(size_t size, size_t alignment) {
-    if(unlikely(size % alignment))
+    if(size % alignment)
         size = size + alignment - (size % alignment);
 
     return size;
@@ -140,39 +140,39 @@ static size_t aral_align_alloc_size(ARAL *ar, uint64_t size) {
 }
 
 static inline void aral_lock(ARAL *ar) {
-    if(likely(!(ar->config.options & ARAL_LOCKLESS)))
+    if(!(ar->config.options & ARAL_LOCKLESS))
         spinlock_lock(&ar->aral_lock.spinlock);
 }
 
 static inline void aral_unlock(ARAL *ar) {
-    if(likely(!(ar->config.options & ARAL_LOCKLESS)))
+    if(!(ar->config.options & ARAL_LOCKLESS))
         spinlock_unlock(&ar->aral_lock.spinlock);
 }
 
 static inline void aral_page_free_lock(ARAL *ar, ARAL_PAGE *page) {
-    if(likely(!(ar->config.options & ARAL_LOCKLESS)))
+    if(!(ar->config.options & ARAL_LOCKLESS))
         spinlock_lock(&page->free.spinlock);
 }
 
 static inline void aral_page_free_unlock(ARAL *ar, ARAL_PAGE *page) {
-    if(likely(!(ar->config.options & ARAL_LOCKLESS)))
+    if(!(ar->config.options & ARAL_LOCKLESS))
         spinlock_unlock(&page->free.spinlock);
 }
 
 static inline bool aral_adders_trylock(ARAL *ar) {
-    if(likely(!(ar->config.options & ARAL_LOCKLESS)))
+    if(!(ar->config.options & ARAL_LOCKLESS))
         return spinlock_trylock(&ar->adders.spinlock);
 
     return true;
 }
 
 static inline void aral_adders_lock(ARAL *ar) {
-    if(likely(!(ar->config.options & ARAL_LOCKLESS)))
+    if(!(ar->config.options & ARAL_LOCKLESS))
         spinlock_lock(&ar->adders.spinlock);
 }
 
 static inline void aral_adders_unlock(ARAL *ar) {
-    if(likely(!(ar->config.options & ARAL_LOCKLESS)))
+    if(!(ar->config.options & ARAL_LOCKLESS))
         spinlock_unlock(&ar->adders.spinlock);
 }
 
@@ -193,7 +193,7 @@ static void aral_delete_leftover_files(const char *name, const char *path, const
 
         snprintfz(full_path, FILENAME_MAX, "%s/%s", path, de->d_name);
         netdata_log_info("ARAL: '%s' removing left-over file '%s'", name, full_path);
-        if(unlikely(unlink(full_path) == -1))
+        if(unlink(full_path) == -1)
             netdata_log_error("ARAL: '%s' cannot delete file '%s'", name, full_path);
     }
 
@@ -205,11 +205,11 @@ static void aral_delete_leftover_files(const char *name, const char *path, const
 
 #ifdef NETDATA_INTERNAL_CHECKS
 static inline void aral_free_validate_internal_check(ARAL *ar, ARAL_FREE *fr) {
-    if(unlikely(fr->size < ar->config.element_size))
+    if(fr->size < ar->config.element_size)
         fatal("ARAL: '%s' free item of size %zu, less than the expected element size %zu",
               ar->config.name, fr->size, ar->config.element_size);
 
-    if(unlikely(fr->size % ar->config.element_size))
+    if(fr->size % ar->config.element_size)
         fatal("ARAL: '%s' free item of size %zu is not multiple to element size %zu",
               ar->config.name, fr->size, ar->config.element_size);
 }
@@ -228,7 +228,7 @@ static inline ARAL_PAGE *find_page_with_allocation_internal_check(ARAL *ar, void
     ARAL_PAGE *page;
 
     for(page = ar->aral_lock.pages; page ; page = page->aral_lock.next) {
-        if(unlikely(seeking >= (uintptr_t)page->data && seeking < (uintptr_t)page->data + page->size))
+        if(seeking >= (uintptr_t)page->data && seeking < (uintptr_t)page->data + page->size)
             break;
     }
 
@@ -278,19 +278,19 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_
     page->max_elements = page->size / ar->config.element_size;
     page->aral_lock.free_elements = page->max_elements;
     page->free_elements_to_move_first = page->max_elements / 4;
-    if(unlikely(page->free_elements_to_move_first < 1))
+    if(page->free_elements_to_move_first < 1)
         page->free_elements_to_move_first = 1;
 
     __atomic_add_fetch(&ar->stats->structures.allocations, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&ar->stats->structures.allocated_bytes, sizeof(ARAL_PAGE), __ATOMIC_RELAXED);
 
-    if(unlikely(ar->config.mmap.enabled)) {
+    if(ar->config.mmap.enabled) {
         ar->aral_lock.file_number++;
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/array_alloc.mmap/%s.%zu", *ar->config.mmap.cache_dir, ar->config.mmap.filename, ar->aral_lock.file_number);
         page->filename = strdupz(filename);
         page->data = netdata_mmap(page->filename, page->size, MAP_SHARED, 0, false, NULL);
-        if (unlikely(!page->data))
+        if (!page->data)
             fatal("ARAL: '%s' cannot allocate aral buffer of size %zu on filename '%s'",
                   ar->config.name, page->size, page->filename);
         __atomic_add_fetch(&ar->stats->mmap.allocations, 1, __ATOMIC_RELAXED);
@@ -323,7 +323,7 @@ void aral_del_page___no_lock_needed(ARAL *ar, ARAL_PAGE *page TRACE_ALLOCATIONS_
     if (ar->config.mmap.enabled) {
         netdata_munmap(page->data, page->size);
 
-        if (unlikely(unlink(page->filename) == 1))
+        if (unlink(page->filename) == 1)
             netdata_log_error("Cannot delete file '%s'", page->filename);
 
         freez((void *)page->filename);
@@ -483,7 +483,7 @@ void *aral_mallocz_internal(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAM
     ARAL_FREE *found_fr = page->free.list;
 
     // check if the remaining size (after we use this slot) is not enough for another element
-    if(unlikely(found_fr->size - ar->config.element_size < ar->config.element_size)) {
+    if(found_fr->size - ar->config.element_size < ar->config.element_size) {
         // we can use the entire free space entry
 
         page->free.list = found_fr->next;
@@ -509,7 +509,7 @@ void *aral_mallocz_internal(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAM
     ARAL_PAGE **page_ptr = (ARAL_PAGE **)&data[ar->config.page_ptr_offset];
     *page_ptr = page;
 
-    if(unlikely(ar->config.mmap.enabled))
+    if(ar->config.mmap.enabled)
         __atomic_add_fetch(&ar->stats->mmap.used_bytes, ar->config.element_size, __ATOMIC_RELAXED);
     else
         __atomic_add_fetch(&ar->stats->malloc.used_bytes, ar->config.element_size, __ATOMIC_RELAXED);
@@ -604,11 +604,11 @@ static void aral_defrag_sorted_page_position___aral_lock_needed(ARAL *ar, ARAL_P
 }
 
 static inline void aral_move_page_with_free_list___aral_lock_needed(ARAL *ar, ARAL_PAGE *page) {
-    if(unlikely(page == ar->aral_lock.pages))
+    if(page == ar->aral_lock.pages)
         // we are the first already
         return;
 
-    if(likely(!(ar->config.options & ARAL_DEFRAGMENT))) {
+    if(!(ar->config.options & ARAL_DEFRAGMENT)) {
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->aral_lock.pages, page, aral_lock.prev, aral_lock.next);
         aral_insert_not_linked_page_with_free_items_to_proper_position___aral_lock_needed(ar, page);
     }
@@ -622,12 +622,12 @@ void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITI
     return;
 #endif
 
-    if(unlikely(!ptr)) return;
+    if(!ptr) return;
 
     // get the page pointer
     ARAL_PAGE *page = aral_ptr_to_page___must_NOT_have_aral_lock(ar, ptr);
 
-    if(unlikely(ar->config.mmap.enabled))
+    if(ar->config.mmap.enabled)
         __atomic_sub_fetch(&ar->stats->mmap.used_bytes, ar->config.element_size, __ATOMIC_RELAXED);
     else
         __atomic_sub_fetch(&ar->stats->malloc.used_bytes, ar->config.element_size, __ATOMIC_RELAXED);
@@ -664,7 +664,7 @@ void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITI
     ar->aral_lock.user_free_operations++;
 
     // if the page is empty, release it
-    if(unlikely(!page->aral_lock.used_elements)) {
+    if(!page->aral_lock.used_elements) {
         bool is_this_page_the_last_one = ar->aral_lock.pages == page && !page->aral_lock.next;
 
         if(!is_this_page_the_last_one)
@@ -725,7 +725,7 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
     }
 
     long int page_size = sysconf(_SC_PAGE_SIZE);
-    if (unlikely(page_size == -1))
+    if (page_size == -1)
         ar->config.natural_page_size = 4096;
     else
         ar->config.natural_page_size = page_size;

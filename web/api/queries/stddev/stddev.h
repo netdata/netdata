@@ -66,7 +66,7 @@ static inline NETDATA_DOUBLE tg_stddev_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_val
 
     NETDATA_DOUBLE value;
 
-    if(likely(g->count > 1)) {
+    if(g->count > 1) {
         value = tg_stddev_stddev(g);
 
         if(!netdata_double_isnumber(value)) {
@@ -93,11 +93,11 @@ static inline NETDATA_DOUBLE tg_stddev_coefficient_of_variation_flush(RRDR *r, R
 
     NETDATA_DOUBLE value;
 
-    if(likely(g->count > 1)) {
+    if(g->count > 1) {
         NETDATA_DOUBLE m = tg_stddev_mean(g);
         value = 100.0 * tg_stddev_stddev(g) / ((m < 0)? -m : m);
 
-        if(unlikely(!netdata_double_isnumber(value))) {
+        if(!netdata_double_isnumber(value)) {
             value = 0.0;
             *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
         }

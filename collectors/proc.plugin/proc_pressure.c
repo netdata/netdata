@@ -71,7 +71,7 @@ static void proc_pressure_do_resource(procfile *ff, int res_idx, int some) {
     pcs = some ? &resources[res_idx].some : &resources[res_idx].full;
     ri = resource_info[res_idx];
 
-    if (unlikely(!pcs->share_time.st)) {
+    if (!pcs->share_time.st) {
         pcs->share_time.st = rrdset_create_localhost(
             "system",
             pcs->share_time.id,
@@ -97,7 +97,7 @@ static void proc_pressure_do_resource(procfile *ff, int res_idx, int some) {
     pcs->share_time.value60 = strtod(procfile_lineword(ff, some ? 0 : 1, 4), NULL);
     pcs->share_time.value300 = strtod(procfile_lineword(ff, some ? 0 : 1, 6), NULL);
 
-    if (unlikely(!pcs->total_time.st)) {
+    if (!pcs->total_time.st) {
         pcs->total_time.st = rrdset_create_localhost(
             "system",
             pcs->total_time.id,
@@ -142,7 +142,7 @@ int do_proc_pressure(int update_every, usec_t dt) {
         return 0;
     }
 
-    if (unlikely(!base_path)) {
+    if (!base_path) {
         base_path = config_get(CONFIG_SECTION_PLUGIN_PROC_PRESSURE, "base path of pressure metrics", "/proc/pressure");
     }
 
@@ -150,7 +150,7 @@ int do_proc_pressure(int update_every, usec_t dt) {
         procfile *ff = resource_info[i].pf;
         int do_some = resources[i].some.enabled, do_full = resources[i].full.enabled;
 
-        if (unlikely(!ff)) {
+        if (!ff) {
             char filename[FILENAME_MAX + 1];
             char config_key[CONFIG_MAX_NAME + 1];
 
@@ -177,7 +177,7 @@ int do_proc_pressure(int update_every, usec_t dt) {
             }
 
             ff = procfile_open(filename, " =", PROCFILE_FLAG_DEFAULT);
-            if (unlikely(!ff)) {
+            if (!ff) {
                 collector_error("Cannot read pressure information from %s.", filename);
                 fail_count++;
                 continue;
@@ -186,13 +186,13 @@ int do_proc_pressure(int update_every, usec_t dt) {
 
         ff = procfile_readall(ff);
         resource_info[i].pf = ff;
-        if (unlikely(!ff)) {
+        if (!ff) {
             fail_count++;
             continue;
         }
 
         size_t lines = procfile_lines(ff);
-        if (unlikely(lines < 1)) {
+        if (lines < 1) {
             collector_error("%s has no lines.", procfile_filename(ff));
             fail_count++;
             continue;

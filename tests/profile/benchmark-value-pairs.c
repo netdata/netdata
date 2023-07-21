@@ -136,37 +136,37 @@ void test1() {
     const char *s = pairs[i].name;
     const char *v = pairs[i].value;
 
-    if(unlikely(!strcmp(s, "cache")))
+    if(!strcmp(s, "cache"))
       values1[i] = strtoull(v, NULL, 10);
 
-    else if(unlikely(!strcmp(s, "rss")))
+    else if(!strcmp(s, "rss"))
       values1[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(!strcmp(s, "rss_huge")))
+    else if(!strcmp(s, "rss_huge"))
       values1[i] = strtoull(v, NULL, 10);
   
-    else if(unlikely(!strcmp(s, "mapped_file")))
+    else if(!strcmp(s, "mapped_file"))
       values1[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(!strcmp(s, "writeback")))
+    else if(!strcmp(s, "writeback"))
       values1[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(!strcmp(s, "dirty")))
+    else if(!strcmp(s, "dirty"))
       values1[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(!strcmp(s, "swap")))
+    else if(!strcmp(s, "swap"))
       values1[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(!strcmp(s, "pgpgin")))
+    else if(!strcmp(s, "pgpgin"))
       values1[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(!strcmp(s, "pgpgout")))
+    else if(!strcmp(s, "pgpgout"))
       values1[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(!strcmp(s, "pgfault")))
+    else if(!strcmp(s, "pgfault"))
       values1[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(!strcmp(s, "pgmajfault")))
+    else if(!strcmp(s, "pgmajfault"))
       values1[i] = strtoull(v, NULL, 10);
   }
 }
@@ -180,37 +180,37 @@ void test2() {
 
     uint32_t hash = simple_hash2(s);
 
-    if(unlikely(hash == cache_hash && !strcmp(s, "cache")))
+    if(hash == cache_hash && !strcmp(s, "cache"))
       values2[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(hash == rss_hash && !strcmp(s, "rss")))
+    else if(hash == rss_hash && !strcmp(s, "rss"))
       values2[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(hash == rss_huge_hash && !strcmp(s, "rss_huge")))
+    else if(hash == rss_huge_hash && !strcmp(s, "rss_huge"))
       values2[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(hash == mapped_file_hash && !strcmp(s, "mapped_file")))
+    else if(hash == mapped_file_hash && !strcmp(s, "mapped_file"))
       values2[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(hash == writeback_hash && !strcmp(s, "writeback")))
+    else if(hash == writeback_hash && !strcmp(s, "writeback"))
       values2[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(hash == dirty_hash && !strcmp(s, "dirty")))
+    else if(hash == dirty_hash && !strcmp(s, "dirty"))
       values2[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(hash == swap_hash && !strcmp(s, "swap")))
+    else if(hash == swap_hash && !strcmp(s, "swap"))
       values2[i] = strtoull(v, NULL, 10);
   
-    else if(unlikely(hash == pgpgin_hash && !strcmp(s, "pgpgin")))
+    else if(hash == pgpgin_hash && !strcmp(s, "pgpgin"))
       values2[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(hash == pgpgout_hash && !strcmp(s, "pgpgout")))
+    else if(hash == pgpgout_hash && !strcmp(s, "pgpgout"))
       values2[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(hash == pgfault_hash && !strcmp(s, "pgfault")))
+    else if(hash == pgfault_hash && !strcmp(s, "pgfault"))
       values2[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(hash == pgmajfault_hash && !strcmp(s, "pgmajfault")))
+    else if(hash == pgmajfault_hash && !strcmp(s, "pgmajfault"))
       values2[i] = strtoull(v, NULL, 10);
   }
 }
@@ -224,37 +224,37 @@ void test3() {
 
     uint32_t hash = simple_hash(s);
 
-    if(unlikely(hash == cache_hash && !strcmp(s, "cache")))
+    if(hash == cache_hash && !strcmp(s, "cache"))
       values3[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(hash == rss_hash && !strcmp(s, "rss")))
+    else if(hash == rss_hash && !strcmp(s, "rss"))
       values3[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(hash == rss_huge_hash && !strcmp(s, "rss_huge")))
+    else if(hash == rss_huge_hash && !strcmp(s, "rss_huge"))
       values3[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(hash == mapped_file_hash && !strcmp(s, "mapped_file")))
+    else if(hash == mapped_file_hash && !strcmp(s, "mapped_file"))
       values3[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(hash == writeback_hash && !strcmp(s, "writeback")))
+    else if(hash == writeback_hash && !strcmp(s, "writeback"))
       values3[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(hash == dirty_hash && !strcmp(s, "dirty")))
+    else if(hash == dirty_hash && !strcmp(s, "dirty"))
       values3[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(hash == swap_hash && !strcmp(s, "swap")))
+    else if(hash == swap_hash && !strcmp(s, "swap"))
       values3[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(hash == pgpgin_hash && !strcmp(s, "pgpgin")))
+    else if(hash == pgpgin_hash && !strcmp(s, "pgpgin"))
       values3[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(hash == pgpgout_hash && !strcmp(s, "pgpgout")))
+    else if(hash == pgpgout_hash && !strcmp(s, "pgpgout"))
       values3[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(hash == pgfault_hash && !strcmp(s, "pgfault")))
+    else if(hash == pgfault_hash && !strcmp(s, "pgfault"))
       values3[i] = strtoull(v, NULL, 10);
     
-    else if(unlikely(hash == pgmajfault_hash && !strcmp(s, "pgmajfault")))
+    else if(hash == pgmajfault_hash && !strcmp(s, "pgmajfault"))
       values3[i] = strtoull(v, NULL, 10);
   }
 }
@@ -269,57 +269,57 @@ void test4() {
 
     uint32_t hash = simple_hash2(s);
 
-    if(unlikely(hash == cache_hash && !strcmp(s, "cache"))) {
+    if(hash == cache_hash && !strcmp(s, "cache")) {
       values4[i] = strtoull(v, NULL, 0);
       continue;
     }
 
-    if(unlikely(hash == rss_hash && !strcmp(s, "rss"))) {
+    if(hash == rss_hash && !strcmp(s, "rss")) {
       values4[i] = strtoull(v, NULL, 0);
       continue;
     }
     
-    if(unlikely(hash == rss_huge_hash && !strcmp(s, "rss_huge"))) {
+    if(hash == rss_huge_hash && !strcmp(s, "rss_huge")) {
       values4[i] = strtoull(v, NULL, 0);
       continue;
     }
     
-    if(unlikely(hash == mapped_file_hash && !strcmp(s, "mapped_file"))) {
+    if(hash == mapped_file_hash && !strcmp(s, "mapped_file")) {
       values4[i] = strtoull(v, NULL, 0);
       continue;
     }
     
-    if(unlikely(hash == writeback_hash && !strcmp(s, "writeback"))) {
+    if(hash == writeback_hash && !strcmp(s, "writeback")) {
       values4[i] = strtoull(v, NULL, 0);
       continue;
     }
     
-    if(unlikely(hash == dirty_hash && !strcmp(s, "dirty"))) {
+    if(hash == dirty_hash && !strcmp(s, "dirty")) {
       values4[i] = strtoull(v, NULL, 0);
       continue;
     }
     
-    if(unlikely(hash == swap_hash && !strcmp(s, "swap"))) {
+    if(hash == swap_hash && !strcmp(s, "swap")) {
       values4[i] = strtoull(v, NULL, 0);
       continue;
     }
     
-    if(unlikely(hash == pgpgin_hash && !strcmp(s, "pgpgin"))) {
+    if(hash == pgpgin_hash && !strcmp(s, "pgpgin")) {
       values4[i] = strtoull(v, NULL, 0);
       continue;
     }
     
-    if(unlikely(hash == pgpgout_hash && !strcmp(s, "pgpgout"))) {
+    if(hash == pgpgout_hash && !strcmp(s, "pgpgout")) {
       values4[i] = strtoull(v, NULL, 0);
       continue;
     }
     
-    if(unlikely(hash == pgfault_hash && !strcmp(s, "pgfault"))) {
+    if(hash == pgfault_hash && !strcmp(s, "pgfault")) {
       values4[i] = strtoull(v, NULL, 0);
       continue;
     }
     
-    if(unlikely(hash == pgmajfault_hash && !strcmp(s, "pgmajfault"))) {
+    if(hash == pgmajfault_hash && !strcmp(s, "pgmajfault")) {
       values4[i] = strtoull(v, NULL, 0);
       continue;
     }
@@ -335,37 +335,37 @@ void test5() {
 
     uint32_t hash = simple_hash2(s);
 
-    if(unlikely(hash == cache_hash && !strcmp(s, "cache")))
+    if(hash == cache_hash && !strcmp(s, "cache"))
       values5[i] = fast_strtoull(v);
     
-    else if(unlikely(hash == rss_hash && !strcmp(s, "rss")))
+    else if(hash == rss_hash && !strcmp(s, "rss"))
       values5[i] = fast_strtoull(v);
     
-    else if(unlikely(hash == rss_huge_hash && !strcmp(s, "rss_huge")))
+    else if(hash == rss_huge_hash && !strcmp(s, "rss_huge"))
       values5[i] = fast_strtoull(v);
     
-    else if(unlikely(hash == mapped_file_hash && !strcmp(s, "mapped_file")))
+    else if(hash == mapped_file_hash && !strcmp(s, "mapped_file"))
       values5[i] = fast_strtoull(v);
     
-    else if(unlikely(hash == writeback_hash && !strcmp(s, "writeback")))
+    else if(hash == writeback_hash && !strcmp(s, "writeback"))
       values5[i] = fast_strtoull(v);
     
-    else if(unlikely(hash == dirty_hash && !strcmp(s, "dirty")))
+    else if(hash == dirty_hash && !strcmp(s, "dirty"))
       values5[i] = fast_strtoull(v);
     
-    else if(unlikely(hash == swap_hash && !strcmp(s, "swap")))
+    else if(hash == swap_hash && !strcmp(s, "swap"))
       values5[i] = fast_strtoull(v);
   
-    else if(unlikely(hash == pgpgin_hash && !strcmp(s, "pgpgin")))
+    else if(hash == pgpgin_hash && !strcmp(s, "pgpgin"))
       values5[i] = fast_strtoull(v);
     
-    else if(unlikely(hash == pgpgout_hash && !strcmp(s, "pgpgout")))
+    else if(hash == pgpgout_hash && !strcmp(s, "pgpgout"))
       values5[i] = fast_strtoull(v);
     
-    else if(unlikely(hash == pgfault_hash && !strcmp(s, "pgfault")))
+    else if(hash == pgfault_hash && !strcmp(s, "pgfault"))
       values5[i] = fast_strtoull(v);
     
-    else if(unlikely(hash == pgmajfault_hash && !strcmp(s, "pgmajfault")))
+    else if(hash == pgmajfault_hash && !strcmp(s, "pgmajfault"))
       values5[i] = fast_strtoull(v);
   }
 }
@@ -384,7 +384,7 @@ void arl_strtoull(const char *name, uint32_t hash, const char *value, void *dst)
 void test6() {
     static ARL_BASE *base = NULL;
 
-    if(unlikely(!base)) {
+    if(!base) {
         base = arl_create("test6", arl_strtoull, 60);
         arl_expect_custom(base, "cache",       NULL, &values6[0]);
         arl_expect_custom(base, "rss",         NULL, &values6[1]);
@@ -418,7 +418,7 @@ void arl_str2ull(const char *name, uint32_t hash, const char *value, void *dst) 
 void test7() {
     static ARL_BASE *base = NULL;
 
-    if(unlikely(!base)) {
+    if(!base) {
         base = arl_create("test7", arl_str2ull, 60);
         arl_expect_custom(base, "cache",       NULL, &values7[0]);
         arl_expect_custom(base, "rss",         NULL, &values7[1]);
@@ -497,14 +497,14 @@ static unsigned long long clk;
 
 static void begin_clock() {
     struct timeval tv;
-    if(unlikely(gettimeofday(&tv, NULL) == -1))
+    if(gettimeofday(&tv, NULL) == -1)
         return;
     clk = tv.tv_sec  * 1000000 + tv.tv_usec;
 }
 
 static unsigned long long end_clock() {
     struct timeval tv;
-    if(unlikely(gettimeofday(&tv, NULL) == -1))
+    if(gettimeofday(&tv, NULL) == -1)
         return -1;
     return clk = tv.tv_sec  * 1000000 + tv.tv_usec - clk;
 }

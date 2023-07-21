@@ -87,7 +87,7 @@ static __thread pid_t gettid_cached_tid = 0;
 pid_t gettid(void) {
     pid_t tid = 0;
 
-    if(likely(gettid_cached_tid > 0))
+    if(gettid_cached_tid > 0)
         return gettid_cached_tid;
 
 #ifdef __FreeBSD__

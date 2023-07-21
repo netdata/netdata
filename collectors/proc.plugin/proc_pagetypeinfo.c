@@ -84,34 +84,34 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
     // Startup: Init arch and open /proc/pagetypeinfo
-    if (unlikely(!pagesize)) {
+    if (!pagesize) {
         pagesize = sysconf(_SC_PAGESIZE);
     }
 
-    if(unlikely(!ff)) {
+    if(!ff) {
         snprintfz(ff_path, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME);
         ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_PAGETYPEINFO, "filename to monitor", ff_path), " \t:", PROCFILE_FLAG_DEFAULT);
 
-        if(unlikely(!ff)) {
+        if(!ff) {
             strncpyz(ff_path, PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME, FILENAME_MAX);
             ff = procfile_open(PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME, " \t,", PROCFILE_FLAG_DEFAULT);
         }
     }
-    if(unlikely(!ff))
+    if(!ff)
         return 1;
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff))
+    if(!ff)
         return 0; // we return 0, so that we will retry to open it next time
 
     // --------------------------------------------------------------------
     // Init: find how many Nodes, Zones and Types
-    if(unlikely(pagelines_cnt == 0)) {
+    if(pagelines_cnt == 0) {
         size_t nodenumlast = -1;
         char *zonenamelast = NULL;
 
         ff_lines = procfile_lines(ff);
-        if(unlikely(!ff_lines)) {
+        if(!ff_lines) {
             collector_error("PLUGIN: PROC_PAGETYPEINFO: Cannot read %s, zero lines reported.", ff_path);
             return 1;
         }

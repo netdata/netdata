@@ -121,7 +121,7 @@ static inline REFCOUNT metric_acquire(MRG *mrg __maybe_unused, METRIC *metric, b
     if(!having_spinlock)
         metric_lock(metric);
 
-    if(unlikely(metric->refcount < 0))
+    if(metric->refcount < 0)
         fatal("METRIC: refcount is %d (negative) during acquire", metric->refcount);
 
     refcount = ++metric->refcount;
@@ -147,17 +147,17 @@ static inline bool metric_release_and_can_be_deleted(MRG *mrg __maybe_unused, ME
 
     metric_lock(metric);
 
-    if(unlikely(metric->refcount <= 0))
+    if(metric->refcount <= 0)
         fatal("METRIC: refcount is %d (zero or negative) during release", metric->refcount);
 
     refcount = --metric->refcount;
 
-    if(likely(metric_has_retention_unsafe(mrg, metric) || refcount != 0))
+    if(metric_has_retention_unsafe(mrg, metric) || refcount != 0)
         ret = false;
 
     metric_unlock(metric);
 
-    if(unlikely(!refcount))
+    if(!refcount)
         __atomic_sub_fetch(&mrg->index[partition].stats.entries_referenced, 1, __ATOMIC_RELAXED);
 
     __atomic_sub_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
@@ -175,10 +175,10 @@ static inline METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *r
     size_t mem_before_judyl, mem_after_judyl;
 
     Pvoid_t *sections_judy_pptr = JudyHSIns(&mrg->index[partition].uuid_judy, &entry->uuid, sizeof(uuid_t), PJE0);
-    if(unlikely(!sections_judy_pptr || sections_judy_pptr == PJERR))
+    if(!sections_judy_pptr || sections_judy_pptr == PJERR)
         fatal("DBENGINE METRIC: corrupted UUIDs JudyHS array");
 
-    if(unlikely(!*sections_judy_pptr))
+    if(!*sections_judy_pptr)
         mrg_stats_size_judyhs_added_uuid(mrg, partition);
 
     mem_before_judyl = JudyLMemUsed(*sections_judy_pptr);
@@ -186,10 +186,10 @@ static inline METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *r
     mem_after_judyl = JudyLMemUsed(*sections_judy_pptr);
     mrg_stats_size_judyl_change(mrg, mem_before_judyl, mem_after_judyl, partition);
 
-    if(unlikely(!PValue || PValue == PJERR))
+    if(!PValue || PValue == PJERR)
         fatal("DBENGINE METRIC: corrupted section JudyL array");
 
-    if(unlikely(*PValue != NULL)) {
+    if(*PValue != NULL) {
         METRIC *metric = *PValue;
 
         metric_acquire(mrg, metric, false);
@@ -238,14 +238,14 @@ static inline METRIC *metric_get_and_acquire(MRG *mrg, uuid_t *uuid, Word_t sect
     mrg_index_read_lock(mrg, partition);
 
     Pvoid_t *sections_judy_pptr = JudyHSGet(mrg->index[partition].uuid_judy, uuid, sizeof(uuid_t));
-    if(unlikely(!sections_judy_pptr)) {
+    if(!sections_judy_pptr) {
         mrg_index_read_unlock(mrg, partition);
         MRG_STATS_SEARCH_MISS(mrg, partition);
         return NULL;
     }
 
     Pvoid_t *PValue = JudyLGet(*sections_judy_pptr, section, PJE0);
-    if(unlikely(!PValue)) {
+    if(!PValue) {
         mrg_index_read_unlock(mrg, partition);
         MRG_STATS_SEARCH_MISS(mrg, partition);
         return NULL;
@@ -275,7 +275,7 @@ static inline bool acquired_metric_del(MRG *mrg, METRIC *metric) {
     }
 
     Pvoid_t *sections_judy_pptr = JudyHSGet(mrg->index[partition].uuid_judy, &metric->uuid, sizeof(uuid_t));
-    if(unlikely(!sections_judy_pptr || !*sections_judy_pptr)) {
+    if(!sections_judy_pptr || !*sections_judy_pptr) {
         MRG_STATS_DELETE_MISS(mrg, partition);
         mrg_index_write_unlock(mrg, partition);
         return false;
@@ -286,7 +286,7 @@ static inline bool acquired_metric_del(MRG *mrg, METRIC *metric) {
     mem_after_judyl = JudyLMemUsed(*sections_judy_pptr);
     mrg_stats_size_judyl_change(mrg, mem_before_judyl, mem_after_judyl, partition);
 
-    if(unlikely(!rc)) {
+    if(!rc) {
         MRG_STATS_DELETE_MISS(mrg, partition);
         mrg_index_write_unlock(mrg, partition);
         return false;
@@ -294,7 +294,7 @@ static inline bool acquired_metric_del(MRG *mrg, METRIC *metric) {
 
     if(!*sections_judy_pptr) {
         rc = JudyHSDel(&mrg->index[partition].uuid_judy, &metric->uuid, sizeof(uuid_t), PJE0);
-        if(unlikely(!rc))
+        if(!rc)
             fatal("DBENGINE METRIC: cannot delete UUID from JudyHS");
         mrg_stats_size_judyhs_removed_uuid(mrg, partition);
     }
@@ -387,7 +387,7 @@ inline Word_t mrg_metric_section(MRG *mrg __maybe_unused, METRIC *metric) {
 inline bool mrg_metric_set_first_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s) {
     internal_fatal(first_time_s < 0, "DBENGINE METRIC: timestamp is negative");
 
-    if(unlikely(first_time_s < 0))
+    if(first_time_s < 0)
         return false;
 
     metric_lock(metric);
@@ -406,30 +406,30 @@ inline void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric,
     internal_fatal(last_time_s > max_acceptable_collected_time(),
                    "DBENGINE METRIC: metric last time is in the future");
 
-    if(unlikely(first_time_s < 0))
+    if(first_time_s < 0)
         first_time_s = 0;
 
-    if(unlikely(last_time_s < 0))
+    if(last_time_s < 0)
         last_time_s = 0;
 
-    if(unlikely(update_every_s < 0))
+    if(update_every_s < 0)
         update_every_s = 0;
 
-    if(unlikely(!first_time_s && !last_time_s && !update_every_s))
+    if(!first_time_s && !last_time_s && !update_every_s)
         return;
 
     metric_lock(metric);
 
-    if(unlikely(first_time_s && (!metric->first_time_s || first_time_s < metric->first_time_s)))
+    if(first_time_s && (!metric->first_time_s || first_time_s < metric->first_time_s))
         metric->first_time_s = first_time_s;
 
-    if(likely(last_time_s && (!metric->latest_time_s_clean || last_time_s > metric->latest_time_s_clean))) {
+    if(last_time_s && (!metric->latest_time_s_clean || last_time_s > metric->latest_time_s_clean)) {
         metric->latest_time_s_clean = last_time_s;
 
-        if(likely(update_every_s))
+        if(update_every_s)
             metric->latest_update_every_s = (uint32_t) update_every_s;
     }
-    else if(unlikely(!metric->latest_update_every_s && update_every_s))
+    else if(!metric->latest_update_every_s && update_every_s)
         metric->latest_update_every_s = (uint32_t) update_every_s;
 
     metric_has_retention_unsafe(mrg, metric);
@@ -457,7 +457,7 @@ inline time_t mrg_metric_get_first_time_s(MRG *mrg __maybe_unused, METRIC *metri
 
     metric_lock(metric);
 
-    if(unlikely(!metric->first_time_s)) {
+    if(!metric->first_time_s) {
         if(metric->latest_time_s_clean)
             metric->first_time_s = metric->latest_time_s_clean;
 
@@ -475,7 +475,7 @@ inline time_t mrg_metric_get_first_time_s(MRG *mrg __maybe_unused, METRIC *metri
 inline void mrg_metric_get_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t *first_time_s, time_t *last_time_s, time_t *update_every_s) {
     metric_lock(metric);
 
-    if(unlikely(!metric->first_time_s)) {
+    if(!metric->first_time_s) {
         if(metric->latest_time_s_clean)
             metric->first_time_s = metric->latest_time_s_clean;
 
@@ -493,7 +493,7 @@ inline void mrg_metric_get_retention(MRG *mrg __maybe_unused, METRIC *metric, ti
 inline bool mrg_metric_set_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {
     internal_fatal(latest_time_s < 0, "DBENGINE METRIC: timestamp is negative");
 
-    if(unlikely(latest_time_s < 0))
+    if(latest_time_s < 0)
         return false;
 
     metric_lock(metric);
@@ -506,7 +506,7 @@ inline bool mrg_metric_set_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *
 
     metric->latest_time_s_clean = latest_time_s;
 
-    if(unlikely(!metric->first_time_s))
+    if(!metric->first_time_s)
         metric->first_time_s = latest_time_s;
 
     metric_has_retention_unsafe(mrg, metric);
@@ -572,13 +572,13 @@ inline bool mrg_metric_set_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *me
 //    internal_fatal(latest_time_s > max_acceptable_collected_time(),
 //                   "DBENGINE METRIC: metric latest time is in the future");
 
-    if(unlikely(latest_time_s < 0))
+    if(latest_time_s < 0)
         return false;
 
     metric_lock(metric);
     metric->latest_time_s_hot = latest_time_s;
 
-    if(unlikely(!metric->first_time_s))
+    if(!metric->first_time_s)
         metric->first_time_s = latest_time_s;
 
     metric_has_retention_unsafe(mrg, metric);
@@ -662,7 +662,7 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
         time_t first_time_s, time_t last_time_s,
         time_t update_every_s, time_t now_s)
 {
-    if(unlikely(last_time_s > now_s)) {
+    if(last_time_s > now_s) {
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "DBENGINE JV2: wrong last time on-disk (%ld - %ld, now %ld), "
                           "fixing last time to now",
@@ -670,7 +670,7 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
         last_time_s = now_s;
     }
 
-    if (unlikely(first_time_s > last_time_s)) {
+    if (first_time_s > last_time_s) {
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "DBENGINE JV2: wrong first time on-disk (%ld - %ld, now %ld), "
                           "fixing first time to last time",
@@ -679,7 +679,7 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
         first_time_s = last_time_s;
     }
 
-    if (unlikely(first_time_s == 0 || last_time_s == 0)) {
+    if (first_time_s == 0 || last_time_s == 0) {
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "DBENGINE JV2: zero on-disk timestamps (%ld - %ld, now %ld), "
                           "using them as-is",
@@ -700,7 +700,7 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
         metric = mrg_metric_add_and_acquire(mrg, entry, &added);
     }
 
-    if (likely(!added))
+    if (!added)
         mrg_metric_expand_retention(mrg, metric, first_time_s, last_time_s, update_every_s);
 
     mrg_metric_release(mrg, metric);

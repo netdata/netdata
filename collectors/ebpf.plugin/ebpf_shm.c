@@ -559,7 +559,7 @@ static void ebpf_update_shm_cgroup(int maps_per_core)
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_publish_shm_t *out = &pids->shm;
-            if (likely(shm_pid) && shm_pid[pid]) {
+            if (shm_pid && shm_pid[pid]) {
                 netdata_publish_shm_t *in = shm_pid[pid];
 
                 memcpy(out, in, sizeof(netdata_publish_shm_t));
@@ -699,14 +699,14 @@ void ebpf_shm_send_apps_data(struct ebpf_target *root)
 {
     struct ebpf_target *w;
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             ebpf_shm_sum_pids(&w->shm, w->root_pid);
         }
     }
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SHMGET_CHART);
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             write_chart_dimension(w->name, (long long) w->shm.get);
         }
     }
@@ -714,7 +714,7 @@ void ebpf_shm_send_apps_data(struct ebpf_target *root)
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SHMAT_CHART);
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             write_chart_dimension(w->name, (long long) w->shm.at);
         }
     }
@@ -722,7 +722,7 @@ void ebpf_shm_send_apps_data(struct ebpf_target *root)
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SHMDT_CHART);
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             write_chart_dimension(w->name, (long long) w->shm.dt);
         }
     }
@@ -730,7 +730,7 @@ void ebpf_shm_send_apps_data(struct ebpf_target *root)
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SHMCTL_CHART);
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             write_chart_dimension(w->name, (long long) w->shm.ctl);
         }
     }
@@ -915,7 +915,7 @@ static void ebpf_send_systemd_shm_charts()
     ebpf_cgroup_target_t *ect;
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SHMGET_CHART);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+        if (ect->systemd && ect->updated) {
             write_chart_dimension(ect->name, (long long)ect->publish_shm.get);
         }
     }
@@ -923,7 +923,7 @@ static void ebpf_send_systemd_shm_charts()
 
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SHMAT_CHART);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+        if (ect->systemd && ect->updated) {
             write_chart_dimension(ect->name, (long long)ect->publish_shm.at);
         }
     }
@@ -931,7 +931,7 @@ static void ebpf_send_systemd_shm_charts()
 
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SHMDT_CHART);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+        if (ect->systemd && ect->updated) {
             write_chart_dimension(ect->name, (long long)ect->publish_shm.dt);
         }
     }
@@ -939,7 +939,7 @@ static void ebpf_send_systemd_shm_charts()
 
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SHMCTL_CHART);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+        if (ect->systemd && ect->updated) {
             write_chart_dimension(ect->name, (long long)ect->publish_shm.ctl);
         }
     }

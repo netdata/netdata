@@ -34,7 +34,7 @@ static inline void tg_incremental_sum_free(RRDR *r) {
 static inline void tg_incremental_sum_add(RRDR *r, NETDATA_DOUBLE value) {
     struct tg_incremental_sum *g = (struct tg_incremental_sum *)r->time_grouping.data;
 
-    if(unlikely(!g->count)) {
+    if(!g->count) {
         if(isnan(g->first))
             g->first = value;
         else
@@ -53,7 +53,7 @@ static inline NETDATA_DOUBLE tg_incremental_sum_flush(RRDR *r, RRDR_VALUE_FLAGS 
 
     NETDATA_DOUBLE value;
 
-    if(unlikely(!g->count || isnan(g->first) || isnan(g->last))) {
+    if(!g->count || isnan(g->first) || isnan(g->last)) {
         value = 0.0;
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }

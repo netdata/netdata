@@ -120,7 +120,7 @@ int format_host_labels_json_plaintext(struct instance *instance, RRDHOST *host)
     if (!instance->labels_buffer)
         instance->labels_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_exporters);
 
-    if (unlikely(!sending_labels_configured(instance)))
+    if (!sending_labels_configured(instance))
         return 0;
 
     buffer_strcat(instance->labels_buffer, "\"labels\":{");

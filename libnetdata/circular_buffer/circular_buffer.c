@@ -16,7 +16,7 @@ struct circular_buffer *cbuffer_new(size_t initial, size_t max, size_t *statisti
 }
 
 void cbuffer_free(struct circular_buffer *buf) {
-    if (unlikely(!buf))
+    if (!buf)
         return;
 
     if(buf->statistics)

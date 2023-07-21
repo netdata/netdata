@@ -96,13 +96,13 @@ static void parse_line_pair(procfile *ff_netstat, ARL_BASE *base, size_t header_
     size_t vwords = procfile_linewords(ff_netstat, values_line);
     size_t w;
 
-    if(unlikely(vwords > hwords)) {
+    if(vwords > hwords) {
         collector_error("File /proc/net/netstat on header line %zu has %zu words, but on value line %zu has %zu words.", header_line, hwords, values_line, vwords);
         vwords = hwords;
     }
 
     for(w = 1; w < vwords ;w++) {
-        if(unlikely(arl_check(base, procfile_lineword(ff_netstat, header_line, w), procfile_lineword(ff_netstat, values_line, w))))
+        if(arl_check(base, procfile_lineword(ff_netstat, header_line, w), procfile_lineword(ff_netstat, values_line, w)))
             break;
     }
 }
@@ -220,7 +220,7 @@ static void do_proc_net_snmp6(int update_every) {
 
     // prepare for /proc/net/snmp6 parsing
 
-    if(unlikely(!arl_ipv6)) {
+    if(!arl_ipv6) {
         do_ip6_packets          = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 packets", CONFIG_BOOLEAN_AUTO);
         do_ip6_fragsout         = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 fragments sent", CONFIG_BOOLEAN_AUTO);
         do_ip6_fragsin          = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 fragments assembly", CONFIG_BOOLEAN_AUTO);
@@ -341,19 +341,19 @@ static void do_proc_net_snmp6(int update_every) {
 
     // parse /proc/net/snmp
 
-    if (unlikely(!ff_snmp6)) {
+    if (!ff_snmp6) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/snmp6");
         ff_snmp6 = procfile_open(
             config_get("plugin:proc:/proc/net/snmp6", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
-        if (unlikely(!ff_snmp6)) {
+        if (!ff_snmp6) {
             do_snmp6 = false;
             return;
         }
     }
 
     ff_snmp6 = procfile_readall(ff_snmp6);
-    if (unlikely(!ff_snmp6))
+    if (!ff_snmp6)
         return;
 
     size_t lines, l;
@@ -364,14 +364,14 @@ static void do_proc_net_snmp6(int update_every) {
 
     for (l = 0; l < lines; l++) {
         size_t words = procfile_linewords(ff_snmp6, l);
-        if (unlikely(words < 2)) {
-            if (unlikely(words)) {
+        if (words < 2) {
+            if (words) {
                 collector_error("Cannot read /proc/net/snmp6 line %zu. Expected 2 params, read %zu.", l, words);
                 continue;
             }
         }
 
-        if (unlikely(arl_check(arl_ipv6, procfile_lineword(ff_snmp6, l, 0), procfile_lineword(ff_snmp6, l, 1))))
+        if (arl_check(arl_ipv6, procfile_lineword(ff_snmp6, l, 0), procfile_lineword(ff_snmp6, l, 1)))
             break;
     }
 
@@ -384,7 +384,7 @@ static void do_proc_net_snmp6(int update_every) {
         static RRDDIM *rd_received = NULL,
                       *rd_sent = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "system"
                     , "ipv6"
@@ -422,7 +422,7 @@ static void do_proc_net_snmp6(int update_every) {
                       *rd_forwarded = NULL,
                       *rd_delivers = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
                     , "packets"
@@ -462,7 +462,7 @@ static void do_proc_net_snmp6(int update_every) {
                       *rd_failed = NULL,
                       *rd_all = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
                     , "fragsout"
@@ -504,7 +504,7 @@ static void do_proc_net_snmp6(int update_every) {
                       *rd_timeout = NULL,
                       *rd_all = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
                     , "fragsin"
@@ -555,7 +555,7 @@ static void do_proc_net_snmp6(int update_every) {
                       *rd_InNoRoutes      = NULL,
                       *rd_OutNoRoutes     = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
                     , "errors"
@@ -603,7 +603,7 @@ static void do_proc_net_snmp6(int update_every) {
         static RRDDIM *rd_received = NULL,
                       *rd_sent     = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
                     , "udppackets"
@@ -645,7 +645,7 @@ static void do_proc_net_snmp6(int update_every) {
                       *rd_InCsumErrors = NULL,
                       *rd_IgnoredMulti = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
                     , "udperrors"
@@ -687,7 +687,7 @@ static void do_proc_net_snmp6(int update_every) {
         static RRDDIM *rd_received = NULL,
                       *rd_sent     = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
                     , "udplitepackets"
@@ -728,7 +728,7 @@ static void do_proc_net_snmp6(int update_every) {
                       *rd_NoPorts      = NULL,
                       *rd_InCsumErrors = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
                     , "udpliteerrors"
@@ -769,7 +769,7 @@ static void do_proc_net_snmp6(int update_every) {
         static RRDDIM *rd_Ip6InMcastOctets  = NULL,
                       *rd_Ip6OutMcastOctets = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
                     , "mcast"
@@ -804,7 +804,7 @@ static void do_proc_net_snmp6(int update_every) {
         static RRDDIM *rd_Ip6InBcastOctets  = NULL,
                       *rd_Ip6OutBcastOctets = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
                     , "bcast"
@@ -839,7 +839,7 @@ static void do_proc_net_snmp6(int update_every) {
         static RRDDIM *rd_Ip6InMcastPkts  = NULL,
                       *rd_Ip6OutMcastPkts = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
                     , "mcastpkts"
@@ -874,7 +874,7 @@ static void do_proc_net_snmp6(int update_every) {
         static RRDDIM *rd_Icmp6InMsgs  = NULL,
                       *rd_Icmp6OutMsgs = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
                     , "icmp"
@@ -908,7 +908,7 @@ static void do_proc_net_snmp6(int update_every) {
         static RRDDIM *rd_Icmp6InRedirects  = NULL,
                       *rd_Icmp6OutRedirects = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
                     , "icmpredir"
@@ -960,7 +960,7 @@ static void do_proc_net_snmp6(int update_every) {
                       *rd_OutTimeExcds    = NULL,
                       *rd_OutParmProblems = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
                     , "icmperrors"
@@ -1016,7 +1016,7 @@ static void do_proc_net_snmp6(int update_every) {
                       *rd_InEchoReplies  = NULL,
                       *rd_OutEchoReplies = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
                     , "icmpechos"
@@ -1062,7 +1062,7 @@ static void do_proc_net_snmp6(int update_every) {
                       *rd_InReductions  = NULL,
                       *rd_OutReductions = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
                     , "groupmemb"
@@ -1107,7 +1107,7 @@ static void do_proc_net_snmp6(int update_every) {
                       *rd_InAdvertisements  = NULL,
                       *rd_OutAdvertisements = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
                     , "icmprouter"
@@ -1149,7 +1149,7 @@ static void do_proc_net_snmp6(int update_every) {
                       *rd_InAdvertisements  = NULL,
                       *rd_OutAdvertisements = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
                     , "icmpneighbor"
@@ -1187,7 +1187,7 @@ static void do_proc_net_snmp6(int update_every) {
         static RRDDIM *rd_InMLDv2Reports  = NULL,
                       *rd_OutMLDv2Reports = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
                     , "icmpmldv2"
@@ -1237,7 +1237,7 @@ static void do_proc_net_snmp6(int update_every) {
                       *rd_OutType135 = NULL,
                       *rd_OutType143 = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
                     , "icmptypes"
@@ -1285,7 +1285,7 @@ static void do_proc_net_snmp6(int update_every) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_InNoECTPkts = NULL, *rd_InECT1Pkts = NULL, *rd_InECT0Pkts = NULL, *rd_InCEPkts = NULL;
 
-        if (unlikely(!st)) {
+        if (!st) {
             st = rrdset_create_localhost(
                 RRD_TYPE_NET_SNMP6,
                 "ect",
@@ -1421,7 +1421,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
     // prepare for /proc/net/netstat parsing
 
-    if(unlikely(!arl_ipext)) {
+    if(!arl_ipext) {
         hash_ipext = simple_hash("IpExt");
         hash_tcpext = simple_hash("TcpExt");
 
@@ -1537,7 +1537,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
     // prepare for /proc/net/snmp parsing
 
-    if(unlikely(!arl_ip)) {
+    if(!arl_ip) {
         do_ip_packets       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 packets", CONFIG_BOOLEAN_AUTO);
         do_ip_fragsout      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 fragments sent", CONFIG_BOOLEAN_AUTO);
         do_ip_fragsin       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 fragments assembly", CONFIG_BOOLEAN_AUTO);
@@ -1654,15 +1654,15 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
     // parse /proc/net/netstat
 
-    if(unlikely(!ff_netstat)) {
+    if(!ff_netstat) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/netstat");
         ff_netstat = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff_netstat)) return 1;
+        if(!ff_netstat) return 1;
     }
 
     ff_netstat = procfile_readall(ff_netstat);
-    if(unlikely(!ff_netstat)) return 0; // we return 0, so that we will retry to open it next time
+    if(!ff_netstat) return 0; // we return 0, so that we will retry to open it next time
 
     lines = procfile_lines(ff_netstat);
 
@@ -1673,11 +1673,11 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         char *key = procfile_lineword(ff_netstat, l, 0);
         uint32_t hash = simple_hash(key);
 
-        if(unlikely(hash == hash_ipext && strcmp(key, "IpExt") == 0)) {
+        if(hash == hash_ipext && strcmp(key, "IpExt") == 0) {
             size_t h = l++;
 
             words = procfile_linewords(ff_netstat, l);
-            if(unlikely(words < 2)) {
+            if(words < 2) {
                 collector_error("Cannot read /proc/net/netstat IpExt line. Expected 2+ params, read %zu.", words);
                 continue;
             }
@@ -1685,11 +1685,11 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
             parse_line_pair(ff_netstat, arl_ipext, h, l);
 
         }
-        else if(unlikely(hash == hash_tcpext && strcmp(key, "TcpExt") == 0)) {
+        else if(hash == hash_tcpext && strcmp(key, "TcpExt") == 0) {
             size_t h = l++;
 
             words = procfile_linewords(ff_netstat, l);
-            if(unlikely(words < 2)) {
+            if(words < 2) {
                 collector_error("Cannot read /proc/net/netstat TcpExt line. Expected 2+ params, read %zu.", words);
                 continue;
             }
@@ -1700,15 +1700,15 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
     // parse /proc/net/snmp
 
-    if(unlikely(!ff_snmp)) {
+    if(!ff_snmp) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/snmp");
         ff_snmp = procfile_open(config_get("plugin:proc:/proc/net/snmp", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff_snmp)) return 1;
+        if(!ff_snmp) return 1;
     }
 
     ff_snmp = procfile_readall(ff_snmp);
-    if(unlikely(!ff_snmp)) return 0; // we return 0, so that we will retry to open it next time
+    if(!ff_snmp) return 0; // we return 0, so that we will retry to open it next time
 
     lines = procfile_lines(ff_snmp);
     size_t w;
@@ -1717,7 +1717,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         char *key = procfile_lineword(ff_snmp, l, 0);
         uint32_t hash = simple_hash(key);
 
-        if(unlikely(hash == hash_ip && strcmp(key, "Ip") == 0)) {
+        if(hash == hash_ip && strcmp(key, "Ip") == 0) {
             size_t h = l++;
 
             if(strcmp(procfile_lineword(ff_snmp, l, 0), "Ip") != 0) {
@@ -1733,11 +1733,11 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             arl_begin(arl_ip);
             for(w = 1; w < words ; w++) {
-                if (unlikely(arl_check(arl_ip, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0))
+                if (arl_check(arl_ip, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0)
                     break;
             }
         }
-        else if(unlikely(hash == hash_icmp && strcmp(key, "Icmp") == 0)) {
+        else if(hash == hash_icmp && strcmp(key, "Icmp") == 0) {
             size_t h = l++;
 
             if(strcmp(procfile_lineword(ff_snmp, l, 0), "Icmp") != 0) {
@@ -1753,11 +1753,11 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             arl_begin(arl_icmp);
             for(w = 1; w < words ; w++) {
-                if (unlikely(arl_check(arl_icmp, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0))
+                if (arl_check(arl_icmp, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0)
                     break;
             }
         }
-        else if(unlikely(hash == hash_icmpmsg && strcmp(key, "IcmpMsg") == 0)) {
+        else if(hash == hash_icmpmsg && strcmp(key, "IcmpMsg") == 0) {
             size_t h = l++;
 
             if(strcmp(procfile_lineword(ff_snmp, l, 0), "IcmpMsg") != 0) {
@@ -1773,11 +1773,11 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             arl_begin(arl_icmpmsg);
             for(w = 1; w < words ; w++) {
-                if (unlikely(arl_check(arl_icmpmsg, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0))
+                if (arl_check(arl_icmpmsg, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0)
                     break;
             }
         }
-        else if(unlikely(hash == hash_tcp && strcmp(key, "Tcp") == 0)) {
+        else if(hash == hash_tcp && strcmp(key, "Tcp") == 0) {
             size_t h = l++;
 
             if(strcmp(procfile_lineword(ff_snmp, l, 0), "Tcp") != 0) {
@@ -1793,11 +1793,11 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             arl_begin(arl_tcp);
             for(w = 1; w < words ; w++) {
-                if (unlikely(arl_check(arl_tcp, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0))
+                if (arl_check(arl_tcp, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0)
                     break;
             }
         }
-        else if(unlikely(hash == hash_udp && strcmp(key, "Udp") == 0)) {
+        else if(hash == hash_udp && strcmp(key, "Udp") == 0) {
             size_t h = l++;
 
             if(strcmp(procfile_lineword(ff_snmp, l, 0), "Udp") != 0) {
@@ -1813,11 +1813,11 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             arl_begin(arl_udp);
             for(w = 1; w < words ; w++) {
-                if (unlikely(arl_check(arl_udp, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0))
+                if (arl_check(arl_udp, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0)
                     break;
             }
         }
-        else if(unlikely(hash == hash_udplite && strcmp(key, "UdpLite") == 0)) {
+        else if(hash == hash_udplite && strcmp(key, "UdpLite") == 0) {
             size_t h = l++;
 
             if(strcmp(procfile_lineword(ff_snmp, l, 0), "UdpLite") != 0) {
@@ -1833,7 +1833,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             arl_begin(arl_udplite);
             for(w = 1; w < words ; w++) {
-                if (unlikely(arl_check(arl_udplite, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0))
+                if (arl_check(arl_udplite, procfile_lineword(ff_snmp, h, w), procfile_lineword(ff_snmp, l, w)) != 0)
                     break;
             }
         }
@@ -1849,7 +1849,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         static RRDSET *st_system_ip = NULL;
         static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
-        if(unlikely(!st_system_ip)) {
+        if(!st_system_ip) {
             st_system_ip = rrdset_create_localhost(
                     "system"
                     , RRD_TYPE_NET_NETSTAT
@@ -1882,7 +1882,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         static RRDSET *st_ip_inerrors = NULL;
         static RRDDIM *rd_noroutes = NULL, *rd_truncated = NULL, *rd_checksum = NULL;
 
-        if(unlikely(!st_ip_inerrors)) {
+        if(!st_ip_inerrors) {
             st_ip_inerrors = rrdset_create_localhost(
                     RRD_TYPE_NET_NETSTAT
                     , "inerrors"
@@ -1919,7 +1919,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         static RRDSET *st_ip_mcast = NULL;
         static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
-        if(unlikely(!st_ip_mcast)) {
+        if(!st_ip_mcast) {
             st_ip_mcast = rrdset_create_localhost(
                     RRD_TYPE_NET_NETSTAT
                     , "mcast"
@@ -1958,7 +1958,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         static RRDSET *st_ip_bcast = NULL;
         static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
-        if(unlikely(!st_ip_bcast)) {
+        if(!st_ip_bcast) {
             st_ip_bcast = rrdset_create_localhost(
                     RRD_TYPE_NET_NETSTAT
                     , "bcast"
@@ -1997,7 +1997,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         static RRDSET *st_ip_mcastpkts = NULL;
         static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
-        if(unlikely(!st_ip_mcastpkts)) {
+        if(!st_ip_mcastpkts) {
             st_ip_mcastpkts = rrdset_create_localhost(
                     RRD_TYPE_NET_NETSTAT
                     , "mcastpkts"
@@ -2033,7 +2033,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         static RRDSET *st_ip_bcastpkts = NULL;
         static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
-        if(unlikely(!st_ip_bcastpkts)) {
+        if(!st_ip_bcastpkts) {
             st_ip_bcastpkts = rrdset_create_localhost(
                     RRD_TYPE_NET_NETSTAT
                     , "bcastpkts"
@@ -2071,7 +2071,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         static RRDSET *st_ecnpkts = NULL;
         static RRDDIM *rd_cep = NULL, *rd_noectp = NULL, *rd_ectp0 = NULL, *rd_ectp1 = NULL;
 
-        if(unlikely(!st_ecnpkts)) {
+        if(!st_ecnpkts) {
             st_ecnpkts = rrdset_create_localhost(
                     RRD_TYPE_NET_NETSTAT
                     , "ecnpkts"
@@ -2112,7 +2112,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         static RRDSET *st_tcpmemorypressures = NULL;
         static RRDDIM *rd_pressures = NULL;
 
-        if(unlikely(!st_tcpmemorypressures)) {
+        if(!st_tcpmemorypressures) {
             st_tcpmemorypressures = rrdset_create_localhost(
                     RRD_TYPE_NET_NETSTAT
                     , "tcpmemorypressures"
@@ -2148,7 +2148,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         static RRDSET *st_tcpconnaborts = NULL;
         static RRDDIM *rd_baddata = NULL, *rd_userclosed = NULL, *rd_nomemory = NULL, *rd_timeout = NULL, *rd_linger = NULL, *rd_failed = NULL;
 
-        if(unlikely(!st_tcpconnaborts)) {
+        if(!st_tcpconnaborts) {
             st_tcpconnaborts = rrdset_create_localhost(
                     RRD_TYPE_NET_NETSTAT
                     , "tcpconnaborts"
@@ -2192,7 +2192,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         static RRDSET *st_tcpreorders = NULL;
         static RRDDIM *rd_timestamp = NULL, *rd_sack = NULL, *rd_fack = NULL, *rd_reno = NULL;
 
-        if(unlikely(!st_tcpreorders)) {
+        if(!st_tcpreorders) {
             st_tcpreorders = rrdset_create_localhost(
                     RRD_TYPE_NET_NETSTAT
                     , "tcpreorders"
@@ -2233,7 +2233,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         static RRDSET *st_ip_tcpofo = NULL;
         static RRDDIM *rd_inqueue = NULL, *rd_dropped = NULL, *rd_merged = NULL, *rd_pruned = NULL;
 
-        if(unlikely(!st_ip_tcpofo)) {
+        if(!st_ip_tcpofo) {
 
             st_ip_tcpofo = rrdset_create_localhost(
                     RRD_TYPE_NET_NETSTAT
@@ -2273,7 +2273,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         static RRDSET *st_syncookies = NULL;
         static RRDDIM *rd_received = NULL, *rd_sent = NULL, *rd_failed = NULL;
 
-        if(unlikely(!st_syncookies)) {
+        if(!st_syncookies) {
 
             st_syncookies = rrdset_create_localhost(
                     RRD_TYPE_NET_NETSTAT
@@ -2312,7 +2312,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                 *rd_TCPReqQFullDrop = NULL,
                 *rd_TCPReqQFullDoCookies = NULL;
 
-        if(unlikely(!st_syn_queue)) {
+        if(!st_syn_queue) {
 
             st_syn_queue = rrdset_create_localhost(
                     RRD_TYPE_NET_NETSTAT
@@ -2348,7 +2348,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         static RRDDIM *rd_overflows = NULL,
             *rd_drops = NULL;
 
-        if(unlikely(!st_accept_queue)) {
+        if(!st_accept_queue) {
 
             st_accept_queue = rrdset_create_localhost(
                     RRD_TYPE_NET_NETSTAT
@@ -2390,7 +2390,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                         *rd_ForwDatagrams = NULL,
                         *rd_InDelivers = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP
                     , "packets"
@@ -2431,7 +2431,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                         *rd_FragFails = NULL,
                         *rd_FragCreates = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP
                     , "fragsout"
@@ -2471,7 +2471,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                         *rd_ReasmFails = NULL,
                         *rd_ReasmReqds = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP
                     , "fragsin"
@@ -2517,7 +2517,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                         *rd_InAddrErrors = NULL,
                         *rd_InUnknownProtos = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP
                     , "errors"
@@ -2569,7 +2569,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
             static RRDDIM *rd_InMsgs = NULL,
                             *rd_OutMsgs = NULL;
 
-            if(unlikely(!st_packets)) {
+            if(!st_packets) {
                 st_packets = rrdset_create_localhost(
                         RRD_TYPE_NET_SNMP
                         , "icmp"
@@ -2600,7 +2600,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             *rd_OutErrors = NULL,
                             *rd_InCsumErrors = NULL;
 
-            if(unlikely(!st_errors)) {
+            if(!st_errors) {
                 st_errors = rrdset_create_localhost(
                         RRD_TYPE_NET_SNMP
                         , "icmp_errors"
@@ -2676,7 +2676,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                         *rd_InTimestampReps  = NULL,
                         *rd_OutTimestampReps = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP
                     , "icmpmsg"
@@ -2752,7 +2752,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_CurrEstab = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP
                     , "tcpsock"
@@ -2785,7 +2785,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         static RRDDIM *rd_InSegs = NULL,
                         *rd_OutSegs = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP
                     , "tcppackets"
@@ -2824,7 +2824,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                         *rd_InCsumErrors = NULL,
                         *rd_RetransSegs = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP
                     , "tcperrors"
@@ -2862,7 +2862,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         static RRDDIM *rd_ActiveOpens = NULL,
                         *rd_PassiveOpens = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP
                     , "tcpopens"
@@ -2901,7 +2901,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                         *rd_AttemptFails = NULL,
                         *rd_TCPSynRetrans = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP
                     , "tcphandshake"
@@ -2944,7 +2944,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         static RRDDIM *rd_InDatagrams = NULL,
                         *rd_OutDatagrams = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP
                     , "udppackets"
@@ -2989,7 +2989,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                         *rd_InCsumErrors = NULL,
                         *rd_IgnoredMulti = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP
                     , "udperrors"
@@ -3042,7 +3042,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
             static RRDDIM *rd_InDatagrams = NULL,
                             *rd_OutDatagrams = NULL;
 
-            if(unlikely(!st)) {
+            if(!st) {
                 st = rrdset_create_localhost(
                         RRD_TYPE_NET_SNMP
                         , "udplite"
@@ -3076,7 +3076,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             *rd_InCsumErrors = NULL,
                             *rd_IgnoredMulti = NULL;
 
-            if(unlikely(!st)) {
+            if(!st) {
                 st = rrdset_create_localhost(
                         RRD_TYPE_NET_SNMP
                         , "udplite_errors"

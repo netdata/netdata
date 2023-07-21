@@ -48,7 +48,7 @@ static int cloud_to_agent_parse(JSON_ENTRY *e)
                 break;
             }
             if (!strcmp(e->name, "payload")) {
-                if (likely(e->data.string)) {
+                if (e->data.string) {
                     size_t len = strlen(e->data.string);
                     data->payload = mallocz(len+1);
                     if (!url_decode_r(data->payload, e->data.string, len + 1))
@@ -135,22 +135,22 @@ static int aclk_handle_cloud_http_request_v2(struct aclk_request *cloud_to_agent
 
     query = aclk_query_new(HTTP_API_V2);
 
-    if (unlikely(aclk_extract_v2_data(raw_payload, &query->data.http_api_v2.payload))) {
+    if (aclk_extract_v2_data(raw_payload, &query->data.http_api_v2.payload)) {
         netdata_log_error("Error extracting payload expected after the JSON dictionary.");
         goto error;
     }
 
-    if (unlikely(aclk_v2_payload_get_query(query->data.http_api_v2.payload, &query->dedup_id))) {
+    if (aclk_v2_payload_get_query(query->data.http_api_v2.payload, &query->dedup_id)) {
         netdata_log_error("Could not extract payload from query");
         goto error;
     }
 
-    if (unlikely(!cloud_to_agent->callback_topic)) {
+    if (!cloud_to_agent->callback_topic) {
         netdata_log_error("Missing callback_topic");
         goto error;
     }
 
-    if (unlikely(!cloud_to_agent->msg_id)) {
+    if (!cloud_to_agent->msg_id) {
         netdata_log_error("Missing msg_id");
         goto error;
     }
@@ -175,7 +175,7 @@ int aclk_handle_cloud_cmd_message(char *payload)
     struct aclk_request cloud_to_agent;
     memset(&cloud_to_agent, 0, sizeof(struct aclk_request));
 
-    if (unlikely(!payload)) {
+    if (!payload) {
         error_report("ACLK incoming 'cmd' message is empty");
         return 1;
     }
@@ -184,7 +184,7 @@ int aclk_handle_cloud_cmd_message(char *payload)
 
     int rc = json_parse(payload, &cloud_to_agent, cloud_to_agent_parse);
 
-    if (unlikely(rc != JSON_OK)) {
+    if (rc != JSON_OK) {
         error_report("Malformed json request (%s)", payload);
         goto err_cleanup;
     }
@@ -201,7 +201,7 @@ int aclk_handle_cloud_cmd_message(char *payload)
         goto err_cleanup;
     }
 
-    if (likely(!aclk_handle_cloud_http_request_v2(&cloud_to_agent, payload))) {
+    if (!aclk_handle_cloud_http_request_v2(&cloud_to_agent, payload)) {
         // aclk_handle_cloud_request takes ownership of the pointers
         // (to avoid copying) in case of success
         freez(cloud_to_agent.type_id);
@@ -278,7 +278,7 @@ int create_node_instance_result(const char *msg, size_t msg_len)
     };
 
     RRDHOST *host = rrdhost_find_by_guid(res.machine_guid);
-    if (likely(host)) {
+    if (host) {
         if (host == localhost) {
             node_state_update.live = 1;
             node_state_update.hops = 0;
@@ -511,7 +511,7 @@ unsigned int aclk_init_rx_msg_handlers(void)
     for (i = 0; rx_msgs[i].fnc; i++) {
         simple_hash_t hash = simple_hash(rx_msgs[i].name);
         new_cloud_rx_msg_t *hdl = find_rx_handler_by_hash(hash);
-        if (unlikely(hdl)) {
+        if (hdl) {
             // the list of message names changes only by changing
             // the source code, therefore fatal is appropriate
             fatal("Hash collision. Choose better hash. Added '%s' clashes with existing '%s'", rx_msgs[i].name, hdl->name);
@@ -530,7 +530,7 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
     }
     new_cloud_rx_msg_t *msg_descriptor = find_rx_handler_by_hash(simple_hash(message_type));
     netdata_log_debug(D_ACLK, "Got message named '%s' from cloud", message_type);
-    if (unlikely(!msg_descriptor)) {
+    if (!msg_descriptor) {
         netdata_log_error("Do not know how to handle message of type '%s'. Ignoring", message_type);
         if (aclk_stats_enabled) {
             ACLK_STATS_LOCK;

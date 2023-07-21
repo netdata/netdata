@@ -31,13 +31,13 @@ static int read_tcp_mem(void) {
                   *tcp_mem_pressure_threshold = NULL,
                   *tcp_mem_high_threshold = NULL;
 
-    if(unlikely(!tcp_mem_low_threshold)) {
+    if(!tcp_mem_low_threshold) {
         tcp_mem_low_threshold      = rrdvar_custom_host_variable_add_and_acquire(localhost, "tcp_mem_low");
         tcp_mem_pressure_threshold = rrdvar_custom_host_variable_add_and_acquire(localhost, "tcp_mem_pressure");
         tcp_mem_high_threshold     = rrdvar_custom_host_variable_add_and_acquire(localhost, "tcp_mem_high");
     }
 
-    if(unlikely(!filename)) {
+    if(!filename) {
         char buffer[FILENAME_MAX + 1];
         snprintfz(buffer, FILENAME_MAX, "%s/proc/sys/net/ipv4/tcp_mem", netdata_configured_host_prefix);
         filename = strdupz(buffer);
@@ -71,7 +71,7 @@ static kernel_uint_t read_tcp_max_orphans(void) {
     static char *filename = NULL;
     static const RRDVAR_ACQUIRED *tcp_max_orphans_var = NULL;
 
-    if(unlikely(!filename)) {
+    if(!filename) {
         char buffer[FILENAME_MAX + 1];
         snprintfz(buffer, FILENAME_MAX, "%s/proc/sys/net/ipv4/tcp_max_orphans", netdata_configured_host_prefix);
         filename = strdupz(buffer);
@@ -80,7 +80,7 @@ static kernel_uint_t read_tcp_max_orphans(void) {
     unsigned long long tcp_max_orphans = 0;
     if(read_single_number_file(filename, &tcp_max_orphans) == 0) {
 
-        if(unlikely(!tcp_max_orphans_var))
+        if(!tcp_max_orphans_var)
             tcp_max_orphans_var = rrdvar_custom_host_variable_add_and_acquire(localhost, "tcp_max_orphans");
 
         rrdvar_custom_host_variable_set(localhost, tcp_max_orphans_var, tcp_max_orphans);
@@ -117,7 +117,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
     static uint32_t hashes[7] = { 0 };
     static ARL_BASE *bases[7] = { NULL };
 
-    if(unlikely(!arl_sockets)) {
+    if(!arl_sockets) {
         do_sockets         = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat", "ipv4 sockets", CONFIG_BOOLEAN_AUTO);
         do_tcp_sockets     = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat", "ipv4 TCP sockets", CONFIG_BOOLEAN_AUTO);
         do_tcp_mem         = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat", "ipv4 TCP memory", CONFIG_BOOLEAN_AUTO);
@@ -172,21 +172,21 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
     }
 
     update_constants_count += update_every;
-    if(unlikely(update_constants_count > update_constants_every)) {
+    if(update_constants_count > update_constants_every) {
         read_tcp_max_orphans();
         read_tcp_mem();
         update_constants_count = 0;
     }
 
-    if(unlikely(!ff)) {
+    if(!ff) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/sockstat");
         ff = procfile_open(config_get("plugin:proc:/proc/net/sockstat", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff)) return 1;
+        if(!ff) return 1;
     }
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
+    if(!ff) return 0; // we return 0, so that we will retry to open it next time
 
     size_t lines = procfile_lines(ff), l;
 
@@ -197,7 +197,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
         int k;
         for(k = 0; keys[k] ; k++) {
-            if(unlikely(hash == hashes[k] && strcmp(key, keys[k]) == 0)) {
+            if(hash == hashes[k] && strcmp(key, keys[k]) == 0) {
                 // fprintf(stderr, "KEY: '%s', l=%zu, w=1, words=%zu\n", key, l, words);
                 ARL_BASE *arl = bases[k];
                 arl_begin(arl);
@@ -207,7 +207,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     char *name  = procfile_lineword(ff, l, w); w++;
                     char *value = procfile_lineword(ff, l, w); w++;
                     // fprintf(stderr, " > NAME '%s', VALUE '%s', l=%zu, w=%zu, words=%zu\n", name, value, l, w, words);
-                    if(unlikely(arl_check(arl, name, value) != 0))
+                    if(arl_check(arl, name, value) != 0)
                         break;
                 }
 
@@ -226,7 +226,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_used = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "ipv4"
                     , "sockstat_sockets"
@@ -265,7 +265,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                       *rd_timewait = NULL,
                       *rd_alloc = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "ipv4"
                     , "sockstat_tcp_sockets"
@@ -303,7 +303,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_mem = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "ipv4"
                     , "sockstat_tcp_mem"
@@ -336,7 +336,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_inuse = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "ipv4"
                     , "sockstat_udp_sockets"
@@ -369,7 +369,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_mem = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "ipv4"
                     , "sockstat_udp_mem"
@@ -402,7 +402,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_inuse = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "ipv4"
                     , "sockstat_udplite_sockets"
@@ -435,7 +435,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_inuse = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "ipv4"
                     , "sockstat_raw_sockets"
@@ -468,7 +468,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_inuse = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "ipv4"
                     , "sockstat_frag_sockets"
@@ -501,7 +501,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_mem = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "ipv4"
                     , "sockstat_frag_mem"

@@ -4,7 +4,7 @@
 
 void chart_labels2json(RRDSET *st, BUFFER *wb, size_t indentation)
 {
-    if(unlikely(!st->rrdlabels))
+    if(!st->rrdlabels)
         return;
 
     char tabs[11];
@@ -57,7 +57,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         rrdset_name(st),
         rrdset_type_name(st->chart_type));
 
-    if (likely(!skip_volatile))
+    if (!skip_volatile)
         buffer_sprintf(
             wb,
             "\t\t\t\"duration\": %"PRId64",\n",
@@ -70,7 +70,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         (int64_t)first_entry_t //rrdset_first_entry_t(st)
     );
 
-    if (likely(!skip_volatile))
+    if (!skip_volatile)
         buffer_sprintf(
             wb,
             "\t\t\t\"last_entry\": %"PRId64",\n",
@@ -116,7 +116,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
     buffer_strcat(wb, ",\n\t\t\t\"red\": ");
     buffer_print_netdata_double(wb, st->red);
 
-    if (likely(!skip_volatile)) {
+    if (!skip_volatile) {
         buffer_strcat(wb, ",\n\t\t\t\"alarms\": {\n");
         size_t alarms = 0;
         RRDCALC *rc;

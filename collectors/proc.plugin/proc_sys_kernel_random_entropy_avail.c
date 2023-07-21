@@ -7,22 +7,22 @@ int do_proc_sys_kernel_random_entropy_avail(int update_every, usec_t dt) {
 
     static procfile *ff = NULL;
 
-    if(unlikely(!ff)) {
+    if(!ff) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/sys/kernel/random/entropy_avail");
         ff = procfile_open(config_get("plugin:proc:/proc/sys/kernel/random/entropy_avail", "filename to monitor", filename), "", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff)) return 1;
+        if(!ff) return 1;
     }
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
+    if(!ff) return 0; // we return 0, so that we will retry to open it next time
 
     unsigned long long entropy = str2ull(procfile_lineword(ff, 0, 0), NULL);
 
     static RRDSET *st = NULL;
     static RRDDIM *rd = NULL;
 
-    if(unlikely(!st)) {
+    if(!st) {
         st = rrdset_create_localhost(
                 "system"
                 , "entropy"

@@ -38,7 +38,7 @@ static inline void pfwords_add(procfile *ff, char *str) {
     // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   adding word No %d: '%s'", fw->len, str);
 
     pfwords *fw = ff->words;
-    if(unlikely(fw->len == fw->size)) {
+    if(fw->len == fw->size) {
         // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   expanding words");
 
         ff->words = fw = reallocz(fw, sizeof(pfwords) + (fw->size + PFWORDS_INCREASE_STEP) * sizeof(char *));
@@ -53,7 +53,7 @@ static inline size_t *pflines_add(procfile *ff) {
     // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   adding line %d at word %d", fl->len, first_word);
 
     pflines *fl = ff->lines;
-    if(unlikely(fl->len == fl->size)) {
+    if(fl->len == fl->size) {
         // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   expanding lines");
 
         ff->lines = fl = reallocz(fl, sizeof(pflines) + (fl->size + PFLINES_INCREASE_STEP) * sizeof(ffline));
@@ -121,12 +121,12 @@ static void procfile_parser(procfile *ff) {
 		    	break;
 
 		    case PF_CHAR_IS_QUOTE:
-		        if(unlikely(!quote && s == t)) {
+		        if(!quote && s == t) {
 		            // quote opened at the beginning
 		            quote = *s;
 		            t = ++s;
 		        }
-		        else if(unlikely(quote && quote == *s)) {
+		        else if(quote && quote == *s) {
 		            // quote closed
 		            quote = 0;
 
@@ -174,9 +174,9 @@ static void procfile_parser(procfile *ff) {
     	}
 	}
 
-    if(likely(s > t && t < e)) {
+    if(s > t && t < e) {
         // the last word
-        if(unlikely(ff->len >= ff->size)) {
+        if(ff->len >= ff->size) {
             // we are going to loose the last byte
             s = &ff->data[ff->size - 1];
         }
@@ -198,7 +198,7 @@ procfile *procfile_readall1(procfile *ff) {
         ssize_t s = ff->len;
         ssize_t x = ff->size - s;
 
-        if(unlikely(!x)) {
+        if(!x) {
             netdata_log_debug(D_PROCFILE, PF_PREFIX ": Expanding data buffer for file '%s'.", procfile_filename(ff));
             ff = reallocz(ff, sizeof(procfile) + ff->size + PROCFILE_INCREMENT_BUFFER);
             ff->size += PROCFILE_INCREMENT_BUFFER;
@@ -206,8 +206,8 @@ procfile *procfile_readall1(procfile *ff) {
 
         netdata_log_debug(D_PROCFILE, "Reading file '%s', from position %zd with length %zd", procfile_filename(ff), s, (ssize_t)(ff->size - s));
         r = read(ff->fd, &ff->data[s], ff->size - s);
-        if(unlikely(r == -1)) {
-            if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) netdata_log_error(PF_PREFIX ": Cannot read from file '%s' on fd %d", procfile_filename(ff), ff->fd);
+        if(r == -1) {
+            if(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO)) netdata_log_error(PF_PREFIX ": Cannot read from file '%s' on fd %d", procfile_filename(ff), ff->fd);
             procfile_close(ff);
             return NULL;
         }
@@ -216,8 +216,8 @@ procfile *procfile_readall1(procfile *ff) {
     }
 
     // netdata_log_debug(D_PROCFILE, "Rewinding file '%s'", ff->filename);
-    if(unlikely(lseek(ff->fd, 0, SEEK_SET) == -1)) {
-        if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) netdata_log_error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
+    if(lseek(ff->fd, 0, SEEK_SET) == -1) {
+        if(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO)) netdata_log_error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
         procfile_close(ff);
         return NULL;
     }
@@ -226,10 +226,10 @@ procfile *procfile_readall1(procfile *ff) {
     pfwords_reset(ff->words);
     procfile_parser(ff);
 
-    if(unlikely(procfile_adaptive_initial_allocation)) {
-        if(unlikely(ff->len > procfile_max_allocation)) procfile_max_allocation = ff->len;
-        if(unlikely(ff->lines->len > procfile_max_lines)) procfile_max_lines = ff->lines->len;
-        if(unlikely(ff->words->len > procfile_max_words)) procfile_max_words = ff->words->len;
+    if(procfile_adaptive_initial_allocation) {
+        if(ff->len > procfile_max_allocation) procfile_max_allocation = ff->len;
+        if(ff->lines->len > procfile_max_lines) procfile_max_lines = ff->lines->len;
+        if(ff->words->len > procfile_max_words) procfile_max_words = ff->words->len;
     }
 
     // netdata_log_debug(D_PROCFILE, "File '%s' updated.", ff->filename);

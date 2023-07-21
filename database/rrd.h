@@ -447,7 +447,7 @@ static inline STORAGE_METRICS_GROUP *storage_engine_metrics_group_get(STORAGE_EN
     internal_fatal(!is_valid_backend(backend), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+    if(backend == STORAGE_ENGINE_BACKEND_DBENGINE)
         return rrdeng_metrics_group_get(db_instance, uuid);
 #endif
     return rrddim_metrics_group_get(db_instance, uuid);
@@ -459,7 +459,7 @@ static inline void storage_engine_metrics_group_release(STORAGE_ENGINE_BACKEND b
     internal_fatal(!is_valid_backend(backend), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+    if(backend == STORAGE_ENGINE_BACKEND_DBENGINE)
         rrdeng_metrics_group_release(db_instance, smg);
     else
 #endif
@@ -472,7 +472,7 @@ static inline STORAGE_COLLECT_HANDLE *storage_metric_store_init(STORAGE_ENGINE_B
     internal_fatal(!is_valid_backend(backend), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+    if(backend == STORAGE_ENGINE_BACKEND_DBENGINE)
         return rrdeng_store_metric_init(db_metric_handle, update_every, smg);
 #endif
     return rrddim_collect_init(db_metric_handle, update_every, smg);
@@ -495,7 +495,7 @@ static inline void storage_engine_store_metric(
     internal_fatal(!is_valid_backend(collection_handle->backend), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(collection_handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+    if(collection_handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE)
         return rrdeng_store_metric_next(collection_handle, point_in_time_ut,
                                         n, min_value, max_value,
                                         count, anomaly_count, flags);
@@ -508,7 +508,7 @@ static inline void storage_engine_store_metric(
 size_t rrdeng_disk_space_max(STORAGE_INSTANCE *db_instance);
 static inline size_t storage_engine_disk_space_max(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance) {
 #ifdef ENABLE_DBENGINE
-    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+    if(backend == STORAGE_ENGINE_BACKEND_DBENGINE)
         return rrdeng_disk_space_max(db_instance);
 #endif
 
@@ -518,7 +518,7 @@ static inline size_t storage_engine_disk_space_max(STORAGE_ENGINE_BACKEND backen
 size_t rrdeng_disk_space_used(STORAGE_INSTANCE *db_instance);
 static inline size_t storage_engine_disk_space_used(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance) {
 #ifdef ENABLE_DBENGINE
-    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+    if(backend == STORAGE_ENGINE_BACKEND_DBENGINE)
         return rrdeng_disk_space_used(db_instance);
 #endif
 
@@ -529,7 +529,7 @@ static inline size_t storage_engine_disk_space_used(STORAGE_ENGINE_BACKEND backe
 time_t rrdeng_global_first_time_s(STORAGE_INSTANCE *db_instance);
 static inline time_t storage_engine_global_first_time_s(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance) {
 #ifdef ENABLE_DBENGINE
-    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+    if(backend == STORAGE_ENGINE_BACKEND_DBENGINE)
         return rrdeng_global_first_time_s(db_instance);
 #endif
 
@@ -539,7 +539,7 @@ static inline time_t storage_engine_global_first_time_s(STORAGE_ENGINE_BACKEND b
 size_t rrdeng_currently_collected_metrics(STORAGE_INSTANCE *db_instance);
 static inline size_t storage_engine_collected_metrics(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance) {
 #ifdef ENABLE_DBENGINE
-    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+    if(backend == STORAGE_ENGINE_BACKEND_DBENGINE)
         return rrdeng_currently_collected_metrics(db_instance);
 #endif
 
@@ -550,13 +550,13 @@ static inline size_t storage_engine_collected_metrics(STORAGE_ENGINE_BACKEND bac
 void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle);
 void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *collection_handle);
 static inline void storage_engine_store_flush(STORAGE_COLLECT_HANDLE *collection_handle) {
-    if(unlikely(!collection_handle))
+    if(!collection_handle)
         return;
 
     internal_fatal(!is_valid_backend(collection_handle->backend), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(collection_handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+    if(collection_handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE)
         rrdeng_store_metric_flush_current_page(collection_handle);
     else
 #endif
@@ -571,7 +571,7 @@ static inline int storage_engine_store_finalize(STORAGE_COLLECT_HANDLE *collecti
     internal_fatal(!is_valid_backend(collection_handle->backend), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(collection_handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+    if(collection_handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE)
         return rrdeng_store_metric_finalize(collection_handle);
 #endif
 
@@ -584,7 +584,7 @@ static inline void storage_engine_store_change_collection_frequency(STORAGE_COLL
     internal_fatal(!is_valid_backend(collection_handle->backend), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(collection_handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+    if(collection_handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE)
         rrdeng_store_metric_change_collection_frequency(collection_handle, update_every);
     else
 #endif
@@ -601,7 +601,7 @@ static inline time_t storage_engine_oldest_time_s(STORAGE_ENGINE_BACKEND backend
     internal_fatal(!is_valid_backend(backend), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+    if(backend == STORAGE_ENGINE_BACKEND_DBENGINE)
         return rrdeng_metric_oldest_time(db_metric_handle);
 #endif
     return rrddim_query_oldest_time_s(db_metric_handle);
@@ -613,7 +613,7 @@ static inline time_t storage_engine_latest_time_s(STORAGE_ENGINE_BACKEND backend
     internal_fatal(!is_valid_backend(backend), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+    if(backend == STORAGE_ENGINE_BACKEND_DBENGINE)
         return rrdeng_metric_latest_time(db_metric_handle);
 #endif
     return rrddim_query_latest_time_s(db_metric_handle);
@@ -634,7 +634,7 @@ static inline void storage_engine_query_init(
     internal_fatal(!is_valid_backend(backend), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+    if(backend == STORAGE_ENGINE_BACKEND_DBENGINE)
         rrdeng_load_metric_init(db_metric_handle, handle, start_time_s, end_time_s, priority);
     else
 #endif
@@ -647,7 +647,7 @@ static inline STORAGE_POINT storage_engine_query_next_metric(struct storage_engi
     internal_fatal(!is_valid_backend(handle->backend), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+    if(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE)
         return rrdeng_load_metric_next(handle);
 #endif
     return rrddim_query_next_metric(handle);
@@ -659,7 +659,7 @@ static inline int storage_engine_query_is_finished(struct storage_engine_query_h
     internal_fatal(!is_valid_backend(handle->backend), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+    if(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE)
         return rrdeng_load_metric_is_finished(handle);
 #endif
     return rrddim_query_is_finished(handle);
@@ -671,7 +671,7 @@ static inline void storage_engine_query_finalize(struct storage_engine_query_han
     internal_fatal(!is_valid_backend(handle->backend), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+    if(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE)
         rrdeng_load_metric_finalize(handle);
     else
 #endif
@@ -684,7 +684,7 @@ static inline time_t storage_engine_align_to_optimal_before(struct storage_engin
     internal_fatal(!is_valid_backend(handle->backend), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+    if(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE)
         return rrdeng_load_align_to_optimal_before(handle);
 #endif
     return rrddim_query_align_to_optimal_before(handle);
@@ -996,7 +996,7 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
 #define rrdhost_flag_clear(host, flag) __atomic_and_fetch(&((host)->flags), ~(flag), __ATOMIC_SEQ_CST)
 
 #ifdef NETDATA_INTERNAL_CHECKS
-#define rrdset_debug(st, fmt, args...) do { if(unlikely(debug_flags & D_RRD_STATS && rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) \
+#define rrdset_debug(st, fmt, args...) do { if(debug_flags & D_RRD_STATS && rrdset_flag_check(st, RRDSET_FLAG_DEBUG)) \
             debug_int(__FILE__, __FUNCTION__, __LINE__, "%s: " fmt, rrdset_name(st), ##args); } while(0)
 #else
 #define rrdset_debug(st, fmt, args...) debug_dummy()
@@ -1461,7 +1461,7 @@ void rrdset_acquired_release(RRDSET_ACQUIRED *rsa);
 static inline RRDSET *rrdset_find_active_localhost(const char *id)
 {
     RRDSET *st = rrdset_find_localhost(id);
-    if (unlikely(st && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)))
+    if (st && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))
         return NULL;
     return st;
 }
@@ -1472,7 +1472,7 @@ RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id);
 static inline RRDSET *rrdset_find_active_bytype_localhost(const char *type, const char *id)
 {
     RRDSET *st = rrdset_find_bytype_localhost(type, id);
-    if (unlikely(st && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)))
+    if (st && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))
         return NULL;
     return st;
 }
@@ -1483,7 +1483,7 @@ RRDSET *rrdset_find_byname(RRDHOST *host, const char *name);
 static inline RRDSET *rrdset_find_active_byname_localhost(const char *name)
 {
     RRDSET *st = rrdset_find_byname_localhost(name);
-    if (unlikely(st && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)))
+    if (st && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))
         return NULL;
     return st;
 }

@@ -29,8 +29,8 @@ inline NETDATA_DOUBLE sum_and_count(const NETDATA_DOUBLE *series, size_t entries
         }
     }
 
-    if(unlikely(!c)) sum = NAN;
-    if(likely(count)) *count = c;
+    if(!c) sum = NAN;
+    if(count) *count = c;
 
     return sum;
 }
@@ -43,14 +43,14 @@ inline NETDATA_DOUBLE average(const NETDATA_DOUBLE *series, size_t entries) {
     size_t count = 0;
     NETDATA_DOUBLE sum = sum_and_count(series, entries, &count);
 
-    if(unlikely(!count)) return NAN;
+    if(!count) return NAN;
     return sum / (NETDATA_DOUBLE)count;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 
 NETDATA_DOUBLE moving_average(const NETDATA_DOUBLE *series, size_t entries, size_t period) {
-    if(unlikely(period <= 0))
+    if(period <= 0)
         return 0.0;
 
     size_t i, count;
@@ -62,9 +62,9 @@ NETDATA_DOUBLE moving_average(const NETDATA_DOUBLE *series, size_t entries, size
 
     for(i = 0, count = 0; i < entries; i++) {
         NETDATA_DOUBLE value = series[i];
-        if(unlikely(!netdata_double_isnumber(value))) continue;
+        if(!netdata_double_isnumber(value)) continue;
 
-        if(unlikely(count < period)) {
+        if(count < period) {
             sum += value;
             avg = (count == period - 1) ? sum / (NETDATA_DOUBLE)period : 0;
         }
@@ -86,19 +86,19 @@ static int qsort_compare(const void *a, const void *b) {
     NETDATA_DOUBLE *p1 = (NETDATA_DOUBLE *)a, *p2 = (NETDATA_DOUBLE *)b;
     NETDATA_DOUBLE n1 = *p1, n2 = *p2;
 
-    if(unlikely(isnan(n1) || isnan(n2))) {
+    if(isnan(n1) || isnan(n2)) {
         if(isnan(n1) && !isnan(n2)) return -1;
         if(!isnan(n1) && isnan(n2)) return 1;
         return 0;
     }
-    if(unlikely(isinf(n1) || isinf(n2))) {
+    if(isinf(n1) || isinf(n2)) {
         if(!isinf(n1) && isinf(n2)) return -1;
         if(isinf(n1) && !isinf(n2)) return 1;
         return 0;
     }
 
-    if(unlikely(n1 < n2)) return -1;
-    if(unlikely(n1 > n2)) return 1;
+    if(n1 < n2) return -1;
+    if(n1 > n2) return 1;
     return 0;
 }
 
@@ -113,9 +113,9 @@ inline NETDATA_DOUBLE *copy_series(const NETDATA_DOUBLE *series, size_t entries)
 }
 
 NETDATA_DOUBLE median_on_sorted_series(const NETDATA_DOUBLE *series, size_t entries) {
-    if(unlikely(entries == 0)) return NAN;
-    if(unlikely(entries == 1)) return series[0];
-    if(unlikely(entries == 2)) return (series[0] + series[1]) / 2;
+    if(entries == 0) return NAN;
+    if(entries == 1) return series[0];
+    if(entries == 2) return (series[0] + series[1]) / 2;
 
     NETDATA_DOUBLE average;
     if(entries % 2 == 0) {
@@ -130,10 +130,10 @@ NETDATA_DOUBLE median_on_sorted_series(const NETDATA_DOUBLE *series, size_t entr
 }
 
 NETDATA_DOUBLE median(const NETDATA_DOUBLE *series, size_t entries) {
-    if(unlikely(entries == 0)) return NAN;
-    if(unlikely(entries == 1)) return series[0];
+    if(entries == 0) return NAN;
+    if(entries == 1) return series[0];
 
-    if(unlikely(entries == 2))
+    if(entries == 2)
         return (series[0] + series[1]) / 2;
 
     NETDATA_DOUBLE *copy = copy_series(series, entries);
@@ -173,7 +173,7 @@ NETDATA_DOUBLE running_median_estimate(const NETDATA_DOUBLE *series, size_t entr
 
     for(i = 0; i < entries ; i++) {
         NETDATA_DOUBLE value = series[i];
-        if(unlikely(!netdata_double_isnumber(value))) continue;
+        if(!netdata_double_isnumber(value)) continue;
 
         average += ( value - average ) * 0.1f; // rough running average.
         median += copysignndd( average * 0.01, value - median );
@@ -185,22 +185,22 @@ NETDATA_DOUBLE running_median_estimate(const NETDATA_DOUBLE *series, size_t entr
 // --------------------------------------------------------------------------------------------------------------------
 
 NETDATA_DOUBLE standard_deviation(const NETDATA_DOUBLE *series, size_t entries) {
-    if(unlikely(entries == 0)) return NAN;
-    if(unlikely(entries == 1)) return series[0];
+    if(entries == 0) return NAN;
+    if(entries == 1) return series[0];
 
     const NETDATA_DOUBLE *value, *end = &series[entries];
     size_t count;
     NETDATA_DOUBLE sum;
 
     for(count = 0, sum = 0, value = series ; value < end ;value++) {
-        if(likely(netdata_double_isnumber(*value))) {
+        if(netdata_double_isnumber(*value)) {
             count++;
             sum += *value;
         }
     }
 
-    if(unlikely(count == 0)) return NAN;
-    if(unlikely(count == 1)) return sum;
+    if(count == 0) return NAN;
+    if(count == 1) return sum;
 
     NETDATA_DOUBLE average = sum / (NETDATA_DOUBLE)count;
 
@@ -211,8 +211,8 @@ NETDATA_DOUBLE standard_deviation(const NETDATA_DOUBLE *series, size_t entries) 
         }
     }
 
-    if(unlikely(count == 0)) return NAN;
-    if(unlikely(count == 1)) return average;
+    if(count == 0) return NAN;
+    if(count == 1) return average;
 
     NETDATA_DOUBLE variance = sum / (NETDATA_DOUBLE)(count); // remove -1 from count to have a population stddev
     NETDATA_DOUBLE stddev = sqrtndd(variance);
@@ -222,17 +222,17 @@ NETDATA_DOUBLE standard_deviation(const NETDATA_DOUBLE *series, size_t entries) 
 // --------------------------------------------------------------------------------------------------------------------
 
 NETDATA_DOUBLE single_exponential_smoothing(const NETDATA_DOUBLE *series, size_t entries, NETDATA_DOUBLE alpha) {
-    if(unlikely(entries == 0))
+    if(entries == 0)
         return NAN;
 
-    if(unlikely(isnan(alpha)))
+    if(isnan(alpha))
         alpha = default_single_exponential_smoothing_alpha;
 
     const NETDATA_DOUBLE *value = series, *end = &series[entries];
     NETDATA_DOUBLE level = (1.0 - alpha) * (*value);
 
     for(value++ ; value < end; value++) {
-        if(likely(netdata_double_isnumber(*value)))
+        if(netdata_double_isnumber(*value))
             level = alpha * (*value) + (1.0 - alpha) * level;
     }
 
@@ -240,17 +240,17 @@ NETDATA_DOUBLE single_exponential_smoothing(const NETDATA_DOUBLE *series, size_t
 }
 
 NETDATA_DOUBLE single_exponential_smoothing_reverse(const NETDATA_DOUBLE *series, size_t entries, NETDATA_DOUBLE alpha) {
-    if(unlikely(entries == 0))
+    if(entries == 0)
         return NAN;
 
-    if(unlikely(isnan(alpha)))
+    if(isnan(alpha))
         alpha = default_single_exponential_smoothing_alpha;
 
     const NETDATA_DOUBLE *value = &series[entries -1];
     NETDATA_DOUBLE level = (1.0 - alpha) * (*value);
 
     for(value++ ; value >= series; value--) {
-        if(likely(netdata_double_isnumber(*value)))
+        if(netdata_double_isnumber(*value))
             level = alpha * (*value) + (1.0 - alpha) * level;
     }
 
@@ -264,27 +264,27 @@ NETDATA_DOUBLE double_exponential_smoothing(const NETDATA_DOUBLE *series, size_t
     NETDATA_DOUBLE alpha,
     NETDATA_DOUBLE beta,
     NETDATA_DOUBLE *forecast) {
-    if(unlikely(entries == 0))
+    if(entries == 0)
         return NAN;
 
     NETDATA_DOUBLE level, trend;
 
-    if(unlikely(isnan(alpha)))
+    if(isnan(alpha))
         alpha = 0.3;
 
-    if(unlikely(isnan(beta)))
+    if(isnan(beta))
         beta = 0.05;
 
     level = series[0];
 
-    if(likely(entries > 1))
+    if(entries > 1)
         trend = series[1] - series[0];
     else
         trend = 0;
 
     const NETDATA_DOUBLE *value = series;
     for(value++ ; value >= series; value--) {
-        if(likely(netdata_double_isnumber(*value))) {
+        if(netdata_double_isnumber(*value)) {
             NETDATA_DOUBLE last_level = level;
             level = alpha * *value + (1.0 - alpha) * (level + trend);
             trend = beta * (level - last_level) + (1.0 - beta) * trend;
@@ -344,7 +344,7 @@ static int __HoltWinters(
     NETDATA_DOUBLE *season        // Estimated values for the seasonal component (size entries - t + 2)
 )
 {
-    if(unlikely(entries < 4))
+    if(entries < 4)
         return 0;
 
     int start_time = 2;
@@ -406,13 +406,13 @@ NETDATA_DOUBLE holtwinters(const NETDATA_DOUBLE *series, size_t entries,
     NETDATA_DOUBLE beta,
     NETDATA_DOUBLE gamma,
     NETDATA_DOUBLE *forecast) {
-    if(unlikely(isnan(alpha)))
+    if(isnan(alpha))
         alpha = 0.3;
 
-    if(unlikely(isnan(beta)))
+    if(isnan(beta))
         beta = 0.05;
 
-    if(unlikely(isnan(gamma)))
+    if(isnan(gamma))
         gamma = 0;
 
     int seasonal = 0;

@@ -62,7 +62,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             //DirectMap2M = 0,
             HardwareCorrupted = 0;
 
-    if(unlikely(!arl_base)) {
+    if(!arl_base) {
         do_ram          = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "system ram", 1);
         do_swap         = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "system swap", CONFIG_BOOLEAN_AUTO);
         do_hwcorrupt    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "hardware corrupted ECC", CONFIG_BOOLEAN_AUTO);
@@ -121,16 +121,16 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         //arl_expect(arl_base, "DirectMap2M", &DirectMap2M);
     }
 
-    if(unlikely(!ff)) {
+    if(!ff) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/meminfo");
         ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff))
+        if(!ff)
             return 1;
     }
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff))
+    if(!ff)
         return 0; // we return 0, so that we will retry to open it next time
 
     size_t lines = procfile_lines(ff), l;
@@ -141,14 +141,14 @@ int do_proc_meminfo(int update_every, usec_t dt) {
 
     for(l = 0; l < lines ;l++) {
         size_t words = procfile_linewords(ff, l);
-        if(unlikely(words < 2)) continue;
+        if(words < 2) continue;
 
         if (first_ff_read && !strcmp(procfile_lineword(ff, l, 0), "Percpu"))
             do_percpu = 1;
 
-        if(unlikely(arl_check(arl_base,
+        if(arl_check(arl_base,
                 procfile_lineword(ff, l, 0),
-                procfile_lineword(ff, l, 1)))) break;
+                procfile_lineword(ff, l, 1))) break;
     }
 
     if (first_ff_read)
@@ -169,7 +169,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             static RRDSET *st_system_ram = NULL;
             static RRDDIM *rd_free = NULL, *rd_used = NULL, *rd_cached = NULL, *rd_buffers = NULL;
 
-            if(unlikely(!st_system_ram)) {
+            if(!st_system_ram) {
                 st_system_ram = rrdset_create_localhost(
                         "system"
                         , "ram"
@@ -202,7 +202,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             static RRDSET *st_mem_available = NULL;
             static RRDDIM *rd_avail = NULL;
 
-            if(unlikely(!st_mem_available)) {
+            if(!st_mem_available) {
                 st_mem_available = rrdset_create_localhost(
                         "mem"
                         , "available"
@@ -236,7 +236,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         static RRDSET *st_system_swap = NULL;
         static RRDDIM *rd_free = NULL, *rd_used = NULL;
 
-        if(unlikely(!st_system_swap)) {
+        if(!st_system_swap) {
             st_system_swap = rrdset_create_localhost(
                     "system"
                     , "swap"
@@ -272,7 +272,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         static RRDSET *st_mem_hwcorrupt = NULL;
         static RRDDIM *rd_corrupted = NULL;
 
-        if(unlikely(!st_mem_hwcorrupt)) {
+        if(!st_mem_hwcorrupt) {
             st_mem_hwcorrupt = rrdset_create_localhost(
                     "mem"
                     , "hwcorrupt"
@@ -301,7 +301,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         static RRDSET *st_mem_committed = NULL;
         static RRDDIM *rd_committed = NULL;
 
-        if(unlikely(!st_mem_committed)) {
+        if(!st_mem_committed) {
             st_mem_committed = rrdset_create_localhost(
                     "mem"
                     , "committed"
@@ -330,7 +330,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         static RRDSET *st_mem_writeback = NULL;
         static RRDDIM *rd_dirty = NULL, *rd_writeback = NULL, *rd_fusewriteback = NULL, *rd_nfs_writeback = NULL, *rd_bounce = NULL;
 
-        if(unlikely(!st_mem_writeback)) {
+        if(!st_mem_writeback) {
             st_mem_writeback = rrdset_create_localhost(
                     "mem"
                     , "writeback"
@@ -369,7 +369,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         static RRDDIM *rd_slab = NULL, *rd_kernelstack = NULL, *rd_pagetables = NULL, *rd_vmallocused = NULL,
                       *rd_percpu = NULL;
 
-        if(unlikely(!st_mem_kernel)) {
+        if(!st_mem_kernel) {
             st_mem_kernel = rrdset_create_localhost(
                     "mem"
                     , "kernel"
@@ -409,7 +409,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         static RRDSET *st_mem_slab = NULL;
         static RRDDIM *rd_reclaimable = NULL, *rd_unreclaimable = NULL;
 
-        if(unlikely(!st_mem_slab)) {
+        if(!st_mem_slab) {
             st_mem_slab = rrdset_create_localhost(
                     "mem"
                     , "slab"
@@ -444,7 +444,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         static RRDSET *st_mem_hugepages = NULL;
         static RRDDIM *rd_used = NULL, *rd_free = NULL, *rd_rsvd = NULL, *rd_surp = NULL;
 
-        if(unlikely(!st_mem_hugepages)) {
+        if(!st_mem_hugepages) {
             st_mem_hugepages = rrdset_create_localhost(
                     "mem"
                     , "hugepages"
@@ -484,7 +484,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         static RRDSET *st_mem_transparent_hugepages = NULL;
         static RRDDIM *rd_anonymous = NULL, *rd_shared = NULL;
 
-        if(unlikely(!st_mem_transparent_hugepages)) {
+        if(!st_mem_transparent_hugepages) {
             st_mem_transparent_hugepages = rrdset_create_localhost(
                     "mem"
                     , "transparent_hugepages"

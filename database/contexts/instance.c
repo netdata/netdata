@@ -109,7 +109,7 @@ static void rrdinstance_insert_callback(const DICTIONARY_ITEM *item __maybe_unus
     }
 
     if(ri->rrdset) {
-        if(unlikely(rrdset_flag_check(ri->rrdset, RRDSET_FLAG_HIDDEN)))
+        if(rrdset_flag_check(ri->rrdset, RRDSET_FLAG_HIDDEN))
             ri->flags |= RRD_FLAG_HIDDEN; // no need of atomics at the constructor
         else
             ri->flags &= ~RRD_FLAG_HIDDEN; // no need of atomics at the constructor
@@ -223,7 +223,7 @@ static bool rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
     }
 
     if(ri->rrdset) {
-        if(unlikely(rrdset_flag_check(ri->rrdset, RRDSET_FLAG_HIDDEN)))
+        if(rrdset_flag_check(ri->rrdset, RRDSET_FLAG_HIDDEN))
             rrd_flag_set(ri, RRD_FLAG_HIDDEN);
         else
             rrd_flag_clear(ri, RRD_FLAG_HIDDEN);
@@ -251,7 +251,7 @@ static void rrdinstance_react_callback(const DICTIONARY_ITEM *item __maybe_unuse
 }
 
 void rrdinstances_create_in_rrdcontext(RRDCONTEXT *rc) {
-    if(unlikely(!rc || rc->rrdinstances)) return;
+    if(!rc || rc->rrdinstances) return;
 
     rc->rrdinstances = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
                                                   &dictionary_stats_category_rrdcontext, sizeof(RRDINSTANCE));
@@ -263,7 +263,7 @@ void rrdinstances_create_in_rrdcontext(RRDCONTEXT *rc) {
 }
 
 void rrdinstances_destroy_from_rrdcontext(RRDCONTEXT *rc) {
-    if(unlikely(!rc || !rc->rrdinstances)) return;
+    if(!rc || !rc->rrdinstances) return;
 
     dictionary_destroy(rc->rrdinstances);
     rc->rrdinstances = NULL;
@@ -272,17 +272,17 @@ void rrdinstances_destroy_from_rrdcontext(RRDCONTEXT *rc) {
 void rrdinstance_trigger_updates(RRDINSTANCE *ri, const char *function) {
     RRDSET *st = ri->rrdset;
 
-    if(likely(st)) {
-        if(unlikely((unsigned int) st->priority != ri->priority)) {
+    if(st) {
+        if((unsigned int) st->priority != ri->priority) {
             ri->priority = st->priority;
             rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
         }
-        if(unlikely(st->update_every != ri->update_every_s)) {
+        if(st->update_every != ri->update_every_s) {
             ri->update_every_s = st->update_every;
             rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
         }
     }
-    else if(unlikely(rrd_flag_is_collected(ri))) {
+    else if(rrd_flag_is_collected(ri)) {
         // there is no rrdset, but we have it as collected!
 
         rrd_flag_set_archived(ri);
@@ -406,18 +406,18 @@ inline void rrdinstance_from_rrdset(RRDSET *st) {
 
 #define rrdset_get_rrdinstance(st) rrdset_get_rrdinstance_with_trace(st, __FUNCTION__);
 static inline RRDINSTANCE *rrdset_get_rrdinstance_with_trace(RRDSET *st, const char *function) {
-    if(unlikely(!st->rrdinstance)) {
+    if(!st->rrdinstance) {
         netdata_log_error("RRDINSTANCE: RRDSET '%s' is not linked to an RRDINSTANCE at %s()", rrdset_id(st), function);
         return NULL;
     }
 
     RRDINSTANCE *ri = rrdinstance_acquired_value(st->rrdinstance);
-    if(unlikely(!ri)) {
+    if(!ri) {
         netdata_log_error("RRDINSTANCE: RRDSET '%s' lost its link to an RRDINSTANCE at %s()", rrdset_id(st), function);
         return NULL;
     }
 
-    if(unlikely(ri->rrdset != st))
+    if(ri->rrdset != st)
         fatal("RRDINSTANCE: '%s' is not linked to RRDSET '%s' at %s()", string2str(ri->id), rrdset_id(st), function);
 
     return ri;
@@ -425,7 +425,7 @@ static inline RRDINSTANCE *rrdset_get_rrdinstance_with_trace(RRDSET *st, const c
 
 inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
-    if(unlikely(!ri)) return;
+    if(!ri) return;
 
     rrd_flag_set_archived(ri);
 
@@ -448,7 +448,7 @@ inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
 
 inline void rrdinstance_rrdset_has_updated_retention(RRDSET *st) {
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
-    if(unlikely(!ri)) return;
+    if(!ri) return;
 
     rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_UPDATE_RETENTION);
     rrdinstance_trigger_updates(ri, __FUNCTION__ );
@@ -456,10 +456,10 @@ inline void rrdinstance_rrdset_has_updated_retention(RRDSET *st) {
 
 inline void rrdinstance_updated_rrdset_name(RRDSET *st) {
     // the chart may not be initialized when this is called
-    if(unlikely(!st->rrdinstance)) return;
+    if(!st->rrdinstance) return;
 
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
-    if(unlikely(!ri)) return;
+    if(!ri) return;
 
     if(st->name != ri->name) {
         STRING *old = ri->name;
@@ -472,18 +472,18 @@ inline void rrdinstance_updated_rrdset_name(RRDSET *st) {
 }
 
 inline void rrdinstance_updated_rrdset_flags_no_action(RRDINSTANCE *ri, RRDSET *st) {
-    if(unlikely(ri->rrdset != st))
+    if(ri->rrdset != st)
         fatal("RRDCONTEXT: instance '%s' is not linked to chart '%s' on host '%s'",
               string2str(ri->id), rrdset_id(st), rrdhost_hostname(st->rrdhost));
 
     bool st_is_hidden = rrdset_flag_check(st, RRDSET_FLAG_HIDDEN);
     bool ri_is_hidden = rrd_flag_check(ri, RRD_FLAG_HIDDEN);
 
-    if(unlikely(st_is_hidden != ri_is_hidden)) {
-        if (unlikely(st_is_hidden && !ri_is_hidden))
+    if(st_is_hidden != ri_is_hidden) {
+        if (st_is_hidden && !ri_is_hidden)
             rrd_flag_set_updated(ri, RRD_FLAG_HIDDEN | RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
 
-        else if (unlikely(!st_is_hidden && ri_is_hidden)) {
+        else if (!st_is_hidden && ri_is_hidden) {
             rrd_flag_clear(ri, RRD_FLAG_HIDDEN);
             rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
         }
@@ -492,9 +492,9 @@ inline void rrdinstance_updated_rrdset_flags_no_action(RRDINSTANCE *ri, RRDSET *
 
 inline void rrdinstance_updated_rrdset_flags(RRDSET *st) {
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
-    if(unlikely(!ri)) return;
+    if(!ri) return;
 
-    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED|RRDSET_FLAG_OBSOLETE)))
+    if(rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED|RRDSET_FLAG_OBSOLETE))
         rrd_flag_set_archived(ri);
 
     rrdinstance_updated_rrdset_flags_no_action(ri, st);
@@ -504,16 +504,16 @@ inline void rrdinstance_updated_rrdset_flags(RRDSET *st) {
 
 inline void rrdinstance_collected_rrdset(RRDSET *st) {
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
-    if(unlikely(!ri)) {
+    if(!ri) {
         rrdcontext_updated_rrdset(st);
         ri = rrdset_get_rrdinstance(st);
-        if(unlikely(!ri))
+        if(!ri)
             return;
     }
 
     rrdinstance_updated_rrdset_flags_no_action(ri, st);
 
-    if(unlikely(ri->internal.collected_metrics_count && !rrd_flag_is_collected(ri)))
+    if(ri->internal.collected_metrics_count && !rrd_flag_is_collected(ri))
         rrd_flag_set_collected(ri);
 
     // we use this variable to detect BEGIN/END without SET

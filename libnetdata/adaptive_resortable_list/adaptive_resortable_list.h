@@ -93,12 +93,12 @@ static inline int arl_check(ARL_BASE *base, const char *keyword, const char *val
     ARL_ENTRY *e = base->next_keyword;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely((base->fast + base->slow) % (base->expected + base->allocated) == 0 && (base->fast + base->slow) > (base->expected + base->allocated) * base->iteration))
+    if((base->fast + base->slow) % (base->expected + base->allocated) == 0 && (base->fast + base->slow) > (base->expected + base->allocated) * base->iteration)
         netdata_log_info("ARL '%s': Did you forget to call arl_begin()?", base->name);
 #endif
 
     // it should be the first entry (pointed by base->next_keyword)
-    if(likely(!strcmp(keyword, e->name))) {
+    if(!strcmp(keyword, e->name)) {
         // it is
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -108,18 +108,18 @@ static inline int arl_check(ARL_BASE *base, const char *keyword, const char *val
         e->flags |= ARL_ENTRY_FLAG_FOUND;
 
         // execute the processor
-        if(unlikely(e->dst)) {
+        if(e->dst) {
             e->processor(e->name, e->hash, value, e->dst);
             base->found++;
         }
 
         // be prepared for the next iteration
         base->next_keyword = e->next;
-        if(unlikely(!base->next_keyword))
+        if(!base->next_keyword)
             base->next_keyword = base->head;
 
         // stop if we collected all the values for this iteration
-        if(unlikely(base->found == base->wanted)) {
+        if(base->found == base->wanted) {
             // fprintf(stderr, "FOUND ALL WANTED 2: found = %zu, wanted = %zu, expected %zu\n", base->found, base->wanted, base->expected);
             return 1;
         }

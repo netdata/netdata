@@ -226,14 +226,14 @@ struct extent_buffer *extent_buffer_get(size_t size) {
         size = extent_buffer_globals.max_size;
 
     spinlock_lock(&extent_buffer_globals.protected.spinlock);
-    if(likely(extent_buffer_globals.protected.available_items)) {
+    if(extent_buffer_globals.protected.available_items) {
         eb = extent_buffer_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(extent_buffer_globals.protected.available_items, eb, cache.prev, cache.next);
         extent_buffer_globals.protected.available--;
     }
     spinlock_unlock(&extent_buffer_globals.protected.spinlock);
 
-    if(unlikely(eb && eb->bytes < size)) {
+    if(eb && eb->bytes < size) {
         size_t bytes = sizeof(struct extent_buffer) + eb->bytes;
         freez(eb);
         eb = NULL;
@@ -241,7 +241,7 @@ struct extent_buffer *extent_buffer_get(size_t size) {
         __atomic_sub_fetch(&extent_buffer_globals.atomics.allocated_bytes, bytes, __ATOMIC_RELAXED);
     }
 
-    if(unlikely(!eb)) {
+    if(!eb) {
         size_t bytes = sizeof(struct extent_buffer) + size;
         eb = mallocz(bytes);
         eb->bytes = size;
@@ -253,7 +253,7 @@ struct extent_buffer *extent_buffer_get(size_t size) {
 }
 
 void extent_buffer_release(struct extent_buffer *eb) {
-    if(unlikely(!eb)) return;
+    if(!eb) return;
 
     spinlock_lock(&extent_buffer_globals.protected.spinlock);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(extent_buffer_globals.protected.available_items, eb, cache.prev, cache.next);
@@ -410,7 +410,7 @@ void pdc_acquire(PDC *pdc) {
 }
 
 bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router __maybe_unused) {
-    if(unlikely(!pdc))
+    if(!pdc)
         return true;
 
     spinlock_lock(&pdc->refcount_spinlock);
@@ -701,10 +701,10 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
         vd.is_valid = false;
 
     else {
-        if(unlikely(vd.entries != entries || vd.update_every_s != update_every_s))
+        if(vd.entries != entries || vd.update_every_s != update_every_s)
             updated = true;
 
-        if (likely(vd.update_every_s)) {
+        if (vd.update_every_s) {
             size_t entries_by_time = page_entries_by_time(vd.start_time_s, vd.end_time_s, vd.update_every_s);
 
             if (vd.entries != entries_by_time) {
@@ -732,7 +732,7 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
         }
     }
 
-    if(unlikely(!vd.is_valid || updated)) {
+    if(!vd.is_valid || updated) {
 #ifndef NETDATA_INTERNAL_CHECKS
         error_limit_static_global_var(erl, 1, 0);
 #endif
@@ -792,7 +792,7 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
 
 static inline struct page_details *epdl_get_pd_load_link_list_from_metric_start_time(EPDL *epdl, Word_t metric_id, time_t start_time_s) {
 
-    if(unlikely(epdl->head_to_datafile_extent_queries_pending_for_extent))
+    if(epdl->head_to_datafile_extent_queries_pending_for_extent)
         // stop appending more pages to this epdl
         epdl_pending_del(epdl);
 
@@ -802,16 +802,16 @@ static inline struct page_details *epdl_get_pd_load_link_list_from_metric_start_
         Pvoid_t *pd_by_start_time_s_judyL = PDCJudyLGet(ep->page_details_by_metric_id_JudyL, metric_id, PJE0);
         internal_fatal(pd_by_start_time_s_judyL == PJERR, "DBENGINE: corrupted extent metrics JudyL");
 
-        if (unlikely(pd_by_start_time_s_judyL && *pd_by_start_time_s_judyL)) {
+        if (pd_by_start_time_s_judyL && *pd_by_start_time_s_judyL) {
             Pvoid_t *pd_pptr = PDCJudyLGet(*pd_by_start_time_s_judyL, start_time_s, PJE0);
             internal_fatal(pd_pptr == PJERR, "DBENGINE: corrupted metric page details JudyHS");
 
-            if(likely(pd_pptr && *pd_pptr)) {
+            if(pd_pptr && *pd_pptr) {
                 struct page_details *pd = *pd_pptr;
                 internal_fatal(metric_id != pd->metric_id, "DBENGINE: metric ids do not match");
 
-                if(likely(!pd->page)) {
-                    if (unlikely(__atomic_load_n(&ep->pdc->workers_should_stop, __ATOMIC_RELAXED)))
+                if(!pd->page) {
+                    if (__atomic_load_n(&ep->pdc->workers_should_stop, __ATOMIC_RELAXED))
                         pdc_page_status_set(pd, PDC_PAGE_FAILED | PDC_PAGE_CANCELLED);
                     else
                         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(pd_list, pd, load.prev, load.next);
@@ -938,7 +938,7 @@ static bool epdl_populate_pages_from_extent_data(
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, data, epdl->extent_size - sizeof(*trailer));
     ret = crc32cmp(trailer->checksum, crc);
-    if (unlikely(ret)) {
+    if (ret) {
         ctx_io_error(ctx);
         have_read_error = true;
         epdl_extent_loading_error_log(ctx, epdl, NULL, "CRC32 checksum FAILED");
@@ -947,7 +947,7 @@ static bool epdl_populate_pages_from_extent_data(
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_EXTENT_DECOMPRESSION);
 
-    if (likely(!have_read_error && RRD_NO_COMPRESSION != header->compression_algorithm)) {
+    if (!have_read_error && RRD_NO_COMPRESSION != header->compression_algorithm) {
         // find the uncompressed extent size
         uncompressed_payload_length = 0;
         for (i = 0; i < count; ++i) {
@@ -960,10 +960,10 @@ static bool epdl_populate_pages_from_extent_data(
             uncompressed_payload_length += header->descr[i].page_length;
         }
 
-        if(unlikely(uncompressed_payload_length > MAX_PAGES_PER_EXTENT * RRDENG_BLOCK_SIZE))
+        if(uncompressed_payload_length > MAX_PAGES_PER_EXTENT * RRDENG_BLOCK_SIZE)
             have_read_error = true;
 
-        if(likely(!have_read_error)) {
+        if(!have_read_error) {
             eb = extent_buffer_get(uncompressed_payload_length);
             uncompressed_buf = eb->data;
 
@@ -1009,7 +1009,7 @@ static bool epdl_populate_pages_from_extent_data(
         mrg_metric_release(main_mrg, metric);
 
         struct page_details *pd_list = epdl_get_pd_load_link_list_from_metric_start_time(epdl, metric_id, start_time_s);
-        if(likely(!pd_list))
+        if(!pd_list)
             continue;
 
         VALIDATED_PAGE_DESCRIPTOR vd = validate_extent_page_descr(
@@ -1022,7 +1022,7 @@ static bool epdl_populate_pages_from_extent_data(
 
         void *page_data;
 
-        if (unlikely(!vd.is_valid)) {
+        if (!vd.is_valid) {
             page_data = DBENGINE_EMPTY_PAGE;
             stats_load_invalid_page++;
         }
@@ -1033,7 +1033,7 @@ static bool epdl_populate_pages_from_extent_data(
                 stats_load_uncompressed++;
             }
             else {
-                if (unlikely(page_offset + vd.page_length > uncompressed_payload_length)) {
+                if (page_offset + vd.page_length > uncompressed_payload_length) {
                     char log[200 + 1];
                     snprintfz(log, 200, "page %u (out of %u) offset %u + page length %zu, "
                                         "exceeds the uncompressed buffer size %u",
@@ -1128,12 +1128,12 @@ static inline void *datafile_extent_read(struct rrdengine_instance *ctx, uv_file
 
     unsigned real_io_size = ALIGN_BYTES_CEILING(size_bytes);
     int ret = posix_memalign(&buffer, RRDFILE_ALIGNMENT, real_io_size);
-    if (unlikely(ret))
+    if (ret)
         fatal("DBENGINE: posix_memalign(): %s", strerror(ret));
 
     uv_buf_t iov = uv_buf_init(buffer, real_io_size);
     ret = uv_fs_read(NULL, &request, file, &iov, 1, pos, NULL);
-    if (unlikely(-1 == ret)) {
+    if (-1 == ret) {
         ctx_io_error(ctx);
         posix_memfree(buffer);
         buffer = NULL;
@@ -1170,7 +1170,7 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
         }
     }
 
-    if(unlikely(should_stop)) {
+    if(should_stop) {
         statistics_counter = &rrdeng_cache_efficiency_stats.pages_load_fail_cancelled;
         not_loaded_pages_tag = PDC_PAGE_CANCELLED;
         goto cleanup;

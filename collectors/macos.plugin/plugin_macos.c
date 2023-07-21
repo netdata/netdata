@@ -63,7 +63,7 @@ void *macos_main(void *ptr)
 
         for (int i = 0; macos_modules[i].name; i++) {
             struct macos_module *pm = &macos_modules[i];
-            if (unlikely(!pm->enabled))
+            if (!pm->enabled)
                 continue;
 
             netdata_log_debug(D_PROCNETDEV_LOOP, "macos calling %s.", pm->name);
@@ -71,7 +71,7 @@ void *macos_main(void *ptr)
             worker_is_busy(i);
             pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
 
-            if (unlikely(netdata_exit))
+            if (netdata_exit)
                 break;
         }
     }

@@ -125,8 +125,8 @@ int execute_insert(sqlite3_stmt *res)
 {
     int rc;
     int cnt = 0;
-    while ((rc = sqlite3_step_monitored(res)) != SQLITE_DONE && ++cnt < SQL_MAX_RETRY && likely(!netdata_exit)) {
-        if (likely(rc == SQLITE_BUSY || rc == SQLITE_LOCKED)) {
+    while ((rc = sqlite3_step_monitored(res)) != SQLITE_DONE && ++cnt < SQL_MAX_RETRY && !netdata_exit) {
+        if (rc == SQLITE_BUSY || rc == SQLITE_LOCKED) {
             usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
             error_report("Failed to insert/update, rc = %d -- attempt %d", rc, cnt);
         }
@@ -145,7 +145,7 @@ static void add_stmt_to_list(sqlite3_stmt *res)
     static int idx = 0;
     static sqlite3_stmt *statements[MAX_OPEN_STATEMENTS];
 
-    if (unlikely(!res)) {
+    if (!res) {
         if (idx)
             netdata_log_info("Finilizing %d statements", idx);
         else
@@ -153,13 +153,13 @@ static void add_stmt_to_list(sqlite3_stmt *res)
         while (idx > 0) {
             int rc;
             rc = sqlite3_finalize(statements[--idx]);
-            if (unlikely(rc != SQLITE_OK))
+            if (rc != SQLITE_OK)
                 error_report("Failed to finalize statement during shutdown, rc = %d", rc);
         }
         return;
     }
 
-    if (unlikely(idx == MAX_OPEN_STATEMENTS))
+    if (idx == MAX_OPEN_STATEMENTS)
         return;
 }
 
@@ -169,7 +169,7 @@ static void release_statement(void *statement)
 #ifdef NETDATA_DEV_MODE
     netdata_log_info("Thread %d: Cleaning prepared statement on %p", gettid(), statement);
 #endif
-    if (unlikely(rc = sqlite3_finalize((sqlite3_stmt *) statement) != SQLITE_OK))
+    if (rc = sqlite3_finalize((sqlite3_stmt *) statement) != SQLITE_OK)
         error_report("Failed to finalize statement, rc = %d", rc);
 }
 
@@ -186,12 +186,12 @@ int prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **state
     pthread_key_t *key = NULL;
     int ret = 1;
 
-    if (likely(keys_used < MAX_PREPARED_STATEMENTS))
+    if (keys_used < MAX_PREPARED_STATEMENTS)
         key = &key_pool[keys_used++];
 
     int rc = sqlite3_prepare_v2(database, query, -1, statement, 0);
-    if (likely(rc == SQLITE_OK)) {
-        if (likely(key)) {
+    if (rc == SQLITE_OK) {
+        if (key) {
             ret = pthread_setspecific(*key, *statement);
 #ifdef NETDATA_DEV_MODE
             netdata_log_info("Thread %d: Using key %u on statement %p", gettid(), keys_used, *statement);
@@ -390,7 +390,7 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     char sqlite_database[FILENAME_MAX + 1];
     int rc;
 
-    if (likely(!memory))
+    if (!memory)
         snprintfz(sqlite_database, FILENAME_MAX, "%s/netdata-meta.db", netdata_configured_cache_dir);
     else
         strcpy(sqlite_database, ":memory:");
@@ -449,20 +449,20 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     const char *list[2] = { buf, NULL };
 
     rc = sqlite3_create_function(db_meta, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC, 0, sqlite_uuid_parse, 0, 0);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         error_report("Failed to register internal u2h function");
 
     rc = sqlite3_create_function(db_meta, "now_usec", 1, SQLITE_ANY, 0, sqlite_now_usec, 0, 0);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         error_report("Failed to register internal now_usec function");
 
     rc = sqlite3_create_function(db_meta, "uuid_random", 0, SQLITE_ANY, 0, sqlite_uuid_random, 0, 0);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         error_report("Failed to register internal uuid_random function");
 
     int target_version = DB_METADATA_VERSION;
 
-    if (likely(!memory))
+    if (!memory)
         target_version = perform_database_migration(db_meta, DB_METADATA_VERSION);
 
     // https://www.sqlite.org/pragma.html#pragma_auto_vacuum
@@ -519,7 +519,7 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
 void sql_close_database(void)
 {
     int rc;
-    if (unlikely(!db_meta))
+    if (!db_meta)
         return;
 
     netdata_log_info("Closing SQLite database");
@@ -527,7 +527,7 @@ void sql_close_database(void)
     add_stmt_to_list(NULL);
 
     rc = sqlite3_close_v2(db_meta);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         error_report("Error %d while closing the SQLite database, %s", rc, sqlite3_errstr(rc));
 }
 
@@ -537,26 +537,26 @@ int exec_statement_with_uuid(const char *sql, uuid_t *uuid)
     sqlite3_stmt *res = NULL;
 
     rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement %s, rc = %d", sql, rc);
         return 1;
     }
 
     rc = sqlite3_bind_blob(res, 1, uuid, sizeof(*uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to bind host parameter to %s, rc = %d", sql, rc);
         goto skip;
     }
 
     rc = execute_insert(res);
-    if (likely(rc == SQLITE_DONE))
+    if (rc == SQLITE_DONE)
         result = SQLITE_OK;
     else
         error_report("Failed to execute %s, rc = %d", sql, rc);
 
 skip:
     rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         error_report("Failed to finalize statement %s, rc = %d", sql, rc);
     return result;
 }
@@ -572,7 +572,7 @@ int db_execute(sqlite3 *db, const char *cmd)
         if (rc != SQLITE_OK) {
             error_report("Failed to execute '%s', rc = %d (%s) -- attempt %d", cmd, rc, err_msg, cnt);
             sqlite3_free(err_msg);
-            if (likely(rc == SQLITE_BUSY || rc == SQLITE_LOCKED)) {
+            if (rc == SQLITE_BUSY || rc == SQLITE_LOCKED) {
                 usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
             }
             else
@@ -588,10 +588,10 @@ int db_execute(sqlite3 *db, const char *cmd)
 
 static inline void set_host_node_id(RRDHOST *host, uuid_t *node_id)
 {
-    if (unlikely(!host))
+    if (!host)
         return;
 
-    if (unlikely(!node_id)) {
+    if (!node_id) {
         freez(host->node_id);
         host->node_id = NULL;
         return;
@@ -599,11 +599,11 @@ static inline void set_host_node_id(RRDHOST *host, uuid_t *node_id)
 
     struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
 
-    if (unlikely(!host->node_id))
+    if (!host->node_id)
         host->node_id = mallocz(sizeof(*host->node_id));
     uuid_copy(*(host->node_id), *node_id);
 
-    if (unlikely(!wc))
+    if (!wc)
         sql_create_aclk_table(host, &host->host_uuid, node_id);
     else
         uuid_unparse_lower(*node_id, wc->node_id);
@@ -617,32 +617,32 @@ int update_node_id(uuid_t *host_id, uuid_t *node_id)
     RRDHOST *host = NULL;
     int rc = 2;
 
-    if (unlikely(!db_meta)) {
+    if (!db_meta) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             error_report("Database has not been initialized");
         return 1;
     }
 
     rc = sqlite3_prepare_v2(db_meta, SQL_UPDATE_NODE_ID, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement to store node instance information");
         return 1;
     }
 
     rc = sqlite3_bind_blob(res, 1, node_id, sizeof(*node_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to bind host_id parameter to store node instance information");
         goto failed;
     }
 
     rc = sqlite3_bind_blob(res, 2, host_id, sizeof(*host_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to bind host_id parameter to store node instance information");
         goto failed;
     }
 
     rc = execute_insert(res);
-    if (unlikely(rc != SQLITE_DONE))
+    if (rc != SQLITE_DONE)
         error_report("Failed to store node instance information, rc = %d", rc);
     rc = sqlite3_changes(db_meta);
 
@@ -650,12 +650,12 @@ int update_node_id(uuid_t *host_id, uuid_t *node_id)
     uuid_unparse_lower(*host_id, host_guid);
     rrd_wrlock();
     host = rrdhost_find_by_guid(host_guid);
-    if (likely(host))
+    if (host)
         set_host_node_id(host, node_id);
     rrd_unlock();
 
 failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+    if (sqlite3_finalize(res) != SQLITE_OK)
         error_report("Failed to finalize the prepared statement when storing node instance information");
 
     return rc - 1;
@@ -668,32 +668,32 @@ int get_host_id(uuid_t *node_id, uuid_t *host_id)
     static __thread sqlite3_stmt *res = NULL;
     int rc;
 
-    if (unlikely(!db_meta)) {
+    if (!db_meta) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             error_report("Database has not been initialized");
         return 1;
     }
 
-    if (unlikely(!res)) {
+    if (!res) {
         rc = prepare_statement(db_meta, SQL_SELECT_HOST_BY_NODE_ID, &res);
-        if (unlikely(rc != SQLITE_OK)) {
+        if (rc != SQLITE_OK) {
             error_report("Failed to prepare statement to select node instance information for a node");
             return 1;
         }
     }
 
     rc = sqlite3_bind_blob(res, 1, node_id, sizeof(*node_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to bind host_id parameter to select node instance information");
         goto failed;
     }
 
     rc = sqlite3_step_monitored(res);
-    if (likely(rc == SQLITE_ROW && host_id))
+    if (rc == SQLITE_ROW && host_id)
         uuid_copy(*host_id, *((uuid_t *) sqlite3_column_blob(res, 0)));
 
 failed:
-    if (unlikely(sqlite3_reset(res) != SQLITE_OK))
+    if (sqlite3_reset(res) != SQLITE_OK)
         error_report("Failed to reset the prepared statement when selecting node instance information");
 
     return (rc == SQLITE_ROW) ? 0 : -1;
@@ -706,30 +706,30 @@ int get_node_id(uuid_t *host_id, uuid_t *node_id)
     sqlite3_stmt *res = NULL;
     int rc;
 
-    if (unlikely(!db_meta)) {
+    if (!db_meta) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             error_report("Database has not been initialized");
         return 1;
     }
 
     rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_NODE_ID, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement to select node instance information for a host");
         return 1;
     }
 
     rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to bind host_id parameter to select node instance information");
         goto failed;
     }
 
     rc = sqlite3_step_monitored(res);
-    if (likely(rc == SQLITE_ROW && node_id))
+    if (rc == SQLITE_ROW && node_id)
         uuid_copy(*node_id, *((uuid_t *) sqlite3_column_blob(res, 0)));
 
 failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+    if (sqlite3_finalize(res) != SQLITE_OK)
         error_report("Failed to finalize the prepared statement when selecting node instance information");
 
     return (rc == SQLITE_ROW) ? 0 : -1;
@@ -743,20 +743,20 @@ void invalidate_node_instances(uuid_t *host_id, uuid_t *claim_id)
     sqlite3_stmt *res = NULL;
     int rc;
 
-    if (unlikely(!db_meta)) {
+    if (!db_meta) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             error_report("Database has not been initialized");
         return;
     }
 
     rc = sqlite3_prepare_v2(db_meta, SQL_INVALIDATE_NODE_INSTANCES, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement to invalidate node instance ids");
         return;
     }
 
     rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to bind host_id parameter to invalidate node instance information");
         goto failed;
     }
@@ -766,17 +766,17 @@ void invalidate_node_instances(uuid_t *host_id, uuid_t *claim_id)
     else
         rc = sqlite3_bind_null(res, 2);
 
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to bind claim_id parameter to invalidate node instance information");
         goto failed;
     }
 
     rc = execute_insert(res);
-    if (unlikely(rc != SQLITE_DONE))
+    if (rc != SQLITE_DONE)
         error_report("Failed to invalidate node instance information, rc = %d", rc);
 
 failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+    if (sqlite3_finalize(res) != SQLITE_OK)
         error_report("Failed to finalize the prepared statement when invalidating node instance information");
 }
 
@@ -789,14 +789,14 @@ struct node_instance_list *get_node_list(void)
     sqlite3_stmt *res = NULL;
     int rc;
 
-    if (unlikely(!db_meta)) {
+    if (!db_meta) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             error_report("Database has not been initialized");
         return NULL;
     }
 
     rc = sqlite3_prepare_v2(db_meta, SQL_GET_NODE_INSTANCE_LIST, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement to get node instance information");
         return NULL;
     };
@@ -842,7 +842,7 @@ struct node_instance_list *get_node_list(void)
     rrd_unlock();
 
 failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+    if (sqlite3_finalize(res) != SQLITE_OK)
         error_report("Failed to finalize the prepared statement when fetching node instance information");
 
     return node_list;
@@ -855,36 +855,36 @@ void sql_load_node_id(RRDHOST *host)
     static __thread sqlite3_stmt *res = NULL;
     int rc;
 
-    if (unlikely(!db_meta)) {
+    if (!db_meta) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             error_report("Database has not been initialized");
         return;
     }
 
-    if (unlikely(!res)) {
+    if (!res) {
         rc = prepare_statement(db_meta, SQL_GET_HOST_NODE_ID, &res);
-        if (unlikely(rc != SQLITE_OK)) {
+        if (rc != SQLITE_OK) {
             error_report("Failed to prepare statement to fetch node id");
             return;
         };
     }
 
     rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to bind host_id parameter to load node instance information");
         goto failed;
     }
 
     rc = sqlite3_step_monitored(res);
-    if (likely(rc == SQLITE_ROW)) {
-        if (likely(sqlite3_column_bytes(res, 0) == sizeof(uuid_t)))
+    if (rc == SQLITE_ROW) {
+        if (sqlite3_column_bytes(res, 0) == sizeof(uuid_t))
             set_host_node_id(host, (uuid_t *)sqlite3_column_blob(res, 0));
         else
             set_host_node_id(host, NULL);
     }
 
 failed:
-    if (unlikely(sqlite3_reset(res) != SQLITE_OK))
+    if (sqlite3_reset(res) != SQLITE_OK)
         error_report("Failed to reset the prepared statement when loading node instance information");
 };
 
@@ -898,13 +898,13 @@ void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *sys
     sqlite3_stmt *res = NULL;
 
     rc = sqlite3_prepare_v2(db_meta, SELECT_HOST_INFO, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement to read host information");
         return;
     }
 
     rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to bind host parameter host information");
         goto skip;
     }
@@ -915,7 +915,7 @@ void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *sys
     }
 
 skip:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+    if (sqlite3_finalize(res) != SQLITE_OK)
         error_report("Failed to finalize the prepared statement when reading host information");
 }
 
@@ -930,13 +930,13 @@ DICTIONARY *sql_load_host_labels(uuid_t *host_id)
     sqlite3_stmt *res = NULL;
 
     rc = sqlite3_prepare_v2(db_meta, SELECT_HOST_LABELS, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement to read host information");
         return NULL;
     }
 
     rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to bind host parameter host information");
         goto skip;
     }
@@ -952,7 +952,7 @@ DICTIONARY *sql_load_host_labels(uuid_t *host_id)
     }
 
 skip:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+    if (sqlite3_finalize(res) != SQLITE_OK)
         error_report("Failed to finalize the prepared statement when reading host information");
     return labels;
 }
@@ -960,7 +960,7 @@ skip:
 // Utils
 int bind_text_null(sqlite3_stmt *res, int position, const char *text, bool can_be_null)
 {
-    if (likely(text))
+    if (text)
         return sqlite3_bind_text(res, position, text, -1, SQLITE_STATIC);
     if (!can_be_null)
         return 1;
@@ -971,7 +971,7 @@ int sql_metadata_cache_stats(int op)
 {
     int count, dummy;
 
-    if (unlikely(!db_meta))
+    if (!db_meta)
         return 0;
 
     netdata_thread_disable_cancelability();

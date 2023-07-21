@@ -380,14 +380,14 @@ static void alert_instances_delete_callback(const DICTIONARY_ITEM *item __maybe_
 }
 
 static FTS_MATCH rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_json_v2_data *ctl, RRDCONTEXT *rc, SIMPLE_PATTERN *q) {
-    if(unlikely(full_text_search_string(&ctl->q.fts, q, rc->id) ||
-                full_text_search_string(&ctl->q.fts, q, rc->family)))
+    if(full_text_search_string(&ctl->q.fts, q, rc->id) ||
+                full_text_search_string(&ctl->q.fts, q, rc->family))
         return FTS_MATCHED_CONTEXT;
 
-    if(unlikely(full_text_search_string(&ctl->q.fts, q, rc->title)))
+    if(full_text_search_string(&ctl->q.fts, q, rc->title))
         return FTS_MATCHED_TITLE;
 
-    if(unlikely(full_text_search_string(&ctl->q.fts, q, rc->units)))
+    if(full_text_search_string(&ctl->q.fts, q, rc->units))
         return FTS_MATCHED_UNITS;
 
     FTS_MATCH matched = FTS_MATCHED_NONE;
@@ -398,7 +398,7 @@ static FTS_MATCH rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_jso
         if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, ri->first_time_s, (ri->flags & RRD_FLAG_COLLECTED) ? ctl->now : ri->last_time_s, 0))
             continue;
 
-        if(unlikely(full_text_search_string(&ctl->q.fts, q, ri->id)) ||
+        if(full_text_search_string(&ctl->q.fts, q, ri->id) ||
            (ri->name != ri->id && full_text_search_string(&ctl->q.fts, q, ri->name))) {
             matched = FTS_MATCHED_INSTANCE;
             break;
@@ -409,7 +409,7 @@ static FTS_MATCH rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_jso
             if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, rm->first_time_s, (rm->flags & RRD_FLAG_COLLECTED) ? ctl->now : rm->last_time_s, 0))
                 continue;
 
-            if(unlikely(full_text_search_string(&ctl->q.fts, q, rm->id)) ||
+            if(full_text_search_string(&ctl->q.fts, q, rm->id) ||
                (rm->name != rm->id && full_text_search_string(&ctl->q.fts, q, rm->name))) {
                 matched = FTS_MATCHED_DIMENSION;
                 break;
@@ -418,8 +418,8 @@ static FTS_MATCH rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_jso
         dfe_done(rm);
 
         size_t label_searches = 0;
-        if(unlikely(ri->rrdlabels && dictionary_entries(ri->rrdlabels) &&
-                    rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, q, ':', &label_searches))) {
+        if(ri->rrdlabels && dictionary_entries(ri->rrdlabels) &&
+                    rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, q, ':', &label_searches)) {
             ctl->q.fts.searches += label_searches;
             ctl->q.fts.char_searches += label_searches;
             matched = FTS_MATCHED_LABEL;
@@ -432,12 +432,12 @@ static FTS_MATCH rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_jso
             RRDSET *st = ri->rrdset;
             rw_spinlock_read_lock(&st->alerts.spinlock);
             for (RRDCALC *rcl = st->alerts.base; rcl; rcl = rcl->next) {
-                if(unlikely(full_text_search_string(&ctl->q.fts, q, rcl->name))) {
+                if(full_text_search_string(&ctl->q.fts, q, rcl->name)) {
                     matched = FTS_MATCHED_ALERT;
                     break;
                 }
 
-                if(unlikely(full_text_search_string(&ctl->q.fts, q, rcl->info))) {
+                if(full_text_search_string(&ctl->q.fts, q, rcl->info)) {
                     matched = FTS_MATCHED_ALERT_INFO;
                     break;
                 }
@@ -893,7 +893,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
         // restore it
         ctl->q.pattern = old_q;
 
-        if(unlikely(added < 0))
+        if(added < 0)
             return -1; // stop the query
 
         if(added)
@@ -1496,13 +1496,13 @@ static void contexts_v2_alert_transition_free(struct sql_alert_transition_fixed_
 static inline void contexts_v2_alert_transition_keep(struct alert_transitions_callback_data *d, struct sql_alert_transition_data *t, const char *machine_guid) {
     d->items_matched++;
 
-    if(unlikely(t->global_id <= d->ctl->request->alerts.global_id_anchor)) {
+    if(t->global_id <= d->ctl->request->alerts.global_id_anchor) {
         // this is in our past, we are not interested
         d->operations.skips_before++;
         return;
     }
 
-    if(unlikely(!d->base)) {
+    if(!d->base) {
         d->last_added = contexts_v2_alert_transition_dup(t, machine_guid, NULL);
         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(d->base, d->last_added, prev, next);
         d->items_to_return++;
@@ -1554,7 +1554,7 @@ static inline void contexts_v2_alert_transition_keep(struct alert_transitions_ca
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(d->base, tmp, prev, next);
         d->items_to_return--;
 
-        if(unlikely(d->last_added == tmp))
+        if(d->last_added == tmp)
             d->last_added = d->base;
 
         contexts_v2_alert_transition_free(tmp);
@@ -2003,7 +2003,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                              rrdcontext_to_json_v2_add_host, &ctl,
                              &ctl.versions, ctl.q.host_node_id_str);
 
-    if(unlikely(ret < 0)) {
+    if(ret < 0) {
         buffer_flush(wb);
 
         if(ret == -2) {

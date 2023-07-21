@@ -126,10 +126,10 @@ PARSER_RC parser_execute(PARSER *parser, PARSER_KEYWORD *keyword, char **words, 
 static inline int find_first_keyword(const char *src, char *dst, int dst_size, bool *isspace_map) {
     const char *s = src, *keyword_start;
 
-    while (unlikely(isspace_map[(uint8_t)*s])) s++;
+    while (isspace_map[(uint8_t)*s]) s++;
     keyword_start = s;
 
-    while (likely(*s && !isspace_map[(uint8_t)*s]) && dst_size > 1) {
+    while (*s && !isspace_map[(uint8_t)*s] && dst_size > 1) {
         *dst++ = *s++;
         dst_size--;
     }
@@ -150,7 +150,7 @@ static inline PARSER_KEYWORD *parser_find_keyword(PARSER *parser, const char *co
 static inline int parser_action(PARSER *parser, char *input) {
     parser->line++;
 
-    if(unlikely(parser->flags & PARSER_DEFER_UNTIL_KEYWORD)) {
+    if(parser->flags & PARSER_DEFER_UNTIL_KEYWORD) {
         char command[PLUGINSD_LINE_MAX + 1];
         bool has_keyword = find_first_keyword(input, command, PLUGINSD_LINE_MAX, isspace_map_pluginsd);
 
@@ -184,12 +184,12 @@ static inline int parser_action(PARSER *parser, char *input) {
     size_t num_words = quoted_strings_splitter_pluginsd(input, words, PLUGINSD_MAX_WORDS);
     const char *command = get_word(words, num_words, 0);
 
-    if(unlikely(!command))
+    if(!command)
         return 0;
 
     PARSER_RC rc;
     PARSER_KEYWORD *t = parser_find_keyword(parser, command);
-    if(likely(t)) {
+    if(t) {
         worker_is_busy(t->worker_job_id);
         rc = parser_execute(parser, t, words, num_words);
         // rc = (*t->func)(words, num_words, parser);

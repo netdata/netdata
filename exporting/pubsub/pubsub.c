@@ -109,7 +109,7 @@ void pubsub_connector_worker(void *instance_p)
         instance->data_is_ready = 0;
 
 
-        if (unlikely(instance->engine->exit)) {
+        if (instance->engine->exit) {
             uv_mutex_unlock(&instance->mutex);
             break;
         }
@@ -161,8 +161,8 @@ void pubsub_connector_worker(void *instance_p)
 
         size_t sent_metrics = 0, lost_metrics = 0, sent_bytes = 0, lost_bytes = 0;
 
-        if (unlikely(pubsub_get_result(
-                connector_specific_data, error_message, &sent_metrics, &sent_bytes, &lost_metrics, &lost_bytes))) {
+        if (pubsub_get_result(
+                connector_specific_data, error_message, &sent_metrics, &sent_bytes, &lost_metrics, &lost_bytes)) {
             // oops! we couldn't send (all or some of the) data
             netdata_log_error("EXPORTING: %s", error_message);
             netdata_log_error(

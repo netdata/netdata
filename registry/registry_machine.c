@@ -70,10 +70,10 @@ REGISTRY_MACHINE *registry_machine_allocate(const char *machine_guid, time_t whe
 REGISTRY_MACHINE *registry_machine_find_or_create(const char *machine_guid, time_t when, bool is_dummy __maybe_unused) {
     REGISTRY_MACHINE *m = NULL;
 
-    if(likely(machine_guid && *machine_guid)) {
+    if(machine_guid && *machine_guid) {
         // validate it is a GUID
         char buf[GUID_LEN + 1];
-        if(unlikely(regenerate_guid(machine_guid, buf) == -1))
+        if(regenerate_guid(machine_guid, buf) == -1)
             netdata_log_info("REGISTRY: machine guid '%s' is not a valid guid. Ignoring it.", machine_guid);
         else {
             machine_guid = buf;
@@ -101,11 +101,11 @@ REGISTRY_MACHINE_URL *registry_machine_link_to_url(REGISTRY_MACHINE *m, STRING *
     else {
         netdata_log_debug(D_REGISTRY, "REGISTRY: registry_machine_link_to_url('%s', '%s'): found", m->guid, string2str(url));
         mu->usages++;
-        if(likely(mu->last_t < (uint32_t)when)) mu->last_t = (uint32_t)when;
+        if(mu->last_t < (uint32_t)when) mu->last_t = (uint32_t)when;
     }
 
     m->usages++;
-    if(likely(m->last_t < (uint32_t)when)) m->last_t = (uint32_t)when;
+    if(m->last_t < (uint32_t)when) m->last_t = (uint32_t)when;
 
     if(mu->flags & REGISTRY_URL_FLAGS_EXPIRED) {
         netdata_log_debug(D_REGISTRY, "REGISTRY: registry_machine_link_to_url('%s', '%s'): accessing an expired URL.", m->guid, string2str(url));

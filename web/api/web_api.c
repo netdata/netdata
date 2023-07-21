@@ -32,7 +32,7 @@ static bool web_client_check_acl_and_bearer(struct web_client *w, WEB_CLIENT_ACL
 }
 
 int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_path_endpoint, struct web_api_command *api_commands) {
-    if(unlikely(!url_path_endpoint || !*url_path_endpoint)) {
+    if(!url_path_endpoint || !*url_path_endpoint) {
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "Which API command?");
         return HTTP_RESP_BAD_REQUEST;
@@ -41,8 +41,8 @@ int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_pat
     uint32_t hash = simple_hash(url_path_endpoint);
 
     for(int i = 0; api_commands[i].command ; i++) {
-        if(unlikely(hash == api_commands[i].hash && !strcmp(url_path_endpoint, api_commands[i].command))) {
-            if(unlikely(!web_client_check_acl_and_bearer(w, api_commands[i].acl)))
+        if(hash == api_commands[i].hash && !strcmp(url_path_endpoint, api_commands[i].command)) {
+            if(!web_client_check_acl_and_bearer(w, api_commands[i].acl))
                 return web_client_bearer_required(w);
 
             char *query_string = (char *)buffer_tostring(w->url_query_string_decoded);

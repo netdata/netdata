@@ -113,12 +113,12 @@ void *freebsd_main(void *ptr)
 
         usec_t hb_dt = heartbeat_next(&hb, step);
 
-        if (unlikely(netdata_exit))
+        if (netdata_exit)
             break;
 
         for (i = 0; freebsd_modules[i].name; i++) {
             struct freebsd_module *pm = &freebsd_modules[i];
-            if (unlikely(!pm->enabled))
+            if (!pm->enabled)
                 continue;
 
             netdata_log_debug(D_PROCNETDEV_LOOP, "FREEBSD calling %s.", pm->name);
@@ -126,7 +126,7 @@ void *freebsd_main(void *ptr)
             worker_is_busy(i);
             pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
 
-            if (unlikely(netdata_exit))
+            if (netdata_exit)
                 break;
         }
     }

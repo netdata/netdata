@@ -248,7 +248,7 @@ void rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts();
 void rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(RRDHOST *host);
 
 static inline int rrdcalc_isrepeating(RRDCALC *rc) {
-    if (unlikely(rc->warn_repeat_every > 0 || rc->crit_repeat_every > 0)) {
+    if (rc->warn_repeat_every > 0 || rc->crit_repeat_every > 0) {
         return 1;
     }
     return 0;

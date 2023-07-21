@@ -58,7 +58,7 @@ static void query_target_destroy(QUERY_TARGET *qt) {
 }
 
 void query_target_release(QUERY_TARGET *qt) {
-    if(unlikely(!qt)) return;
+    if(!qt) return;
 
     internal_fatal(!qt->internal.used, "QUERY TARGET: qt to be released is not used");
 
@@ -159,7 +159,7 @@ static QUERY_TARGET *query_target_get(void) {
     }
     spinlock_unlock(&query_target_base.available.spinlock);
 
-    if(unlikely(!qt))
+    if(!qt)
         qt = callocz(1, sizeof(*qt));
 
     spinlock_lock(&query_target_base.used.spinlock);
@@ -496,7 +496,7 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
 }
 
 static inline STRING *rrdinstance_create_id_fqdn_v1(RRDINSTANCE_ACQUIRED *ria) {
-    if(unlikely(!ria))
+    if(!ria)
         return NULL;
 
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
@@ -504,7 +504,7 @@ static inline STRING *rrdinstance_create_id_fqdn_v1(RRDINSTANCE_ACQUIRED *ria) {
 }
 
 static inline STRING *rrdinstance_create_name_fqdn_v1(RRDINSTANCE_ACQUIRED *ria) {
-    if(unlikely(!ria))
+    if(!ria)
         return NULL;
 
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
@@ -512,7 +512,7 @@ static inline STRING *rrdinstance_create_name_fqdn_v1(RRDINSTANCE_ACQUIRED *ria)
 }
 
 static inline STRING *rrdinstance_create_id_fqdn_v2(RRDINSTANCE_ACQUIRED *ria) {
-    if(unlikely(!ria))
+    if(!ria)
         return NULL;
 
     char buffer[RRD_ID_LENGTH_MAX + 1];
@@ -523,7 +523,7 @@ static inline STRING *rrdinstance_create_id_fqdn_v2(RRDINSTANCE_ACQUIRED *ria) {
 }
 
 static inline STRING *rrdinstance_create_name_fqdn_v2(RRDINSTANCE_ACQUIRED *ria) {
-    if(unlikely(!ria))
+    if(!ria)
         return NULL;
 
     char buffer[RRD_ID_LENGTH_MAX + 1];
@@ -764,7 +764,7 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
 
     size_t dimensions_added = 0, metrics_added = 0, priority = 0;
 
-    if(unlikely(qt->request.rma)) {
+    if(qt->request.rma) {
         if(query_dimension_add(qtl, qn, qc, qi, qt->request.rma, queryable_instance, &metrics_added, priority++))
             dimensions_added++;
     }
@@ -831,11 +831,11 @@ static ssize_t query_context_add(void *data, RRDCONTEXT_ACQUIRED *rca, bool quer
     QUERY_CONTEXT *qc = query_context_allocate(qt, rca);
 
     ssize_t added = 0;
-    if(unlikely(qt->request.ria)) {
+    if(qt->request.ria) {
         if(query_instance_add(qtl, qn, qc, qt->request.ria, queryable_context, false))
             added++;
     }
-    else if(unlikely(qtl->st && qtl->st->rrdcontext == rca && qtl->st->rrdinstance)) {
+    else if(qtl->st && qtl->st->rrdcontext == rca && qtl->st->rrdinstance) {
         if(query_instance_add(qtl, qn, qc, qtl->st->rrdinstance, queryable_context, false))
             added++;
     }
@@ -894,11 +894,11 @@ static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
         qn->node_id[0] = '\0';
 
     // is the chart given valid?
-    if(unlikely(qtl->st && (!qtl->st->rrdinstance || !qtl->st->rrdcontext))) {
+    if(qtl->st && (!qtl->st->rrdinstance || !qtl->st->rrdcontext)) {
         netdata_log_error("QUERY TARGET: RRDSET '%s' given, but it is not linked to rrdcontext structures. Linking it now.", rrdset_name(qtl->st));
         rrdinstance_from_rrdset(qtl->st);
 
-        if(unlikely(qtl->st && (!qtl->st->rrdinstance || !qtl->st->rrdcontext))) {
+        if(qtl->st && (!qtl->st->rrdinstance || !qtl->st->rrdcontext)) {
             netdata_log_error("QUERY TARGET: RRDSET '%s' given, but failed to be linked to rrdcontext structures. Switching to context query.",
                               rrdset_name(qtl->st));
 
@@ -912,11 +912,11 @@ static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
     qtl->qn = qn;
 
     ssize_t added = 0;
-    if(unlikely(qt->request.rca)) {
+    if(qt->request.rca) {
         if(query_context_add(qtl, qt->request.rca, true))
             added++;
     }
-    else if(unlikely(qtl->st)) {
+    else if(qtl->st) {
         // single chart data queries
         if(query_context_add(qtl, qtl->st->rrdcontext, true))
             added++;
@@ -1087,7 +1087,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
 
     qtl.match_ids = qt->request.options & RRDR_OPTION_MATCH_IDS;
     qtl.match_names = qt->request.options & RRDR_OPTION_MATCH_NAMES;
-    if(likely(!qtl.match_ids && !qtl.match_names))
+    if(!qtl.match_ids && !qtl.match_names)
         qtl.match_ids = qtl.match_names = true;
 
     // verify that the chart belongs to the host we are interested
@@ -1096,7 +1096,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
             // It is NULL, set it ourselves.
             host = qtl.st->rrdhost;
         }
-        else if (unlikely(host != qtl.st->rrdhost)) {
+        else if (host != qtl.st->rrdhost) {
             // Oops! A different host!
             netdata_log_error("QUERY TARGET: RRDSET '%s' given does not belong to host '%s'. Switching query host to '%s'",
                   rrdset_name(qtl.st), rrdhost_hostname(host), rrdhost_hostname(qtl.st->rrdhost));
@@ -1210,7 +1210,7 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                         }
                 dfe_done(rm);
 
-                if(unlikely(!proceed))
+                if(!proceed)
                     break;
             }
     dfe_done(ri);

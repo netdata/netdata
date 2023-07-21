@@ -17,13 +17,13 @@ int mongodb_init(struct instance *instance)
     mongoc_uri_t *uri;
     bson_error_t bson_error;
 
-    if (unlikely(!connector_specific_config->collection || !*connector_specific_config->collection)) {
+    if (!connector_specific_config->collection || !*connector_specific_config->collection) {
         netdata_log_error("EXPORTING: collection name is a mandatory MongoDB parameter, but it is not configured");
         return 1;
     }
 
     uri = mongoc_uri_new_with_error(instance->config.destination, &bson_error);
-    if (unlikely(!uri)) {
+    if (!uri) {
         netdata_log_error("EXPORTING: failed to parse URI: %s. Error message: %s",
                           instance->config.destination,
                           bson_error.message);
@@ -41,7 +41,7 @@ int mongodb_init(struct instance *instance)
         (struct mongodb_specific_data *)instance->connector_specific_data;
 
     connector_specific_data->client = mongoc_client_new_from_uri(uri);
-    if (unlikely(!connector_specific_data->client)) {
+    if (!connector_specific_data->client) {
         netdata_log_error("EXPORTING: failed to create a new client");
         return 1;
     }
@@ -129,7 +129,7 @@ int init_mongodb_instance(struct instance *instance)
         instance->engine->mongoc_initialized = 1;
     }
 
-    if (unlikely(mongodb_init(instance))) {
+    if (mongodb_init(instance)) {
         netdata_log_error("EXPORTING: cannot initialize MongoDB exporting connector");
         return 1;
     }
@@ -186,7 +186,7 @@ int format_batch_mongodb(struct instance *instance)
         while (*end && *end != '\n')
             end++;
 
-        if (likely(*end)) {
+        if (*end) {
             *end = '\0';
             end++;
         } else {
@@ -196,7 +196,7 @@ int format_batch_mongodb(struct instance *instance)
         bson_error_t bson_error;
         insert[documents_inserted] = bson_new_from_json((const uint8_t *)start, -1, &bson_error);
 
-        if (unlikely(!insert[documents_inserted])) {
+        if (!insert[documents_inserted]) {
             netdata_log_error(
                 "EXPORTING: Failed creating a BSON document from a JSON string \"%s\" : %s", start, bson_error.message);
             free_bson(insert, documents_inserted);
@@ -296,7 +296,7 @@ void mongodb_connector_worker(void *instance_p)
             instance->data_is_ready = 0;
         }
 
-        if (unlikely(instance->engine->exit)) {
+        if (instance->engine->exit) {
             uv_mutex_unlock(&instance->mutex);
             break;
         }
@@ -337,15 +337,15 @@ void mongodb_connector_worker(void *instance_p)
             connector_specific_config->collection,
             data_size);
 
-        if (likely(documents_inserted != 0)) {
+        if (documents_inserted != 0) {
             bson_error_t bson_error;
-            if (likely(mongoc_collection_insert_many(
+            if (mongoc_collection_insert_many(
                     connector_specific_data->collection,
                     (const bson_t **)insert,
                     documents_inserted,
                     NULL,
                     NULL,
-                    &bson_error))) {
+                    &bson_error)) {
                 stats->sent_metrics = documents_inserted;
                 stats->sent_bytes += data_size;
                 stats->transmission_successes++;
@@ -367,7 +367,7 @@ void mongodb_connector_worker(void *instance_p)
 
         free_bson(insert, documents_inserted);
 
-        if (unlikely(instance->engine->exit))
+        if (instance->engine->exit)
             break;
 
         uv_mutex_lock(&instance->mutex);

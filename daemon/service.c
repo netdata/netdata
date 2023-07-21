@@ -41,7 +41,7 @@ static void svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
     const char *cache_filename = rrddim_cache_filename(rd);
     if(cache_filename) {
         netdata_log_info("Deleting dimension file '%s'.", cache_filename);
-        if (unlikely(unlink(cache_filename) == -1))
+        if (unlink(cache_filename) == -1)
             netdata_log_error("Cannot delete dimension file '%s'", cache_filename);
     }
 
@@ -85,10 +85,10 @@ static bool svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_dimensio
     bool done_all_dimensions = true;
 
     dfe_start_write(st->rrddim_root_index, rd) {
-        if(unlikely(
+        if(
                 all_dimensions ||
                 (rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && (rd->collector.last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now))
-                    )) {
+                    ) {
 
             if(dictionary_acquired_item_references(rd_dfe.item) == 1) {
                 netdata_log_info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rrddim_name(rd), rrddim_id(rd), rrdset_name(st), rrdset_id(st));
@@ -145,11 +145,11 @@ static void svc_rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
         if(rrdset_is_replicating(st))
             continue;
 
-        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)
+        if(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)
                      && st->last_accessed_time_s + rrdset_free_obsolete_time_s < now
                      && st->last_updated.tv_sec + rrdset_free_obsolete_time_s < now
                      && st->last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now
-                     )) {
+                     ) {
             svc_rrdset_obsolete_to_archive(st);
         }
         else if(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS)) {

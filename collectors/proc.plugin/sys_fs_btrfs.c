@@ -123,7 +123,7 @@ static inline int collect_btrfs_error_stats(BTRFS_DEVICE *device){
     char buffer[120 + 1];
     
     int ret = read_file(device->error_stats_filename, buffer, 120);
-    if(unlikely(ret)) {
+    if(ret) {
         collector_error("BTRFS: failed to read '%s'", device->error_stats_filename);
         device->write_errs = 0;
         device->read_errs = 0;
@@ -136,7 +136,7 @@ static inline int collect_btrfs_error_stats(BTRFS_DEVICE *device){
     char *p = buffer;
     while(p){
         char *val = strsep_skip_consecutive_separators(&p, "\n");
-        if(unlikely(!val || !*val)) break;
+        if(!val || !*val) break;
         char *key = strsep_skip_consecutive_separators(&val, " ");
 
         if(!strcmp(key, "write_errs")) device->write_errs = str2ull(val, NULL);
@@ -152,7 +152,7 @@ static inline int collect_btrfs_commits_stats(BTRFS_NODE *node, int update_every
     char buffer[120 + 1];
     
     int ret = read_file(node->commit_stats_filename, buffer, 120);
-    if(unlikely(ret)) {
+    if(ret) {
         collector_error("BTRFS: failed to read '%s'", node->commit_stats_filename);
         node->commits_total = 0;
         node->commits_new = 0;
@@ -167,12 +167,12 @@ static inline int collect_btrfs_commits_stats(BTRFS_NODE *node, int update_every
     char *p = buffer;
     while(p){
         char *val = strsep_skip_consecutive_separators(&p, "\n");
-        if(unlikely(!val || !*val)) break;
+        if(!val || !*val) break;
         char *key = strsep_skip_consecutive_separators(&val, " ");
 
         if(!strcmp(key, "commits")){
             long long commits_total_new = str2ull(val, NULL);
-            if(likely(node->commits_total)){
+            if(node->commits_total){
                 if((node->commits_new = commits_total_new - node->commits_total))
                     node->commits_total = commits_total_new;
             } else node->commits_total = commits_total_new;
@@ -181,7 +181,7 @@ static inline int collect_btrfs_commits_stats(BTRFS_NODE *node, int update_every
         else if(!strcmp(key, "max_commit_ms")) node->commit_timings_max = str2ull(val, NULL);
         else if(!strcmp(key, "total_commit_ms")) {
             long long commit_timings_total_new = str2ull(val, NULL);
-            if(likely(node->commit_timings_total)){
+            if(node->commit_timings_total){
                 long time_delta = commit_timings_total_new - node->commit_timings_total;
                 if(time_delta){
                     node->commits_percentage_time = time_delta * 10 / update_every;
@@ -342,8 +342,8 @@ static inline int find_btrfs_disks(BTRFS_NODE *node, const char *path) {
     d = node->disks;
 
     while(d) {
-        if(unlikely(!d->exists)) {
-            if(unlikely(node->disks == d)) {
+        if(!d->exists) {
+            if(node->disks == d) {
                 node->disks = d->next;
                 btrfs_free_disk(d);
                 d = node->disks;
@@ -428,7 +428,7 @@ static inline int find_btrfs_devices(BTRFS_NODE *node, const char *path) {
         // --------------------------------------------------------------------
         // update the values
 
-        if(unlikely(collect_btrfs_error_stats(d)))
+        if(collect_btrfs_error_stats(d))
             d->exists = 0; // 'd' will be garbaged collected in loop below
     }
     closedir(dir);
@@ -440,8 +440,8 @@ static inline int find_btrfs_devices(BTRFS_NODE *node, const char *path) {
     d = node->devices;
 
     while(d) {
-        if(unlikely(!d->exists)) {
-            if(unlikely(node->devices == d)) {
+        if(!d->exists) {
+            if(node->devices == d) {
                 node->devices = d->next;
                 btrfs_free_device(d);
                 d = node->devices;
@@ -605,7 +605,7 @@ static inline int find_all_btrfs_pools(const char *path, int update_every) {
 
         snprintfz(filename, FILENAME_MAX, "%s/%s/commit_stats", path, de->d_name);
         if(!node->commit_stats_filename) node->commit_stats_filename = strdupz(filename);
-        if(unlikely(collect_btrfs_commits_stats(node, update_every))){
+        if(collect_btrfs_commits_stats(node, update_every)){
             collector_error("BTRFS: failed to collect commit stats for '%s'", node->id);
             btrfs_free_commits_stats(node);
         }     
@@ -640,8 +640,8 @@ static inline int find_all_btrfs_pools(const char *path, int update_every) {
     node = nodes;
 
     while(node) {
-        if(unlikely(!node->exists)) {
-            if(unlikely(nodes == node)) {
+        if(!node->exists) {
+            if(nodes == node) {
                 nodes = node->next;
                 btrfs_free_node(node);
                 node = nodes;
@@ -682,7 +682,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
     (void)dt;
 
-    if(unlikely(!initialized)) {
+    if(!initialized) {
         initialized = 1;
 
         char filename[FILENAME_MAX + 1];
@@ -764,7 +764,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
         }
 
         if(do_commit_stats != CONFIG_BOOLEAN_NO && node->commit_stats_filename) {
-            if (unlikely(collect_btrfs_commits_stats(node, update_every))) {
+            if (collect_btrfs_commits_stats(node, update_every)) {
                 collector_error("BTRFS: failed to collect commit stats for '%s'", node->id);
                 btrfs_free_commits_stats(node);
             }
@@ -772,7 +772,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
         if(do_error_stats != CONFIG_BOOLEAN_NO) {
             for(BTRFS_DEVICE *d = node->devices ; d ; d = d->next) {
-                if(unlikely(collect_btrfs_error_stats(d))){
+                if(collect_btrfs_error_stats(d)){
                     collector_error("BTRFS: failed to collect error stats for '%s', devid:'%d'", node->id, d->id);
                     /* make it refresh btrfs at the next iteration, 
                      * btrfs_free_device(d) will be called in 
@@ -790,7 +790,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                                                           netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
             do_allocation_disks = CONFIG_BOOLEAN_YES;
 
-            if(unlikely(!node->st_allocation_disks)) {
+            if(!node->st_allocation_disks) {
                 char id[RRD_ID_LENGTH_MAX + 1], name[RRD_ID_LENGTH_MAX + 1], title[200 + 1];
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "disk_%s", node->id);
@@ -849,7 +849,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                                                          netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
             do_allocation_data = CONFIG_BOOLEAN_YES;
 
-            if(unlikely(!node->st_allocation_data)) {
+            if(!node->st_allocation_data) {
                 char id[RRD_ID_LENGTH_MAX + 1], name[RRD_ID_LENGTH_MAX + 1], title[200 + 1];
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "data_%s", node->id);
@@ -893,7 +893,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                                                              netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
             do_allocation_metadata = CONFIG_BOOLEAN_YES;
 
-            if(unlikely(!node->st_allocation_metadata)) {
+            if(!node->st_allocation_metadata) {
                 char id[RRD_ID_LENGTH_MAX + 1], name[RRD_ID_LENGTH_MAX + 1], title[200 + 1];
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "metadata_%s", node->id);
@@ -939,7 +939,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                                                            netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
             do_allocation_system = CONFIG_BOOLEAN_YES;
 
-            if(unlikely(!node->st_allocation_system)) {
+            if(!node->st_allocation_system) {
                 char id[RRD_ID_LENGTH_MAX + 1], name[RRD_ID_LENGTH_MAX + 1], title[200 + 1];
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "system_%s", node->id);
@@ -983,7 +983,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                                                     netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
             do_commit_stats = CONFIG_BOOLEAN_YES;
 
-            if(unlikely(!node->st_commits)) {
+            if(!node->st_commits) {
                 char id[RRD_ID_LENGTH_MAX + 1], name[RRD_ID_LENGTH_MAX + 1], title[200 + 1];
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "commits_%s", node->id);
@@ -1016,7 +1016,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
             rrddim_set_by_pointer(node->st_commits, node->rd_commits, node->commits_new);
             rrdset_done(node->st_commits);
 
-            if(unlikely(!node->st_commits_percentage_time)) {
+            if(!node->st_commits_percentage_time) {
                 char id[RRD_ID_LENGTH_MAX + 1], name[RRD_ID_LENGTH_MAX + 1], title[200 + 1];
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "commits_perc_time_%s", node->id);
@@ -1050,7 +1050,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
             rrdset_done(node->st_commits_percentage_time);
 
 
-            if(unlikely(!node->st_commit_timings)) {
+            if(!node->st_commit_timings) {
                 char id[RRD_ID_LENGTH_MAX + 1], name[RRD_ID_LENGTH_MAX + 1], title[200 + 1];
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "commit_timings_%s", node->id);
@@ -1096,7 +1096,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
             for(BTRFS_DEVICE *d = node->devices ; d ; d = d->next) {
 
-                if(unlikely(!d->st_error_stats)) {
+                if(!d->st_error_stats) {
                     char id[RRD_ID_LENGTH_MAX + 1], name[RRD_ID_LENGTH_MAX + 1], title[200 + 1];
 
                     snprintfz(id, RRD_ID_LENGTH_MAX, "device_errors_dev%d_%s", d->id, node->id);

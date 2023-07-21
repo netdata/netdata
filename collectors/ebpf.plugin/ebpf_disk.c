@@ -300,7 +300,7 @@ static void update_disk_table(char *name, int major, int minor, time_t current_t
     }
 
     netdata_ebpf_disks_t *update_next = disk_list;
-    if (likely(disk_list)) {
+    if (disk_list) {
         netdata_ebpf_disks_t *move = disk_list;
         while (move) {
             if (dev == move->dev)
@@ -374,7 +374,7 @@ static int read_local_disks()
     for(l = 2; l < lines ;l++) {
         size_t words = procfile_linewords(ff, l);
         // This is header or end of file
-        if (unlikely(words < 4))
+        if (words < 4)
             continue;
 
         int major = (int)strtol(procfile_lineword(ff, l, 0), NULL, 10);
@@ -558,7 +558,7 @@ static void ebpf_fill_plot_disks(netdata_ebpf_disks_t *ptr)
 {
     pthread_mutex_lock(&plot_mutex);
     ebpf_publish_disk_t *w;
-    if (likely(plot_disks)) {
+    if (plot_disks) {
         ebpf_publish_disk_t *move = plot_disks, *store = plot_disks;
         while (move) {
             if (move->plot == ptr) {
@@ -608,7 +608,7 @@ static void read_hard_disk_tables(int table, int maps_per_core)
         netdata_ebpf_disks_t find;
         find.dev = key.dev;
 
-        if (likely(ret)) {
+        if (ret) {
             if (find.dev != ret->dev)
                 ret = (netdata_ebpf_disks_t *)avl_search_lock(&disk_tree, (avl_t *)&find);
         } else

@@ -443,7 +443,7 @@ char *health_edit_command_from_source(const char *source)
     char *line_num = strchr(temp, '@');
     char *file_no_path = strrchr(temp, '/');
 
-    if (likely(file_no_path && line_num)) {
+    if (file_no_path && line_num) {
         *line_num = '\0';
         snprintfz(
             buffer,
@@ -541,7 +541,7 @@ static int health_readfile(const char *filename, void *data) {
 
     char buffer[HEALTH_CONF_MAX_LINE + 1];
 
-    if(unlikely(!hash_alarm)) {
+    if(!hash_alarm) {
         hash_alarm = simple_uhash(HEALTH_ALARM_KEY);
         hash_template = simple_uhash(HEALTH_TEMPLATE_KEY);
         hash_on = simple_uhash(HEALTH_ON_KEY);
@@ -1326,7 +1326,7 @@ void sql_refresh_hashes(void)
 }
 
 void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath) {
-    if(unlikely((!host->health.health_enabled) && !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)) ||
+    if((!host->health.health_enabled) && !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH) ||
         !service_running(SERVICE_HEALTH)) {
         netdata_log_debug(D_HEALTH, "CONFIG health is not enabled for host '%s'", rrdhost_hostname(host));
         return;

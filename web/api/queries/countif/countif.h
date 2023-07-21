@@ -131,7 +131,7 @@ static inline NETDATA_DOUBLE tg_countif_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_va
 
     NETDATA_DOUBLE value;
 
-    if(unlikely(!g->count)) {
+    if(!g->count) {
         value = 0.0;
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }

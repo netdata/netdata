@@ -160,7 +160,7 @@ static inline double verdana11_width(const char *s, float em_size) {
             w += em_size;
         }
         else {
-            if(likely(!(*s & 0x80))){ // Byte 1XXX XXXX is not valid in UTF8
+            if(!(*s & 0x80)){ // Byte 1XXX XXXX is not valid in UTF8
             double t = verdana11_widths[(unsigned char)*s];
                 if(t != 0.0)
                 w += t + VERDANA_KERNING;
@@ -251,11 +251,11 @@ cleanup:
 
 static inline char *format_value_with_precision_and_unit(char *value_string, size_t value_string_len,
     NETDATA_DOUBLE value, const char *units, int precision) {
-    if(unlikely(isnan(value) || isinf(value)))
+    if(isnan(value) || isinf(value))
         value = 0.0;
 
     char *separator = "";
-    if(unlikely(isalnum(*units)))
+    if(isalnum(*units))
         separator = " ";
 
     if(precision < 0) {
@@ -279,16 +279,16 @@ static inline char *format_value_with_precision_and_unit(char *value_string, siz
         else if(isgreaterequal(abs, 0.0001)) len = snprintfz(value_string, value_string_len, "%0.6" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE) value);
         else                                 len = snprintfz(value_string, value_string_len, "%0.7" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE) value);
 
-        if(unlikely(trim_zeros)) {
+        if(trim_zeros) {
             int l;
             // remove trailing zeros from the decimal part
             for(l = len - 1; l > lstop; l--) {
-                if(likely(value_string[l] == '0')) {
+                if(value_string[l] == '0') {
                     value_string[l] = '\0';
                     len--;
                 }
 
-                else if(unlikely(value_string[l] == '.')) {
+                else if(value_string[l] == '.') {
                     value_string[l] = '\0';
                     len--;
                     break;
@@ -299,7 +299,7 @@ static inline char *format_value_with_precision_and_unit(char *value_string, siz
             }
         }
 
-        if(unlikely(len <= 0)) len = 1;
+        if(len <= 0) len = 1;
         snprintfz(&value_string[len], value_string_len - len, "%s%s", separator, units);
     }
     else {
@@ -365,14 +365,14 @@ inline char *format_value_and_unit(char *value_string, size_t value_string_len,
     static int max = -1;
     int i;
 
-    if(unlikely(max == -1)) {
+    if(max == -1) {
         for(i = 0; badge_units_formatters[i].units; i++)
             badge_units_formatters[i].hash = simple_hash(badge_units_formatters[i].units);
 
         max = i;
     }
 
-    if(unlikely(!units)) units = "";
+    if(!units) units = "";
     uint32_t hash_units = simple_hash(units);
 
     UNITS_FORMAT format = UNITS_FORMAT_NONE;
@@ -385,7 +385,7 @@ inline char *format_value_and_unit(char *value_string, size_t value_string_len,
         }
     }
 
-    if(unlikely(format == UNITS_FORMAT_SECONDS || format == UNITS_FORMAT_SECONDS_AGO)) {
+    if(format == UNITS_FORMAT_SECONDS || format == UNITS_FORMAT_SECONDS_AGO) {
         if(value == 0.0) {
             snprintfz(value_string, value_string_len, "%s", "now");
             return value_string;
@@ -415,7 +415,7 @@ inline char *format_value_and_unit(char *value_string, size_t value_string_len,
         return value_string;
     }
 
-    else if(unlikely(format == UNITS_FORMAT_MINUTES || format == UNITS_FORMAT_MINUTES_AGO)) {
+    else if(format == UNITS_FORMAT_MINUTES || format == UNITS_FORMAT_MINUTES_AGO) {
         if(value == 0.0) {
             snprintfz(value_string, value_string_len, "%s", "now");
             return value_string;
@@ -442,7 +442,7 @@ inline char *format_value_and_unit(char *value_string, size_t value_string_len,
         return value_string;
     }
 
-    else if(unlikely(format == UNITS_FORMAT_HOURS || format == UNITS_FORMAT_HOURS_AGO)) {
+    else if(format == UNITS_FORMAT_HOURS || format == UNITS_FORMAT_HOURS_AGO) {
         if(value == 0.0) {
             snprintfz(value_string, value_string_len, "%s", "now");
             return value_string;
@@ -466,33 +466,33 @@ inline char *format_value_and_unit(char *value_string, size_t value_string_len,
         return value_string;
     }
 
-    else if(unlikely(format == UNITS_FORMAT_ONOFF)) {
+    else if(format == UNITS_FORMAT_ONOFF) {
         snprintfz(value_string, value_string_len, "%s", (value != 0.0)?"on":"off");
         return value_string;
     }
 
-    else if(unlikely(format == UNITS_FORMAT_UPDOWN)) {
+    else if(format == UNITS_FORMAT_UPDOWN) {
         snprintfz(value_string, value_string_len, "%s", (value != 0.0)?"up":"down");
         return value_string;
     }
 
-    else if(unlikely(format == UNITS_FORMAT_OKERROR)) {
+    else if(format == UNITS_FORMAT_OKERROR) {
         snprintfz(value_string, value_string_len, "%s", (value != 0.0)?"ok":"error");
         return value_string;
     }
 
-    else if(unlikely(format == UNITS_FORMAT_OKFAILED)) {
+    else if(format == UNITS_FORMAT_OKFAILED) {
         snprintfz(value_string, value_string_len, "%s", (value != 0.0)?"ok":"failed");
         return value_string;
     }
 
-    else if(unlikely(format == UNITS_FORMAT_EMPTY))
+    else if(format == UNITS_FORMAT_EMPTY)
         units = "";
 
-    else if(unlikely(format == UNITS_FORMAT_PERCENT))
+    else if(format == UNITS_FORMAT_PERCENT)
         units = "%";
 
-    if(unlikely(isnan(value) || isinf(value))) {
+    if(isnan(value) || isinf(value)) {
         strcpy(value_string, "-");
         return value_string;
     }
@@ -529,7 +529,7 @@ static inline const char *color_map(const char *color, const char *def) {
     static int max = -1;
     int i;
 
-    if(unlikely(max == -1)) {
+    if(max == -1) {
         for(i = 0; badge_colors[i].name ;i++)
             badge_colors[i].hash = simple_hash(badge_colors[i].name);
 
@@ -655,17 +655,17 @@ static inline void calc_colorz(const char *color, char *final, size_t len, NETDA
                     v = NAN;
             }
 
-            if(unlikely(isnan(value) || isnan(v))) {
+            if(isnan(value) || isnan(v)) {
                 if(isnan(value) && isnan(v))
                     break;
             }
             else {
-                     if (unlikely(comparison == COLOR_COMPARE_LESS && isless(value, v))) break;
-                else if (unlikely(comparison == COLOR_COMPARE_LESSEQUAL && islessequal(value, v))) break;
-                else if (unlikely(comparison == COLOR_COMPARE_GREATER && isgreater(value, v))) break;
-                else if (unlikely(comparison == COLOR_COMPARE_GREATEREQUAL && isgreaterequal(value, v))) break;
-                else if (unlikely(comparison == COLOR_COMPARE_EQUAL && !islessgreater(value, v))) break;
-                else if (unlikely(comparison == COLOR_COMPARE_NOTEQUAL && islessgreater(value, v))) break;
+                     if (comparison == COLOR_COMPARE_LESS && isless(value, v)) break;
+                else if (comparison == COLOR_COMPARE_LESSEQUAL && islessequal(value, v)) break;
+                else if (comparison == COLOR_COMPARE_GREATER && isgreater(value, v)) break;
+                else if (comparison == COLOR_COMPARE_GREATEREQUAL && isgreaterequal(value, v)) break;
+                else if (comparison == COLOR_COMPARE_EQUAL && !islessgreater(value, v)) break;
+                else if (comparison == COLOR_COMPARE_NOTEQUAL && islessgreater(value, v)) break;
             }
         }
         else
@@ -702,7 +702,7 @@ static int html_color_check(const char *str) {
     while(str[i]) {
         if(!allowed_hexa_char(str[i]))
             return 0;
-        if(unlikely(i >= 6))
+        if(i >= 6)
             return 0;
         i++;
     }
@@ -749,7 +749,7 @@ void buffer_svg(BUFFER *wb, const char *label,
 
     if(scale < 100) scale = 100;
 
-    if(unlikely(!value_color || !*value_color))
+    if(!value_color || !*value_color)
         value_color = (isnan(value) || isinf(value))?"999":"4c1";
 
     calc_colorz(value_color, value_color_buffer, COLOR_STRING_SIZE, value);

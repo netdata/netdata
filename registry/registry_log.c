@@ -4,14 +4,14 @@
 #include "registry_internals.h"
 
 void registry_log(char action, REGISTRY_PERSON *p, REGISTRY_MACHINE *m, STRING *u, const char *name) {
-    if(likely(registry.log_fp)) {
-        if(unlikely(fprintf(registry.log_fp, "%c\t%08x\t%s\t%s\t%s\t%s\n",
+    if(registry.log_fp) {
+        if(fprintf(registry.log_fp, "%c\t%08x\t%s\t%s\t%s\t%s\n",
                 action,
                 p->last_t,
                 p->guid,
                 m->guid,
                 name,
-                string2str(u)) < 0))
+                string2str(u)) < 0)
             netdata_log_error("Registry: failed to save log. Registry data may be lost in case of abnormal restart.");
 
         // we increase the counter even on failures
@@ -21,7 +21,7 @@ void registry_log(char action, REGISTRY_PERSON *p, REGISTRY_MACHINE *m, STRING *
         // this must be outside the log_lock(), or a deadlock will happen.
         // registry_db_save() checks the same inside the log_lock, so only
         // one thread will save the db
-        if(unlikely(registry_db_should_be_saved()))
+        if(registry_db_should_be_saved())
             registry_db_save();
     }
 }
@@ -87,7 +87,7 @@ ssize_t registry_log_load(void) {
                 case 'D': // deletes
 
                     // verify it is valid
-                    if (unlikely(len < 85 || s[1] != '\t' || s[10] != '\t' || s[47] != '\t' || s[84] != '\t')) {
+                    if (len < 85 || s[1] != '\t' || s[10] != '\t' || s[47] != '\t' || s[84] != '\t') {
                         netdata_log_error("Registry: log line %zd is wrong (len = %zu).", line, len);
                         continue;
                     }

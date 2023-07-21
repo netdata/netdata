@@ -235,7 +235,7 @@ static void server_parse_spawn_protocol(unsigned source_len, char *source)
         command_length = payload->command_length;
 
         required_len += command_length;
-        if (unlikely(required_len > MAX_COMMAND_LENGTH - 1)) {
+        if (required_len > MAX_COMMAND_LENGTH - 1) {
             fprintf(stderr, "SPAWN: Ran out of protocol buffer space.\n");
             command_length = (MAX_COMMAND_LENGTH - 1) - (sizeof(*header) + sizeof(*payload));
             required_len = MAX_COMMAND_LENGTH - 1;

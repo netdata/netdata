@@ -496,7 +496,7 @@ void ml_update_global_statistics_charts(uint64_t models_consulted) {
         static RRDSET *st = NULL;
         static RRDDIM *rd = NULL;
 
-        if (unlikely(!st)) {
+        if (!st) {
             st = rrdset_create_localhost(
                     "netdata" // type
                     , "ml_models_consulted" // id

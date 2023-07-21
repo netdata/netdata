@@ -12,7 +12,7 @@ struct registry registry;
 // this is used as a protection against the variations of GUIDs
 int regenerate_guid(const char *guid, char *result) {
     uuid_t uuid;
-    if(unlikely(uuid_parse(guid, uuid) == -1)) {
+    if(uuid_parse(guid, uuid) == -1) {
         netdata_log_info("Registry: GUID '%s' is not a valid GUID.", guid);
         return -1;
     }
@@ -40,7 +40,7 @@ static inline char *registry_fix_machine_name(char *name, size_t *len) {
     // make sure all spaces are a SPACE
     char *t = s;
     while(*t) {
-        if(unlikely(isspace(*t)))
+        if(isspace(*t))
             *t = ' ';
 
         t++;
@@ -55,7 +55,7 @@ static inline char *registry_fix_machine_name(char *name, size_t *len) {
     }
     t++;
 
-    if(likely(len))
+    if(len)
         *len = (t - s);
 
     return s;
@@ -273,7 +273,7 @@ char *registry_get_this_machine_hostname(void) {
 char *registry_get_this_machine_guid(void) {
     static char guid[GUID_LEN + 1] = "";
 
-    if(likely(guid[0]))
+    if(guid[0])
         return guid;
 
     // read it from disk

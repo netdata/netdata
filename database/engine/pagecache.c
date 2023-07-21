@@ -277,7 +277,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
         if (!PValue || PValue == PJERR)
             fatal("DBENGINE: corrupted judy array in %s()", __FUNCTION__ );
 
-        if (unlikely(*PValue)) {
+        if (*PValue) {
             struct page_details *pd = *PValue;
             UNUSED(pd);
 
@@ -535,7 +535,7 @@ static size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METR
     while((datafile = njfv2idx_find_and_acquire_j2_header(&state))) {
         struct journal_v2_header *j2_header = state.j2_header_acquired;
 
-        if (unlikely(!j2_header))
+        if (!j2_header)
             continue;
 
         time_t journal_start_time_s = (time_t)(j2_header->start_time_ut / USEC_PER_SEC);
@@ -546,7 +546,7 @@ static size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METR
         struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + j2_header->metric_offset);
         struct journal_metric_list *uuid_entry = bsearch(uuid,uuid_list,journal_metric_count,sizeof(*uuid_list), journal_metric_uuid_compare);
 
-        if (unlikely(!uuid_entry)) {
+        if (!uuid_entry) {
             // our UUID is not in this datafile
             journalfile_v2_data_release(datafile->journalfile);
             continue;
@@ -623,7 +623,7 @@ void add_page_details_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
     if (!PValue || PValue == PJERR)
         fatal("DBENGINE: corrupted judy array");
 
-    if (unlikely(*PValue)) {
+    if (*PValue) {
         datafile_release(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS);
         return;
     }
@@ -772,7 +772,7 @@ we_are_done:
 }
 
 inline void rrdeng_prep_wait(PDC *pdc) {
-    if (unlikely(pdc && !pdc->prep_done)) {
+    if (pdc && !pdc->prep_done) {
         usec_t started_ut = now_monotonic_usec();
         completion_wait_for(&pdc->prep_completion);
         pdc->prep_done = true;
@@ -803,7 +803,7 @@ void rrdeng_prep_query(struct page_details_control *pdc, bool worker) {
     if (pdc->pages_to_load_from_disk && pdc->page_list_JudyL) {
         pdc_acquire(pdc); // we get 1 for the 1st worker in the chain: do_read_page_list_work()
         usec_t start_ut = now_monotonic_usec();
-        if(likely(pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS))
+        if(pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS)
             pdc_route_synchronously(pdc->ctx, pdc);
         else
             pdc_route_asynchronously(pdc->ctx, pdc);
@@ -829,7 +829,7 @@ void rrdeng_prep_query(struct page_details_control *pdc, bool worker) {
  * @return 1 / 0 (pages found or not found)
  */
 void pg_cache_preload(struct rrdeng_query_handle *handle) {
-    if (unlikely(!handle || !handle->metric))
+    if (!handle || !handle->metric)
         return;
 
     __atomic_add_fetch(&handle->ctx->atomic.inflight_queries, 1, __ATOMIC_RELAXED);
@@ -849,7 +849,7 @@ void pg_cache_preload(struct rrdeng_query_handle *handle) {
     if(ctx_is_available_for_queries(handle->ctx)) {
         handle->pdc->refcount++; // we get 1 for the query thread and 1 for the prep thread
 
-        if(unlikely(handle->pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS))
+        if(handle->pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS)
             rrdeng_prep_query(handle->pdc, false);
         else
             rrdeng_enq_cmd(handle->ctx, RRDENG_OPCODE_QUERY, handle->pdc, NULL, handle->priority, NULL, NULL);
@@ -872,12 +872,12 @@ struct pgc_page *pg_cache_lookup_next(
         time_t last_update_every_s,
         size_t *entries
 ) {
-    if (unlikely(!pdc))
+    if (!pdc)
         return NULL;
 
     rrdeng_prep_wait(pdc);
 
-    if (unlikely(!pdc->page_list_JudyL))
+    if (!pdc->page_list_JudyL)
         return NULL;
 
     usec_t start_ut = now_monotonic_usec();
@@ -932,7 +932,7 @@ struct pgc_page *pg_cache_lookup_next(
         time_t page_update_every_s = pgc_page_update_every_s(page);
         size_t page_length = pgc_page_data_size(main_cache, page);
 
-        if(unlikely(page_start_time_s == INVALID_TIME || page_end_time_s == INVALID_TIME)) {
+        if(page_start_time_s == INVALID_TIME || page_end_time_s == INVALID_TIME) {
             __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_zero_time_skipped, 1, __ATOMIC_RELAXED);
             pgc_page_to_clean_evict_or_release(main_cache, page);
             pdc_page_status_set(pd, PDC_PAGE_INVALID | PDC_PAGE_RELEASED);
@@ -947,7 +947,7 @@ struct pgc_page *pg_cache_lookup_next(
             continue;
         }
         else {
-            if (unlikely(page_update_every_s <= 0 || page_update_every_s > 86400)) {
+            if (page_update_every_s <= 0 || page_update_every_s > 86400) {
                 __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_invalid_update_every_fixed, 1, __ATOMIC_RELAXED);
                 page_update_every_s = pgc_page_fix_update_every(page, last_update_every_s);
                 pd->update_every_s = (uint32_t) page_update_every_s;
@@ -955,7 +955,7 @@ struct pgc_page *pg_cache_lookup_next(
 
             size_t entries_by_size = page_entries_by_size(page_length, CTX_POINT_SIZE_BYTES(ctx));
             size_t entries_by_time = page_entries_by_time(page_start_time_s, page_end_time_s, page_update_every_s);
-            if(unlikely(entries_by_size < entries_by_time)) {
+            if(entries_by_size < entries_by_time) {
                 time_t fixed_page_end_time_s = (time_t)(page_start_time_s + (entries_by_size - 1) * page_update_every_s);
                 pd->last_time_s = page_end_time_s = pgc_page_fix_end_time_s(page, fixed_page_end_time_s);
                 entries_by_time = (page_end_time_s - (page_start_time_s - page_update_every_s)) / page_update_every_s;
@@ -967,7 +967,7 @@ struct pgc_page *pg_cache_lookup_next(
             *entries = entries_by_time;
         }
 
-        if(unlikely(page_end_time_s < now_s)) {
+        if(page_end_time_s < now_s) {
             __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_past_time_skipped, 1, __ATOMIC_RELAXED);
             pgc_page_release(main_cache, page);
             pdc_page_status_set(pd, PDC_PAGE_SKIP | PDC_PAGE_RELEASED);

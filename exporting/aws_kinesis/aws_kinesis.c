@@ -109,7 +109,7 @@ void aws_kinesis_connector_worker(void *instance_p)
             uv_cond_wait(&instance->cond_var, &instance->mutex);
         instance->data_is_ready = 0;
 
-        if (unlikely(instance->engine->exit)) {
+        if (instance->engine->exit) {
             uv_mutex_unlock(&instance->mutex);
             break;
         }
@@ -171,8 +171,8 @@ void aws_kinesis_connector_worker(void *instance_p)
 
             size_t sent_bytes = 0, lost_bytes = 0;
 
-            if (unlikely(kinesis_get_result(
-                    connector_specific_data->request_outcomes, error_message, &sent_bytes, &lost_bytes))) {
+            if (kinesis_get_result(
+                    connector_specific_data->request_outcomes, error_message, &sent_bytes, &lost_bytes)) {
                 // oops! we couldn't send (all or some of the) data
                 netdata_log_error("EXPORTING: %s", error_message);
                 netdata_log_error("EXPORTING: failed to write data to external database '%s'. Willing to write %zu bytes, wrote %zu bytes.",
@@ -194,12 +194,12 @@ void aws_kinesis_connector_worker(void *instance_p)
                 stats->receptions++;
             }
 
-            if (unlikely(instance->engine->exit))
+            if (instance->engine->exit)
                 break;
         }
 
         stats->sent_bytes += sent;
-        if (likely(sent == buffer_len))
+        if (sent == buffer_len)
             stats->sent_metrics = stats->buffered_metrics;
 
         buffer_flush(buffer);

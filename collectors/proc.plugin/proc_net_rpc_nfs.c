@@ -280,7 +280,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
         static RRDDIM *rd_udp = NULL,
                       *rd_tcp = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "nfs"
                     , "net"
@@ -317,7 +317,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                       *rd_retransmits  = NULL,
                       *rd_auth_refresh = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "nfs"
                     , "rpc"
@@ -347,7 +347,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
 
     if(do_proc2 == 2) {
         static RRDSET *st = NULL;
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "nfs"
                     , "proc2"
@@ -366,7 +366,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
 
         size_t i;
         for(i = 0; nfs_proc2_values[i].present ; i++) {
-            if(unlikely(!nfs_proc2_values[i].rd))
+            if(!nfs_proc2_values[i].rd)
                 nfs_proc2_values[i].rd = rrddim_add(st, nfs_proc2_values[i].name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st, nfs_proc2_values[i].rd, nfs_proc2_values[i].value);
@@ -377,7 +377,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
 
     if(do_proc3 == 2) {
         static RRDSET *st = NULL;
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "nfs"
                     , "proc3"
@@ -396,7 +396,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
 
         size_t i;
         for(i = 0; nfs_proc3_values[i].present ; i++) {
-            if(unlikely(!nfs_proc3_values[i].rd))
+            if(!nfs_proc3_values[i].rd)
                 nfs_proc3_values[i].rd = rrddim_add(st, nfs_proc3_values[i].name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st, nfs_proc3_values[i].rd, nfs_proc3_values[i].value);
@@ -407,7 +407,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
 
     if(do_proc4 == 2) {
         static RRDSET *st = NULL;
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "nfs"
                     , "proc4"
@@ -426,7 +426,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
 
         size_t i;
         for(i = 0; nfs_proc4_values[i].present ; i++) {
-            if(unlikely(!nfs_proc4_values[i].rd))
+            if(!nfs_proc4_values[i].rd)
                 nfs_proc4_values[i].rd = rrddim_add(st, nfs_proc4_values[i].name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st, nfs_proc4_values[i].rd, nfs_proc4_values[i].value);

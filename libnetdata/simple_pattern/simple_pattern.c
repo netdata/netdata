@@ -15,7 +15,7 @@ struct simple_pattern {
 };
 
 static struct simple_pattern *parse_pattern(char *str, SIMPLE_PREFIX_MODE default_mode, size_t count) {
-    if(unlikely(count >= 1000))
+    if(count >= 1000)
         return NULL;
 
     // fprintf(stderr, "PARSING PATTERN: '%s'\n", str);
@@ -76,7 +76,7 @@ static struct simple_pattern *parse_pattern(char *str, SIMPLE_PREFIX_MODE defaul
 SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, SIMPLE_PREFIX_MODE default_mode, bool case_sensitive) {
     struct simple_pattern *root = NULL, *last = NULL;
 
-    if(unlikely(!list || !*list)) return root;
+    if(!list || !*list) return root;
 
     char isseparator[256] = {
             [' '] = 1       // space
@@ -87,7 +87,7 @@ SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, 
             , ['\v'] = 1    // vertical tab
     };
 
-    if (unlikely(separators && *separators)) {
+    if (separators && *separators) {
         memset(&isseparator[0], 0, sizeof(isseparator));
         while(*separators) isseparator[(unsigned char)*separators++] = 1;
     }
@@ -111,7 +111,7 @@ SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, 
         }
 
         // empty string
-        if(unlikely(!*s))
+        if(!*s)
             break;
 
         // find the next space
@@ -136,7 +136,7 @@ SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, 
         *c = '\0';
 
         // if we matched the empty string, skip it
-        if(unlikely(!*buf))
+        if(!*buf)
             continue;
 
         // fprintf(stderr, "FOUND PATTERN: '%s'\n", buf);
@@ -145,7 +145,7 @@ SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, 
         m->case_sensitive = case_sensitive;
 
         // link it at the end
-        if(unlikely(!root))
+        if(!root)
             root = last = m;
         else {
             last->next = m;
@@ -164,10 +164,10 @@ static inline char *add_wildcarded(const char *matched, size_t matched_size, cha
     //    fprintf(stderr, "ADD WILDCARDED '%s' of length %zu\n", buf, matched_size);
     //}
 
-    if(unlikely(wildcarded && *wildcarded_size && matched && *matched && matched_size)) {
+    if(wildcarded && *wildcarded_size && matched && *matched && matched_size) {
         size_t wss = *wildcarded_size - 1;
         size_t len = (matched_size < wss)?matched_size:wss;
-        if(likely(len)) {
+        if(len) {
             strncpyz(wildcarded, matched, len);
 
             *wildcarded_size -= len;
@@ -209,7 +209,7 @@ static inline bool match_pattern(struct simple_pattern *m, const char *str, size
         switch(m->mode) {
             default:
             case SIMPLE_PATTERN_EXACT:
-                if(unlikely(sp_strcmp(str, m->match, m->case_sensitive) == 0)) {
+                if(sp_strcmp(str, m->match, m->case_sensitive) == 0) {
                     if(!m->child) return true;
                     return false;
                 }
@@ -236,7 +236,7 @@ static inline bool match_pattern(struct simple_pattern *m, const char *str, size
                 break;
 
             case SIMPLE_PATTERN_PREFIX:
-                if(unlikely(sp_strncmp(str, m->match, m->len, m->case_sensitive) == 0)) {
+                if(sp_strncmp(str, m->match, m->len, m->case_sensitive) == 0) {
                     if(!m->child) {
                         add_wildcarded(&str[m->len], len - m->len, wildcarded, wildcarded_size);
                         return true;
@@ -253,7 +253,7 @@ static inline bool match_pattern(struct simple_pattern *m, const char *str, size
                 break;
 
             case SIMPLE_PATTERN_SUFFIX:
-                if(unlikely(sp_strcmp(&str[len - m->len], m->match, m->case_sensitive) == 0)) {
+                if(sp_strcmp(&str[len - m->len], m->match, m->case_sensitive) == 0) {
                     add_wildcarded(str, len - m->len, wildcarded, wildcarded_size);
                     if(!m->child) return true;
                     return false;
@@ -271,7 +271,7 @@ static inline SIMPLE_PATTERN_RESULT simple_pattern_matches_extract_with_length(S
     for(m = root; m ; m = m->next) {
         char *ws = wildcarded;
         size_t wss = wildcarded_size;
-        if(unlikely(ws)) *ws = '\0';
+        if(ws) *ws = '\0';
 
         if (match_pattern(m, str, len, ws, &wss)) {
             if (m->negative) return SP_MATCHED_NEGATIVE;

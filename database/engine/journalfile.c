@@ -80,18 +80,18 @@ struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJFV2IDX_FIND_STA
 
     Pvoid_t *PValue = NULL;
 
-    if(unlikely(!s->init)) {
+    if(!s->init) {
         s->init = true;
         s->last = s->wanted_start_time_s;
 
         PValue = JudyLPrev(s->ctx->njfv2idx.JudyL, &s->last, PJE0);
-        if (unlikely(PValue == PJERR))
+        if (PValue == PJERR)
             fatal("DBENGINE: NJFV2IDX corrupted judy array");
 
         if(!PValue) {
             s->last = 0;
             PValue = JudyLFirst(s->ctx->njfv2idx.JudyL, &s->last, PJE0);
-            if (unlikely(PValue == PJERR))
+            if (PValue == PJERR)
                 fatal("DBENGINE: NJFV2IDX corrupted judy array");
 
             if(!PValue)
@@ -100,9 +100,9 @@ struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJFV2IDX_FIND_STA
     }
 
     while(1) {
-        if (likely(!PValue)) {
+        if (!PValue) {
             PValue = JudyLNext(s->ctx->njfv2idx.JudyL, &s->last, PJE0);
-            if (unlikely(PValue == PJERR))
+            if (PValue == PJERR)
                 fatal("DBENGINE: NJFV2IDX corrupted judy array");
 
             if(!PValue) {
@@ -161,7 +161,7 @@ static void njfv2idx_add(struct rrdengine_datafile *datafile) {
         if (!PValue || PValue == PJERR)
             fatal("DBENGINE: NJFV2IDX corrupted judy array");
 
-        if (unlikely(*PValue)) {
+        if (*PValue) {
             // already there
             datafile->journalfile->njfv2idx.indexed_as++;
         }
@@ -586,7 +586,7 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
     __atomic_add_fetch(&ctx->stats.journalfile_creations, 1, __ATOMIC_RELAXED);
 
     ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
-    if (unlikely(ret)) {
+    if (ret) {
         fatal("DBENGINE: posix_memalign:%s", strerror(ret));
     }
     memset(superblock, 0, sizeof(*superblock));
@@ -623,7 +623,7 @@ static int journalfile_check_superblock(uv_file file)
     uv_fs_t req;
 
     ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
-    if (unlikely(ret)) {
+    if (ret) {
         fatal("DBENGINE: posix_memalign:%s", strerror(ret));
     }
     iov = uv_buf_init((void *)superblock, sizeof(*superblock));
@@ -759,7 +759,7 @@ static unsigned journalfile_replay_transaction(struct rrdengine_instance *ctx, s
     crc = crc32(crc, buf, sizeof(*jf_header) + payload_length);
     ret = crc32cmp(jf_trailer->checksum, crc);
     netdata_log_debug(D_RRDENGINE, "Transaction %"PRIu64" was read from disk. CRC32 check: %s", *id, ret ? "FAILED" : "SUCCEEDED");
-    if (unlikely(ret)) {
+    if (ret) {
         netdata_log_error("DBENGINE: transaction %"PRIu64" was read from disk. CRC32 check: FAILED", *id);
         return size_bytes;
     }
@@ -799,7 +799,7 @@ static uint64_t journalfile_iterate_transactions(struct rrdengine_instance *ctx,
 
     max_id = 1;
     ret = posix_memalign((void *)&buf, RRDFILE_ALIGNMENT, READAHEAD_BYTES);
-    if (unlikely(ret))
+    if (ret)
         fatal("DBENGINE: posix_memalign:%s", strerror(ret));
 
     for (pos = sizeof(struct rrdeng_jf_sb); pos < file_size; pos += READAHEAD_BYTES) {
@@ -845,7 +845,7 @@ static int journalfile_check_v2_extent_list (void *data_start, size_t file_size)
     journal_v2_trailer = (struct journal_v2_block_trailer *) ((uint8_t *) data_start + j2_header->extent_trailer_offset);
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, (uint8_t *) data_start + j2_header->extent_offset, j2_header->extent_count * sizeof(struct journal_extent_list));
-    if (unlikely(crc32cmp(journal_v2_trailer->checksum, crc))) {
+    if (crc32cmp(journal_v2_trailer->checksum, crc)) {
         netdata_log_error("DBENGINE: extent list CRC32 check: FAILED");
         return 1;
     }
@@ -865,7 +865,7 @@ static int journalfile_check_v2_metric_list(void *data_start, size_t file_size)
     journal_v2_trailer = (struct journal_v2_block_trailer *) ((uint8_t *) data_start + j2_header->metric_trailer_offset);
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, (uint8_t *) data_start + j2_header->metric_offset, j2_header->metric_count * sizeof(struct journal_metric_list));
-    if (unlikely(crc32cmp(journal_v2_trailer->checksum, crc))) {
+    if (crc32cmp(journal_v2_trailer->checksum, crc)) {
         netdata_log_error("DBENGINE: metric list CRC32 check: FAILED");
         return 1;
     }
@@ -909,7 +909,7 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
     crc = crc32(crc, (void *) j2_header, sizeof(*j2_header));
 
     rc = crc32cmp(journal_v2_trailer->checksum, crc);
-    if (unlikely(rc)) {
+    if (rc) {
         netdata_log_error("DBENGINE: file CRC32 check: FAILED");
         return 1;
     }
@@ -1076,7 +1076,7 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
     netdata_log_info("DBENGINE: checking integrity of '%s'", path_v2);
     usec_t validation_start_ut = now_monotonic_usec();
     int rc = journalfile_v2_validate(data_start, journal_v2_file_size, journal_v1_file_size);
-    if (unlikely(rc)) {
+    if (rc) {
         if (rc == 2)
             error_report("File %s needs to be rebuilt", path_v2);
         else if (rc == 3)
@@ -1084,7 +1084,7 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
         else
             error_report("File %s is invalid and it will be rebuilt", path_v2);
 
-        if (unlikely(munmap(data_start, journal_v2_file_size)))
+        if (munmap(data_start, journal_v2_file_size))
             netdata_log_error("DBENGINE: failed to unmap '%s'", path_v2);
 
         close(fd);
@@ -1094,8 +1094,8 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
     struct journal_v2_header *j2_header = (void *) data_start;
     uint32_t entries = j2_header->metric_count;
 
-    if (unlikely(!entries)) {
-        if (unlikely(munmap(data_start, journal_v2_file_size)))
+    if (!entries) {
+        if (munmap(data_start, journal_v2_file_size))
             netdata_log_error("DBENGINE: failed to unmap '%s'", path_v2);
 
         close(fd);
@@ -1395,7 +1395,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
         struct journal_metric_list *current_metric = (void *) data;
         // Write the UUID we are processing
         data  = (void *) journalfile_v2_write_metric_page(&j2_header, data, metric_info, pages_offset);
-        if (unlikely(!data))
+        if (!data)
             break;
 
         // Next we will write
@@ -1411,7 +1411,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
 
         // Start writing descr @ time
         void *page_trailer = journalfile_v2_write_descriptors(&j2_header, metric_page, metric_info, current_metric);
-        if (unlikely(!page_trailer))
+        if (!page_trailer)
             break;
 
         // Trailer (checksum)
@@ -1472,7 +1472,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     netdata_munmap(data_start, total_file_size);
     freez(uuid_list);
 
-    if (likely(resize_file_to == total_file_size))
+    if (resize_file_to == total_file_size)
         return;
 
     int ret = truncate(path, (long) resize_file_to);

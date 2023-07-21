@@ -143,7 +143,7 @@ h2o_iovec_t buffer_to_h2o_iovec(BUFFER *wb);
 #endif
 
 static inline void buffer_need_bytes(BUFFER *buffer, size_t needed_free_size) {
-    if(unlikely(buffer->len + needed_free_size >= buffer->size))
+    if(buffer->len + needed_free_size >= buffer->size)
         buffer_increase(buffer, needed_free_size + 1);
 }
 
@@ -176,7 +176,7 @@ static inline void buffer_fast_charcat(BUFFER *wb, const char c) {
 }
 
 static inline void buffer_fast_rawcat(BUFFER *wb, const char *txt, size_t len) {
-    if(unlikely(!txt || !*txt || !len)) return;
+    if(!txt || !*txt || !len) return;
 
     buffer_need_bytes(wb, len + 1);
 
@@ -195,7 +195,7 @@ static inline void buffer_fast_rawcat(BUFFER *wb, const char *txt, size_t len) {
 }
 
 static inline void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
-    if(unlikely(!txt || !*txt || !len)) return;
+    if(!txt || !*txt || !len) return;
 
     buffer_need_bytes(wb, len + 1);
 
@@ -222,7 +222,7 @@ static inline void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
 }
 
 static inline void buffer_strcat(BUFFER *wb, const char *txt) {
-    if(unlikely(!txt || !*txt)) return;
+    if(!txt || !*txt) return;
 
     const char *t = txt;
     while(*t) {
@@ -244,7 +244,7 @@ static inline void buffer_strcat(BUFFER *wb, const char *txt) {
 }
 
 static inline void buffer_strncat(BUFFER *wb, const char *txt, size_t len) {
-    if(unlikely(!txt || !*txt)) return;
+    if(!txt || !*txt) return;
 
     const char *t = txt;
     buffer_need_bytes(wb, len + 1);
@@ -263,7 +263,7 @@ static inline void buffer_strncat(BUFFER *wb, const char *txt, size_t len) {
 }
 
 static inline void buffer_json_strcat(BUFFER *wb, const char *txt) {
-    if(unlikely(!txt || !*txt)) return;
+    if(!txt || !*txt) return;
 
     const unsigned char *t = (const unsigned char *)txt;
     while(*t) {
@@ -274,7 +274,7 @@ static inline void buffer_json_strcat(BUFFER *wb, const char *txt) {
 
         while(*t && d < e) {
 #ifdef BUFFER_JSON_ESCAPE_UTF
-            if(unlikely(IS_UTF8_STARTBYTE(*t) && IS_UTF8_BYTE(t[1]))) {
+            if(IS_UTF8_STARTBYTE(*t) && IS_UTF8_BYTE(t[1])) {
                 // UTF-8 multi-byte encoded character
 
                 // find how big this character is (2-4 bytes)
@@ -300,7 +300,7 @@ static inline void buffer_json_strcat(BUFFER *wb, const char *txt) {
             }
             else
 #endif
-            if(unlikely(*t < ' ')) {
+            if(*t < ' ') {
                 uint32_t v = *t++;
                 *d++ = '\\';
                 *d++ = 'u';
@@ -310,7 +310,7 @@ static inline void buffer_json_strcat(BUFFER *wb, const char *txt) {
                 *d++ = hex_digits[v & 0xf];
             }
             else {
-                if (unlikely(*t == '\\' || *t == '\"'))
+                if (*t == '\\' || *t == '\"')
                     *d++ = '\\';
 
                 *d++ = *t++;
@@ -327,7 +327,7 @@ static inline void buffer_json_strcat(BUFFER *wb, const char *txt) {
 }
 
 static inline void buffer_json_quoted_strcat(BUFFER *wb, const char *txt) {
-    if(unlikely(!txt || !*txt)) return;
+    if(!txt || !*txt) return;
 
     if(*txt == '"')
         txt++;
@@ -340,12 +340,12 @@ static inline void buffer_json_quoted_strcat(BUFFER *wb, const char *txt) {
         const char *e = &wb->buffer[wb->size - 1]; // remove 1 to make room for the escape character
 
         while(*t && d < e) {
-            if(unlikely(*t == '"' && !t[1])) {
+            if(*t == '"' && !t[1]) {
                 t++;
                 continue;
             }
 
-            if(unlikely(*t == '\\' || *t == '"'))
+            if(*t == '\\' || *t == '"')
                 *d++ = '\\';
 
             *d++ = *t++;
@@ -425,7 +425,7 @@ static inline void char_array_reverse(char *from, char *to) {
 static inline int print_netdata_double(char *dst, NETDATA_DOUBLE value) {
     char *s = dst;
 
-    if(unlikely(value < 0)) {
+    if(value < 0) {
         *s++ = '-';
         value = fabsndd(value);
     }
@@ -433,7 +433,7 @@ static inline int print_netdata_double(char *dst, NETDATA_DOUBLE value) {
     uint64_t fractional_precision = 10000000ULL; // fractional part 7 digits
     int fractional_wanted_digits = 7;
     int exponent = 0;
-    if(unlikely(value >= (NETDATA_DOUBLE)(UINT64_MAX / 10))) {
+    if(value >= (NETDATA_DOUBLE)(UINT64_MAX / 10)) {
         // the number is too big to print using 64bit numbers
         // so, let's convert it to exponential notation
         exponent = (int)(floorndd(log10ndd(value)));
@@ -452,7 +452,7 @@ static inline int print_netdata_double(char *dst, NETDATA_DOUBLE value) {
     // get the integral and the fractional parts as 64-bit integers
     uint64_t integral = (uint64_t)integral_d;
     uint64_t fractional = (uint64_t)llrintndd(fractional_d * (NETDATA_DOUBLE)fractional_precision);
-    if(unlikely(fractional >= fractional_precision)) {
+    if(fractional >= fractional_precision) {
         integral++;
         fractional -= fractional_precision;
     }
@@ -461,7 +461,7 @@ static inline int print_netdata_double(char *dst, NETDATA_DOUBLE value) {
     d = print_uint64_reversed(d, integral);
     char_array_reverse(s, d - 1);      // copy reversed the integral string
 
-    if(likely(fractional != 0)) {
+    if(fractional != 0) {
         *d++ = '.'; // add the dot
 
         // convert the fractional part to string (reversed)
@@ -474,7 +474,7 @@ static inline int print_netdata_double(char *dst, NETDATA_DOUBLE value) {
         while(*(d - 1) == '0') d--;
     }
 
-    if(unlikely(exponent != 0)) {
+    if(exponent != 0) {
         *d++ = 'e';
         *d++ = '+';
         d = print_uint32_reversed(s = d, exponent);

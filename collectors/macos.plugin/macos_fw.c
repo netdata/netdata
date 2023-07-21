@@ -26,7 +26,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
     static int do_io = -1, do_space = -1, do_inodes = -1, do_bandwidth = -1;
 
-    if (unlikely(do_io == -1)) {
+    if (do_io == -1) {
         do_io                   = config_get_boolean("plugin:macos:iokit", "disk i/o", 1);
         do_space                = config_get_boolean("plugin:macos:sysctl", "space usage for all disks", 1);
         do_inodes               = config_get_boolean("plugin:macos:sysctl", "inodes usage for all disks", 1);
@@ -83,12 +83,12 @@ int do_macos_iokit(int update_every, usec_t dt) {
 #endif
 
     /* Get ports and services for drive statistics. */
-    if (unlikely(IOMainPort(bootstrap_port, &main_port))) {
+    if (IOMainPort(bootstrap_port, &main_port)) {
         collector_error("MACOS: IOMasterPort() failed");
         do_io = 0;
         collector_error("DISABLED: system.io");
     /* Get the list of all drive objects. */
-    } else if (unlikely(IOServiceGetMatchingServices(main_port, IOServiceMatching("IOBlockStorageDriver"), &drive_list))) {
+    } else if (IOServiceGetMatchingServices(main_port, IOServiceMatching("IOBlockStorageDriver"), &drive_list)) {
         collector_error("MACOS: IOServiceGetMatchingServices() failed");
         do_io = 0;
         collector_error("DISABLED: system.io");
@@ -101,15 +101,15 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
             /* Get drive media object. */
             status = IORegistryEntryGetChildEntry(drive, kIOServicePlane, &drive_media);
-            if (unlikely(status != KERN_SUCCESS)) {
+            if (status != KERN_SUCCESS) {
                 IOObjectRelease(drive);
                 continue;
             }
 
             /* Get drive media properties. */
-            if (likely(!IORegistryEntryCreateCFProperties(drive_media, (CFMutableDictionaryRef *)&properties, kCFAllocatorDefault, 0))) {
+            if (!IORegistryEntryCreateCFProperties(drive_media, (CFMutableDictionaryRef *)&properties, kCFAllocatorDefault, 0)) {
                 /* Get disk name. */
-                if (likely(name = (CFStringRef)CFDictionaryGetValue(properties, CFSTR(kIOBSDNameKey)))) {
+                if (name = (CFStringRef)CFDictionaryGetValue(properties, CFSTR(kIOBSDNameKey))) {
                     CFStringGetCString(name, diskstat.name, MAXDRIVENAME, kCFStringEncodingUTF8);
                 }
             }
@@ -118,38 +118,38 @@ int do_macos_iokit(int update_every, usec_t dt) {
             CFRelease(properties);
             IOObjectRelease(drive_media);
 
-            if(unlikely(!*diskstat.name)) {
+            if(!*diskstat.name) {
                 IOObjectRelease(drive);
                 continue;
             }
 
             /* Obtain the properties for this drive object. */
-            if (unlikely(IORegistryEntryCreateCFProperties(drive, (CFMutableDictionaryRef *)&properties, kCFAllocatorDefault, 0))) {
+            if (IORegistryEntryCreateCFProperties(drive, (CFMutableDictionaryRef *)&properties, kCFAllocatorDefault, 0)) {
                 IOObjectRelease(drive);
                 collector_error("MACOS: IORegistryEntryCreateCFProperties() failed");
                 do_io = 0;
                 collector_error("DISABLED: system.io");
                 break;
-            } else if (likely(properties)) {
+            } else if (properties) {
                 /* Obtain the statistics from the drive properties. */
-                if (likely(statistics = (CFDictionaryRef)CFDictionaryGetValue(properties, CFSTR(kIOBlockStorageDriverStatisticsKey)))) {
+                if (statistics = (CFDictionaryRef)CFDictionaryGetValue(properties, CFSTR(kIOBlockStorageDriverStatisticsKey))) {
 
                     // --------------------------------------------------------------------
 
                     /* Get bytes read. */
-                    if (likely(number = (CFNumberRef)CFDictionaryGetValue(statistics, CFSTR(kIOBlockStorageDriverStatisticsBytesReadKey)))) {
+                    if (number = (CFNumberRef)CFDictionaryGetValue(statistics, CFSTR(kIOBlockStorageDriverStatisticsBytesReadKey))) {
                         CFNumberGetValue(number, kCFNumberSInt64Type, &diskstat.bytes_read);
                         total_disk_reads += diskstat.bytes_read;
                     }
 
                     /* Get bytes written. */
-                    if (likely(number = (CFNumberRef)CFDictionaryGetValue(statistics, CFSTR(kIOBlockStorageDriverStatisticsBytesWrittenKey)))) {
+                    if (number = (CFNumberRef)CFDictionaryGetValue(statistics, CFSTR(kIOBlockStorageDriverStatisticsBytesWrittenKey))) {
                         CFNumberGetValue(number, kCFNumberSInt64Type, &diskstat.bytes_write);
                         total_disk_writes += diskstat.bytes_write;
                     }
 
                     st = rrdset_find_active_bytype_localhost("disk", diskstat.name);
-                    if (unlikely(!st)) {
+                    if (!st) {
                         st = rrdset_create_localhost(
                                 "disk"
                                 , diskstat.name
@@ -174,17 +174,17 @@ int do_macos_iokit(int update_every, usec_t dt) {
                     rrdset_done(st);
 
                     /* Get number of reads. */
-                    if (likely(number = (CFNumberRef)CFDictionaryGetValue(statistics, CFSTR(kIOBlockStorageDriverStatisticsReadsKey)))) {
+                    if (number = (CFNumberRef)CFDictionaryGetValue(statistics, CFSTR(kIOBlockStorageDriverStatisticsReadsKey))) {
                         CFNumberGetValue(number, kCFNumberSInt64Type, &diskstat.reads);
                     }
 
                     /* Get number of writes. */
-                    if (likely(number = (CFNumberRef)CFDictionaryGetValue(statistics, CFSTR(kIOBlockStorageDriverStatisticsWritesKey)))) {
+                    if (number = (CFNumberRef)CFDictionaryGetValue(statistics, CFSTR(kIOBlockStorageDriverStatisticsWritesKey))) {
                         CFNumberGetValue(number, kCFNumberSInt64Type, &diskstat.writes);
                     }
 
                     st = rrdset_find_active_bytype_localhost("disk_ops", diskstat.name);
-                    if (unlikely(!st)) {
+                    if (!st) {
                         st = rrdset_create_localhost(
                                 "disk_ops"
                                 , diskstat.name
@@ -210,17 +210,17 @@ int do_macos_iokit(int update_every, usec_t dt) {
                     rrdset_done(st);
 
                     /* Get reads time. */
-                    if (likely(number = (CFNumberRef)CFDictionaryGetValue(statistics, CFSTR(kIOBlockStorageDriverStatisticsTotalReadTimeKey)))) {
+                    if (number = (CFNumberRef)CFDictionaryGetValue(statistics, CFSTR(kIOBlockStorageDriverStatisticsTotalReadTimeKey))) {
                         CFNumberGetValue(number, kCFNumberSInt64Type, &diskstat.time_read);
                     }
 
                     /* Get writes time. */
-                    if (likely(number = (CFNumberRef)CFDictionaryGetValue(statistics, CFSTR(kIOBlockStorageDriverStatisticsTotalWriteTimeKey)))) {
+                    if (number = (CFNumberRef)CFDictionaryGetValue(statistics, CFSTR(kIOBlockStorageDriverStatisticsTotalWriteTimeKey))) {
                         CFNumberGetValue(number, kCFNumberSInt64Type, &diskstat.time_write);
                     }
 
                     st = rrdset_find_active_bytype_localhost("disk_util", diskstat.name);
-                    if (unlikely(!st)) {
+                    if (!st) {
                         st = rrdset_create_localhost(
                                 "disk_util"
                                 , diskstat.name
@@ -245,17 +245,17 @@ int do_macos_iokit(int update_every, usec_t dt) {
                     rrdset_done(st);
 
                     /* Get reads latency. */
-                    if (likely(number = (CFNumberRef)CFDictionaryGetValue(statistics, CFSTR(kIOBlockStorageDriverStatisticsLatentReadTimeKey)))) {
+                    if (number = (CFNumberRef)CFDictionaryGetValue(statistics, CFSTR(kIOBlockStorageDriverStatisticsLatentReadTimeKey))) {
                         CFNumberGetValue(number, kCFNumberSInt64Type, &diskstat.latency_read);
                     }
 
                     /* Get writes latency. */
-                    if (likely(number = (CFNumberRef)CFDictionaryGetValue(statistics, CFSTR(kIOBlockStorageDriverStatisticsLatentWriteTimeKey)))) {
+                    if (number = (CFNumberRef)CFDictionaryGetValue(statistics, CFSTR(kIOBlockStorageDriverStatisticsLatentWriteTimeKey))) {
                         CFNumberGetValue(number, kCFNumberSInt64Type, &diskstat.latency_write);
                     }
 
                     st = rrdset_find_active_bytype_localhost("disk_iotime", diskstat.name);
-                    if (unlikely(!st)) {
+                    if (!st) {
                         st = rrdset_create_localhost(
                                 "disk_iotime"
                                 , diskstat.name
@@ -285,9 +285,9 @@ int do_macos_iokit(int update_every, usec_t dt) {
                     // calculate differential charts
                     // only if this is not the first time we run
 
-                    if (likely(dt)) {
+                    if (dt) {
                         st = rrdset_find_active_bytype_localhost("disk_await", diskstat.name);
-                        if (unlikely(!st)) {
+                        if (!st) {
                             st = rrdset_create_localhost(
                                     "disk_await"
                                     , diskstat.name
@@ -315,7 +315,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                         rrdset_done(st);
 
                         st = rrdset_find_active_bytype_localhost("disk_avgsz", diskstat.name);
-                        if (unlikely(!st)) {
+                        if (!st) {
                             st = rrdset_create_localhost(
                                     "disk_avgsz"
                                     , diskstat.name
@@ -343,7 +343,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                         rrdset_done(st);
 
                         st = rrdset_find_active_bytype_localhost("disk_svctm", diskstat.name);
-                        if (unlikely(!st)) {
+                        if (!st) {
                             st = rrdset_create_localhost(
                                     "disk_svctm"
                                     , diskstat.name
@@ -382,9 +382,9 @@ int do_macos_iokit(int update_every, usec_t dt) {
         IOObjectRelease(drive_list);
     }
 
-    if (likely(do_io)) {
+    if (do_io) {
         st = rrdset_find_active_bytype_localhost("system", "io");
-        if (unlikely(!st)) {
+        if (!st) {
             st = rrdset_create_localhost(
                     "system"
                     , "io"
@@ -410,9 +410,9 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
     // Can be merged with FreeBSD plugin
 
-    if (likely(do_space || do_inodes)) {
+    if (do_space || do_inodes) {
         // there is no mount info in sysctl MIBs
-        if (unlikely(!(mntsize = getmntinfo(&mntbuf, MNT_NOWAIT)))) {
+        if (!(mntsize = getmntinfo(&mntbuf, MNT_NOWAIT))) {
             collector_error("MACOS: getmntinfo() failed");
             do_space = 0;
             collector_error("DISABLED: disk_space.X");
@@ -432,9 +432,9 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                 // --------------------------------------------------------------------------
 
-                if (likely(do_space)) {
+                if (do_space) {
                     st = rrdset_find_active_bytype_localhost("disk_space", mntbuf[i].f_mntonname);
-                    if (unlikely(!st)) {
+                    if (!st) {
                         snprintfz(title, 4096, "Disk Space Usage for %s [%s]", mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
                         st = rrdset_create_localhost(
                                 "disk_space"
@@ -464,9 +464,9 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                 // --------------------------------------------------------------------------
 
-                if (likely(do_inodes)) {
+                if (do_inodes) {
                     st = rrdset_find_active_bytype_localhost("disk_inodes", mntbuf[i].f_mntonname);
-                    if (unlikely(!st)) {
+                    if (!st) {
                         snprintfz(title, 4096, "Disk Files (inodes) Usage for %s [%s]", mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
                         st = rrdset_create_localhost(
                                 "disk_inodes"
@@ -498,8 +498,8 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
     // Can be merged with FreeBSD plugin
 
-    if (likely(do_bandwidth)) {
-        if (unlikely(getifaddrs(&ifap))) {
+    if (do_bandwidth) {
+        if (getifaddrs(&ifap)) {
             collector_error("MACOS: getifaddrs()");
             do_bandwidth = 0;
             collector_error("DISABLED: system.ipv4");
@@ -509,7 +509,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                         continue;
 
                 st = rrdset_find_active_bytype_localhost("net", ifa->ifa_name);
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "net"
                             , ifa->ifa_name
@@ -534,7 +534,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                 rrdset_done(st);
 
                 st = rrdset_find_active_bytype_localhost("net_packets", ifa->ifa_name);
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "net_packets"
                             , ifa->ifa_name
@@ -564,7 +564,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                 rrdset_done(st);
 
                 st = rrdset_find_active_bytype_localhost("net_errors", ifa->ifa_name);
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "net_errors"
                             , ifa->ifa_name
@@ -590,7 +590,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                 rrdset_done(st);
 
                 st = rrdset_find_active_bytype_localhost("net_drops", ifa->ifa_name);
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "net_drops"
                             , ifa->ifa_name
@@ -614,7 +614,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                 rrdset_done(st);
 
                 st = rrdset_find_active_bytype_localhost("net_events", ifa->ifa_name);
-                if (unlikely(!st)) {
+                if (!st) {
                     st = rrdset_create_localhost(
                             "net_events"
                             , ifa->ifa_name

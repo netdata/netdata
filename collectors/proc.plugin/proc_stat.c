@@ -63,19 +63,19 @@ static int read_per_core_files(struct cpu_chart *all_cpu_charts, size_t len, siz
 
         f->found = 0;
 
-        if(unlikely(!f->filename))
+        if(!f->filename)
             continue;
 
-        if(unlikely(f->fd == -1)) {
+        if(f->fd == -1) {
             f->fd = open(f->filename, O_RDONLY);
-            if (unlikely(f->fd == -1)) {
+            if (f->fd == -1) {
                 collector_error("Cannot open file '%s'", f->filename);
                 continue;
             }
         }
 
         ssize_t ret = read(f->fd, buf, 50);
-        if(unlikely(ret < 0)) {
+        if(ret < 0) {
             // cannot read that file
 
             collector_error("Cannot read file '%s'", f->filename);
@@ -89,7 +89,7 @@ static int read_per_core_files(struct cpu_chart *all_cpu_charts, size_t len, siz
             // terminate the buffer
             buf[ret] = '\0';
 
-            if(unlikely(keep_per_core_fds_open != CONFIG_BOOLEAN_YES)) {
+            if(keep_per_core_fds_open != CONFIG_BOOLEAN_YES) {
                 close(f->fd);
                 f->fd = -1;
             }
@@ -104,7 +104,7 @@ static int read_per_core_files(struct cpu_chart *all_cpu_charts, size_t len, siz
         f->found = 1;
 
         f->value = str2ll(buf, NULL);
-        if(likely(f->value != 0))
+        if(f->value != 0)
             files_nonzero++;
     }
 
@@ -126,12 +126,12 @@ static int read_per_core_time_in_state_files(struct cpu_chart *all_cpu_charts, s
 
         f->found = 0;
 
-        if(unlikely(!tsf->filename))
+        if(!tsf->filename)
             continue;
 
-        if(unlikely(!tsf->ff)) {
+        if(!tsf->ff) {
             tsf->ff = procfile_open(tsf->filename, " \t:", PROCFILE_FLAG_DEFAULT);
-            if(unlikely(!tsf->ff))
+            if(!tsf->ff)
             {
                 collector_error("Cannot open file '%s'", tsf->filename);
                 continue;
@@ -139,7 +139,7 @@ static int read_per_core_time_in_state_files(struct cpu_chart *all_cpu_charts, s
         }
 
         tsf->ff = procfile_readall(tsf->ff);
-        if(unlikely(!tsf->ff)) {
+        if(!tsf->ff) {
             collector_error("Cannot read file '%s'", tsf->filename);
             procfile_close(tsf->ff);
             tsf->ff = NULL;
@@ -154,7 +154,7 @@ static int read_per_core_time_in_state_files(struct cpu_chart *all_cpu_charts, s
 
             // Check if there is at least one frequency in time_in_state
             if (procfile_word(tsf->ff, 0)[0] == '\0') {
-                if(unlikely(keep_per_core_fds_open != CONFIG_BOOLEAN_YES)) {
+                if(keep_per_core_fds_open != CONFIG_BOOLEAN_YES) {
                     procfile_close(tsf->ff);
                     tsf->ff = NULL;
                 }
@@ -166,7 +166,7 @@ static int read_per_core_time_in_state_files(struct cpu_chart *all_cpu_charts, s
                 continue;
             }
 
-            if (unlikely(tsf->last_ticks_len < lines || tsf->last_ticks == NULL)) {
+            if (tsf->last_ticks_len < lines || tsf->last_ticks == NULL) {
                 tsf->last_ticks = reallocz(tsf->last_ticks, sizeof(struct last_ticks) * lines);
                 memset(tsf->last_ticks, 0, sizeof(struct last_ticks) * lines);
                 tsf->last_ticks_len = lines;
@@ -178,7 +178,7 @@ static int read_per_core_time_in_state_files(struct cpu_chart *all_cpu_charts, s
                 unsigned long long frequency = 0, ticks = 0, ticks_since_last = 0;
 
                 words = procfile_linewords(tsf->ff, l);
-                if(unlikely(words < 2)) {
+                if(words < 2) {
                     collector_error("Cannot read time_in_state line. Expected 2 params, read %zu.", words);
                     continue;
                 }
@@ -195,12 +195,12 @@ static int read_per_core_time_in_state_files(struct cpu_chart *all_cpu_charts, s
 
             }
 
-            if (likely(total_ticks_since_last)) {
+            if (total_ticks_since_last) {
                 avg_freq /= total_ticks_since_last;
                 f->value = avg_freq;
             }
 
-            if(unlikely(keep_per_core_fds_open != CONFIG_BOOLEAN_YES)) {
+            if(keep_per_core_fds_open != CONFIG_BOOLEAN_YES) {
                 procfile_close(tsf->ff);
                 tsf->ff = NULL;
             }
@@ -210,14 +210,14 @@ static int read_per_core_time_in_state_files(struct cpu_chart *all_cpu_charts, s
 
         f->found = 1;
 
-        if(likely(f->value != 0))
+        if(f->value != 0)
             files_nonzero++;
     }
 
-    if(unlikely(files_read == 0))
+    if(files_read == 0)
         return -1;
 
-    if(unlikely(files_nonzero == 0))
+    if(files_nonzero == 0)
         return 0;
 
     return (int)files_nonzero;
@@ -228,10 +228,10 @@ static void chart_per_core_files(struct cpu_chart *all_cpu_charts, size_t len, s
     for(x = 0; x < len ; x++) {
         struct per_core_single_number_file *f = &all_cpu_charts[x].files[index];
 
-        if(unlikely(!f->found))
+        if(!f->found)
             continue;
 
-        if(unlikely(!f->rd))
+        if(!f->rd)
             f->rd = rrddim_add(st, all_cpu_charts[x].id, NULL, multiplier, divisor, algorithm);
 
         rrddim_set_by_pointer(st, f->rd, f->value);
@@ -271,12 +271,12 @@ static void* wake_cpu_thread(void* core) {
     CPU_SET(*(int*)core, &cpu_set);
 
     thread = pthread_self();
-    if(unlikely(pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpu_set))) {
-        if(unlikely(errors < 8)) {
+    if(pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpu_set)) {
+        if(errors < 8) {
             collector_error("Cannot set CPU affinity for core %d", *(int*)core);
             errors++;
         }
-        else if(unlikely(errors < 9)) {
+        else if(errors < 9) {
             collector_error("CPU affinity errors are disabled");
             errors++;
         }
@@ -294,13 +294,13 @@ static int read_schedstat(char *schedstat_filename, struct per_core_cpuidle_char
     struct per_core_cpuidle_chart *cpuidle_charts = *cpuidle_charts_address;
     size_t cores_found = 0;
 
-    if(unlikely(!ff)) {
+    if(!ff) {
         ff = procfile_open(schedstat_filename, " \t:", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff)) return 1;
+        if(!ff) return 1;
     }
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff)) return 1;
+    if(!ff) return 1;
 
     size_t lines = procfile_lines(ff), l;
     size_t words;
@@ -309,21 +309,21 @@ static int read_schedstat(char *schedstat_filename, struct per_core_cpuidle_char
         char *row_key = procfile_lineword(ff, l, 0);
 
         // faster strncmp(row_key, "cpu", 3) == 0
-        if(likely(row_key[0] == 'c' && row_key[1] == 'p' && row_key[2] == 'u')) {
+        if(row_key[0] == 'c' && row_key[1] == 'p' && row_key[2] == 'u') {
             words = procfile_linewords(ff, l);
-            if(unlikely(words < 10)) {
+            if(words < 10) {
                 collector_error("Cannot read /proc/schedstat cpu line. Expected 9 params, read %zu.", words);
                 return 1;
             }
             cores_found++;
 
             size_t core = str2ul(&row_key[3]);
-            if(unlikely(core >= cores_found)) {
+            if(core >= cores_found) {
                 collector_error("Core %zu found but no more than %zu cores were expected.", core, cores_found);
                 return 1;
             }
 
-            if(unlikely(cpuidle_charts_len < cores_found)) {
+            if(cpuidle_charts_len < cores_found) {
                 cpuidle_charts = reallocz(cpuidle_charts, sizeof(struct per_core_cpuidle_chart) * cores_found);
                 *cpuidle_charts_address = cpuidle_charts;
                 memset(cpuidle_charts + cpuidle_charts_len, 0, sizeof(struct per_core_cpuidle_chart) * (cores_found - cpuidle_charts_len));
@@ -341,7 +341,7 @@ static int read_schedstat(char *schedstat_filename, struct per_core_cpuidle_char
 static int read_one_state(char *buf, const char *filename, int *fd) {
     ssize_t ret = read(*fd, buf, 50);
 
-    if(unlikely(ret <= 0)) {
+    if(ret <= 0) {
         // cannot read that file
         collector_error("Cannot read file '%s'", filename);
         close(*fd);
@@ -354,7 +354,7 @@ static int read_one_state(char *buf, const char *filename, int *fd) {
         // terminate the buffer
         buf[ret - 1] = '\0';
 
-        if(unlikely(keep_cpuidle_fds_open != CONFIG_BOOLEAN_YES)) {
+        if(keep_cpuidle_fds_open != CONFIG_BOOLEAN_YES) {
             close(*fd);
             *fd = -1;
         }
@@ -375,7 +375,7 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
     struct per_core_cpuidle_chart *cc = &cpuidle_charts[core];
     size_t state;
 
-    if(unlikely(!cc->cpuidle_state_len || cc->rescan_cpu_states)) {
+    if(!cc->cpuidle_state_len || cc->rescan_cpu_states) {
         int state_file_found = 1; // check at least one state
 
         if(cc->cpuidle_state_len) {
@@ -395,7 +395,7 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
             cc->st = NULL;
         }
 
-        while(likely(state_file_found)) {
+        while(state_file_found) {
             snprintfz(filename, FILENAME_MAX, cpuidle_name_filename, core, cc->cpuidle_state_len);
             if (stat(filename, &stbuf) == 0)
                 cc->cpuidle_state_len++;
@@ -404,7 +404,7 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
         }
         snprintfz(next_state_filename, FILENAME_MAX, cpuidle_name_filename, core, cc->cpuidle_state_len);
 
-        if(likely(cc->cpuidle_state_len))
+        if(cc->cpuidle_state_len)
             cc->cpuidle_state = callocz(cc->cpuidle_state_len, sizeof(struct cpuidle_state));
 
         for(state = 0; state < cc->cpuidle_state_len; state++) {
@@ -412,14 +412,14 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
             snprintfz(filename, FILENAME_MAX, cpuidle_name_filename, core, state);
 
             int fd = open(filename, O_RDONLY, 0666);
-            if(unlikely(fd == -1)) {
+            if(fd == -1) {
                 collector_error("Cannot open file '%s'", filename);
                 cc->rescan_cpu_states = 1;
                 return 1;
             }
 
             ssize_t r = read(fd, name_buf, 50);
-            if(unlikely(r < 1)) {
+            if(r < 1) {
                 collector_error("Cannot read file '%s'", filename);
                 close(fd);
                 cc->rescan_cpu_states = 1;
@@ -442,9 +442,9 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
 
         struct cpuidle_state *cs = &cc->cpuidle_state[state];
 
-        if(unlikely(cs->time_fd == -1)) {
+        if(cs->time_fd == -1) {
             cs->time_fd = open(cs->time_filename, O_RDONLY);
-            if (unlikely(cs->time_fd == -1)) {
+            if (cs->time_fd == -1) {
                 collector_error("Cannot open file '%s'", cs->time_filename);
                 cc->rescan_cpu_states = 1;
                 return 1;
@@ -452,7 +452,7 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
         }
 
         char time_buf[50 + 1];
-        if(likely(read_one_state(time_buf, cs->time_filename, &cs->time_fd))) {
+        if(read_one_state(time_buf, cs->time_filename, &cs->time_fd)) {
             cs->value = str2ll(time_buf, NULL);
         }
         else {
@@ -462,7 +462,7 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
     }
 
     // check if the number of states was increased
-    if(unlikely(stat(next_state_filename, &stbuf) == 0)) {
+    if(stat(next_state_filename, &stbuf) == 0) {
         cc->rescan_cpu_states = 1;
         return 1;
     }
@@ -485,7 +485,7 @@ int do_proc_stat(int update_every, usec_t dt) {
     static int accurate_freq_avail = 0, accurate_freq_is_used = 0;
     size_t cores_found = (size_t)get_system_cpus();
 
-    if(unlikely(do_cpu == -1)) {
+    if(do_cpu == -1) {
         do_cpu                    = config_get_boolean("plugin:proc:/proc/stat", "cpu utilization", CONFIG_BOOLEAN_YES);
         do_cpu_cores              = config_get_boolean("plugin:proc:/proc/stat", "per cpu core utilization", CONFIG_BOOLEAN_YES);
         do_interrupts             = config_get_boolean("plugin:proc:/proc/stat", "cpu interrupts", CONFIG_BOOLEAN_YES);
@@ -494,7 +494,7 @@ int do_proc_stat(int update_every, usec_t dt) {
         do_processes              = config_get_boolean("plugin:proc:/proc/stat", "processes running", CONFIG_BOOLEAN_YES);
 
         // give sane defaults based on the number of processors
-        if(unlikely(get_system_cpus() > 50)) {
+        if(get_system_cpus() > 50) {
             // the system has too many processors
             keep_per_core_fds_open = CONFIG_BOOLEAN_NO;
             do_core_throttle_count = CONFIG_BOOLEAN_NO;
@@ -510,7 +510,7 @@ int do_proc_stat(int update_every, usec_t dt) {
             do_cpu_freq = CONFIG_BOOLEAN_YES;
             do_cpuidle = CONFIG_BOOLEAN_YES;
         }
-        if(unlikely(get_system_cpus() > 24)) {
+        if(get_system_cpus() > 24) {
             // the system has too many processors
             keep_cpuidle_fds_open = CONFIG_BOOLEAN_NO;
         }
@@ -562,15 +562,15 @@ int do_proc_stat(int update_every, usec_t dt) {
         cpuidle_time_filename = config_get("plugin:proc:/proc/stat", "cpuidle time filename to monitor", filename);
     }
 
-    if(unlikely(!ff)) {
+    if(!ff) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/stat");
         ff = procfile_open(config_get("plugin:proc:/proc/stat", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff)) return 1;
+        if(!ff) return 1;
     }
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
+    if(!ff) return 0; // we return 0, so that we will retry to open it next time
 
     size_t lines = procfile_lines(ff), l;
     size_t words;
@@ -582,17 +582,17 @@ int do_proc_stat(int update_every, usec_t dt) {
         uint32_t hash = simple_hash(row_key);
 
         // faster strncmp(row_key, "cpu", 3) == 0
-        if(likely(row_key[0] == 'c' && row_key[1] == 'p' && row_key[2] == 'u')) {
+        if(row_key[0] == 'c' && row_key[1] == 'p' && row_key[2] == 'u') {
             words = procfile_linewords(ff, l);
-            if(unlikely(words < 9)) {
+            if(words < 9) {
                 collector_error("Cannot read /proc/stat cpu line. Expected 9 params, read %zu.", words);
                 continue;
             }
 
             size_t core    = (row_key[3] == '\0') ? 0 : str2ul(&row_key[3]) + 1;
-            if(likely(core > 0)) cores_found = core;
+            if(core > 0) cores_found = core;
 
-            if(likely((core == 0 && do_cpu) || (core > 0 && do_cpu_cores))) {
+            if((core == 0 && do_cpu) || (core > 0 && do_cpu_cores)) {
                 char *id;
                 unsigned long long user = 0, nice = 0, system = 0, idle = 0, iowait = 0, irq = 0, softirq = 0, steal = 0, guest = 0, guest_nice = 0;
 
@@ -615,7 +615,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                 char *title, *type, *context, *family;
                 long priority;
 
-                if(unlikely(core >= all_cpu_charts_size)) {
+                if(core >= all_cpu_charts_size) {
                     size_t old_cpu_charts_size = all_cpu_charts_size;
                     all_cpu_charts_size = core + 1;
                     all_cpu_charts = reallocz(all_cpu_charts, sizeof(struct cpu_chart) * all_cpu_charts_size);
@@ -623,10 +623,10 @@ int do_proc_stat(int update_every, usec_t dt) {
                 }
                 struct cpu_chart *cpu_chart = &all_cpu_charts[core];
 
-                if(unlikely(!cpu_chart->st)) {
+                if(!cpu_chart->st) {
                     cpu_chart->id = strdupz(id);
 
-                    if(unlikely(core == 0)) {
+                    if(core == 0) {
                         title = "Total CPU utilization";
                         type = "system";
                         context = "system.cpu";
@@ -718,7 +718,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                         rrdlabels_add(cpu_chart->st->rrdlabels, "cpu", cpu_core, RRDLABEL_SRC_AUTO);
                     }
 
-                    if(unlikely(core == 0 && cpus_var == NULL))
+                    if(core == 0 && cpus_var == NULL)
                         cpus_var = rrdvar_custom_host_variable_add_and_acquire(localhost, "active_processors");
                 }
 
@@ -735,13 +735,13 @@ int do_proc_stat(int update_every, usec_t dt) {
                 rrdset_done(cpu_chart->st);
             }
         }
-        else if(unlikely(hash == hash_intr && strcmp(row_key, "intr") == 0)) {
-            if(likely(do_interrupts)) {
+        else if(hash == hash_intr && strcmp(row_key, "intr") == 0) {
+            if(do_interrupts) {
                 static RRDSET *st_intr = NULL;
                 static RRDDIM *rd_interrupts = NULL;
                 unsigned long long value = str2ull(procfile_lineword(ff, l, 1), NULL);
 
-                if(unlikely(!st_intr)) {
+                if(!st_intr) {
                     st_intr = rrdset_create_localhost(
                             "system"
                             , "intr"
@@ -766,13 +766,13 @@ int do_proc_stat(int update_every, usec_t dt) {
                 rrdset_done(st_intr);
             }
         }
-        else if(unlikely(hash == hash_ctxt && strcmp(row_key, "ctxt") == 0)) {
-            if(likely(do_context)) {
+        else if(hash == hash_ctxt && strcmp(row_key, "ctxt") == 0) {
+            if(do_context) {
                 static RRDSET *st_ctxt = NULL;
                 static RRDDIM *rd_switches = NULL;
                 unsigned long long value = str2ull(procfile_lineword(ff, l, 1), NULL);
 
-                if(unlikely(!st_ctxt)) {
+                if(!st_ctxt) {
                     st_ctxt = rrdset_create_localhost(
                             "system"
                             , "ctxt"
@@ -795,24 +795,24 @@ int do_proc_stat(int update_every, usec_t dt) {
                 rrdset_done(st_ctxt);
             }
         }
-        else if(unlikely(hash == hash_processes && !processes && strcmp(row_key, "processes") == 0)) {
+        else if(hash == hash_processes && !processes && strcmp(row_key, "processes") == 0) {
             processes = str2ull(procfile_lineword(ff, l, 1), NULL);
         }
-        else if(unlikely(hash == hash_procs_running && !running && strcmp(row_key, "procs_running") == 0)) {
+        else if(hash == hash_procs_running && !running && strcmp(row_key, "procs_running") == 0) {
             running = str2ull(procfile_lineword(ff, l, 1), NULL);
         }
-        else if(unlikely(hash == hash_procs_blocked && !blocked && strcmp(row_key, "procs_blocked") == 0)) {
+        else if(hash == hash_procs_blocked && !blocked && strcmp(row_key, "procs_blocked") == 0) {
             blocked = str2ull(procfile_lineword(ff, l, 1), NULL);
         }
     }
 
     // --------------------------------------------------------------------
 
-    if(likely(do_forks)) {
+    if(do_forks) {
         static RRDSET *st_forks = NULL;
         static RRDDIM *rd_started = NULL;
 
-        if(unlikely(!st_forks)) {
+        if(!st_forks) {
             st_forks = rrdset_create_localhost(
                     "system"
                     , "forks"
@@ -838,12 +838,12 @@ int do_proc_stat(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(likely(do_processes)) {
+    if(do_processes) {
         static RRDSET *st_processes = NULL;
         static RRDDIM *rd_running = NULL;
         static RRDDIM *rd_blocked = NULL;
 
-        if(unlikely(!st_processes)) {
+        if(!st_processes) {
             st_processes = rrdset_create_localhost(
                     "system"
                     , "processes"
@@ -868,15 +868,15 @@ int do_proc_stat(int update_every, usec_t dt) {
         rrdset_done(st_processes);
     }
 
-    if(likely(all_cpu_charts_size > 1)) {
-        if(likely(do_core_throttle_count != CONFIG_BOOLEAN_NO)) {
+    if(all_cpu_charts_size > 1) {
+        if(do_core_throttle_count != CONFIG_BOOLEAN_NO) {
             int r = read_per_core_files(&all_cpu_charts[1], all_cpu_charts_size - 1, CORE_THROTTLE_COUNT_INDEX);
-            if(likely(r != -1 && (do_core_throttle_count == CONFIG_BOOLEAN_YES || r > 0))) {
+            if(r != -1 && (do_core_throttle_count == CONFIG_BOOLEAN_YES || r > 0)) {
                 do_core_throttle_count = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st_core_throttle_count = NULL;
 
-                if (unlikely(!st_core_throttle_count)) {
+                if (!st_core_throttle_count) {
                     st_core_throttle_count = rrdset_create_localhost(
                             "cpu"
                             , "core_throttling"
@@ -898,14 +898,14 @@ int do_proc_stat(int update_every, usec_t dt) {
             }
         }
 
-        if(likely(do_package_throttle_count != CONFIG_BOOLEAN_NO)) {
+        if(do_package_throttle_count != CONFIG_BOOLEAN_NO) {
             int r = read_per_core_files(&all_cpu_charts[1], all_cpu_charts_size - 1, PACKAGE_THROTTLE_COUNT_INDEX);
-            if(likely(r != -1 && (do_package_throttle_count == CONFIG_BOOLEAN_YES || r > 0))) {
+            if(r != -1 && (do_package_throttle_count == CONFIG_BOOLEAN_YES || r > 0)) {
                 do_package_throttle_count = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st_package_throttle_count = NULL;
 
-                if(unlikely(!st_package_throttle_count)) {
+                if(!st_package_throttle_count) {
                     st_package_throttle_count = rrdset_create_localhost(
                             "cpu"
                             , "package_throttling"
@@ -927,7 +927,7 @@ int do_proc_stat(int update_every, usec_t dt) {
             }
         }
 
-        if(likely(do_cpu_freq != CONFIG_BOOLEAN_NO)) {
+        if(do_cpu_freq != CONFIG_BOOLEAN_NO) {
             char filename[FILENAME_MAX + 1];
             int r = 0;
 
@@ -948,12 +948,12 @@ int do_proc_stat(int update_every, usec_t dt) {
                 }
             }
 
-            if(likely(r != -1 && (do_cpu_freq == CONFIG_BOOLEAN_YES || r > 0))) {
+            if(r != -1 && (do_cpu_freq == CONFIG_BOOLEAN_YES || r > 0)) {
                 do_cpu_freq = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st_scaling_cur_freq = NULL;
 
-                if(unlikely(!st_scaling_cur_freq)) {
+                if(!st_scaling_cur_freq) {
                     st_scaling_cur_freq = rrdset_create_localhost(
                             "cpu"
                             , "cpufreq"
@@ -981,7 +981,7 @@ int do_proc_stat(int update_every, usec_t dt) {
     static struct per_core_cpuidle_chart *cpuidle_charts = NULL;
     size_t schedstat_cores_found = 0;
 
-    if(likely(do_cpuidle != CONFIG_BOOLEAN_NO && !read_schedstat(schedstat_filename, &cpuidle_charts, &schedstat_cores_found))) {
+    if(do_cpuidle != CONFIG_BOOLEAN_NO && !read_schedstat(schedstat_filename, &cpuidle_charts, &schedstat_cores_found)) {
         int cpu_states_updated = 0;
         size_t core, state;
 
@@ -989,12 +989,12 @@ int do_proc_stat(int update_every, usec_t dt) {
         // proc.plugin runs on Linux systems only. Multi-platform compatibility is not needed here,
         // so bare pthread functions are used to avoid unneeded overheads.
         for(core = 0; core < schedstat_cores_found; core++) {
-            if(unlikely(!(cpuidle_charts[core].active_time - cpuidle_charts[core].last_active_time))) {
+            if(!(cpuidle_charts[core].active_time - cpuidle_charts[core].last_active_time)) {
                 pthread_t thread;
                 cpu_set_t global_cpu_set;
 
-                if (likely(!pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), &global_cpu_set))) {
-                    if (unlikely(!CPU_ISSET(core, &global_cpu_set))) {
+                if (!pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), &global_cpu_set)) {
+                    if (!CPU_ISSET(core, &global_cpu_set)) {
                         continue;
                     }
                 }
@@ -1002,26 +1002,26 @@ int do_proc_stat(int update_every, usec_t dt) {
                     collector_error("Cannot read current process affinity");
 
                 // These threads are very ephemeral and don't need to have a specific name
-                if(unlikely(pthread_create(&thread, NULL, wake_cpu_thread, (void *)&core)))
+                if(pthread_create(&thread, NULL, wake_cpu_thread, (void *)&core))
                     collector_error("Cannot create wake_cpu_thread");
-                else if(unlikely(pthread_join(thread, NULL)))
+                else if(pthread_join(thread, NULL))
                     collector_error("Cannot join wake_cpu_thread");
                 cpu_states_updated = 1;
             }
         }
 
-        if(unlikely(!cpu_states_updated || !read_schedstat(schedstat_filename, &cpuidle_charts, &schedstat_cores_found))) {
+        if(!cpu_states_updated || !read_schedstat(schedstat_filename, &cpuidle_charts, &schedstat_cores_found)) {
             for(core = 0; core < schedstat_cores_found; core++) {
                 cpuidle_charts[core].last_active_time = cpuidle_charts[core].active_time;
 
                 int r = read_cpuidle_states(cpuidle_name_filename, cpuidle_time_filename, cpuidle_charts, core);
-                if(likely(r != -1 && (do_cpuidle == CONFIG_BOOLEAN_YES || r > 0))) {
+                if(r != -1 && (do_cpuidle == CONFIG_BOOLEAN_YES || r > 0)) {
                     do_cpuidle = CONFIG_BOOLEAN_YES;
 
                     char cpuidle_chart_id[RRD_ID_LENGTH_MAX + 1];
                     snprintfz(cpuidle_chart_id, RRD_ID_LENGTH_MAX, "cpu%zu_cpuidle", core);
 
-                    if(unlikely(!cpuidle_charts[core].st)) {
+                    if(!cpuidle_charts[core].st) {
                         cpuidle_charts[core].st = rrdset_create_localhost(
                                 "cpu"
                                 , cpuidle_chart_id

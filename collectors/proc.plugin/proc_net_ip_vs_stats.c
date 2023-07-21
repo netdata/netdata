@@ -42,7 +42,7 @@ int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
     if(do_sockets) {
         static RRDSET *st = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_IPVS
                     , "sockets"
@@ -67,7 +67,7 @@ int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
 
     if(do_packets) {
         static RRDSET *st = NULL;
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_IPVS
                     , "packets"
@@ -94,7 +94,7 @@ int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
 
     if(do_bandwidth) {
         static RRDSET *st = NULL;
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_IPVS
                     , "net"

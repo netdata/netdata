@@ -56,7 +56,7 @@ struct old_raid {
 static inline char *remove_trailing_chars(char *s, char c)
 {
     while (*s) {
-        if (unlikely(*s == c)) {
+        if (*s == c) {
             *s = '\0';
         }
         s++;
@@ -69,10 +69,10 @@ static inline void make_chart_obsolete(char *name, const char *id_modifier)
     char id[50 + 1];
     RRDSET *st = NULL;
 
-    if (likely(name && id_modifier)) {
+    if (name && id_modifier) {
         snprintfz(id, 50, "mdstat.%s_%s", name, id_modifier);
         st = rrdset_find_active_byname_localhost(id);
-        if (likely(st))
+        if (st)
             rrdset_is_obsolete(st);
     }
 }
@@ -97,7 +97,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
     static size_t old_raids_allocated = 0;
     size_t old_raid_idx = 0;
 
-    if (unlikely(do_health == -1)) {
+    if (do_health == -1) {
         do_health =
             config_get_boolean("plugin:proc:/proc/mdstat", "faulty devices", CONFIG_BOOLEAN_YES);
         do_nonredundant =
@@ -121,20 +121,20 @@ int do_proc_mdstat(int update_every, usec_t dt)
         mismatch_cnt_filename = config_get("plugin:proc:/proc/mdstat", "mismatch_cnt filename to monitor", filename);
     }
 
-    if (unlikely(!ff)) {
+    if (!ff) {
         ff = procfile_open(mdstat_filename, " \t:", PROCFILE_FLAG_DEFAULT);
-        if (unlikely(!ff))
+        if (!ff)
             return 1;
     }
 
     ff = procfile_readall(ff);
-    if (unlikely(!ff))
+    if (!ff)
         return 0; // we return 0, so that we will retry opening it next time
 
     size_t lines = procfile_lines(ff);
     size_t words = 0;
 
-    if (unlikely(lines < 2)) {
+    if (lines < 2) {
         collector_error("Cannot read /proc/mdstat. Expected 2 or more lines, read %zu.", lines);
         return 1;
     }
@@ -143,15 +143,15 @@ int do_proc_mdstat(int update_every, usec_t dt)
     size_t l;
     raids_num = 0;
     for (l = 1; l < lines - 2; l++) {
-        if (unlikely(procfile_lineword(ff, l, 1)[0] == 'a')) // check if the raid is active
+        if (procfile_lineword(ff, l, 1)[0] == 'a') // check if the raid is active
             raids_num++;
     }
 
-    if (unlikely(!raids_num && !old_raids_allocated))
+    if (!raids_num && !old_raids_allocated)
         return 0; // we return 0, so that we will retry searching for raids next time
 
     // allocate the memory we need;
-    if (unlikely(raids_num != raids_allocated)) {
+    if (raids_num != raids_allocated) {
         for (raid_idx = 0; raid_idx < raids_allocated; raid_idx++) {
             struct raid *raid = &raids[raid_idx];
             freez(raid->name);
@@ -175,17 +175,17 @@ int do_proc_mdstat(int update_every, usec_t dt)
 
         words = procfile_linewords(ff, l);
 
-        if (unlikely(words < 3))
+        if (words < 3)
             continue;
 
-        if (unlikely(procfile_lineword(ff, l, 1)[0] != 'a'))
+        if (procfile_lineword(ff, l, 1)[0] != 'a')
             continue;
 
-        if (unlikely(!raid->name)) {
+        if (!raid->name) {
             raid->name = strdupz(procfile_lineword(ff, l, 0));
             raid->hash = simple_hash(raid->name);
             raid->level = strdupz(procfile_lineword(ff, l, 2));
-        } else if (unlikely(strcmp(raid->name, procfile_lineword(ff, l, 0)))) {
+        } else if (strcmp(raid->name, procfile_lineword(ff, l, 0))) {
             freez(raid->name);
             freez(raid->mismatch_cnt_filename);
             freez(raid->level);
@@ -195,7 +195,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
             raid->level = strdupz(procfile_lineword(ff, l, 2));
         }
 
-        if (unlikely(!raid->name || !raid->name[0]))
+        if (!raid->name || !raid->name[0])
             continue;
 
         raid_idx++;
@@ -207,26 +207,26 @@ int do_proc_mdstat(int update_every, usec_t dt)
             continue;
 
         // split inuse and total number of disks
-        if (likely(do_health || do_disks)) {
+        if (do_health || do_disks) {
             char *s = NULL, *str_total = NULL, *str_inuse = NULL;
 
             s = procfile_lineword(ff, l, words - 2);
-            if (unlikely(s[0] != '[')) {
+            if (s[0] != '[') {
                 collector_error("Cannot read /proc/mdstat raid health status. Unexpected format: missing opening bracket.");
                 continue;
             }
             str_total = ++s;
             while (*s) {
-                if (unlikely(*s == '/')) {
+                if (*s == '/') {
                     *s = '\0';
                     str_inuse = s + 1;
-                } else if (unlikely(*s == ']')) {
+                } else if (*s == ']') {
                     *s = '\0';
                     break;
                 }
                 s++;
             }
-            if (unlikely(str_total[0] == '\0' || !str_inuse || str_inuse[0] == '\0')) {
+            if (str_total[0] == '\0' || !str_inuse || str_inuse[0] == '\0') {
                 collector_error("Cannot read /proc/mdstat raid health status. Unexpected format.");
                 continue;
             }
@@ -241,7 +241,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
         l++;
 
         // check if any operation is performed on the raid
-        if (likely(do_operations)) {
+        if (do_operations) {
             char *s = NULL;
 
             raid->check = 0;
@@ -253,13 +253,13 @@ int do_proc_mdstat(int update_every, usec_t dt)
 
             words = procfile_linewords(ff, l);
 
-            if (likely(words < 2))
+            if (words < 2)
                 continue;
 
-            if (unlikely(procfile_lineword(ff, l, 0)[0] != '['))
+            if (procfile_lineword(ff, l, 0)[0] != '[')
                 continue;
 
-            if (unlikely(words < 7)) {
+            if (words < 7) {
                 collector_error("Cannot read /proc/mdstat line. Expected 7 params, read %zu.", words);
                 continue;
             }
@@ -291,7 +291,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
 
             word += 7; // skip leading "finish="
 
-            if (likely(s > word))
+            if (s > word)
                 raid->finish_in = (unsigned long long)(str2ndd(word, NULL) * 60);
 
             word = procfile_lineword(ff, l, 6);
@@ -299,7 +299,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
 
             word += 6; // skip leading "speed="
 
-            if (likely(s > word))
+            if (s > word)
                 raid->speed = str2ull(word, NULL);
         }
     }
@@ -315,17 +315,17 @@ int do_proc_mdstat(int update_every, usec_t dt)
             do_mismatch = do_mismatch_config;
     }
 
-    if (likely(do_mismatch)) {
+    if (do_mismatch) {
         for (raid_idx = 0; raid_idx < raids_num; raid_idx++) {
             char filename[FILENAME_MAX + 1];
             struct raid *raid = &raids[raid_idx];
 
-            if (likely(raid->redundant)) {
-                if (unlikely(!raid->mismatch_cnt_filename)) {
+            if (raid->redundant) {
+                if (!raid->mismatch_cnt_filename) {
                     snprintfz(filename, FILENAME_MAX, mismatch_cnt_filename, raid->name);
                     raid->mismatch_cnt_filename = strdupz(filename);
                 }
-                if (unlikely(read_single_number_file(raid->mismatch_cnt_filename, &raid->mismatch_cnt))) {
+                if (read_single_number_file(raid->mismatch_cnt_filename, &raid->mismatch_cnt)) {
                     collector_error("Cannot read file '%s'", raid->mismatch_cnt_filename);
                     do_mismatch = CONFIG_BOOLEAN_NO;
                     collector_error("Monitoring for mismatch count has been disabled");
@@ -343,9 +343,9 @@ int do_proc_mdstat(int update_every, usec_t dt)
         for (raid_idx = 0; raid_idx < raids_num; raid_idx++) {
             struct raid *raid = &raids[raid_idx];
 
-            if (unlikely(
+            if (
                     raid->hash == old_raid->hash && !strcmp(raid->name, old_raid->name) &&
-                    raid->redundant == old_raid->redundant))
+                    raid->redundant == old_raid->redundant)
                 found = 1;
         }
 
@@ -356,8 +356,8 @@ int do_proc_mdstat(int update_every, usec_t dt)
     for (old_raid_idx = 0; old_raid_idx < old_raids_allocated; old_raid_idx++) {
         struct old_raid *old_raid = &old_raids[old_raid_idx];
 
-        if (unlikely(!old_raid->found)) {
-            if (likely(make_charts_obsolete)) {
+        if (!old_raid->found) {
+            if (make_charts_obsolete) {
                 make_chart_obsolete(old_raid->name, "disks");
                 make_chart_obsolete(old_raid->name, "mismatch");
                 make_chart_obsolete(old_raid->name, "operation");
@@ -370,11 +370,11 @@ int do_proc_mdstat(int update_every, usec_t dt)
     }
 
     // allocate memory for nonredundant arrays
-    if (unlikely(raid_disappeared || old_raids_allocated != raids_num)) {
+    if (raid_disappeared || old_raids_allocated != raids_num) {
         for (old_raid_idx = 0; old_raid_idx < old_raids_allocated; old_raid_idx++) {
             freez(old_raids[old_raid_idx].name);
         }
-        if (likely(raids_num)) {
+        if (raids_num) {
             old_raids = reallocz(old_raids, sizeof(struct old_raid) * raids_num);
             memset(old_raids, 0, sizeof(struct old_raid) * raids_num);
         } else {
@@ -392,9 +392,9 @@ int do_proc_mdstat(int update_every, usec_t dt)
         }
     }
 
-    if (likely(do_health && redundant_num)) {
+    if (do_health && redundant_num) {
         static RRDSET *st_mdstat_health = NULL;
-        if (unlikely(!st_mdstat_health)) {
+        if (!st_mdstat_health) {
             st_mdstat_health = rrdset_create_localhost(
                 "mdstat",
                 "mdstat_health",
@@ -413,14 +413,14 @@ int do_proc_mdstat(int update_every, usec_t dt)
         }
 
         if (!redundant_num) {
-            if (likely(make_charts_obsolete))
+            if (make_charts_obsolete)
                 make_chart_obsolete("mdstat", "health");
         } else {
             for (raid_idx = 0; raid_idx < raids_num; raid_idx++) {
                 struct raid *raid = &raids[raid_idx];
 
-                if (likely(raid->redundant)) {
-                    if (unlikely(!raid->rd_health && !(raid->rd_health = rrddim_find_active(st_mdstat_health, raid->name))))
+                if (raid->redundant) {
+                    if (!raid->rd_health && !(raid->rd_health = rrddim_find_active(st_mdstat_health, raid->name)))
                         raid->rd_health = rrddim_add(st_mdstat_health, raid->name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                     rrddim_set_by_pointer(st_mdstat_health, raid->rd_health, raid->failed_disks);
@@ -436,11 +436,11 @@ int do_proc_mdstat(int update_every, usec_t dt)
         char id[50 + 1];
         char family[50 + 1];
 
-        if (likely(raid->redundant)) {
-            if (likely(do_disks)) {
+        if (raid->redundant) {
+            if (do_disks) {
                 snprintfz(id, 50, "%s_disks", raid->name);
 
-                if (unlikely(!raid->st_disks && !(raid->st_disks = rrdset_find_active_byname_localhost(id)))) {
+                if (!raid->st_disks && !(raid->st_disks = rrdset_find_active_byname_localhost(id))) {
                     snprintfz(family, 50, "%s (%s)", raid->name, raid->level);
 
                     raid->st_disks = rrdset_create_localhost(
@@ -462,9 +462,9 @@ int do_proc_mdstat(int update_every, usec_t dt)
                     add_labels_to_mdstat(raid, raid->st_disks);
                 }
 
-                if (unlikely(!raid->rd_inuse && !(raid->rd_inuse = rrddim_find_active(raid->st_disks, "inuse"))))
+                if (!raid->rd_inuse && !(raid->rd_inuse = rrddim_find_active(raid->st_disks, "inuse")))
                     raid->rd_inuse = rrddim_add(raid->st_disks, "inuse", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                if (unlikely(!raid->rd_down && !(raid->rd_down = rrddim_find_active(raid->st_disks, "down"))))
+                if (!raid->rd_down && !(raid->rd_down = rrddim_find_active(raid->st_disks, "down")))
                     raid->rd_down = rrddim_add(raid->st_disks, "down", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrddim_set_by_pointer(raid->st_disks, raid->rd_inuse, raid->inuse_disks);
@@ -472,10 +472,10 @@ int do_proc_mdstat(int update_every, usec_t dt)
                 rrdset_done(raid->st_disks);
             }
 
-            if (likely(do_mismatch)) {
+            if (do_mismatch) {
                 snprintfz(id, 50, "%s_mismatch", raid->name);
 
-                if (unlikely(!raid->st_mismatch_cnt && !(raid->st_mismatch_cnt = rrdset_find_active_byname_localhost(id)))) {
+                if (!raid->st_mismatch_cnt && !(raid->st_mismatch_cnt = rrdset_find_active_byname_localhost(id))) {
                     snprintfz(family, 50, "%s (%s)", raid->name, raid->level);
 
                     raid->st_mismatch_cnt = rrdset_create_localhost(
@@ -497,17 +497,17 @@ int do_proc_mdstat(int update_every, usec_t dt)
                     add_labels_to_mdstat(raid, raid->st_mismatch_cnt);
                 }
 
-                if (unlikely(!raid->rd_mismatch_cnt && !(raid->rd_mismatch_cnt = rrddim_find_active(raid->st_mismatch_cnt, "count"))))
+                if (!raid->rd_mismatch_cnt && !(raid->rd_mismatch_cnt = rrddim_find_active(raid->st_mismatch_cnt, "count")))
                     raid->rd_mismatch_cnt = rrddim_add(raid->st_mismatch_cnt, "count", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrddim_set_by_pointer(raid->st_mismatch_cnt, raid->rd_mismatch_cnt, raid->mismatch_cnt);
                 rrdset_done(raid->st_mismatch_cnt);
             }
 
-            if (likely(do_operations)) {
+            if (do_operations) {
                 snprintfz(id, 50, "%s_operation", raid->name);
 
-                if (unlikely(!raid->st_operation && !(raid->st_operation = rrdset_find_active_byname_localhost(id)))) {
+                if (!raid->st_operation && !(raid->st_operation = rrdset_find_active_byname_localhost(id))) {
                     snprintfz(family, 50, "%s (%s)", raid->name, raid->level);
 
                     raid->st_operation = rrdset_create_localhost(
@@ -529,13 +529,13 @@ int do_proc_mdstat(int update_every, usec_t dt)
                     add_labels_to_mdstat(raid, raid->st_operation);
                 }
 
-                if(unlikely(!raid->rd_check && !(raid->rd_check = rrddim_find_active(raid->st_operation, "check"))))
+                if(!raid->rd_check && !(raid->rd_check = rrddim_find_active(raid->st_operation, "check")))
                     raid->rd_check = rrddim_add(raid->st_operation, "check", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
-                if(unlikely(!raid->rd_resync && !(raid->rd_resync = rrddim_find_active(raid->st_operation, "resync"))))
+                if(!raid->rd_resync && !(raid->rd_resync = rrddim_find_active(raid->st_operation, "resync")))
                     raid->rd_resync = rrddim_add(raid->st_operation, "resync", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
-                if(unlikely(!raid->rd_recovery && !(raid->rd_recovery = rrddim_find_active(raid->st_operation, "recovery"))))
+                if(!raid->rd_recovery && !(raid->rd_recovery = rrddim_find_active(raid->st_operation, "recovery")))
                     raid->rd_recovery = rrddim_add(raid->st_operation, "recovery", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
-                if(unlikely(!raid->rd_reshape && !(raid->rd_reshape = rrddim_find_active(raid->st_operation, "reshape"))))
+                if(!raid->rd_reshape && !(raid->rd_reshape = rrddim_find_active(raid->st_operation, "reshape")))
                     raid->rd_reshape = rrddim_add(raid->st_operation, "reshape", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
 
                 rrddim_set_by_pointer(raid->st_operation, raid->rd_check, raid->check);
@@ -545,7 +545,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
                 rrdset_done(raid->st_operation);
 
                 snprintfz(id, 50, "%s_finish", raid->name);
-                if (unlikely(!raid->st_finish && !(raid->st_finish = rrdset_find_active_byname_localhost(id)))) {
+                if (!raid->st_finish && !(raid->st_finish = rrdset_find_active_byname_localhost(id))) {
                     snprintfz(family, 50, "%s (%s)", raid->name, raid->level);
 
                     raid->st_finish = rrdset_create_localhost(
@@ -566,14 +566,14 @@ int do_proc_mdstat(int update_every, usec_t dt)
                     add_labels_to_mdstat(raid, raid->st_finish);
                 }
 
-                if(unlikely(!raid->rd_finish_in && !(raid->rd_finish_in = rrddim_find_active(raid->st_finish, "finish_in"))))
+                if(!raid->rd_finish_in && !(raid->rd_finish_in = rrddim_find_active(raid->st_finish, "finish_in")))
                     raid->rd_finish_in = rrddim_add(raid->st_finish, "finish_in", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrddim_set_by_pointer(raid->st_finish, raid->rd_finish_in, raid->finish_in);
                 rrdset_done(raid->st_finish);
 
                 snprintfz(id, 50, "%s_speed", raid->name);
-                if (unlikely(!raid->st_speed && !(raid->st_speed = rrdset_find_active_byname_localhost(id)))) {
+                if (!raid->st_speed && !(raid->st_speed = rrdset_find_active_byname_localhost(id))) {
                     snprintfz(family, 50, "%s (%s)", raid->name, raid->level);
 
                     raid->st_speed = rrdset_create_localhost(
@@ -595,17 +595,17 @@ int do_proc_mdstat(int update_every, usec_t dt)
                     add_labels_to_mdstat(raid, raid->st_speed);
                 }
 
-                if (unlikely(!raid->rd_speed && !(raid->rd_speed = rrddim_find_active(raid->st_speed, "speed"))))
+                if (!raid->rd_speed && !(raid->rd_speed = rrddim_find_active(raid->st_speed, "speed")))
                     raid->rd_speed = rrddim_add(raid->st_speed, "speed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrddim_set_by_pointer(raid->st_speed, raid->rd_speed, raid->speed);
                 rrdset_done(raid->st_speed);
             }
         } else {
-            if (likely(do_nonredundant)) {
+            if (do_nonredundant) {
                 snprintfz(id, 50, "%s_availability", raid->name);
 
-                if (unlikely(!raid->st_nonredundant && !(raid->st_nonredundant = rrdset_find_active_localhost(id)))) {
+                if (!raid->st_nonredundant && !(raid->st_nonredundant = rrdset_find_active_localhost(id))) {
                     snprintfz(family, 50, "%s (%s)", raid->name, raid->level);
 
                     raid->st_nonredundant = rrdset_create_localhost(
@@ -627,7 +627,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
                     add_labels_to_mdstat(raid, raid->st_nonredundant);
                 }
 
-                if (unlikely(!raid->rd_nonredundant && !(raid->rd_nonredundant = rrddim_find_active(raid->st_nonredundant, "available"))))
+                if (!raid->rd_nonredundant && !(raid->rd_nonredundant = rrddim_find_active(raid->st_nonredundant, "available")))
                     raid->rd_nonredundant = rrddim_add(raid->st_nonredundant, "available", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrddim_set_by_pointer(raid->st_nonredundant, raid->rd_nonredundant, 1);

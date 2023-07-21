@@ -84,14 +84,14 @@ struct JulyL *julyl_get(void) {
     spinlock_lock(&julyl_globals.protected.spinlock);
 
     j = julyl_globals.protected.available_items;
-    if(likely(j)) {
+    if(j) {
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(julyl_globals.protected.available_items, j, cache.prev, cache.next);
         julyl_globals.protected.available--;
     }
 
     spinlock_unlock(&julyl_globals.protected.spinlock);
 
-    if(unlikely(!j)) {
+    if(!j) {
         size_t bytes = sizeof(struct JulyL) + JULYL_MIN_ENTRIES * sizeof(struct JulyL_item);
         j = mallocz(bytes);
         j->bytes = bytes;
@@ -108,7 +108,7 @@ struct JulyL *julyl_get(void) {
 }
 
 static void julyl_release(struct JulyL *j) {
-    if(unlikely(!j)) return;
+    if(!j) return;
 
     __atomic_add_fetch(&julyl_globals.atomics.bytes_moved, j->bytes_moved, __ATOMIC_RELAXED);
     __atomic_add_fetch(&julyl_globals.atomics.reallocs, j->reallocs, __ATOMIC_RELAXED);
@@ -164,7 +164,7 @@ PPvoid_t JulyLGet(Pcvoid_t PArray, Word_t Index, PJError_t PJError __maybe_unuse
 
     size_t pos = JulyLGet_binary_search_position_of_index(July, Index);
 
-    if(unlikely(pos >= July->used || July->array[pos].index != Index))
+    if(pos >= July->used || July->array[pos].index != Index)
         return NULL;
 
     return (PPvoid_t)&July->array[pos].value;
@@ -172,7 +172,7 @@ PPvoid_t JulyLGet(Pcvoid_t PArray, Word_t Index, PJError_t PJError __maybe_unuse
 
 PPvoid_t JulyLIns(PPvoid_t PPArray, Word_t Index, PJError_t PJError __maybe_unused) {
     struct JulyL *July = *PPArray;
-    if(unlikely(!July)) {
+    if(!July) {
         July = julyl_get();
         July->used = 0;
         *PPArray = July;
@@ -183,7 +183,7 @@ PPvoid_t JulyLIns(PPvoid_t PPArray, Word_t Index, PJError_t PJError __maybe_unus
     if((pos == July->used || July->array[pos].index != Index)) {
         // we have to add this entry
 
-        if (unlikely(July->used == July->entries)) {
+        if (July->used == July->entries) {
             // we have to expand the array
             size_t bytes = sizeof(struct JulyL) + July->entries * 2 * sizeof(struct JulyL_item);
             __atomic_add_fetch(&julyl_globals.atomics.bytes, bytes - July->bytes, __ATOMIC_RELAXED);
@@ -194,7 +194,7 @@ PPvoid_t JulyLIns(PPvoid_t PPArray, Word_t Index, PJError_t PJError __maybe_unus
             *PPArray = July;
         }
 
-        if (unlikely(pos != July->used)) {
+        if (pos != July->used) {
             // we have to shift some members to make room
             size_t size = (July->used - pos) * sizeof(struct JulyL_item);
             memmove(&July->array[pos + 1], &July->array[pos], size);
@@ -217,7 +217,7 @@ PPvoid_t JulyLFirst(Pcvoid_t PArray, Word_t *Index, PJError_t PJError __maybe_un
     size_t pos = JulyLGet_binary_search_position_of_index(July, *Index);
     // pos is >= Index
 
-    if(unlikely(pos == July->used))
+    if(pos == July->used)
         return NULL;
 
     *Index = July->array[pos].index;
@@ -232,13 +232,13 @@ PPvoid_t JulyLNext(Pcvoid_t PArray, Word_t *Index, PJError_t PJError __maybe_unu
     size_t pos = JulyLGet_binary_search_position_of_index(July, *Index);
     // pos is >= Index
 
-    if(unlikely(pos == July->used))
+    if(pos == July->used)
         return NULL;
 
     if(July->array[pos].index == *Index) {
         pos++;
 
-        if(unlikely(pos == July->used))
+        if(pos == July->used)
             return NULL;
     }
 
@@ -257,7 +257,7 @@ PPvoid_t JulyLLast(Pcvoid_t PArray, Word_t *Index, PJError_t PJError __maybe_unu
     if(pos > 0 && (pos == July->used || July->array[pos].index > *Index))
         pos--;
 
-    if(unlikely(pos == 0 && July->array[0].index > *Index))
+    if(pos == 0 && July->array[0].index > *Index)
         return NULL;
 
     *Index = July->array[pos].index;
@@ -272,7 +272,7 @@ PPvoid_t JulyLPrev(Pcvoid_t PArray, Word_t *Index, PJError_t PJError __maybe_unu
     size_t pos = JulyLGet_binary_search_position_of_index(July, *Index);
     // pos is >= Index
 
-    if(unlikely(pos == 0 || July->used == 0))
+    if(pos == 0 || July->used == 0)
         return NULL;
 
     // get the previous one
@@ -284,7 +284,7 @@ PPvoid_t JulyLPrev(Pcvoid_t PArray, Word_t *Index, PJError_t PJError __maybe_unu
 
 Word_t JulyLFreeArray(PPvoid_t PPArray, PJError_t PJError __maybe_unused) {
     struct JulyL *July = *PPArray;
-    if(unlikely(!July))
+    if(!July)
         return 0;
 
     size_t bytes = July->bytes;

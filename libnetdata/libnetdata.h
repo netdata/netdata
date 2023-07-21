@@ -259,7 +259,7 @@ size_t judy_aral_structures(void);
     do {                                                                                       \
         (item)->next = (head);                                                                 \
                                                                                                \
-        if(likely(head)) {                                                                     \
+        if(head) {                                                                     \
             (item)->prev = (head)->prev;                                                       \
             (head)->prev = (item);                                                             \
         }                                                                                      \
@@ -274,7 +274,7 @@ size_t judy_aral_structures(void);
                                                                                                \
         (item)->next = NULL;                                                                   \
                                                                                                \
-        if(likely(head)) {                                                                     \
+        if(head) {                                                                     \
             (item)->prev = (head)->prev;                                                       \
             (head)->prev->next = (item);                                                       \
             (head)->prev = (item);                                                             \
@@ -477,16 +477,16 @@ typedef struct storage_point {
         if(!storage_point_is_unset(sp) &&               \
            !storage_point_is_gap(sp)) {                 \
                                                         \
-            if(unlikely(signbit((sp).sum)))             \
+            if(signbit((sp).sum))             \
                 (sp).sum = -(sp).sum;                   \
                                                         \
-            if(unlikely(signbit((sp).min)))             \
+            if(signbit((sp).min))             \
                 (sp).min = -(sp).min;                   \
                                                         \
-            if(unlikely(signbit((sp).max)))             \
+            if(signbit((sp).max))             \
                 (sp).max = -(sp).max;                   \
                                                         \
-            if(unlikely((sp).min > (sp).max)) {         \
+            if((sp).min > (sp).max) {         \
                 NETDATA_DOUBLE t = (sp).min;            \
                 (sp).min = (sp).max;                    \
                 (sp).max = t;                           \
@@ -697,16 +697,16 @@ static inline size_t quoted_strings_splitter(char *str, char **words, size_t max
     size_t i = 0;
 
     // skip all white space
-    while (unlikely(isspace_map[(uint8_t)*s]))
+    while (isspace_map[(uint8_t)*s])
         s++;
 
-    if(unlikely(!*s)) {
+    if(!*s) {
         words[i] = NULL;
         return 0;
     }
 
     // check for quote
-    if (unlikely(*s == '\'' || *s == '"')) {
+    if (*s == '\'' || *s == '"') {
         quote = *s; // remember the quote
         s++;        // skip the quote
     }
@@ -715,41 +715,41 @@ static inline size_t quoted_strings_splitter(char *str, char **words, size_t max
     words[i++] = s;
 
     // while we have something
-    while (likely(*s)) {
+    while (*s) {
         // if it is an escape
-        if (unlikely(*s == '\\' && s[1])) {
+        if (*s == '\\' && s[1]) {
             s += 2;
             continue;
         }
 
         // if it is a quote
-        else if (unlikely(*s == quote)) {
+        else if (*s == quote) {
             quote = 0;
             *s = ' ';
             continue;
         }
 
         // if it is a space
-        else if (unlikely(quote == 0 && isspace_map[(uint8_t)*s])) {
+        else if (quote == 0 && isspace_map[(uint8_t)*s]) {
             // terminate the word
             *s++ = '\0';
 
             // skip all white space
-            while (likely(isspace_map[(uint8_t)*s]))
+            while (isspace_map[(uint8_t)*s])
                 s++;
 
             // check for a quote
-            if (unlikely(*s == '\'' || *s == '"')) {
+            if (*s == '\'' || *s == '"') {
                 quote = *s; // remember the quote
                 s++;        // skip the quote
             }
 
             // if we reached the end, stop
-            if (unlikely(!*s))
+            if (!*s)
                 break;
 
             // store the next word
-            if (likely(i < max_words))
+            if (i < max_words)
                 words[i++] = s;
             else
                 break;
@@ -760,7 +760,7 @@ static inline size_t quoted_strings_splitter(char *str, char **words, size_t max
             s++;
     }
 
-    if (likely(i < max_words))
+    if (i < max_words)
         words[i] = NULL;
 
     return i;
@@ -776,7 +776,7 @@ static inline size_t quoted_strings_splitter(char *str, char **words, size_t max
         quoted_strings_splitter(str, words, max_words, isspace_map_pluginsd)
 
 static inline char *get_word(char **words, size_t num_words, size_t index) {
-    if (unlikely(index >= num_words))
+    if (index >= num_words)
         return NULL;
 
     return words[index];
@@ -846,7 +846,7 @@ static inline size_t struct_natural_alignment(size_t size) __attribute__((const)
 
 #define STRUCT_NATURAL_ALIGNMENT (sizeof(uintptr_t) * 2)
 static inline size_t struct_natural_alignment(size_t size) {
-    if(unlikely(size % STRUCT_NATURAL_ALIGNMENT))
+    if(size % STRUCT_NATURAL_ALIGNMENT)
         size = size + STRUCT_NATURAL_ALIGNMENT - (size % STRUCT_NATURAL_ALIGNMENT);
 
     return size;
@@ -880,7 +880,7 @@ struct malloc_trace {
 #endif // NETDATA_TRACE_ALLOCATIONS
 
 static inline PPvoid_t JudyLFirstThenNext(Pcvoid_t PArray, Word_t * PIndex, bool *first) {
-    if(unlikely(*first)) {
+    if(*first) {
         *first = false;
         return JudyLFirst(PArray, PIndex, PJE0);
     }
@@ -889,7 +889,7 @@ static inline PPvoid_t JudyLFirstThenNext(Pcvoid_t PArray, Word_t * PIndex, bool
 }
 
 static inline PPvoid_t JudyLLastThenPrev(Pcvoid_t PArray, Word_t * PIndex, bool *first) {
-    if(unlikely(*first)) {
+    if(*first) {
         *first = false;
         return JudyLLast(PArray, PIndex, PJE0);
     }

@@ -35,7 +35,7 @@ int exporting_discard_response(BUFFER *buffer, struct instance *instance) {
 
     for(; *s && d < e ;s++) {
         char c = *s;
-        if(unlikely(!isprint(c))) c = ' ';
+        if(!isprint(c)) c = ' ';
         *d++ = c;
     }
     *d = '\0';
@@ -88,7 +88,7 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
 #else
         r = recv(*sock, &response->buffer[response->len], response->size - response->len, MSG_DONTWAIT);
 #endif
-        if (likely(r > 0)) {
+        if (r > 0) {
             // we received some data
             response->len += r;
             stats->received_bytes += r;
@@ -240,7 +240,7 @@ void simple_connector_worker(void *instance_p)
             send_stats = 1;
         }
 
-        if (unlikely(instance->engine->exit)) {
+        if (instance->engine->exit) {
             uv_mutex_unlock(&instance->mutex);
             break;
         }
@@ -278,13 +278,13 @@ void simple_connector_worker(void *instance_p)
         // ------------------------------------------------------------------------
         // if we are connected, receive a response, without blocking
 
-        if (likely(sock != -1))
+        if (sock != -1)
             simple_connector_receive_response(&sock, instance);
 
         // ------------------------------------------------------------------------
         // if we are not connected, connect to a data collecting server
 
-        if (unlikely(sock == -1)) {
+        if (sock == -1) {
             size_t reconnects = 0;
 
             sock = connect_to_one_of_urls(
@@ -322,7 +322,7 @@ void simple_connector_worker(void *instance_p)
             stats->reconnects += reconnects;
         }
 
-        if (unlikely(instance->engine->exit))
+        if (instance->engine->exit)
             break;
 
         // ------------------------------------------------------------------------
@@ -330,7 +330,7 @@ void simple_connector_worker(void *instance_p)
 
         failures = 0;
 
-        if (likely(sock != -1)) {
+        if (sock != -1) {
             simple_connector_send_buffer(
                 &sock,
                 &failures,
@@ -352,7 +352,7 @@ void simple_connector_worker(void *instance_p)
             connector_specific_data->first_buffer = connector_specific_data->first_buffer->next;
         }
 
-        if (unlikely(instance->engine->exit))
+        if (instance->engine->exit)
             break;
 
         if (send_stats) {

@@ -108,13 +108,13 @@ const char *rrd_algorithm_name(RRD_ALGORITHM algorithm) {
 // RRD - chart types
 
 inline RRDSET_TYPE rrdset_type_id(const char *name) {
-    if(unlikely(strcmp(name, RRDSET_TYPE_AREA_NAME) == 0))
+    if(strcmp(name, RRDSET_TYPE_AREA_NAME) == 0)
         return RRDSET_TYPE_AREA;
 
-    else if(unlikely(strcmp(name, RRDSET_TYPE_STACKED_NAME) == 0))
+    else if(strcmp(name, RRDSET_TYPE_STACKED_NAME) == 0)
         return RRDSET_TYPE_STACKED;
 
-    else // if(unlikely(strcmp(name, RRDSET_TYPE_LINE_NAME) == 0))
+    else // if(strcmp(name, RRDSET_TYPE_LINE_NAME) == 0)
         return RRDSET_TYPE_LINE;
 }
 
@@ -158,7 +158,7 @@ char *rrdhost_cache_dir_for_rrdset_alloc(RRDHOST *host, const char *id) {
 // RRD - string management
 
 STRING *rrd_string_strdupz(const char *s) {
-    if(unlikely(!s || !*s)) return string_strdupz(s);
+    if(!s || !*s) return string_strdupz(s);
 
     char *tmp = strdupz(s);
     json_fix_string(tmp);

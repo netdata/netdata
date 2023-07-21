@@ -13,7 +13,7 @@ usec_t clock_realtime_resolution = 1000;
 #ifndef HAVE_CLOCK_GETTIME
 inline int clock_gettime(clockid_t clk_id __maybe_unused, struct timespec *ts) {
     struct timeval tv;
-    if(unlikely(gettimeofday(&tv, NULL) == -1)) {
+    if(gettimeofday(&tv, NULL) == -1) {
         netdata_log_error("gettimeofday() failed.");
         return -1;
     }
@@ -78,7 +78,7 @@ void clocks_init(void) {
 
 inline time_t now_sec(clockid_t clk_id) {
     struct timespec ts;
-    if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
+    if(clock_gettime(clk_id, &ts) == -1) {
         netdata_log_error("clock_gettime(%d, &timespec) failed.", clk_id);
         return 0;
     }
@@ -87,7 +87,7 @@ inline time_t now_sec(clockid_t clk_id) {
 
 inline usec_t now_usec(clockid_t clk_id) {
     struct timespec ts;
-    if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
+    if(clock_gettime(clk_id, &ts) == -1) {
         netdata_log_error("clock_gettime(%d, &timespec) failed.", clk_id);
         return 0;
     }
@@ -97,7 +97,7 @@ inline usec_t now_usec(clockid_t clk_id) {
 inline int now_timeval(clockid_t clk_id, struct timeval *tv) {
     struct timespec ts;
 
-    if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
+    if(clock_gettime(clk_id, &ts) == -1) {
         netdata_log_error("clock_gettime(%d, &timespec) failed.", clk_id);
         tv->tv_sec = 0;
         tv->tv_usec = 0;
@@ -169,7 +169,7 @@ inline susec_t dt_usec_signed(struct timeval *now, struct timeval *old) {
     usec_t ts1 = timeval_usec(now);
     usec_t ts2 = timeval_usec(old);
 
-    if(likely(ts1 >= ts2)) return (susec_t)(ts1 - ts2);
+    if(ts1 >= ts2) return (susec_t)(ts1 - ts2);
     return -((susec_t)(ts2 - ts1));
 }
 
@@ -294,7 +294,7 @@ inline void heartbeat_init(heartbeat_t *hb) {
 // it returns the dt using the realtime clock
 
 usec_t heartbeat_next(heartbeat_t *hb, usec_t tick) {
-    if(unlikely(hb->randomness > tick / 2)) {
+    if(hb->randomness > tick / 2) {
         // TODO: The heartbeat tick should be specified at the heartbeat_init() function
         usec_t tmp = (now_realtime_usec() * clock_realtime_resolution) % (tick / 2);
 
@@ -323,18 +323,18 @@ usec_t heartbeat_next(heartbeat_t *hb, usec_t tick) {
         heartbeat_alignment_values[hb->statistics_id].sequence++;
     }
 
-    if(unlikely(now < next)) {
+    if(now < next) {
         errno = 0;
         error_limit_static_global_var(erl, 10, 0);
         error_limit(&erl, "heartbeat clock: woke up %llu microseconds earlier than expected (can be due to the CLOCK_REALTIME set to the past).", next - now);
     }
-    else if(unlikely(now - next >  tick / 2)) {
+    else if(now - next >  tick / 2) {
         errno = 0;
         error_limit_static_global_var(erl, 10, 0);
         error_limit(&erl, "heartbeat clock: woke up %llu microseconds later than expected (can be due to system load or the CLOCK_REALTIME set to the future).", now - next);
     }
 
-    if(unlikely(!hb->realtime)) {
+    if(!hb->realtime) {
         // the first time return zero
         dt = 0;
     }
@@ -360,7 +360,7 @@ void sleep_usec_with_now(usec_t usec, usec_t started_ut) {
     usec_t end_ut = started_ut + usec;
 
     while (nanosleep(&req, &rem) != 0) {
-        if (likely(errno == EINTR && (rem.tv_sec || rem.tv_nsec))) {
+        if (errno == EINTR && (rem.tv_sec || rem.tv_nsec)) {
             req = rem;
             rem = (struct timespec){ 0, 0 };
 
@@ -398,19 +398,19 @@ static inline collected_number uptime_from_boottime(void) {
 
 static procfile *read_proc_uptime_ff = NULL;
 static inline collected_number read_proc_uptime(char *filename) {
-    if(unlikely(!read_proc_uptime_ff)) {
+    if(!read_proc_uptime_ff) {
         read_proc_uptime_ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!read_proc_uptime_ff)) return 0;
+        if(!read_proc_uptime_ff) return 0;
     }
 
     read_proc_uptime_ff = procfile_readall(read_proc_uptime_ff);
-    if(unlikely(!read_proc_uptime_ff)) return 0;
+    if(!read_proc_uptime_ff) return 0;
 
-    if(unlikely(procfile_lines(read_proc_uptime_ff) < 1)) {
+    if(procfile_lines(read_proc_uptime_ff) < 1) {
         netdata_log_error("/proc/uptime has no lines.");
         return 0;
     }
-    if(unlikely(procfile_linewords(read_proc_uptime_ff, 0) < 1)) {
+    if(procfile_linewords(read_proc_uptime_ff, 0) < 1) {
         netdata_log_error("/proc/uptime has less than 1 word in it.");
         return 0;
     }
@@ -421,7 +421,7 @@ static inline collected_number read_proc_uptime(char *filename) {
 inline collected_number uptime_msec(char *filename){
     static int use_boottime = -1;
 
-    if(unlikely(use_boottime == -1)) {
+    if(use_boottime == -1) {
         collected_number uptime_boottime = uptime_from_boottime();
         collected_number uptime_proc     = read_proc_uptime(filename);
 

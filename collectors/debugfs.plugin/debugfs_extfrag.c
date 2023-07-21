@@ -27,7 +27,7 @@ static struct netdata_extrafrag *find_or_create_extrafrag(const char *name)
 
     // search it, from beginning to the end
     for (extrafrag = netdata_extrafrags_root ; extrafrag ; extrafrag = extrafrag->next) {
-        if (unlikely(hash == extrafrag->hash && !strcmp(name, extrafrag->node_zone))) {
+        if (hash == extrafrag->hash && !strcmp(name, extrafrag->node_zone)) {
             return extrafrag;
         }
     }
@@ -63,7 +63,7 @@ int do_debugfs_extfrag(int update_every, const char *name) {
     static procfile *ff = NULL;
     static int chart_order = NETDATA_CHART_PRIO_MEM_FRAGMENTATION;
 
-    if (unlikely(!ff)) {
+    if (!ff) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename,
                   FILENAME_MAX,
@@ -72,17 +72,17 @@ int do_debugfs_extfrag(int update_every, const char *name) {
                   "/sys/kernel/debug/extfrag/extfrag_index");
 
         ff = procfile_open(filename, " \t,", PROCFILE_FLAG_DEFAULT);
-        if (unlikely(!ff)) return 1;
+        if (!ff) return 1;
     }
 
     ff = procfile_readall(ff);
-    if (unlikely(!ff)) return 1;
+    if (!ff) return 1;
 
     size_t l, i, j, lines = procfile_lines(ff);
     for (l = 0; l < lines; l++) {
         char chart_id[64];
         char zone_lowercase[32];
-        if (unlikely(procfile_linewords(ff, l) < 15)) continue;
+        if (procfile_linewords(ff, l) < 15) continue;
         char *zone = procfile_lineword(ff, l, 3);
         strncpyz(zone_lowercase, zone, 31);
         debugfs2lower(zone_lowercase);
@@ -98,7 +98,7 @@ int do_debugfs_extfrag(int update_every, const char *name) {
             line_orders[j] = (collected_number) (value * 1000.0);
         }
 
-        if (unlikely(!extrafrag->id)) {
+        if (!extrafrag->id) {
             extrafrag->id = extrafrag->node_zone;
             fprintf(
                 stdout,

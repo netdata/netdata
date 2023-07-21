@@ -311,7 +311,7 @@ static __thread struct rrd_collector *thread_rrd_collector = NULL;
 
 static void rrd_collector_free(struct rrd_collector *rdc) {
     int32_t expected = 0;
-    if(likely(!__atomic_compare_exchange_n(&rdc->refcount, &expected, -1, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST))) {
+    if(!__atomic_compare_exchange_n(&rdc->refcount, &expected, -1, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
         // the collector is still referenced by charts.
         // leave it hanging there, the last chart will actually free it.
         return;
@@ -323,7 +323,7 @@ static void rrd_collector_free(struct rrd_collector *rdc) {
 
 // called once per collector
 void rrd_collector_started(void) {
-    if(likely(thread_rrd_collector)) return;
+    if(thread_rrd_collector) return;
 
     thread_rrd_collector = callocz(1, sizeof(struct rrd_collector));
     thread_rrd_collector->tid = gettid();
@@ -346,7 +346,7 @@ static struct rrd_collector *rrd_collector_acquire(void) {
 }
 
 static void rrd_collector_release(struct rrd_collector *rdc) {
-    if(unlikely(!rdc)) return;
+    if(!rdc) return;
 
     int32_t refcount = __atomic_sub_fetch(&rdc->refcount, 1, __ATOMIC_SEQ_CST);
     if(refcount == 0 && !rdc->running)
@@ -571,7 +571,7 @@ static int rrd_call_function_find(RRDHOST *host, BUFFER *wb, const char *name, s
 
         // if s == NULL, set it to the end of the buffer
         // this should happen only the first time
-        if(unlikely(!s))
+        if(!s)
             s = &buffer[key_length - 1];
 
         // skip a word from the end

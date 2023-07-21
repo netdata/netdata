@@ -17,7 +17,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
     unsigned long long aentries = 0, asearched = 0, afound = 0, anew = 0, ainvalid = 0, aignore = 0, adelete = 0, adelete_list = 0,
             ainsert = 0, ainsert_failed = 0, adrop = 0, aearly_drop = 0, aicmp_error = 0, aexpect_new = 0, aexpect_create = 0, aexpect_delete = 0, asearch_restart = 0;
 
-    if(unlikely(do_sockets == -1)) {
+    if(do_sockets == -1) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/stat/nf_conntrack");
         nf_conntrack_filename = config_get("plugin:proc:/proc/net/stat/nf_conntrack", "filename to monitor", filename);
@@ -53,23 +53,23 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
         rrdvar_max = rrdvar_custom_host_variable_add_and_acquire(localhost, "netfilter_conntrack_max");
     }
 
-    if(likely(read_full)) {
-        if(unlikely(!ff)) {
+    if(read_full) {
+        if(!ff) {
             ff = procfile_open(nf_conntrack_filename, " \t:", PROCFILE_FLAG_DEFAULT);
-            if(unlikely(!ff))
+            if(!ff)
                 return 0; // we return 0, so that we will retry to open it next time
         }
 
         ff = procfile_readall(ff);
-        if(unlikely(!ff))
+        if(!ff)
             return 0; // we return 0, so that we will retry to open it next time
 
         size_t lines = procfile_lines(ff), l;
 
         for(l = 1; l < lines ;l++) {
             size_t words = procfile_linewords(ff, l);
-            if(unlikely(words < 17)) {
-                if(unlikely(words)) collector_error("Cannot read /proc/net/stat/nf_conntrack line. Expected 17 params, read %zu.", words);
+            if(words < 17) {
+                if(words) collector_error("Cannot read /proc/net/stat/nf_conntrack line. Expected 17 params, read %zu.", words);
                 continue;
             }
 
@@ -93,7 +93,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
             texpect_delete  = strtoull(procfile_lineword(ff, l, 15), NULL, 16);
             tsearch_restart = strtoull(procfile_lineword(ff, l, 16), NULL, 16);
 
-            if(unlikely(!aentries)) aentries =  tentries;
+            if(!aentries) aentries =  tentries;
 
             // sum all the cpus together
             asearched           += tsearched;       // conntrack.search
@@ -115,16 +115,16 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
         }
     }
     else {
-        if(unlikely(read_single_number_file(nf_conntrack_count_filename, &aentries)))
+        if(read_single_number_file(nf_conntrack_count_filename, &aentries))
             return 0; // we return 0, so that we will retry to open it next time
     }
 
     usec_since_last_max += dt;
-    if(unlikely(rrdvar_max && usec_since_last_max >= get_max_every)) {
+    if(rrdvar_max && usec_since_last_max >= get_max_every) {
         usec_since_last_max = 0;
 
         unsigned long long max;
-        if(likely(!read_single_number_file(nf_conntrack_max_filename, &max)))
+        if(!read_single_number_file(nf_conntrack_max_filename, &max))
             rrdvar_custom_host_variable_set(localhost, rrdvar_max, max);
     }
 
@@ -134,7 +134,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_connections = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_STAT_NETFILTER
                     , RRD_TYPE_NET_STAT_CONNTRACK "_sockets"
@@ -166,7 +166,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
                 *rd_ignore  = NULL,
                 *rd_invalid = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_STAT_NETFILTER
                     , RRD_TYPE_NET_STAT_CONNTRACK "_new"
@@ -202,7 +202,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
                 *rd_deleted     = NULL,
                 *rd_delete_list = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_STAT_NETFILTER
                     , RRD_TYPE_NET_STAT_CONNTRACK "_changes"
@@ -238,7 +238,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
                       *rd_deleted = NULL,
                       *rd_new     = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_STAT_NETFILTER
                     , RRD_TYPE_NET_STAT_CONNTRACK "_expect"
@@ -274,7 +274,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
                       *rd_restarted = NULL,
                       *rd_found     = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_STAT_NETFILTER
                     , RRD_TYPE_NET_STAT_CONNTRACK "_search"
@@ -311,7 +311,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
                       *rd_drop          = NULL,
                       *rd_early_drop    = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_STAT_NETFILTER
                     , RRD_TYPE_NET_STAT_CONNTRACK "_errors"

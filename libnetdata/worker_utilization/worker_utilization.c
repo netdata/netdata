@@ -78,7 +78,7 @@ size_t workers_allocated_memory(void) {
 }
 
 void worker_register(const char *name) {
-    if(unlikely(worker)) return;
+    if(worker) return;
 
     worker = callocz(1, sizeof(struct worker));
     worker->pid = gettid();
@@ -115,9 +115,9 @@ void worker_register(const char *name) {
 }
 
 void worker_register_job_custom_metric(size_t job_id, const char *name, const char *units, WORKER_METRIC_TYPE type) {
-    if(unlikely(!worker)) return;
+    if(!worker) return;
 
-    if(unlikely(job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES)) {
+    if(job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES) {
         netdata_log_error("WORKER_UTILIZATION: job_id %zu is too big. Max is %zu", job_id, (size_t)(WORKER_UTILIZATION_MAX_JOB_TYPES - 1));
         return;
     }
@@ -141,7 +141,7 @@ void worker_register_job_name(size_t job_id, const char *name) {
 }
 
 void worker_unregister(void) {
-    if(unlikely(!worker)) return;
+    if(!worker) return;
 
     size_t workname_size = strlen(worker->workname) + 1;
     spinlock_lock(&workers_globals.spinlock);
@@ -182,18 +182,18 @@ static inline void worker_is_idle_with_time(usec_t now) {
     // set it to idle before we set the timestamp
 
     worker->last_action = WORKER_IDLE;
-    if(likely(worker->last_action_timestamp < now))
+    if(worker->last_action_timestamp < now)
         worker->last_action_timestamp = now;
 }
 
 void worker_is_idle(void) {
-    if(unlikely(!worker || worker->last_action != WORKER_BUSY)) return;
+    if(!worker || worker->last_action != WORKER_BUSY) return;
 
     worker_is_idle_with_time(worker_now_monotonic_usec());
 }
 
 void worker_is_busy(size_t job_id) {
-    if(unlikely(!worker || job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
+    if(!worker || job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES)
         return;
 
     usec_t now = worker_now_monotonic_usec();
@@ -212,8 +212,8 @@ void worker_is_busy(size_t job_id) {
 }
 
 void worker_set_metric(size_t job_id, NETDATA_DOUBLE value) {
-    if(unlikely(!worker)) return;
-    if(unlikely(job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
+    if(!worker) return;
+    if(job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES)
         return;
 
     switch(worker->per_job_type[job_id].type) {

@@ -33,19 +33,19 @@ static inline bool is_event_from_alert_variable_config(uint32_t unique_id, uuid_
     }
 
     rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to bind host_id for checking alert variable.");
         sqlite3_finalize(res);
         return false;
     }
 
     rc = sqlite3_step_monitored(res);
-    if (likely(rc == SQLITE_ROW)) {
+    if (rc == SQLITE_ROW) {
         ret = true;
     }
 
     rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         error_report("Failed to finalize statement when trying to check for alert variables, rc = %d", rc);
 
     return ret;
@@ -69,7 +69,7 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
         return 0;
     }
 
-    if (unlikely(uuid_is_null(ae->config_hash_id)))
+    if (uuid_is_null(ae->config_hash_id))
         return 0;
 
     char sql[ACLK_SYNC_QUERY_SIZE];
@@ -89,14 +89,14 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
     }
 
     rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to bind host_id for checking alert variable.");
         sqlite3_finalize(res);
         return false;
     }
 
     rc = sqlite3_step_monitored(res);
-    if (likely(rc == SQLITE_ROW)) {
+    if (rc == SQLITE_ROW) {
         status  = (RRDCALC_STATUS) sqlite3_column_int(res, 0);
         if (sqlite3_column_type(res, 1) != SQLITE_NULL)
             uuid_copy(config_hash_id, *((uuid_t *) sqlite3_column_blob(res, 1)));
@@ -122,7 +122,7 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
 
 done:
     rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         error_report("Failed to finalize statement when trying to filter alert events, rc = %d", rc);
 
     return send;
@@ -162,17 +162,17 @@ int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, int skip_filter)
     snprintfz(sql, ACLK_SYNC_QUERY_SIZE - 1, SQL_QUEUE_ALERT_TO_CLOUD, uuid_str);
 
     int rc = sqlite3_prepare_v2(db_meta, sql, -1, &res_alert, 0);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement to store alert event");
         return 1;
     }
 
     rc = sqlite3_bind_int(res_alert, 1, (int) ae->unique_id);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         goto bind_fail;
 
     rc = execute_insert(res_alert);
-    if (unlikely(rc != SQLITE_DONE)) {
+    if (rc != SQLITE_DONE) {
         error_report("Failed to store alert event %u, rc = %d", ae->unique_id, rc);
         goto bind_fail;
     }
@@ -181,7 +181,7 @@ int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, int skip_filter)
     rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
 
 bind_fail:
-    if (unlikely(sqlite3_finalize(res_alert) != SQLITE_OK))
+    if (sqlite3_finalize(res_alert) != SQLITE_OK)
         error_report("Failed to reset statement in store alert event, rc = %d", rc);
 
     return 0;
@@ -245,16 +245,16 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
 #else
     int rc;
 
-    if (unlikely(!wc->alert_updates)) {
+    if (!wc->alert_updates) {
         netdata_log_access("ACLK STA [%s (%s)]: Ignoring alert push event, updates have been turned off for this node.", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
         return;
     }
 
     char *claim_id = get_agent_claimid();
-    if (unlikely(!claim_id))
+    if (!claim_id)
         return;
 
-    if (unlikely(!wc->host)) {
+    if (!wc->host) {
         freez(claim_id);
         return;
     }
@@ -280,12 +280,12 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
         BUFFER *sql_fix = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
         buffer_sprintf(sql_fix, TABLE_ACLK_ALERT, wc->uuid_str);
         rc = db_execute(db_meta, buffer_tostring(sql_fix));
-        if (unlikely(rc))
+        if (rc)
             error_report("Failed to create ACLK alert table for host %s", rrdhost_hostname(wc->host));
         else {
             buffer_flush(sql_fix);
             buffer_sprintf(sql_fix, INDEX_ACLK_ALERT, wc->uuid_str, wc->uuid_str);
-            if (unlikely(db_execute(db_meta, buffer_tostring(sql_fix))))
+            if (db_execute(db_meta, buffer_tostring(sql_fix)))
                 error_report("Failed to create ACLK alert table for host %s", rrdhost_hostname(wc->host));
         }
         buffer_free(sql_fix);
@@ -302,7 +302,7 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
     }
 
     rc = sqlite3_bind_blob(res, 1, &wc->host->host_uuid, sizeof(wc->host->host_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to bind host_id for pushing alert event.");
         sqlite3_finalize(res);
         buffer_free(sql);
@@ -399,7 +399,7 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
                             "WHERE date_submitted IS NULL AND sequence_id BETWEEN %" PRIu64 " AND %" PRIu64 ";",
                        wc->uuid_str, first_sequence_id, last_sequence_id);
 
-        if (unlikely(db_execute(db_meta, buffer_tostring(sql))))
+        if (db_execute(db_meta, buffer_tostring(sql)))
             error_report("Failed to mark ACLK alert entries as submitted for host %s", rrdhost_hostname(wc->host));
 
         // Mark to do one more check
@@ -418,7 +418,7 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
     }
 
     rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         error_report("Failed to finalize statement to send alert entries from the database, rc = %d", rc);
 
     freez(claim_id);
@@ -438,7 +438,7 @@ void aclk_push_alert_events_for_all_hosts(void)
         rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
 
         struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
-        if (likely(wc))
+        if (wc)
             aclk_push_alert_event(wc);
     }
     dfe_done(host);
@@ -455,7 +455,7 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
     rw_spinlock_write_lock(&host->health_log.spinlock);
 
     buffer_sprintf(sql, "delete from aclk_alert_%s; ", uuid_str);
-    if (unlikely(db_execute(db_meta, buffer_tostring(sql)))) {
+    if (db_execute(db_meta, buffer_tostring(sql))) {
         rw_spinlock_write_unlock(&host->health_log.spinlock);
         buffer_free(sql);
         return;
@@ -476,7 +476,7 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
     }
 
     rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to bind host_id for when trying to queue existing alerts.");
         sqlite3_finalize(res);
         rw_spinlock_write_unlock(&host->health_log.spinlock);
@@ -485,12 +485,12 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
     }
 
     rc = execute_insert(res);
-    if (unlikely(rc != SQLITE_DONE)) {
+    if (rc != SQLITE_DONE) {
         error_report("Failed to queue existing alerts, rc = %d", rc);
     }
 
     rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         error_report("Failed to finalize statement to queue existing alerts, rc = %d", rc);
 
     rw_spinlock_write_unlock(&host->health_log.spinlock);
@@ -501,12 +501,12 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
 
 void aclk_send_alarm_configuration(char *config_hash)
 {
-    if (unlikely(!config_hash))
+    if (!config_hash)
         return;
 
     struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *) localhost->aclk_sync_host_config;
 
-    if (unlikely(!wc))
+    if (!wc)
         return;
 
     netdata_log_access("ACLK REQ [%s (%s)]: Request to send alert config %s.", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A", config_hash);
@@ -531,14 +531,14 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
     struct aclk_sync_host_config *wc = NULL;
     RRDHOST *host = find_host_by_node_id(node_id);
 
-    if (unlikely(!host)) {
+    if (!host) {
         freez(config_hash);
         freez(node_id);
         return 1;
     }
 
     wc = (struct aclk_sync_host_config *)host->aclk_sync_host_config;
-    if (unlikely(!wc)) {
+    if (!wc) {
         freez(config_hash);
         freez(node_id);
         return 1;
@@ -555,7 +555,7 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
         return 1;
 
     rc = sqlite3_bind_blob(res, 1, &hash_uuid , sizeof(hash_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         goto bind_fail;
 
     struct aclk_alarm_configuration alarm_config;
@@ -624,7 +624,7 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
         p_alarm_config.cfg = alarm_config;
     }
 
-    if (likely(p_alarm_config.cfg_hash)) {
+    if (p_alarm_config.cfg_hash) {
         netdata_log_access("ACLK RES [%s (%s)]: Sent alert config %s.", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A", config_hash);
         aclk_send_provide_alarm_cfg(&p_alarm_config);
         freez(p_alarm_config.cfg_hash);
@@ -635,7 +635,7 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
 
 bind_fail:
     rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         error_report("Failed to reset statement when pushing alarm config hash, rc = %d", rc);
 
     freez(config_hash);
@@ -648,7 +648,7 @@ bind_fail:
 // Start streaming alerts
 void aclk_start_alert_streaming(char *node_id, bool resets)
 {
-    if (unlikely(!node_id))
+    if (!node_id)
         return;
 
     uuid_t node_uuid;
@@ -657,15 +657,15 @@ void aclk_start_alert_streaming(char *node_id, bool resets)
 
     RRDHOST *host = find_host_by_node_id(node_id);
 
-    if (unlikely(!host))
+    if (!host)
         return;
 
     struct aclk_sync_host_config *wc  = host->aclk_sync_host_config;
 
-    if (unlikely(!wc))
+    if (!wc)
         return;
 
-    if (unlikely(!host->health.health_enabled)) {
+    if (!host->health.health_enabled) {
         netdata_log_access("ACLK STA [%s (N/A)]: Ignoring request to stream alert state changes, health is disabled.", node_id);
         return;
     }
@@ -692,7 +692,7 @@ void sql_process_queue_removed_alerts_to_aclk(char *node_id)
     RRDHOST *host = find_host_by_node_id(node_id);
     freez(node_id);
 
-    if (unlikely(!host || !(wc = host->aclk_sync_host_config)))
+    if (!host || !(wc = host->aclk_sync_host_config))
         return;
 
     char sql[ACLK_SYNC_QUERY_SIZE * 2];
@@ -707,21 +707,21 @@ void sql_process_queue_removed_alerts_to_aclk(char *node_id)
     }
 
     rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         error_report("Failed to bind host_id for when trying to queue remvoed alerts.");
         sqlite3_finalize(res);
         return;
     }
 
     rc = execute_insert(res);
-    if (unlikely(rc != SQLITE_DONE)) {
+    if (rc != SQLITE_DONE) {
         sqlite3_finalize(res);
         error_report("Failed to queue removed alerts, rc = %d", rc);
         return;
     }
 
     rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         error_report("Failed to finalize statement to queue removed alerts, rc = %d", rc);
 
     netdata_log_access("ACLK STA [%s (%s)]: QUEUED REMOVED ALERTS", wc->node_id, rrdhost_hostname(wc->host));
@@ -732,7 +732,7 @@ void sql_process_queue_removed_alerts_to_aclk(char *node_id)
 
 void sql_queue_removed_alerts_to_aclk(RRDHOST *host)
 {
-    if (unlikely(!host->aclk_sync_host_config))
+    if (!host->aclk_sync_host_config)
         return;
 
     if (!claimed() || !host->node_id)
@@ -747,18 +747,18 @@ void sql_queue_removed_alerts_to_aclk(RRDHOST *host)
 void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id __maybe_unused, char *snapshot_uuid)
 {
     uuid_t node_uuid;
-    if (unlikely(!node_id || uuid_parse(node_id, node_uuid)))
+    if (!node_id || uuid_parse(node_id, node_uuid))
         return;
 
     RRDHOST *host = find_host_by_node_id(node_id);
-    if (unlikely(!host)) {
+    if (!host) {
         netdata_log_access("ACLK STA [%s (N/A)]: ACLK node id does not exist", node_id);
         return;
     }
 
     struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *)host->aclk_sync_host_config;
 
-    if (unlikely(!wc)) {
+    if (!wc) {
        netdata_log_access("ACLK STA [%s (N/A)]: ACLK node id does not exist", node_id);
        return;
     }
@@ -856,7 +856,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
 #ifdef ENABLE_ACLK
     RRDHOST *host = find_host_by_node_id(node_id);
 
-    if (unlikely(!host)) {
+    if (!host) {
         netdata_log_access("AC [%s (N/A)]: Node id not found", node_id);
         freez(node_id);
         return;
@@ -866,7 +866,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
     struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
 
     // we perhaps we don't need this for snapshots
-    if (unlikely(!wc->alert_updates)) {
+    if (!wc->alert_updates) {
         netdata_log_access(
             "ACLK STA [%s (%s)]: Ignoring alert snapshot event, updates have been turned off for this node.",
             wc->node_id,
@@ -874,11 +874,11 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
         return;
     }
 
-    if (unlikely(!wc->alerts_snapshot_uuid))
+    if (!wc->alerts_snapshot_uuid)
         return;
 
     char *claim_id = get_agent_claimid();
-    if (unlikely(!claim_id))
+    if (!claim_id)
         return;
 
     netdata_log_access("ACLK REQ [%s (%s)]: Sending alerts snapshot, snapshot_uuid %s", wc->node_id, rrdhost_hostname(wc->host), wc->alerts_snapshot_uuid);
@@ -892,10 +892,10 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
     ALARM_ENTRY *ae = host->health_log.alarms;
 
     for (; ae; ae = ae->next) {
-        if (likely(ae->updated_by_id))
+        if (ae->updated_by_id)
             continue;
 
-        if (unlikely(ae->new_status == RRDCALC_STATUS_UNINITIALIZED))
+        if (ae->new_status == RRDCALC_STATUS_UNINITIALIZED)
             continue;
 
         if (have_recent_alarm(host, ae->alarm_id, ae->unique_id))
@@ -924,10 +924,10 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
         alarm_snapshot_proto_ptr_t snapshot_proto = NULL;
 
         for (; ae; ae = ae->next) {
-            if (likely(ae->updated_by_id))
+            if (ae->updated_by_id)
                 continue;
 
-            if (unlikely(ae->new_status == RRDCALC_STATUS_UNINITIALIZED))
+            if (ae->new_status == RRDCALC_STATUS_UNINITIALIZED)
                 continue;
 
             if (have_recent_alarm(host, ae->alarm_id, ae->unique_id))
@@ -1027,7 +1027,7 @@ int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert
     }
 
     rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
+    if (rc != SQLITE_OK)
         error_report("Failed to finalize statement to get alert log status from the database, rc = %d", rc);
 
     return 0;
@@ -1035,17 +1035,17 @@ int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert
 
 void aclk_send_alarm_checkpoint(char *node_id, char *claim_id __maybe_unused)
 {
-    if (unlikely(!node_id))
+    if (!node_id)
         return;
 
     struct aclk_sync_host_config *wc = NULL;
     RRDHOST *host = find_host_by_node_id(node_id);
 
-    if (unlikely(!host))
+    if (!host)
         return;
 
     wc = (struct aclk_sync_host_config *)host->aclk_sync_host_config;
-    if (unlikely(!wc)) {
+    if (!wc) {
         netdata_log_access("ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT REQUEST RECEIVED FOR INVALID NODE", node_id);
         return;
     }
@@ -1078,7 +1078,7 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
 {
 #ifdef ENABLE_ACLK
     struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
-    if (unlikely(!wc)) {
+    if (!wc) {
         netdata_log_access("ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT REQUEST RECEIVED FOR INVALID NODE", rrdhost_hostname(host));
         return;
     }
@@ -1096,7 +1096,7 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
 
     active_alerts_t *active_alerts = callocz(BATCH_ALLOCATED, sizeof(active_alerts_t));
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
-        if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+        if(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec)
             continue;
 
         if (rc->status == RRDCALC_STATUS_WARNING ||

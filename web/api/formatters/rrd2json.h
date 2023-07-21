@@ -87,12 +87,12 @@ int rrdset2value_api_v1(
 );
 
 static inline bool rrdr_dimension_should_be_exposed(RRDR_DIMENSION_FLAGS rrdr_dim_flags, RRDR_OPTIONS options) {
-    if(unlikely((options & RRDR_OPTION_RETURN_RAW) && (rrdr_dim_flags & RRDR_DIMENSION_QUERIED)))
+    if((options & RRDR_OPTION_RETURN_RAW) && (rrdr_dim_flags & RRDR_DIMENSION_QUERIED))
         return true;
 
-    if(unlikely(rrdr_dim_flags & RRDR_DIMENSION_HIDDEN)) return false;
-    if(unlikely(!(rrdr_dim_flags & RRDR_DIMENSION_QUERIED))) return false;
-    if(unlikely((options & RRDR_OPTION_NONZERO) && !(rrdr_dim_flags & RRDR_DIMENSION_NONZERO))) return false;
+    if(rrdr_dim_flags & RRDR_DIMENSION_HIDDEN) return false;
+    if(!(rrdr_dim_flags & RRDR_DIMENSION_QUERIED)) return false;
+    if((options & RRDR_OPTION_NONZERO) && !(rrdr_dim_flags & RRDR_DIMENSION_NONZERO)) return false;
 
     return true;
 }

@@ -445,7 +445,7 @@ static void ebpf_update_swap_cgroup(int maps_per_core)
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_publish_swap_t *out = &pids->swap;
-            if (likely(swap_pid) && swap_pid[pid]) {
+            if (swap_pid && swap_pid[pid]) {
                 netdata_publish_swap_t *in = swap_pid[pid];
 
                 memcpy(out, in, sizeof(netdata_publish_swap_t));
@@ -576,14 +576,14 @@ void ebpf_swap_send_apps_data(struct ebpf_target *root)
 {
     struct ebpf_target *w;
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             ebpf_swap_sum_pids(&w->swap, w->root_pid);
         }
     }
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_MEM_SWAP_READ_CHART);
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             write_chart_dimension(w->name, (long long) w->swap.read);
         }
     }
@@ -591,7 +591,7 @@ void ebpf_swap_send_apps_data(struct ebpf_target *root)
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_MEM_SWAP_WRITE_CHART);
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
+        if (w->exposed && w->processes) {
             write_chart_dimension(w->name, (long long) w->swap.write);
         }
     }
@@ -634,7 +634,7 @@ static void ebpf_send_systemd_swap_charts()
     ebpf_cgroup_target_t *ect;
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_MEM_SWAP_READ_CHART);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+        if (ect->systemd && ect->updated) {
             write_chart_dimension(ect->name, (long long) ect->publish_systemd_swap.read);
         }
     }
@@ -642,7 +642,7 @@ static void ebpf_send_systemd_swap_charts()
 
     write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_MEM_SWAP_WRITE_CHART);
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+        if (ect->systemd && ect->updated) {
             write_chart_dimension(ect->name, (long long) ect->publish_systemd_swap.write);
         }
     }

@@ -43,7 +43,7 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
 
     time_t now = now_realtime_sec();
 
-    if(unlikely(!custom_dashboard_info_js_filename))
+    if(!custom_dashboard_info_js_filename)
         custom_dashboard_info_js_filename = config_get(CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
 
     buffer_sprintf(wb, "{\n"
@@ -105,7 +105,7 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
                    , rrdhost_hosts_available()
     );
 
-    if(unlikely(rrdhost_hosts_available() > 1)) {
+    if(rrdhost_hosts_available() > 1) {
         rrd_rdlock();
 
         size_t found = 0;

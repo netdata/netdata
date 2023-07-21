@@ -79,7 +79,7 @@ rrddim_metric_get(STORAGE_INSTANCE *db_instance __maybe_unused, uuid_t *uuid) {
     struct mem_metric_handle *mh = NULL;
     netdata_rwlock_rdlock(&rrddim_JudyHS_rwlock);
     Pvoid_t *PValue = JudyHSGet(rrddim_JudyHS_array, uuid, sizeof(uuid_t));
-    if (likely(NULL != PValue)) {
+    if (NULL != PValue) {
         mh = *PValue;
         if(__atomic_add_fetch(&mh->refcount, 1, __ATOMIC_RELAXED) <= 0)
             mh = NULL;
@@ -194,7 +194,7 @@ static inline void rrddim_fill_the_gap(STORAGE_COLLECT_HANDLE *collection_handle
         for(c = 0; c < entries && now_store_s <= now_collect_s ; now_store_s += update_every_s, c++) {
             rd->db.data[current_entry++] = empty;
 
-            if(unlikely(current_entry >= entries))
+            if(current_entry >= entries)
                 current_entry = 0;
         }
         mh->counter += c;
@@ -221,10 +221,10 @@ void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *collection_handle,
     internal_fatal(ch->rd != mh->rd, "RRDDIM: dimensions do not match");
     check_metric_handle_from_rrddim(mh);
 
-    if(unlikely(point_in_time_s <= mh->last_updated_s))
+    if(point_in_time_s <= mh->last_updated_s)
         return;
 
-    if(unlikely(mh->last_updated_s && point_in_time_s - mh->update_every_s > mh->last_updated_s))
+    if(mh->last_updated_s && point_in_time_s - mh->update_every_s > mh->last_updated_s)
         rrddim_fill_the_gap(collection_handle, point_in_time_s);
 
     rd->db.data[mh->current_entry] = pack_storage_number(n, flags);
@@ -282,7 +282,7 @@ static inline size_t rrddim_time2slot(STORAGE_METRIC_HANDLE *db_metric_handle, t
         }
     }
 
-    if(unlikely(ret >= entries)) {
+    if(ret >= entries) {
         netdata_log_error("INTERNAL ERROR: rrddim_time2slot() on %s returns values outside entries", rrddim_name(rd));
         ret = entries - 1;
     }
@@ -313,14 +313,14 @@ static inline time_t rrddim_slot2time(STORAGE_METRIC_HANDLE *db_metric_handle, s
     else
         ret = last_entry_s - (time_t)(update_every * (last_slot - slot));
 
-    if(unlikely(ret < first_entry_s)) {
+    if(ret < first_entry_s) {
         netdata_log_error("INTERNAL ERROR: rrddim_slot2time() on dimension '%s' of chart '%s' returned time (%ld) too far in the past (before first_entry_s %ld) for slot %zu",
               rrddim_name(rd), rrdset_id(rd->rrdset), ret, first_entry_s, slot);
 
         ret = first_entry_s;
     }
 
-    if(unlikely(ret > last_entry_s)) {
+    if(ret > last_entry_s) {
         netdata_log_error("INTERNAL ERROR: rrddim_slot2time() on dimension '%s' of chart '%s' returned time (%ld) too far into the future (after last_entry_s %ld) for slot %zu",
               rrddim_name(rd), rrdset_id(rd->rrdset), ret, last_entry_s, slot);
 
@@ -380,18 +380,18 @@ STORAGE_POINT rrddim_query_next_metric(struct storage_engine_query_handle *handl
     sp.start_time_s = this_timestamp - h->dt;
     sp.end_time_s = this_timestamp;
 
-    if(unlikely(this_timestamp < h->slot_timestamp)) {
+    if(this_timestamp < h->slot_timestamp) {
         storage_point_empty(sp, sp.start_time_s, sp.end_time_s);
         return sp;
     }
 
-    if(unlikely(this_timestamp > h->last_timestamp)) {
+    if(this_timestamp > h->last_timestamp) {
         storage_point_empty(sp, sp.start_time_s, sp.end_time_s);
         return sp;
     }
 
     storage_number n = rd->db.data[slot++];
-    if(unlikely(slot >= entries)) slot = 0;
+    if(slot >= entries) slot = 0;
 
     h->slot = slot;
     h->slot_timestamp += h->dt;

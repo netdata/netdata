@@ -19,7 +19,7 @@ void rrdr2ssv(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, const char *prefix, con
         int all_values_are_null = 0;
         NETDATA_DOUBLE v = rrdr2value(r, i, options, &all_values_are_null, NULL);
 
-        if(likely(i != start)) {
+        if(i != start) {
             if(r->view.min > v) r->view.min = v;
             if(r->view.max < v) r->view.max = v;
         }
@@ -28,7 +28,7 @@ void rrdr2ssv(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, const char *prefix, con
             r->view.max = v;
         }
 
-        if(likely(i != start))
+        if(i != start)
             buffer_strcat(wb, separator);
 
         if(all_values_are_null) {

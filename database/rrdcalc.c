@@ -67,7 +67,7 @@ uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint3
     // re-use old IDs, by looking them up in the alarm log
     ALARM_ENTRY *ae = NULL;
     for(ae = host->health_log.alarms; ae ;ae = ae->next) {
-        if(unlikely(name == ae->name && chart == ae->chart && !uuid_memcmp(&ae->config_hash_id, config_hash_id))) {
+        if(name == ae->name && chart == ae->chart && !uuid_memcmp(&ae->config_hash_id, config_hash_id)) {
             if(next_event_id) *next_event_id = ae->alarm_event_id + 1;
             break;
         }
@@ -82,7 +82,7 @@ uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint3
         alarm_id = sql_get_alarm_id(host, chart, name, next_event_id, config_hash_id);
 
         if (!alarm_id) {
-            if (unlikely(!host->health_log.next_alarm_id))
+            if (!host->health_log.next_alarm_id)
                 host->health_log.next_alarm_id = (uint32_t)now_realtime_sec();
 
             alarm_id = host->health_log.next_alarm_id++;
@@ -130,7 +130,7 @@ static STRING *rrdcalc_replace_variables_with_rrdset_labels(const char *line, RR
             strcpy(label_val, var+RRDCALC_VAR_LABEL_LEN);
             label_val[i - RRDCALC_VAR_LABEL_LEN - 1] = '\0';
 
-            if(likely(rc->rrdset && rc->rrdset->rrdlabels)) {
+            if(rc->rrdset && rc->rrdset->rrdlabels) {
                 rrdlabels_get_value_strdup_or_null(rc->rrdset->rrdlabels, &lbl_value, label_val);
                 if (lbl_value) {
                     char *buf = find_and_replace(temp, var, lbl_value, m);
@@ -327,7 +327,7 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
 
     time_t now = now_realtime_sec();
 
-    if (likely(rc->status != RRDCALC_STATUS_REMOVED)) {
+    if (rc->status != RRDCALC_STATUS_REMOVED) {
         ALARM_ENTRY *ae = health_create_alarm_entry(
             host,
             rc->id,
@@ -421,7 +421,7 @@ void rrdcalc_link_matching_alerts_to_rrdset(RRDSET *st) {
         if(rc->rrdset)
             continue;
 
-        if(unlikely(rrdcalc_check_if_it_matches_rrdset(rc, st)))
+        if(rrdcalc_check_if_it_matches_rrdset(rc, st))
             rrdcalc_link_to_rrdset(st, rc);
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
@@ -430,7 +430,7 @@ void rrdcalc_link_matching_alerts_to_rrdset(RRDSET *st) {
 static inline int rrdcalc_check_and_link_rrdset_callback(RRDSET *st, void *rrdcalc) {
     RRDCALC *rc = rrdcalc;
 
-    if(unlikely(rrdcalc_check_if_it_matches_rrdset(rc, st))) {
+    if(rrdcalc_check_if_it_matches_rrdset(rc, st)) {
         rrdcalc_link_to_rrdset(st, rc);
         return -1;
     }
@@ -622,7 +622,7 @@ static void rrdcalc_rrdhost_react_callback(const DICTIONARY_ITEM *item __maybe_u
 // RRDCALC rrdhost index management - destructor
 
 static void rrdcalc_free_internals(RRDCALC *rc) {
-    if(unlikely(!rc)) return;
+    if(!rc) return;
 
     expression_free(rc->calculation);
     expression_free(rc->warning);
@@ -658,7 +658,7 @@ static void rrdcalc_rrdhost_delete_callback(const DICTIONARY_ITEM *item __maybe_
     RRDCALC *rc = rrdcalc;
     //RRDHOST *host = rrdhost;
 
-    if(unlikely(rc->rrdset))
+    if(rc->rrdset)
         rrdcalc_unlink_from_rrdset(rc, false);
 
     // any destruction actions that require other locks
@@ -746,7 +746,7 @@ int rrdcalc_add_from_config(RRDHOST *host, RRDCALC *rc) {
         // since we loaded this config from configuration, we need to check if we can link it to alarms
         RRDSET *st;
         rrdset_foreach_read(st, host) {
-            if (unlikely(rrdcalc_check_and_link_rrdset_callback(st, rc) == -1))
+            if (rrdcalc_check_and_link_rrdset_callback(st, rc) == -1)
                 break;
         }
         rrdset_foreach_done(st);
@@ -799,7 +799,7 @@ void rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(RRDHOST *host
 void rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts() {
     RRDHOST *host;
     dfe_start_reentrant(rrdhost_root_index, host) {
-        if (unlikely(!host->health.health_enabled))
+        if (!host->health.health_enabled)
             continue;
 
         if (host->rrdlabels)

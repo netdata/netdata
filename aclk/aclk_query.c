@@ -344,7 +344,7 @@ void *aclk_query_main_thread(void *ptr)
 
         worker_is_idle();
         QUERY_THREAD_LOCK;
-        if (unlikely(pthread_cond_wait(&query_cond_wait, &query_lock_wait)))
+        if (pthread_cond_wait(&query_cond_wait, &query_lock_wait))
             sleep_usec(USEC_PER_SEC * 1);
         QUERY_THREAD_UNLOCK;
     }
@@ -364,7 +364,7 @@ void aclk_query_threads_start(struct aclk_query_threads *query_threads, mqtt_wss
         query_threads->thread_list[i].idx = i; //thread needs to know its index for statistics
         query_threads->thread_list[i].client = client;
 
-        if(unlikely(snprintfz(thread_name, TASK_LEN_MAX, "ACLK_QRY[%d]", i) < 0))
+        if(snprintfz(thread_name, TASK_LEN_MAX, "ACLK_QRY[%d]", i) < 0)
             netdata_log_error("snprintf encoding error");
         netdata_thread_create(
             &query_threads->thread_list[i].thread, thread_name, NETDATA_THREAD_OPTION_JOINABLE, aclk_query_main_thread,

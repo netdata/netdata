@@ -78,7 +78,7 @@ aclk_query_t aclk_queue_pop(void)
     }
 
     aclk_query_queue.head = ret->next;
-    if (unlikely(!aclk_query_queue.head))
+    if (!aclk_query_queue.head)
         aclk_query_queue.tail = aclk_query_queue.head;
     ACLK_QUEUE_UNLOCK;
 

@@ -70,12 +70,12 @@ int mount_point_cleanup(const char *name, void *entry, int slow) {
     if (slow != mp->slow)
         return 0;
 
-    if(likely(mp->updated)) {
+    if(mp->updated) {
         mp->updated = 0;
         return 0;
     }
 
-    if(likely(cleanup_mount_points && mp->collected)) {
+    if(cleanup_mount_points && mp->collected) {
         mp->collected = 0;
         mp->updated = 0;
         mp->shown_error = 0;
@@ -178,10 +178,10 @@ static void calculate_values_and_show_charts(
     fsblkcnt_t btotal         = buff_statvfs->f_blocks;
     fsblkcnt_t bavail_root    = buff_statvfs->f_bfree;
     fsblkcnt_t breserved_root = bavail_root - bavail;
-    fsblkcnt_t bused = likely(btotal >= bavail_root) ? btotal - bavail_root : bavail_root - btotal;
+    fsblkcnt_t bused = btotal >= bavail_root ? btotal - bavail_root : bavail_root - btotal;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(btotal != bavail + breserved_root + bused))
+    if(btotal != bavail + breserved_root + bused)
         collector_error("DISKSPACE: disk block statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", mi->mount_point, disk, (unsigned long long)btotal, (unsigned long long)bavail, (unsigned long long)breserved_root, (unsigned long long)bused);
 #endif
 
@@ -200,7 +200,7 @@ static void calculate_values_and_show_charts(
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(btotal != bavail + breserved_root + bused))
+    if(btotal != bavail + breserved_root + bused)
         collector_error("DISKSPACE: disk inode statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", mi->mount_point, disk, (unsigned long long)ftotal, (unsigned long long)favail, (unsigned long long)freserved_root, (unsigned long long)fused);
 #endif
 
@@ -209,10 +209,10 @@ static void calculate_values_and_show_charts(
     if(m->do_space == CONFIG_BOOLEAN_YES || (m->do_space == CONFIG_BOOLEAN_AUTO &&
                                              (bavail || breserved_root || bused ||
                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-        if(unlikely(!m->st_space) || m->st_space->update_every != update_every) {
+        if(!m->st_space || m->st_space->update_every != update_every) {
             m->do_space = CONFIG_BOOLEAN_YES;
             m->st_space = rrdset_find_active_bytype_localhost("disk_space", disk);
-            if(unlikely(!m->st_space || m->st_space->update_every != update_every)) {
+            if(!m->st_space || m->st_space->update_every != update_every) {
                 char title[4096 + 1];
                 snprintfz(title, 4096, "Disk Space Usage");
                 m->st_space = rrdset_create_localhost(
@@ -249,10 +249,10 @@ static void calculate_values_and_show_charts(
     if(m->do_inodes == CONFIG_BOOLEAN_YES || (m->do_inodes == CONFIG_BOOLEAN_AUTO &&
                                               (favail || freserved_root || fused ||
                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-        if(unlikely(!m->st_inodes) || m->st_inodes->update_every != update_every) {
+        if(!m->st_inodes || m->st_inodes->update_every != update_every) {
             m->do_inodes = CONFIG_BOOLEAN_YES;
             m->st_inodes = rrdset_find_active_bytype_localhost("disk_inodes", disk);
-            if(unlikely(!m->st_inodes) || m->st_inodes->update_every != update_every) {
+            if(!m->st_inodes || m->st_inodes->update_every != update_every) {
                 char title[4096 + 1];
                 snprintfz(title, 4096, "Disk Files (inodes) Usage");
                 m->st_inodes = rrdset_create_localhost(
@@ -286,7 +286,7 @@ static void calculate_values_and_show_charts(
         rendered++;
     }
 
-    if(likely(rendered))
+    if(rendered)
         m->collected++;
 }
 
@@ -301,7 +301,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
     int do_space, do_inodes;
 
-    if(unlikely(!dict_mountpoints)) {
+    if(!dict_mountpoints) {
         SIMPLE_PREFIX_MODE mode = SIMPLE_PATTERN_EXACT;
 
         if(config_move("plugin:proc:/proc/diskstats", "exclude space metrics on paths", CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths") != -1) {
@@ -331,7 +331,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     }
 
     struct mount_point_metadata *m = dictionary_get(dict_mountpoints, mi->mount_point);
-    if(unlikely(!m)) {
+    if(!m) {
         int slow = 0;
         char var_name[4096 + 1];
         snprintfz(var_name, 4096, "plugin:proc:diskspace:%s", mi->mount_point);
@@ -339,16 +339,16 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         int def_space = config_get_boolean_ondemand(CONFIG_SECTION_DISKSPACE, "space usage for all disks", CONFIG_BOOLEAN_AUTO);
         int def_inodes = config_get_boolean_ondemand(CONFIG_SECTION_DISKSPACE, "inodes usage for all disks", CONFIG_BOOLEAN_AUTO);
 
-        if(unlikely(simple_pattern_matches(excluded_mountpoints, mi->mount_point))) {
+        if(simple_pattern_matches(excluded_mountpoints, mi->mount_point)) {
             def_space = CONFIG_BOOLEAN_NO;
             def_inodes = CONFIG_BOOLEAN_NO;
         }
 
-        if(unlikely(simple_pattern_matches(excluded_filesystems, mi->filesystem))) {
+        if(simple_pattern_matches(excluded_filesystems, mi->filesystem)) {
             def_space = CONFIG_BOOLEAN_NO;
             def_inodes = CONFIG_BOOLEAN_NO;
         }
-        if (unlikely(simple_pattern_matches(excluded_filesystems_inodes, mi->filesystem))) {
+        if (simple_pattern_matches(excluded_filesystems_inodes, mi->filesystem)) {
             def_inodes = CONFIG_BOOLEAN_NO;
         }
 
@@ -425,15 +425,15 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
     m->updated = 1;
 
-    if(unlikely(m->do_space == CONFIG_BOOLEAN_NO && m->do_inodes == CONFIG_BOOLEAN_NO))
+    if(m->do_space == CONFIG_BOOLEAN_NO && m->do_inodes == CONFIG_BOOLEAN_NO)
         return;
 
-    if (unlikely(
+    if (
             mi->flags & MOUNTINFO_READONLY &&
             !(mi->flags & MOUNTINFO_IS_IN_SYSD_PROTECTED_LIST) &&
             !m->collected &&
             m->do_space != CONFIG_BOOLEAN_YES &&
-            m->do_inodes != CONFIG_BOOLEAN_YES))
+            m->do_inodes != CONFIG_BOOLEAN_YES)
         return;
 
     usec_t start_time = now_monotonic_high_precision_usec();
@@ -540,7 +540,7 @@ void *diskspace_slow_worker(void *ptr)
         if (!dict_mountpoints)
             continue;
 
-        if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
+        if(!service_running(SERVICE_COLLECTORS)) break;
 
         // --------------------------------------------------------------------------
         // disk space metrics
@@ -557,10 +557,10 @@ void *diskspace_slow_worker(void *ptr)
         for(bmi = slow_mountinfo_root; bmi; bmi = bmi->next) {
             do_slow_disk_space_stats(bmi, slow_update_every);
             
-            if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
+            if(!service_running(SERVICE_COLLECTORS)) break;
         }
 
-        if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
+        if(!service_running(SERVICE_COLLECTORS)) break;
 
         worker_is_busy(WORKER_JOB_SLOW_CLEANUP);
 
@@ -654,7 +654,7 @@ void *diskspace_main(void *ptr) {
         worker_is_idle();
         /* usec_t hb_dt = */ heartbeat_next(&hb, step);
 
-        if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
+        if(!service_running(SERVICE_COLLECTORS)) break;
 
         // --------------------------------------------------------------------------
         // this is smart enough not to reload it every time
@@ -671,7 +671,7 @@ void *diskspace_main(void *ptr) {
 
         struct mountinfo *mi;
         for(mi = disk_mountinfo_root; mi; mi = mi->next) {
-            if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY | MOUNTINFO_IS_BIND)))
+            if(mi->flags & (MOUNTINFO_IS_DUMMY | MOUNTINFO_IS_BIND))
                 continue;
 
             // exclude mounts made by ProtectHome and ProtectSystem systemd hardening options
@@ -681,11 +681,11 @@ void *diskspace_main(void *ptr) {
 
             worker_is_busy(WORKER_JOB_MOUNTPOINT);
             do_disk_space_stats(mi, update_every);
-            if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
+            if(!service_running(SERVICE_COLLECTORS)) break;
         }
         netdata_mutex_unlock(&slow_mountinfo_mutex);
 
-        if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
+        if(!service_running(SERVICE_COLLECTORS)) break;
 
         if(dict_mountpoints) {
             worker_is_busy(WORKER_JOB_CLEANUP);

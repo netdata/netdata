@@ -542,14 +542,14 @@ static int ebpf_read_local_partitions()
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/proc/self/mountinfo", netdata_configured_host_prefix);
     procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
-    if(unlikely(!ff)) {
+    if(!ff) {
         snprintfz(filename, FILENAME_MAX, "%s/proc/1/mountinfo", netdata_configured_host_prefix);
         ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff)) return 0;
+        if(!ff) return 0;
     }
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff))
+    if(!ff)
         return 0;
 
     int count = 0;

@@ -1263,7 +1263,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
     socklen_t addrlen = sizeof(sadr);
 
     int nfd = accept4(fd, (struct sockaddr *)&sadr, &addrlen, flags);
-    if (likely(nfd >= 0)) {
+    if (nfd >= 0) {
         if (getnameinfo((struct sockaddr *)&sadr, addrlen, client_ip, (socklen_t)ipsize,
                         client_port, (socklen_t)portsize, NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
             netdata_log_error("LISTENER: cannot getnameinfo() on received client connection.");
@@ -1346,7 +1346,7 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
 ) {
     netdata_log_debug(D_POLLFD, "POLLFD: ADD: request to add fd %d, slots = %zu, used = %zu, min = %zu, max = %zu, next free = %zd", fd, p->slots, p->used, p->min, p->max, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
 
-    if(unlikely(fd < 0)) return NULL;
+    if(fd < 0) return NULL;
 
     //if(p->limit && p->used >= p->limit) {
     //    netdata_log_info("Max sockets limit reached (%zu sockets), dropping connection", p->used);
@@ -1354,7 +1354,7 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
     //    return NULL;
     //}
 
-    if(unlikely(!p->first_free)) {
+    if(!p->first_free) {
         size_t new_slots = p->slots + POLL_FDS_INCREASE_STEP;
         netdata_log_debug(D_POLLFD, "POLLFD: ADD: increasing size (current = %zu, new = %zu, used = %zu, min = %zu, max = %zu)", p->slots, new_slots, p->used, p->min, p->max);
 
@@ -1425,7 +1425,7 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
 
     netdata_thread_disable_cancelability();
     p->used++;
-    if(unlikely(pi->slot > p->max))
+    if(pi->slot > p->max)
         p->max = pi->slot;
 
     if(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET) {
@@ -1448,14 +1448,14 @@ inline void poll_close_fd(POLLINFO *pi) {
     struct pollfd *pf = &p->fds[pi->slot];
     netdata_log_debug(D_POLLFD, "POLLFD: DEL: request to clear slot %zu (fd %d), old next free was %zd", pi->slot, pf->fd, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
 
-    if(unlikely(pf->fd == -1)) return;
+    if(pf->fd == -1) return;
 
     netdata_thread_disable_cancelability();
 
     if(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET) {
         pi->del_callback(pi);
 
-        if(likely(!(pi->flags & POLLINFO_FLAG_DONT_CLOSE))) {
+        if(!(pi->flags & POLLINFO_FLAG_DONT_CLOSE)) {
             if(close(pf->fd) == -1)
                 netdata_log_error("Failed to close() poll_events() socket %d", pf->fd);
         }
@@ -1487,11 +1487,11 @@ inline void poll_close_fd(POLLINFO *pi) {
     p->first_free = pi;
 
     p->used--;
-    if(unlikely(p->max == pi->slot)) {
+    if(p->max == pi->slot) {
         p->max = p->min;
         ssize_t i;
         for(i = (ssize_t)pi->slot; i > (ssize_t)p->min ;i--) {
-            if (unlikely(p->fds[i].fd != -1)) {
+            if (p->fds[i].fd != -1) {
                 p->max = (size_t)i;
                 break;
             }
@@ -1594,7 +1594,7 @@ static inline int poll_process_send(POLLJOB *p, POLLINFO *pi, struct pollfd *pf,
     // the callback may manipulate the socket list and our pf and pi pointers may be invalid after that call
     size_t slot = pi->slot;
 
-    if (unlikely(pi->snd_callback(pi, &pf->events) == -1))
+    if (pi->snd_callback(pi, &pf->events) == -1)
         poll_close_fd(&p->inf[slot]);
 
     // IMPORTANT:
@@ -1662,17 +1662,17 @@ static int poll_process_new_tcp_connection(POLLJOB *p, POLLINFO *pi, struct poll
         p->access_list, p->allow_dns
         );
 
-    if (unlikely(nfd < 0)) {
+    if (nfd < 0) {
         // accept failed
 
         netdata_log_debug(D_POLLFD, "POLLFD: LISTENER: accept4() slot %zu (fd %d) failed.", pi->slot, pf->fd);
 
-        if(unlikely(errno == EMFILE)) {
+        if(errno == EMFILE) {
             error_limit_static_global_var(erl, 10, 1000);
             error_limit(&erl, "POLLFD: LISTENER: too many open files - used by this thread %zu, max for this thread %zu",
                       p->used, p->limit);
         }
-        else if(unlikely(errno != EWOULDBLOCK && errno != EAGAIN))
+        else if(errno != EWOULDBLOCK && errno != EAGAIN)
             netdata_log_error("POLLFD: LISTENER: accept() failed.");
 
     }
@@ -1785,7 +1785,7 @@ void poll_events(LISTEN_SOCKETS *sockets
     usec_t now_usec = 0, next_timer_usec = 0, last_timer_usec = 0;
     (void)last_timer_usec;
 
-    if(unlikely(timer_usec)) {
+    if(timer_usec) {
         now_usec = now_boottime_usec();
         next_timer_usec = now_usec - (now_usec % timer_usec) + timer_usec;
     }
@@ -1793,10 +1793,10 @@ void poll_events(LISTEN_SOCKETS *sockets
     netdata_thread_cleanup_push(poll_events_cleanup, &p);
 
     while(!check_to_stop_callback()) {
-        if(unlikely(timer_usec)) {
+        if(timer_usec) {
             now_usec = now_boottime_usec();
 
-            if(unlikely(timer_usec && now_usec >= next_timer_usec)) {
+            if(timer_usec && now_usec >= next_timer_usec) {
                 netdata_log_debug(D_POLLFD, "Calling timer callback after %zu usec", (size_t)(now_usec - last_timer_usec));
                 last_timer_usec = now_usec;
                 p.tmr_callback(p.timer_data);
@@ -1826,11 +1826,11 @@ void poll_events(LISTEN_SOCKETS *sockets
         retval = poll(p.fds, p.max + 1, timeout_ms);
         time_t now = now_boottime_sec();
 
-        if(unlikely(retval == -1)) {
+        if(retval == -1) {
             netdata_log_error("POLLFD: LISTENER: poll() failed while waiting on %zu sockets.", p.max + 1);
             break;
         }
-        else if(unlikely(!retval)) {
+        else if(!retval) {
             netdata_log_debug(D_POLLFD, "POLLFD: LISTENER: poll() timeout.");
         }
         else {
@@ -1851,21 +1851,21 @@ void poll_events(LISTEN_SOCKETS *sockets
                 pf = &p.fds[i];
                 revents = pf->revents;
 
-                if(unlikely(revents == 0 || pf->fd == -1))
+                if(revents == 0 || pf->fd == -1)
                     continue;
 
-                if (unlikely(revents & (POLLERR|POLLHUP|POLLNVAL))) {
+                if (revents & (POLLERR|POLLHUP|POLLNVAL)) {
                     // something is wrong to one of our sockets
 
                     pf->revents = 0;
                     processed += poll_process_error(pi, pf, revents);
                 }
-                else if (likely(revents & POLLOUT)) {
+                else if (revents & POLLOUT) {
                     // a client is ready to receive data
 
                     sends[sends_max++] = i;
                 }
-                else if (likely(revents & (POLLIN|POLLPRI))) {
+                else if (revents & (POLLIN|POLLPRI)) {
                     if (pi->flags & POLLINFO_FLAG_CLIENT_SOCKET) {
                         // a client sent data to us
 
@@ -1953,15 +1953,15 @@ void poll_events(LISTEN_SOCKETS *sockets
             }
         }
 
-        if(unlikely(p.checks_every > 0 && now - last_check > p.checks_every)) {
+        if(p.checks_every > 0 && now - last_check > p.checks_every) {
             last_check = now;
 
             // cleanup old sockets
             for(i = 0; i <= p.max; i++) {
                 POLLINFO *pi = &p.inf[i];
 
-                if(likely(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET)) {
-                    if (unlikely(pi->send_count == 0 && p.complete_request_timeout > 0 && (now - pi->connected_t) >= p.complete_request_timeout)) {
+                if(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET) {
+                    if (pi->send_count == 0 && p.complete_request_timeout > 0 && (now - pi->connected_t) >= p.complete_request_timeout) {
                         netdata_log_info("POLLFD: LISTENER: client slot %zu (fd %d) from %s port %s has not sent a complete request in %zu seconds - closing it. "
                               , i
                               , pi->fd
@@ -1971,7 +1971,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                         );
                         poll_close_fd(pi);
                     }
-                    else if(unlikely(pi->recv_count && p.idle_timeout > 0 && now - ((pi->last_received_t > pi->last_sent_t) ? pi->last_received_t : pi->last_sent_t) >= p.idle_timeout )) {
+                    else if(pi->recv_count && p.idle_timeout > 0 && now - ((pi->last_received_t > pi->last_sent_t) ? pi->last_received_t : pi->last_sent_t) >= p.idle_timeout ) {
                         netdata_log_info("POLLFD: LISTENER: client slot %zu (fd %d) from %s port %s is idle for more than %zu seconds - closing it. "
                               , i
                               , pi->fd

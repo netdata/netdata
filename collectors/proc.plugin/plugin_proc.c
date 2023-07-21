@@ -104,16 +104,16 @@ bool inside_lxc_container = false;
 static bool is_lxcfs_proc_mounted() {
     procfile *ff = NULL;
 
-    if (unlikely(!ff)) {
+    if (!ff) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "/proc/self/mounts");
         ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
-        if (unlikely(!ff))
+        if (!ff)
             return false;
     }
 
     ff = procfile_readall(ff);
-    if (unlikely(!ff))
+    if (!ff)
         return false;
 
     unsigned long l, lines = procfile_lines(ff);
@@ -170,15 +170,15 @@ void *proc_main(void *ptr)
         worker_is_idle();
         usec_t hb_dt = heartbeat_next(&hb, step);
 
-        if (unlikely(!service_running(SERVICE_COLLECTORS)))
+        if (!service_running(SERVICE_COLLECTORS))
             break;
 
         for (i = 0; proc_modules[i].name; i++) {
-            if (unlikely(!service_running(SERVICE_COLLECTORS)))
+            if (!service_running(SERVICE_COLLECTORS))
                 break;
 
             struct proc_module *pm = &proc_modules[i];
-            if (unlikely(!pm->enabled))
+            if (!pm->enabled)
                 continue;
 
             netdata_log_debug(D_PROCNETDEV_LOOP, "PROC calling %s.", pm->name);

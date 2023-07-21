@@ -95,17 +95,17 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
     // the latest point will be reported the next time
     before -= update_every;
 
-    if (unlikely(after > before))
+    if (after > before)
         // this can happen when update_every > before - after
         after = before;
 
-    if (unlikely(after < first_t))
+    if (after < first_t)
         after = first_t;
 
-    if (unlikely(before > last_t))
+    if (before > last_t)
         before = last_t;
 
-    if (unlikely(before < first_t || after > last_t)) {
+    if (before < first_t || after > last_t) {
         // the chart has not been updated in the wanted timeframe
         netdata_log_debug(
             D_EXPORTING,
@@ -130,7 +130,7 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
         STORAGE_POINT sp = storage_engine_query_next_metric(&handle);
         points_read++;
 
-        if (unlikely(storage_point_is_gap(sp))) {
+        if (storage_point_is_gap(sp)) {
             // not collected
             continue;
         }
@@ -141,7 +141,7 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
     storage_engine_query_finalize(&handle);
     global_statistics_exporters_query_completed(points_read);
 
-    if (unlikely(!counter)) {
+    if (!counter) {
         netdata_log_debug(
             D_EXPORTING,
             "EXPORTING: %s.%s.%s: no values stored in database for range %lu to %lu",
@@ -153,7 +153,7 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
         return NAN;
     }
 
-    if (unlikely(EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_SUM))
+    if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_SUM)
         return sum;
 
     return sum / (NETDATA_DOUBLE)counter;

@@ -48,10 +48,10 @@ void rrdpush_compressor_destroy(struct compressor_state *state) {
  * or 0 in case of error
  */
 size_t rrdpush_compress(struct compressor_state *state, const char *data, size_t size, char **out) {
-    if(unlikely(!state || !size || !out))
+    if(!state || !size || !out)
         return 0;
 
-    if(unlikely(size > COMPRESSION_MAX_MSG_SIZE)) {
+    if(size > COMPRESSION_MAX_MSG_SIZE) {
         netdata_log_error("RRDPUSH COMPRESS: Compression Failed - Message size %lu above compression buffer limit: %d",
               (long unsigned int)size, COMPRESSION_MAX_MSG_SIZE);
         return 0;
@@ -64,7 +64,7 @@ size_t rrdpush_compress(struct compressor_state *state, const char *data, size_t
         state->compression_result_buffer = mallocz(data_size);
         state->compression_result_buffer_size = data_size;
     }
-    else if(unlikely(state->compression_result_buffer_size < data_size)) {
+    else if(state->compression_result_buffer_size < data_size) {
         state->compression_result_buffer = reallocz(state->compression_result_buffer, data_size);
         state->compression_result_buffer_size = data_size;
     }
@@ -89,7 +89,7 @@ size_t rrdpush_compress(struct compressor_state *state, const char *data, size_t
 
     // update the next writing position of the ring buffer
     state->stream.input_ring_buffer_pos += size;
-    if(unlikely(state->stream.input_ring_buffer_pos >= state->stream.input_ring_buffer_size - COMPRESSION_MAX_MSG_SIZE))
+    if(state->stream.input_ring_buffer_pos >= state->stream.input_ring_buffer_size - COMPRESSION_MAX_MSG_SIZE)
         state->stream.input_ring_buffer_pos = 0;
 
     // update the signature header
@@ -105,13 +105,13 @@ size_t rrdpush_compress(struct compressor_state *state, const char *data, size_t
  * Return the size of uncompressed data or 0 for error
  */
 size_t rrdpush_decompress(struct decompressor_state *state, const char *compressed_data, size_t compressed_size) {
-    if (unlikely(!state || !compressed_data || !compressed_size))
+    if (!state || !compressed_data || !compressed_size)
         return 0;
 
-    if(unlikely(state->stream.read_at != state->stream.write_at))
+    if(state->stream.read_at != state->stream.write_at)
         fatal("RRDPUSH_DECOMPRESS: asked to decompress new data, while there are unread data in the decompression buffer!");
 
-    if (unlikely(state->stream.write_at >= state->stream.size / 2)) {
+    if (state->stream.write_at >= state->stream.size / 2) {
         state->stream.write_at = 0;
         state->stream.read_at = 0;
     }
@@ -124,12 +124,12 @@ size_t rrdpush_decompress(struct decompressor_state *state, const char *compress
             , (int)(state->stream.size - state->stream.write_at)
             );
 
-    if (unlikely(decompressed_size < 0)) {
+    if (decompressed_size < 0) {
         netdata_log_error("RRDPUSH DECOMPRESS: decompressor returned negative decompressed bytes: %ld", decompressed_size);
         return 0;
     }
 
-    if(unlikely(decompressed_size + state->stream.write_at > state->stream.size))
+    if(decompressed_size + state->stream.write_at > state->stream.size)
         fatal("RRDPUSH DECOMPRESS: decompressor overflown the stream_buffer. size: %zu, pos: %zu, added: %ld, "
               "exceeding the buffer by %zu"
               , state->stream.size
@@ -164,7 +164,7 @@ void rrdpush_decompressor_reset(struct decompressor_state *state) {
 }
 
 void rrdpush_decompressor_destroy(struct decompressor_state *state) {
-    if(unlikely(!state->initialized))
+    if(!state->initialized)
         return;
 
     if (state->stream.lz4_stream) {

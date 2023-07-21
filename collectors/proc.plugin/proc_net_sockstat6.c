@@ -35,7 +35,7 @@ int do_proc_net_sockstat6(int update_every, usec_t dt) {
     static uint32_t hashes[6] = { 0 };
     static ARL_BASE *bases[6] = { NULL };
 
-    if(unlikely(!arl_tcp)) {
+    if(!arl_tcp) {
         do_tcp_sockets     = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat6", "ipv6 TCP sockets", CONFIG_BOOLEAN_AUTO);
         do_udp_sockets     = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat6", "ipv6 UDP sockets", CONFIG_BOOLEAN_AUTO);
         do_udplite_sockets = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat6", "ipv6 UDPLITE sockets", CONFIG_BOOLEAN_AUTO);
@@ -71,15 +71,15 @@ int do_proc_net_sockstat6(int update_every, usec_t dt) {
         keys[5] = NULL; // terminator
     }
 
-    if(unlikely(!ff)) {
+    if(!ff) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/sockstat6");
         ff = procfile_open(config_get("plugin:proc:/proc/net/sockstat6", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff)) return 1;
+        if(!ff) return 1;
     }
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
+    if(!ff) return 0; // we return 0, so that we will retry to open it next time
 
     size_t lines = procfile_lines(ff), l;
 
@@ -90,7 +90,7 @@ int do_proc_net_sockstat6(int update_every, usec_t dt) {
 
         int k;
         for(k = 0; keys[k] ; k++) {
-            if(unlikely(hash == hashes[k] && strcmp(key, keys[k]) == 0)) {
+            if(hash == hashes[k] && strcmp(key, keys[k]) == 0) {
                 // fprintf(stderr, "KEY: '%s', l=%zu, w=1, words=%zu\n", key, l, words);
                 ARL_BASE *arl = bases[k];
                 arl_begin(arl);
@@ -100,7 +100,7 @@ int do_proc_net_sockstat6(int update_every, usec_t dt) {
                     char *name  = procfile_lineword(ff, l, w); w++;
                     char *value = procfile_lineword(ff, l, w); w++;
                     // fprintf(stderr, " > NAME '%s', VALUE '%s', l=%zu, w=%zu, words=%zu\n", name, value, l, w, words);
-                    if(unlikely(arl_check(arl, name, value) != 0))
+                    if(arl_check(arl, name, value) != 0)
                         break;
                 }
 
@@ -119,7 +119,7 @@ int do_proc_net_sockstat6(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_inuse = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "ipv6"
                     , "sockstat6_tcp_sockets"
@@ -152,7 +152,7 @@ int do_proc_net_sockstat6(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_inuse = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "ipv6"
                     , "sockstat6_udp_sockets"
@@ -185,7 +185,7 @@ int do_proc_net_sockstat6(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_inuse = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "ipv6"
                     , "sockstat6_udplite_sockets"
@@ -218,7 +218,7 @@ int do_proc_net_sockstat6(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_inuse = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "ipv6"
                     , "sockstat6_raw_sockets"
@@ -251,7 +251,7 @@ int do_proc_net_sockstat6(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_inuse = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "ipv6"
                     , "sockstat6_frag_sockets"

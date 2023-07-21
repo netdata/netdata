@@ -18,7 +18,7 @@ static _CONNECTOR_INSTANCE *find_instance(const char *section)
     _CONNECTOR_INSTANCE *local_ci;
 
     local_ci = add_connector_instance(NULL, NULL); // Get root section
-    if (unlikely(!local_ci))
+    if (!local_ci)
         return local_ci;
 
     if (!section)
@@ -104,7 +104,7 @@ int get_connector_instance(struct connector_instance *target_ci)
 
     global_connector_instance = find_instance(NULL); // Fetch head of instances
 
-    if (unlikely(!global_connector_instance))
+    if (!global_connector_instance)
         return 0;
 
     if (target_ci == NULL) {
@@ -204,7 +204,7 @@ struct engine *read_exporting_config()
     struct connector_instance local_ci;
     struct connector_instance_list *tmp_ci_list = NULL, *tmp_ci_list1 = NULL, *tmp_ci_list_prev = NULL;
 
-    if (unlikely(engine))
+    if (engine)
         return engine;
 
     char *filename = strdupz_path_subpath(netdata_configured_user_config_dir, EXPORTING_CONF);
@@ -293,7 +293,7 @@ struct engine *read_exporting_config()
             netdata_log_info("Instance (%s) on connector (%s) is not enabled", local_ci.instance_name, local_ci.connector_name);
     }
 
-    if (unlikely(!instances_to_activate)) {
+    if (!instances_to_activate) {
         netdata_log_info("No connector instances to activate");
         return NULL;
     }
@@ -497,7 +497,7 @@ struct engine *read_exporting_config()
             tmp_instance->config.options);
 #endif
 
-        if (unlikely(!exporting_config_exists) && !engine->config.hostname) {
+        if (!exporting_config_exists && !engine->config.hostname) {
             engine->config.hostname = strdupz(config_get(instance_name, "hostname", netdata_configured_hostname));
             engine->config.update_every =
                 config_get_number(instance_name, EXPORTING_UPDATE_EVERY_OPTION_NAME, EXPORTING_UPDATE_EVERY_DEFAULT);

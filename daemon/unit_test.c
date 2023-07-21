@@ -1663,7 +1663,7 @@ int test_sqlite(void) {
     }
 
     rc = sqlite3_create_function(db_meta, "now_usec", 1, SQLITE_ANY, 0, sqlite_now_usec, 0, 0);
-    if (unlikely(rc != SQLITE_OK)) {
+    if (rc != SQLITE_OK) {
         fprintf(stderr, "Failed to register internal now_usec function");
         return 1;
     }
@@ -1823,7 +1823,7 @@ static inline void rrddim_set_by_pointer_fake_time(RRDDIM *rd, collected_number 
     rd->collector.counter++;
 
     collected_number v = (value >= 0) ? value : -value;
-    if(unlikely(v > rd->collector.collected_value_max)) rd->collector.collected_value_max = v;
+    if(v > rd->collector.collected_value_max) rd->collector.collected_value_max = v;
 }
 
 static RRDHOST *dbengine_rrdhost_find_or_create(char *name)
@@ -2061,7 +2061,7 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
 
                 // for each dimension
                 rrddim_foreach_read(d, r->internal.qt->request.st) {
-                    if(unlikely(d_dfe.counter >= r->d)) break; // d_counter is provided by the dictionary dfe
+                    if(d_dfe.counter >= r->d) break; // d_counter is provided by the dictionary dfe
 
                     j = (int)d_dfe.counter;
 
@@ -2200,7 +2200,7 @@ int test_dbengine(void)
 
                 // for each dimension
                 rrddim_foreach_read(d, r->internal.qt->request.st) {
-                    if(unlikely(d_dfe.counter >= r->d)) break; // d_counter is provided by the dictionary dfe
+                    if(d_dfe.counter >= r->d) break; // d_counter is provided by the dictionary dfe
 
                     j = (int)d_dfe.counter;
 
@@ -2447,7 +2447,7 @@ static void query_dbengine_chart(void *arg)
             generatedv = generate_dbengine_chart_value(i, j, time_now);
             expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE) generatedv, SN_DEFAULT_FLAGS));
 
-            if (unlikely(storage_engine_query_is_finished(&handle))) {
+            if (storage_engine_query_is_finished(&handle)) {
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
                     fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value " NETDATA_DOUBLE_FORMAT
                         ", found data gap, ### E R R O R ###\n",

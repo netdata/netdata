@@ -28,7 +28,7 @@ typedef enum db_check_action_type {
 #define SQLITE_INSERT_DELAY (10)        // Insert delay in case of lock
 
 #define CHECK_SQLITE_CONNECTION(db_meta)                                                                               \
-    if (unlikely(!db_meta)) {                                                                                          \
+    if (!db_meta) {                                                                                          \
         if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {                                                     \
             return 1;                                                                                                  \
         }                                                                                                              \

@@ -150,7 +150,7 @@ int format_host_labels_opentsdb_telnet(struct instance *instance, RRDHOST *host)
     if(!instance->labels_buffer)
         instance->labels_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_exporters);
 
-    if (unlikely(!sending_labels_configured(instance)))
+    if (!sending_labels_configured(instance))
         return 0;
 
     buffer_strcat(instance->labels_buffer, " ");
@@ -283,7 +283,7 @@ int format_host_labels_opentsdb_http(struct instance *instance, RRDHOST *host) {
     if (!instance->labels_buffer)
         instance->labels_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_exporters);
 
-    if (unlikely(!sending_labels_configured(instance)))
+    if (!sending_labels_configured(instance))
         return 0;
 
     rrdlabels_to_buffer(host->rrdlabels, instance->labels_buffer, ",", ":", "\"", "",

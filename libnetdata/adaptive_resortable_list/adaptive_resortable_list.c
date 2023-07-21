@@ -48,7 +48,7 @@ ARL_BASE *arl_create(const char *name, void (*processor)(const char *, uint32_t,
 }
 
 void arl_free(ARL_BASE *arl_base) {
-    if(unlikely(!arl_base))
+    if(!arl_base)
         return;
 
     while(arl_base->head) {
@@ -74,19 +74,19 @@ void arl_free(ARL_BASE *arl_base) {
 void arl_begin(ARL_BASE *base) {
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(likely(base->iteration > 10)) {
+    if(base->iteration > 10) {
         // do these checks after the ARL has been sorted
 
-        if(unlikely(base->relinkings > (base->expected + base->allocated)))
+        if(base->relinkings > (base->expected + base->allocated))
             netdata_log_info("ARL '%s' has %zu relinkings with %zu expected and %zu allocated entries. Is the source changing so fast?"
                  , base->name, base->relinkings, base->expected, base->allocated);
 
-        if(unlikely(base->slow > base->fast))
+        if(base->slow > base->fast)
             netdata_log_info("ARL '%s' has %zu fast searches and %zu slow searches. Is the source really changing so fast?"
                  , base->name, base->fast, base->slow);
 
         /*
-        if(unlikely(base->iteration % 60 == 0)) {
+        if(base->iteration % 60 == 0) {
             netdata_log_info("ARL '%s' statistics: iteration %zu, expected %zu, wanted %zu, allocated %zu, fred %zu, relinkings %zu, found %zu, added %zu, fast %zu, slow %zu"
                  , base->name
                  , base->iteration
@@ -107,7 +107,7 @@ void arl_begin(ARL_BASE *base) {
     }
 #endif
 
-    if(unlikely(base->iteration > 0 && (base->added || (base->iteration % base->rechecks) == 0))) {
+    if(base->iteration > 0 && (base->added || (base->iteration % base->rechecks) == 0)) {
         int wanted_equals_expected = ((base->iteration % base->rechecks) == 0);
 
         // fprintf(stderr, "\n\narl_begin() rechecking, added %zu, iteration %zu, rechecks %zu, wanted_equals_expected %d\n\n\n", base->added, base->iteration, base->rechecks, wanted_equals_expected);
@@ -156,7 +156,7 @@ void arl_begin(ARL_BASE *base) {
         }
     }
 
-    if(unlikely(!base->head)) {
+    if(!base->head) {
         // hm... no nodes at all in the list #1700
         // add a fake one to prevent a crash
         // this is better than checking for the existence of nodes all the time
@@ -204,7 +204,7 @@ int arl_find_or_create_and_relink(ARL_BASE *base, const char *s, const char *val
             break;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(base->next_keyword && e == base->next_keyword))
+    if(base->next_keyword && e == base->next_keyword)
         fatal("Internal Error: e == base->last");
 #endif
 
@@ -214,7 +214,7 @@ int arl_find_or_create_and_relink(ARL_BASE *base, const char *s, const char *val
         base->relinkings++;
 
         // run the processor for it
-        if(unlikely(e->dst)) {
+        if(e->dst) {
             e->processor(e->name, hash, value, e->dst);
             base->found++;
         }
@@ -241,7 +241,7 @@ int arl_find_or_create_and_relink(ARL_BASE *base, const char *s, const char *val
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(base->iteration % 60 == 0 && e->flags & ARL_ENTRY_FLAG_FOUND))
+    if(base->iteration % 60 == 0 && e->flags & ARL_ENTRY_FLAG_FOUND)
         netdata_log_info("ARL '%s': entry '%s' is already found. Did you forget to call arl_begin()?", base->name, s);
 #endif
 
@@ -268,10 +268,10 @@ int arl_find_or_create_and_relink(ARL_BASE *base, const char *s, const char *val
 
     // prepare the next iteration
     base->next_keyword = e->next;
-    if(unlikely(!base->next_keyword))
+    if(!base->next_keyword)
         base->next_keyword = base->head;
 
-    if(unlikely(base->found == base->wanted)) {
+    if(base->found == base->wanted) {
         // fprintf(stderr, "FOUND ALL WANTED 1: found = %zu, wanted = %zu, expected %zu\n", base->found, base->wanted, base->expected);
         return 1;
     }

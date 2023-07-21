@@ -106,7 +106,7 @@ void service_exits(void) {
 bool service_running(SERVICE_TYPE service) {
     static __thread SERVICE_THREAD *sth = NULL;
 
-    if(unlikely(!sth))
+    if(!sth)
         sth = service_register(SERVICE_THREAD_TYPE_NETDATA, NULL, NULL, NULL, false);
 
     sth->services |= service;
@@ -1262,7 +1262,7 @@ int get_system_info(struct rrdhost_system_info *system_info, bool log) {
     char *script;
     script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("system-info.sh") + 2));
     sprintf(script, "%s/%s", netdata_configured_primary_plugins_dir, "system-info.sh");
-    if (unlikely(access(script, R_OK) != 0)) {
+    if (access(script, R_OK) != 0) {
         netdata_log_error("System info script %s not found.",script);
         freez(script);
         return 1;
@@ -1288,7 +1288,7 @@ int get_system_info(struct rrdhost_system_info *system_info, bool log) {
                 coverity_remove_taint(line);    // I/O is controlled result of system_info.sh - not tainted
                 coverity_remove_taint(value);
 
-                if(unlikely(rrdhost_set_system_info_variable(system_info, line, value))) {
+                if(rrdhost_set_system_info_variable(system_info, line, value)) {
                     netdata_log_error("Unexpected environment variable %s=%s", line, value);
                 }
                 else {

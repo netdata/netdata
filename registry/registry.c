@@ -94,7 +94,7 @@ static STRING *asterisks = NULL;
 
 // callback for rendering PERSON_URLs
 static int registry_json_person_url_callback(REGISTRY_PERSON_URL *pu, struct registry_json_walk_person_urls_callback *c) {
-    if(unlikely(!asterisks))
+    if(!asterisks)
         asterisks = string_strdupz("***");
 
     struct web_client *w = c->w;
@@ -114,7 +114,7 @@ static int registry_json_person_url_callback(REGISTRY_PERSON_URL *pu, struct reg
 
 // callback for rendering MACHINE_URLs
 static int registry_json_machine_url_callback(REGISTRY_MACHINE_URL *mu, struct registry_json_walk_person_urls_callback *c, STRING *hostname) {
-    if(unlikely(!asterisks))
+    if(!asterisks)
         asterisks = string_strdupz("***");
 
     struct web_client *w = c->w;
@@ -214,7 +214,7 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w) {
 
 // the main method for registering an access
 int registry_request_access_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url, char *name, time_t when) {
-    if(unlikely(!registry.enabled))
+    if(!registry.enabled)
         return registry_json_disabled(host, w, "access");
 
     if(!registry_is_valid_url(url)) {
@@ -241,7 +241,7 @@ int registry_request_access_json(RRDHOST *host, struct web_client *w, char *pers
         return HTTP_RESP_OK;
     }
 
-    if(unlikely(person_guid[0] && is_dummy_person(person_guid)))
+    if(person_guid[0] && is_dummy_person(person_guid))
         // it passed the check - they gave us a different person_guid
         // empty the dummy one, so that we will generate a new person_guid
         person_guid[0] = '\0';
@@ -441,7 +441,7 @@ void registry_statistics(void) {
 
     static RRDSET *sts = NULL, *stc = NULL, *stm = NULL;
 
-    if(unlikely(!sts)) {
+    if(!sts) {
         sts = rrdset_create_localhost(
                 "netdata"
                 , "registry_sessions"
@@ -465,7 +465,7 @@ void registry_statistics(void) {
 
     // ------------------------------------------------------------------------
 
-    if(unlikely(!stc)) {
+    if(!stc) {
         stc = rrdset_create_localhost(
                 "netdata"
                 , "registry_entries"
@@ -495,7 +495,7 @@ void registry_statistics(void) {
 
     // ------------------------------------------------------------------------
 
-    if(unlikely(!stm)) {
+    if(!stm) {
         stm = rrdset_create_localhost(
                 "netdata"
                 , "registry_mem"

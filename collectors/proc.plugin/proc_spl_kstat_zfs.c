@@ -23,7 +23,7 @@ int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
 
     arcstats.l2exist = -1;
 
-    if(unlikely(!arl_base)) {
+    if(!arl_base) {
         arl_base = arl_create("arcstats", NULL, 60);
 
         arl_expect(arl_base, "hits", &arcstats.hits);
@@ -119,11 +119,11 @@ int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
         arl_expect(arl_base, "arc_sys_free", &arcstats.arc_sys_free);
     }
 
-    if(unlikely(!ff)) {
+    if(!ff) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, ZFS_PROC_ARCSTATS);
         ff = procfile_open(config_get("plugin:proc:" ZFS_PROC_ARCSTATS, "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff))
+        if(!ff)
             return 1;
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/spl/kstat/zfs");
@@ -132,28 +132,28 @@ int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
         show_zero_charts = config_get_boolean_ondemand("plugin:proc:" ZFS_PROC_ARCSTATS, "show zero charts", CONFIG_BOOLEAN_NO);
         if(show_zero_charts == CONFIG_BOOLEAN_AUTO && netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)
             show_zero_charts = CONFIG_BOOLEAN_YES;
-        if(unlikely(show_zero_charts == CONFIG_BOOLEAN_YES))
+        if(show_zero_charts == CONFIG_BOOLEAN_YES)
             do_zfs_stats = 1;
     }
 
     // check if any pools exist
-    if(likely(!do_zfs_stats)) {
+    if(!do_zfs_stats) {
         DIR *dir = opendir(dirname);
-        if(unlikely(!dir)) {
+        if(!dir) {
             collector_error("Cannot read directory '%s'", dirname);
             return 1;
         }
 
         struct dirent *de = NULL;
-        while(likely(de = readdir(dir))) {
-            if(likely(de->d_type == DT_DIR
+        while(de = readdir(dir)) {
+            if(de->d_type == DT_DIR
                 && (
                     (de->d_name[0] == '.' && de->d_name[1] == '\0')
                     || (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
-                    )))
+                    ))
                 continue;
 
-            if(unlikely(de->d_type == DT_LNK || de->d_type == DT_DIR)) {
+            if(de->d_type == DT_LNK || de->d_type == DT_DIR) {
                 do_zfs_stats = 1;
                 break;
             }
@@ -163,11 +163,11 @@ int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
     }
 
     // do not show ZFS filesystem metrics if there haven't been any pools in the system yet
-    if(unlikely(!do_zfs_stats))
+    if(!do_zfs_stats)
         return 0;
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff))
+    if(!ff)
         return 0; // we return 0, so that we will retry to open it next time
 
     size_t lines = procfile_lines(ff), l;
@@ -176,20 +176,20 @@ int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
 
     for(l = 0; l < lines ;l++) {
         size_t words = procfile_linewords(ff, l);
-        if(unlikely(words < 3)) {
-            if(unlikely(words)) collector_error("Cannot read " ZFS_PROC_ARCSTATS " line %zu. Expected 3 params, read %zu.", l, words);
+        if(words < 3) {
+            if(words) collector_error("Cannot read " ZFS_PROC_ARCSTATS " line %zu. Expected 3 params, read %zu.", l, words);
             continue;
         }
 
         const char *key   = procfile_lineword(ff, l, 0);
         const char *value = procfile_lineword(ff, l, 2);
 
-        if(unlikely(arcstats.l2exist == -1)) {
+        if(arcstats.l2exist == -1) {
             if(key[0] == 'l' && key[1] == '2' && key[2] == '_')
                 arcstats.l2exist = 1;
         }
 
-        if(unlikely(arl_check(arl_base, key, value))) break;
+        if(arl_check(arl_base, key, value)) break;
     }
 
     if (arcstats.size > arcstats.c_min) {
@@ -198,7 +198,7 @@ int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
         zfs_arcstats_shrinkable_cache_size_bytes = 0;
     }
 
-    if(unlikely(arcstats.l2exist == -1))
+    if(arcstats.l2exist == -1)
         arcstats.l2exist = 0;
 
     generate_charts_arcstats(PLUGIN_PROC_NAME, ZFS_PROC_ARCSTATS, show_zero_charts, update_every);
@@ -264,7 +264,7 @@ int update_zfs_pool_state_chart(const DICTIONARY_ITEM *item, void *pool_p, void 
         pool->updated = 0;
 
         if (!pool->disabled) {
-            if (unlikely(!pool->st)) {
+            if (!pool->st) {
                 char chart_id[MAX_CHART_ID + 1];
                 snprintf(chart_id, MAX_CHART_ID, "state_%s", name);
 
@@ -322,7 +322,7 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
 
     int pool_found = 0, state_file_found = 0;
 
-    if (unlikely(do_zfs_pool_state == -1)) {
+    if (do_zfs_pool_state == -1) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/spl/kstat/zfs");
         dirname = config_get("plugin:proc:" ZFS_PROC_POOLS, "directory to monitor", filename);
@@ -332,26 +332,26 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
         do_zfs_pool_state = 1;
     }
 
-    if (likely(do_zfs_pool_state)) {
+    if (do_zfs_pool_state) {
         DIR *dir = opendir(dirname);
-        if (unlikely(!dir)) {
+        if (!dir) {
             collector_error("Cannot read directory '%s'", dirname);
             return 1;
         }
 
         struct dirent *de = NULL;
-        while (likely(de = readdir(dir))) {
-            if (likely(
+        while (de = readdir(dir)) {
+            if (
                     de->d_type == DT_DIR && ((de->d_name[0] == '.' && de->d_name[1] == '\0') ||
-                                             (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0'))))
+                                             (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')))
                 continue;
 
-            if (unlikely(de->d_type == DT_LNK || de->d_type == DT_DIR)) {
+            if (de->d_type == DT_LNK || de->d_type == DT_DIR) {
                 pool_found = 1;
 
                 struct zfs_pool *pool = dictionary_get(zfs_pools, de->d_name);
 
-                if (unlikely(!pool)) {
+                if (!pool) {
                     struct zfs_pool new_zfs_pool = {};
                     pool = dictionary_set(zfs_pools, de->d_name, &new_zfs_pool, sizeof(struct zfs_pool));
                 };

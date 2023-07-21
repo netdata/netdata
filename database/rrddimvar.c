@@ -253,7 +253,7 @@ void rrddimvar_rename_all(RRDDIM *rd) {
 
     RRDDIMVAR *rs;
     dfe_start_write(st->rrddimvar_root_index, rs) {
-        if(unlikely(rs->rrddim == rd))
+        if(rs->rrddim == rd)
             rrddimvar_update_variables_unsafe(rs);
     }
     dfe_done(rs);
@@ -266,7 +266,7 @@ void rrddimvar_delete_all(RRDDIM *rd) {
 
     RRDDIMVAR *rs;
     dfe_start_write(st->rrddimvar_root_index, rs) {
-        if(unlikely(rs->rrddim == rd))
+        if(rs->rrddim == rd)
             dictionary_del(st->rrddimvar_root_index, rs_dfe.name);
     }
     dfe_done(rs);

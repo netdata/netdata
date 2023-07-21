@@ -16,7 +16,7 @@ RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS] = { RRD_BACKFILL_NEW, RRD
 #endif
 
 size_t get_tier_grouping(size_t tier) {
-    if(unlikely(tier >= storage_tiers)) tier = storage_tiers - 1;
+    if(tier >= storage_tiers) tier = storage_tiers - 1;
 
     size_t grouping = 1;
     // first tier is always 1 iteration of whatever update every the chart has
@@ -44,7 +44,7 @@ bool is_storage_engine_shared(STORAGE_INSTANCE *engine __maybe_unused) {
 RRDHOST *find_host_by_node_id(char *node_id) {
 
     uuid_t node_uuid;
-    if (unlikely(!node_id || uuid_parse(node_id, node_uuid)))
+    if (!node_id || uuid_parse(node_id, node_uuid))
         return NULL;
 
     RRDHOST *host, *ret = NULL;
@@ -66,13 +66,13 @@ DICTIONARY *rrdhost_root_index = NULL;
 static DICTIONARY *rrdhost_root_index_hostname = NULL;
 
 static inline void rrdhost_init() {
-    if(unlikely(!rrdhost_root_index)) {
+    if(!rrdhost_root_index) {
         rrdhost_root_index = dictionary_create_advanced(
             DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE,
             &dictionary_stats_category_rrdhost, 0);
     }
 
-    if(unlikely(!rrdhost_root_index_hostname)) {
+    if(!rrdhost_root_index_hostname) {
         rrdhost_root_index_hostname = dictionary_create_advanced(
             DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE,
             &dictionary_stats_category_rrdhost, 0);
@@ -86,14 +86,14 @@ RRDHOST_ACQUIRED *rrdhost_find_and_acquire(const char *machine_guid) {
 }
 
 RRDHOST *rrdhost_acquired_to_rrdhost(RRDHOST_ACQUIRED *rha) {
-    if(unlikely(!rha))
+    if(!rha)
         return NULL;
 
     return (RRDHOST *) dictionary_acquired_item_value((const DICTIONARY_ITEM *)rha);
 }
 
 void rrdhost_acquired_release(RRDHOST_ACQUIRED *rha) {
-    if(unlikely(!rha))
+    if(!rha)
         return;
 
     dictionary_acquired_item_release(rrdhost_root_index, (const DICTIONARY_ITEM *)rha);
@@ -137,14 +137,14 @@ static void rrdhost_index_del_by_guid(RRDHOST *host) {
 // RRDHOST index by hostname
 
 inline RRDHOST *rrdhost_find_by_hostname(const char *hostname) {
-    if(unlikely(!strcmp(hostname, "localhost")))
+    if(!strcmp(hostname, "localhost"))
         return localhost;
 
     return dictionary_get(rrdhost_root_index_hostname, hostname);
 }
 
 static inline void rrdhost_index_del_hostname(RRDHOST *host) {
-    if(unlikely(!host->hostname)) return;
+    if(!host->hostname) return;
 
     if(rrdhost_option_check(host, RRDHOST_OPTION_INDEXED_HOSTNAME)) {
         if(!dictionary_del(rrdhost_root_index_hostname, rrdhost_hostname(host)))
@@ -186,7 +186,7 @@ static inline void rrdhost_init_tags(RRDHOST *host, const char *tags) {
 }
 
 static inline void rrdhost_init_hostname(RRDHOST *host, const char *hostname, bool add_to_index) {
-    if(unlikely(hostname && !*hostname)) hostname = NULL;
+    if(hostname && !*hostname) hostname = NULL;
 
     if(host->hostname && hostname && !strcmp(rrdhost_hostname(host), hostname))
         return;
@@ -331,7 +331,7 @@ int is_legacy = 1;
     host->rrd_history_entries        = align_entries_to_pagesize(memory_mode, entries);
     host->health.health_enabled      = ((memory_mode == RRD_MEMORY_MODE_NONE)) ? 0 : health_enabled;
 
-    if (likely(!archived)) {
+    if (!archived) {
         rrdfunctions_init(host);
         host->rrdlabels = rrdlabels_create();
         rrdhost_initialize_rrdpush_sender(
@@ -399,7 +399,7 @@ int is_legacy = 1;
     if(!host->rrdvars)
         host->rrdvars = rrdvariables_create();
 
-    if (likely(!uuid_parse(host->machine_guid, host->host_uuid)))
+    if (!uuid_parse(host->machine_guid, host->host_uuid))
         sql_load_node_id(host);
     else
         error_report("Host machine GUID %s is not valid", host->machine_guid);
@@ -727,9 +727,9 @@ RRDHOST *rrdhost_find_or_create(
     netdata_log_debug(D_RRDHOST, "Searching for host '%s' with guid '%s'", hostname, guid);
 
     RRDHOST *host = rrdhost_find_by_guid(guid);
-    if (unlikely(host && host->rrd_memory_mode != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) {
+    if (host && host->rrd_memory_mode != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
 
-        if (likely(!archived && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)))
+        if (!archived && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
             return host;
 
         /* If a legacy memory mode instantiates all dbengine state must be discarded to avoid inconsistencies */
@@ -773,7 +773,7 @@ RRDHOST *rrdhost_find_or_create(
         );
     }
     else {
-        if (likely(!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)))
+        if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
             rrdhost_update(host
                , hostname
                , registry_hostname
@@ -988,7 +988,7 @@ void dbengine_init(char *hostname) {
 int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unittest) {
     rrdhost_init();
 
-    if (unlikely(sql_init_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
+    if (sql_init_database(DB_CHECK_NONE, system_info ? 0 : 1)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
             set_late_global_environment(system_info);
             fatal("Failed to initialize SQLite");
@@ -996,11 +996,11 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
         netdata_log_info("Skipping SQLITE metadata initialization since memory mode is not dbengine");
     }
 
-    if (unlikely(sql_init_context_database(system_info ? 0 : 1))) {
+    if (sql_init_context_database(system_info ? 0 : 1)) {
         error_report("Failed to initialize context metadata database");
     }
 
-    if (unlikely(unittest)) {
+    if (unittest) {
         dbengine_enabled = true;
     }
     else {
@@ -1061,7 +1061,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
             , 0
     );
 
-    if (unlikely(!localhost)) {
+    if (!localhost) {
         return 1;
     }
 
@@ -1074,7 +1074,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
                                rrdhost_function_streaming, NULL);
 #endif
 
-    if (likely(system_info)) {
+    if (system_info) {
         migrate_localhost(&localhost->host_uuid);
         sql_aclk_sync_init();
         web_client_api_v1_management_init();
@@ -1086,7 +1086,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
 // RRDHOST - free
 
 void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
-    if(likely(system_info)) {
+    if(system_info) {
         __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
 
         freez(system_info->cloud_provider_type);
@@ -1154,7 +1154,7 @@ static void rrdhost_streaming_sender_structures_free(RRDHOST *host)
 {
     rrdhost_option_clear(host, RRDHOST_OPTION_SENDER_ENABLED);
 
-    if (unlikely(!host->sender))
+    if (!host->sender)
         return;
 
     rrdpush_sender_thread_stop(host, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, true); // stop a possibly running thread
@@ -1452,7 +1452,7 @@ static void rrdhost_load_kubernetes_labels(void) {
     char label_script[sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("get-kubernetes-labels.sh") + 2)];
     sprintf(label_script, "%s/%s", netdata_configured_primary_plugins_dir, "get-kubernetes-labels.sh");
 
-    if (unlikely(access(label_script, R_OK) != 0)) {
+    if (access(label_script, R_OK) != 0) {
         netdata_log_error("Kubernetes pod label fetching script %s not found.",label_script);
         return;
     }
@@ -1922,7 +1922,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
 
             RRDCALC *rc;
             foreach_rrdcalc_in_rrdhost_read(host, rc) {
-                if (unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+                if (!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec)
                     continue;
 
                 switch (rc->status) {

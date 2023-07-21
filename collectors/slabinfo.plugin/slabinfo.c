@@ -134,21 +134,21 @@ struct slabinfo *read_file_slabinfo() {
     static procfile *ff = NULL;
     static long slab_pagesize = 0;
 
-    if (unlikely(!slab_pagesize)) {
+    if (!slab_pagesize) {
         slab_pagesize = sysconf(_SC_PAGESIZE);
         slabdebug("   Discovered pagesize: %ld", slab_pagesize);
     }
 
-    if(unlikely(!ff)) {
+    if(!ff) {
         ff = procfile_reopen(ff, PLUGIN_SLABINFO_PROCFILE, " ,:" , PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff)) {
+        if(!ff) {
             collector_error("<- Cannot open file '%s", PLUGIN_SLABINFO_PROCFILE);
             exit(1);
         }
     }
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff)) {
+    if(!ff) {
         collector_error("<- Cannot read file '%s'", PLUGIN_SLABINFO_PROCFILE);
         exit(0);
     }
@@ -156,14 +156,14 @@ struct slabinfo *read_file_slabinfo() {
 
     // Iterate on all lines to populate / update the slabinfo struct
     size_t lines = procfile_lines(ff), l;
-    if (unlikely(lines != lines_discovered)) {
+    if (lines != lines_discovered) {
         lines_discovered = lines;
         redraw_chart = 1;
     }
 
     slabdebug("   Read %lu lines from procfile", (unsigned long)lines);
     for(l = 2; l < lines; l++) {
-        if (unlikely(procfile_linewords(ff, l) < 14)) {
+        if (procfile_linewords(ff, l) < 14) {
             slabdebug("    Line %zu has only %zu words, skipping", l, procfile_linewords(ff,l));
             continue;
         }
@@ -227,7 +227,7 @@ unsigned int do_slab_stats(int update_every) {
         sactive = read_file_slabinfo();
 
         // Init Charts
-        if (unlikely(redraw_chart)) {
+        if (redraw_chart) {
             redraw_chart = 0;
             // Memory Usage
             printf("CHART %s.%s '' 'Memory Usage' 'B' '%s' '' line %d %d %s\n"

@@ -22,7 +22,7 @@ static struct zone_t *g_zones = NULL;
 static int get_measurement(const char *path, struct measurement_t *measurement)
 {
     int result;
-    if (likely((result = read_single_number_file(path, &measurement->energy_uj)) == 0)) {
+    if ((result = read_single_number_file(path, &measurement->energy_uj)) == 0) {
         measurement->time_us = now_monotonic_high_precision_usec();
     }
     return result;
@@ -33,11 +33,11 @@ calculate_watts(unsigned long long max_energy_range_uj, struct measurement_t *be
 {
     unsigned long long energy_uj = 0;
     usec_t delta_us = after->time_us - before->time_us;
-    if (unlikely(delta_us == 0)) {
+    if (delta_us == 0) {
         return 0;
     }
 
-    if (likely(after->energy_uj >= before->energy_uj)) {
+    if (after->energy_uj >= before->energy_uj) {
         energy_uj = after->energy_uj - before->energy_uj;
     } else {
         energy_uj = after->energy_uj + (max_energy_range_uj - before->energy_uj);
@@ -57,20 +57,20 @@ get_zone(const char *control_type, struct zone_t *parent, const char *dirname, s
     }
 
     char *trimmed = trim(name);
-    if (unlikely(trimmed == NULL || trimmed[0] == 0)) {
+    if (trimmed == NULL || trimmed[0] == 0) {
         return NULL;
     }
 
     snprintfz(temp, FILENAME_MAX, "%s/%s", dirname, "max_energy_range_uj");
     unsigned long long max_energy_range_uj = 0;
-    if (unlikely(read_single_number_file(temp, &max_energy_range_uj) != 0)) {
+    if (read_single_number_file(temp, &max_energy_range_uj) != 0) {
         collector_error("Cannot read %s", temp);
         return NULL;
     }
 
     snprintfz(temp, FILENAME_MAX, "%s/%s", dirname, "energy_uj");
     struct measurement_t measurement;
-    if (unlikely(get_measurement(temp, &measurement) != 0)) {
+    if (get_measurement(temp, &measurement) != 0) {
         collector_error("%s: Cannot read %s", trimmed, temp);
         return NULL;
     }
@@ -103,7 +103,7 @@ static void
 look_for_zones(const char *control_type, struct zone_t *parent, const char *path, struct zone_t **zones, size_t *count)
 {
     DIR *dir = opendir(path);
-    if (unlikely(dir == NULL)) {
+    if (dir == NULL) {
         return;
     }
 
@@ -135,7 +135,7 @@ static int get_rapl_zones(struct zone_t **zones)
     snprintfz(dirname, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/virtual/powercap");
 
     DIR *dir = opendir(dirname);
-    if (unlikely(dir == NULL)) {
+    if (dir == NULL) {
         return 0;
     }
 
@@ -199,12 +199,12 @@ static void send_end_and_flush()
 
 int do_sys_devices_virtual_powercap(int update_every, const char *name)
 {
-    if (unlikely(g_zones_count <= 0)) {
+    if (g_zones_count <= 0) {
         g_zones_count = get_rapl_zones(&g_zones);
-        if (unlikely(g_zones_count < 0)) {
+        if (g_zones_count < 0) {
             collector_error("Failed to find powercap zones.");
             return 1;
-        } else if (unlikely(g_zones_count == 0)) {
+        } else if (g_zones_count == 0) {
             collector_info("No powercap zones found.");
             return 1;
         }
@@ -225,7 +225,7 @@ int do_sys_devices_virtual_powercap(int update_every, const char *name)
         struct measurement_t measurement;
         struct zone_t *zone = &g_zones[ii];
 
-        if (unlikely(get_measurement(zone->path, &measurement) != 0)) {
+        if (get_measurement(zone->path, &measurement) != 0) {
             collector_error("%s: Cannot read %s", zone->name, zone->path);
             continue;
         }

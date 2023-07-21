@@ -7,15 +7,15 @@ int do_proc_sys_fs_file_nr(int update_every, usec_t dt) {
 
     static procfile *ff = NULL;
 
-    if(unlikely(!ff)) {
+    if(!ff) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/sys/fs/file-nr");
         ff = procfile_open(config_get("plugin:proc:/proc/sys/fs/file-nr", "filename to monitor", filename), "", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff)) return 1;
+        if(!ff) return 1;
     }
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
+    if(!ff) return 0; // we return 0, so that we will retry to open it next time
 
     uint64_t allocated = str2ull(procfile_lineword(ff, 0, 0), NULL);
     uint64_t unused = str2ull(procfile_lineword(ff, 0, 1), NULL);
@@ -26,7 +26,7 @@ int do_proc_sys_fs_file_nr(int update_every, usec_t dt) {
     static RRDSET *st_files = NULL;
     static RRDDIM *rd_used = NULL;
 
-    if(unlikely(!st_files)) {
+    if(!st_files) {
         st_files = rrdset_create_localhost(
                 "system"
                 , "file_nr_used"
@@ -51,7 +51,7 @@ int do_proc_sys_fs_file_nr(int update_every, usec_t dt) {
     static RRDSET *st_files_utilization = NULL;
     static RRDDIM *rd_utilization = NULL;
 
-    if(unlikely(!st_files_utilization)) {
+    if(!st_files_utilization) {
         st_files_utilization = rrdset_create_localhost(
                 "system"
                 , "file_nr_utilization"

@@ -479,13 +479,13 @@ void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *m
     char filename[FILENAME_MAX+1];
     snprintfz(filename, FILENAME_MAX, "/proc/self/fdinfo/%d", map->map_fd);
     procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
-    if(unlikely(!ff)) {
+    if(!ff) {
         netdata_log_error("Cannot open %s", filename);
         return;
     }
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff))
+    if(!ff)
         return;
 
     unsigned long j, lines = procfile_lines(ff);
@@ -896,13 +896,13 @@ char *ebpf_find_symbol(char *search)
     char *ret = NULL;
     snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, NETDATA_KALLSYMS);
     procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
-    if(unlikely(!ff)) {
+    if(!ff) {
         netdata_log_error("Cannot open %s%s", netdata_configured_host_prefix, NETDATA_KALLSYMS);
         return ret;
     }
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff))
+    if(!ff)
         return ret;
 
     unsigned long i, lines = procfile_lines(ff);

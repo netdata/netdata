@@ -406,13 +406,13 @@ size_t json_walk_object(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_
             default:
                 if(key) {
                     int len = t[start].end - t[start].start;
-                    if (unlikely(len>JSON_NAME_LEN)) len=JSON_NAME_LEN;
+                    if (len>JSON_NAME_LEN) len=JSON_NAME_LEN;
                     strncpy(ne.name, &js[t[start].start], len);
                     ne.name[len] = '\0';
                     len=strlen(e->fullname) + strlen(e->fullname[0]?".":"") + strlen(ne.name);
                     char *c = mallocz((len+1)*sizeof(char));
                     sprintf(c,"%s%s%s", e->fullname, e->fullname[0]?".":"", ne.name);
-                    if (unlikely(len>JSON_FULLNAME_LEN)) len=JSON_FULLNAME_LEN;
+                    if (len>JSON_FULLNAME_LEN) len=JSON_FULLNAME_LEN;
                     strncpy(ne.fullname, c, len);
                     freez(c);
                     start++;

@@ -77,7 +77,7 @@ static inline void tg_trimmed_mean_free(RRDR *r) {
 static inline void tg_trimmed_mean_add(RRDR *r, NETDATA_DOUBLE value) {
     struct tg_trimmed_mean *g = (struct tg_trimmed_mean *)r->time_grouping.data;
 
-    if(unlikely(g->next_pos >= g->series_size)) {
+    if(g->next_pos >= g->series_size) {
         g->series = onewayalloc_doublesize( r->internal.owa, g->series, g->series_size * sizeof(NETDATA_DOUBLE));
         g->series_size *= 2;
     }
@@ -91,7 +91,7 @@ static inline NETDATA_DOUBLE tg_trimmed_mean_flush(RRDR *r, RRDR_VALUE_FLAGS *rr
     NETDATA_DOUBLE value;
     size_t available_slots = g->next_pos;
 
-    if(unlikely(!available_slots)) {
+    if(!available_slots) {
         value = 0.0;
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
@@ -154,7 +154,7 @@ static inline NETDATA_DOUBLE tg_trimmed_mean_flush(RRDR *r, RRDR_VALUE_FLAGS *rr
             value = min;
     }
 
-    if(unlikely(!netdata_double_isnumber(value))) {
+    if(!netdata_double_isnumber(value)) {
         value = 0.0;
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }

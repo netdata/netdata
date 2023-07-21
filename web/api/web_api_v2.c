@@ -669,7 +669,7 @@ static struct web_api_command api_commands_v2[] = {
 inline int web_client_api_request_v2(RRDHOST *host, struct web_client *w, char *url_path_endpoint) {
     static int initialized = 0;
 
-    if(unlikely(initialized == 0)) {
+    if(initialized == 0) {
         initialized = 1;
 
         for(int i = 0; api_commands_v2[i].command ; i++)

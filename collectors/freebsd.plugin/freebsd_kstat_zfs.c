@@ -13,7 +13,7 @@ int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
     (void)dt;
 
     static int show_zero_charts = -1;
-    if(unlikely(show_zero_charts == -1))
+    if(show_zero_charts == -1)
         show_zero_charts = config_get_boolean_ondemand("plugin:freebsd:zfs_arcstats", "show zero charts", CONFIG_BOOLEAN_NO);
 
     unsigned long long l2_size;
@@ -114,10 +114,10 @@ int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
 
     arcstats.l2exist = -1;
 
-    if(unlikely(sysctlbyname("kstat.zfs.misc.arcstats.l2_size", &l2_size, &uint64_t_size, NULL, 0)))
+    if(sysctlbyname("kstat.zfs.misc.arcstats.l2_size", &l2_size, &uint64_t_size, NULL, 0))
         return 0;
 
-    if(likely(l2_size))
+    if(l2_size)
         arcstats.l2exist = 1;
     else
         arcstats.l2exist = 0;
@@ -234,10 +234,10 @@ int do_kstat_zfs_misc_zio_trim(int update_every, usec_t dt) {
                mib_failed[5] = {0, 0, 0, 0, 0}, mib_unsupported[5] = {0, 0, 0, 0, 0};
     uint64_t bytes, success, failed, unsupported;
 
-    if (unlikely(GETSYSCTL_SIMPLE("kstat.zfs.misc.zio_trim.bytes", mib_bytes, bytes) ||
+    if (GETSYSCTL_SIMPLE("kstat.zfs.misc.zio_trim.bytes", mib_bytes, bytes) ||
                  GETSYSCTL_SIMPLE("kstat.zfs.misc.zio_trim.success", mib_success, success) ||
                  GETSYSCTL_SIMPLE("kstat.zfs.misc.zio_trim.failed", mib_failed, failed) ||
-                 GETSYSCTL_SIMPLE("kstat.zfs.misc.zio_trim.unsupported", mib_unsupported, unsupported))) {
+                 GETSYSCTL_SIMPLE("kstat.zfs.misc.zio_trim.unsupported", mib_unsupported, unsupported)) {
         collector_error("DISABLED: zfs.trim_bytes chart");
         collector_error("DISABLED: zfs.trim_success chart");
         collector_error("DISABLED: kstat.zfs.misc.zio_trim module");
@@ -247,7 +247,7 @@ int do_kstat_zfs_misc_zio_trim(int update_every, usec_t dt) {
         static RRDSET *st_bytes = NULL;
         static RRDDIM *rd_bytes = NULL;
 
-        if (unlikely(!st_bytes)) {
+        if (!st_bytes) {
             st_bytes = rrdset_create_localhost(
                     "zfs",
                     "trim_bytes",
@@ -272,7 +272,7 @@ int do_kstat_zfs_misc_zio_trim(int update_every, usec_t dt) {
         static RRDSET *st_requests = NULL;
         static RRDDIM *rd_successful = NULL, *rd_failed = NULL, *rd_unsupported = NULL;
 
-        if (unlikely(!st_requests)) {
+        if (!st_requests) {
             st_requests = rrdset_create_localhost(
                     "zfs",
                     "trim_requests",

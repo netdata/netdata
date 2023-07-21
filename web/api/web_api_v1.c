@@ -153,7 +153,7 @@ char *get_mgmt_api_key(void) {
     char *api_key_filename=config_get(CONFIG_SECTION_REGISTRY, "netdata management api key file", filename);
     static char guid[GUID_LEN + 1] = "";
 
-    if(likely(guid[0]))
+    if(guid[0])
         return guid;
 
     // read it from disk
@@ -219,7 +219,7 @@ inline RRDR_OPTIONS web_client_api_request_v1_data_options(char *o) {
         uint32_t hash = simple_hash(tok);
         int i;
         for(i = 0; api_v1_data_options[i].name ; i++) {
-            if (unlikely(hash == api_v1_data_options[i].hash && !strcmp(tok, api_v1_data_options[i].name))) {
+            if (hash == api_v1_data_options[i].hash && !strcmp(tok, api_v1_data_options[i].name)) {
                 ret |= api_v1_data_options[i].value;
                 break;
             }
@@ -239,7 +239,7 @@ inline CONTEXTS_V2_OPTIONS web_client_api_request_v2_context_options(char *o) {
         uint32_t hash = simple_hash(tok);
         int i;
         for(i = 0; contexts_v2_options[i].name ; i++) {
-            if (unlikely(hash == contexts_v2_options[i].hash && !strcmp(tok, contexts_v2_options[i].name))) {
+            if (hash == contexts_v2_options[i].hash && !strcmp(tok, contexts_v2_options[i].name)) {
                 ret |= contexts_v2_options[i].value;
                 break;
             }
@@ -259,7 +259,7 @@ inline CONTEXTS_V2_ALERT_STATUS web_client_api_request_v2_alert_status(char *o) 
         uint32_t hash = simple_hash(tok);
         int i;
         for(i = 0; contexts_v2_alert_status[i].name ; i++) {
-            if (unlikely(hash == contexts_v2_alert_status[i].hash && !strcmp(tok, contexts_v2_alert_status[i].name))) {
+            if (hash == contexts_v2_alert_status[i].hash && !strcmp(tok, contexts_v2_alert_status[i].name)) {
                 ret |= contexts_v2_alert_status[i].value;
                 break;
             }
@@ -274,7 +274,7 @@ void web_client_api_request_v2_contexts_alerts_status_to_buffer_json_array(BUFFE
 
     RRDR_OPTIONS used = 0; // to prevent adding duplicates
     for(int i = 0; contexts_v2_alert_status[i].name ; i++) {
-        if (unlikely((contexts_v2_alert_status[i].value & options) && !(contexts_v2_alert_status[i].value & used))) {
+        if ((contexts_v2_alert_status[i].value & options) && !(contexts_v2_alert_status[i].value & used)) {
             const char *name = contexts_v2_alert_status[i].name;
             used |= contexts_v2_alert_status[i].value;
 
@@ -290,7 +290,7 @@ void web_client_api_request_v2_contexts_options_to_buffer_json_array(BUFFER *wb,
 
     RRDR_OPTIONS used = 0; // to prevent adding duplicates
     for(int i = 0; contexts_v2_options[i].name ; i++) {
-        if (unlikely((contexts_v2_options[i].value & options) && !(contexts_v2_options[i].value & used))) {
+        if ((contexts_v2_options[i].value & options) && !(contexts_v2_options[i].value & used)) {
             const char *name = contexts_v2_options[i].name;
             used |= contexts_v2_options[i].value;
 
@@ -306,7 +306,7 @@ void web_client_api_request_v1_data_options_to_buffer_json_array(BUFFER *wb, con
 
     RRDR_OPTIONS used = 0; // to prevent adding duplicates
     for(int i = 0; api_v1_data_options[i].name ; i++) {
-        if (unlikely((api_v1_data_options[i].value & options) && !(api_v1_data_options[i].value & used))) {
+        if ((api_v1_data_options[i].value & options) && !(api_v1_data_options[i].value & used)) {
             const char *name = api_v1_data_options[i].name;
             used |= api_v1_data_options[i].value;
 
@@ -324,7 +324,7 @@ void web_client_api_request_v1_data_options_to_string(char *buf, size_t size, RR
     RRDR_OPTIONS used = 0; // to prevent adding duplicates
     int added = 0;
     for(int i = 0; api_v1_data_options[i].name ; i++) {
-        if (unlikely((api_v1_data_options[i].value & options) && !(api_v1_data_options[i].value & used))) {
+        if ((api_v1_data_options[i].value & options) && !(api_v1_data_options[i].value & used)) {
             const char *name = api_v1_data_options[i].name;
             used |= api_v1_data_options[i].value;
 
@@ -345,7 +345,7 @@ inline uint32_t web_client_api_request_v1_data_format(char *name) {
     int i;
 
     for(i = 0; api_v1_data_formats[i].name ; i++) {
-        if (unlikely(hash == api_v1_data_formats[i].hash && !strcmp(name, api_v1_data_formats[i].name))) {
+        if (hash == api_v1_data_formats[i].hash && !strcmp(name, api_v1_data_formats[i].name)) {
             return api_v1_data_formats[i].value;
         }
     }
@@ -358,7 +358,7 @@ inline uint32_t web_client_api_request_v1_data_google_format(char *name) {
     int i;
 
     for(i = 0; api_v1_data_google_formats[i].name ; i++) {
-        if (unlikely(hash == api_v1_data_google_formats[i].hash && !strcmp(name, api_v1_data_google_formats[i].name))) {
+        if (hash == api_v1_data_google_formats[i].hash && !strcmp(name, api_v1_data_google_formats[i].name)) {
             return api_v1_data_google_formats[i].value;
         }
     }
@@ -909,7 +909,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
             hash_switch = 0, hash_machine = 0, hash_url = 0, hash_name = 0, hash_delete_url = 0, hash_for = 0,
             hash_to = 0 /*, hash_redirects = 0 */;
 
-    if(unlikely(!hash_action)) {
+    if(!hash_action) {
         hash_action = simple_hash("action");
         hash_access = simple_hash("access");
         hash_hello = simple_hash("hello");
@@ -1008,21 +1008,21 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
 #endif /* NETDATA_INTERNAL_CHECKS */
     }
 
-    if(unlikely(respect_web_browser_do_not_track_policy && web_client_has_donottrack(w))) {
+    if(respect_web_browser_do_not_track_policy && web_client_has_donottrack(w)) {
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "Your web browser is sending 'DNT: 1' (Do Not Track). The registry requires persistent cookies on your browser to work.");
         return HTTP_RESP_BAD_REQUEST;
     }
 
-    if(unlikely(action == 'H')) {
+    if(action == 'H') {
         // HELLO request, dashboard ACL
         analytics_log_dashboard();
-        if(unlikely(!web_client_can_access_dashboard(w)))
+        if(!web_client_can_access_dashboard(w))
             return web_client_permission_denied(w);
     }
     else {
         // everything else, registry ACL
-        if(unlikely(!web_client_can_access_registry(w)))
+        if(!web_client_can_access_registry(w))
             return web_client_permission_denied(w);
     }
 
@@ -1030,7 +1030,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
 
     switch(action) {
         case 'A':
-            if(unlikely(!machine_guid || !machine_url || !url_name)) {
+            if(!machine_guid || !machine_url || !url_name) {
                 netdata_log_error("Invalid registry request - access requires these parameters: machine ('%s'), url ('%s'), name ('%s')", machine_guid ? machine_guid : "UNSET", machine_url ? machine_url : "UNSET", url_name ? url_name : "UNSET");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Access request.");
@@ -1041,7 +1041,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
             return registry_request_access_json(host, w, person_guid, machine_guid, machine_url, url_name, now_realtime_sec());
 
         case 'D':
-            if(unlikely(!machine_guid || !machine_url || !delete_url)) {
+            if(!machine_guid || !machine_url || !delete_url) {
                 netdata_log_error("Invalid registry request - delete requires these parameters: machine ('%s'), url ('%s'), delete_url ('%s')", machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", delete_url?delete_url:"UNSET");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Delete request.");
@@ -1052,7 +1052,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
             return registry_request_delete_json(host, w, person_guid, machine_guid, machine_url, delete_url, now_realtime_sec());
 
         case 'S':
-            if(unlikely(!search_machine_guid)) {
+            if(!search_machine_guid) {
                 netdata_log_error("Invalid registry request - search requires these parameters: for ('%s')", search_machine_guid?search_machine_guid:"UNSET");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Search request.");
@@ -1063,7 +1063,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
             return registry_request_search_json(host, w, person_guid, search_machine_guid);
 
         case 'W':
-            if(unlikely(!machine_guid || !machine_url || !to_person_guid)) {
+            if(!machine_guid || !machine_url || !to_person_guid) {
                 netdata_log_error("Invalid registry request - switching identity requires these parameters: machine ('%s'), url ('%s'), to ('%s')", machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", to_person_guid?to_person_guid:"UNSET");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Switch request.");
@@ -1089,7 +1089,7 @@ void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host, BUFFER
     size_t normal = 0, warning = 0, critical = 0;
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
-        if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+        if(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec)
             continue;
 
         switch(rc->status) {
@@ -1562,7 +1562,7 @@ static struct web_api_command api_commands_v1[] = {
 inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url_path_endpoint) {
     static int initialized = 0;
 
-    if(unlikely(initialized == 0)) {
+    if(initialized == 0) {
         initialized = 1;
 
         for(int i = 0; api_commands_v1[i].command ; i++)

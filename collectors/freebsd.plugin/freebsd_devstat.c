@@ -88,21 +88,21 @@ static struct disk *disks_root = NULL, *disks_last_used = NULL;
 static size_t disks_added = 0, disks_found = 0;
 
 static void disk_free(struct disk *dm) {
-    if (likely(dm->st_io))
+    if (dm->st_io)
         rrdset_is_obsolete(dm->st_io);
-    if (likely(dm->st_ops))
+    if (dm->st_ops)
         rrdset_is_obsolete(dm->st_ops);
-    if (likely(dm->st_qops))
+    if (dm->st_qops)
         rrdset_is_obsolete(dm->st_qops);
-    if (likely(dm->st_util))
+    if (dm->st_util)
         rrdset_is_obsolete(dm->st_util);
-    if (likely(dm->st_iotime))
+    if (dm->st_iotime)
         rrdset_is_obsolete(dm->st_iotime);
-    if (likely(dm->st_await))
+    if (dm->st_await)
         rrdset_is_obsolete(dm->st_await);
-    if (likely(dm->st_avagsz))
+    if (dm->st_avagsz)
         rrdset_is_obsolete(dm->st_avagsz);
-    if (likely(dm->st_svctm))
+    if (dm->st_svctm)
         rrdset_is_obsolete(dm->st_svctm);
 
     disks_added--;
@@ -111,11 +111,11 @@ static void disk_free(struct disk *dm) {
 }
 
 static void disks_cleanup() {
-    if (likely(disks_found == disks_added)) return;
+    if (disks_found == disks_added) return;
 
     struct disk *dm = disks_root, *last = NULL;
     while(dm) {
-        if (unlikely(!dm->updated)) {
+        if (!dm->updated) {
             // collector_info("Removing disk '%s', linked after '%s'", dm->name, last?last->name:"ROOT");
 
             if (disks_last_used == dm)
@@ -147,7 +147,7 @@ static struct disk *get_disk(const char *name) {
 
     // search it, from the last position to the end
     for(dm = disks_last_used ; dm ; dm = dm->next) {
-        if (unlikely(hash == dm->hash && !strcmp(name, dm->name))) {
+        if (hash == dm->hash && !strcmp(name, dm->name)) {
             disks_last_used = dm->next;
             return dm;
         }
@@ -155,7 +155,7 @@ static struct disk *get_disk(const char *name) {
 
     // search it from the beginning to the last position we used
     for(dm = disks_root ; dm != disks_last_used ; dm = dm->next) {
-        if (unlikely(hash == dm->hash && !strcmp(name, dm->name))) {
+        if (hash == dm->hash && !strcmp(name, dm->name)) {
             disks_last_used = dm->next;
             return dm;
         }
@@ -194,7 +194,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
             do_iotime = -1, do_await = -1, do_avagsz = -1, do_svctm = -1;
     static SIMPLE_PATTERN *excluded_disks = NULL;
 
-    if (unlikely(enable_new_disks == -1)) {
+    if (enable_new_disks == -1) {
         enable_new_disks = config_get_boolean_ondemand(CONFIG_SECTION_KERN_DEVSTAT,
                                                        "enable new disks detected at runtime", CONFIG_BOOLEAN_AUTO);
 
@@ -228,25 +228,25 @@ int do_kern_devstat(int update_every, usec_t dt) {
             true);
     }
 
-    if (likely(do_system_io || do_io || do_ops || do_qops || do_util || do_iotime || do_await || do_avagsz || do_svctm)) {
+    if (do_system_io || do_io || do_ops || do_qops || do_util || do_iotime || do_await || do_avagsz || do_svctm) {
         static int mib_numdevs[3] = {0, 0, 0};
         int numdevs;
         int common_error = 0;
 
-        if (unlikely(GETSYSCTL_SIMPLE("kern.devstat.numdevs", mib_numdevs, numdevs))) {
+        if (GETSYSCTL_SIMPLE("kern.devstat.numdevs", mib_numdevs, numdevs)) {
             common_error = 1;
         } else {
             static int mib_devstat[3] = {0, 0, 0};
             static void *devstat_data = NULL;
             static int old_numdevs = 0;
 
-            if (unlikely(numdevs != old_numdevs)) {
+            if (numdevs != old_numdevs) {
                 devstat_data = reallocz(devstat_data, sizeof(long) + sizeof(struct devstat) *
                                                                      numdevs); // there is generation number before devstat structures
                 old_numdevs = numdevs;
             }
-            if (unlikely(GETSYSCTL_WSIZE("kern.devstat.all", mib_devstat, devstat_data,
-                                         sizeof(long) + sizeof(struct devstat) * numdevs))) {
+            if (GETSYSCTL_WSIZE("kern.devstat.all", mib_devstat, devstat_data,
+                                         sizeof(long) + sizeof(struct devstat) * numdevs)) {
                 common_error = 1;
             } else {
                 struct devstat *dstat;
@@ -259,7 +259,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                 dstat = (struct devstat*)((char*)devstat_data + sizeof(long)); // skip generation number
 
                 for (i = 0; i < numdevs; i++) {
-                    if (likely(do_system_io)) {
+                    if (do_system_io) {
                         if (((dstat[i].device_type & DEVSTAT_TYPE_MASK) == DEVSTAT_TYPE_DIRECT) ||
                             ((dstat[i].device_type & DEVSTAT_TYPE_MASK) == DEVSTAT_TYPE_STORARRAY)) {
                             total_disk_kbytes_read += dstat[i].bytes[DEVSTAT_READ] / KILO_FACTOR;
@@ -267,7 +267,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                         }
                     }
 
-                    if (unlikely(!enable_pass_devices))
+                    if (!enable_pass_devices)
                         if ((dstat[i].device_type & DEVSTAT_TYPE_PASS) == DEVSTAT_TYPE_PASS)
                             continue;
 
@@ -288,7 +288,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                         dm->updated = 1;
                         disks_found++;
 
-                        if(unlikely(!dm->configured)) {
+                        if(!dm->configured) {
                             char var_name[4096 + 1];
 
                             // this is the first time we see this disk
@@ -298,7 +298,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
 
                             dm->enabled = enable_new_disks;
 
-                            if (likely(dm->enabled))
+                            if (dm->enabled)
                                 dm->enabled = !simple_pattern_matches(excluded_disks, disk);
 
                             snprintfz(var_name, 4096, "%s:%s", CONFIG_SECTION_KERN_DEVSTAT, disk);
@@ -352,7 +352,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                 dstat[i].bytes[DEVSTAT_WRITE] ||
                                                                 dstat[i].bytes[DEVSTAT_FREE] ||
                                                                 netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                            if (unlikely(!dm->st_io)) {
+                            if (!dm->st_io) {
                                 dm->st_io = rrdset_create_localhost("disk",
                                                                     disk,
                                                                     NULL,
@@ -387,7 +387,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                  dstat[i].operations[DEVSTAT_NO_DATA] ||
                                                                  dstat[i].operations[DEVSTAT_FREE] ||
                                                                  netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                            if (unlikely(!dm->st_ops)) {
+                            if (!dm->st_ops) {
                                 dm->st_ops = rrdset_create_localhost("disk_ops",
                                                                      disk,
                                                                      NULL,
@@ -425,7 +425,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                  (dstat[i].start_count ||
                                                                   dstat[i].end_count ||
                                                                   netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                            if (unlikely(!dm->st_qops)) {
+                            if (!dm->st_qops) {
                                 dm->st_qops = rrdset_create_localhost("disk_qops",
                                                                       disk,
                                                                       NULL,
@@ -452,7 +452,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                         if(dm->do_util == CONFIG_BOOLEAN_YES || (dm->do_util == CONFIG_BOOLEAN_AUTO &&
                                                                  (cur_dstat.busy_time_ms ||
                                                                   netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                            if (unlikely(!dm->st_util)) {
+                            if (!dm->st_util) {
                                 dm->st_util = rrdset_create_localhost("disk_util",
                                                                       disk,
                                                                       NULL,
@@ -483,7 +483,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                     cur_dstat.duration_other_ms ||
                                                                     cur_dstat.duration_free_ms ||
                                                                     netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                            if (unlikely(!dm->st_iotime)) {
+                            if (!dm->st_iotime) {
                                 dm->st_iotime = rrdset_create_localhost("disk_iotime",
                                                                         disk,
                                                                         NULL,
@@ -520,14 +520,14 @@ int do_kern_devstat(int update_every, usec_t dt) {
                         // calculate differential charts
                         // only if this is not the first time we run
 
-                        if (likely(dt)) {
+                        if (dt) {
                             if(dm->do_await == CONFIG_BOOLEAN_YES || (dm->do_await == CONFIG_BOOLEAN_AUTO &&
                                                                       (dstat[i].operations[DEVSTAT_READ] ||
                                                                        dstat[i].operations[DEVSTAT_WRITE] ||
                                                                        dstat[i].operations[DEVSTAT_NO_DATA] ||
                                                                        dstat[i].operations[DEVSTAT_FREE] ||
                                                                        netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                                if (unlikely(!dm->st_await)) {
+                                if (!dm->st_await) {
                                     dm->st_await = rrdset_create_localhost("disk_await",
                                                                            disk,
                                                                            NULL,
@@ -590,7 +590,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                         dstat[i].operations[DEVSTAT_WRITE] ||
                                                                         dstat[i].operations[DEVSTAT_FREE] ||
                                                                         netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                                if (unlikely(!dm->st_avagsz)) {
+                                if (!dm->st_avagsz) {
                                     dm->st_avagsz = rrdset_create_localhost("disk_avgsz",
                                                                             disk,
                                                                             NULL,
@@ -645,7 +645,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                        dstat[i].operations[DEVSTAT_NO_DATA] ||
                                                                        dstat[i].operations[DEVSTAT_FREE] ||
                                                                        netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-                                if (unlikely(!dm->st_svctm)) {
+                                if (!dm->st_svctm) {
                                     dm->st_svctm = rrdset_create_localhost("disk_svctm",
                                                                            disk,
                                                                            NULL,
@@ -696,11 +696,11 @@ int do_kern_devstat(int update_every, usec_t dt) {
                     }
                 }
 
-                if (likely(do_system_io)) {
+                if (do_system_io) {
                     static RRDSET *st = NULL;
                     static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
-                    if (unlikely(!st)) {
+                    if (!st) {
                         st = rrdset_create_localhost("system",
                                                      "io",
                                                      NULL,
@@ -726,7 +726,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
             }
         }
 
-        if (unlikely(common_error)) {
+        if (common_error) {
             do_system_io = 0;
             collector_error("DISABLED: system.io chart");
             do_io = 0;

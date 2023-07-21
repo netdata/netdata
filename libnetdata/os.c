@@ -14,7 +14,7 @@ long get_system_cpus_with_cache(bool cache, bool for_netdata) {
 
     int index = for_netdata ? CPUS_FOR_NETDATA : CPUS_FOR_COLLECTORS;
 
-    if(likely(cache && processors[index] > 0))
+    if(cache && processors[index] > 0)
         return processors[index];
 
 #if defined(__APPLE__) || defined(__FreeBSD__)
@@ -27,7 +27,7 @@ long get_system_cpus_with_cache(bool cache, bool for_netdata) {
     int32_t tmp_processors;
     bool error = false;
 
-    if (unlikely(GETSYSCTL_BY_NAME(HW_CPU_NAME, tmp_processors)))
+    if (GETSYSCTL_BY_NAME(HW_CPU_NAME, tmp_processors))
         error = true;
     else
         processors[index] = tmp_processors;
@@ -91,7 +91,7 @@ pid_t get_system_pid_max(void) {
 #elif __FreeBSD__
     int32_t tmp_pid_max;
 
-        if (unlikely(GETSYSCTL_BY_NAME("kern.pid_max", tmp_pid_max))) {
+        if (GETSYSCTL_BY_NAME("kern.pid_max", tmp_pid_max)) {
             pid_max = 99999;
             netdata_log_error("Assuming system's maximum pid is %d.", pid_max);
         } else {
@@ -102,7 +102,7 @@ pid_t get_system_pid_max(void) {
 #else
 
     static char read = 0;
-    if(unlikely(read)) return pid_max;
+    if(read) return pid_max;
     read = 1;
 
     char filename[FILENAME_MAX + 1];
@@ -196,11 +196,11 @@ const char *os_type = "freebsd";
 int getsysctl_by_name(const char *name, void *ptr, size_t len) {
     size_t nlen = len;
 
-    if (unlikely(sysctlbyname(name, ptr, &nlen, NULL, 0) == -1)) {
+    if (sysctlbyname(name, ptr, &nlen, NULL, 0) == -1) {
         netdata_log_error("FREEBSD: sysctl(%s...) failed: %s", name, strerror(errno));
         return 1;
     }
-    if (unlikely(nlen != len)) {
+    if (nlen != len) {
         netdata_log_error("FREEBSD: sysctl(%s...) expected %lu, got %lu", name, (unsigned long)len, (unsigned long)nlen);
         return 1;
     }
@@ -210,15 +210,15 @@ int getsysctl_by_name(const char *name, void *ptr, size_t len) {
 int getsysctl_simple(const char *name, int *mib, size_t miblen, void *ptr, size_t len) {
     size_t nlen = len;
 
-    if (unlikely(!mib[0]))
-        if (unlikely(getsysctl_mib(name, mib, miblen)))
+    if (!mib[0])
+        if (getsysctl_mib(name, mib, miblen))
             return 1;
 
-    if (unlikely(sysctl(mib, miblen, ptr, &nlen, NULL, 0) == -1)) {
+    if (sysctl(mib, miblen, ptr, &nlen, NULL, 0) == -1) {
         netdata_log_error("FREEBSD: sysctl(%s...) failed: %s", name, strerror(errno));
         return 1;
     }
-    if (unlikely(nlen != len)) {
+    if (nlen != len) {
         netdata_log_error("FREEBSD: sysctl(%s...) expected %lu, got %lu", name, (unsigned long)len, (unsigned long)nlen);
         return 1;
     }
@@ -229,15 +229,15 @@ int getsysctl_simple(const char *name, int *mib, size_t miblen, void *ptr, size_
 int getsysctl(const char *name, int *mib, size_t miblen, void *ptr, size_t *len) {
     size_t nlen = *len;
 
-    if (unlikely(!mib[0]))
-        if (unlikely(getsysctl_mib(name, mib, miblen)))
+    if (!mib[0])
+        if (getsysctl_mib(name, mib, miblen))
             return 1;
 
-    if (unlikely(sysctl(mib, miblen, ptr, len, NULL, 0) == -1)) {
+    if (sysctl(mib, miblen, ptr, len, NULL, 0) == -1) {
         netdata_log_error("FREEBSD: sysctl(%s...) failed: %s", name, strerror(errno));
         return 1;
     }
-    if (unlikely(ptr != NULL && nlen != *len)) {
+    if (ptr != NULL && nlen != *len) {
         netdata_log_error("FREEBSD: sysctl(%s...) expected %lu, got %lu", name, (unsigned long)*len, (unsigned long)nlen);
         return 1;
     }
@@ -248,11 +248,11 @@ int getsysctl(const char *name, int *mib, size_t miblen, void *ptr, size_t *len)
 int getsysctl_mib(const char *name, int *mib, size_t len) {
     size_t nlen = len;
 
-    if (unlikely(sysctlnametomib(name, mib, &nlen) == -1)) {
+    if (sysctlnametomib(name, mib, &nlen) == -1) {
         netdata_log_error("FREEBSD: sysctl(%s...) failed: %s", name, strerror(errno));
         return 1;
     }
-    if (unlikely(nlen != len)) {
+    if (nlen != len) {
         netdata_log_error("FREEBSD: sysctl(%s...) expected %lu, got %lu", name, (unsigned long)len, (unsigned long)nlen);
         return 1;
     }
@@ -273,11 +273,11 @@ const char *os_type = "macos";
 int getsysctl_by_name(const char *name, void *ptr, size_t len) {
     size_t nlen = len;
 
-    if (unlikely(sysctlbyname(name, ptr, &nlen, NULL, 0) == -1)) {
+    if (sysctlbyname(name, ptr, &nlen, NULL, 0) == -1) {
         netdata_log_error("MACOS: sysctl(%s...) failed: %s", name, strerror(errno));
         return 1;
     }
-    if (unlikely(nlen != len)) {
+    if (nlen != len) {
         netdata_log_error("MACOS: sysctl(%s...) expected %lu, got %lu", name, (unsigned long)len, (unsigned long)nlen);
         return 1;
     }

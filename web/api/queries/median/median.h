@@ -80,7 +80,7 @@ static inline void tg_median_free(RRDR *r) {
 static inline void tg_median_add(RRDR *r, NETDATA_DOUBLE value) {
     struct tg_median *g = (struct tg_median *)r->time_grouping.data;
 
-    if(unlikely(g->next_pos >= g->series_size)) {
+    if(g->next_pos >= g->series_size) {
         g->series = onewayalloc_doublesize( r->internal.owa, g->series, g->series_size * sizeof(NETDATA_DOUBLE));
         g->series_size *= 2;
     }
@@ -94,7 +94,7 @@ static inline NETDATA_DOUBLE tg_median_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_val
     size_t available_slots = g->next_pos;
     NETDATA_DOUBLE value;
 
-    if(unlikely(!available_slots)) {
+    if(!available_slots) {
         value = 0.0;
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
@@ -128,7 +128,7 @@ static inline NETDATA_DOUBLE tg_median_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_val
             value = median_on_sorted_series(&g->series[start_slot], end_slot - start_slot + 1);
     }
 
-    if(unlikely(!netdata_double_isnumber(value))) {
+    if(!netdata_double_isnumber(value)) {
         value = 0.0;
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }

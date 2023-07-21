@@ -81,15 +81,15 @@ int is_legacy_child(const char *machine_guid)
     uuid_t uuid;
     char  dbengine_file[FILENAME_MAX+1];
 
-    if (unlikely(!strcmp(machine_guid, "unittest-dbengine") || !strcmp(machine_guid, "dbengine-dataset") ||
-                 !strcmp(machine_guid, "dbengine-stress-test"))) {
+    if (!strcmp(machine_guid, "unittest-dbengine") || !strcmp(machine_guid, "dbengine-dataset") ||
+                 !strcmp(machine_guid, "dbengine-stress-test")) {
         return 1;
     }
     if (!uuid_parse(machine_guid, uuid)) {
         uv_fs_t stat_req;
         snprintfz(dbengine_file, FILENAME_MAX, "%s/%s/dbengine", netdata_configured_cache_dir, machine_guid);
         int rc = uv_fs_stat(NULL, &stat_req, dbengine_file, NULL);
-        if (likely(rc == 0 && ((stat_req.statbuf.st_mode & S_IFMT) == S_IFDIR))) {
+        if (rc == 0 && ((stat_req.statbuf.st_mode & S_IFMT) == S_IFDIR)) {
             //netdata_log_info("Found legacy engine folder \"%s\"", dbengine_file);
             return 1;
         }
@@ -129,10 +129,10 @@ int compute_multidb_diskspace()
 
     snprintfz(multidb_disk_space_file, FILENAME_MAX, "%s/dbengine_multihost_size", netdata_configured_varlib_dir);
     fp = fopen(multidb_disk_space_file, "r");
-    if (likely(fp)) {
+    if (fp) {
         int rc = fscanf(fp, "%d", &computed_multidb_disk_quota_mb);
         fclose(fp);
-        if (unlikely(rc != 1 || computed_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB)) {
+        if (rc != 1 || computed_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
             errno = 0;
             netdata_log_error("File '%s' contains invalid input, it will be rebuild", multidb_disk_space_file);
             computed_multidb_disk_quota_mb = -1;
@@ -141,12 +141,12 @@ int compute_multidb_diskspace()
 
     if (computed_multidb_disk_quota_mb == -1) {
         int rc = count_legacy_children(netdata_configured_cache_dir);
-        if (likely(rc >= 0)) {
+        if (rc >= 0) {
             computed_multidb_disk_quota_mb = (rc + 1) * default_rrdeng_disk_quota_mb;
             netdata_log_info("Found %d legacy dbengines, setting multidb diskspace to %dMB", rc, computed_multidb_disk_quota_mb);
 
             fp = fopen(multidb_disk_space_file, "w");
-            if (likely(fp)) {
+            if (fp) {
                 fprintf(fp, "%d", computed_multidb_disk_quota_mb);
                 netdata_log_info("Created file '%s' to store the computed value", multidb_disk_space_file);
                 fclose(fp);

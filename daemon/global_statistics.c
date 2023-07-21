@@ -250,7 +250,7 @@ static void global_statistics_charts(void) {
         static RRDDIM *rd_cpu_user   = NULL,
                       *rd_cpu_system = NULL;
 
-        if (unlikely(!st_cpu)) {
+        if (!st_cpu) {
             st_cpu = rrdset_create_localhost(
                     "netdata"
                     , "server_cpu"
@@ -296,7 +296,7 @@ static void global_statistics_charts(void) {
         static RRDDIM *rd_judy = NULL;
         static RRDDIM *rd_other = NULL;
 
-        if (unlikely(!st_memory)) {
+        if (!st_memory) {
             st_memory = rrdset_create_localhost(
                     "netdata",
                     "memory",
@@ -385,7 +385,7 @@ static void global_statistics_charts(void) {
         static RRDDIM *rd_buffers_aral = NULL;
         static RRDDIM *rd_buffers_judy = NULL;
 
-        if (unlikely(!st_memory_buffers)) {
+        if (!st_memory_buffers) {
             st_memory_buffers = rrdset_create_localhost(
                 "netdata",
                 "memory_buffers",
@@ -440,7 +440,7 @@ static void global_statistics_charts(void) {
         static RRDSET *st_uptime = NULL;
         static RRDDIM *rd_uptime = NULL;
 
-        if (unlikely(!st_uptime)) {
+        if (!st_uptime) {
             st_uptime = rrdset_create_localhost(
                     "netdata",
                     "uptime",
@@ -468,7 +468,7 @@ static void global_statistics_charts(void) {
         static RRDSET *st_clients = NULL;
         static RRDDIM *rd_clients = NULL;
 
-        if (unlikely(!st_clients)) {
+        if (!st_clients) {
             st_clients = rrdset_create_localhost(
                     "netdata"
                     , "clients"
@@ -497,7 +497,7 @@ static void global_statistics_charts(void) {
         static RRDSET *st_reqs = NULL;
         static RRDDIM *rd_requests = NULL;
 
-        if (unlikely(!st_reqs)) {
+        if (!st_reqs) {
             st_reqs = rrdset_create_localhost(
                     "netdata"
                     , "requests"
@@ -527,7 +527,7 @@ static void global_statistics_charts(void) {
         static RRDDIM *rd_in = NULL,
                       *rd_out = NULL;
 
-        if (unlikely(!st_bytes)) {
+        if (!st_bytes) {
             st_bytes = rrdset_create_localhost(
                     "netdata"
                     , "net"
@@ -559,7 +559,7 @@ static void global_statistics_charts(void) {
         static RRDDIM *rd_average = NULL,
                       *rd_max     = NULL;
 
-        if (unlikely(!st_duration)) {
+        if (!st_duration) {
             st_duration = rrdset_create_localhost(
                     "netdata"
                     , "response_time"
@@ -591,7 +591,7 @@ static void global_statistics_charts(void) {
         if (web_requests)
             average_response_time = (collected_number) (web_usec / web_requests);
 
-        if (unlikely(average_response_time != -1))
+        if (average_response_time != -1)
             rrddim_set_by_pointer(st_duration, rd_average, average_response_time);
         else
             rrddim_set_by_pointer(st_duration, rd_average, 0);
@@ -606,7 +606,7 @@ static void global_statistics_charts(void) {
         static RRDSET *st_compression = NULL;
         static RRDDIM *rd_savings = NULL;
 
-        if (unlikely(!st_compression)) {
+        if (!st_compression) {
             st_compression = rrdset_create_localhost(
                     "netdata"
                     , "compression_ratio"
@@ -658,7 +658,7 @@ static void global_statistics_charts(void) {
         static RRDDIM *rd_backfill_queries = NULL;
         static RRDDIM *rd_replication_queries = NULL;
 
-        if (unlikely(!st_queries)) {
+        if (!st_queries) {
             st_queries = rrdset_create_localhost(
                     "netdata"
                     , "queries"
@@ -709,7 +709,7 @@ static void global_statistics_charts(void) {
         static RRDDIM *rd_backfill_points_read = NULL;
         static RRDDIM *rd_replication_points_read = NULL;
 
-        if (unlikely(!st_points_read)) {
+        if (!st_points_read) {
             st_points_read = rrdset_create_localhost(
                     "netdata"
                     , "db_points_read"
@@ -758,7 +758,7 @@ static void global_statistics_charts(void) {
         static RRDDIM *rd_ml_points_generated = NULL;
         static RRDDIM *rd_replication_points_generated = NULL;
 
-        if (unlikely(!st_points_generated)) {
+        if (!st_points_generated) {
             st_points_generated = rrdset_create_localhost(
                     "netdata"
                     , "db_points_results"
@@ -798,7 +798,7 @@ static void global_statistics_charts(void) {
         static RRDSET *st_points_stored = NULL;
         static RRDDIM *rds[RRD_STORAGE_TIERS] = {};
 
-        if (unlikely(!st_points_stored)) {
+        if (!st_points_stored) {
             st_points_stored = rrdset_create_localhost(
                     "netdata"
                     , "db_points_stored"
@@ -956,7 +956,7 @@ static void sqlite3_statistics_charts(void) {
         static RRDSET *st_sqlite3_queries = NULL;
         static RRDDIM *rd_queries = NULL;
 
-        if (unlikely(!st_sqlite3_queries)) {
+        if (!st_sqlite3_queries) {
             st_sqlite3_queries = rrdset_create_localhost(
                 "netdata"
                 , "sqlite3_queries"
@@ -986,7 +986,7 @@ static void sqlite3_statistics_charts(void) {
         static RRDSET *st_sqlite3_queries_by_status = NULL;
         static RRDDIM *rd_ok = NULL, *rd_failed = NULL, *rd_busy = NULL, *rd_locked = NULL;
 
-        if (unlikely(!st_sqlite3_queries_by_status)) {
+        if (!st_sqlite3_queries_by_status) {
             st_sqlite3_queries_by_status = rrdset_create_localhost(
                 "netdata"
                 , "sqlite3_queries_by_status"
@@ -1022,7 +1022,7 @@ static void sqlite3_statistics_charts(void) {
         static RRDSET *st_sqlite3_rows = NULL;
         static RRDDIM *rd_rows = NULL;
 
-        if (unlikely(!st_sqlite3_rows)) {
+        if (!st_sqlite3_rows) {
             st_sqlite3_rows = rrdset_create_localhost(
                 "netdata"
                 , "sqlite3_rows"
@@ -1053,7 +1053,7 @@ static void sqlite3_statistics_charts(void) {
         static RRDDIM *rd_cache_spill= NULL;
         static RRDDIM *rd_cache_write= NULL;
 
-        if (unlikely(!st_sqlite3_cache)) {
+        if (!st_sqlite3_cache) {
             st_sqlite3_cache = rrdset_create_localhost(
                 "netdata"
                 , "sqlite3_metatada_cache"
@@ -1097,7 +1097,7 @@ static void sqlite3_statistics_charts(void) {
         static RRDDIM *rd_cache_spill= NULL;
         static RRDDIM *rd_cache_write= NULL;
 
-        if (unlikely(!st_sqlite3_cache)) {
+        if (!st_sqlite3_cache) {
             st_sqlite3_cache = rrdset_create_localhost(
                 "netdata"
                 , "sqlite3_context_cache"
@@ -1216,7 +1216,7 @@ struct dbengine2_cache_pointers {
 static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *ptrs, struct pgc_statistics *pgc_stats, struct pgc_statistics *pgc_stats_old __maybe_unused, const char *name, int priority) {
 
     {
-        if (unlikely(!ptrs->st_cache_hit_ratio)) {
+        if (!ptrs->st_cache_hit_ratio) {
             BUFFER *id = buffer_create(100, NULL);
             buffer_sprintf(id, "dbengine_%s_cache_hit_ratio", name);
 
@@ -1264,7 +1264,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
     }
 
     {
-        if (unlikely(!ptrs->st_operations)) {
+        if (!ptrs->st_operations) {
             BUFFER *id = buffer_create(100, NULL);
             buffer_sprintf(id, "dbengine_%s_cache_operations", name);
 
@@ -1318,7 +1318,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
     }
 
     {
-        if (unlikely(!ptrs->st_pgc_memory)) {
+        if (!ptrs->st_pgc_memory) {
             BUFFER *id = buffer_create(100, NULL);
             buffer_sprintf(id, "dbengine_%s_cache_memory", name);
 
@@ -1372,7 +1372,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
     }
 
     {
-        if (unlikely(!ptrs->st_pgc_tm)) {
+        if (!ptrs->st_pgc_tm) {
             BUFFER *id = buffer_create(100, NULL);
             buffer_sprintf(id, "dbengine_%s_target_memory", name);
 
@@ -1422,7 +1422,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
     }
 
     {
-        if (unlikely(!ptrs->st_pgc_pages)) {
+        if (!ptrs->st_pgc_pages) {
             BUFFER *id = buffer_create(100, NULL);
             buffer_sprintf(id, "dbengine_%s_cache_pages", name);
 
@@ -1466,7 +1466,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
     }
 
     {
-        if (unlikely(!ptrs->st_pgc_memory_changes)) {
+        if (!ptrs->st_pgc_memory_changes) {
             BUFFER *id = buffer_create(100, NULL);
             buffer_sprintf(id, "dbengine_%s_cache_memory_changes", name);
 
@@ -1508,7 +1508,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
     }
 
     {
-        if (unlikely(!ptrs->st_pgc_memory_migrations)) {
+        if (!ptrs->st_pgc_memory_migrations) {
             BUFFER *id = buffer_create(100, NULL);
             buffer_sprintf(id, "dbengine_%s_cache_memory_migrations", name);
 
@@ -1548,7 +1548,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
     }
 
     {
-        if (unlikely(!ptrs->st_pgc_memory_events)) {
+        if (!ptrs->st_pgc_memory_events) {
             BUFFER *id = buffer_create(100, NULL);
             buffer_sprintf(id, "dbengine_%s_cache_events", name);
 
@@ -1590,7 +1590,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
     }
 
     {
-        if (unlikely(!ptrs->st_pgc_waste)) {
+        if (!ptrs->st_pgc_waste) {
             BUFFER *id = buffer_create(100, NULL);
             buffer_sprintf(id, "dbengine_%s_waste_events", name);
 
@@ -1642,7 +1642,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
     }
 
     {
-        if (unlikely(!ptrs->st_pgc_workers)) {
+        if (!ptrs->st_pgc_workers) {
             BUFFER *id = buffer_create(100, NULL);
             buffer_sprintf(id, "dbengine_%s_cache_workers", name);
 
@@ -1740,7 +1740,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_pgc_memory_metrics = NULL;  // metric registry memory
         static RRDDIM *rd_pgc_memory_buffers = NULL;
 
-        if (unlikely(!st_pgc_memory)) {
+        if (!st_pgc_memory) {
             st_pgc_memory = rrdset_create_localhost(
                     "netdata",
                     "dbengine_memory",
@@ -1792,7 +1792,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_pgc_buffers_julyl = NULL;
 #endif
 
-        if (unlikely(!st_pgc_buffers)) {
+        if (!st_pgc_buffers) {
             st_pgc_buffers = rrdset_create_localhost(
                     "netdata",
                     "dbengine_buffers",
@@ -1851,7 +1851,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDSET *st_julyl_moved = NULL;
         static RRDDIM *rd_julyl_moved = NULL;
 
-        if (unlikely(!st_julyl_moved)) {
+        if (!st_julyl_moved) {
             st_julyl_moved = rrdset_create_localhost(
                     "netdata",
                     "dbengine_julyl_moved",
@@ -1885,7 +1885,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_mrg_without_retention = NULL;
         static RRDDIM *rd_mrg_multiple_writers = NULL;
 
-        if (unlikely(!st_mrg_metrics)) {
+        if (!st_mrg_metrics) {
             st_mrg_metrics = rrdset_create_localhost(
                     "netdata",
                     "dbengine_metrics",
@@ -1925,7 +1925,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_mrg_del = NULL;
         static RRDDIM *rd_mrg_search = NULL;
 
-        if (unlikely(!st_mrg_ops)) {
+        if (!st_mrg_ops) {
             st_mrg_ops = rrdset_create_localhost(
                     "netdata",
                     "dbengine_metrics_registry_operations",
@@ -1957,7 +1957,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDSET *st_mrg_references = NULL;
         static RRDDIM *rd_mrg_references = NULL;
 
-        if (unlikely(!st_mrg_references)) {
+        if (!st_mrg_references) {
             st_mrg_references = rrdset_create_localhost(
                     "netdata",
                     "dbengine_metrics_registry_references",
@@ -1988,7 +1988,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_extent_cache_hit_ratio = NULL;
         static RRDDIM *rd_extent_merge_hit_ratio = NULL;
 
-        if (unlikely(!st_cache_hit_ratio)) {
+        if (!st_cache_hit_ratio) {
             st_cache_hit_ratio = rrdset_create_localhost(
                     "netdata",
                     "dbengine_cache_hit_ratio",
@@ -2065,7 +2065,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_planned_with_gaps = NULL;
         static RRDDIM *rd_executed_with_gaps = NULL;
 
-        if (unlikely(!st_queries)) {
+        if (!st_queries) {
             st_queries = rrdset_create_localhost(
                     "netdata",
                     "dbengine_queries",
@@ -2101,7 +2101,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDSET *st_queries_running = NULL;
         static RRDDIM *rd_queries = NULL;
 
-        if (unlikely(!st_queries_running)) {
+        if (!st_queries_running) {
             st_queries_running = rrdset_create_localhost(
                     "netdata",
                     "dbengine_queries_running",
@@ -2131,7 +2131,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_open = NULL;
         static RRDDIM *rd_jv2 = NULL;
 
-        if (unlikely(!st_query_pages_metadata_source)) {
+        if (!st_query_pages_metadata_source) {
             st_query_pages_metadata_source = rrdset_create_localhost(
                     "netdata",
                     "dbengine_query_pages_metadata_source",
@@ -2165,7 +2165,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_pages_disk = NULL;
         static RRDDIM *rd_pages_extent_cache = NULL;
 
-        if (unlikely(!st_query_pages_data_source)) {
+        if (!st_query_pages_data_source) {
             st_query_pages_data_source = rrdset_create_localhost(
                     "netdata",
                     "dbengine_query_pages_data_source",
@@ -2201,7 +2201,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_wait_loaded = NULL;
         static RRDDIM *rd_nowait_loaded = NULL;
 
-        if (unlikely(!st_query_next_page)) {
+        if (!st_query_next_page) {
             st_query_next_page = rrdset_create_localhost(
                     "netdata",
                     "dbengine_query_next_page",
@@ -2242,7 +2242,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_pages_fixed_entries = NULL;
         static RRDDIM *rd_pages_overlapping = NULL;
 
-        if (unlikely(!st_query_page_issues)) {
+        if (!st_query_page_issues) {
             st_query_page_issues = rrdset_create_localhost(
                     "netdata",
                     "dbengine_query_next_page_issues",
@@ -2289,7 +2289,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_invalid_extent = NULL;
         static RRDDIM *rd_extent_merged = NULL;
 
-        if (unlikely(!st_query_pages_from_disk)) {
+        if (!st_query_pages_from_disk) {
             st_query_pages_from_disk = rrdset_create_localhost(
                     "netdata",
                     "dbengine_query_pages_disk_load",
@@ -2341,7 +2341,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_jv2_indexing = NULL;
         static RRDDIM *rd_retention = NULL;
 
-        if (unlikely(!st_events)) {
+        if (!st_events) {
             st_events = rrdset_create_localhost(
                     "netdata",
                     "dbengine_events",
@@ -2385,7 +2385,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_journal_v2 = NULL;
         static RRDDIM *rd_pass4 = NULL;
 
-        if (unlikely(!st_prep_timings)) {
+        if (!st_prep_timings) {
             st_prep_timings = rrdset_create_localhost(
                     "netdata",
                     "dbengine_prep_timings",
@@ -2426,7 +2426,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_next_page_preload_fast = NULL;
         static RRDDIM *rd_next_page_preload_slow = NULL;
 
-        if (unlikely(!st_query_timings)) {
+        if (!st_query_timings) {
             st_query_timings = rrdset_create_localhost(
                     "netdata",
                     "dbengine_query_timings",
@@ -2508,7 +2508,7 @@ static void dbengine2_statistics_charts(void) {
                 static RRDSET *st_compression = NULL;
                 static RRDDIM *rd_savings = NULL;
 
-                if (unlikely(!st_compression)) {
+                if (!st_compression) {
                     st_compression = rrdset_create_localhost(
                             "netdata",
                             "dbengine_compression_ratio",
@@ -2549,7 +2549,7 @@ static void dbengine2_statistics_charts(void) {
                 static RRDDIM *rd_reads = NULL;
                 static RRDDIM *rd_writes = NULL;
 
-                if (unlikely(!st_io_stats)) {
+                if (!st_io_stats) {
                     st_io_stats = rrdset_create_localhost(
                             "netdata",
                             "dbengine_io_throughput",
@@ -2581,7 +2581,7 @@ static void dbengine2_statistics_charts(void) {
                 static RRDDIM *rd_reads = NULL;
                 static RRDDIM *rd_writes = NULL;
 
-                if (unlikely(!st_io_stats)) {
+                if (!st_io_stats) {
                     st_io_stats = rrdset_create_localhost(
                             "netdata",
                             "dbengine_io_operations",
@@ -2614,7 +2614,7 @@ static void dbengine2_statistics_charts(void) {
                 static RRDDIM *rd_io_errors = NULL;
                 static RRDDIM *pg_cache_over_half_dirty_events = NULL;
 
-                if (unlikely(!st_errors)) {
+                if (!st_errors) {
                     st_errors = rrdset_create_localhost(
                             "netdata",
                             "dbengine_global_errors",
@@ -2649,7 +2649,7 @@ static void dbengine2_statistics_charts(void) {
                 static RRDDIM *rd_fd_current = NULL;
                 static RRDDIM *rd_fd_max = NULL;
 
-                if (unlikely(!st_fd)) {
+                if (!st_fd) {
                     st_fd = rrdset_create_localhost(
                             "netdata",
                             "dbengine_global_file_descriptors",
@@ -2689,7 +2689,7 @@ static void update_strings_charts() {
 
     string_statistics(&inserts, &deletes, &searches, &entries, &references, &memory, &duplications, &releases);
 
-    if (unlikely(!st_ops)) {
+    if (!st_ops) {
         st_ops = rrdset_create_localhost(
             "netdata"
             , "strings_ops"
@@ -2718,7 +2718,7 @@ static void update_strings_charts() {
     rrddim_set_by_pointer(st_ops, rd_ops_releases,     (collected_number)releases);
     rrdset_done(st_ops);
 
-    if (unlikely(!st_entries)) {
+    if (!st_entries) {
         st_entries = rrdset_create_localhost(
             "netdata"
             , "strings_entries"
@@ -2741,7 +2741,7 @@ static void update_strings_charts() {
     rrddim_set_by_pointer(st_entries, rd_entries_refs, (collected_number)references);
     rrdset_done(st_entries);
 
-    if (unlikely(!st_mem)) {
+    if (!st_mem) {
         st_mem = rrdset_create_localhost(
             "netdata"
             , "strings_memory"
@@ -2769,7 +2769,7 @@ static void update_heartbeat_charts() {
     static RRDDIM *rd_heartbeat_max = NULL;
     static RRDDIM *rd_heartbeat_avg = NULL;
 
-    if (unlikely(!st_heartbeat)) {
+    if (!st_heartbeat) {
         st_heartbeat = rrdset_create_localhost(
             "netdata"
             , "heartbeat"
@@ -2885,7 +2885,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     load_dictionary_stats_entry(dictionaries.deleted);
 
     if(c->st_dicts || total != 0) {
-        if (unlikely(!c->st_dicts)) {
+        if (!c->st_dicts) {
             char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.dictionaries", c->context_prefix, stats.name);
 
@@ -2926,7 +2926,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     load_dictionary_stats_entry(items.pending_deletion);
 
     if(c->st_items || total != 0) {
-        if (unlikely(!c->st_items)) {
+        if (!c->st_items) {
             char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.items", c->context_prefix, stats.name);
 
@@ -2976,7 +2976,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     load_dictionary_stats_entry(ops.deletes);
 
     if(c->st_ops || total != 0) {
-        if (unlikely(!c->st_ops)) {
+        if (!c->st_ops) {
             char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.ops", c->context_prefix, stats.name);
 
@@ -3035,7 +3035,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     load_dictionary_stats_entry(callbacks.deletes);
 
     if(c->st_callbacks || total != 0) {
-        if (unlikely(!c->st_callbacks)) {
+        if (!c->st_callbacks) {
             char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.callbacks", c->context_prefix, stats.name);
 
@@ -3081,7 +3081,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     load_dictionary_stats_entry(memory.dict);
 
     if(c->st_memory || total != 0) {
-        if (unlikely(!c->st_memory)) {
+        if (!c->st_memory) {
             char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.memory", c->context_prefix, stats.name);
 
@@ -3126,7 +3126,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     load_dictionary_stats_entry(spin_locks.delete_spins);
 
     if(c->st_spins || total != 0) {
-        if (unlikely(!c->st_spins)) {
+        if (!c->st_spins) {
             char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.spins", c->context_prefix, stats.name);
 
@@ -3492,7 +3492,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
 
     // ----------------------------------------------------------------------
 
-    if(unlikely(!wu->st_workers_time)) {
+    if(!wu->st_workers_time) {
         char name[RRD_ID_LENGTH_MAX + 1];
         snprintfz(name, RRD_ID_LENGTH_MAX, "workers_time_%s", wu->name_lowercase);
 
@@ -3517,16 +3517,16 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
 
     // we add the min and max dimensions only when we have multiple workers
 
-    if(unlikely(!wu->rd_workers_time_min && wu->workers_registered > 1))
+    if(!wu->rd_workers_time_min && wu->workers_registered > 1)
         wu->rd_workers_time_min = rrddim_add(wu->st_workers_time, "min", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
 
-    if(unlikely(!wu->rd_workers_time_max && wu->workers_registered > 1))
+    if(!wu->rd_workers_time_max && wu->workers_registered > 1)
         wu->rd_workers_time_max = rrddim_add(wu->st_workers_time, "max", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
 
-    if(unlikely(!wu->rd_workers_time_avg))
+    if(!wu->rd_workers_time_avg)
         wu->rd_workers_time_avg = rrddim_add(wu->st_workers_time, "average", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
 
-    if(unlikely(wu->workers_min_busy_time == WORKERS_MIN_PERCENT_DEFAULT)) wu->workers_min_busy_time = 0.0;
+    if(wu->workers_min_busy_time == WORKERS_MIN_PERCENT_DEFAULT) wu->workers_min_busy_time = 0.0;
 
     if(wu->rd_workers_time_min)
         rrddim_set_by_pointer(wu->st_workers_time, wu->rd_workers_time_min, (collected_number)((double)wu->workers_min_busy_time * WORKER_CHART_DECIMAL_PRECISION));
@@ -3545,7 +3545,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
 
 #ifdef __linux__
     if(wu->workers_cpu_registered || wu->st_workers_cpu) {
-        if(unlikely(!wu->st_workers_cpu)) {
+        if(!wu->st_workers_cpu) {
             char name[RRD_ID_LENGTH_MAX + 1];
             snprintfz(name, RRD_ID_LENGTH_MAX, "workers_cpu_%s", wu->name_lowercase);
 
@@ -3568,16 +3568,16 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
             );
         }
 
-        if (unlikely(!wu->rd_workers_cpu_min && wu->workers_registered > 1))
+        if (!wu->rd_workers_cpu_min && wu->workers_registered > 1)
             wu->rd_workers_cpu_min = rrddim_add(wu->st_workers_cpu, "min", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
 
-        if (unlikely(!wu->rd_workers_cpu_max && wu->workers_registered > 1))
+        if (!wu->rd_workers_cpu_max && wu->workers_registered > 1)
             wu->rd_workers_cpu_max = rrddim_add(wu->st_workers_cpu, "max", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
 
-        if(unlikely(!wu->rd_workers_cpu_avg))
+        if(!wu->rd_workers_cpu_avg)
             wu->rd_workers_cpu_avg = rrddim_add(wu->st_workers_cpu, "average", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
 
-        if(unlikely(wu->workers_cpu_min == WORKERS_MIN_PERCENT_DEFAULT)) wu->workers_cpu_min = 0.0;
+        if(wu->workers_cpu_min == WORKERS_MIN_PERCENT_DEFAULT) wu->workers_cpu_min = 0.0;
 
         if(wu->rd_workers_cpu_min)
             rrddim_set_by_pointer(wu->st_workers_cpu, wu->rd_workers_cpu_min, (collected_number)(wu->workers_cpu_min * WORKER_CHART_DECIMAL_PRECISION));
@@ -3596,7 +3596,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
 
     // ----------------------------------------------------------------------
 
-    if(unlikely(!wu->st_workers_jobs_per_job_type)) {
+    if(!wu->st_workers_jobs_per_job_type) {
         char name[RRD_ID_LENGTH_MAX + 1];
         snprintfz(name, RRD_ID_LENGTH_MAX, "workers_jobs_by_type_%s", wu->name_lowercase);
 
@@ -3622,12 +3622,12 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
     {
         size_t i;
         for(i = 0; i <= wu->workers_max_job_id ;i++) {
-            if(unlikely(wu->per_job_type[i].type != WORKER_METRIC_IDLE_BUSY))
+            if(wu->per_job_type[i].type != WORKER_METRIC_IDLE_BUSY)
                 continue;
 
             if (wu->per_job_type[i].name) {
 
-                if(unlikely(!wu->per_job_type[i].rd_jobs_started))
+                if(!wu->per_job_type[i].rd_jobs_started)
                     wu->per_job_type[i].rd_jobs_started = rrddim_add(wu->st_workers_jobs_per_job_type, string2str(wu->per_job_type[i].name), NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrddim_set_by_pointer(wu->st_workers_jobs_per_job_type, wu->per_job_type[i].rd_jobs_started, (collected_number)(wu->per_job_type[i].jobs_started));
@@ -3639,7 +3639,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
 
     // ----------------------------------------------------------------------
 
-    if(unlikely(!wu->st_workers_busy_per_job_type)) {
+    if(!wu->st_workers_busy_per_job_type) {
         char name[RRD_ID_LENGTH_MAX + 1];
         snprintfz(name, RRD_ID_LENGTH_MAX, "workers_busy_time_by_type_%s", wu->name_lowercase);
 
@@ -3665,12 +3665,12 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
     {
         size_t i;
         for(i = 0; i <= wu->workers_max_job_id ;i++) {
-            if(unlikely(wu->per_job_type[i].type != WORKER_METRIC_IDLE_BUSY))
+            if(wu->per_job_type[i].type != WORKER_METRIC_IDLE_BUSY)
                 continue;
 
             if (wu->per_job_type[i].name) {
 
-                if(unlikely(!wu->per_job_type[i].rd_busy_time))
+                if(!wu->per_job_type[i].rd_busy_time)
                     wu->per_job_type[i].rd_busy_time = rrddim_add(wu->st_workers_busy_per_job_type, string2str(wu->per_job_type[i].name), NULL, 1, USEC_PER_MS, RRD_ALGORITHM_ABSOLUTE);
 
                 rrddim_set_by_pointer(wu->st_workers_busy_per_job_type, wu->per_job_type[i].rd_busy_time, (collected_number)(wu->per_job_type[i].busy_time));
@@ -3683,7 +3683,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
     // ----------------------------------------------------------------------
 
     if(wu->st_workers_threads || wu->workers_registered > 1) {
-        if(unlikely(!wu->st_workers_threads)) {
+        if(!wu->st_workers_threads) {
             char name[RRD_ID_LENGTH_MAX + 1];
             snprintfz(name, RRD_ID_LENGTH_MAX, "workers_threads_%s", wu->name_lowercase);
 
@@ -3843,7 +3843,7 @@ static void workers_utilization_reset_statistics(struct worker_utilization *wu) 
 
     size_t i;
     for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
-        if(unlikely(!wu->name_lowercase)) {
+        if(!wu->name_lowercase) {
             wu->name_lowercase = strdupz(wu->name);
             char *s = wu->name_lowercase;
             for( ; *s ; s++) *s = tolower(*s);
@@ -3881,14 +3881,14 @@ static int read_thread_cpu_time_from_proc_stat(pid_t pid __maybe_unused, kernel_
     // (re)open the procfile to the new filename
     bool set_quotes = (ff == NULL) ? true : false;
     ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_ERROR_ON_ERROR_LOG);
-    if(unlikely(!ff)) return -1;
+    if(!ff) return -1;
 
     if(set_quotes)
         procfile_set_open_close(ff, "(", ")");
 
     // read the entire file and split it to lines and words
     ff = procfile_readall(ff);
-    if(unlikely(!ff)) return -1;
+    if(!ff) return -1;
 
     // parse the numbers we are interested
     *utime = str2kernel_uint_t(procfile_lineword(ff, 0, 13));
@@ -4062,7 +4062,7 @@ static void worker_utilization_charts(void) {
         netdata_thread_enable_cancelability();
 
         // skip the first iteration, so that we don't accumulate startup utilization to our charts
-        if(likely(iterations > 1))
+        if(iterations > 1)
             workers_utilization_update_chart(&all_workers_utilization[i]);
 
         netdata_thread_disable_cancelability();

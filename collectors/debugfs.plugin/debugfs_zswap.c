@@ -307,7 +307,7 @@ static void zswap_send_end_and_flush()
 
 static void zswap_independent_chart(struct netdata_zswap_metric *metric, int update_every, const char *name)
 {
-    if (unlikely(!metric->chart_created)) {
+    if (!metric->chart_created) {
         metric->chart_created = CONFIG_BOOLEAN_YES;
 
         zswap_send_chart(metric, update_every, name, NULL);
@@ -323,13 +323,13 @@ void zswap_reject_chart(int update_every, const char *name)
 {
     struct netdata_zswap_metric *metric = &zswap_rejected_metrics[NETDATA_ZSWAP_REJECTED_CHART];
 
-    if (unlikely(!metric->chart_created)) {
+    if (!metric->chart_created) {
         metric->chart_created = CONFIG_BOOLEAN_YES;
 
         zswap_send_chart(metric, update_every, name, NULL);
         for (int i = NETDATA_ZSWAP_REJECTED_COMPRESS_POOR; zswap_rejected_metrics[i].filename; i++) {
             metric = &zswap_rejected_metrics[i];
-            if (likely(metric->enabled))
+            if (metric->enabled)
                 zswap_send_dimension(metric);
         }
     }
@@ -338,7 +338,7 @@ void zswap_reject_chart(int update_every, const char *name)
     zswap_send_begin(metric);
     for (int i = NETDATA_ZSWAP_REJECTED_COMPRESS_POOR; zswap_rejected_metrics[i].filename; i++) {
         metric = &zswap_rejected_metrics[i];
-        if (likely(metric->enabled))
+        if (metric->enabled)
             zswap_send_set(metric);
     }
     zswap_send_end_and_flush();
@@ -350,16 +350,16 @@ static void zswap_obsolete_charts(int update_every, const char *name)
 
     for (int i = 0; zswap_independent_metrics[i].filename; i++) {
         metric = &zswap_independent_metrics[i];
-        if (likely(metric->chart_created))
+        if (metric->chart_created)
             zswap_send_chart(metric, update_every, name, "obsolete");
     }
 
     metric = &zswap_rejected_metrics[NETDATA_ZSWAP_REJECTED_CHART];
-    if (likely(metric->chart_created))
+    if (metric->chart_created)
         zswap_send_chart(metric, update_every, name, "obsolete");
 
     metric = &zswap_calculated_metrics[NETDATA_ZSWAP_COMPRESSION_RATIO_CHART];
-    if (likely(metric->chart_created))
+    if (metric->chart_created)
         zswap_send_chart(metric, update_every, name, "obsolete");
 }
 
@@ -372,7 +372,7 @@ static int debugfs_is_zswap_enabled()
 
     int ret = read_file(filename, state, ZSWAP_STATE_SIZE);
 
-    if (unlikely(!ret && !strcmp(state, "Y"))) {
+    if (!ret && !strcmp(state, "Y")) {
         return 0;
     }
     return 1;
@@ -382,7 +382,7 @@ int do_debugfs_zswap(int update_every, const char *name)
 {
     static int check_if_enabled = 1;
 
-    if (likely(check_if_enabled && debugfs_is_zswap_enabled())) {
+    if (check_if_enabled && debugfs_is_zswap_enabled()) {
         netdata_log_info("Zswap is disabled");
         return 1;
     }
@@ -395,9 +395,9 @@ int do_debugfs_zswap(int update_every, const char *name)
 
     for (int i = 0; zswap_independent_metrics[i].filename; i++) {
         metric = &zswap_independent_metrics[i];
-        if (unlikely(!metric->enabled))
+        if (!metric->enabled)
             continue;
-        if (unlikely(!(metric->enabled = !zswap_collect_data(metric))))
+        if (!(metric->enabled = !zswap_collect_data(metric)))
             continue;
         zswap_independent_chart(metric, update_every, name);
         enabled++;
@@ -417,18 +417,18 @@ int do_debugfs_zswap(int update_every, const char *name)
     int enabled_rejected = 0;
     for (int i = NETDATA_ZSWAP_REJECTED_COMPRESS_POOR; zswap_rejected_metrics[i].filename; i++) {
         metric = &zswap_rejected_metrics[i];
-        if (unlikely(!metric->enabled))
+        if (!metric->enabled)
             continue;
-        if (unlikely(!(metric->enabled = !zswap_collect_data(metric))))
+        if (!(metric->enabled = !zswap_collect_data(metric)))
             continue;
         enabled++;
         enabled_rejected++;
     }
 
-    if (likely(enabled_rejected > 0))
+    if (enabled_rejected > 0)
         zswap_reject_chart(update_every, name);
 
-    if (unlikely(!enabled)) {
+    if (!enabled) {
         zswap_obsolete_charts(update_every, name);
         return 1;
     }

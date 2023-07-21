@@ -51,7 +51,7 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
     static unsigned long long SctpInPktDiscards           = 0ULL;
     static unsigned long long SctpInDataChunkDiscards     = 0ULL;
 
-    if(unlikely(!arl_base)) {
+    if(!arl_base) {
         do_associations = config_get_boolean_ondemand("plugin:proc:/proc/net/sctp/snmp", "established associations", CONFIG_BOOLEAN_AUTO);
         do_transitions = config_get_boolean_ondemand("plugin:proc:/proc/net/sctp/snmp", "association transitions", CONFIG_BOOLEAN_AUTO);
         do_fragmentation = config_get_boolean_ondemand("plugin:proc:/proc/net/sctp/snmp", "fragmentation", CONFIG_BOOLEAN_AUTO);
@@ -94,16 +94,16 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
         arl_expect(arl_base, "SctpInDataChunkDiscards", &SctpInDataChunkDiscards);
     }
 
-    if(unlikely(!ff)) {
+    if(!ff) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/sctp/snmp");
         ff = procfile_open(config_get("plugin:proc:/proc/net/sctp/snmp", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff))
+        if(!ff)
             return 1;
     }
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff))
+    if(!ff)
         return 0; // we return 0, so that we will retry to open it next time
 
     size_t lines = procfile_lines(ff), l;
@@ -112,14 +112,14 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
 
     for(l = 0; l < lines ;l++) {
         size_t words = procfile_linewords(ff, l);
-        if(unlikely(words < 2)) {
-            if(unlikely(words)) collector_error("Cannot read /proc/net/sctp/snmp line %zu. Expected 2 params, read %zu.", l, words);
+        if(words < 2) {
+            if(words) collector_error("Cannot read /proc/net/sctp/snmp line %zu. Expected 2 params, read %zu.", l, words);
             continue;
         }
 
-        if(unlikely(arl_check(arl_base,
+        if(arl_check(arl_base,
                 procfile_lineword(ff, l, 0),
-                procfile_lineword(ff, l, 1)))) break;
+                procfile_lineword(ff, l, 1))) break;
     }
 
     // --------------------------------------------------------------------
@@ -130,7 +130,7 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_established = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "sctp"
                     , "established"
@@ -168,7 +168,7 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
                       *rd_aborted = NULL,
                       *rd_shutdown = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "sctp"
                     , "transitions"
@@ -208,7 +208,7 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
         static RRDDIM *rd_received = NULL,
                       *rd_sent = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "sctp"
                     , "packets"
@@ -245,7 +245,7 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
         static RRDDIM *rd_invalid = NULL,
                       *rd_csum = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "sctp"
                     , "packet_errors"
@@ -283,7 +283,7 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
         static RRDDIM *rd_fragmented = NULL,
                       *rd_reassembled = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "sctp"
                     , "fragmentation"
@@ -328,7 +328,7 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
                 *rd_OutOrder   = NULL,
                 *rd_OutUnorder = NULL;
 
-        if(unlikely(!st)) {
+        if(!st) {
             st = rrdset_create_localhost(
                     "sctp"
                     , "chunks"

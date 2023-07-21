@@ -591,7 +591,7 @@ void netdata_cgroup_ebpf_initialize_shm()
                                                                        PROT_READ | PROT_WRITE, MAP_SHARED,
                                                                        shm_fd_cgroup_ebpf, 0);
 
-    if (unlikely(MAP_FAILED == shm_cgroup_ebpf.header)) {
+    if (MAP_FAILED == shm_cgroup_ebpf.header) {
         shm_cgroup_ebpf.header = NULL;
         collector_error("Cannot map shared memory used between cgroup and eBPF, integration won't happen");
         goto end_init_shm;
@@ -983,19 +983,19 @@ static int k8s_get_container_first_proc_comm(const char *id, char *comm) {
     snprintfz(filename, FILENAME_MAX, "%s/%s/cgroup.procs", cgroup_cpuacct_base, id);
 
     ff = procfile_reopen(ff, filename, NULL, CGROUP_PROCFILE_FLAG);
-    if (unlikely(!ff)) {
+    if (!ff) {
         netdata_log_debug(D_CGROUP, "CGROUP: k8s_is_pause_container(): cannot open file '%s'.", filename);
         return 1;
     }
 
     ff = procfile_readall(ff);
-    if (unlikely(!ff)) {
+    if (!ff) {
         netdata_log_debug(D_CGROUP, "CGROUP: k8s_is_pause_container(): cannot read file '%s'.", filename);
         return 1;
     }
 
     unsigned long lines = procfile_lines(ff);
-    if (likely(lines < 2)) {
+    if (lines < 2) {
         return 1;
     }
 
@@ -1007,19 +1007,19 @@ static int k8s_get_container_first_proc_comm(const char *id, char *comm) {
     snprintfz(filename, FILENAME_MAX, "%s/proc/%s/comm", netdata_configured_host_prefix, pid);
 
     ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_DEFAULT);
-    if (unlikely(!ff)) {
+    if (!ff) {
         netdata_log_debug(D_CGROUP, "CGROUP: k8s_is_pause_container(): cannot open file '%s'.", filename);
         return 1;
     }
 
     ff = procfile_readall(ff);
-    if (unlikely(!ff)) {
+    if (!ff) {
         netdata_log_debug(D_CGROUP, "CGROUP: k8s_is_pause_container(): cannot read file '%s'.", filename);
         return 1;
     }
 
     lines = procfile_lines(ff);
-    if (unlikely(lines != 2)) {
+    if (lines != 2) {
         return 1;
     }
 
@@ -1052,7 +1052,7 @@ static int calc_cgroup_depth(const char *id) {
     int depth = 0;
     const char *s;
     for (s = id; *s; s++) {
-        depth += unlikely(*s == '/');
+        depth += *s == '/';
     }
     return depth;
 }
@@ -1063,16 +1063,16 @@ static int calc_cgroup_depth(const char *id) {
 static inline void cgroup_read_cpuacct_stat(struct cpuacct_stat *cp) {
     static procfile *ff = NULL;
 
-    if(likely(cp->filename)) {
+    if(cp->filename) {
         ff = procfile_reopen(ff, cp->filename, NULL, CGROUP_PROCFILE_FLAG);
-        if(unlikely(!ff)) {
+        if(!ff) {
             cp->updated = 0;
             cgroups_check = 1;
             return;
         }
 
         ff = procfile_readall(ff);
-        if(unlikely(!ff)) {
+        if(!ff) {
             cp->updated = 0;
             cgroups_check = 1;
             return;
@@ -1080,7 +1080,7 @@ static inline void cgroup_read_cpuacct_stat(struct cpuacct_stat *cp) {
 
         unsigned long i, lines = procfile_lines(ff);
 
-        if(unlikely(lines < 1)) {
+        if(lines < 1) {
             collector_error("CGROUP: file '%s' should have 1+ lines.", cp->filename);
             cp->updated = 0;
             return;
@@ -1090,43 +1090,43 @@ static inline void cgroup_read_cpuacct_stat(struct cpuacct_stat *cp) {
             char *s = procfile_lineword(ff, i, 0);
             uint32_t hash = simple_hash(s);
 
-            if(unlikely(hash == user_hash && !strcmp(s, "user")))
+            if(hash == user_hash && !strcmp(s, "user"))
                 cp->user = str2ull(procfile_lineword(ff, i, 1), NULL);
 
-            else if(unlikely(hash == system_hash && !strcmp(s, "system")))
+            else if(hash == system_hash && !strcmp(s, "system"))
                 cp->system = str2ull(procfile_lineword(ff, i, 1), NULL);
         }
 
         cp->updated = 1;
 
-        if(unlikely(cp->enabled == CONFIG_BOOLEAN_AUTO &&
-                    (cp->user || cp->system || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
+        if(cp->enabled == CONFIG_BOOLEAN_AUTO &&
+                    (cp->user || cp->system || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))
             cp->enabled = CONFIG_BOOLEAN_YES;
     }
 }
 
 static inline void cgroup_read_cpuacct_cpu_stat(struct cpuacct_cpu_throttling *cp) {
-    if (unlikely(!cp->filename)) {
+    if (!cp->filename) {
         return;
     }
 
     static procfile *ff = NULL;
     ff = procfile_reopen(ff, cp->filename, NULL, CGROUP_PROCFILE_FLAG);
-    if (unlikely(!ff)) {
+    if (!ff) {
         cp->updated = 0;
         cgroups_check = 1;
         return;
     }
 
     ff = procfile_readall(ff);
-    if (unlikely(!ff)) {
+    if (!ff) {
         cp->updated = 0;
         cgroups_check = 1;
         return;
     }
 
     unsigned long lines = procfile_lines(ff);
-    if (unlikely(lines < 3)) {
+    if (lines < 3) {
         collector_error("CGROUP: file '%s' should have 3 lines.", cp->filename);
         cp->updated = 0;
         return;
@@ -1139,11 +1139,11 @@ static inline void cgroup_read_cpuacct_cpu_stat(struct cpuacct_cpu_throttling *c
         char *s = procfile_lineword(ff, i, 0);
         uint32_t hash = simple_hash(s);
 
-        if (unlikely(hash == nr_periods_hash && !strcmp(s, "nr_periods"))) {
+        if (hash == nr_periods_hash && !strcmp(s, "nr_periods")) {
             cp->nr_periods = str2ull(procfile_lineword(ff, i, 1), NULL);
-        } else if (unlikely(hash == nr_throttled_hash && !strcmp(s, "nr_throttled"))) {
+        } else if (hash == nr_throttled_hash && !strcmp(s, "nr_throttled")) {
             cp->nr_throttled = str2ull(procfile_lineword(ff, i, 1), NULL);
-        } else if (unlikely(hash == throttled_time_hash && !strcmp(s, "throttled_time"))) {
+        } else if (hash == throttled_time_hash && !strcmp(s, "throttled_time")) {
             cp->throttled_time = str2ull(procfile_lineword(ff, i, 1), NULL);
         }
     }
@@ -1152,10 +1152,10 @@ static inline void cgroup_read_cpuacct_cpu_stat(struct cpuacct_cpu_throttling *c
 
     cp->updated = 1;
 
-    if (unlikely(cp->enabled == CONFIG_BOOLEAN_AUTO)) {
-        if (likely(
+    if (cp->enabled == CONFIG_BOOLEAN_AUTO) {
+        if (
                 cp->nr_periods || cp->nr_throttled || cp->throttled_time ||
-                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)) {
+                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES) {
             cp->enabled = CONFIG_BOOLEAN_YES;
         }
     }
@@ -1163,19 +1163,19 @@ static inline void cgroup_read_cpuacct_cpu_stat(struct cpuacct_cpu_throttling *c
 
 static inline void cgroup2_read_cpuacct_cpu_stat(struct cpuacct_stat *cp, struct cpuacct_cpu_throttling *cpt) {
     static procfile *ff = NULL;
-    if (unlikely(!cp->filename)) {
+    if (!cp->filename) {
         return;
     }
 
     ff = procfile_reopen(ff, cp->filename, NULL, CGROUP_PROCFILE_FLAG);
-    if (unlikely(!ff)) {
+    if (!ff) {
         cp->updated = 0;
         cgroups_check = 1;
         return;
     }
 
     ff = procfile_readall(ff);
-    if (unlikely(!ff)) {
+    if (!ff) {
         cp->updated = 0;
         cgroups_check = 1;
         return;
@@ -1183,7 +1183,7 @@ static inline void cgroup2_read_cpuacct_cpu_stat(struct cpuacct_stat *cp, struct
 
     unsigned long lines = procfile_lines(ff);
 
-    if (unlikely(lines < 3)) {
+    if (lines < 3) {
         collector_error("CGROUP: file '%s' should have at least 3 lines.", cp->filename);
         cp->updated = 0;
         return;
@@ -1196,15 +1196,15 @@ static inline void cgroup2_read_cpuacct_cpu_stat(struct cpuacct_stat *cp, struct
         char *s = procfile_lineword(ff, i, 0);
         uint32_t hash = simple_hash(s);
 
-        if (unlikely(hash == user_usec_hash && !strcmp(s, "user_usec"))) {
+        if (hash == user_usec_hash && !strcmp(s, "user_usec")) {
             cp->user = str2ull(procfile_lineword(ff, i, 1), NULL);
-        } else if (unlikely(hash == system_usec_hash && !strcmp(s, "system_usec"))) {
+        } else if (hash == system_usec_hash && !strcmp(s, "system_usec")) {
             cp->system = str2ull(procfile_lineword(ff, i, 1), NULL);
-        } else if (unlikely(hash == nr_periods_hash && !strcmp(s, "nr_periods"))) {
+        } else if (hash == nr_periods_hash && !strcmp(s, "nr_periods")) {
             cpt->nr_periods = str2ull(procfile_lineword(ff, i, 1), NULL);
-        } else if (unlikely(hash == nr_throttled_hash && !strcmp(s, "nr_throttled"))) {
+        } else if (hash == nr_throttled_hash && !strcmp(s, "nr_throttled")) {
             cpt->nr_throttled = str2ull(procfile_lineword(ff, i, 1), NULL);
-        } else if (unlikely(hash == throttled_usec_hash && !strcmp(s, "throttled_usec"))) {
+        } else if (hash == throttled_usec_hash && !strcmp(s, "throttled_usec")) {
             cpt->throttled_time = str2ull(procfile_lineword(ff, i, 1), NULL) * 1000; // usec -> ns
         }
     }
@@ -1214,33 +1214,33 @@ static inline void cgroup2_read_cpuacct_cpu_stat(struct cpuacct_stat *cp, struct
     cp->updated = 1;
     cpt->updated = 1;
 
-    if (unlikely(cp->enabled == CONFIG_BOOLEAN_AUTO)) {
-        if (likely(cp->user || cp->system || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)) {
+    if (cp->enabled == CONFIG_BOOLEAN_AUTO) {
+        if (cp->user || cp->system || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES) {
             cp->enabled = CONFIG_BOOLEAN_YES;
         }
     }
-    if (unlikely(cpt->enabled == CONFIG_BOOLEAN_AUTO)) {
-        if (likely(
+    if (cpt->enabled == CONFIG_BOOLEAN_AUTO) {
+        if (
                 cpt->nr_periods || cpt->nr_throttled || cpt->throttled_time ||
-                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)) {
+                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES) {
             cpt->enabled = CONFIG_BOOLEAN_YES;
         }
     }
 }
 
 static inline void cgroup_read_cpuacct_cpu_shares(struct cpuacct_cpu_shares *cp) {
-    if (unlikely(!cp->filename)) {
+    if (!cp->filename) {
         return;
     }
 
-    if (unlikely(read_single_number_file(cp->filename, &cp->shares))) {
+    if (read_single_number_file(cp->filename, &cp->shares)) {
         cp->updated = 0;
         cgroups_check = 1;
         return;
     }
 
     cp->updated = 1;
-    if (unlikely((cp->enabled == CONFIG_BOOLEAN_AUTO)) &&
+    if ((cp->enabled == CONFIG_BOOLEAN_AUTO) &&
         (cp->shares || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)) {
         cp->enabled = CONFIG_BOOLEAN_YES;
     }
@@ -1249,29 +1249,29 @@ static inline void cgroup_read_cpuacct_cpu_shares(struct cpuacct_cpu_shares *cp)
 static inline void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
     static procfile *ff = NULL;
 
-    if(likely(ca->filename)) {
+    if(ca->filename) {
         ff = procfile_reopen(ff, ca->filename, NULL, CGROUP_PROCFILE_FLAG);
-        if(unlikely(!ff)) {
+        if(!ff) {
             ca->updated = 0;
             cgroups_check = 1;
             return;
         }
 
         ff = procfile_readall(ff);
-        if(unlikely(!ff)) {
+        if(!ff) {
             ca->updated = 0;
             cgroups_check = 1;
             return;
         }
 
-        if(unlikely(procfile_lines(ff) < 1)) {
+        if(procfile_lines(ff) < 1) {
             collector_error("CGROUP: file '%s' should have 1+ lines but has %zu.", ca->filename, procfile_lines(ff));
             ca->updated = 0;
             return;
         }
 
         unsigned long i = procfile_linewords(ff, 0);
-        if(unlikely(i == 0)) {
+        if(i == 0) {
             ca->updated = 0;
             return;
         }
@@ -1283,7 +1283,7 @@ static inline void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
             else break;
         }
 
-        if(unlikely(i != ca->cpus)) {
+        if(i != ca->cpus) {
             freez(ca->cpu_percpu);
             ca->cpu_percpu = mallocz(sizeof(unsigned long long) * i);
             ca->cpus = (unsigned int)i;
@@ -1298,30 +1298,30 @@ static inline void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
 
         ca->updated = 1;
 
-        if(unlikely(ca->enabled == CONFIG_BOOLEAN_AUTO &&
-                    (total || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
+        if(ca->enabled == CONFIG_BOOLEAN_AUTO &&
+                    (total || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))
             ca->enabled = CONFIG_BOOLEAN_YES;
     }
 }
 
 static inline void cgroup_read_blkio(struct blkio *io) {
-    if(unlikely(io->enabled == CONFIG_BOOLEAN_AUTO && io->delay_counter > 0)) {
+    if(io->enabled == CONFIG_BOOLEAN_AUTO && io->delay_counter > 0) {
         io->delay_counter--;
         return;
     }
 
-    if(likely(io->filename)) {
+    if(io->filename) {
         static procfile *ff = NULL;
 
         ff = procfile_reopen(ff, io->filename, NULL, CGROUP_PROCFILE_FLAG);
-        if(unlikely(!ff)) {
+        if(!ff) {
             io->updated = 0;
             cgroups_check = 1;
             return;
         }
 
         ff = procfile_readall(ff);
-        if(unlikely(!ff)) {
+        if(!ff) {
             io->updated = 0;
             cgroups_check = 1;
             return;
@@ -1329,7 +1329,7 @@ static inline void cgroup_read_blkio(struct blkio *io) {
 
         unsigned long i, lines = procfile_lines(ff);
 
-        if(unlikely(lines < 1)) {
+        if(lines < 1) {
             collector_error("CGROUP: file '%s' should have 1+ lines.", io->filename);
             io->updated = 0;
             return;
@@ -1347,28 +1347,28 @@ static inline void cgroup_read_blkio(struct blkio *io) {
             char *s = procfile_lineword(ff, i, 1);
             uint32_t hash = simple_hash(s);
 
-            if(unlikely(hash == Read_hash && !strcmp(s, "Read")))
+            if(hash == Read_hash && !strcmp(s, "Read"))
                 io->Read += str2ull(procfile_lineword(ff, i, 2), NULL);
 
-            else if(unlikely(hash == Write_hash && !strcmp(s, "Write")))
+            else if(hash == Write_hash && !strcmp(s, "Write"))
                 io->Write += str2ull(procfile_lineword(ff, i, 2), NULL);
 
 /*
-            else if(unlikely(hash == Sync_hash && !strcmp(s, "Sync")))
+            else if(hash == Sync_hash && !strcmp(s, "Sync"))
                 io->Sync += str2ull(procfile_lineword(ff, i, 2));
 
-            else if(unlikely(hash == Async_hash && !strcmp(s, "Async")))
+            else if(hash == Async_hash && !strcmp(s, "Async"))
                 io->Async += str2ull(procfile_lineword(ff, i, 2));
 
-            else if(unlikely(hash == Total_hash && !strcmp(s, "Total")))
+            else if(hash == Total_hash && !strcmp(s, "Total"))
                 io->Total += str2ull(procfile_lineword(ff, i, 2));
 */
         }
 
         io->updated = 1;
 
-        if(unlikely(io->enabled == CONFIG_BOOLEAN_AUTO)) {
-            if(unlikely(io->Read || io->Write || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))
+        if(io->enabled == CONFIG_BOOLEAN_AUTO) {
+            if(io->Read || io->Write || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)
                 io->enabled = CONFIG_BOOLEAN_YES;
             else
                 io->delay_counter = cgroup_recheck_zero_blkio_every_iterations;
@@ -1377,23 +1377,23 @@ static inline void cgroup_read_blkio(struct blkio *io) {
 }
 
 static inline void cgroup2_read_blkio(struct blkio *io, unsigned int word_offset) {
-    if(unlikely(io->enabled == CONFIG_BOOLEAN_AUTO && io->delay_counter > 0)) {
+    if(io->enabled == CONFIG_BOOLEAN_AUTO && io->delay_counter > 0) {
             io->delay_counter--;
             return;
         }
 
-        if(likely(io->filename)) {
+        if(io->filename) {
             static procfile *ff = NULL;
 
             ff = procfile_reopen(ff, io->filename, NULL, CGROUP_PROCFILE_FLAG);
-            if(unlikely(!ff)) {
+            if(!ff) {
                 io->updated = 0;
                 cgroups_check = 1;
                 return;
             }
 
             ff = procfile_readall(ff);
-            if(unlikely(!ff)) {
+            if(!ff) {
                 io->updated = 0;
                 cgroups_check = 1;
                 return;
@@ -1401,7 +1401,7 @@ static inline void cgroup2_read_blkio(struct blkio *io, unsigned int word_offset
 
             unsigned long i, lines = procfile_lines(ff);
 
-            if (unlikely(lines < 1)) {
+            if (lines < 1) {
                 collector_error("CGROUP: file '%s' should have 1+ lines.", io->filename);
                 io->updated = 0;
                 return;
@@ -1417,8 +1417,8 @@ static inline void cgroup2_read_blkio(struct blkio *io, unsigned int word_offset
 
             io->updated = 1;
 
-            if(unlikely(io->enabled == CONFIG_BOOLEAN_AUTO)) {
-                if(unlikely(io->Read || io->Write || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))
+            if(io->enabled == CONFIG_BOOLEAN_AUTO) {
+                if(io->Read || io->Write || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)
                     io->enabled = CONFIG_BOOLEAN_YES;
                 else
                     io->delay_counter = cgroup_recheck_zero_blkio_every_iterations;
@@ -1429,16 +1429,16 @@ static inline void cgroup2_read_blkio(struct blkio *io, unsigned int word_offset
 static inline void cgroup2_read_pressure(struct pressure *res) {
     static procfile *ff = NULL;
 
-    if (likely(res->filename)) {
+    if (res->filename) {
         ff = procfile_reopen(ff, res->filename, " =", CGROUP_PROCFILE_FLAG);
-        if (unlikely(!ff)) {
+        if (!ff) {
             res->updated = 0;
             cgroups_check = 1;
             return;
         }
 
         ff = procfile_readall(ff);
-        if (unlikely(!ff)) {
+        if (!ff) {
             res->updated = 0;
             cgroups_check = 1;
             return;
@@ -1465,7 +1465,7 @@ static inline void cgroup2_read_pressure(struct pressure *res) {
 
         res->updated = 1;
 
-        if (unlikely(res->some.enabled == CONFIG_BOOLEAN_AUTO)) {
+        if (res->some.enabled == CONFIG_BOOLEAN_AUTO) {
             res->some.enabled = CONFIG_BOOLEAN_YES;
             if (lines > 2) {
                 res->full.enabled = CONFIG_BOOLEAN_YES;
@@ -1480,21 +1480,21 @@ static inline void cgroup_read_memory(struct memory *mem, char parent_cg_is_unif
     static procfile *ff = NULL;
 
     // read detailed ram usage
-    if(likely(mem->filename_detailed)) {
-        if(unlikely(mem->enabled_detailed == CONFIG_BOOLEAN_AUTO && mem->delay_counter_detailed > 0)) {
+    if(mem->filename_detailed) {
+        if(mem->enabled_detailed == CONFIG_BOOLEAN_AUTO && mem->delay_counter_detailed > 0) {
             mem->delay_counter_detailed--;
             goto memory_next;
         }
 
         ff = procfile_reopen(ff, mem->filename_detailed, NULL, CGROUP_PROCFILE_FLAG);
-        if(unlikely(!ff)) {
+        if(!ff) {
             mem->updated_detailed = 0;
             cgroups_check = 1;
             goto memory_next;
         }
 
         ff = procfile_readall(ff);
-        if(unlikely(!ff)) {
+        if(!ff) {
             mem->updated_detailed = 0;
             cgroups_check = 1;
             goto memory_next;
@@ -1502,14 +1502,14 @@ static inline void cgroup_read_memory(struct memory *mem, char parent_cg_is_unif
 
         unsigned long i, lines = procfile_lines(ff);
 
-        if(unlikely(lines < 1)) {
+        if(lines < 1) {
             collector_error("CGROUP: file '%s' should have 1+ lines.", mem->filename_detailed);
             mem->updated_detailed = 0;
             goto memory_next;
         }
 
 
-        if(unlikely(!mem->arl_base)) {
+        if(!mem->arl_base) {
             if(parent_cg_is_unified == 0){
                 mem->arl_base = arl_create("cgroup/memory", NULL, 60);
 
@@ -1550,17 +1550,17 @@ static inline void cgroup_read_memory(struct memory *mem, char parent_cg_is_unif
                     procfile_lineword(ff, i, 1))) break;
         }
 
-        if(unlikely(mem->arl_dirty->flags & ARL_ENTRY_FLAG_FOUND))
+        if(mem->arl_dirty->flags & ARL_ENTRY_FLAG_FOUND)
             mem->detailed_has_dirty = 1;
 
-        if(unlikely(parent_cg_is_unified == 0 && mem->arl_swap->flags & ARL_ENTRY_FLAG_FOUND))
+        if(parent_cg_is_unified == 0 && mem->arl_swap->flags & ARL_ENTRY_FLAG_FOUND)
             mem->detailed_has_swap = 1;
 
         // fprintf(stderr, "READ: '%s', cache: %llu, rss: %llu, rss_huge: %llu, mapped_file: %llu, writeback: %llu, dirty: %llu, swap: %llu, pgpgin: %llu, pgpgout: %llu, pgfault: %llu, pgmajfault: %llu, inactive_anon: %llu, active_anon: %llu, inactive_file: %llu, active_file: %llu, unevictable: %llu, hierarchical_memory_limit: %llu, total_cache: %llu, total_rss: %llu, total_rss_huge: %llu, total_mapped_file: %llu, total_writeback: %llu, total_dirty: %llu, total_swap: %llu, total_pgpgin: %llu, total_pgpgout: %llu, total_pgfault: %llu, total_pgmajfault: %llu, total_inactive_anon: %llu, total_active_anon: %llu, total_inactive_file: %llu, total_active_file: %llu, total_unevictable: %llu\n", mem->filename, mem->cache, mem->rss, mem->rss_huge, mem->mapped_file, mem->writeback, mem->dirty, mem->swap, mem->pgpgin, mem->pgpgout, mem->pgfault, mem->pgmajfault, mem->inactive_anon, mem->active_anon, mem->inactive_file, mem->active_file, mem->unevictable, mem->hierarchical_memory_limit, mem->total_cache, mem->total_rss, mem->total_rss_huge, mem->total_mapped_file, mem->total_writeback, mem->total_dirty, mem->total_swap, mem->total_pgpgin, mem->total_pgpgout, mem->total_pgfault, mem->total_pgmajfault, mem->total_inactive_anon, mem->total_active_anon, mem->total_inactive_file, mem->total_active_file, mem->total_unevictable);
 
         mem->updated_detailed = 1;
 
-        if(unlikely(mem->enabled_detailed == CONFIG_BOOLEAN_AUTO)) {
+        if(mem->enabled_detailed == CONFIG_BOOLEAN_AUTO) {
             if(( (!parent_cg_is_unified) && ( mem->total_cache || mem->total_dirty || mem->total_rss || mem->total_rss_huge || mem->total_mapped_file || mem->total_writeback
                     || mem->total_swap || mem->total_pgpgin || mem->total_pgpgout || mem->total_pgfault || mem->total_pgmajfault || mem->total_inactive_file))
                || (parent_cg_is_unified && ( mem->anon || mem->total_dirty || mem->kernel_stack || mem->slab || mem->sock || mem->total_writeback
@@ -1575,36 +1575,36 @@ static inline void cgroup_read_memory(struct memory *mem, char parent_cg_is_unif
 memory_next:
 
     // read usage_in_bytes
-    if(likely(mem->filename_usage_in_bytes)) {
+    if(mem->filename_usage_in_bytes) {
         mem->updated_usage_in_bytes = !read_single_number_file(mem->filename_usage_in_bytes, &mem->usage_in_bytes);
-        if(unlikely(mem->updated_usage_in_bytes && mem->enabled_usage_in_bytes == CONFIG_BOOLEAN_AUTO &&
-                    (mem->usage_in_bytes || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
+        if(mem->updated_usage_in_bytes && mem->enabled_usage_in_bytes == CONFIG_BOOLEAN_AUTO &&
+                    (mem->usage_in_bytes || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))
             mem->enabled_usage_in_bytes = CONFIG_BOOLEAN_YES;
     }
 
-    if (likely(mem->updated_usage_in_bytes && mem->updated_detailed)) {
+    if (mem->updated_usage_in_bytes && mem->updated_detailed) {
         mem->usage_in_bytes =
             (mem->usage_in_bytes > mem->total_inactive_file) ? (mem->usage_in_bytes - mem->total_inactive_file) : 0;
     }
 
     // read msw_usage_in_bytes
-    if(likely(mem->filename_msw_usage_in_bytes)) {
+    if(mem->filename_msw_usage_in_bytes) {
         mem->updated_msw_usage_in_bytes = !read_single_number_file(mem->filename_msw_usage_in_bytes, &mem->msw_usage_in_bytes);
-        if(unlikely(mem->updated_msw_usage_in_bytes && mem->enabled_msw_usage_in_bytes == CONFIG_BOOLEAN_AUTO &&
-                    (mem->msw_usage_in_bytes || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
+        if(mem->updated_msw_usage_in_bytes && mem->enabled_msw_usage_in_bytes == CONFIG_BOOLEAN_AUTO &&
+                    (mem->msw_usage_in_bytes || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))
             mem->enabled_msw_usage_in_bytes = CONFIG_BOOLEAN_YES;
     }
 
     // read failcnt
-    if(likely(mem->filename_failcnt)) {
-        if(unlikely(mem->enabled_failcnt == CONFIG_BOOLEAN_AUTO && mem->delay_counter_failcnt > 0)) {
+    if(mem->filename_failcnt) {
+        if(mem->enabled_failcnt == CONFIG_BOOLEAN_AUTO && mem->delay_counter_failcnt > 0) {
             mem->updated_failcnt = 0;
             mem->delay_counter_failcnt--;
         }
         else {
             mem->updated_failcnt = !read_single_number_file(mem->filename_failcnt, &mem->failcnt);
-            if(unlikely(mem->updated_failcnt && mem->enabled_failcnt == CONFIG_BOOLEAN_AUTO)) {
-                if(unlikely(mem->failcnt || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))
+            if(mem->updated_failcnt && mem->enabled_failcnt == CONFIG_BOOLEAN_AUTO) {
+                if(mem->failcnt || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)
                     mem->enabled_failcnt = CONFIG_BOOLEAN_YES;
                 else
                     mem->delay_counter_failcnt = cgroup_recheck_zero_mem_failcnt_every_iterations;
@@ -1930,22 +1930,22 @@ static void is_cgroup_procs_exist(netdata_ebpf_cgroup_shm_body_t *out, char *id)
     struct stat buf;
 
     snprintfz(out->path, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_cpuset_base, id);
-    if (likely(stat(out->path, &buf) == 0)) {
+    if (stat(out->path, &buf) == 0) {
         return;
     }
 
     snprintfz(out->path, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_blkio_base, id);
-    if (likely(stat(out->path, &buf) == 0)) {
+    if (stat(out->path, &buf) == 0) {
         return;
     }
 
     snprintfz(out->path, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_memory_base, id);
-    if (likely(stat(out->path, &buf) == 0)) {
+    if (stat(out->path, &buf) == 0) {
         return;
     }
 
     snprintfz(out->path, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_devices_base, id);
-    if (likely(stat(out->path, &buf) == 0)) {
+    if (stat(out->path, &buf) == 0) {
         return;
     }
 
@@ -1962,7 +1962,7 @@ static inline void convert_cgroup_to_systemd_service(struct cgroup *cg) {
     // skip to the last slash
     size_t len = strlen(s);
     while (len--) {
-        if (unlikely(s[len] == '/')) {
+        if (s[len] == '/') {
             break;
         }
     }
@@ -1973,7 +1973,7 @@ static inline void convert_cgroup_to_systemd_service(struct cgroup *cg) {
     // remove extension
     len = strlen(s);
     while (len--) {
-        if (unlikely(s[len] == '.')) {
+        if (s[len] == '.') {
             break;
         }
     }
@@ -2125,7 +2125,7 @@ static inline void discovery_update_filenames() {
     struct cgroup *cg;
     struct stat buf;
     for(cg = discovered_cgroup_root; cg ; cg = cg->discovered_next) {
-        if(unlikely(!cg->available || !cg->enabled || cg->pending_renames))
+        if(!cg->available || !cg->enabled || cg->pending_renames)
             continue;
 
         netdata_log_debug(D_CGROUP, "checking paths for cgroup '%s'", cg->id);
@@ -2134,9 +2134,9 @@ static inline void discovery_update_filenames() {
         // and update the filenames they read
         char filename[FILENAME_MAX + 1];
         if(!cgroup_use_unified_cgroups) {
-            if(unlikely(cgroup_enable_cpuacct_stat && !cg->cpuacct_stat.filename)) {
+            if(cgroup_enable_cpuacct_stat && !cg->cpuacct_stat.filename) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/cpuacct.stat", cgroup_cpuacct_base, cg->id);
-                if(likely(stat(filename, &buf) != -1)) {
+                if(stat(filename, &buf) != -1) {
                     cg->cpuacct_stat.filename = strdupz(filename);
                     cg->cpuacct_stat.enabled = cgroup_enable_cpuacct_stat;
                     snprintfz(filename, FILENAME_MAX, "%s%s/cpuset.cpus", cgroup_cpuset_base, cg->id);
@@ -2151,9 +2151,9 @@ static inline void discovery_update_filenames() {
                     netdata_log_debug(D_CGROUP, "cpuacct.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
 
-            if(unlikely(cgroup_enable_cpuacct_usage && !cg->cpuacct_usage.filename && !is_cgroup_systemd_service(cg))) {
+            if(cgroup_enable_cpuacct_usage && !cg->cpuacct_usage.filename && !is_cgroup_systemd_service(cg)) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/cpuacct.usage_percpu", cgroup_cpuacct_base, cg->id);
-                if(likely(stat(filename, &buf) != -1)) {
+                if(stat(filename, &buf) != -1) {
                     cg->cpuacct_usage.filename = strdupz(filename);
                     cg->cpuacct_usage.enabled = cgroup_enable_cpuacct_usage;
                     netdata_log_debug(D_CGROUP, "cpuacct.usage_percpu filename for cgroup '%s': '%s'", cg->id, cg->cpuacct_usage.filename);
@@ -2161,9 +2161,9 @@ static inline void discovery_update_filenames() {
                 else
                     netdata_log_debug(D_CGROUP, "cpuacct.usage_percpu file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            if(unlikely(cgroup_enable_cpuacct_cpu_throttling && !cg->cpuacct_cpu_throttling.filename && !is_cgroup_systemd_service(cg))) {
+            if(cgroup_enable_cpuacct_cpu_throttling && !cg->cpuacct_cpu_throttling.filename && !is_cgroup_systemd_service(cg)) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/cpu.stat", cgroup_cpuacct_base, cg->id);
-                if(likely(stat(filename, &buf) != -1)) {
+                if(stat(filename, &buf) != -1) {
                     cg->cpuacct_cpu_throttling.filename = strdupz(filename);
                     cg->cpuacct_cpu_throttling.enabled = cgroup_enable_cpuacct_cpu_throttling;
                     netdata_log_debug(D_CGROUP, "cpu.stat filename for cgroup '%s': '%s'", cg->id, cg->cpuacct_cpu_throttling.filename);
@@ -2171,11 +2171,11 @@ static inline void discovery_update_filenames() {
                 else
                     netdata_log_debug(D_CGROUP, "cpu.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            if (unlikely(
+            if (
                     cgroup_enable_cpuacct_cpu_shares && !cg->cpuacct_cpu_shares.filename &&
-                    !is_cgroup_systemd_service(cg))) {
+                    !is_cgroup_systemd_service(cg)) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/cpu.shares", cgroup_cpuacct_base, cg->id);
-                if (likely(stat(filename, &buf) != -1)) {
+                if (stat(filename, &buf) != -1) {
                     cg->cpuacct_cpu_shares.filename = strdupz(filename);
                     cg->cpuacct_cpu_shares.enabled = cgroup_enable_cpuacct_cpu_shares;
                     netdata_log_debug(
@@ -2184,9 +2184,9 @@ static inline void discovery_update_filenames() {
                     netdata_log_debug(D_CGROUP, "cpu.shares file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
 
-            if(unlikely((cgroup_enable_detailed_memory || cgroup_used_memory) && !cg->memory.filename_detailed && (cgroup_used_memory || cgroup_enable_systemd_services_detailed_memory || !is_cgroup_systemd_service(cg)))) {
+            if((cgroup_enable_detailed_memory || cgroup_used_memory) && !cg->memory.filename_detailed && (cgroup_used_memory || cgroup_enable_systemd_services_detailed_memory || !is_cgroup_systemd_service(cg))) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/memory.stat", cgroup_memory_base, cg->id);
-                if(likely(stat(filename, &buf) != -1)) {
+                if(stat(filename, &buf) != -1) {
                     cg->memory.filename_detailed = strdupz(filename);
                     cg->memory.enabled_detailed = (cgroup_enable_detailed_memory == CONFIG_BOOLEAN_YES)?CONFIG_BOOLEAN_YES:CONFIG_BOOLEAN_AUTO;
                     netdata_log_debug(D_CGROUP, "memory.stat filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_detailed);
@@ -2195,9 +2195,9 @@ static inline void discovery_update_filenames() {
                     netdata_log_debug(D_CGROUP, "memory.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
 
-            if(unlikely(cgroup_enable_memory && !cg->memory.filename_usage_in_bytes)) {
+            if(cgroup_enable_memory && !cg->memory.filename_usage_in_bytes) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/memory.usage_in_bytes", cgroup_memory_base, cg->id);
-                if(likely(stat(filename, &buf) != -1)) {
+                if(stat(filename, &buf) != -1) {
                     cg->memory.filename_usage_in_bytes = strdupz(filename);
                     cg->memory.enabled_usage_in_bytes = cgroup_enable_memory;
                     netdata_log_debug(D_CGROUP, "memory.usage_in_bytes filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_usage_in_bytes);
@@ -2208,9 +2208,9 @@ static inline void discovery_update_filenames() {
                     netdata_log_debug(D_CGROUP, "memory.usage_in_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
 
-            if(unlikely(cgroup_enable_swap && !cg->memory.filename_msw_usage_in_bytes)) {
+            if(cgroup_enable_swap && !cg->memory.filename_msw_usage_in_bytes) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/memory.memsw.usage_in_bytes", cgroup_memory_base, cg->id);
-                if(likely(stat(filename, &buf) != -1)) {
+                if(stat(filename, &buf) != -1) {
                     cg->memory.filename_msw_usage_in_bytes = strdupz(filename);
                     cg->memory.enabled_msw_usage_in_bytes = cgroup_enable_swap;
                     snprintfz(filename, FILENAME_MAX, "%s%s/memory.memsw.limit_in_bytes", cgroup_memory_base, cg->id);
@@ -2221,9 +2221,9 @@ static inline void discovery_update_filenames() {
                     netdata_log_debug(D_CGROUP, "memory.msw_usage_in_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
 
-            if(unlikely(cgroup_enable_memory_failcnt && !cg->memory.filename_failcnt)) {
+            if(cgroup_enable_memory_failcnt && !cg->memory.filename_failcnt) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/memory.failcnt", cgroup_memory_base, cg->id);
-                if(likely(stat(filename, &buf) != -1)) {
+                if(stat(filename, &buf) != -1) {
                     cg->memory.filename_failcnt = strdupz(filename);
                     cg->memory.enabled_failcnt = cgroup_enable_memory_failcnt;
                     netdata_log_debug(D_CGROUP, "memory.failcnt filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_failcnt);
@@ -2232,16 +2232,16 @@ static inline void discovery_update_filenames() {
                     netdata_log_debug(D_CGROUP, "memory.failcnt file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
 
-            if(unlikely(cgroup_enable_blkio_io && !cg->io_service_bytes.filename)) {
+            if(cgroup_enable_blkio_io && !cg->io_service_bytes.filename) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_service_bytes_recursive", cgroup_blkio_base, cg->id);
-                if (unlikely(stat(filename, &buf) != -1)) {
+                if (stat(filename, &buf) != -1) {
                     cg->io_service_bytes.filename = strdupz(filename);
                     cg->io_service_bytes.enabled = cgroup_enable_blkio_io;
                     netdata_log_debug(D_CGROUP, "blkio.io_service_bytes_recursive filename for cgroup '%s': '%s'", cg->id, cg->io_service_bytes.filename);
                 } else {
                     netdata_log_debug(D_CGROUP, "blkio.io_service_bytes_recursive file for cgroup '%s': '%s' does not exist.", cg->id, filename);
                     snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_service_bytes", cgroup_blkio_base, cg->id);
-                    if (likely(stat(filename, &buf) != -1)) {
+                    if (stat(filename, &buf) != -1) {
                         cg->io_service_bytes.filename = strdupz(filename);
                         cg->io_service_bytes.enabled = cgroup_enable_blkio_io;
                         netdata_log_debug(D_CGROUP, "blkio.io_service_bytes filename for cgroup '%s': '%s'", cg->id, cg->io_service_bytes.filename);
@@ -2251,16 +2251,16 @@ static inline void discovery_update_filenames() {
                 }
             }
 
-            if (unlikely(cgroup_enable_blkio_ops && !cg->io_serviced.filename)) {
+            if (cgroup_enable_blkio_ops && !cg->io_serviced.filename) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_serviced_recursive", cgroup_blkio_base, cg->id);
-                if (unlikely(stat(filename, &buf) != -1)) {
+                if (stat(filename, &buf) != -1) {
                     cg->io_serviced.filename = strdupz(filename);
                     cg->io_serviced.enabled = cgroup_enable_blkio_ops;
                     netdata_log_debug(D_CGROUP, "blkio.io_serviced_recursive filename for cgroup '%s': '%s'", cg->id, cg->io_serviced.filename);
                 } else {
                     netdata_log_debug(D_CGROUP, "blkio.io_serviced_recursive file for cgroup '%s': '%s' does not exist.", cg->id, filename);
                     snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_serviced", cgroup_blkio_base, cg->id);
-                    if (likely(stat(filename, &buf) != -1)) {
+                    if (stat(filename, &buf) != -1) {
                         cg->io_serviced.filename = strdupz(filename);
                         cg->io_serviced.enabled = cgroup_enable_blkio_ops;
                         netdata_log_debug(D_CGROUP, "blkio.io_serviced filename for cgroup '%s': '%s'", cg->id, cg->io_serviced.filename);
@@ -2270,9 +2270,9 @@ static inline void discovery_update_filenames() {
                 }
             }
 
-            if (unlikely(cgroup_enable_blkio_throttle_io && !cg->throttle_io_service_bytes.filename)) {
+            if (cgroup_enable_blkio_throttle_io && !cg->throttle_io_service_bytes.filename) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/blkio.throttle.io_service_bytes_recursive", cgroup_blkio_base, cg->id);
-                if (unlikely(stat(filename, &buf) != -1)) {
+                if (stat(filename, &buf) != -1) {
                     cg->throttle_io_service_bytes.filename = strdupz(filename);
                     cg->throttle_io_service_bytes.enabled = cgroup_enable_blkio_throttle_io;
                     netdata_log_debug(D_CGROUP,"blkio.throttle.io_service_bytes_recursive filename for cgroup '%s': '%s'", cg->id, cg->throttle_io_service_bytes.filename);
@@ -2280,7 +2280,7 @@ static inline void discovery_update_filenames() {
                     netdata_log_debug(D_CGROUP, "blkio.throttle.io_service_bytes_recursive file for cgroup '%s': '%s' does not exist.", cg->id, filename);
                     snprintfz(
                         filename, FILENAME_MAX, "%s%s/blkio.throttle.io_service_bytes", cgroup_blkio_base, cg->id);
-                    if (likely(stat(filename, &buf) != -1)) {
+                    if (stat(filename, &buf) != -1) {
                         cg->throttle_io_service_bytes.filename = strdupz(filename);
                         cg->throttle_io_service_bytes.enabled = cgroup_enable_blkio_throttle_io;
                         netdata_log_debug(D_CGROUP, "blkio.throttle.io_service_bytes filename for cgroup '%s': '%s'", cg->id, cg->throttle_io_service_bytes.filename);
@@ -2290,16 +2290,16 @@ static inline void discovery_update_filenames() {
                 }
             }
 
-            if (unlikely(cgroup_enable_blkio_throttle_ops && !cg->throttle_io_serviced.filename)) {
+            if (cgroup_enable_blkio_throttle_ops && !cg->throttle_io_serviced.filename) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/blkio.throttle.io_serviced_recursive", cgroup_blkio_base, cg->id);
-                if (unlikely(stat(filename, &buf) != -1)) {
+                if (stat(filename, &buf) != -1) {
                     cg->throttle_io_serviced.filename = strdupz(filename);
                     cg->throttle_io_serviced.enabled = cgroup_enable_blkio_throttle_ops;
                     netdata_log_debug(D_CGROUP, "blkio.throttle.io_serviced_recursive filename for cgroup '%s': '%s'", cg->id, cg->throttle_io_serviced.filename);
                 } else {
                     netdata_log_debug(D_CGROUP, "blkio.throttle.io_serviced_recursive file for cgroup '%s': '%s' does not exist.", cg->id, filename);
                     snprintfz(filename, FILENAME_MAX, "%s%s/blkio.throttle.io_serviced", cgroup_blkio_base, cg->id);
-                    if (likely(stat(filename, &buf) != -1)) {
+                    if (stat(filename, &buf) != -1) {
                         cg->throttle_io_serviced.filename = strdupz(filename);
                         cg->throttle_io_serviced.enabled = cgroup_enable_blkio_throttle_ops;
                         netdata_log_debug(D_CGROUP, "blkio.throttle.io_serviced filename for cgroup '%s': '%s'", cg->id, cg->throttle_io_serviced.filename);
@@ -2309,16 +2309,16 @@ static inline void discovery_update_filenames() {
                 }
             }
 
-            if (unlikely(cgroup_enable_blkio_merged_ops && !cg->io_merged.filename)) {
+            if (cgroup_enable_blkio_merged_ops && !cg->io_merged.filename) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_merged_recursive", cgroup_blkio_base, cg->id);
-                if (unlikely(stat(filename, &buf) != -1)) {
+                if (stat(filename, &buf) != -1) {
                     cg->io_merged.filename = strdupz(filename);
                     cg->io_merged.enabled = cgroup_enable_blkio_merged_ops;
                     netdata_log_debug(D_CGROUP, "blkio.io_merged_recursive filename for cgroup '%s': '%s'", cg->id, cg->io_merged.filename);
                 } else {
                     netdata_log_debug(D_CGROUP, "blkio.io_merged_recursive file for cgroup '%s': '%s' does not exist.", cg->id, filename);
                     snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_merged", cgroup_blkio_base, cg->id);
-                    if (likely(stat(filename, &buf) != -1)) {
+                    if (stat(filename, &buf) != -1) {
                         cg->io_merged.filename = strdupz(filename);
                         cg->io_merged.enabled = cgroup_enable_blkio_merged_ops;
                         netdata_log_debug(D_CGROUP, "blkio.io_merged filename for cgroup '%s': '%s'", cg->id, cg->io_merged.filename);
@@ -2328,16 +2328,16 @@ static inline void discovery_update_filenames() {
                 }
             }
 
-            if (unlikely(cgroup_enable_blkio_queued_ops && !cg->io_queued.filename)) {
+            if (cgroup_enable_blkio_queued_ops && !cg->io_queued.filename) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_queued_recursive", cgroup_blkio_base, cg->id);
-                if (unlikely(stat(filename, &buf) != -1)) {
+                if (stat(filename, &buf) != -1) {
                     cg->io_queued.filename = strdupz(filename);
                     cg->io_queued.enabled = cgroup_enable_blkio_queued_ops;
                     netdata_log_debug(D_CGROUP, "blkio.io_queued_recursive filename for cgroup '%s': '%s'", cg->id, cg->io_queued.filename);
                 } else {
                     netdata_log_debug(D_CGROUP, "blkio.io_queued_recursive file for cgroup '%s': '%s' does not exist.", cg->id, filename);
                     snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_queued", cgroup_blkio_base, cg->id);
-                    if (likely(stat(filename, &buf) != -1)) {
+                    if (stat(filename, &buf) != -1) {
                         cg->io_queued.filename = strdupz(filename);
                         cg->io_queued.enabled = cgroup_enable_blkio_queued_ops;
                         netdata_log_debug(D_CGROUP, "blkio.io_queued filename for cgroup '%s': '%s'", cg->id, cg->io_queued.filename);
@@ -2347,30 +2347,30 @@ static inline void discovery_update_filenames() {
                 }
             }
         }
-        else if(likely(cgroup_unified_exist)) {
-            if(unlikely(cgroup_enable_blkio_io && !cg->io_service_bytes.filename)) {
+        else if(cgroup_unified_exist) {
+            if(cgroup_enable_blkio_io && !cg->io_service_bytes.filename) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/io.stat", cgroup_unified_base, cg->id);
-                if(likely(stat(filename, &buf) != -1)) {
+                if(stat(filename, &buf) != -1) {
                     cg->io_service_bytes.filename = strdupz(filename);
                     cg->io_service_bytes.enabled = cgroup_enable_blkio_io;
                     netdata_log_debug(D_CGROUP, "io.stat filename for unified cgroup '%s': '%s'", cg->id, cg->io_service_bytes.filename);
                 } else
                     netdata_log_debug(D_CGROUP, "io.stat file for unified cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            if (unlikely(cgroup_enable_blkio_ops && !cg->io_serviced.filename)) {
+            if (cgroup_enable_blkio_ops && !cg->io_serviced.filename) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/io.stat", cgroup_unified_base, cg->id);
-                if (likely(stat(filename, &buf) != -1)) {
+                if (stat(filename, &buf) != -1) {
                     cg->io_serviced.filename = strdupz(filename);
                     cg->io_serviced.enabled = cgroup_enable_blkio_ops;
                     netdata_log_debug(D_CGROUP, "io.stat filename for unified cgroup '%s': '%s'", cg->id, cg->io_service_bytes.filename);
                 } else
                     netdata_log_debug(D_CGROUP, "io.stat file for unified cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            if (unlikely(
+            if (
                     (cgroup_enable_cpuacct_stat || cgroup_enable_cpuacct_cpu_throttling) &&
-                    !cg->cpuacct_stat.filename)) {
+                    !cg->cpuacct_stat.filename) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/cpu.stat", cgroup_unified_base, cg->id);
-                if(likely(stat(filename, &buf) != -1)) {
+                if(stat(filename, &buf) != -1) {
                     cg->cpuacct_stat.filename = strdupz(filename);
                     cg->cpuacct_stat.enabled = cgroup_enable_cpuacct_stat;
                     cg->cpuacct_cpu_throttling.enabled = cgroup_enable_cpuacct_cpu_throttling;
@@ -2383,9 +2383,9 @@ static inline void discovery_update_filenames() {
                 else
                     netdata_log_debug(D_CGROUP, "cpu.stat file for unified cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            if (unlikely(cgroup_enable_cpuacct_cpu_shares && !cg->cpuacct_cpu_shares.filename)) {
+            if (cgroup_enable_cpuacct_cpu_shares && !cg->cpuacct_cpu_shares.filename) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/cpu.weight", cgroup_unified_base, cg->id);
-                if (likely(stat(filename, &buf) != -1)) {
+                if (stat(filename, &buf) != -1) {
                     cg->cpuacct_cpu_shares.filename = strdupz(filename);
                     cg->cpuacct_cpu_shares.enabled = cgroup_enable_cpuacct_cpu_shares;
                     netdata_log_debug(D_CGROUP, "cpu.weight filename for cgroup '%s': '%s'", cg->id, cg->cpuacct_cpu_shares.filename);
@@ -2393,9 +2393,9 @@ static inline void discovery_update_filenames() {
                     netdata_log_debug(D_CGROUP, "cpu.weight file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
 
-            if(unlikely((cgroup_enable_detailed_memory || cgroup_used_memory) && !cg->memory.filename_detailed && (cgroup_used_memory || cgroup_enable_systemd_services_detailed_memory || !is_cgroup_systemd_service(cg)))) {
+            if((cgroup_enable_detailed_memory || cgroup_used_memory) && !cg->memory.filename_detailed && (cgroup_used_memory || cgroup_enable_systemd_services_detailed_memory || !is_cgroup_systemd_service(cg))) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/memory.stat", cgroup_unified_base, cg->id);
-                if(likely(stat(filename, &buf) != -1)) {
+                if(stat(filename, &buf) != -1) {
                     cg->memory.filename_detailed = strdupz(filename);
                     cg->memory.enabled_detailed = (cgroup_enable_detailed_memory == CONFIG_BOOLEAN_YES)?CONFIG_BOOLEAN_YES:CONFIG_BOOLEAN_AUTO;
                     netdata_log_debug(D_CGROUP, "memory.stat filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_detailed);
@@ -2404,9 +2404,9 @@ static inline void discovery_update_filenames() {
                     netdata_log_debug(D_CGROUP, "memory.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
 
-            if(unlikely(cgroup_enable_memory && !cg->memory.filename_usage_in_bytes)) {
+            if(cgroup_enable_memory && !cg->memory.filename_usage_in_bytes) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/memory.current", cgroup_unified_base, cg->id);
-                if(likely(stat(filename, &buf) != -1)) {
+                if(stat(filename, &buf) != -1) {
                     cg->memory.filename_usage_in_bytes = strdupz(filename);
                     cg->memory.enabled_usage_in_bytes = cgroup_enable_memory;
                     netdata_log_debug(D_CGROUP, "memory.current filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_usage_in_bytes);
@@ -2417,9 +2417,9 @@ static inline void discovery_update_filenames() {
                     netdata_log_debug(D_CGROUP, "memory.current file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
 
-            if(unlikely(cgroup_enable_swap && !cg->memory.filename_msw_usage_in_bytes)) {
+            if(cgroup_enable_swap && !cg->memory.filename_msw_usage_in_bytes) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/memory.swap.current", cgroup_unified_base, cg->id);
-                if(likely(stat(filename, &buf) != -1)) {
+                if(stat(filename, &buf) != -1) {
                     cg->memory.filename_msw_usage_in_bytes = strdupz(filename);
                     cg->memory.enabled_msw_usage_in_bytes = cgroup_enable_swap;
                     snprintfz(filename, FILENAME_MAX, "%s%s/memory.swap.max", cgroup_unified_base, cg->id);
@@ -2430,9 +2430,9 @@ static inline void discovery_update_filenames() {
                     netdata_log_debug(D_CGROUP, "memory.swap file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
 
-            if (unlikely(cgroup_enable_pressure_cpu && !cg->cpu_pressure.filename)) {
+            if (cgroup_enable_pressure_cpu && !cg->cpu_pressure.filename) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/cpu.pressure", cgroup_unified_base, cg->id);
-                if (likely(stat(filename, &buf) != -1)) {
+                if (stat(filename, &buf) != -1) {
                     cg->cpu_pressure.filename = strdupz(filename);
                     cg->cpu_pressure.some.enabled = cgroup_enable_pressure_cpu;
                     cg->cpu_pressure.full.enabled = CONFIG_BOOLEAN_NO;
@@ -2442,9 +2442,9 @@ static inline void discovery_update_filenames() {
                 }
             }
 
-            if (unlikely((cgroup_enable_pressure_io_some || cgroup_enable_pressure_io_full) && !cg->io_pressure.filename)) {
+            if ((cgroup_enable_pressure_io_some || cgroup_enable_pressure_io_full) && !cg->io_pressure.filename) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/io.pressure", cgroup_unified_base, cg->id);
-                if (likely(stat(filename, &buf) != -1)) {
+                if (stat(filename, &buf) != -1) {
                     cg->io_pressure.filename = strdupz(filename);
                     cg->io_pressure.some.enabled = cgroup_enable_pressure_io_some;
                     cg->io_pressure.full.enabled = cgroup_enable_pressure_io_full;
@@ -2454,9 +2454,9 @@ static inline void discovery_update_filenames() {
                 }
             }
 
-            if (unlikely((cgroup_enable_pressure_memory_some || cgroup_enable_pressure_memory_full) && !cg->memory_pressure.filename)) {
+            if ((cgroup_enable_pressure_memory_some || cgroup_enable_pressure_memory_full) && !cg->memory_pressure.filename) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/memory.pressure", cgroup_unified_base, cg->id);
-                if (likely(stat(filename, &buf) != -1)) {
+                if (stat(filename, &buf) != -1) {
                     cg->memory_pressure.filename = strdupz(filename);
                     cg->memory_pressure.some.enabled = cgroup_enable_pressure_memory_some;
                     cg->memory_pressure.full.enabled = cgroup_enable_pressure_memory_full;
@@ -2537,7 +2537,7 @@ static inline void discovery_share_cgroups_with_ebpf() {
         ptr->enabled = cg->enabled;
         if (cgroup_use_unified_cgroups) {
             snprintfz(ptr->path, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_unified_base, cg->id);
-            if (likely(stat(ptr->path, &buf) == -1)) {
+            if (stat(ptr->path, &buf) == -1) {
                 ptr->path[0] = '\0';
                 ptr->enabled = 0;
             }
@@ -2676,7 +2676,7 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
     if (cg->first_time_seen) {
         worker_is_busy(WORKER_DISCOVERY_PROCESS_FIRST_TIME);
         discovery_process_first_time_seen_cgroup(cg);
-        if (unlikely(cg->first_time_seen || cg->processed)) {
+        if (cg->first_time_seen || cg->processed) {
             return;
         }
     }
@@ -2684,7 +2684,7 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
     if (cg->pending_renames) {
         worker_is_busy(WORKER_DISCOVERY_PROCESS_RENAME);
         discovery_rename_cgroup(cg);
-        if (unlikely(cg->pending_renames || cg->processed)) {
+        if (cg->pending_renames || cg->processed) {
             return;
         }
     }
@@ -2812,7 +2812,7 @@ void cgroup_discovery_worker(void *ptr)
         discovery_thread.start_discovery = 0;
         uv_mutex_unlock(&discovery_thread.mutex);
 
-        if (unlikely(!service_running(SERVICE_COLLECTORS)))
+        if (!service_running(SERVICE_COLLECTORS))
             break;
 
         discovery_find_all_cgroups();
@@ -2871,7 +2871,7 @@ void update_systemd_services_charts(
 
     // create the charts
 
-    if (unlikely(do_cpu && !st_cpu)) {
+    if (do_cpu && !st_cpu) {
         char title[CHART_TITLE_MAX + 1];
         snprintfz(title, CHART_TITLE_MAX, "Systemd Services CPU utilization (100%% = 1 core)");
 
@@ -2891,7 +2891,7 @@ void update_systemd_services_charts(
         );
     }
 
-    if (unlikely(do_mem_usage && !st_mem_usage)) {
+    if (do_mem_usage && !st_mem_usage) {
         st_mem_usage = rrdset_create_localhost(
                 "services"
                 , "mem_usage"
@@ -2908,8 +2908,8 @@ void update_systemd_services_charts(
         );
     }
 
-    if(likely(do_mem_detailed)) {
-        if(unlikely(!st_mem_detailed_rss)) {
+    if(do_mem_detailed) {
+        if(!st_mem_detailed_rss) {
             st_mem_detailed_rss = rrdset_create_localhost(
                     "services"
                     , "mem_rss"
@@ -2926,7 +2926,7 @@ void update_systemd_services_charts(
             );
         }
 
-        if(unlikely(!st_mem_detailed_mapped)) {
+        if(!st_mem_detailed_mapped) {
             st_mem_detailed_mapped = rrdset_create_localhost(
                     "services"
                     , "mem_mapped"
@@ -2943,7 +2943,7 @@ void update_systemd_services_charts(
             );
         }
 
-        if(unlikely(!st_mem_detailed_cache)) {
+        if(!st_mem_detailed_cache) {
             st_mem_detailed_cache = rrdset_create_localhost(
                     "services"
                     , "mem_cache"
@@ -2960,7 +2960,7 @@ void update_systemd_services_charts(
             );
         }
 
-        if(unlikely(!st_mem_detailed_writeback)) {
+        if(!st_mem_detailed_writeback) {
             st_mem_detailed_writeback = rrdset_create_localhost(
                     "services"
                     , "mem_writeback"
@@ -2978,7 +2978,7 @@ void update_systemd_services_charts(
 
         }
 
-        if(unlikely(!st_mem_detailed_pgfault)) {
+        if(!st_mem_detailed_pgfault) {
             st_mem_detailed_pgfault = rrdset_create_localhost(
                     "services"
                     , "mem_pgfault"
@@ -2995,7 +2995,7 @@ void update_systemd_services_charts(
             );
         }
 
-        if(unlikely(!st_mem_detailed_pgmajfault)) {
+        if(!st_mem_detailed_pgmajfault) {
             st_mem_detailed_pgmajfault = rrdset_create_localhost(
                     "services"
                     , "mem_pgmajfault"
@@ -3012,7 +3012,7 @@ void update_systemd_services_charts(
             );
         }
 
-        if(unlikely(!st_mem_detailed_pgpgin)) {
+        if(!st_mem_detailed_pgpgin) {
             st_mem_detailed_pgpgin = rrdset_create_localhost(
                     "services"
                     , "mem_pgpgin"
@@ -3030,7 +3030,7 @@ void update_systemd_services_charts(
 
         }
 
-        if(unlikely(!st_mem_detailed_pgpgout)) {
+        if(!st_mem_detailed_pgpgout) {
             st_mem_detailed_pgpgout = rrdset_create_localhost(
                     "services"
                     , "mem_pgpgout"
@@ -3048,7 +3048,7 @@ void update_systemd_services_charts(
         }
     }
 
-    if(unlikely(do_mem_failcnt && !st_mem_failcnt)) {
+    if(do_mem_failcnt && !st_mem_failcnt) {
         st_mem_failcnt = rrdset_create_localhost(
                 "services"
                 , "mem_failcnt"
@@ -3082,8 +3082,8 @@ void update_systemd_services_charts(
         );
     }
 
-    if(likely(do_io)) {
-        if(unlikely(!st_io_read)) {
+    if(do_io) {
+        if(!st_io_read) {
             st_io_read = rrdset_create_localhost(
                     "services"
                     , "io_read"
@@ -3100,7 +3100,7 @@ void update_systemd_services_charts(
             );
         }
 
-        if(unlikely(!st_io_write)) {
+        if(!st_io_write) {
             st_io_write = rrdset_create_localhost(
                     "services"
                     , "io_write"
@@ -3118,8 +3118,8 @@ void update_systemd_services_charts(
         }
     }
 
-    if(likely(do_io_ops)) {
-        if(unlikely(!st_io_serviced_read)) {
+    if(do_io_ops) {
+        if(!st_io_serviced_read) {
             st_io_serviced_read = rrdset_create_localhost(
                     "services"
                     , "io_ops_read"
@@ -3136,7 +3136,7 @@ void update_systemd_services_charts(
             );
         }
 
-        if(unlikely(!st_io_serviced_write)) {
+        if(!st_io_serviced_write) {
             st_io_serviced_write = rrdset_create_localhost(
                     "services"
                     , "io_ops_write"
@@ -3154,8 +3154,8 @@ void update_systemd_services_charts(
         }
     }
 
-    if(likely(do_throttle_io)) {
-        if(unlikely(!st_throttle_io_read)) {
+    if(do_throttle_io) {
+        if(!st_throttle_io_read) {
 
             st_throttle_io_read = rrdset_create_localhost(
                     "services"
@@ -3174,7 +3174,7 @@ void update_systemd_services_charts(
 
         }
 
-        if(unlikely(!st_throttle_io_write)) {
+        if(!st_throttle_io_write) {
             st_throttle_io_write = rrdset_create_localhost(
                     "services"
                     , "throttle_io_write"
@@ -3192,8 +3192,8 @@ void update_systemd_services_charts(
         }
     }
 
-    if(likely(do_throttle_ops)) {
-        if(unlikely(!st_throttle_ops_read)) {
+    if(do_throttle_ops) {
+        if(!st_throttle_ops_read) {
             st_throttle_ops_read = rrdset_create_localhost(
                     "services"
                     , "throttle_io_ops_read"
@@ -3210,7 +3210,7 @@ void update_systemd_services_charts(
             );
         }
 
-        if(unlikely(!st_throttle_ops_write)) {
+        if(!st_throttle_ops_write) {
             st_throttle_ops_write = rrdset_create_localhost(
                     "services"
                     , "throttle_io_ops_write"
@@ -3228,8 +3228,8 @@ void update_systemd_services_charts(
         }
     }
 
-    if(likely(do_queued_ops)) {
-        if(unlikely(!st_queued_ops_read)) {
+    if(do_queued_ops) {
+        if(!st_queued_ops_read) {
             st_queued_ops_read = rrdset_create_localhost(
                     "services"
                     , "queued_io_ops_read"
@@ -3246,7 +3246,7 @@ void update_systemd_services_charts(
             );
         }
 
-        if(unlikely(!st_queued_ops_write)) {
+        if(!st_queued_ops_write) {
 
             st_queued_ops_write = rrdset_create_localhost(
                     "services"
@@ -3265,8 +3265,8 @@ void update_systemd_services_charts(
         }
     }
 
-    if(likely(do_merged_ops)) {
-        if(unlikely(!st_merged_ops_read)) {
+    if(do_merged_ops) {
+        if(!st_merged_ops_read) {
             st_merged_ops_read = rrdset_create_localhost(
                     "services"
                     , "merged_io_ops_read"
@@ -3283,7 +3283,7 @@ void update_systemd_services_charts(
             );
         }
 
-        if(unlikely(!st_merged_ops_write)) {
+        if(!st_merged_ops_write) {
             st_merged_ops_write = rrdset_create_localhost(
                     "services"
                     , "merged_io_ops_write"
@@ -3304,11 +3304,11 @@ void update_systemd_services_charts(
     // update the values
     struct cgroup *cg;
     for(cg = cgroup_root; cg ; cg = cg->next) {
-        if(unlikely(!cg->enabled || cg->pending_renames || !is_cgroup_systemd_service(cg)))
+        if(!cg->enabled || cg->pending_renames || !is_cgroup_systemd_service(cg))
             continue;
 
-        if(likely(do_cpu && cg->cpuacct_stat.updated)) {
-            if(unlikely(!cg->rd_cpu)){
+        if(do_cpu && cg->cpuacct_stat.updated) {
+            if(!cg->rd_cpu){
 
 
                 if (!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
@@ -3321,64 +3321,64 @@ void update_systemd_services_charts(
             rrddim_set_by_pointer(st_cpu, cg->rd_cpu, cg->cpuacct_stat.user + cg->cpuacct_stat.system);
         }
 
-        if(likely(do_mem_usage && cg->memory.updated_usage_in_bytes)) {
-            if(unlikely(!cg->rd_mem_usage))
+        if(do_mem_usage && cg->memory.updated_usage_in_bytes) {
+            if(!cg->rd_mem_usage)
                 cg->rd_mem_usage = rrddim_add(st_mem_usage, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
 
             rrddim_set_by_pointer(st_mem_usage, cg->rd_mem_usage, cg->memory.usage_in_bytes);
         }
 
-        if(likely(do_mem_detailed && cg->memory.updated_detailed)) {
-            if(unlikely(!cg->rd_mem_detailed_rss))
+        if(do_mem_detailed && cg->memory.updated_detailed) {
+            if(!cg->rd_mem_detailed_rss)
                 cg->rd_mem_detailed_rss = rrddim_add(st_mem_detailed_rss, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
 
             rrddim_set_by_pointer(st_mem_detailed_rss, cg->rd_mem_detailed_rss, cg->memory.total_rss);
 
-            if(unlikely(!cg->rd_mem_detailed_mapped))
+            if(!cg->rd_mem_detailed_mapped)
                 cg->rd_mem_detailed_mapped = rrddim_add(st_mem_detailed_mapped, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
 
             rrddim_set_by_pointer(st_mem_detailed_mapped, cg->rd_mem_detailed_mapped, cg->memory.total_mapped_file);
 
-            if(unlikely(!cg->rd_mem_detailed_cache))
+            if(!cg->rd_mem_detailed_cache)
                 cg->rd_mem_detailed_cache = rrddim_add(st_mem_detailed_cache, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
 
             rrddim_set_by_pointer(st_mem_detailed_cache, cg->rd_mem_detailed_cache, cg->memory.total_cache);
 
-            if(unlikely(!cg->rd_mem_detailed_writeback))
+            if(!cg->rd_mem_detailed_writeback)
                 cg->rd_mem_detailed_writeback = rrddim_add(st_mem_detailed_writeback, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
 
             rrddim_set_by_pointer(st_mem_detailed_writeback, cg->rd_mem_detailed_writeback, cg->memory.total_writeback);
 
-            if(unlikely(!cg->rd_mem_detailed_pgfault))
+            if(!cg->rd_mem_detailed_pgfault)
                 cg->rd_mem_detailed_pgfault = rrddim_add(st_mem_detailed_pgfault, cg->chart_id, cg->chart_title, system_page_size, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st_mem_detailed_pgfault, cg->rd_mem_detailed_pgfault, cg->memory.total_pgfault);
 
-            if(unlikely(!cg->rd_mem_detailed_pgmajfault))
+            if(!cg->rd_mem_detailed_pgmajfault)
                 cg->rd_mem_detailed_pgmajfault = rrddim_add(st_mem_detailed_pgmajfault, cg->chart_id, cg->chart_title, system_page_size, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st_mem_detailed_pgmajfault, cg->rd_mem_detailed_pgmajfault, cg->memory.total_pgmajfault);
 
-            if(unlikely(!cg->rd_mem_detailed_pgpgin))
+            if(!cg->rd_mem_detailed_pgpgin)
                 cg->rd_mem_detailed_pgpgin = rrddim_add(st_mem_detailed_pgpgin, cg->chart_id, cg->chart_title, system_page_size, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st_mem_detailed_pgpgin, cg->rd_mem_detailed_pgpgin, cg->memory.total_pgpgin);
 
-            if(unlikely(!cg->rd_mem_detailed_pgpgout))
+            if(!cg->rd_mem_detailed_pgpgout)
                 cg->rd_mem_detailed_pgpgout = rrddim_add(st_mem_detailed_pgpgout, cg->chart_id, cg->chart_title, system_page_size, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st_mem_detailed_pgpgout, cg->rd_mem_detailed_pgpgout, cg->memory.total_pgpgout);
         }
 
-        if(likely(do_mem_failcnt && cg->memory.updated_failcnt)) {
-            if(unlikely(!cg->rd_mem_failcnt))
+        if(do_mem_failcnt && cg->memory.updated_failcnt) {
+            if(!cg->rd_mem_failcnt)
                 cg->rd_mem_failcnt = rrddim_add(st_mem_failcnt, cg->chart_id, cg->chart_title, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st_mem_failcnt, cg->rd_mem_failcnt, cg->memory.failcnt);
         }
 
-        if(likely(do_swap_usage && cg->memory.updated_msw_usage_in_bytes)) {
-            if(unlikely(!cg->rd_swap_usage))
+        if(do_swap_usage && cg->memory.updated_msw_usage_in_bytes) {
+            if(!cg->rd_swap_usage)
                 cg->rd_swap_usage = rrddim_add(st_swap_usage, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
 
             if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
@@ -3392,73 +3392,73 @@ void update_systemd_services_charts(
             }
         }
 
-        if(likely(do_io && cg->io_service_bytes.updated)) {
-            if(unlikely(!cg->rd_io_service_bytes_read))
+        if(do_io && cg->io_service_bytes.updated) {
+            if(!cg->rd_io_service_bytes_read)
                 cg->rd_io_service_bytes_read = rrddim_add(st_io_read, cg->chart_id, cg->chart_title, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st_io_read, cg->rd_io_service_bytes_read, cg->io_service_bytes.Read);
 
-            if(unlikely(!cg->rd_io_service_bytes_write))
+            if(!cg->rd_io_service_bytes_write)
                 cg->rd_io_service_bytes_write = rrddim_add(st_io_write, cg->chart_id, cg->chart_title, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st_io_write, cg->rd_io_service_bytes_write, cg->io_service_bytes.Write);
         }
 
-        if(likely(do_io_ops && cg->io_serviced.updated)) {
-            if(unlikely(!cg->rd_io_serviced_read))
+        if(do_io_ops && cg->io_serviced.updated) {
+            if(!cg->rd_io_serviced_read)
                 cg->rd_io_serviced_read = rrddim_add(st_io_serviced_read, cg->chart_id, cg->chart_title, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st_io_serviced_read, cg->rd_io_serviced_read, cg->io_serviced.Read);
 
-            if(unlikely(!cg->rd_io_serviced_write))
+            if(!cg->rd_io_serviced_write)
                 cg->rd_io_serviced_write = rrddim_add(st_io_serviced_write, cg->chart_id, cg->chart_title, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st_io_serviced_write, cg->rd_io_serviced_write, cg->io_serviced.Write);
         }
 
-        if(likely(do_throttle_io && cg->throttle_io_service_bytes.updated)) {
-            if(unlikely(!cg->rd_throttle_io_read))
+        if(do_throttle_io && cg->throttle_io_service_bytes.updated) {
+            if(!cg->rd_throttle_io_read)
                 cg->rd_throttle_io_read = rrddim_add(st_throttle_io_read, cg->chart_id, cg->chart_title, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st_throttle_io_read, cg->rd_throttle_io_read, cg->throttle_io_service_bytes.Read);
 
-            if(unlikely(!cg->rd_throttle_io_write))
+            if(!cg->rd_throttle_io_write)
                 cg->rd_throttle_io_write = rrddim_add(st_throttle_io_write, cg->chart_id, cg->chart_title, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st_throttle_io_write, cg->rd_throttle_io_write, cg->throttle_io_service_bytes.Write);
         }
 
-        if(likely(do_throttle_ops && cg->throttle_io_serviced.updated)) {
-            if(unlikely(!cg->rd_throttle_io_serviced_read))
+        if(do_throttle_ops && cg->throttle_io_serviced.updated) {
+            if(!cg->rd_throttle_io_serviced_read)
                 cg->rd_throttle_io_serviced_read = rrddim_add(st_throttle_ops_read, cg->chart_id, cg->chart_title, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st_throttle_ops_read, cg->rd_throttle_io_serviced_read, cg->throttle_io_serviced.Read);
 
-            if(unlikely(!cg->rd_throttle_io_serviced_write))
+            if(!cg->rd_throttle_io_serviced_write)
                 cg->rd_throttle_io_serviced_write = rrddim_add(st_throttle_ops_write, cg->chart_id, cg->chart_title, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st_throttle_ops_write, cg->rd_throttle_io_serviced_write, cg->throttle_io_serviced.Write);
         }
 
-        if(likely(do_queued_ops && cg->io_queued.updated)) {
-            if(unlikely(!cg->rd_io_queued_read))
+        if(do_queued_ops && cg->io_queued.updated) {
+            if(!cg->rd_io_queued_read)
                 cg->rd_io_queued_read = rrddim_add(st_queued_ops_read, cg->chart_id, cg->chart_title, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st_queued_ops_read, cg->rd_io_queued_read, cg->io_queued.Read);
 
-            if(unlikely(!cg->rd_io_queued_write))
+            if(!cg->rd_io_queued_write)
                 cg->rd_io_queued_write = rrddim_add(st_queued_ops_write, cg->chart_id, cg->chart_title, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st_queued_ops_write, cg->rd_io_queued_write, cg->io_queued.Write);
         }
 
-        if(likely(do_merged_ops && cg->io_merged.updated)) {
-            if(unlikely(!cg->rd_io_merged_read))
+        if(do_merged_ops && cg->io_merged.updated) {
+            if(!cg->rd_io_merged_read)
                 cg->rd_io_merged_read = rrddim_add(st_merged_ops_read, cg->chart_id, cg->chart_title, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st_merged_ops_read, cg->rd_io_merged_read, cg->io_merged.Read);
 
-            if(unlikely(!cg->rd_io_merged_write))
+            if(!cg->rd_io_merged_write)
                 cg->rd_io_merged_write = rrddim_add(st_merged_ops_write, cg->chart_id, cg->chart_title, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st_merged_ops_write, cg->rd_io_merged_write, cg->io_merged.Write);
@@ -3466,13 +3466,13 @@ void update_systemd_services_charts(
     }
 
     // complete the iteration
-    if(likely(do_cpu))
+    if(do_cpu)
         rrdset_done(st_cpu);
 
-    if(likely(do_mem_usage))
+    if(do_mem_usage)
         rrdset_done(st_mem_usage);
 
-    if(unlikely(do_mem_detailed)) {
+    if(do_mem_detailed) {
         rrdset_done(st_mem_detailed_cache);
         rrdset_done(st_mem_detailed_rss);
         rrdset_done(st_mem_detailed_mapped);
@@ -3483,38 +3483,38 @@ void update_systemd_services_charts(
         rrdset_done(st_mem_detailed_pgpgout);
     }
 
-    if(likely(do_mem_failcnt))
+    if(do_mem_failcnt)
         rrdset_done(st_mem_failcnt);
 
-    if(likely(do_swap_usage))
+    if(do_swap_usage)
         rrdset_done(st_swap_usage);
 
-    if(likely(do_io)) {
+    if(do_io) {
         rrdset_done(st_io_read);
         rrdset_done(st_io_write);
     }
 
-    if(likely(do_io_ops)) {
+    if(do_io_ops) {
         rrdset_done(st_io_serviced_read);
         rrdset_done(st_io_serviced_write);
     }
 
-    if(likely(do_throttle_io)) {
+    if(do_throttle_io) {
         rrdset_done(st_throttle_io_read);
         rrdset_done(st_throttle_io_write);
     }
 
-    if(likely(do_throttle_ops)) {
+    if(do_throttle_ops) {
         rrdset_done(st_throttle_ops_read);
         rrdset_done(st_throttle_ops_write);
     }
 
-    if(likely(do_queued_ops)) {
+    if(do_queued_ops) {
         rrdset_done(st_queued_ops_read);
         rrdset_done(st_queued_ops_write);
     }
 
-    if(likely(do_merged_ops)) {
+    if(do_merged_ops) {
         rrdset_done(st_merged_ops_read);
         rrdset_done(st_merged_ops_write);
     }
@@ -3564,18 +3564,18 @@ static inline void update_cpu_limits2(struct cgroup *cg) {
         static procfile *ff = NULL;
 
         ff = procfile_reopen(ff, cg->filename_cpu_cfs_quota, NULL, CGROUP_PROCFILE_FLAG);
-        if(unlikely(!ff)) {
+        if(!ff) {
             goto cpu_limits2_err;
         }
 
         ff = procfile_readall(ff);
-        if(unlikely(!ff)) {
+        if(!ff) {
             goto cpu_limits2_err;
         }
 
         unsigned long lines = procfile_lines(ff);
 
-        if (unlikely(lines < 1)) {
+        if (lines < 1) {
             collector_error("CGROUP: file '%s' should have 1 lines.", cg->filename_cpu_cfs_quota);
             return;
         }
@@ -3602,7 +3602,7 @@ cpu_limits2_err:
 
 static inline int update_memory_limits(char **filename, const RRDSETVAR_ACQUIRED **chart_var, unsigned long long *value, const char *chart_var_name, struct cgroup *cg) {
     if(*filename) {
-        if(unlikely(!*chart_var)) {
+        if(!*chart_var) {
             *chart_var = rrdsetvar_custom_chart_variable_add_and_acquire(cg->st_mem_usage, chart_var_name);
             if(!*chart_var) {
                 collector_error("Cannot create cgroup %s chart variable '%s'. Will not update its limit anymore.", cg->id, chart_var_name);
@@ -3666,10 +3666,10 @@ void update_cgroup_charts(int update_every) {
 
     struct cgroup *cg;
     for(cg = cgroup_root; cg ; cg = cg->next) {
-        if(unlikely(!cg->enabled || cg->pending_renames))
+        if(!cg->enabled || cg->pending_renames)
             continue;
 
-        if(likely(cgroup_enable_systemd_services && is_cgroup_systemd_service(cg))) {
+        if(cgroup_enable_systemd_services && is_cgroup_systemd_service(cg)) {
             if(cg->cpuacct_stat.updated && cg->cpuacct_stat.enabled == CONFIG_BOOLEAN_YES) services_do_cpu++;
 
             if(cgroup_enable_systemd_services_detailed_memory && cg->memory.updated_detailed && cg->memory.enabled_detailed) services_do_mem_detailed++;
@@ -3688,8 +3688,8 @@ void update_cgroup_charts(int update_every) {
 
         type[0] = '\0';
 
-        if(likely(cg->cpuacct_stat.updated && cg->cpuacct_stat.enabled == CONFIG_BOOLEAN_YES)) {
-            if(unlikely(!cg->st_cpu)) {
+        if(cg->cpuacct_stat.updated && cg->cpuacct_stat.enabled == CONFIG_BOOLEAN_YES) {
+            if(!cg->st_cpu) {
                 snprintfz(
                     title,
                     CHART_TITLE_MAX,
@@ -3726,7 +3726,7 @@ void update_cgroup_charts(int update_every) {
             rrddim_set(cg->st_cpu, "system", cg->cpuacct_stat.system);
             rrdset_done(cg->st_cpu);
 
-            if(likely(cg->filename_cpuset_cpus || cg->filename_cpu_cfs_period || cg->filename_cpu_cfs_quota)) {
+            if(cg->filename_cpuset_cpus || cg->filename_cpu_cfs_period || cg->filename_cpu_cfs_quota) {
                 if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
                     update_cpu_limits(&cg->filename_cpuset_cpus, &cg->cpuset_cpus, cg);
                     update_cpu_limits(&cg->filename_cpu_cfs_period, &cg->cpu_cfs_period, cg);
@@ -3735,7 +3735,7 @@ void update_cgroup_charts(int update_every) {
                     update_cpu_limits2(cg);
                 }
 
-                if(unlikely(!cg->chart_var_cpu_limit)) {
+                if(!cg->chart_var_cpu_limit) {
                     cg->chart_var_cpu_limit = rrdsetvar_custom_chart_variable_add_and_acquire(cg->st_cpu, "cpu_limit");
                     if(!cg->chart_var_cpu_limit) {
                         collector_error("Cannot create cgroup %s chart variable 'cpu_limit'. Will not update its limit anymore.", cg->id);
@@ -3750,18 +3750,18 @@ void update_cgroup_charts(int update_every) {
                 else {
                     NETDATA_DOUBLE value = 0, quota = 0;
 
-                    if(likely( ((!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) && (cg->filename_cpuset_cpus || (cg->filename_cpu_cfs_period && cg->filename_cpu_cfs_quota)))
-                            || ((cg->options & CGROUP_OPTIONS_IS_UNIFIED) && cg->filename_cpu_cfs_quota))) {
-                        if(unlikely(cg->cpu_cfs_quota > 0))
+                    if( ((!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) && (cg->filename_cpuset_cpus || (cg->filename_cpu_cfs_period && cg->filename_cpu_cfs_quota)))
+                            || ((cg->options & CGROUP_OPTIONS_IS_UNIFIED) && cg->filename_cpu_cfs_quota)) {
+                        if(cg->cpu_cfs_quota > 0)
                             quota = (NETDATA_DOUBLE)cg->cpu_cfs_quota / (NETDATA_DOUBLE)cg->cpu_cfs_period;
 
-                        if(unlikely(quota > 0 && quota < cg->cpuset_cpus))
+                        if(quota > 0 && quota < cg->cpuset_cpus)
                             value = quota * 100;
                         else
                             value = (NETDATA_DOUBLE)cg->cpuset_cpus * 100;
                     }
-                    if(likely(value)) {
-                        if(unlikely(!cg->st_cpu_limit)) {
+                    if(value) {
+                        if(!cg->st_cpu_limit) {
                             snprintfz(title, CHART_TITLE_MAX, "CPU Usage within the limits");
 
                             cg->st_cpu_limit = rrdset_create_localhost(
@@ -3802,7 +3802,7 @@ void update_cgroup_charts(int update_every) {
                         rrdset_done(cg->st_cpu_limit);
                     }
                     else {
-                        if(unlikely(cg->st_cpu_limit)) {
+                        if(cg->st_cpu_limit) {
                             rrdset_is_obsolete(cg->st_cpu_limit);
                             cg->st_cpu_limit = NULL;
                         }
@@ -3812,8 +3812,8 @@ void update_cgroup_charts(int update_every) {
             }
         }
 
-        if (likely(cg->cpuacct_cpu_throttling.updated && cg->cpuacct_cpu_throttling.enabled == CONFIG_BOOLEAN_YES)) {
-            if (unlikely(!cg->st_cpu_nr_throttled)) {
+        if (cg->cpuacct_cpu_throttling.updated && cg->cpuacct_cpu_throttling.enabled == CONFIG_BOOLEAN_YES) {
+            if (!cg->st_cpu_nr_throttled) {
                 snprintfz(title, CHART_TITLE_MAX, "CPU Throttled Runnable Periods");
 
                 cg->st_cpu_nr_throttled = rrdset_create_localhost(
@@ -3838,7 +3838,7 @@ void update_cgroup_charts(int update_every) {
                 rrdset_done(cg->st_cpu_nr_throttled);
             }
 
-            if (unlikely(!cg->st_cpu_throttled_time)) {
+            if (!cg->st_cpu_throttled_time) {
                 snprintfz(title, CHART_TITLE_MAX, "CPU Throttled Time Duration");
 
                 cg->st_cpu_throttled_time = rrdset_create_localhost(
@@ -3864,8 +3864,8 @@ void update_cgroup_charts(int update_every) {
             }
         }
 
-        if (likely(cg->cpuacct_cpu_shares.updated && cg->cpuacct_cpu_shares.enabled == CONFIG_BOOLEAN_YES)) {
-            if (unlikely(!cg->st_cpu_shares)) {
+        if (cg->cpuacct_cpu_shares.updated && cg->cpuacct_cpu_shares.enabled == CONFIG_BOOLEAN_YES) {
+            if (!cg->st_cpu_shares) {
                 snprintfz(title, CHART_TITLE_MAX, "CPU Time Relative Share");
 
                 cg->st_cpu_shares = rrdset_create_localhost(
@@ -3891,11 +3891,11 @@ void update_cgroup_charts(int update_every) {
             }
         }
 
-        if(likely(cg->cpuacct_usage.updated && cg->cpuacct_usage.enabled == CONFIG_BOOLEAN_YES)) {
+        if(cg->cpuacct_usage.updated && cg->cpuacct_usage.enabled == CONFIG_BOOLEAN_YES) {
             char id[RRD_ID_LENGTH_MAX + 1];
             unsigned int i;
 
-            if(unlikely(!cg->st_cpu_per_core)) {
+            if(!cg->st_cpu_per_core) {
                 snprintfz(
                     title,
                     CHART_TITLE_MAX,
@@ -3932,8 +3932,8 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_cpu_per_core);
         }
 
-        if(likely(cg->memory.updated_detailed && cg->memory.enabled_detailed == CONFIG_BOOLEAN_YES)) {
-            if(unlikely(!cg->st_mem)) {
+        if(cg->memory.updated_detailed && cg->memory.enabled_detailed == CONFIG_BOOLEAN_YES) {
+            if(!cg->st_mem) {
                 snprintfz(title, CHART_TITLE_MAX, "Memory Usage");
 
                 cg->st_mem = rrdset_create_localhost(
@@ -3991,7 +3991,7 @@ void update_cgroup_charts(int update_every) {
             }
             rrdset_done(cg->st_mem);
 
-            if(unlikely(!cg->st_writeback)) {
+            if(!cg->st_writeback) {
                 snprintfz(title, CHART_TITLE_MAX, "Writeback Memory");
 
                 cg->st_writeback = rrdset_create_localhost(
@@ -4024,7 +4024,7 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_writeback);
 
             if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
-                if(unlikely(!cg->st_mem_activity)) {
+                if(!cg->st_mem_activity) {
                     snprintfz(title, CHART_TITLE_MAX, "Memory Activity");
 
                     cg->st_mem_activity = rrdset_create_localhost(
@@ -4053,7 +4053,7 @@ void update_cgroup_charts(int update_every) {
                 rrdset_done(cg->st_mem_activity);
             }
 
-            if(unlikely(!cg->st_pgfaults)) {
+            if(!cg->st_pgfaults) {
                 snprintfz(title, CHART_TITLE_MAX, "Memory Page Faults");
 
                 cg->st_pgfaults = rrdset_create_localhost(
@@ -4082,8 +4082,8 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_pgfaults);
         }
 
-        if(likely(cg->memory.updated_usage_in_bytes && cg->memory.enabled_usage_in_bytes == CONFIG_BOOLEAN_YES)) {
-            if(unlikely(!cg->st_mem_usage)) {
+        if(cg->memory.updated_usage_in_bytes && cg->memory.enabled_usage_in_bytes == CONFIG_BOOLEAN_YES) {
+            if(!cg->st_mem_usage) {
                 snprintfz(title, CHART_TITLE_MAX, "Used Memory");
 
                 cg->st_mem_usage = rrdset_create_localhost(
@@ -4119,19 +4119,19 @@ void update_cgroup_charts(int update_every) {
             }
             rrdset_done(cg->st_mem_usage);
 
-            if (likely(update_memory_limits(&cg->filename_memory_limit, &cg->chart_var_memory_limit, &cg->memory_limit, "memory_limit", cg))) {
+            if (update_memory_limits(&cg->filename_memory_limit, &cg->chart_var_memory_limit, &cg->memory_limit, "memory_limit", cg)) {
                 static unsigned long long ram_total = 0;
 
-                if(unlikely(!ram_total)) {
+                if(!ram_total) {
                     procfile *ff = NULL;
 
                     char filename[FILENAME_MAX + 1];
                     snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/meminfo");
                     ff = procfile_open(config_get("plugin:cgroups", "meminfo filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
 
-                    if(likely(ff))
+                    if(ff)
                         ff = procfile_readall(ff);
-                    if(likely(ff && procfile_lines(ff) && !strncmp(procfile_word(ff, 0), "MemTotal", 8)))
+                    if(ff && procfile_lines(ff) && !strncmp(procfile_word(ff, 0), "MemTotal", 8))
                         ram_total = str2ull(procfile_word(ff, 1), NULL) * 1024;
                     else {
                         collector_error("Cannot read file %s. Will not update cgroup %s RAM limit anymore.", filename, cg->id);
@@ -4142,13 +4142,13 @@ void update_cgroup_charts(int update_every) {
                     procfile_close(ff);
                 }
 
-                if(likely(ram_total)) {
+                if(ram_total) {
                     unsigned long long memory_limit = ram_total;
 
-                    if(unlikely(cg->memory_limit < ram_total))
+                    if(cg->memory_limit < ram_total)
                         memory_limit = cg->memory_limit;
 
-                    if(unlikely(!cg->st_mem_usage_limit)) {
+                    if(!cg->st_mem_usage_limit) {
                         snprintfz(title, CHART_TITLE_MAX, "Used RAM within the limits");
 
                         cg->st_mem_usage_limit = rrdset_create_localhost(
@@ -4178,7 +4178,7 @@ void update_cgroup_charts(int update_every) {
                     rrddim_set(cg->st_mem_usage_limit, "used", cg->memory.usage_in_bytes);
                     rrdset_done(cg->st_mem_usage_limit);
 
-                    if (unlikely(!cg->st_mem_utilization)) {
+                    if (!cg->st_mem_utilization) {
                         snprintfz(title, CHART_TITLE_MAX, "Memory Utilization");
 
                         cg->st_mem_utilization = rrdset_create_localhost(
@@ -4211,12 +4211,12 @@ void update_cgroup_charts(int update_every) {
                 }
             }
             else {
-                if(unlikely(cg->st_mem_usage_limit)) {
+                if(cg->st_mem_usage_limit) {
                     rrdset_is_obsolete(cg->st_mem_usage_limit);
                     cg->st_mem_usage_limit = NULL;
                 }
 
-                if(unlikely(cg->st_mem_utilization)) {
+                if(cg->st_mem_utilization) {
                     rrdset_is_obsolete(cg->st_mem_utilization);
                     cg->st_mem_utilization = NULL;
                 }
@@ -4225,8 +4225,8 @@ void update_cgroup_charts(int update_every) {
             update_memory_limits(&cg->filename_memoryswap_limit, &cg->chart_var_memoryswap_limit, &cg->memoryswap_limit, "memory_and_swap_limit", cg);
         }
 
-        if(likely(cg->memory.updated_failcnt && cg->memory.enabled_failcnt == CONFIG_BOOLEAN_YES)) {
-            if(unlikely(!cg->st_mem_failcnt)) {
+        if(cg->memory.updated_failcnt && cg->memory.enabled_failcnt == CONFIG_BOOLEAN_YES) {
+            if(!cg->st_mem_failcnt) {
                 snprintfz(title, CHART_TITLE_MAX, "Memory Limit Failures");
 
                 cg->st_mem_failcnt = rrdset_create_localhost(
@@ -4253,8 +4253,8 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_mem_failcnt);
         }
 
-        if(likely(cg->io_service_bytes.updated && cg->io_service_bytes.enabled == CONFIG_BOOLEAN_YES)) {
-            if(unlikely(!cg->st_io)) {
+        if(cg->io_service_bytes.updated && cg->io_service_bytes.enabled == CONFIG_BOOLEAN_YES) {
+            if(!cg->st_io) {
                 snprintfz(title, CHART_TITLE_MAX, "I/O Bandwidth (all disks)");
 
                 cg->st_io = rrdset_create_localhost(
@@ -4283,8 +4283,8 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_io);
         }
 
-        if(likely(cg->io_serviced.updated && cg->io_serviced.enabled == CONFIG_BOOLEAN_YES)) {
-            if(unlikely(!cg->st_serviced_ops)) {
+        if(cg->io_serviced.updated && cg->io_serviced.enabled == CONFIG_BOOLEAN_YES) {
+            if(!cg->st_serviced_ops) {
                 snprintfz(title, CHART_TITLE_MAX, "Serviced I/O Operations (all disks)");
 
                 cg->st_serviced_ops = rrdset_create_localhost(
@@ -4313,8 +4313,8 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_serviced_ops);
         }
 
-        if(likely(cg->throttle_io_service_bytes.updated && cg->throttle_io_service_bytes.enabled == CONFIG_BOOLEAN_YES)) {
-            if(unlikely(!cg->st_throttle_io)) {
+        if(cg->throttle_io_service_bytes.updated && cg->throttle_io_service_bytes.enabled == CONFIG_BOOLEAN_YES) {
+            if(!cg->st_throttle_io) {
                 snprintfz(title, CHART_TITLE_MAX, "Throttle I/O Bandwidth (all disks)");
 
                 cg->st_throttle_io = rrdset_create_localhost(
@@ -4343,8 +4343,8 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_throttle_io);
         }
 
-        if(likely(cg->throttle_io_serviced.updated && cg->throttle_io_serviced.enabled == CONFIG_BOOLEAN_YES)) {
-            if(unlikely(!cg->st_throttle_serviced_ops)) {
+        if(cg->throttle_io_serviced.updated && cg->throttle_io_serviced.enabled == CONFIG_BOOLEAN_YES) {
+            if(!cg->st_throttle_serviced_ops) {
                 snprintfz(title, CHART_TITLE_MAX, "Throttle Serviced I/O Operations (all disks)");
 
                 cg->st_throttle_serviced_ops = rrdset_create_localhost(
@@ -4373,8 +4373,8 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_throttle_serviced_ops);
         }
 
-        if(likely(cg->io_queued.updated && cg->io_queued.enabled == CONFIG_BOOLEAN_YES)) {
-            if(unlikely(!cg->st_queued_ops)) {
+        if(cg->io_queued.updated && cg->io_queued.enabled == CONFIG_BOOLEAN_YES) {
+            if(!cg->st_queued_ops) {
                 snprintfz(title, CHART_TITLE_MAX, "Queued I/O Operations (all disks)");
 
                 cg->st_queued_ops = rrdset_create_localhost(
@@ -4403,8 +4403,8 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_queued_ops);
         }
 
-        if(likely(cg->io_merged.updated && cg->io_merged.enabled == CONFIG_BOOLEAN_YES)) {
-            if(unlikely(!cg->st_merged_ops)) {
+        if(cg->io_merged.updated && cg->io_merged.enabled == CONFIG_BOOLEAN_YES) {
+            if(!cg->st_merged_ops) {
                 snprintfz(title, CHART_TITLE_MAX, "Merged I/O Operations (all disks)");
 
                 cg->st_merged_ops = rrdset_create_localhost(
@@ -4436,11 +4436,11 @@ void update_cgroup_charts(int update_every) {
         if (cg->options & CGROUP_OPTIONS_IS_UNIFIED) {
             struct pressure *res = &cg->cpu_pressure;
 
-            if (likely(res->updated && res->some.enabled)) {
+            if (res->updated && res->some.enabled) {
                 struct pressure_charts *pcs;
                 pcs = &res->some;
 
-                if (unlikely(!pcs->share_time.st)) {
+                if (!pcs->share_time.st) {
                     RRDSET *chart;
                     snprintfz(title, CHART_TITLE_MAX, "CPU some pressure");
                     chart = pcs->share_time.st = rrdset_create_localhost(
@@ -4463,7 +4463,7 @@ void update_cgroup_charts(int update_every) {
                     pcs->share_time.rd300 = rrddim_add(chart, "some 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                 }
 
-                if (unlikely(!pcs->total_time.st)) {
+                if (!pcs->total_time.st) {
                     RRDSET *chart;
                     snprintfz(title, CHART_TITLE_MAX, "CPU some pressure stall time");
                     chart = pcs->total_time.st = rrdset_create_localhost(
@@ -4486,11 +4486,11 @@ void update_cgroup_charts(int update_every) {
 
                 update_pressure_charts(pcs);
             }
-            if (likely(res->updated && res->full.enabled)) {
+            if (res->updated && res->full.enabled) {
                 struct pressure_charts *pcs;
                 pcs = &res->full;
 
-                if (unlikely(!pcs->share_time.st)) {
+                if (!pcs->share_time.st) {
                     RRDSET *chart;
                     snprintfz(title, CHART_TITLE_MAX, "CPU full pressure");
                     chart = pcs->share_time.st = rrdset_create_localhost(
@@ -4513,7 +4513,7 @@ void update_cgroup_charts(int update_every) {
                     pcs->share_time.rd300 = rrddim_add(chart, "full 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                 }
 
-                if (unlikely(!pcs->total_time.st)) {
+                if (!pcs->total_time.st) {
                     RRDSET *chart;
                     snprintfz(title, CHART_TITLE_MAX, "CPU full pressure stall time");
                     chart = pcs->total_time.st = rrdset_create_localhost(
@@ -4539,11 +4539,11 @@ void update_cgroup_charts(int update_every) {
 
             res = &cg->memory_pressure;
 
-            if (likely(res->updated && res->some.enabled)) {
+            if (res->updated && res->some.enabled) {
                 struct pressure_charts *pcs;
                 pcs = &res->some;
 
-                if (unlikely(!pcs->share_time.st)) {
+                if (!pcs->share_time.st) {
                     RRDSET *chart;
                     snprintfz(title, CHART_TITLE_MAX, "Memory some pressure");
                     chart = pcs->share_time.st = rrdset_create_localhost(
@@ -4566,7 +4566,7 @@ void update_cgroup_charts(int update_every) {
                     pcs->share_time.rd300 = rrddim_add(chart, "some 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                 }
 
-                if (unlikely(!pcs->total_time.st)) {
+                if (!pcs->total_time.st) {
                     RRDSET *chart;
                     snprintfz(title, CHART_TITLE_MAX, "Memory some pressure stall time");
                     chart = pcs->total_time.st = rrdset_create_localhost(
@@ -4590,11 +4590,11 @@ void update_cgroup_charts(int update_every) {
                 update_pressure_charts(pcs);
             }
 
-            if (likely(res->updated && res->full.enabled)) {
+            if (res->updated && res->full.enabled) {
                 struct pressure_charts *pcs;
                 pcs = &res->full;
 
-                if (unlikely(!pcs->share_time.st)) {
+                if (!pcs->share_time.st) {
                     RRDSET *chart;
                     snprintfz(title, CHART_TITLE_MAX, "Memory full pressure");
 
@@ -4619,7 +4619,7 @@ void update_cgroup_charts(int update_every) {
                     pcs->share_time.rd300 = rrddim_add(chart, "full 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                 }
 
-                if (unlikely(!pcs->total_time.st)) {
+                if (!pcs->total_time.st) {
                     RRDSET *chart;
                     snprintfz(title, CHART_TITLE_MAX, "Memory full pressure stall time");
                     chart = pcs->total_time.st = rrdset_create_localhost(
@@ -4645,11 +4645,11 @@ void update_cgroup_charts(int update_every) {
 
             res = &cg->io_pressure;
 
-            if (likely(res->updated && res->some.enabled)) {
+            if (res->updated && res->some.enabled) {
                 struct pressure_charts *pcs;
                 pcs = &res->some;
 
-                if (unlikely(!pcs->share_time.st)) {
+                if (!pcs->share_time.st) {
                     RRDSET *chart;
                     snprintfz(title, CHART_TITLE_MAX, "I/O some pressure");
                     chart = pcs->share_time.st = rrdset_create_localhost(
@@ -4672,7 +4672,7 @@ void update_cgroup_charts(int update_every) {
                     pcs->share_time.rd300 = rrddim_add(chart, "some 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                 }
 
-                if (unlikely(!pcs->total_time.st)) {
+                if (!pcs->total_time.st) {
                     RRDSET *chart;
                     snprintfz(title, CHART_TITLE_MAX, "I/O some pressure stall time");
                     chart = pcs->total_time.st = rrdset_create_localhost(
@@ -4696,11 +4696,11 @@ void update_cgroup_charts(int update_every) {
                 update_pressure_charts(pcs);
             }
 
-            if (likely(res->updated && res->full.enabled)) {
+            if (res->updated && res->full.enabled) {
                 struct pressure_charts *pcs;
                 pcs = &res->full;
 
-                if (unlikely(!pcs->share_time.st)) {
+                if (!pcs->share_time.st) {
                     RRDSET *chart;
                     snprintfz(title, CHART_TITLE_MAX, "I/O full pressure");
                     chart = pcs->share_time.st = rrdset_create_localhost(
@@ -4723,7 +4723,7 @@ void update_cgroup_charts(int update_every) {
                     pcs->share_time.rd300 = rrddim_add(chart, "full 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
                 }
 
-                if (unlikely(!pcs->total_time.st)) {
+                if (!pcs->total_time.st) {
                     RRDSET *chart;
                     snprintfz(title, CHART_TITLE_MAX, "I/O full pressure stall time");
                     chart = pcs->total_time.st = rrdset_create_localhost(
@@ -4749,7 +4749,7 @@ void update_cgroup_charts(int update_every) {
         }
     }
 
-    if(likely(cgroup_enable_systemd_services))
+    if(cgroup_enable_systemd_services)
         update_systemd_services_charts(update_every, services_do_cpu, services_do_mem_usage, services_do_mem_detailed
                                        , services_do_mem_failcnt, services_do_swap_usage, services_do_io
                                        , services_do_io_ops, services_do_throttle_io, services_do_throttle_ops
@@ -4853,10 +4853,10 @@ void *cgroups_main(void *ptr) {
         worker_is_idle();
 
         usec_t hb_dt = heartbeat_next(&hb, step);
-        if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
+        if(!service_running(SERVICE_COLLECTORS)) break;
 
         find_dt += hb_dt;
-        if (unlikely(find_dt >= find_every || (!is_inside_k8s && cgroups_check))) {
+        if (find_dt >= find_every || (!is_inside_k8s && cgroups_check)) {
             uv_cond_signal(&discovery_thread.cond_var);
             discovery_thread.start_discovery = 1;
             find_dt = 0;
@@ -4868,11 +4868,11 @@ void *cgroups_main(void *ptr) {
 
         worker_is_busy(WORKER_CGROUPS_READ);
         read_all_discovered_cgroups(cgroup_root);
-        if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
+        if(!service_running(SERVICE_COLLECTORS)) break;
 
         worker_is_busy(WORKER_CGROUPS_CHART);
         update_cgroup_charts(cgroup_update_every);
-        if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
+        if(!service_running(SERVICE_COLLECTORS)) break;
 
         worker_is_idle();
         uv_mutex_unlock(&cgroup_root_mutex);

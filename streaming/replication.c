@@ -168,10 +168,10 @@ static struct replication_query *replication_query_prepare(
     size_t count = 0;
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        if (unlikely(!rd || !rd_dfe.item || !rrddim_check_exposed(rd)))
+        if (!rd || !rd_dfe.item || !rrddim_check_exposed(rd))
             continue;
 
-        if (unlikely(rd_dfe.counter >= q->dimensions)) {
+        if (rd_dfe.counter >= q->dimensions) {
             internal_error(true,
                            "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s' has more dimensions than the replicated ones",
                            rrdhost_hostname(st->rrdhost), rrdset_id(st));
@@ -258,7 +258,7 @@ static void replication_query_finalize(BUFFER *wb, struct replication_query *q, 
 
     for (size_t i = 0; i < dimensions; i++) {
         struct replication_dimension *d = &q->data[i];
-        if (unlikely(!d->enabled)) continue;
+        if (!d->enabled) continue;
 
         storage_engine_query_finalize(&d->handle);
 
@@ -296,7 +296,7 @@ static void replication_query_align_to_optimal_before(struct replication_query *
 
     for (size_t i = 0; i < dimensions; i++) {
         struct replication_dimension *d = &q->data[i];
-        if(unlikely(!d->enabled)) continue;
+        if(!d->enabled) continue;
 
         time_t new_before = storage_engine_align_to_optimal_before(&d->handle);
         if (!expanded_before || new_before < expanded_before)
@@ -332,7 +332,7 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
         time_t min_start_time = 0, max_start_time = 0, min_end_time = 0, max_end_time = 0, min_update_every = 0, max_update_every = 0;
         for (size_t i = 0; i < dimensions ;i++) {
             struct replication_dimension *d = &q->data[i];
-            if(unlikely(!d->enabled || d->skip)) continue;
+            if(!d->enabled || d->skip) continue;
 
             // fetch the first valid point for the dimension
             int max_skip = 1000;
@@ -354,21 +354,21 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
                 continue;
             }
 
-            if(unlikely(d->sp.end_time_s < now || d->sp.end_time_s < d->sp.start_time_s))
+            if(d->sp.end_time_s < now || d->sp.end_time_s < d->sp.start_time_s)
                 // this dimension does not provide any data
                 continue;
 
             time_t update_every = d->sp.end_time_s - d->sp.start_time_s;
-            if(unlikely(!update_every))
+            if(!update_every)
                 update_every = q->st->update_every;
 
-            if(unlikely(!min_update_every))
+            if(!min_update_every)
                 min_update_every = update_every;
 
-            if(unlikely(!min_start_time))
+            if(!min_start_time)
                 min_start_time = d->sp.start_time_s;
 
-            if(unlikely(!min_end_time))
+            if(!min_end_time)
                 min_end_time = d->sp.end_time_s;
 
             min_update_every = MIN(min_update_every, update_every);
@@ -381,8 +381,8 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
             max_end_time = MAX(max_end_time, d->sp.end_time_s);
         }
 
-        if (unlikely(min_update_every != max_update_every ||
-                     min_start_time != max_start_time)) {
+        if (min_update_every != max_update_every ||
+                     min_start_time != max_start_time) {
 
             time_t fix_min_start_time;
             if(last_end_time_in_buffer &&
@@ -414,14 +414,14 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
             min_start_time = fix_min_start_time;
         }
 
-        if(likely(min_start_time <= now && min_end_time >= now)) {
+        if(min_start_time <= now && min_end_time >= now) {
             // we have a valid point
 
-            if (unlikely(min_end_time == min_start_time))
+            if (min_end_time == min_start_time)
                 min_start_time = min_end_time - q->st->update_every;
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
-            if (unlikely(!actual_after))
+            if (!actual_after)
                 actual_after = min_end_time;
 
             actual_before = min_end_time;
@@ -455,12 +455,12 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
             // output the replay values for this time
             for (size_t i = 0; i < dimensions; i++) {
                 struct replication_dimension *d = &q->data[i];
-                if (unlikely(!d->enabled)) continue;
+                if (!d->enabled) continue;
 
-                if (likely( d->sp.start_time_s <= min_end_time &&
+                if ( d->sp.start_time_s <= min_end_time &&
                             d->sp.end_time_s >= min_end_time &&
                             !storage_point_is_unset(d->sp) &&
-                            !storage_point_is_gap(d->sp))) {
+                            !storage_point_is_gap(d->sp)) {
 
                     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"", sizeof(PLUGINSD_KEYWORD_REPLAY_SET) - 1 + 2);
                     buffer_fast_strcat(wb, rrddim_id(d->rd), string_strlen(d->rd->id));
@@ -476,7 +476,7 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
 
             now = min_end_time + 1;
         }
-        else if(unlikely(min_end_time < now))
+        else if(min_end_time < now)
             // the query does not progress
             break;
         else {
@@ -877,25 +877,25 @@ bool replicate_chart_request(send_command callback, void *callback_data, RRDHOST
 
     // The gap is now r.gap.from -> r.gap.to
 
-    if (unlikely(!rrdhost_option_check(host, RRDHOST_OPTION_REPLICATION)))
+    if (!rrdhost_option_check(host, RRDHOST_OPTION_REPLICATION))
         return send_replay_chart_cmd(&r, "empty replication request, replication is disabled", false);
 
-    if (unlikely(!rrdset_number_of_dimensions(st)))
+    if (!rrdset_number_of_dimensions(st))
         return send_replay_chart_cmd(&r, "empty replication request, chart has no dimensions", false);
 
-    if (unlikely(!r.child_db.first_entry_t || !r.child_db.last_entry_t))
+    if (!r.child_db.first_entry_t || !r.child_db.last_entry_t)
         return send_replay_chart_cmd(&r, "empty replication request, child has no stored data", false);
 
-    if (unlikely(r.child_db.first_entry_t < 0 || r.child_db.last_entry_t < 0))
+    if (r.child_db.first_entry_t < 0 || r.child_db.last_entry_t < 0)
         return send_replay_chart_cmd(&r, "empty replication request, child db timestamps are invalid", true);
 
-    if (unlikely(r.child_db.first_entry_t > r.child_db.wall_clock_time))
+    if (r.child_db.first_entry_t > r.child_db.wall_clock_time)
         return send_replay_chart_cmd(&r, "empty replication request, child db first entry is after its wall clock time", true);
 
-    if (unlikely(r.child_db.first_entry_t > r.child_db.last_entry_t))
+    if (r.child_db.first_entry_t > r.child_db.last_entry_t)
         return send_replay_chart_cmd(&r, "empty replication request, child timings are invalid (first entry > last entry)", true);
 
-    if (unlikely(r.local_db.last_entry_t > r.child_db.last_entry_t))
+    if (r.local_db.last_entry_t > r.child_db.last_entry_t)
         return send_replay_chart_cmd(&r, "empty replication request, local last entry is later than the child one", false);
 
     // let's find what the child can provide to fill that gap
@@ -1120,7 +1120,7 @@ static void replication_sort_entry_destroy(struct replication_sort_entry *rse) {
 }
 
 static void replication_sort_entry_add(struct replication_request *rq) {
-    if(unlikely(rrdpush_sender_replication_buffer_full_get(rq->sender))) {
+    if(rrdpush_sender_replication_buffer_full_get(rq->sender)) {
         rq->indexed_in_judy = false;
         rq->not_indexed_buffer_full = true;
         rq->not_indexed_preprocessing = false;
@@ -1157,14 +1157,14 @@ static void replication_sort_entry_add(struct replication_request *rq) {
     size_t mem_before_outer_judyl = JudyLMemUsed(replication_globals.unsafe.queue.JudyL_array);
     inner_judy_ptr = JudyLIns(&replication_globals.unsafe.queue.JudyL_array, (Word_t) rq->after, PJE0);
     size_t mem_after_outer_judyl = JudyLMemUsed(replication_globals.unsafe.queue.JudyL_array);
-    if(unlikely(!inner_judy_ptr || inner_judy_ptr == PJERR))
+    if(!inner_judy_ptr || inner_judy_ptr == PJERR)
         fatal("REPLICATION: corrupted outer judyL");
 
     // add it to the inner judy, using unique_id as key
     size_t mem_before_inner_judyl = JudyLMemUsed(*inner_judy_ptr);
     Pvoid_t *item = JudyLIns(inner_judy_ptr, rq->unique_id, PJE0);
     size_t mem_after_inner_judyl = JudyLMemUsed(*inner_judy_ptr);
-    if(unlikely(!item || item == PJERR))
+    if(!item || item == PJERR)
         fatal("REPLICATION: corrupted inner judyL");
 
     *item = rse;
@@ -1255,7 +1255,7 @@ static struct replication_request replication_request_get_first_available() {
 
     struct replication_request rq_to_return = (struct replication_request){ .found = false };
 
-    if(unlikely(!replication_globals.unsafe.queue.after || !replication_globals.unsafe.queue.unique_id)) {
+    if(!replication_globals.unsafe.queue.after || !replication_globals.unsafe.queue.unique_id) {
         replication_globals.unsafe.queue.after = 0;
         replication_globals.unsafe.queue.unique_id = 0;
     }
@@ -1281,7 +1281,7 @@ static struct replication_request replication_request_get_first_available() {
         while (!rq_to_return.found && (inner_judy_pptr = JudyLFirstThenNext(replication_globals.unsafe.queue.JudyL_array, &replication_globals.unsafe.queue.after, &find_same_after))) {
             Pvoid_t *our_item_pptr;
 
-            if(unlikely(round == 2 && replication_globals.unsafe.queue.after > started_after))
+            if(round == 2 && replication_globals.unsafe.queue.after > started_after)
                 break;
 
             while (!rq_to_return.found && (our_item_pptr = JudyLNext(*inner_judy_pptr, &replication_globals.unsafe.queue.unique_id, PJE0))) {
@@ -1403,7 +1403,7 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
     bool ret = false;
 
     if(!rq->st) {
-        if(likely(workers))
+        if(workers)
             worker_is_busy(WORKER_JOB_FIND_CHART);
 
         rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
@@ -1419,7 +1419,7 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
     netdata_thread_disable_cancelability();
 
     if(!rq->q) {
-        if(likely(workers))
+        if(workers)
             worker_is_busy(WORKER_JOB_PREPARE_QUERY);
 
         rq->q = replication_response_prepare(
@@ -1430,7 +1430,7 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
                 rq->sender->capabilities);
     }
 
-    if(likely(workers))
+    if(workers)
         worker_is_busy(WORKER_JOB_QUERYING);
 
     // send the replication data
@@ -1507,7 +1507,7 @@ void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
     size_t available = cbuffer_available_size_unsafe(s->host->sender->buffer);
     size_t percentage = (s->buffer->max_size - available) * 100 / s->buffer->max_size;
 
-    if(unlikely(percentage > MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED && !rrdpush_sender_replication_buffer_full_get(s))) {
+    if(percentage > MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED && !rrdpush_sender_replication_buffer_full_get(s)) {
         rrdpush_sender_replication_buffer_full_set(s, true);
 
         struct replication_request *rq;
@@ -1521,7 +1521,7 @@ void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
         replication_globals.unsafe.senders_full++;
         replication_recursive_unlock();
     }
-    else if(unlikely(percentage < MIN_SENDER_BUFFER_PERCENTAGE_ALLOWED && rrdpush_sender_replication_buffer_full_get(s))) {
+    else if(percentage < MIN_SENDER_BUFFER_PERCENTAGE_ALLOWED && rrdpush_sender_replication_buffer_full_get(s)) {
         rrdpush_sender_replication_buffer_full_set(s, false);
 
         struct replication_request *rq;
@@ -1692,7 +1692,7 @@ static void replication_pipeline_cancel_and_cleanup(void) {
 static int replication_pipeline_execute_next(void) {
     struct replication_request *rq;
 
-    if(unlikely(!rtp.rqs)) {
+    if(!rtp.rqs) {
         rtp.max_requests_ahead = (int)get_netdata_cpus() / 2;
 
         if(rtp.max_requests_ahead > libuv_worker_threads * 2)
@@ -1780,7 +1780,7 @@ static int replication_pipeline_execute_next(void) {
 
     } while(!rq->found && rtp.rqs_last_executed != rtp.rqs_last_prepared);
 
-    if(unlikely(!rq->found)) {
+    if(!rq->found) {
         worker_is_idle();
         return REQUEST_QUEUE_EMPTY;
     }
@@ -1792,7 +1792,7 @@ static int replication_pipeline_execute_next(void) {
     rq->found = false;
     rq->q = NULL;
 
-    if(unlikely(!chart_found)) {
+    if(!chart_found) {
         worker_is_idle();
         return REQUEST_CHART_NOT_FOUND;
     }
@@ -1812,7 +1812,7 @@ static void *replication_worker_thread(void *ptr) {
     netdata_thread_cleanup_push(replication_worker_cleanup, ptr);
 
     while(service_running(SERVICE_REPLICATION)) {
-        if(unlikely(replication_pipeline_execute_next() == REQUEST_QUEUE_EMPTY)) {
+        if(replication_pipeline_execute_next() == REQUEST_QUEUE_EMPTY) {
             sender_thread_buffer_free();
             worker_is_busy(WORKER_JOB_WAIT);
             worker_is_idle();
@@ -1896,7 +1896,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
 
         // statistics
         usec_t now_mono_ut = now_monotonic_usec();
-        if(unlikely(now_mono_ut - last_now_mono_ut > default_rrd_update_every * USEC_PER_SEC)) {
+        if(now_mono_ut - last_now_mono_ut > default_rrd_update_every * USEC_PER_SEC) {
             last_now_mono_ut = now_mono_ut;
 
             worker_is_busy(WORKER_JOB_STATISTICS);
@@ -1954,7 +1954,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
             worker_is_idle();
         }
 
-        if(unlikely(replication_pipeline_execute_next() == REQUEST_QUEUE_EMPTY)) {
+        if(replication_pipeline_execute_next() == REQUEST_QUEUE_EMPTY) {
 
             worker_is_busy(WORKER_JOB_WAIT);
             replication_recursive_lock();

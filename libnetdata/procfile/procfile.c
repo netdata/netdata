@@ -30,7 +30,7 @@ char *procfile_filename(procfile *ff) {
     snprintfz(buffer, FILENAME_MAX, "/proc/self/fd/%d", ff->fd);
 
     ssize_t l = readlink(buffer, filename, FILENAME_MAX);
-    if(unlikely(l == -1))
+    if(l == -1)
         snprintfz(filename, FILENAME_MAX, "unknown filename for fd %d", ff->fd);
     else
         filename[l] = '\0';
@@ -51,7 +51,7 @@ static inline void procfile_words_add(procfile *ff, char *str) {
     // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   adding word No %d: '%s'", fw->len, str);
 
     pfwords *fw = ff->words;
-    if(unlikely(fw->len == fw->size)) {
+    if(fw->len == fw->size) {
         // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   expanding words");
         size_t minimum = PFWORDS_INCREASE_STEP;
         size_t optimal = fw->size / 2;
@@ -96,7 +96,7 @@ static inline size_t *procfile_lines_add(procfile *ff) {
     // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   adding line %d at word %d", fl->len, first_word);
 
     pflines *fl = ff->lines;
-    if(unlikely(fl->len == fl->size)) {
+    if(fl->len == fl->size) {
         // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   expanding lines");
         size_t minimum = PFLINES_INCREASE_STEP;
         size_t optimal = fl->size / 2;
@@ -117,7 +117,7 @@ NEVERNULL
 static inline pflines *procfile_lines_create(void) {
     // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   initializing lines");
 
-    size_t size = (unlikely(procfile_adaptive_initial_allocation)) ? procfile_max_words : PFLINES_INCREASE_STEP;
+    size_t size = (procfile_adaptive_initial_allocation) ? procfile_max_words : PFLINES_INCREASE_STEP;
 
     pflines *new = mallocz(sizeof(pflines) + size * sizeof(ffline));
     new->len = 0;
@@ -142,7 +142,7 @@ static inline void procfile_lines_free(pflines *fl) {
 // The procfile
 
 void procfile_close(procfile *ff) {
-    if(unlikely(!ff)) return;
+    if(!ff) return;
 
     netdata_log_debug(D_PROCFILE, PF_PREFIX ": Closing file '%s'", procfile_filename(ff));
 
@@ -150,7 +150,7 @@ void procfile_close(procfile *ff) {
     procfile_lines_free(ff->lines);
     procfile_words_free(ff->words);
 
-    if(likely(ff->fd != -1)) close(ff->fd);
+    if(ff->fd != -1) close(ff->fd);
     freez(ff);
 }
 
@@ -175,10 +175,10 @@ static void procfile_parser(procfile *ff) {
 
         // this is faster than a switch()
         // read more here: http://lazarenko.me/switch/
-        if(likely(ct == PF_CHAR_IS_WORD)) {
+        if(ct == PF_CHAR_IS_WORD) {
             s++;
         }
-        else if(likely(ct == PF_CHAR_IS_SEPARATOR)) {
+        else if(ct == PF_CHAR_IS_SEPARATOR) {
             if(!quote && !opened) {
                 if (s != t) {
                     // separator, but we have word before it
@@ -198,7 +198,7 @@ static void procfile_parser(procfile *ff) {
                 s++;
             }
         }
-        else if(likely(ct == PF_CHAR_IS_NEWLINE)) {
+        else if(ct == PF_CHAR_IS_NEWLINE) {
             // end of line
 
             *s = '\0';
@@ -210,13 +210,13 @@ static void procfile_parser(procfile *ff) {
 
             line_words = procfile_lines_add(ff);
         }
-        else if(likely(ct == PF_CHAR_IS_QUOTE)) {
-            if(unlikely(!quote && s == t)) {
+        else if(ct == PF_CHAR_IS_QUOTE) {
+            if(!quote && s == t) {
                 // quote opened at the beginning
                 quote = *s;
                 t = ++s;
             }
-            else if(unlikely(quote && quote == *s)) {
+            else if(quote && quote == *s) {
                 // quote closed
                 quote = 0;
 
@@ -228,7 +228,7 @@ static void procfile_parser(procfile *ff) {
             else
                 s++;
         }
-        else if(likely(ct == PF_CHAR_IS_OPEN)) {
+        else if(ct == PF_CHAR_IS_OPEN) {
             if(s == t) {
                 opened++;
                 t = ++s;
@@ -240,7 +240,7 @@ static void procfile_parser(procfile *ff) {
             else
                 s++;
         }
-        else if(likely(ct == PF_CHAR_IS_CLOSE)) {
+        else if(ct == PF_CHAR_IS_CLOSE) {
             if(opened) {
                 opened--;
 
@@ -260,9 +260,9 @@ static void procfile_parser(procfile *ff) {
             fatal("Internal Error: procfile_readall() does not handle all the cases.");
     }
 
-    if(likely(s > t && t < e)) {
+    if(s > t && t < e) {
         // the last word
-        if(unlikely(ff->len >= ff->size)) {
+        if(ff->len >= ff->size) {
             // we are going to loose the last byte
             s = &ff->data[ff->size - 1];
         }
@@ -283,7 +283,7 @@ procfile *procfile_readall(procfile *ff) {
         ssize_t s = ff->len;
         ssize_t x = ff->size - s;
 
-        if(unlikely(!x)) {
+        if(!x) {
             size_t minimum = PROCFILE_INCREMENT_BUFFER;
             size_t optimal = ff->size / 2;
             size_t wanted = (optimal > minimum)?optimal:minimum;
@@ -295,9 +295,9 @@ procfile *procfile_readall(procfile *ff) {
 
         netdata_log_debug(D_PROCFILE, "Reading file '%s', from position %zd with length %zd", procfile_filename(ff), s, (ssize_t)(ff->size - s));
         r = read(ff->fd, &ff->data[s], ff->size - s);
-        if(unlikely(r == -1)) {
-            if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) collector_error(PF_PREFIX ": Cannot read from file '%s' on fd %d", procfile_filename(ff), ff->fd);
-            else if(unlikely(ff->flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
+        if(r == -1) {
+            if(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO)) collector_error(PF_PREFIX ": Cannot read from file '%s' on fd %d", procfile_filename(ff), ff->fd);
+            else if(ff->flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG)
                 netdata_log_error(PF_PREFIX ": Cannot read from file '%s' on fd %d", procfile_filename(ff), ff->fd);
             procfile_close(ff);
             return NULL;
@@ -307,9 +307,9 @@ procfile *procfile_readall(procfile *ff) {
     }
 
     // netdata_log_debug(D_PROCFILE, "Rewinding file '%s'", ff->filename);
-    if(unlikely(lseek(ff->fd, 0, SEEK_SET) == -1)) {
-        if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) collector_error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
-        else if(unlikely(ff->flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
+    if(lseek(ff->fd, 0, SEEK_SET) == -1) {
+        if(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO)) collector_error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
+        else if(ff->flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG)
             netdata_log_error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
         procfile_close(ff);
         return NULL;
@@ -319,10 +319,10 @@ procfile *procfile_readall(procfile *ff) {
     procfile_words_reset(ff->words);
     procfile_parser(ff);
 
-    if(unlikely(procfile_adaptive_initial_allocation)) {
-        if(unlikely(ff->len > procfile_max_allocation)) procfile_max_allocation = ff->len;
-        if(unlikely(ff->lines->len > procfile_max_lines)) procfile_max_lines = ff->lines->len;
-        if(unlikely(ff->words->len > procfile_max_words)) procfile_max_words = ff->words->len;
+    if(procfile_adaptive_initial_allocation) {
+        if(ff->len > procfile_max_allocation) procfile_max_allocation = ff->len;
+        if(ff->lines->len > procfile_max_lines) procfile_max_lines = ff->lines->len;
+        if(ff->words->len > procfile_max_words) procfile_max_words = ff->words->len;
     }
 
     // netdata_log_debug(D_PROCFILE, "File '%s' updated.", ff->filename);
@@ -333,10 +333,10 @@ static PF_CHAR_TYPE procfile_default_separators[256];
 __attribute__((constructor)) void procfile_initialize_default_separators(void) {
     int i = 256;
     while(i--) {
-        if(unlikely(i == '\n' || i == '\r'))
+        if(i == '\n' || i == '\r')
             procfile_default_separators[i] = PF_CHAR_IS_NEWLINE;
 
-        else if(unlikely(isspace(i) || !isprint(i)))
+        else if(isspace(i) || !isprint(i))
             procfile_default_separators[i] = PF_CHAR_IS_SEPARATOR;
 
         else
@@ -347,7 +347,7 @@ __attribute__((constructor)) void procfile_initialize_default_separators(void) {
 NOINLINE
 static void procfile_set_separators(procfile *ff, const char *separators) {
     // set the separators
-    if(unlikely(!separators))
+    if(!separators)
         separators = " \t=|";
 
     // copy the default
@@ -365,11 +365,11 @@ void procfile_set_quotes(procfile *ff, const char *quotes) {
     // remove all quotes
     int i = 256;
     while(i--)
-        if(unlikely(ffs[i] == PF_CHAR_IS_QUOTE))
+        if(ffs[i] == PF_CHAR_IS_QUOTE)
             ffs[i] = PF_CHAR_IS_WORD;
 
     // if nothing given, return
-    if(unlikely(!quotes || !*quotes))
+    if(!quotes || !*quotes)
         return;
 
     // set the quotes
@@ -384,11 +384,11 @@ void procfile_set_open_close(procfile *ff, const char *open, const char *close) 
     // remove all open/close
     int i = 256;
     while(i--)
-        if(unlikely(ffs[i] == PF_CHAR_IS_OPEN || ffs[i] == PF_CHAR_IS_CLOSE))
+        if(ffs[i] == PF_CHAR_IS_OPEN || ffs[i] == PF_CHAR_IS_CLOSE)
             ffs[i] = PF_CHAR_IS_WORD;
 
     // if nothing given, return
-    if(unlikely(!open || !*open || !close || !*close))
+    if(!open || !*open || !close || !*close)
         return;
 
     // set the openings
@@ -406,16 +406,16 @@ procfile *procfile_open(const char *filename, const char *separators, uint32_t f
     netdata_log_debug(D_PROCFILE, PF_PREFIX ": Opening file '%s'", filename);
 
     int fd = open(filename, procfile_open_flags, 0666);
-    if(unlikely(fd == -1)) {
-        if(unlikely(!(flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) collector_error(PF_PREFIX ": Cannot open file '%s'", filename);
-        else if(unlikely(flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
+    if(fd == -1) {
+        if(!(flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO)) collector_error(PF_PREFIX ": Cannot open file '%s'", filename);
+        else if(flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG)
             netdata_log_error(PF_PREFIX ": Cannot open file '%s'", filename);
         return NULL;
     }
 
     // netdata_log_info("PROCFILE: opened '%s' on fd %d", filename, fd);
 
-    size_t size = (unlikely(procfile_adaptive_initial_allocation)) ? procfile_max_allocation : PROCFILE_INCREMENT_BUFFER;
+    size_t size = (procfile_adaptive_initial_allocation) ? procfile_max_allocation : PROCFILE_INCREMENT_BUFFER;
     procfile *ff = mallocz(sizeof(procfile) + size);
 
     //strncpyz(ff->filename, filename, FILENAME_MAX);
@@ -435,15 +435,15 @@ procfile *procfile_open(const char *filename, const char *separators, uint32_t f
 }
 
 procfile *procfile_reopen(procfile *ff, const char *filename, const char *separators, uint32_t flags) {
-    if(unlikely(!ff)) return procfile_open(filename, separators, flags);
+    if(!ff) return procfile_open(filename, separators, flags);
 
-    if(likely(ff->fd != -1)) {
+    if(ff->fd != -1) {
         // netdata_log_info("PROCFILE: closing fd %d", ff->fd);
         close(ff->fd);
     }
 
     ff->fd = open(filename, procfile_open_flags, 0666);
-    if(unlikely(ff->fd == -1)) {
+    if(ff->fd == -1) {
         procfile_close(ff);
         return NULL;
     }
@@ -456,7 +456,7 @@ procfile *procfile_reopen(procfile *ff, const char *filename, const char *separa
     ff->flags = flags;
 
     // do not do the separators again if NULL is given
-    if(likely(separators)) procfile_set_separators(ff, separators);
+    if(separators) procfile_set_separators(ff, separators);
 
     return ff;
 }
@@ -471,13 +471,13 @@ void procfile_print(procfile *ff) {
 
     netdata_log_debug(D_PROCFILE, "File '%s' with %zu lines and %zu words", procfile_filename(ff), ff->lines->len, ff->words->len);
 
-    for(l = 0; likely(l < lines) ;l++) {
+    for(l = 0; l < lines ;l++) {
         size_t words = procfile_linewords(ff, l);
 
         netdata_log_debug(D_PROCFILE, " line %zu starts at word %zu and has %zu words", l, ff->lines->lines[l].first, ff->lines->lines[l].words);
 
         size_t w;
-        for(w = 0; likely(w < words) ;w++) {
+        for(w = 0; w < words ;w++) {
             s = procfile_lineword(ff, l, w);
             netdata_log_debug(D_PROCFILE, "     [%zu.%zu] '%s'", l, w, s);
         }

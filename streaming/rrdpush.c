@@ -183,7 +183,7 @@ static inline bool should_send_chart_matching(RRDSET *st, RRDSET_FLAGS flags) {
     if(!(flags & RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED))
         return false;
 
-    if(unlikely(!(flags & (RRDSET_FLAG_UPSTREAM_SEND | RRDSET_FLAG_UPSTREAM_IGNORE)))) {
+    if(!(flags & (RRDSET_FLAG_UPSTREAM_SEND | RRDSET_FLAG_UPSTREAM_IGNORE))) {
         RRDHOST *host = st->rrdhost;
 
         if (flags & RRDSET_FLAG_ANOMALY_DETECTION) {
@@ -250,8 +250,8 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
 
     // properly set the name for the remote end to parse it
     char *name = "";
-    if(likely(st->name)) {
-        if(unlikely(st->id != st->name)) {
+    if(st->name) {
+        if(st->id != st->name) {
             // they differ
             name = strchr(rrdset_name(st), '.');
             if(name)
@@ -355,10 +355,10 @@ static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_sta
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        if(unlikely(!rrddim_check_updated(rd)))
+        if(!rrddim_check_updated(rd))
             continue;
 
-        if(likely(rrddim_check_exposed(rd))) {
+        if(rrddim_check_exposed(rd)) {
             buffer_fast_strcat(wb, "SET \"", 5);
             buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
             buffer_fast_strcat(wb, "\" = ", 4);
@@ -374,7 +374,7 @@ static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_sta
     }
     rrddim_foreach_done(rd);
 
-    if(unlikely(flags & RRDSET_FLAG_UPSTREAM_SEND_VARIABLES))
+    if(flags & RRDSET_FLAG_UPSTREAM_SEND_VARIABLES)
         rrdsetvar_print_to_streaming_custom_chart_variables(st, wb);
 
     buffer_fast_strcat(wb, "END\n", 4);
@@ -386,8 +386,8 @@ static void rrdpush_sender_thread_spawn(RRDHOST *host);
 bool rrdset_push_chart_definition_now(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
-    if(unlikely(!rrdhost_can_send_definitions_to_parent(host)
-        || !should_send_chart_matching(st, __atomic_load_n(&st->flags, __ATOMIC_SEQ_CST))))
+    if(!rrdhost_can_send_definitions_to_parent(host)
+        || !should_send_chart_matching(st, __atomic_load_n(&st->flags, __ATOMIC_SEQ_CST)))
         return false;
 
     BUFFER *wb = sender_start(host->sender);
@@ -411,9 +411,9 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
     NUMBER_ENCODING doubles_encoding = stream_has_capability(rsb, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
     BUFFER *wb = rsb->wb;
     time_t point_end_time_s = (time_t)(point_end_time_ut / USEC_PER_SEC);
-    if(unlikely(rsb->last_point_end_time_s != point_end_time_s)) {
+    if(rsb->last_point_end_time_s != point_end_time_s) {
 
-        if(unlikely(rsb->begin_v2_added))
+        if(rsb->begin_v2_added)
             buffer_fast_strcat(wb, PLUGINSD_KEYWORD_END_V2 "\n", sizeof(PLUGINSD_KEYWORD_END_V2) - 1 + 1);
 
         buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2 " '", sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1 + 2);
@@ -454,7 +454,7 @@ void rrdset_push_metrics_finished(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
         return;
 
     if(rsb->v2 && rsb->begin_v2_added) {
-        if(unlikely(rsb->rrdset_flags & RRDSET_FLAG_UPSTREAM_SEND_VARIABLES))
+        if(rsb->rrdset_flags & RRDSET_FLAG_UPSTREAM_SEND_VARIABLES)
             rrdsetvar_print_to_streaming_custom_chart_variables(st, rsb->wb);
 
         buffer_fast_strcat(rsb->wb, PLUGINSD_KEYWORD_END_V2 "\n", sizeof(PLUGINSD_KEYWORD_END_V2) - 1 + 1);
@@ -472,19 +472,19 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
     RRDHOST_FLAGS host_flags = __atomic_load_n(&host->flags, __ATOMIC_SEQ_CST);
 
     // check if we are not connected
-    if(unlikely(!(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS))) {
+    if(!(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS)) {
 
-        if(unlikely(!(host_flags & (RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED))))
+        if(!(host_flags & (RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED)))
             rrdpush_sender_thread_spawn(host);
 
-        if(unlikely(!(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS))) {
+        if(!(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS)) {
             rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS);
             netdata_log_error("STREAM %s [send]: not ready - collected metrics are not sent to parent.", rrdhost_hostname(host));
         }
 
         return (RRDSET_STREAM_BUFFER) { .wb = NULL, };
     }
-    else if(unlikely(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS)) {
+    else if(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS) {
         netdata_log_info("STREAM %s [send]: sending metrics to parent...", rrdhost_hostname(host));
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS);
     }
@@ -493,11 +493,11 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
     bool exposed_upstream = (rrdset_flags & RRDSET_FLAG_UPSTREAM_EXPOSED);
     bool replication_in_progress = !(rrdset_flags & RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
 
-    if(unlikely((exposed_upstream && replication_in_progress) ||
-                !should_send_chart_matching(st, rrdset_flags)))
+    if((exposed_upstream && replication_in_progress) ||
+                !should_send_chart_matching(st, rrdset_flags))
         return (RRDSET_STREAM_BUFFER) { .wb = NULL, };
 
-    if(unlikely(!exposed_upstream)) {
+    if(!exposed_upstream) {
         BUFFER *wb = sender_start(host->sender);
         replication_in_progress = rrdpush_send_chart_definition(wb, st);
         sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
@@ -523,8 +523,8 @@ static int send_labels_callback(const char *name, const char *value, RRDLABEL_SR
 }
 
 void rrdpush_send_host_labels(RRDHOST *host) {
-    if(unlikely(!rrdhost_can_send_definitions_to_parent(host)
-                 || !stream_has_capability(host->sender, STREAM_CAP_HLABELS)))
+    if(!rrdhost_can_send_definitions_to_parent(host)
+                 || !stream_has_capability(host->sender, STREAM_CAP_HLABELS))
         return;
 
     BUFFER *wb = sender_start(host->sender);
@@ -541,7 +541,7 @@ void rrdpush_send_global_functions(RRDHOST *host) {
     if(!stream_has_capability(host->sender, STREAM_CAP_FUNCTIONS))
         return;
 
-    if(unlikely(!rrdhost_can_send_definitions_to_parent(host)))
+    if(!rrdhost_can_send_definitions_to_parent(host))
         return;
 
     BUFFER *wb = sender_start(host->sender);
@@ -557,7 +557,7 @@ void rrdpush_send_claimed_id(RRDHOST *host) {
     if(!stream_has_capability(host->sender, STREAM_CAP_CLAIM))
         return;
 
-    if(unlikely(!rrdhost_can_send_definitions_to_parent(host)))
+    if(!rrdhost_can_send_definitions_to_parent(host))
         return;
     
     BUFFER *wb = sender_start(host->sender);
@@ -881,7 +881,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
             else if(!strcmp(name, "NETDATA_PROTOCOL_VERSION") && (rpt->capabilities & STREAM_CAP_INVALID))
                 rpt->capabilities = convert_stream_version_to_capabilities(1, NULL, false);
 
-            if (unlikely(rrdhost_set_system_info_variable(rpt->system_info, name, value))) {
+            if (rrdhost_set_system_info_variable(rpt->system_info, name, value)) {
                 netdata_log_info("STREAM '%s' [receive from [%s]:%s]: "
                      "request has parameter '%s' = '%s', which is not used."
                      , (rpt->hostname && *rpt->hostname) ? rpt->hostname : "-"
@@ -1086,14 +1086,14 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         return HTTP_RESP_OK;
     }
 
-    if(unlikely(web_client_streaming_rate_t > 0)) {
+    if(web_client_streaming_rate_t > 0) {
         static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
         static time_t last_stream_accepted_t = 0;
 
         time_t now = now_realtime_sec();
         spinlock_lock(&spinlock);
 
-        if(unlikely(last_stream_accepted_t == 0))
+        if(last_stream_accepted_t == 0)
             last_stream_accepted_t = now;
 
         if(now - last_stream_accepted_t < web_client_streaming_rate_t) {
@@ -1133,7 +1133,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
 
         rrd_rdlock();
         RRDHOST *host = rrdhost_find_by_guid(rpt->machine_guid);
-        if (unlikely(host && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) /* Ignore archived hosts. */
+        if (host && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) /* Ignore archived hosts. */
             host = NULL;
 
         if (host) {

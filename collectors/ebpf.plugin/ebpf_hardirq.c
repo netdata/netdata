@@ -316,37 +316,37 @@ static int hardirq_parse_interrupts(char *irq_name, int irq)
 {
     static procfile *ff = NULL;
     static int cpus = -1;
-    if(unlikely(!ff)) {
+    if(!ff) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/interrupts");
         ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
     }
-    if(unlikely(!ff))
+    if(!ff)
         return -1;
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff))
+    if(!ff)
         return -1; // we return 0, so that we will retry to open it next time
 
     size_t words = procfile_linewords(ff, 0);
-    if(unlikely(cpus == -1)) {
+    if(cpus == -1) {
         uint32_t w;
         cpus = 0;
         for(w = 0; w < words ; w++) {
-            if(likely(strncmp(procfile_lineword(ff, 0, w), "CPU", 3) == 0))
+            if(strncmp(procfile_lineword(ff, 0, w), "CPU", 3) == 0)
                 cpus++;
         }
    }
 
     size_t lines = procfile_lines(ff), l;
-    if(unlikely(!lines)) {
+    if(!lines) {
         collector_error("Cannot read /proc/interrupts, zero lines reported.");
         return -1;
     }
 
     for(l = 1; l < lines ;l++) {
         words = procfile_linewords(ff, l);
-        if(unlikely(!words)) continue;
+        if(!words) continue;
         const char *id = procfile_lineword(ff, l, 0);
         if (!isdigit(id[0]))
             continue;
@@ -355,7 +355,7 @@ static int hardirq_parse_interrupts(char *irq_name, int irq)
         if (cmp != irq)
             continue;
 
-        if(unlikely((uint32_t)(cpus + 2) < words)) {
+        if((uint32_t)(cpus + 2) < words) {
             const char *name = procfile_lineword(ff, l, words - 1);
             // On some motherboards IRQ can have the same name, so we append IRQ id to differentiate.
             snprintfz(irq_name, NETDATA_HARDIRQ_NAME_LEN - 1, "%d_%s", irq, name);
@@ -388,7 +388,7 @@ static int hardirq_read_latency_map(int mapfd)
     while (bpf_map_get_next_key(mapfd, &key, &next_key) == 0) {
         // get val for this key.
         int test = bpf_map_lookup_elem(mapfd, &key, hardirq_ebpf_vals);
-        if (unlikely(test < 0)) {
+        if (test < 0) {
             key = next_key;
             continue;
         }
@@ -409,7 +409,7 @@ static int hardirq_read_latency_map(int mapfd)
         bool v_is_new = false;
         search_v.irq = key.irq;
         v = (hardirq_val_t *)avl_search_lock(&hardirq_pub, (avl_t *)&search_v);
-        if (unlikely(v == NULL)) {
+        if (v == NULL) {
             // latency/name can only be added reliably at a later time.
             // when they're added, only then will we AVL insert.
             v = ebpf_hardirq_get();
@@ -462,7 +462,7 @@ static void hardirq_read_latency_static_map(int mapfd)
     for (i = 0; i < HARDIRQ_EBPF_STATIC_END; i++) {
         uint32_t map_i = hardirq_static_vals[i].idx;
         int test = bpf_map_lookup_elem(mapfd, &map_i, hardirq_ebpf_static_vals);
-        if (unlikely(test < 0)) {
+        if (test < 0) {
             continue;
         }
 

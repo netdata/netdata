@@ -66,13 +66,13 @@ int do_proc_sys_devices_system_node(int update_every, usec_t dt) {
     static int do_numastat = -1, numa_node_count = 0;
     struct node *m;
 
-    if(unlikely(numa_root == NULL)) {
+    if(numa_root == NULL) {
         numa_node_count = find_all_nodes();
-        if(unlikely(numa_root == NULL))
+        if(numa_root == NULL)
             return 1;
     }
 
-    if(unlikely(do_numastat == -1)) {
+    if(do_numastat == -1) {
         do_numastat = config_get_boolean_ondemand("plugin:proc:/sys/devices/system/node", "enable per-node numa metrics", CONFIG_BOOLEAN_AUTO);
 
         hash_local_node     = simple_hash("local_node");
@@ -88,18 +88,18 @@ int do_proc_sys_devices_system_node(int update_every, usec_t dt) {
         for(m = numa_root; m; m = m->next) {
             if(m->numastat_filename) {
 
-                if(unlikely(!m->numastat_ff)) {
+                if(!m->numastat_ff) {
                     m->numastat_ff = procfile_open(m->numastat_filename, " ", PROCFILE_FLAG_DEFAULT);
 
-                    if(unlikely(!m->numastat_ff))
+                    if(!m->numastat_ff)
                         continue;
                 }
 
                 m->numastat_ff = procfile_readall(m->numastat_ff);
-                if(unlikely(!m->numastat_ff || procfile_lines(m->numastat_ff) < 1 || procfile_linewords(m->numastat_ff, 0) < 1))
+                if(!m->numastat_ff || procfile_lines(m->numastat_ff) < 1 || procfile_linewords(m->numastat_ff, 0) < 1)
                     continue;
 
-                if(unlikely(!m->numastat_st)) {
+                if(!m->numastat_st) {
                     m->numastat_st = rrdset_create_localhost(
                             "mem"
                             , m->name
@@ -132,8 +132,8 @@ int do_proc_sys_devices_system_node(int update_every, usec_t dt) {
                 for(l = 0; l < lines; l++) {
                     size_t words = procfile_linewords(m->numastat_ff, l);
 
-                    if(unlikely(words < 2)) {
-                        if(unlikely(words))
+                    if(words < 2) {
+                        if(words)
                             collector_error("Cannot read %s numastat line %zu. Expected 2 params, read %zu.", m->name, l, words);
                         continue;
                     }
@@ -141,18 +141,18 @@ int do_proc_sys_devices_system_node(int update_every, usec_t dt) {
                     char *name  = procfile_lineword(m->numastat_ff, l, 0);
                     char *value = procfile_lineword(m->numastat_ff, l, 1);
 
-                    if (unlikely(!name || !*name || !value || !*value))
+                    if (!name || !*name || !value || !*value)
                         continue;
 
                     uint32_t hash = simple_hash(name);
-                    if(likely(
+                    if(
                                (hash == hash_numa_hit       && !strcmp(name, "numa_hit"))
                             || (hash == hash_numa_miss      && !strcmp(name, "numa_miss"))
                             || (hash == hash_local_node     && !strcmp(name, "local_node"))
                             || (hash == hash_numa_foreign   && !strcmp(name, "numa_foreign"))
                             || (hash == hash_interleave_hit && !strcmp(name, "interleave_hit"))
                             || (hash == hash_other_node     && !strcmp(name, "other_node"))
-                    ))
+                    )
                         rrddim_set(m->numastat_st, name, (collected_number)str2kernel_uint_t(value));
                 }
 

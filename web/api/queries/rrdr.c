@@ -38,8 +38,8 @@ static void rrdr_dump(RRDR *r)
 
         // for each dimension
         for(c = 0, d = r->st->dimensions; d ;c++, d = d->next) {
-            if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
-            if(unlikely(!(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
+            if(r->od[c] & RRDR_DIMENSION_HIDDEN) continue;
+            if(!(r->od[c] & RRDR_DIMENSION_NONZERO)) continue;
 
             if(co[c] & RRDR_EMPTY)
                 fprintf(stderr, "null ");
@@ -59,7 +59,7 @@ static void rrdr_dump(RRDR *r)
 */
 
 inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r) {
-    if(unlikely(!r)) return;
+    if(!r) return;
 
     for(size_t d = 0; d < r->d ;d++) {
         string_freez(r->di[d]);
@@ -108,7 +108,7 @@ inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r) {
 }
 
 RRDR *rrdr_create(ONEWAYALLOC *owa, QUERY_TARGET *qt, size_t dimensions, size_t points) {
-    if(unlikely(!qt))
+    if(!qt)
         return NULL;
 
     // create the rrdr

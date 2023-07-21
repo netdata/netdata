@@ -132,7 +132,7 @@ static void rrdcalctemplate_free_internals(RRDCALCTEMPLATE *rt) {
 }
 
 void rrdcalctemplate_free_unused_rrdcalctemplate_loaded_from_config(RRDCALCTEMPLATE *rt) {
-    if(unlikely(!rt)) return;
+    if(!rt) return;
 
     rrdcalctemplate_free_internals(rt);
     freez(rt);
@@ -222,17 +222,17 @@ static size_t rrdcalctemplate_key(char *dst, size_t dst_len, const char *name, c
 }
 
 void rrdcalctemplate_add_from_config(RRDHOST *host, RRDCALCTEMPLATE *rt) {
-    if(unlikely(!rt->context)) {
+    if(!rt->context) {
         netdata_log_error("Health configuration for template '%s' does not have a context", rrdcalctemplate_name(rt));
         return;
     }
 
-    if(unlikely(!rt->update_every)) {
+    if(!rt->update_every) {
         netdata_log_error("Health configuration for template '%s' has no frequency (parameter 'every'). Ignoring it.", rrdcalctemplate_name(rt));
         return;
     }
 
-    if(unlikely(!RRDCALCTEMPLATE_HAS_DB_LOOKUP(rt) && !rt->calculation && !rt->warning && !rt->critical)) {
+    if(!RRDCALCTEMPLATE_HAS_DB_LOOKUP(rt) && !rt->calculation && !rt->warning && !rt->critical) {
         netdata_log_error("Health configuration for template '%s' is useless (no calculation, no warning and no critical evaluation)", rrdcalctemplate_name(rt));
         return;
     }

@@ -87,7 +87,7 @@ static void register_result(DICTIONARY *results, RRDHOST *host, RRDCONTEXT_ACQUI
     NETDATA_DOUBLE v = fabsndd(value);
 
     // no need to store zero scored values
-    if(unlikely(fpclassify(v) == FP_ZERO && !register_zero))
+    if(fpclassify(v) == FP_ZERO && !register_zero)
         return;
 
     // keep track of the max of the baseline / highlight ratio
@@ -1222,7 +1222,7 @@ static double ks_2samp(
     double en = round(dbase_size * dhigh_size / (dbase_size + dhigh_size));
 
     // under these conditions, KSfbar() crashes
-    if(unlikely(isnan(en) || isinf(en) || en == 0.0 || isnan(d) || isinf(d)))
+    if(isnan(en) || isinf(en) || en == 0.0 || isnan(d) || isinf(d))
         return NAN;
 
     return KSfbar((int)en, d);
@@ -1240,10 +1240,10 @@ static double kstwo(
     int base_size = (int)calculate_pairs_diff(baseline_diffs, baseline, baseline_points);
     int high_size = (int)calculate_pairs_diff(highlight_diffs, highlight, highlight_points);
 
-    if(unlikely(!base_size || !high_size))
+    if(!base_size || !high_size)
         return NAN;
 
-    if(unlikely(base_size != baseline_points - 1 || high_size != highlight_points - 1)) {
+    if(base_size != baseline_points - 1 || high_size != highlight_points - 1) {
         netdata_log_error("Metric correlations: internal error - calculate_pairs_diff() returns the wrong number of entries");
         return NAN;
     }
@@ -1297,13 +1297,13 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
         goto cleanup;
     }
 
-    if(unlikely(r->od[0] & RRDR_DIMENSION_HIDDEN))
+    if(r->od[0] & RRDR_DIMENSION_HIDDEN)
         goto cleanup;
 
-    if(unlikely(!(r->od[0] & RRDR_DIMENSION_QUERIED)))
+    if(!(r->od[0] & RRDR_DIMENSION_QUERIED))
         goto cleanup;
 
-    if(unlikely(!(r->od[0] & RRDR_DIMENSION_NONZERO)))
+    if(!(r->od[0] & RRDR_DIMENSION_NONZERO))
         goto cleanup;
 
     if(rrdr_rows(r) < 2)
@@ -1367,11 +1367,11 @@ static void rrdset_metric_correlations_ks2(
     if(!isnan(prob) && !isinf(prob)) {
 
         // these conditions should never happen, but still let's check
-        if(unlikely(prob < 0.0)) {
+        if(prob < 0.0) {
             netdata_log_error("Metric correlations: kstwo() returned a negative number: %f", prob);
             prob = -prob;
         }
-        if(unlikely(prob > 1.0)) {
+        if(prob > 1.0) {
             netdata_log_error("Metric correlations: kstwo() returned a number above 1.0: %f", prob);
             prob = 1.0;
         }
@@ -1628,7 +1628,7 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
     NETDATA_DOUBLE last_value = NAN;
     size_t unique_values = 0;
     for(size_t i = 0; i < dimensions ;i++) {
-        if(likely(slots[i] != last_value))
+        if(slots[i] != last_value)
             slots[unique_values++] = last_value = slots[i];
     }
 
@@ -1642,7 +1642,7 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
     dfe_start_read(results, t) {
         int slot = binary_search_bigger_than_netdata_double(slots, 0, (int)unique_values, t->value);
         NETDATA_DOUBLE v = slot * slot_weight;
-        if(unlikely(v > 1.0)) v = 1.0;
+        if(v > 1.0) v = 1.0;
         v = 1.0 - v;
         t->value = v;
     }

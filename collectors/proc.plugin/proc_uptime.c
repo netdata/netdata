@@ -16,7 +16,7 @@ int do_proc_uptime(int update_every, usec_t dt) {
     static RRDSET *st = NULL;
     static RRDDIM *rd = NULL;
 
-    if(unlikely(!st)) {
+    if(!st) {
 
         st = rrdset_create_localhost(
                 "system"

@@ -74,13 +74,13 @@ struct iface *read_proc_net_dev(const char *scope __maybe_unused, const char *pr
 #endif
 
     ff = procfile_open(filename, " \t,:|", PROCFILE_FLAG_DEFAULT);
-    if(unlikely(!ff)) {
+    if(!ff) {
         collector_error("Cannot open file '%s'", filename);
         return NULL;
     }
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff)) {
+    if(!ff) {
         collector_error("Cannot read file '%s'", filename);
         return NULL;
     }
@@ -88,7 +88,7 @@ struct iface *read_proc_net_dev(const char *scope __maybe_unused, const char *pr
     size_t lines = procfile_lines(ff), l;
     struct iface *root = NULL;
     for(l = 2; l < lines ;l++) {
-        if (unlikely(procfile_linewords(ff, l) < 1)) continue;
+        if (procfile_linewords(ff, l) < 1) continue;
 
         struct iface *t = callocz(1, sizeof(struct iface));
         t->device = strdupz(procfile_lineword(ff, l, 0));

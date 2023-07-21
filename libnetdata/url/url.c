@@ -56,7 +56,7 @@ char *url_encode(char *str) {
  *  @return The character decoded on success and 0 otherwise
  */
 char url_percent_escape_decode(const char *s) {
-    if(likely(s[1] && s[2]))
+    if(s[1] && s[2])
         return (char)(from_hex(s[1]) << 4 | from_hex(s[2]));
     return 0;
 }
@@ -75,7 +75,7 @@ char url_utf8_get_byte_length(char c) {
         return 1;
 
     char length = 0;
-    while(likely(c & 0x80)) {
+    while(c & 0x80) {
         length++;
         c <<= 1;
     }
@@ -101,19 +101,19 @@ char url_utf8_get_byte_length(char c) {
 char url_decode_multibyte_utf8(const char *s, char *d, const char *d_end) {
     char first_byte = url_percent_escape_decode(s);
 
-    if(unlikely(!first_byte || !IS_UTF8_STARTBYTE(first_byte)))
+    if(!first_byte || !IS_UTF8_STARTBYTE(first_byte))
         return 0;
 
     char byte_length = url_utf8_get_byte_length(first_byte);
 
-    if(unlikely(byte_length <= 0 || d+byte_length >= d_end))
+    if(byte_length <= 0 || d+byte_length >= d_end)
         return 0;
 
     char to_read = byte_length;
     while(to_read > 0) {
         char c = url_percent_escape_decode(s);
 
-        if(unlikely( !IS_UTF8_BYTE(c) ))
+        if( !IS_UTF8_BYTE(c) )
             return 0;
         if((to_read != byte_length) && IS_UTF8_STARTBYTE(c)) 
             return 0;
@@ -195,11 +195,11 @@ char *url_decode_r(char *to, const char *url, size_t size) {
          *e = &to[size - 1]; // destination end
 
     while(*s && d < e) {
-        if(unlikely(*s == '%')) {
+        if(*s == '%') {
             char t = url_percent_escape_decode(s);
             if(IS_UTF8_BYTE(t)) {
                 char bytes_written = url_decode_multibyte_utf8(s, d, e);
-                if(likely(bytes_written)){
+                if(bytes_written){
                     d += bytes_written;
                     s += (bytes_written * 3)-1;
                 }
@@ -207,7 +207,7 @@ char *url_decode_r(char *to, const char *url, size_t size) {
                     goto fail_cleanup;
                 }
             }
-            else if(likely(t) && isprint(t)) {
+            else if(t && isprint(t)) {
                 // avoid HTTP header injection
                 *d++ = t;
                 s += 2;
@@ -215,7 +215,7 @@ char *url_decode_r(char *to, const char *url, size_t size) {
             else
                 goto fail_cleanup;
         }
-        else if(unlikely(*s == '+'))
+        else if(*s == '+')
             *d++ = ' ';
 
         else
@@ -226,7 +226,7 @@ char *url_decode_r(char *to, const char *url, size_t size) {
 
     *d = '\0';
 
-    if(unlikely( utf8_check((unsigned  char *)to) )) //NULL means success here
+    if( utf8_check((unsigned  char *)to) ) //NULL means success here
         return NULL;
 
     return to;
@@ -240,10 +240,10 @@ inline bool url_is_request_complete(char *begin, char *end, size_t length, char 
     if (begin == end || length < 4)
         return false;
 
-    if(likely(strncmp(begin, "GET ", 4)) == 0) {
+    if(strncmp(begin, "GET ", 4) == 0) {
         return strstr(end - 4, "\r\n\r\n");
     }
-    else if(unlikely(strncmp(begin, "POST ", 5) == 0)) {
+    else if(strncmp(begin, "POST ", 5) == 0) {
         char *cl = strstr(begin, "Content-Length: ");
         if(!cl) return false;
         cl = &cl[16];

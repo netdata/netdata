@@ -41,18 +41,18 @@ void buffer_char_replace(BUFFER *wb, char from, char to) {
 }
 
 void buffer_print_sn_flags(BUFFER *wb, SN_FLAGS flags, bool send_anomaly_bit) {
-    if(unlikely(flags == SN_EMPTY_SLOT)) {
+    if(flags == SN_EMPTY_SLOT) {
         buffer_fast_strcat(wb, "E", 1);
         return;
     }
 
     size_t printed = 0;
-    if(likely(send_anomaly_bit && (flags & SN_FLAG_NOT_ANOMALOUS))) {
+    if(send_anomaly_bit && (flags & SN_FLAG_NOT_ANOMALOUS)) {
         buffer_fast_strcat(wb, "A", 1);
         printed++;
     }
 
-    if(unlikely(flags & SN_FLAG_RESET)) {
+    if(flags & SN_FLAG_RESET) {
         buffer_fast_strcat(wb, "R", 1);
         printed++;
     }
@@ -84,7 +84,7 @@ void buffer_strcat_htmlescape(BUFFER *wb, const char *txt)
 
 void buffer_snprintf(BUFFER *wb, size_t len, const char *fmt, ...)
 {
-    if(unlikely(!fmt || !*fmt)) return;
+    if(!fmt || !*fmt) return;
 
     buffer_need_bytes(wb, len + 1);
 
@@ -100,7 +100,7 @@ void buffer_snprintf(BUFFER *wb, size_t len, const char *fmt, ...)
 
 void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args)
 {
-    if(unlikely(!fmt || !*fmt)) return;
+    if(!fmt || !*fmt) return;
 
     size_t wrote = 0, need = 2, space_remaining = 0;
 
@@ -123,7 +123,7 @@ void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args)
 
 void buffer_sprintf(BUFFER *wb, const char *fmt, ...)
 {
-    if(unlikely(!fmt || !*fmt)) return;
+    if(!fmt || !*fmt) return;
 
     va_list args;
     size_t wrote = 0, need = 2, space_remaining = 0;
@@ -264,7 +264,7 @@ BUFFER *buffer_create(size_t size, size_t *statistics)
 }
 
 void buffer_free(BUFFER *b) {
-    if(unlikely(!b)) return;
+    if(!b) return;
 
     buffer_overflow_check(b);
 

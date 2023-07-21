@@ -111,7 +111,7 @@ static inline const RRDVAR_ACQUIRED *rrdvar_get_and_acquire(DICTIONARY *dict, ST
 }
 
 inline void rrdvar_release_and_del(DICTIONARY *dict, const RRDVAR_ACQUIRED *rva) {
-    if(unlikely(!dict || !rva)) return;
+    if(!dict || !rva) return;
 
     RRDVAR *rv = dictionary_acquired_item_value((const DICTIONARY_ITEM *)rva);
 
@@ -121,7 +121,7 @@ inline void rrdvar_release_and_del(DICTIONARY *dict, const RRDVAR_ACQUIRED *rva)
 }
 
 inline const RRDVAR_ACQUIRED *rrdvar_add_and_acquire(const char *scope __maybe_unused, DICTIONARY *dict, STRING *name, RRDVAR_TYPE type, RRDVAR_FLAGS options, void *value) {
-    if(unlikely(!dict || !name)) return NULL;
+    if(!dict || !name) return NULL;
 
     struct rrdvar_constructor tmp = {
         .name = name,
@@ -134,7 +134,7 @@ inline const RRDVAR_ACQUIRED *rrdvar_add_and_acquire(const char *scope __maybe_u
 }
 
 inline void rrdvar_add(const char *scope __maybe_unused, DICTIONARY *dict, STRING *name, RRDVAR_TYPE type, RRDVAR_FLAGS options, void *value) {
-    if(unlikely(!dict || !name)) return;
+    if(!dict || !name) return;
 
     struct rrdvar_constructor tmp = {
         .name = name,
@@ -155,13 +155,13 @@ void rrdvar_delete_all(DICTIONARY *dict) {
 // CUSTOM HOST VARIABLES
 
 inline int rrdvar_walkthrough_read(DICTIONARY *dict, int (*callback)(const DICTIONARY_ITEM *item, void *rrdvar, void *data), void *data) {
-    if(unlikely(!dict)) return 0;  // when health is not enabled
+    if(!dict) return 0;  // when health is not enabled
     return dictionary_walkthrough_read(dict, callback, data);
 }
 
 const RRDVAR_ACQUIRED *rrdvar_custom_host_variable_add_and_acquire(RRDHOST *host, const char *name) {
     DICTIONARY *dict = host->rrdvars;
-    if(unlikely(!dict)) return NULL; // when health is not enabled
+    if(!dict) return NULL; // when health is not enabled
 
     STRING *name_string = rrdvar_name_to_string(name);
 
@@ -172,7 +172,7 @@ const RRDVAR_ACQUIRED *rrdvar_custom_host_variable_add_and_acquire(RRDHOST *host
 }
 
 void rrdvar_custom_host_variable_set(RRDHOST *host, const RRDVAR_ACQUIRED *rva, NETDATA_DOUBLE value) {
-    if(unlikely(!host->rrdvars || !rva)) return; // when health is not enabled
+    if(!host->rrdvars || !rva) return; // when health is not enabled
 
     if(rrdvar_type(rva) != RRDVAR_TYPE_CALCULATED || !(rrdvar_flags(rva) & (RRDVAR_FLAG_CUSTOM_HOST_VAR | RRDVAR_FLAG_ALLOCATED)))
         netdata_log_error("requested to set variable '%s' to value " NETDATA_DOUBLE_FORMAT " but the variable is not a custom one.", rrdvar_name(rva), value);
@@ -189,7 +189,7 @@ void rrdvar_custom_host_variable_set(RRDHOST *host, const RRDVAR_ACQUIRED *rva, 
 }
 
 void rrdvar_release(DICTIONARY *dict, const RRDVAR_ACQUIRED *rva) {
-    if(unlikely(!dict || !rva)) return;  // when health is not enabled
+    if(!dict || !rva) return;  // when health is not enabled
     dictionary_acquired_item_release(dict, (const DICTIONARY_ITEM *)rva);
 }
 
@@ -197,7 +197,7 @@ void rrdvar_release(DICTIONARY *dict, const RRDVAR_ACQUIRED *rva) {
 // RRDVAR lookup
 
 NETDATA_DOUBLE rrdvar2number(const RRDVAR_ACQUIRED *rva) {
-    if(unlikely(!rva)) return NAN;
+    if(!rva) return NAN;
 
     RRDVAR *rv = dictionary_acquired_item_value((const DICTIONARY_ITEM *)rva);
 
@@ -325,7 +325,7 @@ static int single_variable2json_callback(const DICTIONARY_ITEM *item __maybe_unu
     NETDATA_DOUBLE value = rrdvar2number(rva);
 
     if (helper->options == RRDVAR_FLAG_NONE || rrdvar_flags(rva) & helper->options) {
-        if(unlikely(isnan(value) || isinf(value)))
+        if(isnan(value) || isinf(value))
             buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": null", helper->counter?",":"", rrdvar_name(rva));
         else
             buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": %0.5" NETDATA_DOUBLE_MODIFIER, helper->counter?",":"", rrdvar_name(rva), (NETDATA_DOUBLE)value);

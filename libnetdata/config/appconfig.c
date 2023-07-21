@@ -15,8 +15,8 @@ _CONNECTOR_INSTANCE *add_connector_instance(struct section *connector, struct se
     static struct _connector_instance *global_connector_instance = NULL;
     struct _connector_instance *local_ci, *local_ci_tmp;
 
-    if (unlikely(!connector)) {
-        if (unlikely(!instance))
+    if (!connector) {
+        if (!instance)
             return global_connector_instance;
 
         local_ci = global_connector_instance;
@@ -44,24 +44,24 @@ int is_valid_connector(char *type, int check_reserved)
 {
     int rc = 1;
 
-    if (unlikely(!type))
+    if (!type)
         return 0;
 
     if (!check_reserved) {
-        if (unlikely(is_valid_connector(type,1))) {
+        if (is_valid_connector(type,1)) {
             return 0;
         }
-        //if (unlikely(*type == ':')
+        //if (*type == ':'
         //    return 0;
         char *separator = strrchr(type, ':');
-        if (likely(separator)) {
+        if (separator) {
             *separator = '\0';
             rc = separator - type;
         } else
             return 0;
     }
 //    else {
-//        if (unlikely(is_valid_connector(type,1))) {
+//        if (is_valid_connector(type,1)) {
 //            netdata_log_error("Section %s invalid -- reserved name", type);
 //            return 0;
 //        }
@@ -173,7 +173,7 @@ static inline struct section *appconfig_section_create(struct config *root, cons
 
     avl_init_lock(&co->values_index, appconfig_option_compare);
 
-    if(unlikely(appconfig_index_add(root, co) != co))
+    if(appconfig_index_add(root, co) != co)
         netdata_log_error("INTERNAL ERROR: indexing of section '%s', already exists.", co->name);
 
     appconfig_wrlock(root);
@@ -212,7 +212,7 @@ void appconfig_section_destroy_non_loaded(struct config *root, const char *secti
     }
     for(cv = co->values ; cv ; cv = cv_next) {
         cv_next = cv->next;
-        if(unlikely(!appconfig_option_index_del(co, cv)))
+        if(!appconfig_option_index_del(co, cv))
             netdata_log_error("Cannot remove config option '%s' from section '%s'.", cv->name, co->name);
         freez(cv->value);
         freez(cv->name);
@@ -221,7 +221,7 @@ void appconfig_section_destroy_non_loaded(struct config *root, const char *secti
     co->values = NULL;
     config_section_unlock(co);
 
-    if (unlikely(!appconfig_index_del(root, co))) {
+    if (!appconfig_index_del(root, co)) {
         netdata_log_error("Cannot remove section '%s' from config.", section);
         return;
     }
@@ -279,7 +279,7 @@ void appconfig_section_option_destroy_non_loaded(struct config *root, const char
         return;
     }
 
-    if (unlikely(!(cv && appconfig_option_index_del(co, cv)))) {
+    if (!(cv && appconfig_option_index_del(co, cv))) {
         config_section_unlock(co);
         netdata_log_error("Could not destroy section option '%s -> %s'. The option not found.", section, name);
         return;
@@ -374,7 +374,7 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
     cv_new = appconfig_option_index_find(co_new, name_new, 0);
     if(cv_new) goto cleanup;
 
-    if(unlikely(appconfig_option_index_del(co_old, cv_old) != cv_old))
+    if(appconfig_option_index_del(co_old, cv_old) != cv_old)
         netdata_log_error("INTERNAL ERROR: deletion of config '%s' from section '%s', deleted the wrong config entry.", cv_old->name, co_old->name);
 
     if(co_old->values == cv_old) {
@@ -397,7 +397,7 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
     cv_new->next = co_new->values;
     co_new->values = cv_new;
 
-    if(unlikely(appconfig_option_index_add(co_new, cv_old) != cv_old))
+    if(appconfig_option_index_add(co_new, cv_old) != cv_old)
         netdata_log_error("INTERNAL ERROR: re-indexing of config '%s' in section '%s', already exists.", cv_old->name, co_new->name);
 
     ret = 0;
@@ -682,20 +682,20 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
             if (is_exporter_config) {
                 global_exporting_section =
                     !(strcmp(s, CONFIG_SECTION_EXPORTING)) || !(strcmp(s, CONFIG_SECTION_PROMETHEUS));
-                if (unlikely(!global_exporting_section)) {
+                if (!global_exporting_section) {
                     int rc;
                     rc = is_valid_connector(s, 0);
-                    if (likely(rc)) {
+                    if (rc) {
                         strncpyz(working_connector, s, CONFIG_MAX_NAME);
                         s = s + rc + 1;
-                        if (unlikely(!(*s))) {
+                        if (!(*s)) {
                             _connectors++;
                             sprintf(buffer, "instance_%d", _connectors);
                             s = buffer;
                         }
                         strncpyz(working_instance, s, CONFIG_MAX_NAME);
                         working_connector_section = NULL;
-                        if (unlikely(appconfig_section_find(root, working_instance))) {
+                        if (appconfig_section_find(root, working_instance)) {
                             netdata_log_error("Instance (%s) already exists", working_instance);
                             co = NULL;
                             continue;
@@ -766,12 +766,12 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
 
         if (!cv) {
             cv = appconfig_value_create(co, name, value);
-            if (likely(is_exporter_config) && unlikely(!global_exporting_section)) {
-                if (unlikely(!working_connector_section)) {
+            if (is_exporter_config && !global_exporting_section) {
+                if (!working_connector_section) {
                     working_connector_section = appconfig_section_find(root, working_connector);
                     if (!working_connector_section)
                         working_connector_section = appconfig_section_create(root, working_connector);
-                    if (likely(working_connector_section)) {
+                    if (working_connector_section) {
                         add_connector_instance(working_connector_section, co);
                     }
                 }
@@ -906,7 +906,7 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
 int config_parse_duration(const char* string, int* result) {
     while(*string && isspace(*string)) string++;
 
-    if(unlikely(!*string)) goto fallback;
+    if(!*string) goto fallback;
 
     if(*string == 'n' && !strcmp(string, "never")) {
         // this is a valid option

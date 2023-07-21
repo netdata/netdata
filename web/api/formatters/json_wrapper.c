@@ -102,7 +102,7 @@ struct summary_total_counts {
 };
 
 static inline void aggregate_into_summary_totals(struct summary_total_counts *totals, QUERY_METRICS_COUNTS *metrics) {
-    if(unlikely(!totals || !metrics))
+    if(!totals || !metrics)
         return;
 
     if(metrics->selected) {
@@ -761,7 +761,7 @@ static inline void rrdr_dimension_query_points_statistics(BUFFER *wb, const char
     STORAGE_POINT *sp = (dview) ? r->dview : r->dqp;
     NETDATA_DOUBLE anomaly_rate_multiplier = (dview) ? RRDR_DVIEW_ANOMALY_COUNT_MULTIPLIER : 1.0;
 
-    if(unlikely(!sp))
+    if(!sp)
         return;
 
     if(key)
@@ -1284,7 +1284,7 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb) {
     char kq[2] = "\"",                    // key quote
          sq[2] = "\"";                    // string quote
 
-    if(unlikely(options & RRDR_OPTION_GOOGLE_JSON)) {
+    if(options & RRDR_OPTION_GOOGLE_JSON) {
         kq[0] = '\0';
         sq[0] = '\'';
     }

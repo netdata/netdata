@@ -184,7 +184,7 @@ static inline void tc_class_free(struct tc_device *n, struct tc_class *c) {
 static inline void tc_device_classes_cleanup(struct tc_device *d) {
     static int cleanup_every = 999;
 
-    if(unlikely(cleanup_every > 0)) {
+    if(cleanup_every > 0) {
         cleanup_every = (int) config_get_number("plugin:tc", "cleanup unused classes every", 120);
         if(cleanup_every < 0) cleanup_every = -cleanup_every;
     }
@@ -194,7 +194,7 @@ static inline void tc_device_classes_cleanup(struct tc_device *d) {
 
     struct tc_class *c;
     dfe_start_write(d->classes, c) {
-        if(unlikely(cleanup_every && c->unupdated >= cleanup_every))
+        if(cleanup_every && c->unupdated >= cleanup_every)
             tc_class_free(d, c);
 
         else {
@@ -208,7 +208,7 @@ static inline void tc_device_classes_cleanup(struct tc_device *d) {
 static inline void tc_device_commit(struct tc_device *d) {
     static int enable_new_interfaces = -1, enable_bytes = -1, enable_packets = -1, enable_dropped = -1, enable_tokens = -1, enable_ctokens = -1, enabled_all_classes_qdiscs = -1;
 
-    if(unlikely(enable_new_interfaces == -1)) {
+    if(enable_new_interfaces == -1) {
         enable_new_interfaces      = config_get_boolean_ondemand("plugin:tc", "enable new interfaces detected at runtime", CONFIG_BOOLEAN_YES);
         enable_bytes               = config_get_boolean_ondemand("plugin:tc", "enable traffic charts for all interfaces", CONFIG_BOOLEAN_AUTO);
         enable_packets             = config_get_boolean_ondemand("plugin:tc", "enable packets charts for all interfaces", CONFIG_BOOLEAN_AUTO);
@@ -218,7 +218,7 @@ static inline void tc_device_commit(struct tc_device *d) {
         enabled_all_classes_qdiscs = config_get_boolean_ondemand("plugin:tc", "enable show all classes and qdiscs for all interfaces", CONFIG_BOOLEAN_NO);
     }
 
-    if(unlikely(d->enabled == (char)-1)) {
+    if(d->enabled == (char)-1) {
         char var_name[CONFIG_MAX_NAME + 1];
         snprintfz(var_name, CONFIG_MAX_NAME, "qos for %s", string2str(d->id));
 
@@ -256,7 +256,7 @@ static inline void tc_device_commit(struct tc_device *d) {
         c->isleaf = true;       // this is a leaf class
         c->hasparent = false;   // without a parent
 
-        if(unlikely(!c->updated))
+        if(!c->updated)
             c->unupdated++;     // increase its unupdated counter
         else {
             c->unupdated = 0;   // reset its unupdated counter
@@ -270,18 +270,18 @@ static inline void tc_device_commit(struct tc_device *d) {
     }
     dfe_done(c);
 
-    if(unlikely(!d->enabled || (!updated_classes && !updated_qdiscs))) {
+    if(!d->enabled || (!updated_classes && !updated_qdiscs)) {
         netdata_log_debug(D_TC_LOOP, "TC: Ignoring TC device '%s'. It is not enabled/updated.", string2str(d->name?d->name:d->id));
         tc_device_classes_cleanup(d);
         return;
     }
 
-    if(unlikely(updated_classes && updated_qdiscs)) {
+    if(updated_classes && updated_qdiscs) {
         collector_error("TC: device '%s' has active both classes (%d) and qdiscs (%d). Will render only qdiscs.", string2str(d->id), updated_classes, updated_qdiscs);
 
         // set all classes to !updated
         dfe_start_read(d->classes, c) {
-            if (unlikely(!c->isqdisc && c->updated))
+            if (!c->isqdisc && c->updated)
                 c->updated = false;
         }
         dfe_done(c);
@@ -303,9 +303,9 @@ static inline void tc_device_commit(struct tc_device *d) {
     //
     // so, here we remove the isleaf flag from nodes in the middle
     // and we add the hasparent flag to leaf nodes we found their parent
-    if(likely(!d->enabled_all_classes_qdiscs)) {
+    if(!d->enabled_all_classes_qdiscs) {
         dfe_start_read(d->classes, c) {
-            if(unlikely(!c->updated))
+            if(!c->updated)
                 continue;
 
             //netdata_log_debug(D_TC_LOOP, "TC: In device '%s', %s '%s'  has leafid: '%s' and parentid '%s'.",
@@ -317,7 +317,7 @@ static inline void tc_device_commit(struct tc_device *d) {
 
             // find if c is leaf or not
             dfe_start_read(d->classes, x) {
-                if(unlikely(!x->updated || c == x || !x->parentid))
+                if(!x->updated || c == x || !x->parentid)
                     continue;
 
                 // classes have both parentid and leafid
@@ -337,12 +337,12 @@ static inline void tc_device_commit(struct tc_device *d) {
     }
 
     dfe_start_read(d->classes, c) {
-        if(unlikely(!c->updated))
+        if(!c->updated)
             continue;
 
         // netdata_log_debug(D_TC_LOOP, "TC: device '%s', %s '%s' isleaf=%d, hasparent=%d", d->id, (c->isqdisc)?"qdisc":"class", c->id, c->isleaf, c->hasparent);
 
-        if(unlikely((c->isleaf && c->hasparent) || d->enabled_all_classes_qdiscs)) {
+        if((c->isleaf && c->hasparent) || d->enabled_all_classes_qdiscs) {
             c->render = true;
             active_nodes++;
             bytes_sum += c->bytes;
@@ -352,7 +352,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             ctokens_sum += c->ctokens;
         }
 
-        //if(unlikely(!c->hasparent)) {
+        //if(!c->hasparent) {
         //    if(root) collector_error("TC: multiple root class/qdisc for device '%s' (old: '%s', new: '%s')", d->id, root->id, c->id);
         //    root = c;
         //    netdata_log_debug(D_TC_LOOP, "TC: found root class/qdisc '%s'", root->id);
@@ -363,7 +363,7 @@ static inline void tc_device_commit(struct tc_device *d) {
 #ifdef NETDATA_INTERNAL_CHECKS
     // dump all the list to see what we know
 
-    if(unlikely(debug_flags & D_TC_LOOP)) {
+    if(debug_flags & D_TC_LOOP) {
         dfe_start_read(d->classes, c) {
             if(c->render) netdata_log_debug(D_TC_LOOP, "TC: final nodes dump for '%s': class %s, OK", string2str(d->name), string2str(c->id));
             else netdata_log_debug(D_TC_LOOP, "TC: final nodes dump for '%s': class '%s', IGNORE (updated: %d, isleaf: %d, hasparent: %d, parent: '%s')",
@@ -373,7 +373,7 @@ static inline void tc_device_commit(struct tc_device *d) {
     }
 #endif
 
-    if(unlikely(!active_nodes)) {
+    if(!active_nodes) {
         netdata_log_debug(D_TC_LOOP, "TC: Ignoring TC device '%s'. No useful classes/qdiscs.", string2str(d->name?d->name:d->id));
         tc_device_classes_cleanup(d);
         return;
@@ -402,7 +402,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                                                   (bytes_sum || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         d->enabled_bytes = CONFIG_BOOLEAN_YES;
 
-        if(unlikely(!d->st_bytes)) {
+        if(!d->st_bytes) {
             d->st_bytes = rrdset_create_localhost(
                 RRD_TYPE_TC,
                 string2str(d->id),
@@ -422,7 +422,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             rrdlabels_add(d->st_bytes->rrdlabels, "device_group", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
-            if(unlikely(d->name_updated))
+            if(d->name_updated)
                 rrdset_reset_name(d->st_bytes, string2str(d->name));
 
             if(d->name && d->name_updated)
@@ -436,11 +436,11 @@ static inline void tc_device_commit(struct tc_device *d) {
         }
 
         dfe_start_read(d->classes, c) {
-            if(unlikely(!c->render)) continue;
+            if(!c->render) continue;
 
-            if(unlikely(!c->rd_bytes))
+            if(!c->rd_bytes)
                 c->rd_bytes = rrddim_add(d->st_bytes, string2str(c->id), string2str(c->name?c->name:c->id), 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-            else if(unlikely(c->name_updated))
+            else if(c->name_updated)
                 rrddim_reset_name(d->st_bytes, c->rd_bytes, string2str(c->name));
 
             rrddim_set_by_pointer(d->st_bytes, c->rd_bytes, c->bytes);
@@ -458,7 +458,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                                                      netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         d->enabled_packets = CONFIG_BOOLEAN_YES;
 
-        if(unlikely(!d->st_packets)) {
+        if(!d->st_packets) {
             char id[RRD_ID_LENGTH_MAX + 1];
             char name[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_packets", string2str(d->id));
@@ -483,7 +483,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             rrdlabels_add(d->st_packets->rrdlabels, "device_group", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
-            if(unlikely(d->name_updated)) {
+            if(d->name_updated) {
                 char name[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(name, RRD_ID_LENGTH_MAX, "%s_packets", string2str(d->name?d->name:d->id));
                 rrdset_reset_name(d->st_packets, name);
@@ -500,11 +500,11 @@ static inline void tc_device_commit(struct tc_device *d) {
         }
 
         dfe_start_read(d->classes, c) {
-            if(unlikely(!c->render)) continue;
+            if(!c->render) continue;
 
-            if(unlikely(!c->rd_packets))
+            if(!c->rd_packets)
                 c->rd_packets = rrddim_add(d->st_packets, string2str(c->id), string2str(c->name?c->name:c->id), 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            else if(unlikely(c->name_updated))
+            else if(c->name_updated)
                 rrddim_reset_name(d->st_packets, c->rd_packets, string2str(c->name));
 
             rrddim_set_by_pointer(d->st_packets, c->rd_packets, c->packets);
@@ -522,7 +522,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                                                      netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         d->enabled_dropped = CONFIG_BOOLEAN_YES;
 
-        if(unlikely(!d->st_dropped)) {
+        if(!d->st_dropped) {
             char id[RRD_ID_LENGTH_MAX + 1];
             char name[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_dropped", string2str(d->id));
@@ -547,7 +547,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             rrdlabels_add(d->st_dropped->rrdlabels, "device_group", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
-            if(unlikely(d->name_updated)) {
+            if(d->name_updated) {
                 char name[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(name, RRD_ID_LENGTH_MAX, "%s_dropped", string2str(d->name?d->name:d->id));
                 rrdset_reset_name(d->st_dropped, name);
@@ -564,11 +564,11 @@ static inline void tc_device_commit(struct tc_device *d) {
         }
 
         dfe_start_read(d->classes, c) {
-            if(unlikely(!c->render)) continue;
+            if(!c->render) continue;
 
-            if(unlikely(!c->rd_dropped))
+            if(!c->rd_dropped)
                 c->rd_dropped = rrddim_add(d->st_dropped, string2str(c->id), string2str(c->name?c->name:c->id), 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            else if(unlikely(c->name_updated))
+            else if(c->name_updated)
                 rrddim_reset_name(d->st_dropped, c->rd_dropped, string2str(c->name));
 
             rrddim_set_by_pointer(d->st_dropped, c->rd_dropped, c->dropped);
@@ -586,7 +586,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                                                     netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         d->enabled_tokens = CONFIG_BOOLEAN_YES;
 
-        if(unlikely(!d->st_tokens)) {
+        if(!d->st_tokens) {
             char id[RRD_ID_LENGTH_MAX + 1];
             char name[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_tokens", string2str(d->id));
@@ -611,7 +611,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             rrdlabels_add(d->st_tokens->rrdlabels, "device_group", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
-            if(unlikely(d->name_updated)) {
+            if(d->name_updated) {
                 char name[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(name, RRD_ID_LENGTH_MAX, "%s_tokens", string2str(d->name?d->name:d->id));
                 rrdset_reset_name(d->st_tokens, name);
@@ -628,12 +628,12 @@ static inline void tc_device_commit(struct tc_device *d) {
         }
 
         dfe_start_read(d->classes, c) {
-            if(unlikely(!c->render)) continue;
+            if(!c->render) continue;
 
-            if(unlikely(!c->rd_tokens)) {
+            if(!c->rd_tokens) {
                 c->rd_tokens = rrddim_add(d->st_tokens, string2str(c->id), string2str(c->name?c->name:c->id), 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
-            else if(unlikely(c->name_updated))
+            else if(c->name_updated)
                 rrddim_reset_name(d->st_tokens, c->rd_tokens, string2str(c->name));
 
             rrddim_set_by_pointer(d->st_tokens, c->rd_tokens, c->tokens);
@@ -651,7 +651,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                                                      netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         d->enabled_ctokens = CONFIG_BOOLEAN_YES;
 
-        if(unlikely(!d->st_ctokens)) {
+        if(!d->st_ctokens) {
             char id[RRD_ID_LENGTH_MAX + 1];
             char name[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_ctokens", string2str(d->id));
@@ -678,7 +678,7 @@ static inline void tc_device_commit(struct tc_device *d) {
         else {
             netdata_log_debug(D_TC_LOOP, "TC: Updating _ctokens chart for device '%s'", string2str(d->name?d->name:d->id));
 
-            if(unlikely(d->name_updated)) {
+            if(d->name_updated) {
                 char name[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(name, RRD_ID_LENGTH_MAX, "%s_ctokens", string2str(d->name?d->name:d->id));
                 rrdset_reset_name(d->st_ctokens, name);
@@ -695,11 +695,11 @@ static inline void tc_device_commit(struct tc_device *d) {
         }
 
         dfe_start_read(d->classes, c) {
-            if(unlikely(!c->render)) continue;
+            if(!c->render) continue;
 
-            if(unlikely(!c->rd_ctokens))
+            if(!c->rd_ctokens)
                 c->rd_ctokens = rrddim_add(d->st_ctokens, string2str(c->id), string2str(c->name?c->name:c->id), 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            else if(unlikely(c->name_updated))
+            else if(c->name_updated)
                 rrddim_reset_name(d->st_ctokens, c->rd_ctokens, string2str(c->name));
 
             rrddim_set_by_pointer(d->st_ctokens, c->rd_ctokens, c->ctokens);
@@ -713,17 +713,17 @@ static inline void tc_device_commit(struct tc_device *d) {
 }
 
 static inline void tc_device_set_class_name(struct tc_device *d, char *id, char *name) {
-    if(unlikely(!name || !*name)) return;
+    if(!name || !*name) return;
 
     struct tc_class *c = tc_class_index_find(d, id);
-    if(likely(c)) {
-        if(likely(c->name)) {
+    if(c) {
+        if(c->name) {
             if(!strcmp(string2str(c->name), name)) return;
             string_freez(c->name);
             c->name = NULL;
         }
 
-        if(likely(name && *name && strcmp(string2str(c->id), name) != 0)) {
+        if(name && *name && strcmp(string2str(c->id), name) != 0) {
             netdata_log_debug(D_TC_LOOP, "TC: Setting device '%s', class '%s' name to '%s'", string2str(d->id), id, name);
             c->name = string_strdupz(name);
             c->name_updated = true;
@@ -732,7 +732,7 @@ static inline void tc_device_set_class_name(struct tc_device *d, char *id, char 
 }
 
 static inline void tc_device_set_device_name(struct tc_device *d, char *name) {
-    if(unlikely(!name || !*name)) return;
+    if(!name || !*name) return;
 
     if(d->name) {
         if(!strcmp(string2str(d->name), name)) return;
@@ -740,7 +740,7 @@ static inline void tc_device_set_device_name(struct tc_device *d, char *name) {
         d->name = NULL;
     }
 
-    if(likely(name && *name && strcmp(string2str(d->id), name) != 0)) {
+    if(name && *name && strcmp(string2str(d->id), name) != 0) {
         netdata_log_debug(D_TC_LOOP, "TC: Setting device '%s' name to '%s'", string2str(d->id), name);
         d->name = string_strdupz(name);
         d->name_updated = true;
@@ -751,7 +751,7 @@ static inline void tc_device_set_device_family(struct tc_device *d, char *family
     string_freez(d->family);
     d->family = NULL;
 
-    if(likely(family && *family && strcmp(string2str(d->id), family) != 0)) {
+    if(family && *family && strcmp(string2str(d->id), family) != 0) {
         netdata_log_debug(D_TC_LOOP, "TC: Setting device '%s' family to '%s'", string2str(d->id), family);
         d->family = string_strdupz(family);
         d->family_updated = true;
@@ -824,7 +824,7 @@ static inline void tc_split_words(char *str, char **words, int max_words) {
     // while we have something
     while(*s) {
         // if it is a space
-        if(unlikely(tc_space(*s))) {
+        if(tc_space(*s)) {
 
             // terminate the word
             *s++ = '\0';
@@ -939,21 +939,21 @@ void *tc_main(void *ptr) {
         netdata_log_debug(D_TC_LOOP, "executing '%s'", command);
 
         fp_child_output = netdata_popen(command, (pid_t *)&tc_child_pid, &fp_child_input);
-        if(unlikely(!fp_child_output)) {
+        if(!fp_child_output) {
             collector_error("TC: Cannot popen(\"%s\", \"r\").", command);
             goto cleanup;
         }
 
         char buffer[TC_LINE_MAX+1] = "";
         while(fgets(buffer, TC_LINE_MAX, fp_child_output) != NULL) {
-            if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
+            if(!service_running(SERVICE_COLLECTORS)) break;
 
             buffer[TC_LINE_MAX] = '\0';
             // netdata_log_debug(D_TC_LOOP, "TC: read '%s'", buffer);
 
             tc_split_words(buffer, words, PLUGINSD_MAX_WORDS);
 
-            if(unlikely(!words[0] || !*words[0])) {
+            if(!words[0] || !*words[0]) {
                 // netdata_log_debug(D_TC_LOOP, "empty line");
                 worker_is_idle();
                 continue;
@@ -962,7 +962,7 @@ void *tc_main(void *ptr) {
 
             first_hash = simple_hash(words[0]);
 
-            if(unlikely(device && ((first_hash == CLASS_HASH && strcmp(words[0], "class") == 0) ||  (first_hash == QDISC_HASH && strcmp(words[0], "qdisc") == 0)))) {
+            if(device && ((first_hash == CLASS_HASH && strcmp(words[0], "class") == 0) ||  (first_hash == QDISC_HASH && strcmp(words[0], "qdisc") == 0))) {
                 worker_is_busy(WORKER_TC_CLASS);
 
                 // netdata_log_debug(D_TC_LOOP, "CLASS line on class id='%s', parent='%s', parentid='%s', leaf='%s', leafid='%s'", words[2], words[3], words[4], words[5], words[6]);
@@ -976,14 +976,14 @@ void *tc_main(void *ptr) {
 
                 int parent_is_root = 0;
                 int parent_is_parent = 0;
-                if(likely(parent)) {
+                if(parent) {
                     parent_is_parent = !strcmp(parent, "parent");
 
                     if(!parent_is_parent)
                         parent_is_root = !strcmp(parent, "root");
                 }
 
-                if(likely(type && id && (parent_is_root || parent_is_parent))) {
+                if(type && id && (parent_is_root || parent_is_parent)) {
                     bool qdisc = false;
 
                     if(first_hash == QDISC_HASH) {
@@ -1030,12 +1030,12 @@ void *tc_main(void *ptr) {
                     class = NULL;
                 }
             }
-            else if(unlikely(first_hash == END_HASH && strcmp(words[0], "END") == 0)) {
+            else if(first_hash == END_HASH && strcmp(words[0], "END") == 0) {
                 worker_is_busy(WORKER_TC_END);
 
                 // netdata_log_debug(D_TC_LOOP, "END line");
 
-                if(likely(device)) {
+                if(device) {
                     netdata_thread_disable_cancelability();
                     tc_device_commit(device);
                     // tc_device_free(device);
@@ -1045,12 +1045,12 @@ void *tc_main(void *ptr) {
                 device = NULL;
                 class = NULL;
             }
-            else if(unlikely(first_hash == BEGIN_HASH && strcmp(words[0], "BEGIN") == 0)) {
+            else if(first_hash == BEGIN_HASH && strcmp(words[0], "BEGIN") == 0) {
                 worker_is_busy(WORKER_TC_BEGIN);
 
                 // netdata_log_debug(D_TC_LOOP, "BEGIN line on device '%s'", words[1]);
 
-                if(likely(words[1] && *words[1])) {
+                if(words[1] && *words[1]) {
                     device = tc_device_create(words[1]);
                 }
                 else {
@@ -1060,11 +1060,11 @@ void *tc_main(void *ptr) {
 
                 class = NULL;
             }
-            else if(unlikely(device && class && first_hash == SENT_HASH && strcmp(words[0], "Sent") == 0)) {
+            else if(device && class && first_hash == SENT_HASH && strcmp(words[0], "Sent") == 0) {
                 worker_is_busy(WORKER_TC_SENT);
 
                 // netdata_log_debug(D_TC_LOOP, "SENT line '%s'", words[1]);
-                if(likely(words[1] && *words[1])) {
+                if(words[1] && *words[1]) {
                     class->bytes = str2ull(words[1], NULL);
                     class->updated = true;
                 }
@@ -1072,65 +1072,65 @@ void *tc_main(void *ptr) {
                     class->updated = false;
                 }
 
-                if(likely(words[3] && *words[3]))
+                if(words[3] && *words[3])
                     class->packets = str2ull(words[3], NULL);
 
-                if(likely(words[6] && *words[6]))
+                if(words[6] && *words[6])
                     class->dropped = str2ull(words[6], NULL);
 
-                //if(likely(words[8] && *words[8]))
+                //if(words[8] && *words[8])
                 //    class->overlimits = str2ull(words[8]);
 
-                //if(likely(words[10] && *words[10]))
+                //if(words[10] && *words[10])
                 //    class->requeues = str2ull(words[8]);
             }
-            else if(unlikely(device && class && class->updated && first_hash == LENDED_HASH && strcmp(words[0], "lended:") == 0)) {
+            else if(device && class && class->updated && first_hash == LENDED_HASH && strcmp(words[0], "lended:") == 0) {
                 worker_is_busy(WORKER_TC_LENDED);
 
                 // netdata_log_debug(D_TC_LOOP, "LENDED line '%s'", words[1]);
-                //if(likely(words[1] && *words[1]))
+                //if(words[1] && *words[1])
                 //    class->lended = str2ull(words[1]);
 
-                //if(likely(words[3] && *words[3]))
+                //if(words[3] && *words[3])
                 //    class->borrowed = str2ull(words[3]);
 
-                //if(likely(words[5] && *words[5]))
+                //if(words[5] && *words[5])
                 //    class->giants = str2ull(words[5]);
             }
-            else if(unlikely(device && class && class->updated && first_hash == TOKENS_HASH && strcmp(words[0], "tokens:") == 0)) {
+            else if(device && class && class->updated && first_hash == TOKENS_HASH && strcmp(words[0], "tokens:") == 0) {
                 worker_is_busy(WORKER_TC_TOKENS);
 
                 // netdata_log_debug(D_TC_LOOP, "TOKENS line '%s'", words[1]);
-                if(likely(words[1] && *words[1]))
+                if(words[1] && *words[1])
                     class->tokens = str2ull(words[1], NULL);
 
-                if(likely(words[3] && *words[3]))
+                if(words[3] && *words[3])
                     class->ctokens = str2ull(words[3], NULL);
             }
-            else if(unlikely(device && first_hash == SETDEVICENAME_HASH && strcmp(words[0], "SETDEVICENAME") == 0)) {
+            else if(device && first_hash == SETDEVICENAME_HASH && strcmp(words[0], "SETDEVICENAME") == 0) {
                 worker_is_busy(WORKER_TC_SETDEVICENAME);
 
                 // netdata_log_debug(D_TC_LOOP, "SETDEVICENAME line '%s'", words[1]);
-                if(likely(words[1] && *words[1]))
+                if(words[1] && *words[1])
                     tc_device_set_device_name(device, words[1]);
             }
-            else if(unlikely(device && first_hash == SETDEVICEGROUP_HASH && strcmp(words[0], "SETDEVICEGROUP") == 0)) {
+            else if(device && first_hash == SETDEVICEGROUP_HASH && strcmp(words[0], "SETDEVICEGROUP") == 0) {
                 worker_is_busy(WORKER_TC_SETDEVICEGROUP);
 
                 // netdata_log_debug(D_TC_LOOP, "SETDEVICEGROUP line '%s'", words[1]);
-                if(likely(words[1] && *words[1]))
+                if(words[1] && *words[1])
                     tc_device_set_device_family(device, words[1]);
             }
-            else if(unlikely(device && first_hash == SETCLASSNAME_HASH && strcmp(words[0], "SETCLASSNAME") == 0)) {
+            else if(device && first_hash == SETCLASSNAME_HASH && strcmp(words[0], "SETCLASSNAME") == 0) {
                 worker_is_busy(WORKER_TC_SETCLASSNAME);
 
                 // netdata_log_debug(D_TC_LOOP, "SETCLASSNAME line '%s' '%s'", words[1], words[2]);
                 char *id    = words[1];
                 char *path  = words[2];
-                if(likely(id && *id && path && *path))
+                if(id && *id && path && *path)
                     tc_device_set_class_name(device, id, path);
             }
-            else if(unlikely(first_hash == WORKTIME_HASH && strcmp(words[0], "WORKTIME") == 0)) {
+            else if(first_hash == WORKTIME_HASH && strcmp(words[0], "WORKTIME") == 0) {
                 worker_is_busy(WORKER_TC_WORKTIME);
                 worker_set_metric(WORKER_TC_PLUGIN_TIME, str2ll(words[1], NULL));
 
@@ -1157,13 +1157,13 @@ void *tc_main(void *ptr) {
         int code = netdata_pclose(fp_child_input, fp_child_output, (pid_t)tc_child_pid);
         tc_child_pid = 0;
 
-        if(unlikely(device)) {
+        if(device) {
             // tc_device_free(device);
             device = NULL;
             class = NULL;
         }
 
-        if(unlikely(!service_running(SERVICE_COLLECTORS)))
+        if(!service_running(SERVICE_COLLECTORS))
             goto cleanup;
 
         if(code == 1 || code == 127) {

@@ -15,7 +15,7 @@ bool netdata_ssl_validate_certificate_sender =  true;
 static SOCKET_PEERS netdata_ssl_peers(NETDATA_SSL *ssl) {
     int sock_fd;
 
-    if(unlikely(!ssl->conn))
+    if(!ssl->conn)
         sock_fd = -1;
     else
         sock_fd = SSL_get_rfd(ssl->conn);
@@ -175,7 +175,7 @@ void netdata_ssl_close(NETDATA_SSL *ssl) {
 static inline bool is_handshake_complete(NETDATA_SSL *ssl, const char *op) {
     error_limit_static_thread_var(erl, 1, 0);
 
-    if(unlikely(!ssl->conn)) {
+    if(!ssl->conn) {
         internal_error(true, "SSL: trying to %s on a NULL connection", op);
         return false;
     }
@@ -227,12 +227,12 @@ ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num) {
     errno = 0;
     ssl->ssl_errno = 0;
 
-    if(unlikely(!is_handshake_complete(ssl, "read")))
+    if(!is_handshake_complete(ssl, "read"))
         return -1;
 
     int bytes = SSL_read(ssl->conn, buf, (int)num);
 
-    if(unlikely(bytes <= 0)) {
+    if(bytes <= 0) {
         int err = SSL_get_error(ssl->conn, bytes);
         if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
             ssl->ssl_errno = err;
@@ -264,12 +264,12 @@ ssize_t netdata_ssl_write(NETDATA_SSL *ssl, const void *buf, size_t num) {
     errno = 0;
     ssl->ssl_errno = 0;
 
-    if(unlikely(!is_handshake_complete(ssl, "write")))
+    if(!is_handshake_complete(ssl, "write"))
         return -1;
 
     int bytes = SSL_write(ssl->conn, (uint8_t *)buf, (int)num);
 
-    if(unlikely(bytes <= 0)) {
+    if(bytes <= 0) {
         int err = SSL_get_error(ssl->conn, bytes);
         if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
             ssl->ssl_errno = err;
@@ -287,7 +287,7 @@ ssize_t netdata_ssl_write(NETDATA_SSL *ssl, const void *buf, size_t num) {
 static inline bool is_handshake_initialized(NETDATA_SSL *ssl, const char *op) {
     error_limit_static_thread_var(erl, 1, 0);
 
-    if(unlikely(!ssl->conn)) {
+    if(!ssl->conn) {
         internal_error(true, "SSL: trying to %s on a NULL connection", op);
         return false;
     }
@@ -346,7 +346,7 @@ bool netdata_ssl_connect(NETDATA_SSL *ssl) {
     errno = 0;
     ssl->ssl_errno = 0;
 
-    if(unlikely(!is_handshake_initialized(ssl, "connect")))
+    if(!is_handshake_initialized(ssl, "connect"))
         return false;
 
     SSL_set_connect_state(ssl->conn);
@@ -372,7 +372,7 @@ bool netdata_ssl_accept(NETDATA_SSL *ssl) {
     errno = 0;
     ssl->ssl_errno = 0;
 
-    if(unlikely(!is_handshake_initialized(ssl, "accept")))
+    if(!is_handshake_initialized(ssl, "accept"))
         return false;
 
     SSL_set_accept_state(ssl->conn);

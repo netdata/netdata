@@ -29,7 +29,7 @@ static void find_all_mc() {
     char *dirname = config_get("plugin:proc:/sys/devices/system/edac/mc", "directory to monitor", name);
 
     DIR *dir = opendir(dirname);
-    if(unlikely(!dir)) {
+    if(!dir) {
         collector_error("Cannot read ECC memory errors directory '%s'", dirname);
         return;
     }
@@ -67,9 +67,9 @@ static void find_all_mc() {
 int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
     (void)dt;
 
-    if(unlikely(mc_root == NULL)) {
+    if(mc_root == NULL) {
         find_all_mc();
-        if(unlikely(mc_root == NULL))
+        if(mc_root == NULL)
             return 1;
     }
 
@@ -77,7 +77,7 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
     NETDATA_DOUBLE ce_sum = 0, ue_sum = 0;
     struct mc *m;
 
-    if(unlikely(do_ce == -1)) {
+    if(do_ce == -1) {
         do_ce = config_get_boolean_ondemand("plugin:proc:/sys/devices/system/edac/mc", "enable ECC memory correctable errors", CONFIG_BOOLEAN_YES);
         do_ue = config_get_boolean_ondemand("plugin:proc:/sys/devices/system/edac/mc", "enable ECC memory uncorrectable errors", CONFIG_BOOLEAN_YES);
     }
@@ -87,14 +87,14 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
             if(m->ce_count_filename) {
                 m->ce_updated = 0;
 
-                if(unlikely(!m->ce_ff)) {
+                if(!m->ce_ff) {
                     m->ce_ff = procfile_open(m->ce_count_filename, " \t", PROCFILE_FLAG_DEFAULT);
-                    if(unlikely(!m->ce_ff))
+                    if(!m->ce_ff)
                         continue;
                 }
 
                 m->ce_ff = procfile_readall(m->ce_ff);
-                if(unlikely(!m->ce_ff || procfile_lines(m->ce_ff) < 1 || procfile_linewords(m->ce_ff, 0) < 1))
+                if(!m->ce_ff || procfile_lines(m->ce_ff) < 1 || procfile_linewords(m->ce_ff, 0) < 1)
                     continue;
 
                 m->ce_count = str2ull(procfile_lineword(m->ce_ff, 0, 0), NULL);
@@ -109,14 +109,14 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
             if(m->ue_count_filename) {
                 m->ue_updated = 0;
 
-                if(unlikely(!m->ue_ff)) {
+                if(!m->ue_ff) {
                     m->ue_ff = procfile_open(m->ue_count_filename, " \t", PROCFILE_FLAG_DEFAULT);
-                    if(unlikely(!m->ue_ff))
+                    if(!m->ue_ff)
                         continue;
                 }
 
                 m->ue_ff = procfile_readall(m->ue_ff);
-                if(unlikely(!m->ue_ff || procfile_lines(m->ue_ff) < 1 || procfile_linewords(m->ue_ff, 0) < 1))
+                if(!m->ue_ff || procfile_lines(m->ue_ff) < 1 || procfile_linewords(m->ue_ff, 0) < 1)
                     continue;
 
                 m->ue_count = str2ull(procfile_lineword(m->ue_ff, 0, 0), NULL);
@@ -134,7 +134,7 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
 
         static RRDSET *ce_st = NULL;
 
-        if(unlikely(!ce_st)) {
+        if(!ce_st) {
             ce_st = rrdset_create_localhost(
                     "mem"
                     , "ecc_ce"
@@ -153,7 +153,7 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
 
         for(m = mc_root; m; m = m->next) {
             if (m->ce_count_filename && m->ce_updated) {
-                if(unlikely(!m->ce_rd))
+                if(!m->ce_rd)
                     m->ce_rd = rrddim_add(ce_st, m->name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 rrddim_set_by_pointer(ce_st, m->ce_rd, m->ce_count);
@@ -171,7 +171,7 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
 
         static RRDSET *ue_st = NULL;
 
-        if(unlikely(!ue_st)) {
+        if(!ue_st) {
             ue_st = rrdset_create_localhost(
                     "mem"
                     , "ecc_ue"
@@ -190,7 +190,7 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
 
         for(m = mc_root; m; m = m->next) {
             if (m->ue_count_filename && m->ue_updated) {
-                if(unlikely(!m->ue_rd))
+                if(!m->ue_rd)
                     m->ue_rd = rrddim_add(ue_st, m->name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 rrddim_set_by_pointer(ue_st, m->ue_rd, m->ue_count);

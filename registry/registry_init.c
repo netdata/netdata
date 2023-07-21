@@ -48,7 +48,7 @@ void registry_db_stats(void) {
 
 void registry_generate_curl_urls(void) {
     FILE *fp = fopen("/tmp/registry.curl", "w+");
-    if (unlikely(!fp))
+    if (!fp)
         return;
 
     REGISTRY_PERSON *p;
@@ -179,7 +179,7 @@ int registry_init(void) {
         registry_db_load();
         registry_log_load();
 
-        if(unlikely(registry_db_should_be_saved()))
+        if(registry_db_should_be_saved())
             registry_db_save();
 
 //        registry_db_stats();

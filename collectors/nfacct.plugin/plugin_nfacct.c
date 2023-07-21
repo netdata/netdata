@@ -533,7 +533,7 @@ static struct {
 static inline struct nfacct_data *nfacct_data_get(const char *name, uint32_t hash) {
     struct nfacct_data *d = NULL, *last = NULL;
     for(d = nfacct_root.nfacct_metrics; d ; last = d, d = d->next) {
-        if(unlikely(d->hash == hash && !strcmp(d->name, name)))
+        if(d->hash == hash && !strcmp(d->name, name))
             return d;
     }
 
@@ -661,8 +661,8 @@ static void nfacct_send_metrics() {
     }
 
     for(d = nfacct_root.nfacct_metrics; d ; d = d->next) {
-        if(likely(d->updated)) {
-            if(unlikely(!d->packets_dimension_added)) {
+        if(d->updated) {
+            if(!d->packets_dimension_added) {
                 d->packets_dimension_added = 1;
                 printf(
                     "CHART netfilter.nfacct_packets '' 'Netfilter Accounting Packets' 'packets/s' 'nfacct' '' stacked %d %d %s\n",
@@ -675,7 +675,7 @@ static void nfacct_send_metrics() {
     }
     printf("BEGIN netfilter.nfacct_packets\n");
     for(d = nfacct_root.nfacct_metrics; d ; d = d->next) {
-        if(likely(d->updated)) {
+        if(d->updated) {
             printf("SET %s = %lld\n"
                     , d->name
                     , (collected_number)d->pkts
@@ -696,8 +696,8 @@ static void nfacct_send_metrics() {
     }
 
     for(d = nfacct_root.nfacct_metrics; d ; d = d->next) {
-        if(likely(d->updated)) {
-            if(unlikely(!d->bytes_dimension_added)) {
+        if(d->updated) {
+            if(!d->bytes_dimension_added) {
                 d->bytes_dimension_added = 1;
                 printf(
                     "CHART netfilter.nfacct_bytes '' 'Netfilter Accounting Bandwidth' 'kilobytes/s' 'nfacct' '' stacked %d %d %s\n",
@@ -710,7 +710,7 @@ static void nfacct_send_metrics() {
     }
     printf("BEGIN netfilter.nfacct_bytes\n");
     for(d = nfacct_root.nfacct_metrics; d ; d = d->next) {
-        if(likely(d->updated)) {
+        if(d->updated) {
             printf("SET %s = %lld\n"
                    , d->name
                    , (collected_number)d->bytes
@@ -849,7 +849,7 @@ int main(int argc, char **argv) {
     for(iteration = 0; 1; iteration++) {
         usec_t dt = heartbeat_next(&hb, step);
 
-        if(unlikely(netdata_exit)) break;
+        if(netdata_exit) break;
 
         if(debug && iteration)
             fprintf(stderr, "nfacct.plugin: iteration %zu, dt %llu usec\n"
@@ -857,21 +857,21 @@ int main(int argc, char **argv) {
                     , dt
             );
 
-        if(likely(nfacct)) {
+        if(nfacct) {
             if(debug) fprintf(stderr, "nfacct.plugin: calling nfacct_collect()\n");
             nfacct = !nfacct_collect();
 
-            if(likely(nfacct)) {
+            if(nfacct) {
                 if(debug) fprintf(stderr, "nfacct.plugin: calling nfacct_send_metrics()\n");
                 nfacct_send_metrics();
             }
         }
 
-        if(likely(nfstat)) {
+        if(nfstat) {
             if(debug) fprintf(stderr, "nfacct.plugin: calling nfstat_collect()\n");
             nfstat = !nfstat_collect();
 
-            if(likely(nfstat)) {
+            if(nfstat) {
                 if(debug) fprintf(stderr, "nfacct.plugin: calling nfstat_send_metrics()\n");
                 nfstat_send_metrics();
             }

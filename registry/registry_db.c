@@ -106,10 +106,10 @@ static inline int registry_person_save(const DICTIONARY_ITEM *item __maybe_unuse
 // SAVE THE REGISTRY DATABASE
 
 int registry_db_save(void) {
-    if(unlikely(!registry.enabled))
+    if(!registry.enabled)
         return -1;
 
-    if(unlikely(!registry_db_should_be_saved()))
+    if(!registry_db_should_be_saved())
         return -2;
 
     error_log_limit_unlimited();
@@ -235,7 +235,7 @@ size_t registry_db_load(void) {
         netdata_log_debug(D_REGISTRY, "REGISTRY: read line %zu to length %zu: %s", line, len, s);
         switch(*s) {
             case 'U': // person URL
-                if(unlikely(!p)) {
+                if(!p) {
                     netdata_log_error("REGISTRY: ignoring line %zu, no person loaded: %s", line, s);
                     continue;
                 }
@@ -293,7 +293,7 @@ size_t registry_db_load(void) {
             case 'P': // person
                 m = NULL;
                 // verify it is valid
-                if(unlikely(len != 65 || s[1] != '\t' || s[10] != '\t' || s[19] != '\t' || s[28] != '\t' || s[65] != '\0')) {
+                if(len != 65 || s[1] != '\t' || s[10] != '\t' || s[19] != '\t' || s[28] != '\t' || s[65] != '\0') {
                     netdata_log_error("REGISTRY: person line %zu is wrong (len = %zu).", line, len);
                     continue;
                 }
@@ -306,7 +306,7 @@ size_t registry_db_load(void) {
                 break;
 
             case 'V': // machine URL
-                if(unlikely(!m)) {
+                if(!m) {
                     netdata_log_error("REGISTRY: ignoring line %zu, no machine loaded: %s", line, s);
                     continue;
                 }
@@ -345,7 +345,7 @@ size_t registry_db_load(void) {
             case 'M': // machine
                 p = NULL;
                 // verify it is valid
-                if(unlikely(len != 65 || s[1] != '\t' || s[10] != '\t' || s[19] != '\t' || s[28] != '\t' || s[65] != '\0')) {
+                if(len != 65 || s[1] != '\t' || s[10] != '\t' || s[19] != '\t' || s[28] != '\t' || s[65] != '\0') {
                     netdata_log_error("REGISTRY: person line %zu is wrong (len = %zu).", line, len);
                     continue;
                 }
@@ -358,7 +358,7 @@ size_t registry_db_load(void) {
                 break;
 
             case 'T': // totals
-                if(unlikely(len != 103 || s[1] != '\t' || s[18] != '\t' || s[35] != '\t' || s[52] != '\t' || s[69] != '\t' || s[86] != '\t' || s[103] != '\0')) {
+                if(len != 103 || s[1] != '\t' || s[18] != '\t' || s[35] != '\t' || s[52] != '\t' || s[69] != '\t' || s[86] != '\t' || s[103] != '\0') {
                     netdata_log_error("REGISTRY: totals line %zu is wrong (len = %zu).", line, len);
                     continue;
                 }

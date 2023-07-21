@@ -16,7 +16,7 @@ PPvoid_t JulyLPrev(Pcvoid_t PArray, Word_t *Index, PJError_t PJError);
 Word_t JulyLFreeArray(PPvoid_t PPArray, PJError_t PJError);
 
 static inline PPvoid_t JulyLFirstThenNext(Pcvoid_t PArray, Word_t * PIndex, bool *first) {
-    if(unlikely(*first)) {
+    if(*first) {
         *first = false;
         return JulyLFirst(PArray, PIndex, PJE0);
     }
@@ -25,7 +25,7 @@ static inline PPvoid_t JulyLFirstThenNext(Pcvoid_t PArray, Word_t * PIndex, bool
 }
 
 static inline PPvoid_t JulyLLastThenPrev(Pcvoid_t PArray, Word_t * PIndex, bool *first) {
-    if(unlikely(*first)) {
+    if(*first) {
         *first = false;
         return JulyLLast(PArray, PIndex, PJE0);
     }

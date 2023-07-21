@@ -42,12 +42,12 @@ static inline NETDATA_DOUBLE tg_average_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_va
 
     NETDATA_DOUBLE value;
 
-    if(unlikely(!g->count)) {
+    if(!g->count) {
         value = 0.0;
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
     else {
-        if(unlikely(r->time_grouping.resampling_group != 1))
+        if(r->time_grouping.resampling_group != 1)
             value = g->sum / r->time_grouping.resampling_divisor;
         else
             value = g->sum / g->count;

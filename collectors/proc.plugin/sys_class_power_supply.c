@@ -61,27 +61,27 @@ static struct power_supply *power_supply_root = NULL;
 static int files_num = 0;
 
 void power_supply_free(struct power_supply *ps) {
-    if(likely(ps)) {
+    if(ps) {
 
         // free capacity structure
-        if(likely(ps->capacity)) {
-            if(likely(ps->capacity->st)) rrdset_is_obsolete(ps->capacity->st);
+        if(ps->capacity) {
+            if(ps->capacity->st) rrdset_is_obsolete(ps->capacity->st);
             freez(ps->capacity->filename);
-            if(likely(ps->capacity->fd != -1)) close(ps->capacity->fd);
+            if(ps->capacity->fd != -1) close(ps->capacity->fd);
             files_num--;
             freez(ps->capacity);
         }
         freez(ps->name);
 
         struct ps_property *pr = ps->property_root;
-        while(likely(pr)) {
+        while(pr) {
 
             // free dimensions
             struct ps_property_dim *pd = pr->property_dim_root;
-            while(likely(pd)) {
+            while(pd) {
                 freez(pd->name);
                 freez(pd->filename);
-                if(likely(pd->fd != -1)) close(pd->fd);
+                if(pd->fd != -1) close(pd->fd);
                 files_num--;
                 struct ps_property_dim *d = pd;
                 pd = pd->next;
@@ -89,7 +89,7 @@ void power_supply_free(struct power_supply *ps) {
             }
 
             // free properties
-            if(likely(pr->st)) rrdset_is_obsolete(pr->st);
+            if(pr->st) rrdset_is_obsolete(pr->st);
             freez(pr->name);
             freez(pr->title);
             freez(pr->units);
@@ -99,13 +99,13 @@ void power_supply_free(struct power_supply *ps) {
         }
 
         // remove power supply from linked list
-        if(likely(ps == power_supply_root)) {
+        if(ps == power_supply_root) {
             power_supply_root = ps->next;
         }
         else {
             struct power_supply *last;
             for(last = power_supply_root; last && last->next != ps; last = last->next);
-            if(likely(last)) last->next = ps->next;
+            if(last) last->next = ps->next;
         }
 
         freez(ps);
@@ -122,7 +122,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
     static int keep_fds_open = CONFIG_BOOLEAN_NO, keep_fds_open_config = -1;
     static char *dirname = NULL;
 
-    if(unlikely(do_capacity == -1)) {
+    if(do_capacity == -1) {
         do_capacity    = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery capacity", CONFIG_BOOLEAN_YES);
         do_property[0] = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery charge", CONFIG_BOOLEAN_NO);
         do_property[1] = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery energy", CONFIG_BOOLEAN_NO);
@@ -136,33 +136,33 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
     }
 
     DIR *dir = opendir(dirname);
-    if(unlikely(!dir)) {
+    if(!dir) {
         collector_error("Cannot read directory '%s'", dirname);
         return 1;
     }
 
     struct dirent *de = NULL;
-    while(likely(de = readdir(dir))) {
-        if(likely(de->d_type == DT_DIR
+    while(de = readdir(dir)) {
+        if(de->d_type == DT_DIR
             && (
                 (de->d_name[0] == '.' && de->d_name[1] == '\0')
                 || (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
-                )))
+                ))
             continue;
 
-        if(likely(de->d_type == DT_LNK || de->d_type == DT_DIR)) {
+        if(de->d_type == DT_LNK || de->d_type == DT_DIR) {
             uint32_t hash = simple_hash(de->d_name);
 
             struct power_supply *ps;
             for(ps = power_supply_root; ps; ps = ps->next) {
-                if(unlikely(ps->hash == hash && !strcmp(ps->name, de->d_name))) {
+                if(ps->hash == hash && !strcmp(ps->name, de->d_name)) {
                     ps->found = 1;
                     break;
                 }
             }
 
             // allocate memory for power supply and initialize it
-            if(unlikely(!ps)) {
+            if(!ps) {
                 ps = callocz(sizeof(struct power_supply), 1);
                 ps->name = strdupz(de->d_name);
                 ps->hash = simple_hash(de->d_name);
@@ -171,7 +171,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                 power_supply_root = ps;
 
                 struct stat stbuf;
-                if(likely(do_capacity != CONFIG_BOOLEAN_NO)) {
+                if(do_capacity != CONFIG_BOOLEAN_NO) {
                     char filename[FILENAME_MAX + 1];
                     snprintfz(filename, FILENAME_MAX, "%s/%s/%s", dirname, de->d_name, "capacity");
                     if (stat(filename, &stbuf) == 0) {
@@ -187,7 +187,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                 size_t prev_idx = 3; // there is no property with this index
 
                 for(pr_idx = 0; pr_idx < 3; pr_idx++) {
-                    if(unlikely(do_property[pr_idx] != CONFIG_BOOLEAN_NO)) {
+                    if(do_property[pr_idx] != CONFIG_BOOLEAN_NO) {
                         struct ps_property *pr = NULL;
                         int min_value_found = 0, max_value_found = 0;
 
@@ -199,13 +199,13 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                                       ps_property_names[pr_idx], ps_property_dim_names[pd_idx]);
                             if (stat(filename, &stbuf) == 0) {
 
-                                if(unlikely(pd_idx == pr_idx * 5 + 1))
+                                if(pd_idx == pr_idx * 5 + 1)
                                     min_value_found = 1;
-                                if(unlikely(pd_idx == pr_idx * 5 + 3))
+                                if(pd_idx == pr_idx * 5 + 3)
                                     max_value_found = 1;
 
                                 // add chart
-                                if(unlikely(prev_idx != pr_idx)) {
+                                if(prev_idx != pr_idx) {
                                     pr = callocz(sizeof(struct ps_property), 1);
                                     pr->name = strdupz(ps_property_names[pr_idx]);
                                     pr->title = strdupz(ps_property_titles[pr_idx]);
@@ -228,7 +228,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                         }
 
                         // create a zero empty/min dimension
-                        if(unlikely(max_value_found && !min_value_found)) {
+                        if(max_value_found && !min_value_found) {
                             struct ps_property_dim *pd;
                             pd= callocz(sizeof(struct ps_property_dim), 1);
                             pd->name = strdupz(ps_property_dim_names[pr_idx * 5 + 1]);
@@ -241,12 +241,12 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
             }
 
             // read capacity file
-            if(likely(ps->capacity)) {
+            if(ps->capacity) {
                 char buffer[30 + 1];
 
-                if(unlikely(ps->capacity->fd == -1)) {
+                if(ps->capacity->fd == -1) {
                     ps->capacity->fd = open(ps->capacity->filename, O_RDONLY, 0666);
-                    if(unlikely(ps->capacity->fd == -1)) {
+                    if(ps->capacity->fd == -1) {
                         collector_error("Cannot open file '%s'", ps->capacity->filename);
                         power_supply_free(ps);
                         ps = NULL;
@@ -256,7 +256,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                 if (ps)
                 {
                     ssize_t r = read(ps->capacity->fd, buffer, 30);
-                    if(unlikely(r < 1)) {
+                    if(r < 1) {
                         collector_error("Cannot read file '%s'", ps->capacity->filename);
                         power_supply_free(ps);
                         ps = NULL;
@@ -265,11 +265,11 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                         buffer[r] = '\0';
                         ps->capacity->value = str2ull(buffer, NULL);
 
-                        if(unlikely(!keep_fds_open)) {
+                        if(!keep_fds_open) {
                             close(ps->capacity->fd);
                             ps->capacity->fd = -1;
                         }
-                        else if(unlikely(lseek(ps->capacity->fd, 0, SEEK_SET) == -1)) {
+                        else if(lseek(ps->capacity->fd, 0, SEEK_SET) == -1) {
                             collector_error("Cannot seek in file '%s'", ps->capacity->filename);
                             close(ps->capacity->fd);
                             ps->capacity->fd = -1;
@@ -286,12 +286,12 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                 for(pr = ps->property_root; pr && !read_error; pr = pr->next) {
                     struct ps_property_dim *pd;
                     for(pd = pr->property_dim_root; pd; pd = pd->next) {
-                        if(likely(!pd->always_zero)) {
+                        if(!pd->always_zero) {
                             char buffer[30 + 1];
 
-                            if(unlikely(pd->fd == -1)) {
+                            if(pd->fd == -1) {
                                 pd->fd = open(pd->filename, O_RDONLY, 0666);
-                                if(unlikely(pd->fd == -1)) {
+                                if(pd->fd == -1) {
                                     collector_error("Cannot open file '%s'", pd->filename);
                                     read_error = 1;
                                     power_supply_free(ps);
@@ -300,7 +300,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                             }
 
                             ssize_t r = read(pd->fd, buffer, 30);
-                            if(unlikely(r < 1)) {
+                            if(r < 1) {
                                 collector_error("Cannot read file '%s'", pd->filename);
                                 read_error = 1;
                                 power_supply_free(ps);
@@ -309,11 +309,11 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                             buffer[r] = '\0';
                             pd->value = str2ull(buffer, NULL);
 
-                            if(unlikely(!keep_fds_open)) {
+                            if(!keep_fds_open) {
                                 close(pd->fd);
                                 pd->fd = -1;
                             }
-                            else if(unlikely(lseek(pd->fd, 0, SEEK_SET) == -1)) {
+                            else if(lseek(pd->fd, 0, SEEK_SET) == -1) {
                                 collector_error("Cannot seek in file '%s'", pd->filename);
                                 close(pd->fd);
                                 pd->fd = -1;
@@ -328,8 +328,8 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
     closedir(dir);
 
     keep_fds_open = keep_fds_open_config;
-    if(likely(keep_fds_open_config == CONFIG_BOOLEAN_AUTO)) {
-        if(unlikely(files_num > 32))
+    if(keep_fds_open_config == CONFIG_BOOLEAN_AUTO) {
+        if(files_num > 32)
             keep_fds_open = CONFIG_BOOLEAN_NO;
         else
             keep_fds_open = CONFIG_BOOLEAN_YES;
@@ -338,16 +338,16 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     struct power_supply *ps = power_supply_root;
-    while(unlikely(ps)) {
-        if(unlikely(!ps->found)) {
+    while(ps) {
+        if(!ps->found) {
             struct power_supply *f = ps;
             ps = ps->next;
             power_supply_free(f);
             continue;
         }
 
-        if(likely(ps->capacity)) {
-            if(unlikely(!ps->capacity->st)) {
+        if(ps->capacity) {
+            if(!ps->capacity->st) {
                 ps->capacity->st = rrdset_create_localhost(
                         "powersupply_capacity"
                         , ps->name
@@ -366,7 +366,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                 add_labels_to_power_supply(ps, ps->capacity->st);
             }
 
-            if(unlikely(!ps->capacity->rd)) ps->capacity->rd = rrddim_add(ps->capacity->st, "capacity", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            if(!ps->capacity->rd) ps->capacity->rd = rrddim_add(ps->capacity->st, "capacity", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rrddim_set_by_pointer(ps->capacity->st, ps->capacity->rd, ps->capacity->value);
 
             rrdset_done(ps->capacity->st);
@@ -374,7 +374,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
 
         struct ps_property *pr;
         for(pr = ps->property_root; pr; pr = pr->next) {
-            if(unlikely(!pr->st)) {
+            if(!pr->st) {
                 char id[RRD_ID_LENGTH_MAX + 1], context[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(id, RRD_ID_LENGTH_MAX, "powersupply_%s", pr->name);
                 snprintfz(context, RRD_ID_LENGTH_MAX, "powersupply.%s", pr->name);
@@ -399,7 +399,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
 
             struct ps_property_dim *pd;
             for(pd = pr->property_dim_root; pd; pd = pd->next) {
-                if(unlikely(!pd->rd)) pd->rd = rrddim_add(pr->st, pd->name, NULL, 1, 1000000, RRD_ALGORITHM_ABSOLUTE);
+                if(!pd->rd) pd->rd = rrddim_add(pr->st, pd->name, NULL, 1, 1000000, RRD_ALGORITHM_ABSOLUTE);
                 rrddim_set_by_pointer(pr->st, pd->rd, pd->value);
             }
 

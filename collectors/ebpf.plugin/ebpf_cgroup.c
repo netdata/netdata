@@ -80,7 +80,7 @@ void ebpf_map_cgroup_shared_memory()
     // Map only header
     void *mapped = (netdata_ebpf_cgroup_shm_header_t *) ebpf_cgroup_map_shm_locally(shm_fd_ebpf_cgroup,
                                                                                    sizeof(netdata_ebpf_cgroup_shm_header_t));
-    if (unlikely(mapped == SEM_FAILED)) {
+    if (mapped == SEM_FAILED) {
         return;
     }
     netdata_ebpf_cgroup_shm_header_t *header = mapped;
@@ -94,7 +94,7 @@ void ebpf_map_cgroup_shared_memory()
     }
 
     ebpf_mapped_memory = (void *)ebpf_cgroup_map_shm_locally(shm_fd_ebpf_cgroup, length);
-    if (unlikely(ebpf_mapped_memory == MAP_FAILED)) {
+    if (ebpf_mapped_memory == MAP_FAILED) {
         return;
     }
     shm_ebpf_cgroup.header = ebpf_mapped_memory;
@@ -335,7 +335,7 @@ void ebpf_create_charts_on_systemd(char *id, char *title, char *units, char *fam
                          order, update_every, module);
 
     for (w = ebpf_cgroup_pids; w; w = w->next) {
-        if (unlikely(w->systemd) && unlikely(w->updated))
+        if (w->systemd && w->updated)
             fprintf(stdout, "DIMENSION %s '' %s 1 1\n", w->name, algorithm);
     }
 }

@@ -307,7 +307,7 @@ void *mallocz_int(size_t size, const char *file, const char *function, size_t li
     size_t_atomic_bytes(add, p->bytes, size);
 
     struct malloc_header *t = (struct malloc_header *)libc_malloc(malloc_header_size + size);
-    if (unlikely(!t)) fatal("mallocz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
+    if (!t) fatal("mallocz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
     t->signature.magic = 0x0BADCAFE;
     t->signature.trace = p;
     t->signature.size = size;
@@ -329,7 +329,7 @@ void *callocz_int(size_t nmemb, size_t size, const char *file, const char *funct
     size_t_atomic_bytes(add, p->bytes, size);
 
     struct malloc_header *t = (struct malloc_header *)libc_calloc(1, malloc_header_size + size);
-    if (unlikely(!t)) fatal("mallocz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
+    if (!t) fatal("mallocz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
     t->signature.magic = 0x0BADCAFE;
     t->signature.trace = p;
     t->signature.size = size;
@@ -351,7 +351,7 @@ char *strdupz_int(const char *s, const char *file, const char *function, size_t 
     size_t_atomic_bytes(add, p->bytes, size);
 
     struct malloc_header *t = (struct malloc_header *)libc_malloc(malloc_header_size + size);
-    if (unlikely(!t)) fatal("strdupz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
+    if (!t) fatal("strdupz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
     t->signature.magic = 0x0BADCAFE;
     t->signature.trace = p;
     t->signature.size = size;
@@ -395,7 +395,7 @@ void *reallocz_int(void *ptr, size_t size, const char *file, const char *functio
     size_t_atomic_bytes(add, p->bytes, size);
 
     t = (struct malloc_header *)libc_realloc(t, malloc_header_size + size);
-    if (unlikely(!t)) fatal("reallocz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
+    if (!t) fatal("reallocz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
     t->signature.magic = 0x0BADCAFE;
     t->signature.trace = p;
     t->signature.size = size;
@@ -409,7 +409,7 @@ void *reallocz_int(void *ptr, size_t size, const char *file, const char *functio
 }
 
 size_t mallocz_usable_size_int(void *ptr, const char *file, const char *function, size_t line) {
-    if(unlikely(!ptr)) return 0;
+    if(!ptr) return 0;
 
     struct malloc_header *t = malloc_get_header(ptr, __FUNCTION__, file, function, line);
     if(!t) {
@@ -423,7 +423,7 @@ size_t mallocz_usable_size_int(void *ptr, const char *file, const char *function
 }
 
 void freez_int(void *ptr, const char *file, const char *function, size_t line) {
-    if(unlikely(!ptr)) return;
+    if(!ptr) return;
 
     struct malloc_header *t = malloc_get_header(ptr, __FUNCTION__, file, function, line);
     if(!t) {
@@ -446,7 +446,7 @@ void freez_int(void *ptr, const char *file, const char *function, size_t line) {
 
 char *strdupz(const char *s) {
     char *t = strdup(s);
-    if (unlikely(!t)) fatal("Cannot strdup() string '%s'", s);
+    if (!t) fatal("Cannot strdup() string '%s'", s);
     return t;
 }
 
@@ -457,19 +457,19 @@ void freez(void *ptr) {
 
 void *mallocz(size_t size) {
     void *p = malloc(size);
-    if (unlikely(!p)) fatal("Cannot allocate %zu bytes of memory.", size);
+    if (!p) fatal("Cannot allocate %zu bytes of memory.", size);
     return p;
 }
 
 void *callocz(size_t nmemb, size_t size) {
     void *p = calloc(nmemb, size);
-    if (unlikely(!p)) fatal("Cannot allocate %zu bytes of memory.", nmemb * size);
+    if (!p) fatal("Cannot allocate %zu bytes of memory.", nmemb * size);
     return p;
 }
 
 void *reallocz(void *ptr, size_t size) {
     void *p = realloc(ptr, size);
-    if (unlikely(!p)) fatal("Cannot re-allocate memory to %zu bytes.", size);
+    if (!p) fatal("Cannot re-allocate memory to %zu bytes.", size);
     return p;
 }
 
@@ -486,8 +486,8 @@ void json_escape_string(char *dst, const char *src, size_t size) {
     char *d = dst, *e = &dst[size - 1];
 
     for(t = src; *t && d < e ;t++) {
-        if(unlikely(*t == '\\' || *t == '"')) {
-            if(unlikely(d + 1 >= e)) break;
+        if(*t == '\\' || *t == '"') {
+            if(d + 1 >= e) break;
             *d++ = '\\';
         }
         *d++ = *t;
@@ -499,13 +499,13 @@ void json_escape_string(char *dst, const char *src, size_t size) {
 void json_fix_string(char *s) {
     unsigned char c;
     while((c = (unsigned char)*s)) {
-        if(unlikely(c == '\\'))
+        if(c == '\\')
             *s++ = '/';
-        else if(unlikely(c == '"'))
+        else if(c == '"')
             *s++ = '\'';
-        else if(unlikely(isspace(c) || iscntrl(c)))
+        else if(isspace(c) || iscntrl(c))
             *s++ = ' ';
-        else if(unlikely(!isprint(c) || c > 127))
+        else if(!isprint(c) || c > 127)
             *s++ = '_';
         else
             s++;
@@ -1142,17 +1142,17 @@ void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool r
     // MAP_SHARED is used in memory mode map
     // MAP_PRIVATE is used in memory mode ram and save
 
-    if(unlikely(!(flags & MAP_SHARED) && !(flags & MAP_PRIVATE)))
+    if(!(flags & MAP_SHARED) && !(flags & MAP_PRIVATE))
         fatal("Neither MAP_SHARED or MAP_PRIVATE were given to netdata_mmap()");
 
-    if(unlikely((flags & MAP_SHARED) && (flags & MAP_PRIVATE)))
+    if((flags & MAP_SHARED) && (flags & MAP_PRIVATE))
         fatal("Both MAP_SHARED and MAP_PRIVATE were given to netdata_mmap()");
 
-    if(unlikely((flags & MAP_SHARED) && (!filename || !*filename)))
+    if((flags & MAP_SHARED) && (!filename || !*filename))
         fatal("MAP_SHARED requested, without a filename to netdata_mmap()");
 
     // don't enable ksm is the global setting is disabled
-    if(unlikely(!enable_ksm)) ksm = 0;
+    if(!enable_ksm) ksm = 0;
 
     // KSM only merges anonymous (private) pages, never pagecache (file) pages
     // but MAP_PRIVATE without MAP_ANONYMOUS it fails too, so we need it always
@@ -1270,12 +1270,12 @@ char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len) {
 }
 
 int vsnprintfz(char *dst, size_t n, const char *fmt, va_list args) {
-    if(unlikely(!n)) return 0;
+    if(!n) return 0;
 
     int size = vsnprintf(dst, n, fmt, args);
     dst[n - 1] = '\0';
 
-    if (unlikely((size_t) size > n)) size = (int)n;
+    if ((size_t) size > n) size = (int)n;
 
     return size;
 }
@@ -1332,14 +1332,14 @@ int recursively_delete_dir(const char *path, const char *reason) {
         }
 
         netdata_log_info("Deleting %s file '%s'", reason?reason:"", fullpath);
-        if(unlikely(unlink(fullpath) == -1))
+        if(unlink(fullpath) == -1)
             netdata_log_error("Cannot delete %s file '%s'", reason?reason:"", fullpath);
         else
             ret++;
     }
 
     netdata_log_info("Deleting empty directory '%s'", path);
-    if(unlikely(rmdir(path) == -1))
+    if(rmdir(path) == -1)
         netdata_log_error("Cannot delete empty directory '%s'", path);
     else
         ret++;
@@ -1420,8 +1420,8 @@ failed:
 }
 
 char *strdupz_path_subpath(const char *path, const char *subpath) {
-    if(unlikely(!path || !*path)) path = ".";
-    if(unlikely(!subpath)) subpath = "";
+    if(!path || !*path) path = ".";
+    if(!subpath) subpath = "";
 
     // skip trailing slashes in path
     size_t len = strlen(path);
@@ -1671,13 +1671,13 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
     size_t repl_len = strlen(replace);
     char *value, *dst;
 
-    if (likely(where))
+    if (where)
         size += (repl_len - find_len);
 
     value = mallocz(size);
     dst = value;
 
-    if (likely(where)) {
+    if (where) {
         size_t count = where - src;
 
         memmove(dst, src, count);
@@ -1813,7 +1813,7 @@ void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds){
         struct dirent *entry;
         while ((entry = readdir(dir)) != NULL) {
             fd = str2i(entry->d_name);
-            if(unlikely((fd == STDIN_FILENO ) || (fd == STDOUT_FILENO) || (fd == STDERR_FILENO) )) continue;
+            if((fd == STDIN_FILENO ) || (fd == STDOUT_FILENO) || (fd == STDERR_FILENO) ) continue;
             switch(action){
                 case OPEN_FD_ACTION_CLOSE:
                     if(fd_is_valid(fd)) (void)close(fd);

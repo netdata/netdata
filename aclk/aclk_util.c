@@ -184,7 +184,7 @@ static void topic_generate_final(struct aclk_topic *t) {
         return;
 
     rrdhost_aclk_state_lock(localhost);
-    if (unlikely(!localhost->aclk_state.claimed_id)) {
+    if (!localhost->aclk_state.claimed_id) {
         netdata_log_error("This should never be called if agent not claimed");
         rrdhost_aclk_state_unlock(localhost);
         return;

@@ -56,7 +56,7 @@ void *timex_main(void *ptr)
     int do_sync = config_get_boolean(CONFIG_SECTION_TIMEX, "clock synchronization state", CONFIG_BOOLEAN_YES);
     int do_offset = config_get_boolean(CONFIG_SECTION_TIMEX, "time offset", CONFIG_BOOLEAN_YES);
 
-    if (unlikely(do_sync == CONFIG_BOOLEAN_NO && do_offset == CONFIG_BOOLEAN_NO)) {
+    if (do_sync == CONFIG_BOOLEAN_NO && do_offset == CONFIG_BOOLEAN_NO) {
         netdata_log_info("No charts to show");
         goto exit;
     }
@@ -93,7 +93,7 @@ void *timex_main(void *ptr)
             static RRDSET *st_sync_state = NULL;
             static RRDDIM *rd_sync_state;
 
-            if (unlikely(!st_sync_state)) {
+            if (!st_sync_state) {
                 st_sync_state = rrdset_create_localhost(
                     "system",
                     "clock_sync_state",
@@ -116,7 +116,7 @@ void *timex_main(void *ptr)
 
             static RRDSET *st_clock_status = NULL;
 
-            if (unlikely(!st_clock_status)) {
+            if (!st_clock_status) {
                 st_clock_status = rrdset_create_localhost(
                     "system",
                     "clock_status",
@@ -147,7 +147,7 @@ void *timex_main(void *ptr)
             static RRDSET *st_offset = NULL;
             static RRDDIM *rd_offset;
 
-            if (unlikely(!st_offset)) {
+            if (!st_offset) {
                 st_offset = rrdset_create_localhost(
                     "system",
                     "clock_sync_offset",
