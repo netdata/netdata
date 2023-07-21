@@ -203,7 +203,7 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt __maybe_unuse
                     , "edac"
                     , "mem.edac_mc"
                     , "Memory Controller (MC) Error Detection And Correction (EDAC) Errors"
-                    , "errors"
+                    , "errors/s"
                     , PLUGIN_PROC_NAME
                     , "/sys/devices/system/edac/mc"
                     , NETDATA_CHART_PRIO_MEM_HW_ECC_CE
@@ -251,7 +251,7 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt __maybe_unuse
                 		, "edac"
                         , "mem.edac_mc_dimm"
                 		, "DIMM Error Detection And Correction (EDAC) Errors"
-                        , "errors"
+                        , "errors/s"
                         , PLUGIN_PROC_NAME
                         , "/sys/devices/system/edac/mc"
                         , NETDATA_CHART_PRIO_MEM_HW_ECC_CE + 1
