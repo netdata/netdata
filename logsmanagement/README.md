@@ -624,8 +624,8 @@ For example, the following configuration will add 2 outputs to a `docker events`
         event type chart = yes
         event action chart = yes
 
-		## Stream to https://cloud.openobserve.ai/
-		output 1 name             = http
+        ## Stream to https://cloud.openobserve.ai/
+        output 1 name             = http
         output 1 URI              = YOUR_API_URI
         output 1 Host             = api.openobserve.ai
         output 1 Port             = 443
@@ -637,7 +637,7 @@ For example, the following configuration will add 2 outputs to a `docker events`
         output 1 HTTP_Passwd      = YOUR_OPENOBSERVE_PASSWORD
         output 1 compress         = gzip
 
-		## Real-time export to /tmp/docker_event_logs.csv
+        ## Real-time export to /tmp/docker_event_logs.csv
         output 2 name             = file
         output 2 Path             = /tmp
         output 2 File             = docker_event_logs.csv
