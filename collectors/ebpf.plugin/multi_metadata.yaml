@@ -4,7 +4,7 @@ modules:
       plugin_name: ebpf.plugin
       module_name: filedescriptor
       monitored_instance:
-        name: ebpf filedescriptor
+        name: Filedescriptor
         link: ""
         categories:
           - data-collection.ebpf
