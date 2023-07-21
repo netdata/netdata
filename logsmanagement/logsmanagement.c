@@ -344,7 +344,7 @@ static int logs_manag_config_load(Flb_socket_config_t **forward_in_config_p){
     return rc;
 }
 
-#define FLB_OUTPUT_PLUGIN_NAME_KEY "plugin"
+#define FLB_OUTPUT_PLUGIN_NAME_KEY "name"
 
 static int flb_output_param_get_cb(void *entry, void *data){
     struct config_option *option = (struct config_option *) entry;
@@ -358,7 +358,7 @@ static int flb_output_param_get_cb(void *entry, void *data){
         char *param_key = &option->name[param_prefix_len]; // param_key should look like " host"
         while(*param_key == ' ') param_key++; // remove whitespace so it looks like "host"
         
-        if(*param_key && strcasecmp(param_key, FLB_OUTPUT_PLUGIN_NAME_KEY)){ // ignore param_key "plugin" 
+        if(*param_key && strcasecmp(param_key, FLB_OUTPUT_PLUGIN_NAME_KEY)){ // ignore param_key "name" 
             // netdata_log_debug(D_LOGS_MANAG, "config_option: name[%s], value[%s]", option->name, option->value);
             // netdata_log_debug(D_LOGS_MANAG, "config option kv:[%s][%s]", param_key, option->value);
 

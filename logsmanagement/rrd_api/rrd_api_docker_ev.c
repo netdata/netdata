@@ -15,7 +15,7 @@ void docker_ev_chart_init(struct File_info *p_file_info){
                 , "collected_logs_total"
                 , NULL
                 , "collected_logs"
-                , "docker_events_logs.collected_logs"
+                , NULL
                 , CHART_TITLE_TOTAL_COLLECTED_LOGS
                 , "log records"
                 , "logsmanagement.plugin"
@@ -34,7 +34,7 @@ void docker_ev_chart_init(struct File_info *p_file_info){
                 , "collected_logs_rate"
                 , NULL
                 , "collected_logs"
-                , "docker_events_logs.collected_logs"
+                , NULL
                 , CHART_TITLE_RATE_COLLECTED_LOGS
                 , "log records"
                 , "logsmanagement.plugin"

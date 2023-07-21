@@ -3,7 +3,7 @@
 ## Table of Contents
 
 - [Summary](#summary)  
-    - [Types of available collectors](#collector-types)
+    - [Types of available log collectors](#collector-types)
 - [Getting Started](#getting-started)  
 - [Package Requirements](#package-requirements)
     - [Systemd](#requirements-systemd)
@@ -17,11 +17,12 @@
 	- [Syslog socket](#collector-configuration-syslog)
 	- [Serial](#collector-configuration-serial)
 - [Custom Charts](#custom-charts)
-- [Streaming](#streaming)
+- [Streaming logs to Netdata](#streaming-in)
 	- [Example: Systemd log streaming](#streaming-systemd)
 	- [Example: Kernel log streaming](#streaming-kmsg)
 	- [Example: Generic log streaming](#streaming-generic)
 	- [Example: Docker Events log streaming](#streaming-docker-events)
+- [Streaming logs from Netdata (exporting)](#streaming-out)
 - [Troubleshooting](#troubleshooting)
 
 <a name="summary"/>
@@ -45,7 +46,7 @@ To configure Netdata's logs management engine properly, please make sure you are
 
 <a name="collector-types"/>
 
-### Types of available collectors
+### Types of available log collectors
 
 </a>
 
@@ -307,12 +308,10 @@ added to the respective log source configuration section:
 	custom 1 ignore case = no
 
 where the value denoted by:
-    - `custom x chart` is the title of the chart.
-    - `custom x regex name` is an optional name for the dimension of this particular metric 
-    (if absent, the regex will be used as the dimension name instead).
-    - `custom x regex` is the POSIX Extended Regular Expression to be used to match log records.
-    - `custom x ignore case` is equivalent to setting `REG_ICASE` when using 
-    POSIX Extended Regular Expressions for case insensitive searches. It is optional and defaults to `yes`. 
+- `custom x chart` is the title of the chart.
+- `custom x regex name` is an optional name for the dimension of this particular metric (if absent, the regex will be used as the dimension name instead).
+- `custom x regex` is the POSIX Extended Regular Expression to be used to match log records.
+- `custom x ignore case` is equivalent to setting `REG_ICASE` when using POSIX Extended Regular Expressions for case insensitive searches. It is optional and defaults to `yes`. 
 
 `x` must start from number 1 and monotonically increase by 1 every time a new regular expression is configured. 
 If the titles of two or more charts of a certain log source are the same, the dimensions will be grouped together 
@@ -322,14 +321,33 @@ Example of configuration for a generic log source collection with custom regex-b
 
 ```
 [Auth.log]
-	enabled = yes
-	update every = 1
+	## Example: Log collector that will tail auth.log file and count 
+	## occurences of certain `sudo` commands, using POSIX regular expressions.
+
+	## Required settings
+	enabled = no
 	log type = flb_tail
-	circular buffer max size = 256 # in MiB
-	compression acceleration = 1 # see https://github.com/lz4/lz4/blob/90d68e37093d815e7ea06b0ee3c168cccffc84b8/lib/lz4.h#L195
-	buffer flush to DB = 6 # in sec, default 6 min 4
-	disk space limit = 500 # in MiB, default 500MiB
-	log path = /var/log/auth.log
+
+	## Optional settings, common to all log source. 
+	## Uncomment to override global equivalents in netdata.conf.
+	# update every = 1
+	# update timeout = 10
+	# use log timestamp = auto
+	# circular buffer max size MiB = 64
+	# circular buffer drop logs if full = no
+	# compression acceleration = 1
+	# db mode = none
+	# circular buffer flush to db = 6
+	# disk space limit MiB = 500
+
+	## This section supports auto-detection of log file path if section name
+	## is left unchanged, otherwise it can be set manually, e.g.:
+	## log path = /var/log/auth.log
+	## See README for more information on 'log path = auto' option
+	log path = auto
+
+	## Use inotify instead of file stat watcher. Set to 'no' to reduce CPU usage.
+	use inotify = yes
 
 	custom 1 chart = sudo and su
 	custom 1 regex name = sudo
@@ -351,13 +369,13 @@ And the generated charts based on this configuration:
 
 ![Auth.log](https://user-images.githubusercontent.com/5953192/197003292-13cf2285-c614-42a1-ad5a-896370c22883.PNG)
 
-<a name="streaming"/>
+<a name="streaming-in"/>
 
-## Streaming
+## Streaming logs to Netdata
 
 </a>
 
-Netdata supports 2 streaming configurations:
+Netdata supports 2 incoming streaming configurations:
 1. `syslog` messages over Unix or network sockets. 
 2. Fluent Bit's [Forward protocol](https://docs.fluentbit.io/manual/pipeline/outputs/forward).
 
@@ -395,8 +413,10 @@ Example configuration of an `flb_docker_events` type parent log collection:
 	log type = flb_systemd
 
 	## Optional settings, common to all log source. 
-	## Uncomment to override global equivalents.
+	## Uncomment to override global equivalents in netdata.conf.
 	# update every = 1
+	# update timeout = 10
+	# use log timestamp = auto
 	# circular buffer max size MiB = 64
 	# circular buffer drop logs if full = no
 	# compression acceleration = 1
@@ -434,8 +454,10 @@ Example configuration of an `flb_kmsg` type parent log collection:
 	log type = flb_kmsg
 
 	## Optional settings, common to all log source. 
-	## Uncomment to override global equivalents.
+	## Uncomment to override global equivalents in netdata.conf.
 	# update every = 1
+	# update timeout = 10
+	use log timestamp = no
 	# circular buffer max size MiB = 64
 	# circular buffer drop logs if full = no
 	# compression acceleration = 1
@@ -466,7 +488,7 @@ fluent-bit -i kmsg -o forward -p Compress=gzip -F record_modifier -p 'Record="st
 
 </a>
 
-This is the most flexible option for a parent log collection, as it allows aggregation of logs from multiple children Fluent Bit instances of different log types. Example configuration of a generic parent log collection:
+This is the most flexible option for a parent log collection, as it allows aggregation of logs from multiple children Fluent Bit instances of different log types. Example configuration of a generic parent log collection with `db mode = full`:
 
 ```
 [Forward collection]
@@ -476,8 +498,10 @@ This is the most flexible option for a parent log collection, as it allows aggre
 	log type = flb_tail
 
 	## Optional settings, common to all log source. 
-	## Uncomment to override global equivalents.
+	## Uncomment to override global equivalents in netdata.conf.
 	# update every = 1
+	# update timeout = 10
+	# use log timestamp = auto
 	# circular buffer max size MiB = 64
 	# circular buffer drop logs if full = no
 	# compression acceleration = 1
@@ -517,8 +541,10 @@ Example configuration of a `flb_docker_events` type parent log collection:
 	log type = flb_docker_events
 
 	## Optional settings, common to all log source. 
-	## Uncomment to override global equivalents.
+	## Uncomment to override global equivalents in netdata.conf.
 	# update every = 1
+	# update timeout = 10
+	# use log timestamp = auto
 	# circular buffer max size MiB = 64
 	# circular buffer drop logs if full = no
 	# compression acceleration = 1
@@ -553,6 +579,68 @@ Logs will appear in the parent in their unstructured format:
 
 ```
 {"status":"create","id":"de2432a4f00bd26a4899dde5633bb16090a4f367c36f440ebdfdc09020cb462d","from":"hello-world","Type":"container","Action":"create","Actor":{"ID":"de2432a4f00bd26a4899dde5633bb16090a4f367c36f440ebdfdc09020cb462d","Attributes":{"image":"hello-world","name":"lucid_yalow"}},"scope":"local","time":1680263414,"timeNano":1680263414473911042}
+```
+
+<a name="streaming-out"/>
+
+## Streaming logs from Netdata (exporting)
+
+</a>
+
+Netdata supports real-time log streaming and exporting through any of [Fluent Bit's outgoing streaming configurations](https://docs.fluentbit.io/manual/pipeline/outputs). 
+
+To use any of the outputs, follow Fluent Bit's documentation with the addition of a `output x` prefix to all of the configuration parameters of the output. `x` must start from number 1 and monotonically increase by 1 every time a new output is configured for the log source. 
+
+For example, the following configuration will add 2 outputs to a `docker events` log collector. The first output will stream logs to https://cloud.openobserve.ai/ using Fluent Bit's [http output plugin](https://docs.fluentbit.io/manual/pipeline/outputs/http) and the second one will save the same logs in a file in CSV format, using Fluent Bit's [file output plugin](https://docs.fluentbit.io/manual/pipeline/outputs/file):
+
+```
+[Docker Events Logs]
+        ## Example: Log collector that will monitor the Docker daemon socket and
+        ## collect Docker event logs in a default format similar to executing 
+        ## the `sudo docker events` command.
+
+        ## Required settings
+        enabled = yes
+        log type = flb_docker_events
+
+        ## Optional settings, common to all log source. 
+        ## Uncomment to override global equivalents in netdata.conf.
+        # update every = 1
+        # update timeout = 10
+        # use log timestamp = auto
+        # circular buffer max size MiB = 64
+        # circular buffer drop logs if full = no
+        # compression acceleration = 1
+        # db mode = none
+        # circular buffer flush to db = 6
+        # disk space limit MiB = 500
+
+        ## Use default Docker socket UNIX path: /var/run/docker.sock
+        log path = auto
+
+        ## Charts to enable
+        # collected logs total chart enable = no
+        # collected logs rate chart enable = yes
+        event type chart = yes
+        event action chart = yes
+
+		## Stream to https://cloud.openobserve.ai/
+		output 1 name             = http
+        output 1 URI              = YOUR_API_URI
+        output 1 Host             = api.openobserve.ai
+        output 1 Port             = 443
+        output 1 tls              = On
+        output 1 Format           = json
+        output 1 Json_date_key    = _timestamp
+        output 1 Json_date_format = iso8601
+        output 1 HTTP_User        = test@netdata.cloud
+        output 1 HTTP_Passwd      = YOUR_OPENOBSERVE_PASSWORD
+        output 1 compress         = gzip
+
+		## Real-time export to /tmp/docker_event_logs.csv
+        output 2 name             = file
+        output 2 Path             = /tmp
+        output 2 File             = docker_event_logs.csv
 ```
 
 </a>
