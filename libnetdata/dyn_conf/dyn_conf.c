@@ -547,27 +547,8 @@ void handle_module_root(struct uni_http_response *resp, int method, struct confi
     resp->status = HTTP_RESP_METHOD_NOT_ALLOWED;
     }
 
-void handle_job_root(struct uni_http_response *resp, int method, struct module *mod, const char *job_id, void *post_payload, size_t post_payload_size)
+static inline void _handle_job_root(struct uni_http_response *resp, int method, struct module *mod, const char *job_id, void *post_payload, size_t post_payload_size, struct job *job)
 {
-    if (strncmp(job_id, DYN_CONF_JOB_LIST, strlen(DYN_CONF_JOB_LIST)) == 0) {
-        if (method != HTTP_METHOD_GET) {
-            resp->content = "method not allowed (only GET)";
-            resp->content_length = strlen(resp->content);
-            resp->status = HTTP_RESP_METHOD_NOT_ALLOWED;
-            return;
-        }
-        json_object *obj = get_list_of_jobs_json(mod);
-        json_object *wrapper = json_object_new_object();
-        json_object_object_add(wrapper, "jobs", obj);
-        resp->content = strdupz(json_object_to_json_string_ext(wrapper, JSON_C_TO_STRING_PRETTY));
-        json_object_put(wrapper);
-        resp->status = HTTP_RESP_OK;
-        resp->content_type = CT_APPLICATION_JSON;
-        resp->content_free = freez;
-        resp->content_length = strlen(resp->content);
-        return;
-    }
-        struct job *job = get_job_by_name(mod, job_id);
     if (method == HTTP_METHOD_POST) {
         if (job != NULL) {
             resp->content = "can't POST, job already exists (use PUT to update?)";
@@ -656,6 +637,34 @@ void handle_job_root(struct uni_http_response *resp, int method, struct module *
             resp->status = HTTP_RESP_METHOD_NOT_ALLOWED;
             return;
     }
+}
+
+void handle_job_root(struct uni_http_response *resp, int method, struct module *mod, const char *job_id, void *post_payload, size_t post_payload_size)
+{
+    if (strncmp(job_id, DYN_CONF_JOB_LIST, strlen(DYN_CONF_JOB_LIST)) == 0) {
+        if (method != HTTP_METHOD_GET) {
+            resp->content = "method not allowed (only GET)";
+            resp->content_length = strlen(resp->content);
+            resp->status = HTTP_RESP_METHOD_NOT_ALLOWED;
+            return;
+        }
+        json_object *obj = get_list_of_jobs_json(mod);
+        json_object *wrapper = json_object_new_object();
+        json_object_object_add(wrapper, "jobs", obj);
+        resp->content = strdupz(json_object_to_json_string_ext(wrapper, JSON_C_TO_STRING_PRETTY));
+        json_object_put(wrapper);
+        resp->status = HTTP_RESP_OK;
+        resp->content_type = CT_APPLICATION_JSON;
+        resp->content_free = freez;
+        resp->content_length = strlen(resp->content);
+        return;
+    }
+    DICTIONARY_ITEM *job_item = dictionary_get_and_acquire_item(mod->jobs, job_id);
+    struct job *job = dictionary_acquired_item_value(job_item);
+
+    _handle_job_root(resp, method, mod, job_id, post_payload, post_payload_size, job);
+
+    dictionary_acquired_item_release(mod->jobs, job_item);
 }
 
 struct uni_http_response dyn_conf_process_http_request(int method, const char *plugin, const char *module, const char *job_id, void *post_payload, size_t post_payload_size)
