@@ -5,50 +5,51 @@ modules:
       module_name: vm.loadavg
       monitored_instance:
         name: freebsd vm.loadavg
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -98,50 +99,51 @@ modules:
       module_name: vm.vmtotal
       monitored_instance:
         name: freebsd vm.vmtotal
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -186,50 +188,51 @@ modules:
       module_name: kern.cp_time
       monitored_instance:
         name: freebsd kern.cp_time
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -295,50 +298,51 @@ modules:
       module_name: dev.cpu.temperature
       monitored_instance:
         name: freebsd dev.cpu.temperature
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -366,50 +370,51 @@ modules:
       module_name: dev.cpu.0.freq
       monitored_instance:
         name: freebsd dev.cpu.0.freq
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -437,50 +442,51 @@ modules:
       module_name: hw.intrcnt
       monitored_instance:
         name: freebsd hw.intrcnt
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -514,50 +520,51 @@ modules:
       module_name: vm.stats.sys.v_intr
       monitored_instance:
         name: freebsd vm.stats.sys.v_intr
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -585,50 +592,51 @@ modules:
       module_name: vm.stats.sys.v_soft
       monitored_instance:
         name: freebsd vm.stats.sys.v_soft
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -656,50 +664,51 @@ modules:
       module_name: vm.stats.sys.v_swtch
       monitored_instance:
         name: freebsd vm.stats.sys.v_swtch
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -733,50 +742,51 @@ modules:
       module_name: vm.swap_info
       monitored_instance:
         name: freebsd vm.swap_info
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -810,50 +820,51 @@ modules:
       module_name: system.ram
       monitored_instance:
         name: freebsd system.ram
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -913,50 +924,51 @@ modules:
       module_name: vm.stats.vm.v_swappgs
       monitored_instance:
         name: freebsd vm.stats.vm.v_swappgs
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -990,50 +1002,51 @@ modules:
       module_name: vm.stats.vm.v_pgfaults
       monitored_instance:
         name: freebsd vm.stats.vm.v_pgfaults
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1065,50 +1078,51 @@ modules:
       module_name: kern.ipc.sem
       monitored_instance:
         name: freebsd kern.ipc.sem
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1152,50 +1166,51 @@ modules:
       module_name: kern.ipc.shm
       monitored_instance:
         name: freebsd kern.ipc.shm
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1229,50 +1244,51 @@ modules:
       module_name: kern.ipc.msq
       monitored_instance:
         name: freebsd kern.ipc.msq
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1313,50 +1329,51 @@ modules:
       module_name: uptime
       monitored_instance:
         name: freebsd uptime
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1384,50 +1401,51 @@ modules:
       module_name: net.isr
       monitored_instance:
         name: freebsd net.isr
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1441,7 +1459,9 @@ modules:
       - name: 1min_netdev_budget_ran_outs
         link: https://github.com/netdata/netdata/blob/master/health/health.d/softnet.conf
         metric: system.softnet_stat
-        info: average number of times ksoftirq ran out of sysctl net.core.netdev_budget or net.core.netdev_budget_usecs with work remaining over the last minute (this can be a cause for dropped packets)
+        info:
+          average number of times ksoftirq ran out of sysctl net.core.netdev_budget or net.core.netdev_budget_usecs with work remaining over the last
+          minute (this can be a cause for dropped packets)
         os: "linux"
       - name: 10min_netisr_backlog_exceeded
         link: https://github.com/netdata/netdata/blob/master/health/health.d/softnet.conf
@@ -1486,50 +1506,51 @@ modules:
       module_name: devstat
       monitored_instance:
         name: freebsd devstat
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1628,50 +1649,51 @@ modules:
       module_name: net.inet.tcp.states
       monitored_instance:
         name: freebsd net.inet.tcp.states
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1704,50 +1726,51 @@ modules:
       module_name: net.inet.tcp.stats
       monitored_instance:
         name: freebsd net.inet.tcp.stats
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1761,7 +1784,9 @@ modules:
       - name: 10s_ipv4_tcp_resets_sent
         link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
         metric: ipv4.tcphandshake
-        info: average number of sent TCP RESETS over the last 10 seconds. This can indicate a port scan, or that a service running on this host has crashed. Netdata will not send a clear notification for this alarm.
+        info:
+          average number of sent TCP RESETS over the last 10 seconds. This can indicate a port scan, or that a service running on this host has
+          crashed. Netdata will not send a clear notification for this alarm.
         os: "linux"
       - name: 1m_ipv4_tcp_resets_received
         link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
@@ -1771,7 +1796,9 @@ modules:
       - name: 10s_ipv4_tcp_resets_received
         link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
         metric: ipv4.tcphandshake
-        info: average number of received TCP RESETS over the last 10 seconds. This can be an indication that a service this host needs has crashed. Netdata will not send a clear notification for this alarm.
+        info:
+          average number of received TCP RESETS over the last 10 seconds. This can be an indication that a service this host needs has crashed.
+          Netdata will not send a clear notification for this alarm.
         os: "linux freebsd"
     metrics:
       folding:
@@ -1853,50 +1880,51 @@ modules:
       module_name: net.inet.udp.stats
       monitored_instance:
         name: freebsd net.inet.udp.stats
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1945,50 +1973,51 @@ modules:
       module_name: net.inet.icmp.stats
       monitored_instance:
         name: freebsd net.inet.icmp.stats
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -2034,50 +2063,51 @@ modules:
       module_name: net.inet.ip.stats
       monitored_instance:
         name: freebsd net.inet.ip.stats
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -2135,50 +2165,51 @@ modules:
       module_name: net.inet6.ip6.stats
       monitored_instance:
         name: freebsd net.inet6.ip6.stats
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -2238,50 +2269,51 @@ modules:
       module_name: net.inet6.icmp6.stats
       monitored_instance:
         name: freebsd net.inet6.icmp6.stats
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -2374,50 +2406,51 @@ modules:
       module_name: ipfw
       monitored_instance:
         name: freebsd ipfw
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -2470,50 +2503,51 @@ modules:
       module_name: getifaddrs
       monitored_instance:
         name: freebsd getifaddrs
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -2562,7 +2596,9 @@ modules:
       - name: 10s_received_packets_storm
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
         metric: net.packets
-        info: ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over the last minute
+        info:
+          ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over
+          the last minute
         os: "linux freebsd"
       - name: interface_inbound_errors
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
@@ -2670,50 +2706,51 @@ modules:
       module_name: getmntinfo
       monitored_instance:
         name: freebsd getmntinfo
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -2761,50 +2798,51 @@ modules:
       module_name: zfs
       monitored_instance:
         name: freebsd zfs
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:

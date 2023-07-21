@@ -6,54 +6,55 @@ modules:
       module_name: apps
       monitored_instance:
         name: Applications
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.processes-and-system-services
+        icon_filename: "netdata.png"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords:
-       - applications
-       - processes
-       - os
-       - host monitoring
+        - applications
+        - processes
+        - os
+        - host monitoring
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "Monitor Applications for optimal software performance and resource usage."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -225,56 +226,57 @@ modules:
       module_name: groups
       monitored_instance:
         name: User Groups
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.processes-and-system-services
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords:
-       - groups
-       - processes
-       - user auditing
-       - authorization
-       - os
-       - host monitoring
+        - groups
+        - processes
+        - user auditing
+        - authorization
+        - os
+        - host monitoring
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration monitors resource utilization on a user groups context."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -446,54 +448,55 @@ modules:
       module_name: users
       monitored_instance:
         name: Users
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.processes-and-system-services
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords:
-       - users
-       - processes
-       - os
-       - host monitoring
+        - users
+        - processes
+        - os
+        - host monitoring
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration monitors resource utilization on a user context."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
