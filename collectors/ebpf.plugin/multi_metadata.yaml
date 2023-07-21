@@ -35,7 +35,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list: ['Kernel compiled with bpf syscall', 'Compiled either with CONFIG_KPROBES and when it is possible CONFIG_DEBUG_INFO_BTF.']
+        list: []
       configuration:
         file:
           name: ""
@@ -45,7 +45,7 @@ modules:
           folding:
             title: ""
             enabled: true
-          list: ['ebpf load mode', 'apps', 'cgroups', 'update every', 'pid table size', 'ebpf type format', 'ebpf co-re tracing', 'maps per core', 'lifetime']
+          list: []
         examples:
           folding:
             enabled: true
@@ -53,7 +53,7 @@ modules:
           list: []
     troubleshooting:
       problems:
-        list: ['Kernel not compiled with necessary option', 'function is modified inside kernel', 'Linux Distribution modifies kernel delivered by kernel.org']
+        list: []
     alerts: []
     metrics:
       folding:
