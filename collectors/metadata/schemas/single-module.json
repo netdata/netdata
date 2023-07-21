@@ -108,6 +108,10 @@
         "most_popular": {
           "type": "boolean",
           "description": "Whether or not the integration is to be flagged as most-popular, meaning it will show up at the top of the menu."
+        },
+        "community": {
+          "type": "boolean",
+          "description": "Whether or not the integration should be flagged as community."
         }
       },
       "required": [
@@ -167,7 +171,7 @@
             "exclude"
           ]
         },
-        "multi-instance": {
+        "multi_instance": {
           "type": "boolean",
           "description": "Whether this collector supports collecting metrics from multiple (for example, local and remote) instances."
         },
@@ -234,7 +238,7 @@
       "required": [
         "data_collection",
         "supported_platforms",
-        "multi-instance",
+        "multi_instance",
         "additional_permissions",
         "default_behavior"
       ]

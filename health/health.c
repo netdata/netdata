@@ -433,14 +433,14 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 
     if(unlikely(ae->new_status < RRDCALC_STATUS_CLEAR)) {
         // do not send notifications for internal statuses
-        netdata_log_debug(D_HEALTH, "Health not sending notification for alarm '%s.%s' status %s (internal statuses)", ae_chart_name(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
+        netdata_log_debug(D_HEALTH, "Health not sending notification for alarm '%s.%s' status %s (internal statuses)", ae_chart_id(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
         goto done;
     }
 
     if(unlikely(ae->new_status <= RRDCALC_STATUS_CLEAR && (ae->flags & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION))) {
         // do not send notifications for disabled statuses
-        netdata_log_debug(D_HEALTH, "Health not sending notification for alarm '%s.%s' status %s (it has no-clear-notification enabled)", ae_chart_name(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
-        netdata_log_health("[%s]: Health not sending notification for alarm '%s.%s' status %s (it has no-clear-notification enabled)", rrdhost_hostname(host), ae_chart_name(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
+        netdata_log_debug(D_HEALTH, "Health not sending notification for alarm '%s.%s' status %s (it has no-clear-notification enabled)", ae_chart_id(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
+        netdata_log_health("[%s]: Health not sending notification for alarm '%s.%s' status %s (it has no-clear-notification enabled)", rrdhost_hostname(host), ae_chart_id(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
 
         // mark it as run, so that we will send the same alarm if it happens again
         goto done;
@@ -457,9 +457,9 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
             // we have executed this alarm notification in the past
             if(last_executed_status == ae->new_status && !(ae->flags & HEALTH_ENTRY_FLAG_IS_REPEATING)) {
                 // don't send the notification for the same status again
-                netdata_log_debug(D_HEALTH, "Health not sending again notification for alarm '%s.%s' status %s", ae_chart_name(ae), ae_name(ae)
+                netdata_log_debug(D_HEALTH, "Health not sending again notification for alarm '%s.%s' status %s", ae_chart_id(ae), ae_name(ae)
                       , rrdcalc_status2string(ae->new_status));
-                netdata_log_health("[%s]: Health not sending again notification for alarm '%s.%s' status %s", rrdhost_hostname(host), ae_chart_name(ae), ae_name(ae)
+                netdata_log_health("[%s]: Health not sending again notification for alarm '%s.%s' status %s", rrdhost_hostname(host), ae_chart_id(ae), ae_name(ae)
                       , rrdcalc_status2string(ae->new_status));
                 goto done;
             }
@@ -470,7 +470,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
             if(unlikely(ae->new_status == RRDCALC_STATUS_CLEAR)) {
                 if((!(ae->flags & HEALTH_ENTRY_RUN_ONCE)) || (ae->flags & HEALTH_ENTRY_RUN_ONCE && ae->old_status < RRDCALC_STATUS_RAISED) ) {
                     netdata_log_debug(D_HEALTH, "Health not sending notification for first initialization of alarm '%s.%s' status %s"
-                    , ae_chart_name(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
+                    , ae_chart_id(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
                     goto done;
                 }
             }
@@ -479,11 +479,11 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 
     // Check if alarm notifications are silenced
     if (ae->flags & HEALTH_ENTRY_FLAG_SILENCED) {
-        netdata_log_health("[%s]: Health not sending notification for alarm '%s.%s' status %s (command API has disabled notifications)", rrdhost_hostname(host), ae_chart_name(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
+        netdata_log_health("[%s]: Health not sending notification for alarm '%s.%s' status %s (command API has disabled notifications)", rrdhost_hostname(host), ae_chart_id(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
         goto done;
     }
 
-    netdata_log_health("[%s]: Sending notification for alarm '%s.%s' status %s.", rrdhost_hostname(host), ae_chart_name(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
+    netdata_log_health("[%s]: Sending notification for alarm '%s.%s' status %s.", rrdhost_hostname(host), ae_chart_id(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
 
     const char *exec      = (ae->exec)      ? ae_exec(ae)      : string2str(host->health.health_default_exec);
     const char *recipient = (ae->recipient) ? ae_recipient(ae) : string2str(host->health.health_default_recipient);
@@ -562,7 +562,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                               ae->alarm_event_id,
                               (unsigned long)ae->when,
                               ae_name(ae),
-                              ae->chart?ae_chart_name(ae):"NOCHART",
+                              ae->chart?ae_chart_id(ae):"NOCHART",
                               ae->family?ae_family(ae):"NOFAMILY",
                               rrdcalc_status2string(ae->new_status),
                               rrdcalc_status2string(ae->old_status),
@@ -627,7 +627,7 @@ static inline void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
 
 static inline void health_process_notifications(RRDHOST *host, ALARM_ENTRY *ae) {
     netdata_log_debug(D_HEALTH, "Health alarm '%s.%s' = " NETDATA_DOUBLE_FORMAT_AUTO " - changed status from %s to %s",
-         ae->chart?ae_chart_name(ae):"NOCHART", ae_name(ae),
+         ae->chart?ae_chart_id(ae):"NOCHART", ae_name(ae),
          ae->new_value,
          rrdcalc_status2string(ae->old_status),
          rrdcalc_status2string(ae->new_status)
@@ -844,8 +844,9 @@ static void initialize_health(RRDHOST *host)
     host->health.health_default_exec = string_strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
     host->health.health_default_recipient = string_strdupz("root");
 
-    // TODO: This needs to go to the metadata thread
-    // Health should wait before accessing the table (needs to be created by the metadata thread)
+    if (!is_chart_name_populated(&host->host_uuid))
+        chart_name_populate(&host->host_uuid);
+
     sql_health_alarm_log_load(host);
 
     // ------------------------------------------------------------------------
@@ -1156,6 +1157,7 @@ void *health_main(void *ptr) {
                                                                     rc->name,
                                                                     rc->rrdset->id,
                                                                     rc->rrdset->context,
+                                                                    rc->rrdset->name,
                                                                     rc->rrdset->family,
                                                                     rc->classification,
                                                                     rc->component,
@@ -1422,6 +1424,7 @@ void *health_main(void *ptr) {
                                                                     rc->name,
                                                                     rc->rrdset->id,
                                                                     rc->rrdset->context,
+                                                                    rc->rrdset->name,
                                                                     rc->rrdset->family,
                                                                     rc->classification,
                                                                     rc->component,
@@ -1446,7 +1449,7 @@ void *health_main(void *ptr) {
 
                         health_alarm_log_add_entry(host, ae);
 
-                        netdata_log_health("[%s]: Alert event for [%s.%s], value [%s], status [%s].", rrdhost_hostname(host), ae_chart_name(ae), ae_name(ae), ae_new_value_string(ae), rrdcalc_status2string(ae->new_status));
+                        netdata_log_health("[%s]: Alert event for [%s.%s], value [%s], status [%s].", rrdhost_hostname(host), ae_chart_id(ae), ae_name(ae), ae_new_value_string(ae), rrdcalc_status2string(ae->new_status));
 
                         rc->last_status_change_value = rc->value;
                         rc->last_status_change = now;
@@ -1508,6 +1511,7 @@ void *health_main(void *ptr) {
                                                                     rc->name,
                                                                     rc->rrdset->id,
                                                                     rc->rrdset->context,
+                                                                    rc->rrdset->name,
                                                                     rc->rrdset->family,
                                                                     rc->classification,
                                                                     rc->component,

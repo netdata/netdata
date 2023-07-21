@@ -1330,7 +1330,7 @@ check_special_native_deps() {
         progress "EPEL is available, attempting to install so that required dependencies are available."
 
         # shellcheck disable=SC2086
-        if ! run_as_root env ${env} ${pm_cmd} install ${pkg_install_opts} epel-release; then
+        if ! run_as_root env ${env} ${pm_cmd} ${install_subcmd} ${pkg_install_opts} epel-release; then
           warning "Failed to install EPEL, even though it is required to install native packages on this system."
           return 1
         fi
@@ -1350,12 +1350,16 @@ common_rpm_opts() {
 }
 
 common_dnf_opts() {
+  if [ "${INTERACTIVE}" = "0" ]; then
+    interactive_opts="-y"
+  fi
   if command -v dnf > /dev/null; then
     pm_cmd="dnf"
     repo_subcmd="makecache"
   else
     pm_cmd="yum"
   fi
+  install_subcmd="install"
   pkg_install_opts="${interactive_opts}"
   repo_update_opts="${interactive_opts}"
   uninstall_subcmd="remove"
@@ -1390,16 +1394,18 @@ try_package_install() {
     release=""
   fi
 
-  if [ "${INTERACTIVE}" = "0" ]; then
-    interactive_opts="-y"
-    env="DEBIAN_FRONTEND=noninteractive"
-  else
-    interactive_opts=""
-    env=""
-  fi
+  interactive_opts=""
+  env=""
 
   case "${DISTRO_COMPAT_NAME}" in
     debian|ubuntu)
+      if [ "${INTERACTIVE}" = "0" ]; then
+        install_subcmd="-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold install"
+        interactive_opts="-y"
+        env="DEBIAN_FRONTEND=noninteractive"
+      else
+        install_subcmd="install"
+      fi
       needs_early_refresh=1
       pm_cmd="apt-get"
       repo_subcmd="update"
@@ -1427,6 +1433,11 @@ try_package_install() {
       repo_prefix="${DISTRO_COMPAT_NAME}/${SYSVERSION}"
       ;;
     opensuse)
+      if [ "${INTERACTIVE}" = "0" ]; then
+        install_subcmd="--non-interactive --no-gpg-checks install"
+      else
+        install_subcmd="--no-gpg-checks install"
+      fi
       common_rpm_opts
       pm_cmd="zypper"
       repo_subcmd="--gpg-auto-import-keys refresh"
@@ -1497,7 +1508,7 @@ try_package_install() {
     fi
 
     # shellcheck disable=SC2086
-    if ! run_as_root env ${env} ${pm_cmd} install ${pkg_install_opts} "${tmpdir}/${repoconfig_file}"; then
+    if ! run_as_root env ${env} ${pm_cmd} ${install_subcmd} ${pkg_install_opts} "${tmpdir}/${repoconfig_file}"; then
       warning "Failed to install repository configuration package."
       return 2
     fi
@@ -1546,7 +1557,7 @@ try_package_install() {
   fi
 
   # shellcheck disable=SC2086
-  if ! run_as_root env ${env} ${pm_cmd} install ${pkg_install_opts} "netdata${NATIVE_VERSION}"; then
+  if ! run_as_root env ${env} ${pm_cmd} ${install_subcmd} ${pkg_install_opts} "netdata${NATIVE_VERSION}"; then
     warning "Failed to install Netdata package."
     if [ -z "${NO_CLEANUP}" ]; then
       progress "Attempting to uninstall repository configuration package."
@@ -1559,7 +1570,7 @@ try_package_install() {
   if [ -n "${explicitly_install_native_plugins}" ]; then
     progress "Installing external plugins."
     # shellcheck disable=SC2086
-    if ! run_as_root env ${env} ${pm_cmd} install ${DEFAULT_PLUGIN_PACKAGES}; then
+    if ! run_as_root env ${env} ${pm_cmd} ${install_subcmd} ${DEFAULT_PLUGIN_PACKAGES}; then
       warning "Failed to install external plugin packages. Some collectors may not be available."
     fi
   fi

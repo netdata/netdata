@@ -690,26 +690,24 @@ static void ebpf_update_dc_cgroup(int maps_per_core)
  *
  * Read the table with number of calls for all functions
  *
+ * @param stats         vector used to read data from control table.
  * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_dc_read_global_table(int maps_per_core)
+static void ebpf_dc_read_global_tables(netdata_idx_t *stats, int maps_per_core)
 {
-    uint32_t idx;
-    netdata_idx_t *val = dcstat_hash_values;
-    netdata_idx_t *stored = dcstat_values;
-    int fd = dcstat_maps[NETDATA_DCSTAT_GLOBAL_STATS].map_fd;
+    ebpf_read_global_table_stats(dcstat_hash_values,
+                                 dcstat_values,
+                                 dcstat_maps[NETDATA_DCSTAT_GLOBAL_STATS].map_fd,
+                                 maps_per_core,
+                                 NETDATA_KEY_DC_REFERENCE,
+                                 NETDATA_DIRECTORY_CACHE_END);
 
-    for (idx = NETDATA_KEY_DC_REFERENCE; idx < NETDATA_DIRECTORY_CACHE_END; idx++) {
-        if (!bpf_map_lookup_elem(fd, &idx, stored)) {
-            int i;
-            int end = (maps_per_core) ? ebpf_nprocs: 1;
-            netdata_idx_t total = 0;
-            for (i = 0; i < end; i++)
-                total += stored[i];
-
-            val[idx] = total;
-        }
-    }
+    ebpf_read_global_table_stats(stats,
+                                 dcstat_values,
+                                 dcstat_maps[NETDATA_DCSTAT_CTRL].map_fd,
+                                 maps_per_core,
+                                 NETDATA_CONTROLLER_PID_TABLE_ADD,
+                                 NETDATA_CONTROLLER_END);
 }
 
 /**
@@ -1169,6 +1167,8 @@ static void dcstat_collector(ebpf_module_t *em)
     int maps_per_core = em->maps_per_core;
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
+    netdata_idx_t *stats = em->hash_table_stats;
+    memset(stats, 0, sizeof(em->hash_table_stats));
     while (!ebpf_exit_plugin && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
 
@@ -1177,7 +1177,7 @@ static void dcstat_collector(ebpf_module_t *em)
 
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
-        ebpf_dc_read_global_table(maps_per_core);
+        ebpf_dc_read_global_tables(stats, maps_per_core);
         pthread_mutex_lock(&collect_data_mutex);
         if (apps)
             read_dc_apps_table(maps_per_core);

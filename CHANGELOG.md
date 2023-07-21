@@ -1,5 +1,24 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.41.0...HEAD)
+
+**Merged pull requests:**
+
+- meta schema change multi-instance to multi\_instance [\#15470](https://github.com/netdata/netdata/pull/15470) ([ilyam8](https://github.com/ilyam8))
+- fix the calculation of incremental-sum [\#15468](https://github.com/netdata/netdata/pull/15468) ([ktsaou](https://github.com/ktsaou))
+- apps.plugin fds limits improvements [\#15467](https://github.com/netdata/netdata/pull/15467) ([ktsaou](https://github.com/ktsaou))
+- Add community key in schema [\#15465](https://github.com/netdata/netdata/pull/15465) ([Ancairon](https://github.com/Ancairon))
+- Update proc plugin yaml [\#15460](https://github.com/netdata/netdata/pull/15460) ([Ancairon](https://github.com/Ancairon))
+- Macos yaml updates [\#15459](https://github.com/netdata/netdata/pull/15459) ([Ancairon](https://github.com/Ancairon))
+- Freeipmi yaml updates [\#15458](https://github.com/netdata/netdata/pull/15458) ([Ancairon](https://github.com/Ancairon))
+- Add short descriptions to cgroups yaml [\#15457](https://github.com/netdata/netdata/pull/15457) ([Ancairon](https://github.com/Ancairon))
+- Store and transmit chart\_name to cloud in alert events [\#15441](https://github.com/netdata/netdata/pull/15441) ([MrZammler](https://github.com/MrZammler))
+- Add linux powercap metrics collector [\#15364](https://github.com/netdata/netdata/pull/15364) ([fhriley](https://github.com/fhriley))
+- Hash table charts [\#15323](https://github.com/netdata/netdata/pull/15323) ([thiagoftsm](https://github.com/thiagoftsm))
+- Fix non-interactive options for apt-get and zypper. [\#15288](https://github.com/netdata/netdata/pull/15288) ([zeylos](https://github.com/zeylos))
+
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.40.1...v1.41.0)
@@ -404,15 +423,6 @@
 - Update Agent notification methods documentation [\#14827](https://github.com/netdata/netdata/pull/14827) ([Ancairon](https://github.com/Ancairon))
 - Delete installation instructions specific to FreeNAS [\#14826](https://github.com/netdata/netdata/pull/14826) ([Ancairon](https://github.com/Ancairon))
 - First batch of adding descriptions to the documentation [\#14825](https://github.com/netdata/netdata/pull/14825) ([Ancairon](https://github.com/Ancairon))
-- Fix Btrfs unallocated space accounting [\#14824](https://github.com/netdata/netdata/pull/14824) ([intelfx](https://github.com/intelfx))
-- Update the bundled version of makeself used to create static builds. [\#14822](https://github.com/netdata/netdata/pull/14822) ([Ferroin](https://github.com/Ferroin))
-- configure extent cache size [\#14821](https://github.com/netdata/netdata/pull/14821) ([ktsaou](https://github.com/ktsaou))
-- Docs, shorten too long titles, and add a description below [\#14820](https://github.com/netdata/netdata/pull/14820) ([Ancairon](https://github.com/Ancairon))
-- update posthog domain [\#14818](https://github.com/netdata/netdata/pull/14818) ([andrewm4894](https://github.com/andrewm4894))
-- minor - add capability signifying this agent can speak apiv2 [\#14817](https://github.com/netdata/netdata/pull/14817) ([underhood](https://github.com/underhood))
-- Minor improvements to netdata-security.md [\#14815](https://github.com/netdata/netdata/pull/14815) ([cakrit](https://github.com/cakrit))
-- Update privacy link in aclk doc [\#14813](https://github.com/netdata/netdata/pull/14813) ([cakrit](https://github.com/cakrit))
-- Consolidate security and privacy documents [\#14812](https://github.com/netdata/netdata/pull/14812) ([cakrit](https://github.com/cakrit))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 

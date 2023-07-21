@@ -60,7 +60,7 @@ ebpf_module_t ebpf_modules[] = {
                   NETDATA_V5_14,
       .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL,
       .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES, .lifetime = EBPF_DEFAULT_LIFETIME, .running_time = 0 },
-      { .thread_name = "socket", .config_name = "socket", .thread_description = NETDATA_EBPF_SOCKET_MODULE_DESC,
+    { .thread_name = "socket", .config_name = "socket", .thread_description = NETDATA_EBPF_SOCKET_MODULE_DESC,
       .enabled = 0, .start_routine = ebpf_socket_thread,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
@@ -1229,7 +1229,7 @@ void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, 
  */
 int ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em)
 {
-    static int priority = 140100;
+    static int priority = NETATA_EBPF_ORDER_STAT_ARAL_BEGIN;
     char *mem = { NETDATA_EBPF_STAT_DIMENSION_MEMORY };
     char *aral = { NETDATA_EBPF_STAT_DIMENSION_ARAL };
 
@@ -1323,6 +1323,49 @@ void ebpf_send_data_aral_chart(ARAL *memory, ebpf_module_t *em)
     write_begin_chart(NETDATA_MONITORING_FAMILY, em->memory_allocations);
     write_chart_dimension(aral, (long long)stats->structures.allocations);
     write_end_chart();
+}
+
+/*****************************************************************
+ *
+ *  FUNCTIONS TO READ GLOBAL HASH TABLES
+ *
+ *****************************************************************/
+
+/**
+ * Read Global Table Stats
+ *
+ * Read data from specified table (map_fd) using array allocated inside thread(values) and storing
+ * them in stats vector starting from the first position.
+ *
+ * For PID tables is recommended to use a function to parse the specific data.
+ *
+ * @param stats             vector used to store data
+ * @param values            helper to read data from hash tables.
+ * @param map_fd            table that has data
+ * @param maps_per_core     Is necessary to read data from all cores?
+ * @param begin             initial value to query hash table
+ * @param end               last value that will not be used.
+ */
+void ebpf_read_global_table_stats(netdata_idx_t *stats,
+                                  netdata_idx_t *values,
+                                  int map_fd,
+                                  int maps_per_core,
+                                  uint32_t begin,
+                                  uint32_t end)
+{
+    uint32_t idx, order;
+
+    for (idx = begin, order = 0; idx < end; idx++, order++) {
+        if (!bpf_map_lookup_elem(map_fd, &idx, values)) {
+            int i;
+            int before = (maps_per_core) ? ebpf_nprocs: 1;
+            netdata_idx_t total = 0;
+            for (i = 0; i < before; i++)
+                total += values[i];
+
+            stats[order] = total;
+        }
+    }
 }
 
 /*****************************************************************
@@ -2454,6 +2497,47 @@ static char *hash_table_stat = {"hash_table"};
 static char *hash_table_core[NETDATA_EBPF_LOAD_STAT_END] = {"per_core", "unique"};
 
 /**
+ * Send Hash Table PID data
+ *
+ * Send all information associated with a specific pid table.
+ *
+ * @param chart   chart id
+ * @param idx     index position in hash_table_stats
+ */
+static inline void ebpf_send_hash_table_pid_data(char *chart, uint32_t idx)
+{
+    int i;
+    write_begin_chart(NETDATA_MONITORING_FAMILY, chart);
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
+        ebpf_module_t *wem = &ebpf_modules[i];
+        if (wem->apps_routine)
+            write_chart_dimension((char *)wem->thread_name,
+                                  (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ?
+                                  wem->hash_table_stats[idx]:
+                                  0);
+    }
+    write_end_chart();
+}
+
+/**
+ * Send Global Hash Table data
+ *
+ * Send all information associated with a specific pid table.
+ *
+ */
+static inline void ebpf_send_global_hash_table_data()
+{
+    int i;
+    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_HASH_TABLES_GLOBAL_ELEMENTS);
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
+        ebpf_module_t *wem = &ebpf_modules[i];
+        write_chart_dimension((char *)wem->thread_name,
+                              (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ? NETDATA_CONTROLLER_END: 0);
+    }
+    write_end_chart();
+}
+
+/**
  * Send Statistic Data
  *
  * Send statistic information to netdata.
@@ -2500,6 +2584,11 @@ void ebpf_send_statistic_data()
     write_chart_dimension(hash_table_core[NETDATA_EBPF_THREAD_PER_CORE], (long long)plugin_statistics.hash_percpu);
     write_chart_dimension(hash_table_core[NETDATA_EBPF_THREAD_UNIQUE], (long long)plugin_statistics.hash_unique);
     write_end_chart();
+
+    ebpf_send_global_hash_table_data();
+
+    ebpf_send_hash_table_pid_data(NETDATA_EBPF_HASH_TABLES_INSERT_PID_ELEMENTS, NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_ADD);
+    ebpf_send_hash_table_pid_data(NETDATA_EBPF_HASH_TABLES_REMOVE_PID_ELEMENTS, NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_DEL);
 }
 
 /**
@@ -2681,6 +2770,66 @@ static inline void ebpf_create_statistic_hash_per_core(int update_every)
                                 ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
 }
 
+/**
+ * Hash table global elements
+ *
+ * Write to standard output current values inside global tables.
+ *
+ * @param update_every time used to update charts
+ */
+static void ebpf_create_statistic_hash_global_elements(int update_every)
+{
+    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
+                         NETDATA_EBPF_HASH_TABLES_GLOBAL_ELEMENTS,
+                         "Controllers inside global table",
+                         "rows",
+                         NETDATA_EBPF_FAMILY,
+                         NETDATA_EBPF_CHART_TYPE_LINE,
+                         NULL,
+                         NETDATA_EBPF_ORDER_STAT_HASH_GLOBAL_TABLE_TOTAL,
+                         update_every,
+                         NETDATA_EBPF_MODULE_NAME_PROCESS);
+
+    int i;
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
+        ebpf_write_global_dimension((char *)ebpf_modules[i].thread_name,
+                                    (char *)ebpf_modules[i].thread_name,
+                                    ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+    }
+}
+
+/**
+ * Hash table global elements
+ *
+ * Write to standard output current values inside global tables.
+ *
+ * @param update_every time used to update charts
+ * @param id           chart id
+ * @param title        chart title
+ * @param order        ordder chart will be shown on dashboard.
+ */
+static void ebpf_create_statistic_hash_pid_table(int update_every, char *id, char *title, int order)
+{
+    ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
+                         id,
+                         title,
+                         "rows",
+                         NETDATA_EBPF_FAMILY,
+                         NETDATA_EBPF_CHART_TYPE_LINE,
+                         NULL,
+                         order,
+                         update_every,
+                         NETDATA_EBPF_MODULE_NAME_PROCESS);
+
+    int i;
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
+        ebpf_module_t *wem = &ebpf_modules[i];
+        if (wem->apps_routine)
+            ebpf_write_global_dimension((char *)wem->thread_name,
+                                        (char *)wem->thread_name,
+                                        ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
+    }
+}
 
 /**
  * Create Statistics Charts
@@ -2718,6 +2867,20 @@ static void ebpf_create_statistic_charts(int update_every)
     ebpf_create_statistic_hash_tables(update_every);
 
     ebpf_create_statistic_hash_per_core(update_every);
+
+    ebpf_create_statistic_hash_global_elements(update_every);
+
+    ebpf_create_statistic_hash_pid_table(update_every,
+                                         NETDATA_EBPF_HASH_TABLES_INSERT_PID_ELEMENTS,
+                                         "Elements inserted into PID table",
+                                         NETDATA_EBPF_ORDER_STAT_HASH_PID_TABLE_ADDED);
+
+    ebpf_create_statistic_hash_pid_table(update_every,
+                                         NETDATA_EBPF_HASH_TABLES_REMOVE_PID_ELEMENTS,
+                                         "Elements removed from PID table",
+                                         NETDATA_EBPF_ORDER_STAT_HASH_PID_TABLE_REMOVED);
+
+    fflush(stdout);
 }
 
 /*****************************************************************
