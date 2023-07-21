@@ -1416,7 +1416,7 @@ cleanup:
         if(!(p->log_thrown & PID_LOG_LIMITS_DETAIL)) {
             netdata_log_info(
                     "FDS_LIMITS: PID %d (%s) is using "
-                    "%0.2d %% of its fds limits, "
+                    "%0.2f %% of its fds limits, "
                     "open fds = %llu ("
                     "files = %llu, "
                     "pipes = %llu, "
