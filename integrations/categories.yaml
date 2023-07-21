@@ -162,6 +162,11 @@
               description: ""
               most_popular: false
               children: []
+        - id: data-collection.linux-systems.kernel-metrics
+          name: Kernel Metrics
+          description: ""
+          most_popular: false
+          children: []
     - id: data-collection.notifications
       name: Notifications
       description: ""
