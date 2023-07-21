@@ -312,7 +312,7 @@ typedef struct systemd_metrics{
 /*                          Docker Events metrics                             */
 /* -------------------------------------------------------------------------- */
 
-static const char *docker_ev_type_string[] = {
+static const char *const docker_ev_type_string[] = {
     "container", "image", "plugin", "volume", "network", "daemon", "service", "node", "secret", "config", "unknown"
 };
 
@@ -320,7 +320,7 @@ static const char *docker_ev_type_string[] = {
 
 #define NUM_OF_CONTAINER_ACTIONS 25 /**< == size of 'Containers actions' array, largest array in docker_ev_action_string **/
 
-static const char *docker_ev_action_string[NUM_OF_DOCKER_EV_TYPES][NUM_OF_CONTAINER_ACTIONS] = {
+static const char *const docker_ev_action_string[NUM_OF_DOCKER_EV_TYPES][NUM_OF_CONTAINER_ACTIONS] = {
     /* Order of arrays is important, it must match the order of docker_ev_type_string[] strings. */
 
 	/* Containers actions */
