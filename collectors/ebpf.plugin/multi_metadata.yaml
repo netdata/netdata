@@ -4,7 +4,7 @@ modules:
       plugin_name: ebpf.plugin
       module_name: filedescriptor
       monitored_instance:
-        name: Filedescriptor
+        name: eBPF Filedescriptor
         link: ""
         categories:
           - data-collection.ebpf
@@ -14,7 +14,9 @@ modules:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: ["file", "eBPF"]
+      keywords:
+        - file
+        - eBPF
       most_popular: false
     overview:
       data_collection:
