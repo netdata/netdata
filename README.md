@@ -110,9 +110,9 @@ It scales nicely from just a single server to thousands of servers, even in comp
 |DBENGINE v2|Faster, more reliable, far more scalable!|Feb<br/>2023|[v1.38](https://github.com/netdata/netdata/releases/tag/v1.38.0)|
 |Netdata Functions|Netdata beyond metrics! Monitoring anything!|||
 |Events Feed|Live feed of events about topology changes and alerts.|||
-|Role Based<br/>Access Control|More roles, offering finer control over access to infrastructure.|||
+|Role Based<br/>Access Control|More roles, offering finer control over access to infrastructure.|Feb<br/>2023|[v1.38](https://github.com/netdata/netdata/releases/tag/v1.38.0#v1380-rbac)|
 |Infinite Scalability|Streaming compression. Replication. Active-active clustering.|Nov<br/>2022|[v1.37](https://github.com/netdata/netdata/releases/tag/v1.37.0)|
-|Grafana Plugin|Netdata Cloud as a data source for Grafana.|||
+|Grafana Plugin|Netdata Cloud as a data source for Grafana.|Nov<br/>2022|[v1.37](https://github.com/netdata/netdata/releases/tag/v1.37.0#v1370-grafana-plugin)|
 |PostgreSQL|Completely rewritten, to reveal all the info, even at the table level.|||
 |Metrics Correlations|Advanced algorithms to find the needle in the haystack.|Aug<br/>2022|[v1.36](https://github.com/netdata/netdata/releases/tag/v1.36.0)|
 |Database Tiering|Netdata gets unlimited retention!|||
