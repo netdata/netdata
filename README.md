@@ -102,7 +102,7 @@ It scales nicely from just a single server to thousands of servers, even in comp
 |Integrations|Netdata Integrations Marketplace!|soon|finishing|
 |New Agent UI|Now Netdata Cloud and Netdata Agent share the same dashboard!|Jul<br/>2023|[v1.41](https://github.com/netdata/netdata/releases/tag/v1.41.0)|
 |Summary Dashboards|High level tiles everywhere!|Jun<br/>2023|[v1.40](https://github.com/netdata/netdata/releases/tag/v1.40.0)|
-|Machine Learning|Multiple ML models per metric.|||
+|Machine Learning|Multiple ML models per metric.|Jun<br/>2023|[v1.40](https://github.com/netdata/netdata/releases/tag/v1.40.0#v1400-ml-extended-training)|
 |SSL|Netdata Agent gets a new SSL layer.|||
 |New Cloud UI|Filter, slice and dice any dataset from the UI! ML-first!|May<br/>2023|[v1.39](https://github.com/netdata/netdata/releases/tag/v1.39.0)|
 |Microsoft Windows|Monitor Windows hosts and apps!|||
@@ -117,7 +117,7 @@ It scales nicely from just a single server to thousands of servers, even in comp
 |Metrics Correlations|Advanced algorithms to find the needle in the haystack.|Aug<br/>2022|[v1.36](https://github.com/netdata/netdata/releases/tag/v1.36.0)|
 |Database Tiering|Netdata gets unlimited retention!|||
 |Kubernetes|Monitor your kubernetes workloads.|||
-|Machine Learning|Anomaly Rate information on every chart.|||
+|Machine Learning|Anomaly Rate information on every chart.|Aug<br/>2022|[v1.36](https://github.com/netdata/netdata/releases/tag/v1.36.0#v1360-anomaly-rate-on-charts)|
 
 </details>
 
