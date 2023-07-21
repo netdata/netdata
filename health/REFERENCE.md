@@ -1257,7 +1257,7 @@ template: cpu_template
     crit: $this > 80
 ```
 
-The `alarm` line specifies the naming scheme Netdata will use. You can use whatever naming scheme you'd like, with `.`
+The `template` line specifies the naming scheme Netdata will use. You can use whatever naming scheme you'd like, with `.`
 and `_` being the only allowed symbols.
 
 The `lookup` line has changed from `of` to `foreach`, and we're now passing three dimensions.
