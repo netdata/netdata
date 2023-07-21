@@ -48,7 +48,7 @@
 #define DELETE_MISSING_NODE_INSTANCES "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);"
 
 #define METADATA_CMD_Q_MAX_SIZE (1024)              // Max queue size; callers will block until there is room
-#define METADATA_MAINTENANCE_FIRST_CHECK (1800)     // Maintenance first run after agent startup in seconds
+#define METADATA_MAINTENANCE_FIRST_CHECK (120)     // Maintenance first run after agent startup in seconds
 #define METADATA_MAINTENANCE_RETRY (60)             // Retry run if already running or last run did actual work
 #define METADATA_MAINTENANCE_REPEAT (60)            // Repeat time for main task
 #define METADATA_HEALTH_LOG_INTERVAL (3600)         // Repeat maintenance for health
