@@ -4,7 +4,7 @@ modules:
     meta: &meta
       plugin_name: freeipmi.plugin
       module_name: sensors
-      monitored_instance:
+      monitored_instance: &monitored_instance
         name: IPMI
         link: "https://www.ibm.com/docs/en/power9/0009-ESS?topic=ipmi-overview"
         categories:
@@ -141,6 +141,7 @@ modules:
     meta:
       <<: *meta
       monitored_instance:
+        <<: *monitored_instance
         name: FreeIPMI
         link: "https://www.gnu.org/software/freeipmi/"
         icon_filename: "freeipmi.jpg"
