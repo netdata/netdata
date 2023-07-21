@@ -24,7 +24,7 @@ This collector is supported on all platforms.
 [% endif %]
 
 [# TODO: This attribute name needs to be changed in the schema #]
-[% if entry.overview['multi-instance'] %]
+[% if entry.overview.multi_instance %]
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 [% else %]
 This collector only supports collecting metrics from a single instance of this integration.
