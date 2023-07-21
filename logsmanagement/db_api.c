@@ -1167,17 +1167,10 @@ return_error:
  * @todo Limit number of results returned through SQLite Query to speed up search?
  */
 void db_search(logs_query_params_t *const p_query_params, struct File_info *const p_file_infos[]) {
-
-    BUFFER *const res_buff = p_query_params->results_buff;
     int rc = 0;
-    sqlite3_stmt *stmt_retrieve_log_msg_metadata;
-    Circ_buff_item_t tmp_itm = {0};
-    size_t text_compressed_size_max = 0;
-    logs_query_res_hdr_t res_hdr = {0}; // results header
-    uv_fs_t read_req;
 
-    /* Used only when multiple DBs are searched */
-    sqlite3 *dbt = NULL;
+    sqlite3_stmt *stmt_retrieve_log_msg_metadata;
+    sqlite3 *dbt = NULL; // Used only when multiple DBs are searched
         
     if(!p_file_infos[1]){ /* Single DB to be searched */
         stmt_retrieve_log_msg_metadata = p_file_infos[0]->stmt_retrieve_log_msg_metadata;
@@ -1262,6 +1255,12 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
             return;
         }
     }
+
+    Circ_buff_item_t tmp_itm = {0};
+    
+    BUFFER *const res_buff = p_query_params->results_buff;
+    m_assert(res_buff->len == 0, "res_buff->len should equal 0");
+    size_t text_compressed_size_max = 0;
     
     while (rc == SQLITE_ROW) {
 
@@ -1274,11 +1273,16 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
         unsigned long num_lines = (unsigned long) sqlite3_column_int64(stmt_retrieve_log_msg_metadata, 5);
         int db_off = p_file_infos[1] ? sqlite3_column_int(stmt_retrieve_log_msg_metadata, 6) : 0;
 
+        /* If exceeding quota and new timestamp is different than previous, terminate query */
+        if(res_buff->len >= p_query_params->quota && (tmp_itm.timestamp != p_query_params->end_timestamp))
+            break;
+
         /* Retrieve compressed log messages from BLOB file */
         if(tmp_itm.text_compressed_size > text_compressed_size_max){
             text_compressed_size_max = tmp_itm.text_compressed_size;
             tmp_itm.text_compressed = reallocz(tmp_itm.text_compressed, text_compressed_size_max);
         }
+        uv_fs_t read_req;
         uv_buf_t uv_buf = uv_buf_init(tmp_itm.text_compressed, tmp_itm.text_compressed_size);
         rc = uv_fs_read(NULL, &read_req, p_file_infos[db_off]->blob_handles[blob_handles_offset], &uv_buf, 1, blob_offset, NULL);
         uv_fs_req_cleanup(&read_req);
@@ -1288,6 +1292,7 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
         }
         
         /* Append retrieved results to BUFFER */
+        logs_query_res_hdr_t res_hdr = {0}; // results header
         buffer_increase(res_buff, sizeof(res_hdr) + tmp_itm.text_size);
         res_hdr.timestamp = tmp_itm.timestamp;
                                                         
@@ -1299,7 +1304,7 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
         } 
         else {
             /* In case of search_keyword, less than sizeof(res_hdr) + tmp_itm.text_size 
-             * space is required, but go for worst case scenario for now */
+             * space may be required, but go for worst case scenario for now */
             decompress_text(&tmp_itm, NULL);
             res_hdr.matches = search_keyword(   tmp_itm.data, tmp_itm.text_size, 
                                                 &res_buff->buffer[res_buff->len + sizeof(res_hdr)], 
@@ -1322,14 +1327,11 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
             memcpy(&res_buff->buffer[res_buff->len], &res_hdr, sizeof(res_hdr));
             res_buff->len += sizeof(res_hdr) + res_hdr.text_size; 
             p_query_params->num_lines += res_hdr.matches;
-        }        
-        
-        if(res_buff->len >= p_query_params->quota){
-            p_query_params->end_timestamp = tmp_itm.timestamp;
-            break;
         }
 
-        res_hdr = (logs_query_res_hdr_t){0};
+        m_assert(TEST_MS_TIMESTAMP_VALID(res_hdr.timestamp), "res_hdr.timestamp is invalid");
+
+        p_query_params->end_timestamp = res_hdr.timestamp;
 
         rc = sqlite3_step(stmt_retrieve_log_msg_metadata);
         if (unlikely(rc != SQLITE_ROW && rc != SQLITE_DONE)){

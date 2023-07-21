@@ -104,6 +104,8 @@ void circ_buff_search(Circ_buff_t *const buffs[], logs_query_params_t *const p_q
                 p_query_params->num_lines += res_hdr.matches;
             }
 
+            m_assert(TEST_MS_TIMESTAMP_VALID(res_hdr.timestamp), "res_hdr.timestamp is invalid");
+
             if(results->len >= p_query_params->quota){
                 p_query_params->end_timestamp = res_hdr.timestamp;
                 break;

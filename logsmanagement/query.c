@@ -88,9 +88,8 @@ const logs_qry_res_err_t *execute_logs_manag_query(logs_query_params_t *p_query_
     if(unlikely(!*p_query_params->filename && !*p_query_params->chart_name))
         return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_INV_REQ_ERR];
 
-    if(unlikely(!p_query_params->start_timestamp || 
-                !p_query_params->end_timestamp   ||
-                p_query_params->start_timestamp > p_query_params->end_timestamp))
+    if(unlikely(!p_query_params->start_timestamp || !p_query_params->end_timestamp ||
+                (p_query_params->start_timestamp > p_query_params->end_timestamp)))
         return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_INV_TS_ERROR];
 
     /* Find p_file_infos for this query according to chart_names or filenames 
@@ -135,9 +134,8 @@ const logs_qry_res_err_t *execute_logs_manag_query(logs_query_params_t *p_query_
      * the DB during the query execution and also no other execute_logs_manag_query 
      * will try to access the DB at the same time. The operations happen 
      * atomically and the DB searches in series. */
-    for(int pfi_off = 0; p_file_infos[pfi_off]; pfi_off++){
+    for(int pfi_off = 0; p_file_infos[pfi_off]; pfi_off++)
         uv_mutex_lock(p_file_infos[pfi_off]->db_mut);
-    }
 
 #if MEASURE_QUERY_TIME
     const msec_t start_time = now_realtime_msec();
@@ -167,9 +165,8 @@ const logs_qry_res_err_t *execute_logs_manag_query(logs_query_params_t *p_query_
         }
     }
 
-    for(int pfi_off = 0; p_file_infos[pfi_off]; pfi_off++){
+    for(int pfi_off = 0; p_file_infos[pfi_off]; pfi_off++)
         uv_mutex_unlock(p_file_infos[pfi_off]->db_mut);
-    }
 
 #if MEASURE_QUERY_TIME
     const msec_t end_time = now_realtime_msec();
