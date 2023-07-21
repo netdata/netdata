@@ -27,6 +27,16 @@
       description: ""
       most_popular: false
       children: []
+    - id: data-collection.ebpf
+      name: eBPF
+      description: ""
+      most_popular: false
+      children: []
+    - id: data-collection.freebsd
+      name: FreeBSD
+      description: ""
+      most_popular: false
+      children: []
     - id: data-collection.containers-and-vms
       name: Containers and VMs
       description: ""
