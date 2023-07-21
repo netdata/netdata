@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import os
 import sys
 
 from pathlib import Path
@@ -35,6 +36,22 @@ RENDER_KEYS = [
     'setup',
     'troubleshooting',
 ]
+
+GITHUB_ACTIONS = os.environ.get('GITHUB_ACTIONS', False)
+
+
+def debug(msg):
+    if GITHUB_ACTIONS:
+        print(f':debug:{ msg }')
+    else:
+        print(f'>>> { msg }')
+
+
+def warn(msg, path):
+    if GITHUB_ACTIONS:
+        print(f':warning file={ path }:{ msg }')
+    else:
+        print(f'!!! WARNING:{ path }:{ msg }')
 
 
 def retrieve_from_filesystem(uri):
@@ -115,19 +132,19 @@ def load_yaml(src):
     yaml = YAML(typ='safe')
 
     if not src.is_file():
-        print(f':warning file={ src }:{ src } is not a file.')
+        warn(f'{ src } is not a file.', src)
         return False
 
     try:
         contents = src.read_text()
     except (IOError, OSError):
-        print(f':warning file={ src }:Failed to load { src }.')
+        warn(f'Failed to read { src }.', src)
         return False
 
     try:
         data = yaml.load(contents)
     except YAMLError:
-        print(f':warning file={ src }:Failed to parse { src } as YAML.')
+        warn(f'Failed to parse { src } as YAML.', src)
         return False
 
     return data
@@ -139,7 +156,7 @@ def load_metadata():
     single, multi = get_metadata_entries()
 
     for path in single:
-        print(f':debug:Loading { path }.')
+        debug(f'Loading { path }.')
         data = load_yaml(path)
 
         if not data:
@@ -148,14 +165,14 @@ def load_metadata():
         try:
             SINGLE_VALIDATOR.validate(data)
         except ValidationError:
-            print(f':warning file={ path }:Failed to validate { path } against the schema.')
+            warn(f'Failed to validate { path } against the schema.', path)
             continue
 
         data['_src_path'] = path
         ret.append(data)
 
     for path in multi:
-        print(f':debug:Loading { path }.')
+        debug(f'Loading { path }.')
         data = load_yaml(path)
 
         if not data:
@@ -164,7 +181,7 @@ def load_metadata():
         try:
             MULTI_VALIDATOR.validate(data)
         except ValidationError:
-            print(f':warning file={ path }:Failed to validate { path } against the schema.')
+            warn(f'Failed to validate { path } against the schema.', path)
             continue
 
         for item in data['modules']:
@@ -187,11 +204,11 @@ def make_id(meta):
 
 
 def render_keys(integrations, categories):
-    print(':debug:Computing default categories.')
+    debug('Computing default categories.')
 
     default_cats, valid_cats = get_category_sets(categories)
 
-    print(':debug:Generating integration IDs.')
+    debug('Generating integration IDs.')
 
     for item in integrations:
         item['id'] = make_id(item['meta'])
@@ -199,7 +216,7 @@ def render_keys(integrations, categories):
     idmap = {i['id']: i for i in integrations}
 
     for item in integrations:
-        print(f':debug:Processing { item["id"] }')
+        debug(f'Processing { item["id"] }.')
 
         related = []
 
@@ -207,7 +224,7 @@ def render_keys(integrations, categories):
             res_id = make_id(res)
 
             if res_id not in idmap.keys():
-                print(f':warning file={ item["_src_path"] }:Could not find related integration { res_id }, ignoring it.')
+                warn(f'Could not find related integration { res_id }, ignoring it.', item['_src_path'])
                 continue
 
             related.append({
@@ -220,14 +237,16 @@ def render_keys(integrations, categories):
 
         item_cats = set(item['meta']['monitored_instance']['categories'])
         bogus_cats = item_cats - valid_cats
+        actual_cats = item_cats & valid_cats
 
         if bogus_cats:
-            print(f':warning file={ item["_src_path"] }:Ignoring invalid categories: { ", ".join(bogus_cats) }')
+            warn(f'Ignoring invalid categories: { ", ".join(bogus_cats) }', item["_src_path"])
 
         if not item_cats:
             item['meta']['monitored_instance']['categories'] = list(default_cats)
+            warn(f'{ item["id"] } does not list any caregories, adding it to: { default_cats }', item["_src_path"])
         else:
-            item['meta']['monitored_instance']['categories'] = list(item_cats)
+            item['meta']['monitored_instance']['categories'] = list(actual_cats)
 
         for scope in item['metrics']['scopes']:
             if scope['name'] == 'global':
