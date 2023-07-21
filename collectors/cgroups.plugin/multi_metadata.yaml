@@ -18,8 +18,8 @@ modules:
       keywords:
         - containers
       most_popular: true
-    overview:
-      data_collection:
+    overview: &overview
+      data_collection: &data_collection
         metrics_description: "Monitor Containers for performance, resource usage, and health status."
         method_description: ""
       supported_platforms:
@@ -414,7 +414,9 @@ modules:
         - pods
         - containers
     overview:
+      <<: *overview
       data-collection:
+        <<: *data_collection
         metrics_description: Monitor Kubernetes Clusters for performance, resource usage, and health status.
     alerts:
       - name: k8s_cgroup_10min_cpu_usage
@@ -807,7 +809,9 @@ modules:
           - systemd
           - services
     overview:
+      <<: *overview
       data-collection:
+        <<: *data_collection
         metrics_desctiption: "Monitor Systemd Services for performance, resource usage, and health status."
     alerts: []
     metrics:
@@ -979,7 +983,9 @@ modules:
         - virtualization
         - container
     overview:
+      <<: *overview
       data_collection:
+        <<: *data_collection
         metrics_description: "Monitor Virtual Machines for performance, resource usage, and health status."
   - <<: *module
     meta:
@@ -995,7 +1001,9 @@ modules:
         - lxd
         - container
     overview:
+      <<: *overview
       data_collection:
+        <<: *data_collection
         metrics_description: "Monitor LXC Containers for performance, resource usage, and health status."
   - <<: *module
     meta:
@@ -1010,7 +1018,9 @@ modules:
         - libvirt
         - container
     overview:
+      <<: *overview
       data_collection:
+        <<: *data_collection
         metrics_description: "Monitor Libvirt for performance, resource usage, and health status."
   - <<: *module
     meta:
@@ -1025,7 +1035,9 @@ modules:
         - ovirt
         - container
     overview:
+      <<: *overview
       data_collection:
+        <<: *data_collection
         metrics_description: "Monitor oVirt for performance, resource usage, and health status."
   - <<: *module
     meta:
@@ -1040,5 +1052,7 @@ modules:
         - proxmox
         - container
     overview:
+      <<: *overview
       data_collection:
+        <<: *data_collection
         metrics_description: "Monitor Proxmox for performance, resource usage, and health status."
