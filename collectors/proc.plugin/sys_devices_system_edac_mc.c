@@ -93,9 +93,12 @@ static void find_all_mc() {
         }
 
         while((de = readdir(dir))) {
-            if(de->d_type == DT_DIR &&
-            ((strncmp(de->d_name, "rank", 4) == 0 && isdigit(de->d_name[4])) ||
-            (strncmp(de->d_name, "dimm", 4) == 0 && isdigit(de->d_name[4])))) {
+            // it can be dimmX or rankX directory
+            // https://www.kernel.org/doc/html/v5.0/admin-guide/ras.html#f5
+
+            if (de->d_type == DT_DIR &&
+                ((strncmp(de->d_name, "rank", 4) == 0 || strncmp(de->d_name, "dimm", 4) == 0)) &&
+                isdigit(de->d_name[4])) {
 
                 struct edac_dimm *d = callocz(1, sizeof(struct edac_dimm));
                 d->name = strdupz(de->d_name);
@@ -200,7 +203,7 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt __maybe_unuse
                     , "edac"
                     , "mem.edac_mc"
                     , "Memory Controller (MC) Error Detection And Correction (EDAC) Errors"
-                    , "errors"
+                    , "errors/s"
                     , PLUGIN_PROC_NAME
                     , "/sys/devices/system/edac/mc"
                     , NETDATA_CHART_PRIO_MEM_HW_ECC_CE
@@ -248,7 +251,7 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt __maybe_unuse
                 		, "edac"
                         , "mem.edac_mc_dimm"
                 		, "DIMM Error Detection And Correction (EDAC) Errors"
-                        , "errors"
+                        , "errors/s"
                         , PLUGIN_PROC_NAME
                         , "/sys/devices/system/edac/mc"
                         , NETDATA_CHART_PRIO_MEM_HW_ECC_CE + 1
@@ -257,7 +260,7 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt __maybe_unuse
                 );
 
                 rrdlabels_add(d->st->rrdlabels, "controller", m->name, RRDLABEL_SRC_AUTO);
-                rrdlabels_add(d->st->rrdlabels, "rank", d->name, RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->st->rrdlabels, "dimm", d->name, RRDLABEL_SRC_AUTO);
 
                 char buffer[1024 + 1];
 

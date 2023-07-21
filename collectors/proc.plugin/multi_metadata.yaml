@@ -1307,7 +1307,7 @@ modules:
       plugin_name: proc.plugin
       module_name: /sys/devices/system/edac/mc
       monitored_instance:
-        name: System Memory Errors
+        name: Memory modules (DIMMs)
         link: ""
         categories:
           - data-collection.linux-systems.memory-metrics
@@ -1319,9 +1319,10 @@ modules:
         description: ""
       keywords:
         - edac
-        - error detection and correction memory controllers
         - ecc
+        - dimm
         - ram
+        - hardware
       most_popular: false
     overview:
       data_collection:
@@ -1362,16 +1363,22 @@ modules:
       problems:
         list: []
     alerts:
-      - name: 1hour_ecc_memory_correctable
+      - name: ecc_memory_mc_noinfo_correctable
+        metric: mem.edac_mc
+        info: memory controller ${label:controller} ECC correctable errors (unknown DIMM slot) in the last 10 minutes
         link: https://github.com/netdata/netdata/blob/master/health/health.d/memory.conf
-        metric: mem.ecc_ce
-        info: number of ECC correctable errors in the last 10 minutes
-        os: "linux"
-      - name: 1hour_ecc_memory_uncorrectable
+      - name: ecc_memory_mc_noinfo_uncorrectable
+        metric: mem.edac_mc
+        info: memory controller ${label:controller} ECC uncorrectable errors (unknown DIMM slot) in the last 10 minutes
         link: https://github.com/netdata/netdata/blob/master/health/health.d/memory.conf
-        metric: mem.ecc_ue
-        info: number of ECC uncorrectable errors in the last 10 minutes
-        os: "linux"
+      - name: ecc_memory_dimm_correctable
+        metric: mem.edac_mc_dimm
+        info: DIMM ${label:dimm} controller ${label:controller} (location ${label:dimm_location}) ECC correctable errors in the last 10 minutes
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/memory.conf
+      - name: ecc_memory_dimm_uncorrectable
+        metric: mem.edac_mc_dimm
+        info: DIMM ${label:dimm} controller ${label:controller} (location ${label:dimm_location}) ECC uncorrectable errors in the last 10 minutes
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/memory.conf
     metrics:
       folding:
         title: Metrics
@@ -1379,22 +1386,54 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
-          description: ""
-          labels: []
+        - name: memory controller
+          description: These metrics refer to the memory controller.
+          labels:
+            - name: controller
+              description: "[mcX](https://www.kernel.org/doc/html/v5.0/admin-guide/ras.html#mcx-directories) directory name of this memory controller."
+            - name: mc_name
+              description: Memory controller type.
+            - name: size_mb
+              description: The amount of memory in megabytes that this memory controller manages.
+            - name: max_location
+              description: Last available memory slot in this memory controller.
           metrics:
-            - name: mem.ecc_ce
-              description: ECC Memory Correctable Errors
-              unit: "errors"
+            - name: mem.edac_mc
+              description: Memory Controller (MC) Error Detection And Correction (EDAC) Errors
+              unit: errors/s
               chart_type: line
               dimensions:
-                - name: a dimension per mem controller
-            - name: mem.ecc_ue
-              description: ECC Memory Uncorrectable Errors
-              unit: "errors"
+                - name: correctable
+                - name: uncorrectable
+                - name: correctable_noinfo
+                - name: uncorrectable_noinfo
+        - name: memory module
+          description: These metrics refer to the memory module (or rank, [depends on the memory controller](https://www.kernel.org/doc/html/v5.0/admin-guide/ras.html#f5)).
+          labels:
+            - name: controller
+              description: "[mcX](https://www.kernel.org/doc/html/v5.0/admin-guide/ras.html#mcx-directories) directory name of this memory controller."
+            - name: dimm
+              description: "[dimmX or rankX](https://www.kernel.org/doc/html/v5.0/admin-guide/ras.html#dimmx-or-rankx-directories) directory name of this memory module."
+            - name: dimm_dev_type
+              description: Type of DRAM device used in this memory module. For example, x1, x2, x4, x8.
+            - name: dimm_edac_mode
+              description: Used type of error detection and correction. For example, S4ECD4ED would mean a Chipkill with x4 DRAM.
+            - name: dimm_label
+              description: Label assigned to this memory module.
+            - name: dimm_location
+              description: Location of the memory module.
+            - name: dimm_mem_type
+              description: Type of the memory module. Usually either buffered or unbuffered memory.
+            - name: size
+              description: The amount of memory in megabytes that this memory module manages.
+          metrics:
+            - name: mem.edac_mc
+              description: DIMM Error Detection And Correction (EDAC) Errors
+              unit: errors/s
               chart_type: line
               dimensions:
-                - name: a dimension per mem controller
+                - name: correctable
+                - name: uncorrectable
   - meta:
       plugin_name: proc.plugin
       module_name: /sys/devices/system/node
