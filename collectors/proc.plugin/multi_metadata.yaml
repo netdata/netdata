@@ -1428,7 +1428,7 @@ modules:
               description: The amount of memory in megabytes that this memory module manages.
           metrics:
             - name: mem.edac_mc
-              description: Memory Controller (MC) Error Detection And Correction (EDAC) Errors
+              description: DIMM Error Detection And Correction (EDAC) Errors
               unit: errors/s
               chart_type: line
               dimensions:
