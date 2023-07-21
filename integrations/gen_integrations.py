@@ -38,13 +38,16 @@ RENDER_KEYS = [
 ]
 
 GITHUB_ACTIONS = os.environ.get('GITHUB_ACTIONS', False)
+DEBUG = os.environ.get('DEBUG', False)
 
 
 def debug(msg):
     if GITHUB_ACTIONS:
         print(f':debug:{ msg }')
-    else:
+    elif DEBUG:
         print(f'>>> { msg }')
+    else:
+        pass
 
 
 def warn(msg, path):
