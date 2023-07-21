@@ -35,7 +35,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list: []
+        list: ['Kernel compiled with bpf syscall', 'Compiled either with CONFIG_KPROBES and when it is possible CONFIG_DEBUG_INFO_BTF.']
       configuration:
         file:
           name: ""
@@ -45,7 +45,7 @@ modules:
           folding:
             title: ""
             enabled: true
-          list: []
+          list: ['ebpf load mode', 'apps', 'cgroups', 'update every', 'pid table size', 'ebpf type format', 'ebpf co-re tracing', 'maps per core', 'lifetime']
         examples:
           folding:
             enabled: true
@@ -53,7 +53,7 @@ modules:
           list: []
     troubleshooting:
       problems:
-        list: []
+        list: ['Kernel not compiled with necessary option', 'function is modified inside kernel', 'Linux Distribution modifies kernel delivered by kernel.org']
     alerts: []
     metrics:
       folding:
@@ -180,13 +180,8 @@ modules:
         include: []
         exclude: []
       multi_instance: true
-<<<<<<< HEAD
       additional_permissions:
         description: ""
-=======
-      additional_permissions: setuid
-        description: 'The plugin needs to load data inside the kernel.'
->>>>>>> b5fbfa504 (ebpf_yaml: Update additional_permissions)
       default_behavior:
         auto_detection:
           description: ""
@@ -370,13 +365,8 @@ modules:
         include: []
         exclude: []
       multi_instance: true
-<<<<<<< HEAD
       additional_permissions:
         description: ""
-=======
-      additional_permissions: setuid
-        description: 'The plugin needs to load data inside the kernel.'
->>>>>>> b5fbfa504 (ebpf_yaml: Update additional_permissions)
       default_behavior:
         auto_detection:
           description: ""
@@ -447,13 +437,8 @@ modules:
         include: []
         exclude: []
       multi_instance: true
-<<<<<<< HEAD
       additional_permissions:
         description: ""
-=======
-      additional_permissions: setuid
-        description: 'The plugin needs to load data inside the kernel.'
->>>>>>> b5fbfa504 (ebpf_yaml: Update additional_permissions)
       default_behavior:
         auto_detection:
           description: ""
@@ -524,13 +509,8 @@ modules:
         include: []
         exclude: []
       multi_instance: true
-<<<<<<< HEAD
       additional_permissions:
         description: ""
-=======
-      additional_permissions: setuid
-        description: 'The plugin needs to load data inside the kernel.'
->>>>>>> b5fbfa504 (ebpf_yaml: Update additional_permissions)
       default_behavior:
         auto_detection:
           description: ""
@@ -695,13 +675,8 @@ modules:
         include: []
         exclude: []
       multi_instance: true
-<<<<<<< HEAD
       additional_permissions:
         description: ""
-=======
-      additional_permissions: setuid
-        description: 'The plugin needs to load data inside the kernel.'
->>>>>>> b5fbfa504 (ebpf_yaml: Update additional_permissions)
       default_behavior:
         auto_detection:
           description: ""
@@ -798,13 +773,8 @@ modules:
         include: []
         exclude: []
       multi_instance: true
-<<<<<<< HEAD
       additional_permissions:
         description: ""
-=======
-      additional_permissions: setuid
-        description: 'The plugin needs to load data inside the kernel.'
->>>>>>> b5fbfa504 (ebpf_yaml: Update additional_permissions)
       default_behavior:
         auto_detection:
           description: ""
@@ -875,13 +845,8 @@ modules:
         include: []
         exclude: []
       multi_instance: true
-<<<<<<< HEAD
       additional_permissions:
         description: ""
-=======
-      additional_permissions: setuid
-        description: 'The plugin needs to load data inside the kernel.'
->>>>>>> b5fbfa504 (ebpf_yaml: Update additional_permissions)
       default_behavior:
         auto_detection:
           description: ""
@@ -993,13 +958,8 @@ modules:
         include: []
         exclude: []
       multi_instance: true
-<<<<<<< HEAD
       additional_permissions:
         description: ""
-=======
-      additional_permissions: setuid
-        description: 'The plugin needs to load data inside the kernel.'
->>>>>>> b5fbfa504 (ebpf_yaml: Update additional_permissions)
       default_behavior:
         auto_detection:
           description: ""
@@ -1086,13 +1046,8 @@ modules:
         include: []
         exclude: []
       multi_instance: true
-<<<<<<< HEAD
       additional_permissions:
         description: ""
-=======
-      additional_permissions: setuid
-        description: 'The plugin needs to load data inside the kernel.'
->>>>>>> b5fbfa504 (ebpf_yaml: Update additional_permissions)
       default_behavior:
         auto_detection:
           description: ""
@@ -1384,13 +1339,8 @@ modules:
         include: []
         exclude: []
       multi_instance: true
-<<<<<<< HEAD
       additional_permissions:
         description: ""
-=======
-      additional_permissions: setuid
-        description: 'The plugin needs to load data inside the kernel.'
->>>>>>> b5fbfa504 (ebpf_yaml: Update additional_permissions)
       default_behavior:
         auto_detection:
           description: ""
@@ -1549,13 +1499,8 @@ modules:
         include: []
         exclude: []
       multi_instance: true
-<<<<<<< HEAD
       additional_permissions:
         description: ""
-=======
-      additional_permissions: setuid
-        description: 'The plugin needs to load data inside the kernel.'
->>>>>>> b5fbfa504 (ebpf_yaml: Update additional_permissions)
       default_behavior:
         auto_detection:
           description: ""
@@ -1658,13 +1603,8 @@ modules:
         include: []
         exclude: []
       multi_instance: true
-<<<<<<< HEAD
       additional_permissions:
         description: ""
-=======
-      additional_permissions: setuid
-        description: 'The plugin needs to load data inside the kernel.'
->>>>>>> b5fbfa504 (ebpf_yaml: Update additional_permissions)
       default_behavior:
         auto_detection:
           description: ""
@@ -1814,13 +1754,8 @@ modules:
         include: []
         exclude: []
       multi_instance: true
-<<<<<<< HEAD
       additional_permissions:
         description: ""
-=======
-      additional_permissions: setuid
-        description: 'The plugin needs to load data inside the kernel.'
->>>>>>> b5fbfa504 (ebpf_yaml: Update additional_permissions)
       default_behavior:
         auto_detection:
           description: ""
@@ -1891,13 +1826,8 @@ modules:
         include: []
         exclude: []
       multi_instance: true
-<<<<<<< HEAD
       additional_permissions:
         description: ""
-=======
-      additional_permissions: setuid
-        description: 'The plugin needs to load data inside the kernel.'
->>>>>>> b5fbfa504 (ebpf_yaml: Update additional_permissions)
       default_behavior:
         auto_detection:
           description: ""
@@ -1976,13 +1906,8 @@ modules:
         include: []
         exclude: []
       multi_instance: true
-<<<<<<< HEAD
       additional_permissions:
         description: ""
-=======
-      additional_permissions: setuid
-        description: 'The plugin needs to load data inside the kernel.'
->>>>>>> b5fbfa504 (ebpf_yaml: Update additional_permissions)
       default_behavior:
         auto_detection:
           description: ""
@@ -2348,13 +2273,8 @@ modules:
         include: []
         exclude: []
       multi_instance: true
-<<<<<<< HEAD
       additional_permissions:
         description: ""
-=======
-      additional_permissions: setuid
-        description: 'The plugin needs to load data inside the kernel.'
->>>>>>> b5fbfa504 (ebpf_yaml: Update additional_permissions)
       default_behavior:
         auto_detection:
           description: ""
