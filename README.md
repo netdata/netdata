@@ -105,8 +105,8 @@ It scales nicely from just a single server to thousands of servers, even in comp
 |Machine Learning|Multiple ML models per metric.|Jun<br/>2023|[v1.40](https://github.com/netdata/netdata/releases/tag/v1.40.0#v1400-ml-extended-training)|
 |SSL|Netdata Agent gets a new SSL layer.|||
 |New Cloud UI|Filter, slice and dice any dataset from the UI! ML-first!|May<br/>2023|[v1.39](https://github.com/netdata/netdata/releases/tag/v1.39.0)|
-|Microsoft Windows|Monitor Windows hosts and apps!|||
-|Virtual Nodes|Go collectors can now be assigned to virtual nodes!|||
+|Microsoft Windows|Monitor Windows hosts and apps!|May<br/>2023|[v1.39](https://github.com/netdata/netdata/releases/tag/v1.39.0#v1390-windows-support)|
+|Virtual Nodes|Go collectors can now be assigned to virtual nodes!|May<br/>2023|[v1.39](https://github.com/netdata/netdata/releases/tag/v1.39.0#v1390-virtual-nodes-and-custom-labels)|
 |DBENGINE v2|Faster, more reliable, far more scalable!|Feb<br/>2023|[v1.38](https://github.com/netdata/netdata/releases/tag/v1.38.0)|
 |Netdata Functions|Netdata beyond metrics! Monitoring anything!|||
 |Events Feed|Live feed of events about topology changes and alerts.|||
