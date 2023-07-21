@@ -108,8 +108,8 @@ It scales nicely from just a single server to thousands of servers, even in comp
 |Microsoft Windows|Monitor Windows hosts and apps!|May<br/>2023|[v1.39](https://github.com/netdata/netdata/releases/tag/v1.39.0#v1390-windows-support)|
 |Virtual Nodes|Go collectors can now be assigned to virtual nodes!|May<br/>2023|[v1.39](https://github.com/netdata/netdata/releases/tag/v1.39.0#v1390-virtual-nodes-and-custom-labels)|
 |DBENGINE v2|Faster, more reliable, far more scalable!|Feb<br/>2023|[v1.38](https://github.com/netdata/netdata/releases/tag/v1.38.0)|
-|Netdata Functions|Netdata beyond metrics! Monitoring anything!|||
-|Events Feed|Live feed of events about topology changes and alerts.|||
+|Netdata Functions|Netdata beyond metrics! Monitoring anything!|Feb<br/>2023|[v1.38](https://github.com/netdata/netdata/releases/tag/v1.38.0#v1380-functions)|
+|Events Feed|Live feed of events about topology changes and alerts.|Feb<br/>2023|[v1.38](https://github.com/netdata/netdata/releases/tag/v1.38.0#v1380-feed)|
 |Role Based<br/>Access Control|More roles, offering finer control over access to infrastructure.|Feb<br/>2023|[v1.38](https://github.com/netdata/netdata/releases/tag/v1.38.0#v1380-rbac)|
 |Infinite Scalability|Streaming compression. Replication. Active-active clustering.|Nov<br/>2022|[v1.37](https://github.com/netdata/netdata/releases/tag/v1.37.0)|
 |Grafana Plugin|Netdata Cloud as a data source for Grafana.|Nov<br/>2022|[v1.37](https://github.com/netdata/netdata/releases/tag/v1.37.0#v1370-grafana-plugin)|
