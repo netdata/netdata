@@ -1533,35 +1533,19 @@ inline int web_client_api_request_v1_logsmanagement_sources(RRDHOST *host, struc
 
     buffer_sprintf( w->response.data, 
                     "{\n"
-                    "   \"api version\": %s,\n" 
-                    "   \"log sources\": {\n",
-                    QUERY_VERSION);
-    LOGS_QUERY_RESULT_TYPE err_code = fetch_log_sources(w->response.data);
+                    "   \"api version\": "LOGS_QRY_VERSION",\n" 
+                    "   \"log sources\": {\n");
+    const logs_qry_res_err_t *const res_err = fetch_log_sources(w->response.data);
     buffer_sprintf( w->response.data, 
                     "\n"
                     "   },\n"
                     "   \"error code\": %d,\n"
-                    "   \"error\": \"",
-                    err_code);
-    int status;
-    switch(err_code){
-        case GENERIC_ERROR:
-            buffer_strcat(w->response.data, "query generic error");
-            status = HTTP_RESP_BACKEND_FETCH_FAILED;
-            break;
-        case NO_RESULTS_FOUND:
-            buffer_strcat(w->response.data, "no results found");
-            status = HTTP_RESP_OK;
-            break;
-        default:
-            buffer_strcat(w->response.data, "no error");
-            status = HTTP_RESP_OK;
-            break;
-    } 
-    buffer_strcat(w->response.data, "\"\n}");
+                    "   \"error\": \"%s\"\n}",
+                    res_err->err_code,
+                    res_err->err_str);
 
     buffer_no_cacheable(w->response.data);
-    return status;
+    return res_err->http_code;
 }
 
 inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_client *w, char *url) {
@@ -1621,12 +1605,12 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
     query_params.results_buff = buffer_create(query_params.quota, &netdata_buffers_statistics.buffers_api);
     
     buffer_strcat(w->response.data, "{\n");
-    buffer_sprintf(w->response.data, "\t\"api_version\": %s,\n", QUERY_VERSION);
+    buffer_sprintf(w->response.data, "\t\"api_version\": %s,\n", LOGS_QRY_VERSION);
     buffer_sprintf(w->response.data, "\t\"requested_from\": %llu,\n", query_params.start_timestamp);
     buffer_sprintf(w->response.data, "\t\"requested_until\": %llu,\n", query_params.end_timestamp);
     buffer_sprintf(w->response.data, "\t\"requested_quota\": %llu,\n", query_params.quota / (1 KiB));
     buffer_sprintf(w->response.data, "\t\"requested_keyword\": \"%s\",\n", query_params.keyword ? query_params.keyword : "");
-    LOGS_QUERY_RESULT_TYPE err_code = execute_logs_manag_query(&query_params); // WARNING! query may change start_timestamp, end_timestamp and quota  
+    const logs_qry_res_err_t *const res_err = execute_logs_manag_query(&query_params); // WARNING! query may change start_timestamp, end_timestamp and quota  
     buffer_sprintf(w->response.data, "\t\"actual_from\": %llu,\n", query_params.start_timestamp);
     buffer_sprintf(w->response.data, "\t\"actual_until\": %llu,\n", query_params.end_timestamp);
     buffer_sprintf(w->response.data, "\t\"actual_quota\": %llu,\n", query_params.quota / (1 KiB));
@@ -1716,35 +1700,14 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
                                                                    end.ru_stime.tv_usec - 
                                                                    start.ru_stime.tv_sec * USEC_PER_SEC -
                                                                    start.ru_stime.tv_usec);
-    buffer_sprintf(w->response.data, "\t\"error_code\": %d,\n", err_code);
-    buffer_sprintf(w->response.data, "\t\"error\": \"");
-    switch(err_code){
-        case GENERIC_ERROR:
-            buffer_strcat(w->response.data, "query generic error");
-            break;
-        case INVALID_REQUEST_ERROR:
-            buffer_strcat(w->response.data, "invalid request");
-            break;
-        case NO_MATCHING_CHART_OR_FILENAME_ERROR:
-            buffer_strcat(w->response.data, "no matching chart or filename found");
-            break;
-        case NO_RESULTS_FOUND:
-            buffer_strcat(w->response.data, "no results found");
-            break;
-        default:
-            buffer_strcat(w->response.data, "success");
-            break;
-    } 
-    buffer_strcat(w->response.data, "\"\n}");
+    buffer_sprintf(w->response.data, "\t\"error_code\": %d,\n", res_err->err_code);
+    buffer_sprintf(w->response.data, "\t\"error\": \"%s\"\n}", res_err->err_str);
         
     buffer_free(query_params.results_buff);
 
     buffer_no_cacheable(w->response.data);
 
-    if( unlikely(   err_code == INVALID_REQUEST_ERROR || 
-                    err_code == NO_MATCHING_CHART_OR_FILENAME_ERROR)) return HTTP_RESP_BAD_REQUEST;
-    if( unlikely(err_code == GENERIC_ERROR)) return HTTP_RESP_BACKEND_FETCH_FAILED;
-    return HTTP_RESP_OK;
+    return res_err->http_code;
 }
 #endif // ENABLE_LOGSMANAGEMENT
 

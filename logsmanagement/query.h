@@ -12,7 +12,7 @@
 #include "libnetdata/libnetdata.h"
 #include "logsmanagement_conf.h"
 
-#define QUERY_VERSION "1"
+#define LOGS_QRY_VERSION "1"
 
 #define LOGS_QRY_KW_START_TIME  "from"
 #define LOGS_QRY_KW_END_TIME    "until"
@@ -26,15 +26,27 @@
 #define LOGS_QRY_KW_JSON_ARRAY  "json_array"
 #define LOGS_QRY_KW_NEWLINE     "newline"
 
-typedef enum logs_query_result_type {
-    OK = 0,
-    GENERIC_ERROR = -1,
-    INVALID_REQUEST_ERROR = -2,
-    NO_MATCHING_CHART_OR_FILENAME_ERROR = -3,
-    NO_RESULTS_FOUND = -4,
-} LOGS_QUERY_RESULT_TYPE;
+typedef struct {
+    const enum {LOGS_QRY_RES_ERR_CODE_OK, 
+                LOGS_QRY_RES_ERR_CODE_GEN_ERR, 
+                LOGS_QRY_RES_ERR_CODE_INV_REQ_ERR,
+                LOGS_QRY_RES_ERR_CODE_INV_TS_ERROR,
+                LOGS_QRY_RES_ERR_CODE_NO_MATCH_ERR,
+                LOGS_QRY_RES_ERR_CODE_NOT_FOUND_ERR } err_code;
+    char const *const err_str;
+    const int http_code;
+} logs_qry_res_err_t;
 
-LOGS_QUERY_RESULT_TYPE fetch_log_sources(BUFFER *wb);
+static const logs_qry_res_err_t logs_qry_res_err[] = {
+    { LOGS_QRY_RES_ERR_CODE_OK,             "success",                              HTTP_RESP_OK                    },
+    { LOGS_QRY_RES_ERR_CODE_GEN_ERR,        "generic error",                        HTTP_RESP_BACKEND_FETCH_FAILED  },
+    { LOGS_QRY_RES_ERR_CODE_INV_REQ_ERR,    "invalid request",                      HTTP_RESP_BAD_REQUEST           },
+    { LOGS_QRY_RES_ERR_CODE_INV_TS_ERROR,   "invalid timestamp range",              HTTP_RESP_BAD_REQUEST           },
+    { LOGS_QRY_RES_ERR_CODE_NO_MATCH_ERR,   "no matching chart or filename found",  HTTP_RESP_BAD_REQUEST           },
+    { LOGS_QRY_RES_ERR_CODE_NOT_FOUND_ERR,  "no results found",                     HTTP_RESP_OK                    }
+};
+
+const logs_qry_res_err_t *fetch_log_sources(BUFFER *wb);
 
 typedef enum logs_query_data_format {
     LOGS_QUERY_DATA_FORMAT_JSON_ARRAY, // default
@@ -94,10 +106,10 @@ typedef struct logs_query_res_hdr {
  * @brief Primary query API. 
  * @param p_query_params See documentation of logs_query_params_t struct on how 
  * to use argument.
- * @return enum of LOGS_QUERY_RESULT_TYPE with result of query
+ * @return enum of LOGS_QRY_RES_ERR_CODE with result of query
  * @todo Cornercase if filename not found in DB? Return specific message?
  */
-LOGS_QUERY_RESULT_TYPE execute_logs_manag_query(logs_query_params_t *p_query_params);
+const logs_qry_res_err_t *execute_logs_manag_query(logs_query_params_t *p_query_params);
 
 #ifdef ENABLE_LOGSMANAGEMENT_TESTS
 /* Used as public only for unit testing, normally defined as static */

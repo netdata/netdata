@@ -81,8 +81,6 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
     UNUSED(callback);
     UNUSED(callback_data);
 
-    int status;
-
     logs_query_params_t query_params = {  
         .start_timestamp = LOGS_MANAG_QUERY_START_DEFAULT,
         .end_timestamp = LOGS_MANAG_QUERY_END_DEFAULT, /* default from / until to return all timestamps */
@@ -112,32 +110,17 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
                             "{\n"
                             "   \"api version\": %s,\n" 
                             "   \"log sources\": {\n",
-                            QUERY_VERSION);
-            LOGS_QUERY_RESULT_TYPE err_code = fetch_log_sources(dest_wb);
+                            LOGS_QRY_VERSION);
+            const logs_qry_res_err_t *const res_err = fetch_log_sources(dest_wb);
             buffer_sprintf( dest_wb, 
                             "\n"
                             "   },\n"
                             "   \"error code\": %d,\n"
-                            "   \"error\": \"",
-                            err_code);
-            
-            switch(err_code){
-                case GENERIC_ERROR:
-                    buffer_strcat(dest_wb, "query generic error");
-                    status = HTTP_RESP_BACKEND_FETCH_FAILED;
-                    break;
-                case NO_RESULTS_FOUND:
-                    buffer_strcat(dest_wb, "no results found");
-                    status = HTTP_RESP_OK;
-                    break;
-                default:
-                    buffer_strcat(dest_wb, "no error");
-                    status = HTTP_RESP_OK;
-                    break;
-            } 
-            buffer_strcat(dest_wb, "\"\n}");
+                            "   \"error\": \"%s\"\n}",
+                            res_err->err_code,
+                            res_err->err_str);
 
-            return status;
+            return res_err->http_code;
         }
 
         char *key = strsep_skip_consecutive_separators(&value, ":");
@@ -194,20 +177,8 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
     const unsigned long req_quota = query_params.quota;
     struct rusage start, end;
     getrusage(RUSAGE_THREAD, &start);
-    LOGS_QUERY_RESULT_TYPE err_code = execute_logs_manag_query(&query_params); // WARNING! query may change start_timestamp, end_timestamp and quota
+    const logs_qry_res_err_t *const res_err = execute_logs_manag_query(&query_params); // WARNING! query may change start_timestamp, end_timestamp and quota
     getrusage(RUSAGE_THREAD, &end);
-
-    switch(err_code){
-        case INVALID_REQUEST_ERROR:
-        case NO_MATCHING_CHART_OR_FILENAME_ERROR:
-            status = HTTP_RESP_BAD_REQUEST;
-            break;
-        case GENERIC_ERROR:
-            status = HTTP_RESP_BACKEND_FETCH_FAILED;
-            break;
-        default:
-            status = HTTP_RESP_OK;
-    }
 
     fn_off = cn_off = 0;
 
@@ -224,9 +195,9 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
                     "      \"requested_until\": %llu,\n"
                     "      \"requested_quota\": %llu,\n"
                     "      \"requested_keyword\": \"%s\",\n",
-                    status,
+                    res_err->http_code,
                     update_every,
-                    QUERY_VERSION,
+                    LOGS_QRY_VERSION,
                     req_start_timestamp,
                     req_end_timestamp,
                     req_quota / (1 KiB),
@@ -258,33 +229,16 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
                     "      \"user_time\": %llu,\n"
                     "      \"system_time\": %llu,\n"
                     "      \"error_code\": %d,\n"
-                    "      \"error\": \"",
+                    "      \"error\": \"%s\"\n",
                     query_params.num_lines,
                     end.ru_utime.tv_sec * USEC_PER_SEC + end.ru_utime.tv_usec - 
                     start.ru_utime.tv_sec * USEC_PER_SEC - start.ru_utime.tv_usec,
                     end.ru_stime.tv_sec * USEC_PER_SEC + end.ru_stime.tv_usec - 
                     start.ru_stime.tv_sec * USEC_PER_SEC - start.ru_stime.tv_usec,
-                    err_code
+                    res_err->err_code,
+                    res_err->err_str
     );
-    switch(err_code){
-        case GENERIC_ERROR:
-            buffer_strcat(dest_wb, "query generic error");
-            break;
-        case INVALID_REQUEST_ERROR:
-            buffer_strcat(dest_wb, "invalid request");
-            break;
-        case NO_MATCHING_CHART_OR_FILENAME_ERROR:
-            buffer_strcat(dest_wb, "no matching chart or filename found");
-            break;
-        case NO_RESULTS_FOUND:
-            buffer_strcat(dest_wb, "no results found");
-            break;
-        default:
-            buffer_strcat(dest_wb, "success");
-            break;
-    } 
     buffer_strcat(  dest_wb, 
-                    "\"\n"
                     "   },\n"
                     "   \"data\":[\n"
     );
@@ -382,5 +336,5 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
 
     // buffer_no_cacheable(dest_wb);  
 
-    return status;
+    return res_err->http_code;
 }

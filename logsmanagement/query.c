@@ -46,8 +46,9 @@ UNIT_STATIC char *sanitise_string(char *const s){
     return s_san;
 }
 
-LOGS_QUERY_RESULT_TYPE fetch_log_sources(BUFFER *wb){
-    if(unlikely(!p_file_infos_arr || !p_file_infos_arr->count)) return NO_RESULTS_FOUND;
+const logs_qry_res_err_t *fetch_log_sources(BUFFER *wb){
+    if(unlikely(!p_file_infos_arr || !p_file_infos_arr->count)) 
+        return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_NOT_FOUND_ERR];
 
     for (int i = 0; i < p_file_infos_arr->count; i++) {
         buffer_sprintf( wb, "       \"%s\": {\n"
@@ -69,24 +70,28 @@ LOGS_QUERY_RESULT_TYPE fetch_log_sources(BUFFER *wb){
                         p_file_infos_arr->data[i]->blob_max_size * BLOB_MAX_FILES
                         );
     }
+
     /* Results are terminated as ",\n" but should actually be null-terminated, 
      * so replace those 2 characters with '\0' */
     wb->len -= 2;
     wb->buffer[wb->len] = '\0';
-    return OK;
+
+    return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_OK];
 }
 
-LOGS_QUERY_RESULT_TYPE execute_logs_manag_query(logs_query_params_t *p_query_params) {
+const logs_qry_res_err_t *execute_logs_manag_query(logs_query_params_t *p_query_params) {
     struct File_info *p_file_infos[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES] = {NULL};
 
     if(unlikely(p_query_params->quota > MAX_LOG_MSG_SIZE)) p_query_params->quota = MAX_LOG_MSG_SIZE;
 
     /* Check all required query parameters are present */
-    if(unlikely( !p_query_params->start_timestamp || 
-                 !p_query_params->end_timestamp || 
-                (!*p_query_params->filename && !*p_query_params->chart_name))){
-        return INVALID_REQUEST_ERROR;
-    }
+    if(unlikely(!*p_query_params->filename && !*p_query_params->chart_name))
+        return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_INV_REQ_ERR];
+
+    if(unlikely(!p_query_params->start_timestamp || 
+                !p_query_params->end_timestamp   ||
+                p_query_params->start_timestamp > p_query_params->end_timestamp))
+        return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_INV_TS_ERROR];
 
     /* Find p_file_infos for this query according to chart_names or filenames 
      * if the former is not valid. Only one of the two will be used, 
@@ -115,9 +120,9 @@ LOGS_QUERY_RESULT_TYPE execute_logs_manag_query(logs_query_params_t *p_query_par
             }
         }
     }
-    else return NO_MATCHING_CHART_OR_FILENAME_ERROR;
+    else return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_NO_MATCH_ERR];
 
-    if(unlikely(!p_file_infos[0])) return NO_MATCHING_CHART_OR_FILENAME_ERROR;
+    if(unlikely(!p_file_infos[0])) return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_NO_MATCH_ERR];
 
     
     if( p_query_params->sanitize_keyword && p_query_params->keyword && 
@@ -180,7 +185,7 @@ LOGS_QUERY_RESULT_TYPE execute_logs_manag_query(logs_query_params_t *p_query_par
         freez(p_query_params->keyword);
     }
 
-    if(!p_query_params->results_buff->len) return NO_RESULTS_FOUND;
+    if(!p_query_params->results_buff->len) return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_NOT_FOUND_ERR];
 
-    return OK;
+    return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_OK];
 }
