@@ -1511,21 +1511,30 @@ modules:
       plugin_name: ebpf.plugin
       module_name: filesystem
       monitored_instance:
-        name: ebpf filesystem
+        name: eBPF Filesystem
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - Filesystem
+        - ext4
+        - btrfs
+        - nfs
+        - xfs
+        - zfs
+        - eBPF
+        - latency
+        - I/O
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
+        metrics_description: "Monitor latency for main actions on filesystem like I/O events."
         method_description: ""
       supported_platforms:
         include: []
