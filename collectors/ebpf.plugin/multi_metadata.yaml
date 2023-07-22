@@ -1936,21 +1936,26 @@ modules:
       plugin_name: ebpf.plugin
       module_name: vfs
       monitored_instance:
-        name: ebpf vfs
+        name: eBPF VFS
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - virtual
+        - filesystem
+        - eBPF
+        - I/O
+        - files
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
+        metrics_description: "Monitor I/O events on Linux Virtual Filesystem."
         method_description: ""
       supported_platforms:
         include: []
