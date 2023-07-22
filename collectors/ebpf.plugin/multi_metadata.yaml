@@ -668,21 +668,25 @@ modules:
       plugin_name: ebpf.plugin
       module_name: sync
       monitored_instance:
-        name: ebpf sync
+        name: eBPF Sync
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - syscall
+        - eBPF
+        - hard disk
+        - memory
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
+        metrics_description: "Monitor syscalls responsible to move data from memory to storage device."
         method_description: ""
       supported_platforms:
         include: []
