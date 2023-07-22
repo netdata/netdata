@@ -1799,8 +1799,10 @@ int main (int argc, char **argv) {
     for(iteration = 0; 1 ; iteration++) {
         usec_t dt = heartbeat_next(&hb, step);
 
-        if(!tty)
+        if (!tty) {
             fprintf(stdout, "\n"); // keepalive to avoid parser read timeout (2 minutes) during ipmi_detect_speed_secs()
+            fflush(stdout);
+        }
 
         struct netdata_ipmi_state state = {0 };
 
