@@ -427,11 +427,11 @@ modules:
       plugin_name: ebpf.plugin
       module_name: hardirq
       monitored_instance:
-        name: ebpf hardirq
+        name: eBPF Hardirq
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
@@ -441,7 +441,7 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
+        metrics_description: "Monitor latency for each HardIRQ available."
         method_description: ""
       supported_platforms:
         include: []
@@ -490,7 +490,7 @@ modules:
           labels: []
           metrics:
             - name: system.hardirq_latency
-              description: Hardware IRQ latency
+              description: Hard IRQ latency
               unit: "milisecondds"
               chart_type: stacked
               dimensions:
@@ -1848,80 +1848,6 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: soft IRQs
-  - meta:
-      plugin_name: ebpf.plugin
-      module_name: hardirq
-      monitored_instance:
-        name: eBPF HardIRQ
-        link: ""
-        categories:
-          - data-collection.ebpf
-        icon_filename: "ebpf.jpg"
-      related_resources:
-        integrations:
-          list: []
-      info_provided_to_referring_integrations:
-        description: ""
-      keywords:
-        - HardIRQ
-        - eBPF
-      most_popular: false
-    overview:
-      data_collection:
-        metrics_description: "Monitor latency for each HardIRQ available."
-        method_description: ""
-      supported_platforms:
-        include: []
-        exclude: []
-      multi_instance: true
-      additional_permissions:
-        description: ""
-      default_behavior:
-        auto_detection:
-          description: ""
-        limits:
-          description: ""
-        performance_impact:
-          description: ""
-    setup:
-      prerequisites:
-        list: []
-      configuration:
-        file:
-          name: ""
-          description: ""
-        options:
-          description: ""
-          folding:
-            title: ""
-            enabled: true
-          list: []
-        examples:
-          folding:
-            enabled: true
-            title: ""
-          list: []
-    troubleshooting:
-      problems:
-        list: []
-    alerts: []
-    metrics:
-      folding:
-        title: Metrics
-        enabled: false
-      description: ""
-      availability: []
-      scopes:
-        - name: global
-          description: ""
-          labels: []
-          metrics:
-            - name: system.hardirq_latency
-              description: Hard IRQ latency
-              unit: "miliseconds"
-              chart_type: stacked
-              dimensions:
-                - name: hard IRQs
   - meta:
       plugin_name: ebpf.plugin
       module_name: mount
