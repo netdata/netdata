@@ -2,50 +2,60 @@
 
 #include "plugin_proc.h"
 
-struct edac_count {
-    bool updated;
-    char *filename;
-    procfile *ff;
+static char *pci_aer_dirname = NULL;
+
+typedef enum __attribute__((packed)) {
+    AER_DEV_NONFATAL,
+    AER_DEV_CORRECTABLE,
+    AER_DEV_FATAL,
+    AER_ROOTPORT_TOTAL_ERR_COR,
+    AER_ROOTPORT_TOTAL_ERR_FATAL,
+} AER_TYPE;
+
+struct aer_value {
     kernel_uint_t count;
     RRDDIM *rd;
 };
 
-struct edac_dimm {
-	char *name;
+struct aer_entry {
+    bool updated;
 
-    struct edac_count ce;
-    struct edac_count ue;
+    STRING *name;
+    AER_TYPE type;
 
-    RRDSET *st;
-
-    struct edac_dimm *prev, *next;
-};
-
-struct mc {
-    char *name;
-
-    struct edac_count ce;
-    struct edac_count ue;
-    struct edac_count ce_noinfo;
-    struct edac_count ue_noinfo;
+    procfile *ff;
+    DICTIONARY *values;
 
     RRDSET *st;
-
-    struct edac_dimm *dimms;
-
-    struct mc *prev, *next;
 };
 
-static struct mc *mc_root = NULL;
-static char *pci_aer_dirname = NULL;
+DICTIONARY *aer_root = NULL;
 
-static DICTIONARY *aer_dev_fatal = NULL;
-static DICTIONARY *aer_dev_nonfatal = NULL;
-static DICTIONARY *aer_dev_correctable = NULL;
+static bool aer_value_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
+	struct aer_value *v = old_value;
+    struct aer_value *nv = new_value;
 
-struct pci_device {
+    v->count = nv->count;
 
-};
+    return false;
+}
+
+static void aer_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct aer_entry *a = value;
+    a->values = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE);
+    dictionary_register_conflict_callback(a->values, aer_value_conflict_callback, NULL);
+}
+
+static void add_pci_aer(const char *base_dir, const char *d_name, AER_TYPE type) {
+    char buffer[FILENAME_MAX + 1];
+    snprintfz(buffer, FILENAME_MAX, "%s/%s", base_dir, d_name);
+    struct aer_entry *a = dictionary_set(aer_root, buffer, NULL, sizeof(struct aer_entry));
+
+    if(!a->name)
+        a->name = string_strdupz(d_name);
+
+    a->type = type;
+}
 
 static bool recursively_find_pci_aer(const char *base_dir, const char *d_name, int depth) {
     if(depth > 100)
@@ -62,17 +72,26 @@ static bool recursively_find_pci_aer(const char *base_dir, const char *d_name, i
     struct dirent *de = NULL;
     while((de = readdir(dir))) {
         if(de->d_type == DT_DIR) {
+            if(de->d_name[0] == '.')
+                continue;
+
             recursively_find_pci_aer(buffer, de->d_name, depth + 1);
         }
         else if(de->d_type == DT_REG) {
             if(strcmp(de->d_name, "aer_dev_nonfatal") == 0) {
-                ;
+                add_pci_aer(buffer, de->d_name, AER_DEV_NONFATAL);
             }
             else if(strcmp(de->d_name, "aer_dev_correctable") == 0) {
-                ;
+                add_pci_aer(buffer, de->d_name, AER_DEV_CORRECTABLE);
             }
             else if(strcmp(de->d_name, "aer_dev_fatal") == 0) {
-                ;
+                add_pci_aer(buffer, de->d_name, AER_DEV_FATAL);
+            }
+            else if(strcmp(de->d_name, "aer_rootport_total_err_cor") == 0) {
+                add_pci_aer(buffer, de->d_name, AER_ROOTPORT_TOTAL_ERR_COR);
+            }
+            else if(strcmp(de->d_name, "aer_rootport_total_err_fatal") == 0) {
+                add_pci_aer(buffer, de->d_name, AER_ROOTPORT_TOTAL_ERR_FATAL);
             }
         }
     }
@@ -99,174 +118,174 @@ static void find_all_pci_aer() {
     closedir(dir);
 }
 
-static kernel_uint_t read_edac_count(struct edac_count *t) {
+static void read_pci_aer_values(const char *filename, struct aer_entry *t) {
     t->updated = false;
-    t->count = 0;
 
-    if(t->filename) {
-        if(unlikely(!t->ff)) {
-            t->ff = procfile_open(t->filename, " \t", PROCFILE_FLAG_DEFAULT);
-            if(unlikely(!t->ff))
-                return 0;
-        }
-
-        t->ff = procfile_readall(t->ff);
-        if(unlikely(!t->ff || procfile_lines(t->ff) < 1 || procfile_linewords(t->ff, 0) < 1))
-            return 0;
-
-        t->count = str2ull(procfile_lineword(t->ff, 0, 0), NULL);
-        t->updated = true;
+    if(unlikely(!t->ff)) {
+        t->ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
+        if(unlikely(!t->ff))
+            return;
     }
 
-    return t->count;
+    t->ff = procfile_readall(t->ff);
+    if(unlikely(!t->ff || procfile_lines(t->ff) < 1 || procfile_linewords(t->ff, 0) < 1))
+        return;
+
+    size_t lines = procfile_lines(t->ff);
+    for(size_t l = 0; l < lines ; l++) {
+        struct aer_value v = {
+                .count = str2ull(procfile_lineword(t->ff, l, 1), NULL)
+        };
+        dictionary_set(t->values, procfile_lineword(t->ff, l, 0), &v, sizeof(v));
+    }
+
+    t->updated = true;
 }
 
-static bool read_edac_mc_file(const char *mc, const char *filename, char *out, size_t out_size) {
-    char f[FILENAME_MAX + 1];
-    snprintfz(f, FILENAME_MAX, "%s/%s/%s", pci_aer_dirname, mc, filename);
-    if(read_file(f, out, out_size) != 0) {
-        collector_error("EDAC: cannot read file '%s'", f);
-        return false;
-    }
-    return true;
-}
+static void read_pci_aer_count(const char *filename, struct aer_entry *t) {
+    t->updated = false;
 
-static bool read_edac_mc_rank_file(const char *mc, const char *rank, const char *filename, char *out, size_t out_size) {
-    char f[FILENAME_MAX + 1];
-    snprintfz(f, FILENAME_MAX, "%s/%s/%s/%s", pci_aer_dirname, mc, rank, filename);
-    if(read_file(f, out, out_size) != 0) {
-        collector_error("EDAC: cannot read file '%s'", f);
-        return false;
+    if(unlikely(!t->ff)) {
+        t->ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
+        if(unlikely(!t->ff))
+            return;
     }
-    return true;
+
+    t->ff = procfile_readall(t->ff);
+    if(unlikely(!t->ff || procfile_lines(t->ff) < 1 || procfile_linewords(t->ff, 0) < 1))
+        return;
+
+    struct aer_value v = {
+            .count = str2ull(procfile_lineword(t->ff, 0, 0), NULL)
+    };
+    dictionary_set(t->values, "count", &v, sizeof(v));
+    t->updated = true;
 }
 
 int do_proc_sys_devices_pci_aer(int update_every, usec_t dt __maybe_unused) {
-    if(unlikely(!mc_root)) {
+    if(unlikely(!aer_root)) {
+        char buffer[100 + 1] = "";
+        rrdlabels_get_value_strcpyz(localhost->rrdlabels, buffer, 100, "_virtualization");
+        if(strcmp(buffer, "none") != 0)
+            // no need to run on virtualized environments
+            return 1;
+
+        aer_root = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
+        dictionary_register_insert_callback(aer_root, aer_insert_callback, NULL);
         find_all_pci_aer();
 
-        if(!mc_root)
-            // don't call this again
+        if(!dictionary_entries(aer_root))
             return 1;
     }
 
-    for(struct mc *m = mc_root; m; m = m->next) {
-        read_edac_count(&m->ce);
-        read_edac_count(&m->ce_noinfo);
-        read_edac_count(&m->ue);
-        read_edac_count(&m->ue_noinfo);
+	struct aer_entry *a;
+    dfe_start_read(aer_root, a) {
+        switch(a->type) {
+            case AER_DEV_NONFATAL:
+            case AER_DEV_FATAL:
+            case AER_DEV_CORRECTABLE:
+                read_pci_aer_values(a_dfe.name, a);
+                break;
 
-        for(struct edac_dimm *d = m->dimms; d ;d = d->next) {
-            read_edac_count(&d->ce);
-            read_edac_count(&d->ue);
+            case AER_ROOTPORT_TOTAL_ERR_COR:
+            case AER_ROOTPORT_TOTAL_ERR_FATAL:
+                read_pci_aer_count(a_dfe.name, a);
+                break;
         }
-    }
 
-    // --------------------------------------------------------------------
-
-    for(struct mc *m = mc_root; m ; m = m->next) {
-        if(unlikely(!m->ce.updated && !m->ue.updated && !m->ce_noinfo.updated && !m->ue_noinfo.updated))
+        if(!a->updated)
             continue;
 
-        if(unlikely(!m->st)) {
-            char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "edac_%s", m->name);
-            m->st = rrdset_create_localhost(
-                    "mem"
-                    , id
-                    , NULL
-                    , "edac"
-                    , "mem.edac_mc"
-                    , "Memory Controller (MC) Error Detection And Correction (EDAC) Errors"
-                    , "errors/s"
-                    , PLUGIN_PROC_NAME
-                    , "/sys/devices/system/edac/mc"
-                    , NETDATA_CHART_PRIO_MEM_HW_ECC_CE
-                    , update_every
-                    , RRDSET_TYPE_LINE
-            );
+        if(!a->st) {
+            const char *title;
+            const char *context;
 
-            rrdlabels_add(m->st->rrdlabels, "controller", m->name, RRDLABEL_SRC_AUTO);
+            switch(a->type) {
+                case AER_DEV_NONFATAL:
+                    title = "PCI Advanced Error Recovery Non-Fatal Errors";
+                    context = "pci.aer_nonfatal";
+                    break;
 
-            char buffer[1024 + 1];
+                case AER_DEV_FATAL:
+                    title = "PCI Advanced Error Recovery Fatal Errors";
+                    context = "pci.aer_fatal";
+                    break;
 
-            if(read_edac_mc_file(m->name, "mc_name", buffer, 1024))
-                rrdlabels_add(m->st->rrdlabels, "mc_name", buffer, RRDLABEL_SRC_AUTO);
+                case AER_DEV_CORRECTABLE:
+                    title = "PCI Advanced Error Recovery Correctable Errors";
+                    context = "pci.aer_correctable";
+                    break;
 
-            if(read_edac_mc_file(m->name, "size_mb", buffer, 1024))
-                rrdlabels_add(m->st->rrdlabels, "size_mb", buffer, RRDLABEL_SRC_AUTO);
+                case AER_ROOTPORT_TOTAL_ERR_COR:
+                    title = "PCI Root-Port Advanced Error Recovery Correctable Errors";
+                    context = "pci.rootport_aer_correctable";
+                    break;
 
-            if(read_edac_mc_file(m->name, "max_location", buffer, 1024))
-                rrdlabels_add(m->st->rrdlabels, "max_location", buffer, RRDLABEL_SRC_AUTO);
-
-            m->ce.rd = rrddim_add(m->st, "correctable", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            m->ue.rd = rrddim_add(m->st, "uncorrectable", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            m->ce_noinfo.rd = rrddim_add(m->st, "correctable_noinfo", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            m->ue_noinfo.rd = rrddim_add(m->st, "uncorrectable_noinfo", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(m->st, m->ce.rd, (collected_number)m->ce.count);
-        rrddim_set_by_pointer(m->st, m->ue.rd, (collected_number)m->ue.count);
-        rrddim_set_by_pointer(m->st, m->ce_noinfo.rd, (collected_number)m->ce_noinfo.count);
-        rrddim_set_by_pointer(m->st, m->ue_noinfo.rd, (collected_number)m->ue_noinfo.count);
-
-        rrdset_done(m->st);
-
-        for(struct edac_dimm *d = m->dimms; d ;d = d->next) {
-            if(unlikely(!d->ce.updated && !d->ue.updated))
-                continue;
-
-            if(unlikely(!d->st)) {
-                char id[RRD_ID_LENGTH_MAX + 1];
-                snprintfz(id, RRD_ID_LENGTH_MAX, "edac_%s_%s", m->name, d->name);
-                d->st = rrdset_create_localhost(
-                        "mem"
-                		, id
-                		, NULL
-                		, "edac"
-                        , "mem.edac_mc_dimm"
-                		, "DIMM Error Detection And Correction (EDAC) Errors"
-                        , "errors/s"
-                        , PLUGIN_PROC_NAME
-                        , "/sys/devices/system/edac/mc"
-                        , NETDATA_CHART_PRIO_MEM_HW_ECC_CE + 1
-                        , update_every
-                        , RRDSET_TYPE_LINE
-                );
-
-                rrdlabels_add(d->st->rrdlabels, "controller", m->name, RRDLABEL_SRC_AUTO);
-                rrdlabels_add(d->st->rrdlabels, "dimm", d->name, RRDLABEL_SRC_AUTO);
-
-                char buffer[1024 + 1];
-
-                if(read_edac_mc_rank_file(m->name, d->name, "dimm_dev_type", buffer, 1024))
-                    rrdlabels_add(d->st->rrdlabels, "dimm_dev_type", buffer, RRDLABEL_SRC_AUTO);
-
-                if(read_edac_mc_rank_file(m->name, d->name, "dimm_edac_mode", buffer, 1024))
-                    rrdlabels_add(d->st->rrdlabels, "dimm_edac_mode", buffer, RRDLABEL_SRC_AUTO);
-
-                if(read_edac_mc_rank_file(m->name, d->name, "dimm_label", buffer, 1024))
-                    rrdlabels_add(d->st->rrdlabels, "dimm_label", buffer, RRDLABEL_SRC_AUTO);
-
-                if(read_edac_mc_rank_file(m->name, d->name, "dimm_location", buffer, 1024))
-                    rrdlabels_add(d->st->rrdlabels, "dimm_location", buffer, RRDLABEL_SRC_AUTO);
-
-                if(read_edac_mc_rank_file(m->name, d->name, "dimm_mem_type", buffer, 1024))
-                    rrdlabels_add(d->st->rrdlabels, "dimm_mem_type", buffer, RRDLABEL_SRC_AUTO);
-
-                if(read_edac_mc_rank_file(m->name, d->name, "size", buffer, 1024))
-                    rrdlabels_add(d->st->rrdlabels, "size", buffer, RRDLABEL_SRC_AUTO);
-
-                d->ce.rd = rrddim_add(d->st, "correctable", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                d->ue.rd = rrddim_add(d->st, "uncorrectable", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                case AER_ROOTPORT_TOTAL_ERR_FATAL:
+                    title = "PCI Root-Port Advanced Error Recovery Fatal Errors";
+                    context = "pci.rootport_aer_fatal";
+                    break;
             }
 
-            rrddim_set_by_pointer(d->st, d->ce.rd, (collected_number)d->ce.count);
-            rrddim_set_by_pointer(d->st, d->ue.rd, (collected_number)d->ue.count);
+            char id[RRD_ID_LENGTH_MAX + 1];
+            char nm[RRD_ID_LENGTH_MAX + 1];
+            size_t len = strlen(pci_aer_dirname);
 
-            rrdset_done(d->st);
+            const char *fname = a_dfe.name;
+            if(strncmp(a_dfe.name, pci_aer_dirname, len) == 0)
+                fname = &a_dfe.name[len];
+
+            if(*fname == '/')
+                fname++;
+
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", &context[4], fname);
+            char *slash = strrchr(id, '/');
+            if(slash)
+                *slash = '\0';
+
+            netdata_fix_chart_id(id);
+
+            snprintfz(nm, RRD_ID_LENGTH_MAX, "%s", fname);
+            slash = strrchr(nm, '/');
+            if(slash)
+                *slash = '\0';
+
+            a->st = rrdset_create_localhost(
+                    "pci"
+            		, id
+            		, NULL
+            		, "aer"
+            		, context
+            		, title
+            		, "errors/s"
+            		, PLUGIN_PROC_NAME
+            		, "/sys/devices/pci/aer"
+            		, NETDATA_CHART_PRIO_PCI_AER
+            		, update_every
+            		, RRDSET_TYPE_LINE
+            );
+
+            rrdlabels_add(a->st->rrdlabels, "device", nm, RRDLABEL_SRC_AUTO);
+
+            struct aer_value *v;
+            dfe_start_read(a->values, v) {
+                v->rd = rrddim_add(a->st, v_dfe.name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+            dfe_done(v);
         }
+
+        struct aer_value *v;
+        dfe_start_read(a->values, v) {
+            if(unlikely(!v->rd))
+                v->rd = rrddim_add(a->st, v_dfe.name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            rrddim_set_by_pointer(a->st, v->rd, (collected_number)v->count);
+        }
+        dfe_done(v);
+
+        rrdset_done(a->st);
     }
+    dfe_done(a);
 
     return 0;
 }

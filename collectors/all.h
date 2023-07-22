@@ -115,6 +115,11 @@
 #define NETDATA_CHART_PRIO_MEM_ZRAM_EFFICIENCY        1603
 #define NETDATA_CHART_PRIO_MEM_FRAGMENTATION          1700
 
+// PCI
+
+#define NETDATA_CHART_PRIO_PCI_AER                    1800
+
+
 // Disks
 
 #define NETDATA_CHART_PRIO_DISK_IO                    2000
