@@ -6,10 +6,20 @@
 
 **Merged pull requests:**
 
+- Improve the update of the alert chart name in the database [\#15490](https://github.com/netdata/netdata/pull/15490) ([stelfrag](https://github.com/stelfrag))
+- Add basic slabinfo metadata. [\#15484](https://github.com/netdata/netdata/pull/15484) ([Ferroin](https://github.com/Ferroin))
+- docs: note that health foreach works only with template [\#15478](https://github.com/netdata/netdata/pull/15478) ([ilyam8](https://github.com/ilyam8))
+- Yaml file updates [\#15477](https://github.com/netdata/netdata/pull/15477) ([Ancairon](https://github.com/Ancairon))
+- Rename most-popular to most\_popular in categories.yaml [\#15476](https://github.com/netdata/netdata/pull/15476) ([Ancairon](https://github.com/Ancairon))
+- Fix coverity issue [\#15475](https://github.com/netdata/netdata/pull/15475) ([stelfrag](https://github.com/stelfrag))
+- Memory Controller \(MC\) and DIMM Error Detection And Correction \(EDAC\) [\#15473](https://github.com/netdata/netdata/pull/15473) ([ktsaou](https://github.com/ktsaou))
 - meta schema change multi-instance to multi\_instance [\#15470](https://github.com/netdata/netdata/pull/15470) ([ilyam8](https://github.com/ilyam8))
+- fix anchors [\#15469](https://github.com/netdata/netdata/pull/15469) ([Ancairon](https://github.com/Ancairon))
 - fix the calculation of incremental-sum [\#15468](https://github.com/netdata/netdata/pull/15468) ([ktsaou](https://github.com/ktsaou))
 - apps.plugin fds limits improvements [\#15467](https://github.com/netdata/netdata/pull/15467) ([ktsaou](https://github.com/ktsaou))
 - Add community key in schema [\#15465](https://github.com/netdata/netdata/pull/15465) ([Ancairon](https://github.com/Ancairon))
+- Overhaul deployment strategies documentation [\#15464](https://github.com/netdata/netdata/pull/15464) ([ralphm](https://github.com/ralphm))
+- Update debugfs plugin metadata. [\#15463](https://github.com/netdata/netdata/pull/15463) ([Ferroin](https://github.com/Ferroin))
 - Update proc plugin yaml [\#15460](https://github.com/netdata/netdata/pull/15460) ([Ancairon](https://github.com/Ancairon))
 - Macos yaml updates [\#15459](https://github.com/netdata/netdata/pull/15459) ([Ancairon](https://github.com/Ancairon))
 - Freeipmi yaml updates [\#15458](https://github.com/netdata/netdata/pull/15458) ([Ancairon](https://github.com/Ancairon))
@@ -298,8 +308,6 @@
 - Use chart labels to filter alerts [\#14982](https://github.com/netdata/netdata/pull/14982) ([MrZammler](https://github.com/MrZammler))
 - Remove Fedora 36 from CI and platform support. [\#14938](https://github.com/netdata/netdata/pull/14938) ([Ferroin](https://github.com/Ferroin))
 - make zlib compulsory dep [\#14928](https://github.com/netdata/netdata/pull/14928) ([underhood](https://github.com/underhood))
-- Try to detect bind mounts [\#14831](https://github.com/netdata/netdata/pull/14831) ([MrZammler](https://github.com/MrZammler))
-- Remove old logic for handling of legacy stock config files. [\#14829](https://github.com/netdata/netdata/pull/14829) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.39.1](https://github.com/netdata/netdata/tree/v1.39.1) (2023-05-18)
 
@@ -412,17 +420,6 @@
 - Update parent child examples [\#14842](https://github.com/netdata/netdata/pull/14842) ([cakrit](https://github.com/cakrit))
 - fix double host prefix when reading ZFS pools state [\#14840](https://github.com/netdata/netdata/pull/14840) ([ilyam8](https://github.com/ilyam8))
 - Update enable-notifications.md [\#14838](https://github.com/netdata/netdata/pull/14838) ([cakrit](https://github.com/cakrit))
-- Update deployment-strategies.md [\#14837](https://github.com/netdata/netdata/pull/14837) ([cakrit](https://github.com/cakrit))
-- Update database engine readme [\#14836](https://github.com/netdata/netdata/pull/14836) ([cakrit](https://github.com/cakrit))
-- Update change-metrics-storage.md [\#14835](https://github.com/netdata/netdata/pull/14835) ([cakrit](https://github.com/cakrit))
-- Update change-metrics-storage.md [\#14834](https://github.com/netdata/netdata/pull/14834) ([cakrit](https://github.com/cakrit))
-- Update netdata-security.md [\#14833](https://github.com/netdata/netdata/pull/14833) ([cakrit](https://github.com/cakrit))
-- Boost dbengine [\#14832](https://github.com/netdata/netdata/pull/14832) ([ktsaou](https://github.com/ktsaou))
-- add some third party collectors [\#14830](https://github.com/netdata/netdata/pull/14830) ([andrewm4894](https://github.com/andrewm4894))
-- Add opsgenie integration docs [\#14828](https://github.com/netdata/netdata/pull/14828) ([iorvd](https://github.com/iorvd))
-- Update Agent notification methods documentation [\#14827](https://github.com/netdata/netdata/pull/14827) ([Ancairon](https://github.com/Ancairon))
-- Delete installation instructions specific to FreeNAS [\#14826](https://github.com/netdata/netdata/pull/14826) ([Ancairon](https://github.com/Ancairon))
-- First batch of adding descriptions to the documentation [\#14825](https://github.com/netdata/netdata/pull/14825) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
