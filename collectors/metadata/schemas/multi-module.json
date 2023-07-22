@@ -12,5 +12,9 @@
                 "$ref": "./single-module.json"
             }
         }
-    }
+    },
+    "required": [
+        "plugin_name",
+        "modules"
+    ]
 }
