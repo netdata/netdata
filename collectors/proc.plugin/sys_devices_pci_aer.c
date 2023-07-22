@@ -230,27 +230,27 @@ int do_proc_sys_devices_pci_aer(int update_every, usec_t dt __maybe_unused) {
 
             switch(a->type) {
                 case AER_DEV_NONFATAL:
-                    title = "PCI Advanced Error Reporting Non-Fatal Errors";
+                    title = "PCI Advanced Error Reporting (AER) Non-Fatal Errors";
                     context = "pci.aer_nonfatal";
                     break;
 
                 case AER_DEV_FATAL:
-                    title = "PCI Advanced Error Reporting Fatal Errors";
+                    title = "PCI Advanced Error Reporting (AER) Fatal Errors";
                     context = "pci.aer_fatal";
                     break;
 
                 case AER_DEV_CORRECTABLE:
-                    title = "PCI Advanced Error Reporting Correctable Errors";
+                    title = "PCI Advanced Error Reporting (AER) Correctable Errors";
                     context = "pci.aer_correctable";
                     break;
 
                 case AER_ROOTPORT_TOTAL_ERR_COR:
-                    title = "PCI Root-Port Advanced Error Reporting Correctable Errors";
+                    title = "PCI Root-Port Advanced Error Reporting (AER) Correctable Errors";
                     context = "pci.rootport_aer_correctable";
                     break;
 
                 case AER_ROOTPORT_TOTAL_ERR_FATAL:
-                    title = "PCI Root-Port Advanced Error Reporting Fatal Errors";
+                    title = "PCI Root-Port Advanced Error Reporting (AER) Fatal Errors";
                     context = "pci.rootport_aer_fatal";
                     break;
             }
