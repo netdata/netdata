@@ -772,21 +772,24 @@ modules:
       plugin_name: ebpf.plugin
       module_name: mdflush
       monitored_instance:
-        name: ebpf mdflush
+        name: eBPF MDflush
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - MD
+        - RAID
+        - eBPF
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
+        metrics_description: "Monitor when flush events happen between disks."
         method_description: ""
       supported_platforms:
         include: []
