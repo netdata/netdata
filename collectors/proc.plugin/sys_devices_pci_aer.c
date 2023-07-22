@@ -133,10 +133,18 @@ static void read_pci_aer_values(const char *filename, struct aer_entry *t) {
 
     size_t lines = procfile_lines(t->ff);
     for(size_t l = 0; l < lines ; l++) {
+        if(procfile_linewords(t->ff, l) != 2)
+            continue;
+
         struct aer_value v = {
                 .count = str2ull(procfile_lineword(t->ff, l, 1), NULL)
         };
-        dictionary_set(t->values, procfile_lineword(t->ff, l, 0), &v, sizeof(v));
+
+        char *key = procfile_lineword(t->ff, l, 0);
+        if(!key || !*key || (key[0] == 'T' && key[1] == 'O' && key[2] == 'T' && key[3] == 'A' && key[4] == 'L' && key[5] == '_'))
+            continue;
+
+        dictionary_set(t->values, key, &v, sizeof(v));
     }
 
     t->updated = true;
