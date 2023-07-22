@@ -351,21 +351,25 @@ modules:
       plugin_name: ebpf.plugin
       module_name: disk
       monitored_instance:
-        name: ebpf disk
+        name: eBPF Disk
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - hard Disk
+        - eBPF
+        - latency
+        - partition
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
+        metrics_description: "Measure latency for I/O events on disk."
         method_description: ""
       supported_platforms:
         include: []
