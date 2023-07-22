@@ -1624,21 +1624,24 @@ modules:
       plugin_name: ebpf.plugin
       module_name: shm
       monitored_instance:
-        name: ebpf shm
+        name: eBPF SHM
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - syscall
+        - shared memory
+        - eBPF
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
+        metrics_description: "Monitor syscalls responsible to manipulate shared memory."
         method_description: ""
       supported_platforms:
         include: []
