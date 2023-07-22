@@ -959,21 +959,23 @@ modules:
       plugin_name: ebpf.plugin
       module_name: oomkill
       monitored_instance:
-        name: ebpf oomkill
+        name: eBPF OOMkill
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - application
+        - memory
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
+        metrics_description: "Monitor applications that reach out of memory."
         method_description: ""
       supported_platforms:
         include: []
