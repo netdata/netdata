@@ -1348,21 +1348,24 @@ modules:
       plugin_name: ebpf.plugin
       module_name: dcstat
       monitored_instance:
-        name: ebpf dcstat
+        name: eBPF DCstat
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - Directory Cache
+        - File system
+        - eBPF
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
+        metrics_description: "Monitor directory cache events per application given an overall vision about files on memory or storage device."
         method_description: ""
       supported_platforms:
         include: []
