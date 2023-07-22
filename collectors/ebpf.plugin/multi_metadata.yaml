@@ -842,21 +842,25 @@ modules:
       plugin_name: ebpf.plugin
       module_name: swap
       monitored_instance:
-        name: ebpf swap
+        name: eBPF SWAP
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - SWAP
+        - memory
+        - eBPF
+        - Hard Disk
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
+        metrics_description: "Monitors when swap has I/O events and applications executing events."
         method_description: ""
       supported_platforms:
         include: []
