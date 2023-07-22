@@ -170,6 +170,26 @@ static void read_pci_aer_count(const char *filename, struct aer_entry *t) {
     t->updated = true;
 }
 
+static void add_label_from_link(struct aer_entry *a, const char *path, const char *link) {
+    char name[FILENAME_MAX + 1];
+    strncpyz(name, path, FILENAME_MAX);
+    char *slash = strrchr(name, '/');
+    if(slash)
+        *slash = '\0';
+
+    char name2[FILENAME_MAX + 1];
+    snprintfz(name2, FILENAME_MAX, "%s/%s", name, link);
+
+    ssize_t len = readlink(name2, name, FILENAME_MAX);
+    if(len != -1) {
+        name[len] = '\0';  // Null-terminate the string
+        slash = strrchr(name, '/');
+        if(slash) slash++;
+        else slash = name;
+        rrdlabels_add(a->st->rrdlabels, link, slash, RRDLABEL_SRC_AUTO);
+    }
+}
+
 int do_proc_sys_devices_pci_aer(int update_every, usec_t dt __maybe_unused) {
     if(unlikely(!aer_root)) {
         char buffer[100 + 1] = "";
@@ -210,27 +230,27 @@ int do_proc_sys_devices_pci_aer(int update_every, usec_t dt __maybe_unused) {
 
             switch(a->type) {
                 case AER_DEV_NONFATAL:
-                    title = "PCI Advanced Error Recovery Non-Fatal Errors";
+                    title = "PCI Advanced Error Reporting Non-Fatal Errors";
                     context = "pci.aer_nonfatal";
                     break;
 
                 case AER_DEV_FATAL:
-                    title = "PCI Advanced Error Recovery Fatal Errors";
+                    title = "PCI Advanced Error Reporting Fatal Errors";
                     context = "pci.aer_fatal";
                     break;
 
                 case AER_DEV_CORRECTABLE:
-                    title = "PCI Advanced Error Recovery Correctable Errors";
+                    title = "PCI Advanced Error Reporting Correctable Errors";
                     context = "pci.aer_correctable";
                     break;
 
                 case AER_ROOTPORT_TOTAL_ERR_COR:
-                    title = "PCI Root-Port Advanced Error Recovery Correctable Errors";
+                    title = "PCI Root-Port Advanced Error Reporting Correctable Errors";
                     context = "pci.rootport_aer_correctable";
                     break;
 
                 case AER_ROOTPORT_TOTAL_ERR_FATAL:
-                    title = "PCI Root-Port Advanced Error Recovery Fatal Errors";
+                    title = "PCI Root-Port Advanced Error Reporting Fatal Errors";
                     context = "pci.rootport_aer_fatal";
                     break;
             }
@@ -274,6 +294,7 @@ int do_proc_sys_devices_pci_aer(int update_every, usec_t dt __maybe_unused) {
             );
 
             rrdlabels_add(a->st->rrdlabels, "device", nm, RRDLABEL_SRC_AUTO);
+            add_label_from_link(a, a_dfe.name, "driver");
 
             struct aer_value *v;
             dfe_start_read(a->values, v) {
