@@ -21,9 +21,10 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector actively monitors and records CPU utilization, states and frequencies and key overall system performance metrics.
+          CPU utilization, states and frequencies and key Linux system performance metrics.
           
           The `/proc/stat` file provides various types of system statistics:
+          
           - The overall system CPU usage statistics
           - Per CPU core statistics
           - The total context switching of the system
@@ -32,6 +33,7 @@ modules:
           - The total CPU softirqs
           
           The collector also reads:
+          
           - `/proc/schedstat` for statistics about the process scheduler in the Linux kernel.
           - `/sys/devices/system/cpu/[X]/thermal_throttle/core_throttle_count` to get the count of thermal throttling events for a specific CPU core on Linux systems.
           - `/sys/devices/system/cpu/[X]/thermal_throttle/package_throttle_count` to get the count of thermal throttling events for a specific CPU package on a Linux system.
@@ -209,7 +211,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors Entropy, a measure of the randomness or unpredictability of data.
+          Entropy, a measure of the randomness or unpredictability of data.
           
           In the context of cryptography, entropy is used to generate random numbers or keys that are essential for
           secure communication and encryption. Without a good source of entropy, cryptographic protocols can become
@@ -317,9 +319,10 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This integration provides the amount of time the system has been up (running).
+          The amount of time the system has been up (running).
           
           Uptime is a critical aspect of overall system performance:
+          
           - **Availability**: Uptime monitoring can show whether a server is consistently available or experiences frequent downtimes.
           - **Performance Monitoring**: While server uptime alone doesn't provide detailed performance data, analyzing the duration and frequency of downtimes can help identify patterns or trends.
           - **Proactive problem detection**: If server uptime monitoring reveals unexpected downtimes or a decreasing uptime trend, it can serve as an early warning sign of potential problems.
@@ -403,16 +406,16 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors and records statistics related to the kernel's virtual memory subsystem.
+          Linux Virtual memory subsystem.
           
-          It captures information about memory management, indicating how effectively the kernel allocates and frees
+          Information about memory management, indicating how effectively the kernel allocates and frees
           memory resources in response to system demands.
           
-          It monitors page faults, which occur when a process requests a portion of its memory that isn't
+          Monitors page faults, which occur when a process requests a portion of its memory that isn't
           immediately available. Monitoring these events can help diagnose inefficiencies in memory management and
           provide insights into application behavior.
           
-          It tracks swapping activity — a vital aspect of memory management where the kernel moves data from RAM to
+          Tracks swapping activity — a vital aspect of memory management where the kernel moves data from RAM to
           swap space, and vice versa, based on memory demand and usage. It also monitors the utilization of zswap,
           a compressed cache for swap pages, and provides insights into its usage and performance implications.
           
