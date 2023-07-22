@@ -363,6 +363,7 @@ struct rrdb rrdb = {
     .rrdhost_root_index_hostname = NULL,
     .unittest_running = false,
     .dbengine_enabled = false,
+    .storage_tiers = 3,
     .use_direct_io = true,
     .storage_tiers_grouping_iterations = {
         1,
