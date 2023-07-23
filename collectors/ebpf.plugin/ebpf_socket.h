@@ -272,17 +272,29 @@ extern ebpf_network_viewer_options_t network_viewer_opt;
  * Structure to store socket information
  */
 typedef struct netdata_socket {
-    uint64_t recv_packets;
-    uint64_t sent_packets;
-    uint64_t recv_bytes;
-    uint64_t sent_bytes;
+    // Timestamp
     uint64_t first_timestamp;
     uint64_t current_timestamp;
-    uint32_t close;       // Current timestamp
-    uint32_t retransmit; // It is never used with UDP
+    // Socket additional info
     uint16_t protocol;
     uint16_t family;
-    uint32_t reserved;
+    struct {
+        uint32_t call_tcp_sent;
+        uint32_t call_tcp_received;
+        uint64_t tcp_bytes_sent;
+        uint64_t tcp_bytes_received;
+        uint32_t close;        //It is never used with UDP
+        uint32_t retransmit;   //It is never used with UDP
+        uint32_t ipv4_connect;
+        uint32_t ipv6_connect;
+    } tcp;
+
+    struct {
+        uint32_t call_udp_sent;
+        uint32_t call_udp_received;
+        uint64_t udp_bytes_sent;
+        uint64_t udp_bytes_received;
+    } udp;
 } netdata_socket_t;
 
 typedef struct netdata_plot_values {

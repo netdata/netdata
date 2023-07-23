@@ -684,7 +684,6 @@ static void ebpf_update_global_publish(
  *
  * @param plot  the structure where the data will be stored
  * @param sock  the last update from the socket
- */
 static inline void update_nv_plot_data(netdata_plot_values_t *plot, netdata_socket_t *sock)
 {
     if (sock->current_timestamp != plot->last_time) {
@@ -702,12 +701,12 @@ static inline void update_nv_plot_data(netdata_plot_values_t *plot, netdata_sock
     sock->sent_bytes   = 0;
     sock->retransmit   = 0;
 }
+*/
 
 /**
  * Calculate Network Viewer Plot
  *
  * Do math with collected values before to plot data.
- */
 static inline void calculate_nv_plot()
 {
     uint32_t i;
@@ -727,12 +726,11 @@ static inline void calculate_nv_plot()
     }
     outbound_vectors.max_plot = end;
 
-    /*
     // The 'Other' dimension is always calculated for the chart to have at least one dimension
     update_nv_plot_data(&outbound_vectors.plot[outbound_vectors.last].plot,
                         &outbound_vectors.plot[outbound_vectors.last].sock);
-                        */
 }
+*/
 
 /**
  * Network viewer send bytes
@@ -1800,24 +1798,6 @@ static void fill_last_nv_dimension(netdata_socket_plot_t *ptr, int is_outbound)
 }
 
 /**
- * Update Socket Data
- *
- * Update the socket information with last collected data
- *
- * @param sock
- * @param lvalues
- */
-static inline void update_socket_data(netdata_socket_t *sock, netdata_socket_t *lvalues)
-{
-    sock->recv_packets = lvalues->recv_packets;
-    sock->sent_packets = lvalues->sent_packets;
-    sock->recv_bytes   = lvalues->recv_bytes;
-    sock->sent_bytes   = lvalues->sent_bytes;
-    sock->retransmit   = lvalues->retransmit;
-    sock->current_timestamp = lvalues->current_timestamp;
-}
-
-/**
  * Store socket inside avl
  *
  * Store the socket values inside the avl tree.
@@ -1839,7 +1819,7 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
     ret = (netdata_socket_plot_t *) avl_search_lock(&out->tree, (avl_t *)&test);
     if (ret) {
         if (lvalues->current_timestamp != ret->plot.last_time) {
-            update_socket_data(&ret->sock, lvalues);
+            memcpy(&ret->sock, lvalues, sizeof(ret->sock));
         }
     } else {
         uint32_t curr = out->next;
@@ -1850,7 +1830,7 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
         int resolved;
         if (curr == last) {
             if (lvalues->current_timestamp != w->plot.last_time) {
-                update_socket_data(&w->sock, lvalues);
+                memcpy(&w->sock, lvalues, sizeof(w->sock));
             }
             return;
         } else {
@@ -1937,19 +1917,20 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
     if (!network_viewer_opt.enabled || !is_socket_allowed(key, family))
         return;
 
-    uint64_t bsent = 0, brecv = 0, psent = 0, precv = 0;
-    uint16_t retransmit = 0;
     int i;
     uint8_t protocol = values[0].protocol;
     uint64_t ct = values[0].current_timestamp;
     for (i = 1; i < end; i++) {
         netdata_socket_t *w = &values[i];
 
-        precv += w->recv_packets;
-        psent += w->sent_packets;
-        brecv += w->recv_bytes;
-        bsent += w->sent_bytes;
-        retransmit += w->retransmit;
+        values[0].tcp.call_tcp_sent         += w->tcp.call_tcp_sent;
+        values[0].tcp.call_tcp_received     += w->tcp.call_tcp_received;
+        values[0].tcp.tcp_bytes_received    += w->tcp.tcp_bytes_received;
+        values[0].tcp.tcp_bytes_sent        += w->tcp.tcp_bytes_sent;
+        values[0].tcp.close                 += w->tcp.close;
+        values[0].tcp.retransmit            += w->tcp.retransmit;
+        values[0].tcp.ipv4_connect          += w->tcp.ipv4_connect;
+        values[0].tcp.ipv6_connect          += w->tcp.ipv6_connect;
 
         if (!protocol)
             protocol = w->protocol;
@@ -1958,12 +1939,7 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
             ct = w->current_timestamp;
     }
 
-    values[0].recv_packets += precv;
-    values[0].sent_packets += psent;
-    values[0].recv_bytes   += brecv;
-    values[0].sent_bytes   += bsent;
-    values[0].retransmit   += retransmit;
-    values[0].protocol     = (!protocol)?IPPROTO_TCP:protocol;
+    values[0].protocol          = (!protocol)?IPPROTO_TCP:protocol;
     values[0].current_timestamp = ct;
 
     uint32_t dir;
@@ -2003,14 +1979,25 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_idx_t *key, net
     // DST Port
     buffer_json_add_array_item_uint64(wb, (uint64_t) ntohs(key->dport));
 
-    // Protocol
-    buffer_json_add_array_item_string(wb, (values->protocol == IPPROTO_TCP) ? "TCP": "UDP");
+    if (values->protocol == IPPROTO_TCP) {
+        // Protocol
+        buffer_json_add_array_item_string(wb, "TCP");
 
-    // Traffic received
-    buffer_json_add_array_item_uint64(wb, (uint64_t) values->recv_bytes);
+        // Traffic received
+        buffer_json_add_array_item_uint64(wb, (uint64_t) values->tcp.tcp_bytes_received);
 
-    // Traffic sent
-    buffer_json_add_array_item_uint64(wb, (uint64_t) values->sent_bytes);
+        // Traffic sent
+        buffer_json_add_array_item_uint64(wb, (uint64_t) values->tcp.tcp_bytes_sent);
+    } else {
+        // Protocol
+        buffer_json_add_array_item_string(wb, "UDP");
+
+        // Traffic received
+        buffer_json_add_array_item_uint64(wb, (uint64_t) values->udp.call_udp_received);
+
+        // Traffic sent
+        buffer_json_add_array_item_uint64(wb, (uint64_t) values->udp.udp_bytes_sent);
+    }
 
     buffer_json_array_close(wb);
 }
@@ -2040,11 +2027,11 @@ static void ebpf_read_socket_hash_table(int fd, int family, int maps_per_core)
     } else
         end = 1;
 
+    // We need to reset the values when we are working on kernel 4.15 or newer, because kernel does not create
+    // values for specific processor unless it is used to store data. As result of this behavior one the next socket
+    // can have values from the previous one.
+    memset(values, 0, length);
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
-        // We need to reset the values when we are working on kernel 4.15 or newer, because kernel does not create
-        // values for specific processor unless it is used to store data. As result of this behavior one the next socket
-        // can have values from the previous one.
-        memset(values, 0, length);
         test = bpf_map_lookup_elem(fd, &key, values);
         if (test < 0) {
             key = next_key;
@@ -2052,6 +2039,7 @@ static void ebpf_read_socket_hash_table(int fd, int family, int maps_per_core)
         }
 
         hash_accumulator(values, &key, family, end);
+        memset(values, 0, length);
 
         key = next_key;
     }
