@@ -696,12 +696,12 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
         bool update_metric_time = true;
         if (!metric) {
             MRG_ENTRY entry = {
+                    .uuid = temp_id,
                     .section = (Word_t)ctx,
                     .first_time_s = vd.start_time_s,
                     .last_time_s = vd.end_time_s,
                     .latest_update_every_s = (uint32_t) vd.update_every_s,
             };
-            uuid_copy(entry.uuid, *temp_id);
 
             bool added;
             metric = mrg_metric_add_and_acquire(main_mrg, entry, &added);
