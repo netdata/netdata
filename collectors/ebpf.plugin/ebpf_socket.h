@@ -311,6 +311,7 @@ typedef struct netdata_socket_idx {
     uint16_t sport;
     union netdata_ip_t daddr;
     uint16_t dport;
+    uint32_t pid;
 } netdata_socket_idx_t;
 
 // Next values were defined according getnameinfo(3)

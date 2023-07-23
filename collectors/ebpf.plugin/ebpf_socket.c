@@ -2164,7 +2164,8 @@ void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
     // thread was not initialized
     if (!em->maps || (em->maps && em->maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED)){
         netdata_socket_idx_t key = {.daddr.addr32[0] = 2130706433, .dport = 0,
-                                    .saddr.addr32[0] = 2130706433, .sport = 0};
+                                    .saddr.addr32[0] = 2130706433, .sport = 0,
+                                    .pid = getpid()};
         netdata_socket_t val = {};
         ebpf_fill_function_buffer(buf, &key, &val);
         return;
