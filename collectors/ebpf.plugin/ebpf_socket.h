@@ -11,8 +11,6 @@
 // Vector indexes
 #define NETDATA_UDP_START 3
 
-#define NETDATA_SOCKET_READ_SLEEP_MS 800000ULL
-
 // config file
 #define NETDATA_NETWORK_CONFIG_FILE "network.conf"
 #define EBPF_NETWORK_VIEWER_SECTION "network connections"
@@ -329,7 +327,6 @@ typedef struct netdata_socket_idx {
 // Next values were defined according getnameinfo(3)
 #define NETDATA_MAX_NETWORK_COMBINED_LENGTH 1018
 #define NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH 5 // :TCP:
-#define NETDATA_DIM_LENGTH_WITHOUT_SERVICE_PROTOCOL 979
 
 #define NETDATA_INBOUND_DIRECTION (uint32_t)1
 #define NETDATA_OUTBOUND_DIRECTION (uint32_t)2
