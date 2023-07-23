@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- freeipmi flush keepalive msgs [\#15499](https://github.com/netdata/netdata/pull/15499) ([ilyam8](https://github.com/ilyam8))
+- Fix resource leak - CID 396310 [\#15491](https://github.com/netdata/netdata/pull/15491) ([stelfrag](https://github.com/stelfrag))
 - Improve the update of the alert chart name in the database [\#15490](https://github.com/netdata/netdata/pull/15490) ([stelfrag](https://github.com/stelfrag))
 - Add basic slabinfo metadata. [\#15484](https://github.com/netdata/netdata/pull/15484) ([Ferroin](https://github.com/Ferroin))
 - docs: note that health foreach works only with template [\#15478](https://github.com/netdata/netdata/pull/15478) ([ilyam8](https://github.com/ilyam8))
@@ -418,8 +420,6 @@
 - Add a checkpoint message to alerts stream [\#14847](https://github.com/netdata/netdata/pull/14847) ([MrZammler](https://github.com/MrZammler))
 - fix  \#14841 Exception funktion call Rados.mon\_command\(\) [\#14844](https://github.com/netdata/netdata/pull/14844) ([farax4de](https://github.com/farax4de))
 - Update parent child examples [\#14842](https://github.com/netdata/netdata/pull/14842) ([cakrit](https://github.com/cakrit))
-- fix double host prefix when reading ZFS pools state [\#14840](https://github.com/netdata/netdata/pull/14840) ([ilyam8](https://github.com/ilyam8))
-- Update enable-notifications.md [\#14838](https://github.com/netdata/netdata/pull/14838) ([cakrit](https://github.com/cakrit))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
