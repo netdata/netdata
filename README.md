@@ -265,6 +265,36 @@ Each Netdata Agent can perform the following functions:
 
 When using Netdata Parents, all the functions of a Netdata Agent (except data collection) can be delegated to Parents to offload production systems.
 
+The core of Netdata is developed in C. We have our own `libnetdata`, that provides:
+
+- **`DICTIONARY`**<br/>
+  A high performance algorithm to maintain both indexed and ordered pools of structures Netdata needs. For indexing it uses JudyHS arrays, although it is modular: any hashtable or tree can be integrated into it. Despite been in C, dictionaries follow object-oriented programming principles, so there are constructors, destructors, automatic memory management, garbage collection and more. For more see [here](https://github.com/netdata/netdata/tree/master/libnetdata/dictionary).
+  
+- **`ARAL`**<br/>
+  ARray ALlocator (ARAL) is used to minimize the system allocations made by Netdata. ARAL is optimized for peak performance when multi-threaded. It also allows all structures that use it to be allocated in memory mapped files (shared memory) instead of RAM. For more see [here](https://github.com/netdata/netdata/tree/master/libnetdata/aral).
+
+- **`PROCFILE`**<br/>
+  A high performance `/proc` (but also any) file parser and text tokenizer. It achieves its performance by keeping files open and adjustings its buffers to read the entire file in one call (which is also required by the Linux kernel). For more see [here](https://github.com/netdata/netdata/tree/master/libnetdata/procfile).
+
+- **`STRING`**<br/>
+  A string internet mechanism, for string deduplication and indexing (using JudyHS arrays), optimized for multi-threaded usage. For more see [here](https://github.com/netdata/netdata/tree/master/libnetdata/string).
+
+- **`ARL`**<br/>
+  Adaptive Resortable List (ARL), is a very fast list iterator, that keeps the expected items on the list in the same order they are found in input list. So, the first iteration is somewhat slower, but all the following iterations are perfectly aligned for best performance. For more see [here](https://github.com/netdata/netdata/tree/master/libnetdata/adaptive_resortable_list).
+
+- **`BUFFER`**<br/>
+  A flexible text buffer management system that allows Netdata to automatically handle dynamically sized text buffer allocations. The same mechanism is used for generating consistent JSON output by the Netdata APIs. For more see [here](https://github.com/netdata/netdata/tree/master/libnetdata/buffer).
+
+- **`SPINLOCK`**<br/>
+  Like POSIX `MUTEX` and `RWLOCK` but a lot faster, based on atomic operations, with significantly smaller memory impact, while being portable.
+
+- **`PGC`**<br/>
+  A caching layer that can be used to cache any kind of time-related data, with automatic indexing (based on a tree of JudyL arrays), memory management, evictions, flushing, pressure management. This is extensively used in `dbengine`. For more see [here](https://github.com/netdata/netdata/blob/master/database/engine/README.md).
+
+The above, and many more, allow Netdata developers to work on the application fast and with confidence. Most of the business logic in Netdata is a work of mixing the above.
+
+Netdata data collections plugins can be developed in any language. Most of our application collectors though are developed in [Go](https://github.com/netdata/go.d.plugin).
+
 </details>
 
 ## FAQ
