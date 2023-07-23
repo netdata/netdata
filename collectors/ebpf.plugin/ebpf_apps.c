@@ -380,19 +380,19 @@ int ebpf_read_hash_table(void *ep, int fd, uint32_t pid)
  *
  * Read information from kernel ring to user ring.
  *
- * @param ep    the table with all process stats values.
+ * @param ns    the table with all process stats values.
  * @param fd    the file descriptor mapped from kernel
  * @param ef    a pointer for the functions mapped from dynamic library
  * @param pids  the list of pids associated to a target.
  *
  * @return
  */
-size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int fd, struct ebpf_pid_on_target *pids)
+size_t read_bandwidth_statistic_using_pid_on_target(netdata_socket_t **ns, int fd, struct ebpf_pid_on_target *pids)
 {
     size_t count = 0;
     while (pids) {
         uint32_t current_pid = pids->pid;
-        if (!ebpf_read_hash_table(ep[current_pid], fd, current_pid))
+        if (!ebpf_read_hash_table(ns[current_pid], fd, current_pid))
             count++;
 
         pids = pids->next;
@@ -409,14 +409,14 @@ size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int f
  * @param bpf_map_lookup_elem   a pointer for the function to read the data
  * @param bpf_map_get_next_key  a pointer fo the function to read the index.
  */
-size_t read_bandwidth_statistic_using_hash_table(ebpf_bandwidth_t **out, int fd)
+size_t read_bandwidth_statistic_using_hash_table(netdata_socket_t **out, int fd)
 {
     size_t count = 0;
     uint32_t key = 0;
     uint32_t next_key = 0;
 
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
-        ebpf_bandwidth_t *eps = out[next_key];
+        netdata_socket_t *eps = out[next_key];
         if (!eps) {
             eps = callocz(1, sizeof(ebpf_process_stat_t));
             out[next_key] = eps;

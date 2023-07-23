@@ -75,8 +75,6 @@ static netdata_idx_t *socket_hash_values = NULL;
 static netdata_syscall_stat_t socket_aggregated_data[NETDATA_MAX_SOCKET_VECTOR];
 static netdata_publish_syscall_t socket_publish_aggregated[NETDATA_MAX_SOCKET_VECTOR];
 
-static ebpf_bandwidth_t *bandwidth_vector = NULL;
-
 netdata_vector_plot_t inbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_vector_plot_t outbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_socket_t *socket_values;
@@ -2217,9 +2215,9 @@ static void ebpf_socket_read_hash_global_tables(netdata_idx_t *stats, int maps_p
  * Fill publish apps when necessary.
  *
  * @param current_pid  the PID that I am updating
- * @param eb           the structure with data read from memory.
+ * @param ns           the structure with data read from memory.
  */
-void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
+void ebpf_socket_fill_publish_apps(uint32_t current_pid, netdata_socket_t *ns)
 {
     ebpf_socket_publish_apps_t *curr = socket_bandwidth_curr[current_pid];
     if (!curr) {
@@ -2227,16 +2225,17 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
         socket_bandwidth_curr[current_pid] = curr;
     }
 
-    curr->bytes_sent = eb->bytes_sent;
-    curr->bytes_received = eb->bytes_received;
-    curr->call_tcp_sent = eb->call_tcp_sent;
-    curr->call_tcp_received = eb->call_tcp_received;
-    curr->retransmit = eb->retransmit;
-    curr->call_udp_sent = eb->call_udp_sent;
-    curr->call_udp_received = eb->call_udp_received;
-    curr->call_close = eb->close;
-    curr->call_tcp_v4_connection = eb->tcp_v4_connection;
-    curr->call_tcp_v6_connection = eb->tcp_v6_connection;
+    curr->bytes_sent = ns->tcp.tcp_bytes_sent;
+    curr->bytes_received = ns->tcp.tcp_bytes_received;
+    curr->call_tcp_sent = ns->tcp.call_tcp_sent;
+    curr->call_tcp_received = ns->tcp.call_tcp_received;
+    curr->retransmit = ns->tcp.retransmit;
+    curr->call_close = ns->tcp.close;
+    curr->call_tcp_v4_connection = ns->tcp.ipv4_connect;
+    curr->call_tcp_v6_connection = ns->tcp.ipv6_connect;
+
+    curr->call_udp_sent = ns->udp.call_udp_sent;
+    curr->call_udp_received = ns->udp.call_udp_received;
 }
 
 /**
@@ -2244,22 +2243,24 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, ebpf_bandwidth_t *eb)
  *
  * @param out the vector with the values to sum
  */
-void ebpf_socket_bandwidth_accumulator(ebpf_bandwidth_t *out, int maps_per_core)
+void ebpf_socket_bandwidth_accumulator(netdata_socket_t *out, int maps_per_core)
 {
     int i, end = (maps_per_core) ? ebpf_nprocs : 1;
-    ebpf_bandwidth_t *total = &out[0];
+    netdata_socket_t *total = &out[0];
     for (i = 1; i < end; i++) {
-        ebpf_bandwidth_t *move = &out[i];
-        total->bytes_sent += move->bytes_sent;
-        total->bytes_received += move->bytes_received;
-        total->call_tcp_sent += move->call_tcp_sent;
-        total->call_tcp_received += move->call_tcp_received;
-        total->retransmit += move->retransmit;
-        total->call_udp_sent += move->call_udp_sent;
-        total->call_udp_received += move->call_udp_received;
-        total->close += move->close;
-        total->tcp_v4_connection += move->tcp_v4_connection;
-        total->tcp_v6_connection += move->tcp_v6_connection;
+        netdata_socket_t *move = &out[i];
+        total->tcp.call_tcp_sent += move->tcp.call_tcp_sent;
+        total->tcp.call_tcp_received += move->tcp.call_tcp_received;
+        total->tcp.tcp_bytes_sent += move->tcp.tcp_bytes_sent;
+        total->tcp.tcp_bytes_received += move->tcp.tcp_bytes_received;
+        total->tcp.close += move->tcp.close;
+        total->tcp.retransmit += move->tcp.retransmit;
+        total->tcp.ipv4_connect += move->tcp.ipv4_connect;
+        total->tcp.ipv6_connect += move->tcp.ipv6_connect;
+        total->udp.call_udp_sent += move->udp.call_udp_sent;
+        total->udp.call_udp_received += move->udp.call_udp_received;
+        total->udp.udp_bytes_sent += move->udp.udp_bytes_sent;
+        total->udp.udp_bytes_received += move->udp.udp_bytes_received;
     }
 }
 
@@ -2271,25 +2272,25 @@ void ebpf_socket_bandwidth_accumulator(ebpf_bandwidth_t *out, int maps_per_core)
 static void ebpf_socket_update_apps_data(int maps_per_core)
 {
     int fd = socket_maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd;
-    ebpf_bandwidth_t *eb = bandwidth_vector;
+    netdata_socket_t *ns = socket_values;
     uint32_t key;
     struct ebpf_pid_stat *pids = ebpf_root_of_pids;
-    size_t length = sizeof(ebpf_bandwidth_t);
+    size_t length = sizeof(netdata_socket_t);
     if (maps_per_core)
         length *= ebpf_nprocs;
     while (pids) {
         key = pids->pid;
 
-        if (bpf_map_lookup_elem(fd, &key, eb)) {
+        if (bpf_map_lookup_elem(fd, &key, ns)) {
             pids = pids->next;
             continue;
         }
 
-        ebpf_socket_bandwidth_accumulator(eb, maps_per_core);
+        ebpf_socket_bandwidth_accumulator(ns, maps_per_core);
 
-        ebpf_socket_fill_publish_apps(key, eb);
+        ebpf_socket_fill_publish_apps(key, ns);
 
-        memset(eb, 0, length);
+        memset(ns, 0, length);
 
         pids = pids->next;
     }
@@ -2306,10 +2307,10 @@ static void ebpf_update_socket_cgroup(int maps_per_core)
 {
     ebpf_cgroup_target_t *ect ;
 
-    ebpf_bandwidth_t *eb = bandwidth_vector;
+    netdata_socket_t *ns = socket_values;
     int fd = socket_maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd;
 
-    size_t length = sizeof(ebpf_bandwidth_t);
+    size_t length = sizeof(netdata_socket_t);
     if (maps_per_core)
         length *= ebpf_nprocs;
 
@@ -2318,7 +2319,7 @@ static void ebpf_update_socket_cgroup(int maps_per_core)
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
-            ebpf_bandwidth_t *out = &pids->socket;
+            netdata_socket_t *out = &pids->socket;
             ebpf_socket_publish_apps_t *publish = &ect->publish_socket;
             if (likely(socket_bandwidth_curr) && socket_bandwidth_curr[pid]) {
                 ebpf_socket_publish_apps_t *in = socket_bandwidth_curr[pid];
@@ -2334,23 +2335,23 @@ static void ebpf_update_socket_cgroup(int maps_per_core)
                 publish->call_tcp_v4_connection = in->call_tcp_v4_connection;
                 publish->call_tcp_v6_connection = in->call_tcp_v6_connection;
             } else {
-                if (!bpf_map_lookup_elem(fd, &pid, eb)) {
-                    ebpf_socket_bandwidth_accumulator(eb, maps_per_core);
+                if (!bpf_map_lookup_elem(fd, &pid, ns)) {
+                    ebpf_socket_bandwidth_accumulator(ns, maps_per_core);
 
-                    memcpy(out, eb, sizeof(ebpf_bandwidth_t));
+                    memcpy(out, ns, sizeof(netdata_socket_t));
 
-                    publish->bytes_sent = out->bytes_sent;
-                    publish->bytes_received = out->bytes_received;
-                    publish->call_tcp_sent = out->call_tcp_sent;
-                    publish->call_tcp_received = out->call_tcp_received;
-                    publish->retransmit = out->retransmit;
-                    publish->call_udp_sent = out->call_udp_sent;
-                    publish->call_udp_received = out->call_udp_received;
-                    publish->call_close = out->close;
-                    publish->call_tcp_v4_connection = out->tcp_v4_connection;
-                    publish->call_tcp_v6_connection = out->tcp_v6_connection;
+                    publish->bytes_sent = out->tcp.tcp_bytes_sent;
+                    publish->bytes_received = out->tcp.tcp_bytes_received;
+                    publish->call_tcp_sent = out->tcp.call_tcp_sent;
+                    publish->call_tcp_received = out->tcp.call_tcp_received;
+                    publish->retransmit = out->tcp.retransmit;
+                    publish->call_close = out->tcp.close;
+                    publish->call_tcp_v4_connection = out->tcp.ipv4_connect;
+                    publish->call_tcp_v6_connection = out->tcp.ipv6_connect;
+                    publish->call_udp_sent = out->udp.call_udp_sent;
+                    publish->call_udp_received = out->udp.call_udp_received;
 
-                    memset(eb, 0, length);
+                    memset(ns, 0, length);
                 }
             }
         }
@@ -2372,18 +2373,18 @@ static void ebpf_socket_sum_cgroup_pids(ebpf_socket_publish_apps_t *socket, stru
     memset(&accumulator, 0, sizeof(accumulator));
 
     while (pids) {
-        ebpf_bandwidth_t *w = &pids->socket;
+        netdata_socket_t *w = &pids->socket;
 
-        accumulator.bytes_received += w->bytes_received;
-        accumulator.bytes_sent += w->bytes_sent;
-        accumulator.call_tcp_received += w->call_tcp_received;
-        accumulator.call_tcp_sent += w->call_tcp_sent;
-        accumulator.retransmit += w->retransmit;
-        accumulator.call_udp_received += w->call_udp_received;
-        accumulator.call_udp_sent += w->call_udp_sent;
-        accumulator.call_close += w->close;
-        accumulator.call_tcp_v4_connection += w->tcp_v4_connection;
-        accumulator.call_tcp_v6_connection += w->tcp_v6_connection;
+        accumulator.bytes_received += w->tcp.tcp_bytes_received;
+        accumulator.bytes_sent += w->tcp.tcp_bytes_sent;
+        accumulator.call_tcp_received += w->tcp.call_tcp_received;
+        accumulator.call_tcp_sent += w->tcp.call_tcp_sent;
+        accumulator.retransmit += w->tcp.retransmit;
+        accumulator.call_close += w->tcp.close;
+        accumulator.call_tcp_v4_connection += w->tcp.ipv4_connect;
+        accumulator.call_tcp_v6_connection += w->tcp.ipv6_connect;
+        accumulator.call_udp_received += w->udp.call_udp_received;
+        accumulator.call_udp_sent += w->udp.call_udp_sent;
 
         pids = pids->next;
     }
@@ -2953,7 +2954,6 @@ static void ebpf_socket_allocate_global_vectors(int apps)
     if (apps) {
         ebpf_socket_aral_init();
         socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
-        bandwidth_vector = callocz((size_t)ebpf_nprocs, sizeof(ebpf_bandwidth_t));
     }
 
     socket_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_socket_t));
