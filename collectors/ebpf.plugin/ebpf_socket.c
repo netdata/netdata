@@ -75,7 +75,6 @@ static netdata_idx_t *socket_hash_values = NULL;
 static netdata_syscall_stat_t socket_aggregated_data[NETDATA_MAX_SOCKET_VECTOR];
 static netdata_publish_syscall_t socket_publish_aggregated[NETDATA_MAX_SOCKET_VECTOR];
 
-netdata_vector_plot_t inbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_vector_plot_t outbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_socket_t *socket_values;
 
@@ -1836,7 +1835,7 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
             memcpy(&w->index, lindex, sizeof(netdata_socket_idx_t));
             w->family = family;
 
-            resolved = fill_names(w, out != (netdata_vector_plot_t *)&inbound_vectors);
+            // resolved = fill_names(w, out != (netdata_vector_plot_t *)&inbound_vectors);
         }
 
         if (!resolved) {
@@ -1857,11 +1856,13 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
             netdata_log_error("Internal error, cannot insert the AVL tree.");
 
 #ifdef NETDATA_INTERNAL_CHECKS
+        /*
         char iptext[INET6_ADDRSTRLEN];
         if (inet_ntop(family, &w->index.daddr.addr8, iptext, sizeof(iptext)))
             netdata_log_info("New %s dimension added: ID = %u, IP = %s, NAME = %s, DIM1 = %s, DIM2 = %s, DIM3 = %s",
                  (out == &inbound_vectors)?"inbound":"outbound", curr, iptext, w->resolved_name,
                  w->dimension_recv, w->dimension_sent, w->dimension_retransmit);
+                 */
 #endif
         curr++;
         if (curr > last)
@@ -1892,7 +1893,7 @@ netdata_vector_plot_t * select_vector_to_store(uint32_t *direction, netdata_sock
     while (move_ports) {
         if (move_ports->protocol == proto && move_ports->first == cmp->sport) {
             *direction = NETDATA_INBOUND_DIRECTION;
-            return &inbound_vectors;
+            return NULL;
         }
 
         move_ports = move_ports->next;
@@ -1944,9 +1945,11 @@ static void ebpf_hash_socket_accumulator(netdata_socket_t *values, netdata_socke
     values[0].protocol          = (!protocol)?IPPROTO_TCP:protocol;
     values[0].current_timestamp = ct;
 
+    /*
     uint32_t dir;
     netdata_vector_plot_t *table = select_vector_to_store(&dir, key, protocol);
     store_socket_inside_avl(table, &values[0], key, family, dir);
+     */
 }
 
 /**
@@ -2958,7 +2961,6 @@ static void ebpf_socket_allocate_global_vectors(int apps)
 
     socket_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_socket_t));
     if (network_viewer_opt.enabled) {
-        inbound_vectors.plot = callocz(network_viewer_opt.max_dim, sizeof(netdata_socket_plot_t));
         outbound_vectors.plot = callocz(network_viewer_opt.max_dim, sizeof(netdata_socket_plot_t));
     }
 }
@@ -2970,9 +2972,7 @@ static void ebpf_socket_allocate_global_vectors(int apps)
  */
 static void initialize_inbound_outbound()
 {
-    inbound_vectors.last = network_viewer_opt.max_dim - 1;
-    outbound_vectors.last = inbound_vectors.last;
-    fill_last_nv_dimension(&inbound_vectors.plot[inbound_vectors.last], 0);
+    outbound_vectors.last = 0;
     fill_last_nv_dimension(&outbound_vectors.plot[outbound_vectors.last], 1);
 }
 
@@ -3930,9 +3930,7 @@ void *ebpf_socket_thread(void *ptr)
     ebpf_socket_allocate_global_vectors(em->apps_charts);
 
     if (network_viewer_opt.enabled) {
-        memset(&inbound_vectors.tree, 0, sizeof(avl_tree_lock));
         memset(&outbound_vectors.tree, 0, sizeof(avl_tree_lock));
-        avl_init_lock(&inbound_vectors.tree, ebpf_compare_sockets);
         avl_init_lock(&outbound_vectors.tree, ebpf_compare_sockets);
 
         initialize_inbound_outbound();
