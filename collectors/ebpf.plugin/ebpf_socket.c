@@ -23,16 +23,7 @@ static char *socket_id_names[NETDATA_MAX_SOCKET_VECTOR] = { "tcp_cleanup_rbuf", 
                                                             "tcp_connect_v4", "tcp_connect_v6", "inet_csk_accept_tcp",
                                                             "inet_csk_accept_udp" };
 
-static ebpf_local_maps_t socket_maps[] = {{.name = "tbl_bandwidth",
-                                           .internal_input = NETDATA_COMPILED_CONNECTIONS_ALLOWED,
-                                           .user_input = NETDATA_MAXIMUM_CONNECTIONS_ALLOWED,
-                                           .type = NETDATA_EBPF_MAP_RESIZABLE | NETDATA_EBPF_MAP_PID,
-                                           .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
-#ifdef LIBBPF_MAJOR_VERSION
-                                           .map_type = BPF_MAP_TYPE_PERCPU_HASH
-#endif
-                                          },
-                                          {.name = "tbl_global_sock",
+static ebpf_local_maps_t socket_maps[] = {{.name = "tbl_global_sock",
                                            .internal_input = NETDATA_SOCKET_COUNTER,
                                            .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
                                            .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
@@ -350,7 +341,6 @@ static long ebpf_socket_attach_probes(struct socket_bpf *obj, netdata_run_mode_t
  */
 static void ebpf_socket_set_hash_tables(struct socket_bpf *obj)
 {
-    socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH].map_fd = bpf_map__fd(obj->maps.tbl_bandwidth);
     socket_maps[NETDATA_SOCKET_GLOBAL].map_fd = bpf_map__fd(obj->maps.tbl_global_sock);
     socket_maps[NETDATA_SOCKET_LPORTS].map_fd = bpf_map__fd(obj->maps.tbl_lports);
     socket_maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd = bpf_map__fd(obj->maps.tbl_nd_socket);
@@ -368,16 +358,12 @@ static void ebpf_socket_set_hash_tables(struct socket_bpf *obj)
  */
 static void ebpf_socket_adjust_map(struct socket_bpf *obj, ebpf_module_t *em)
 {
-    ebpf_update_map_size(obj->maps.tbl_bandwidth, &socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH],
-                         em, bpf_map__name(obj->maps.tbl_bandwidth));
-
     ebpf_update_map_size(obj->maps.tbl_nd_socket, &socket_maps[NETDATA_SOCKET_OPEN_SOCKET],
                          em, bpf_map__name(obj->maps.tbl_nd_socket));
 
     ebpf_update_map_size(obj->maps.tbl_nv_udp, &socket_maps[NETDATA_SOCKET_TABLE_UDP],
                          em, bpf_map__name(obj->maps.tbl_nv_udp));
 
-    ebpf_update_map_type(obj->maps.tbl_bandwidth, &socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH]);
     ebpf_update_map_type(obj->maps.tbl_nd_socket, &socket_maps[NETDATA_SOCKET_OPEN_SOCKET]);
     ebpf_update_map_type(obj->maps.tbl_nv_udp, &socket_maps[NETDATA_SOCKET_TABLE_UDP]);
     ebpf_update_map_type(obj->maps.socket_ctrl, &socket_maps[NETDATA_SOCKET_TABLE_CTRL]);
@@ -2292,7 +2278,7 @@ void ebpf_socket_bandwidth_accumulator(ebpf_bandwidth_t *out, int maps_per_core)
  */
 static void ebpf_socket_update_apps_data(int maps_per_core)
 {
-    int fd = socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH].map_fd;
+    int fd = socket_maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd;
     ebpf_bandwidth_t *eb = bandwidth_vector;
     uint32_t key;
     struct ebpf_pid_stat *pids = ebpf_root_of_pids;
@@ -2329,7 +2315,7 @@ static void ebpf_update_socket_cgroup(int maps_per_core)
     ebpf_cgroup_target_t *ect ;
 
     ebpf_bandwidth_t *eb = bandwidth_vector;
-    int fd = socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH].map_fd;
+    int fd = socket_maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd;
 
     size_t length = sizeof(ebpf_bandwidth_t);
     if (maps_per_core)
@@ -3876,12 +3862,13 @@ void parse_service_name_section(struct config *cfg)
     }
 }
 
+/**
+ * Parse table size options
+ *
+ * @param cfg configuration options read from user file.
+ */
 void parse_table_size_options(struct config *cfg)
 {
-    socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH].user_input = (uint32_t) appconfig_get_number(cfg,
-                                                                                            EBPF_GLOBAL_SECTION,
-                                                                                            EBPF_CONFIG_BANDWIDTH_SIZE, NETDATA_MAXIMUM_CONNECTIONS_ALLOWED);
-
     socket_maps[NETDATA_SOCKET_OPEN_SOCKET].user_input = (uint32_t) appconfig_get_number(cfg,
                                                                                         EBPF_GLOBAL_SECTION,
                                                                                         EBPF_CONFIG_SOCKET_MONITORING_SIZE,
