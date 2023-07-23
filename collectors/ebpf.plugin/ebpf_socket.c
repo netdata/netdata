@@ -1912,14 +1912,12 @@ netdata_vector_plot_t * select_vector_to_store(uint32_t *direction, netdata_sock
  * @param family        the connection family
  * @param end           the values size.
  */
-static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key, int family, int end)
+static void ebpf_hash_socket_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key, int end)
 {
-    if (!network_viewer_opt.enabled || !is_socket_allowed(key, family))
-        return;
-
     int i;
     uint8_t protocol = values[0].protocol;
     uint64_t ct = values[0].current_timestamp;
+    uint16_t family = AF_UNSPEC;
     for (i = 1; i < end; i++) {
         netdata_socket_t *w = &values[i];
 
@@ -1935,9 +1933,15 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
         if (!protocol)
             protocol = w->protocol;
 
+        if (family == AF_UNSPEC)
+            family = w->family;
+
         if (w->current_timestamp != ct)
             ct = w->current_timestamp;
     }
+
+    if (!network_viewer_opt.enabled || !is_socket_allowed(key, family))
+        return;
 
     values[0].protocol          = (!protocol)?IPPROTO_TCP:protocol;
     values[0].current_timestamp = ct;
@@ -2008,12 +2012,11 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_idx_t *key, net
  * Read data from hash tables created on kernel ring.
  *
  * @param fd                 the hash table with data.
- * @param family             the family associated to the hash table
  * @param maps_per_core      do I need to read all cores?
  *
  * @return it returns 0 on success and -1 otherwise.
  */
-static void ebpf_read_socket_hash_table(int fd, int family, int maps_per_core)
+static void ebpf_read_socket_hash_table(int fd, int maps_per_core)
 {
     netdata_socket_idx_t key = {};
     netdata_socket_idx_t next_key = {};
@@ -2038,7 +2041,7 @@ static void ebpf_read_socket_hash_table(int fd, int family, int maps_per_core)
             continue;
         }
 
-        hash_accumulator(values, &key, family, end);
+        ebpf_hash_socket_accumulator(values, &key, end);
         memset(values, 0, length);
 
         key = next_key;
@@ -2162,7 +2165,7 @@ void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
     int fd = em->maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd;
     int maps_per_core = em->maps_per_core;
 
-    ebpf_read_socket_hash_table(fd, AF_INET6, maps_per_core);
+    ebpf_read_socket_hash_table(fd, maps_per_core);
 }
 
 /**
