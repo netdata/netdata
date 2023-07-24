@@ -1571,12 +1571,13 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_idx_t *key, net
  *
  * Read data from hash tables created on kernel ring.
  *
+ * @param buf                buffer used to store data to be shown by function.
  * @param fd                 the hash table with data.
  * @param maps_per_core      do I need to read all cores?
  *
  * @return it returns 0 on success and -1 otherwise.
  */
-static void ebpf_read_socket_hash_table(int fd, int maps_per_core)
+static void ebpf_read_socket_hash_table(BUFFER *buf, int fd, int maps_per_core)
 {
     netdata_socket_idx_t key = {};
     netdata_socket_idx_t next_key = {};
@@ -1602,6 +1603,9 @@ static void ebpf_read_socket_hash_table(int fd, int maps_per_core)
         }
 
         ebpf_hash_socket_accumulator(values, &key, end);
+        if (buf)
+            ebpf_fill_function_buffer(buf, &key, values);
+
         memset(values, 0, length);
 
         key = next_key;
@@ -1707,6 +1711,7 @@ static void read_listen_table()
  * This thread is necessary, because we cannot freeze the whole plugin to read the data on very busy socket.
  *
  * @param buf the buffer to store data;
+ * @param em  the module main structure.
  *
  * @return It always returns NULL.
  */
@@ -1725,7 +1730,7 @@ void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
     int fd = em->maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd;
     int maps_per_core = em->maps_per_core;
 
-    ebpf_read_socket_hash_table(fd, maps_per_core);
+    ebpf_read_socket_hash_table(buf, fd, maps_per_core);
 }
 
 /**
