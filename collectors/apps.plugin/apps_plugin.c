@@ -1363,6 +1363,9 @@ static inline kernel_uint_t get_proc_pid_limits_limit(char *buf, const char *key
     char *v = &line[key_len];
     while(isspace(*v)) v++;
 
+    if(strcmp(v, "unlimited") == 0)
+        return 0;
+
     return str2ull(v, NULL);
 }
 
