@@ -190,12 +190,6 @@ int ebpf_read_hash_table(void *ep, int fd, uint32_t pid);
 
 int get_pid_comm(pid_t pid, size_t n, char *dest);
 
-size_t read_processes_statistic_using_pid_on_target(ebpf_process_stat_t **ep,
-                                                           int fd,
-                                                           struct ebpf_pid_on_target *pids);
-
-size_t read_bandwidth_statistic_using_pid_on_target(netdata_socket_t **ns, int fd, struct ebpf_pid_on_target *pids);
-
 void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core);
 void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core);
 
