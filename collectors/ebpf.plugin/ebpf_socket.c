@@ -1606,6 +1606,8 @@ static void ebpf_read_socket_hash_table(BUFFER *buf, int fd, int maps_per_core)
         if (buf)
             ebpf_fill_function_buffer(buf, &key, values);
 
+        ebpf_socket_fill_publish_apps(key.pid, values);
+
         memset(values, 0, length);
 
         key = next_key;
@@ -1806,61 +1808,15 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, netdata_socket_t *ns)
 }
 
 /**
- * Bandwidth accumulator.
- *
- * @param out the vector with the values to sum
- */
-void ebpf_socket_bandwidth_accumulator(netdata_socket_t *out, int maps_per_core)
-{
-    int i, end = (maps_per_core) ? ebpf_nprocs : 1;
-    netdata_socket_t *total = &out[0];
-    for (i = 1; i < end; i++) {
-        netdata_socket_t *move = &out[i];
-        total->tcp.call_tcp_sent += move->tcp.call_tcp_sent;
-        total->tcp.call_tcp_received += move->tcp.call_tcp_received;
-        total->tcp.tcp_bytes_sent += move->tcp.tcp_bytes_sent;
-        total->tcp.tcp_bytes_received += move->tcp.tcp_bytes_received;
-        total->tcp.close += move->tcp.close;
-        total->tcp.retransmit += move->tcp.retransmit;
-        total->tcp.ipv4_connect += move->tcp.ipv4_connect;
-        total->tcp.ipv6_connect += move->tcp.ipv6_connect;
-        total->udp.call_udp_sent += move->udp.call_udp_sent;
-        total->udp.call_udp_received += move->udp.call_udp_received;
-        total->udp.udp_bytes_sent += move->udp.udp_bytes_sent;
-        total->udp.udp_bytes_received += move->udp.udp_bytes_received;
-    }
-}
-
-/**
  *  Update the apps data reading information from the hash table
  *
  * @param maps_per_core      do I need to read all cores?
  */
-static void ebpf_socket_update_apps_data(int maps_per_core)
+static inline void ebpf_socket_update_apps_data(int maps_per_core)
 {
     int fd = socket_maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd;
-    netdata_socket_t *ns = socket_values;
-    uint32_t key;
-    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
-    size_t length = sizeof(netdata_socket_t);
-    if (maps_per_core)
-        length *= ebpf_nprocs;
-    while (pids) {
-        key = pids->pid;
 
-        if (bpf_map_lookup_elem(fd, &key, ns)) {
-            pids = pids->next;
-            continue;
-        }
-
-        ebpf_socket_bandwidth_accumulator(ns, maps_per_core);
-
-        ebpf_socket_fill_publish_apps(key, ns);
-
-        memset(ns, 0, length);
-
-        pids = pids->next;
-    }
+    ebpf_read_socket_hash_table(NULL, fd, maps_per_core);
 }
 
 /**
@@ -1874,19 +1830,11 @@ static void ebpf_update_socket_cgroup(int maps_per_core)
 {
     ebpf_cgroup_target_t *ect ;
 
-    netdata_socket_t *ns = socket_values;
-    int fd = socket_maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd;
-
-    size_t length = sizeof(netdata_socket_t);
-    if (maps_per_core)
-        length *= ebpf_nprocs;
-
     pthread_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
-            netdata_socket_t *out = &pids->socket;
             ebpf_socket_publish_apps_t *publish = &ect->publish_socket;
             if (likely(socket_bandwidth_curr) && socket_bandwidth_curr[pid]) {
                 ebpf_socket_publish_apps_t *in = socket_bandwidth_curr[pid];
@@ -1901,25 +1849,6 @@ static void ebpf_update_socket_cgroup(int maps_per_core)
                 publish->call_close = in->call_close;
                 publish->call_tcp_v4_connection = in->call_tcp_v4_connection;
                 publish->call_tcp_v6_connection = in->call_tcp_v6_connection;
-            } else {
-                if (!bpf_map_lookup_elem(fd, &pid, ns)) {
-                    ebpf_socket_bandwidth_accumulator(ns, maps_per_core);
-
-                    memcpy(out, ns, sizeof(netdata_socket_t));
-
-                    publish->bytes_sent = out->tcp.tcp_bytes_sent;
-                    publish->bytes_received = out->tcp.tcp_bytes_received;
-                    publish->call_tcp_sent = out->tcp.call_tcp_sent;
-                    publish->call_tcp_received = out->tcp.call_tcp_received;
-                    publish->retransmit = out->tcp.retransmit;
-                    publish->call_close = out->tcp.close;
-                    publish->call_tcp_v4_connection = out->tcp.ipv4_connect;
-                    publish->call_tcp_v6_connection = out->tcp.ipv6_connect;
-                    publish->call_udp_sent = out->udp.call_udp_sent;
-                    publish->call_udp_received = out->udp.call_udp_received;
-
-                    memset(ns, 0, length);
-                }
             }
         }
     }
