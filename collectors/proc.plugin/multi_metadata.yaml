@@ -242,7 +242,7 @@ modules:
           Alternatively, software-based solutions such as `Haveged` can be used to generate additional entropy by
           exploiting sources of randomness in the system, such as CPU utilization and network traffic. These solutions
           can help to mitigate the risk of entropy depletion, but they may not be as reliable as hardware-based solutions.
-      method_description: ""
+        method_description: ""
       supported_platforms:
         include: [ "linux" ]
         exclude: []
@@ -1040,12 +1040,34 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: "Monitor SoftIRQs metrics for efficient software interrupt operations."
+        metrics_description: |
+          In the Linux kernel, handling of hardware interrupts is split into two halves: the top half and the bottom half.
+          The top half is the routine that responds immediately to an interrupt, while the bottom half is deferred to be processed later.
+          
+          Softirqs are a mechanism in the Linux kernel used to handle the bottom halves of interrupts, which can be
+          deferred and processed later in a context where it's safe to enable interrupts.
+          
+          The actual work of handling the interrupt is offloaded to a softirq and executed later when the system
+          decides it's a good time to process them. This helps to keep the system responsive by not blocking the top
+          half for too long, which could lead to missed interrupts.
+          
+          Monitoring `/proc/softirqs` is useful for:
+
+          - **Performance tuning**: A high rate of softirqs could indicate a performance issue. For instance, a high
+            rate of network softirqs (`NET_RX` and `NET_TX`) could indicate a network performance issue.
+
+          - **Troubleshooting**: If a system is behaving unexpectedly, checking the softirqs could provide clues about
+            what is going on. For example, a sudden increase in block device softirqs (BLOCK) might indicate a problem
+            with a disk.
+
+          - **Understanding system behavior**: Knowing what types of softirqs are happening can help you understand what
+            your system is doing, particularly in terms of how it's interacting with hardware and how it's handling
+            interrupts.
         method_description: ""
       supported_platforms:
         include: []
         exclude: []
-      multi_instance: true
+      multi_instance: false
       additional_permissions:
         description: ""
       default_behavior:
@@ -1125,12 +1147,34 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: "This integration provides statistics on Softnet, such as processed events, dropped events and more."
+        metrics_description: |
+          `/proc/net/softnet_stat` provides statistics that relate to the handling of network packets by softirq.
+          
+          It provides information about:
+  
+          - Total number of processed packets (`processed`).
+          - Times ksoftirq ran out of quota (`dropped`).
+          - Times net_rx_action was rescheduled.
+          - Number of times processed all lists before quota.
+          - Number of times did not process all lists due to quota.
+          - Number of times net_rx_action was rescheduled for GRO (Generic Receive Offload) cells.
+          - Number of times GRO cells were processed.
+          
+          Monitoring the /proc/net/softnet_stat file can be useful for:
+          
+          - **Network performance monitoring**: By tracking the total number of processed packets and how many packets
+            were dropped, you can gain insights into your system's network performance.
+          
+          - **Troubleshooting**: If you're experiencing network-related issues, this collector can provide valuable clues.
+            For instance, a high number of dropped packets may indicate a network problem.
+          
+          - **Capacity planning**: If your system is consistently processing near its maximum capacity of network
+            packets, it might be time to consider upgrading your network infrastructure.
         method_description: ""
       supported_platforms:
         include: []
         exclude: []
-      multi_instance: true
+      multi_instance: false
       additional_permissions:
         description: ""
       default_behavior:
