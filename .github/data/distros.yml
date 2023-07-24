@@ -212,7 +212,7 @@ include:
 
   - &ubuntu
     distro: ubuntu
-    version: "22.10"
+    version: "22.04"
     eol_check: true
     env_prep: |
       rm -f /etc/apt/apt.conf.d/docker && apt-get update
@@ -220,7 +220,7 @@ include:
       apt-get remove -y libjson-c-dev
     packages: &ubuntu_packages
       type: deb
-      repo_distro: ubuntu/kinetic
+      repo_distro: ubuntu/jammy
       arches:
         - amd64
         - armhf
@@ -232,11 +232,6 @@ include:
     packages:
       <<: *ubuntu_packages
       repo_distro: ubuntu/lunar
-  - <<: *ubuntu
-    version: "22.04"
-    packages:
-      <<: *ubuntu_packages
-      repo_distro: ubuntu/jammy
   - <<: *ubuntu
     version: "20.04"
     packages:
