@@ -512,7 +512,7 @@ Netdata is a popular project...
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
 
-Check its [stargazers on github](https://github.com/netdata/netdata/stargazers). You will find people from quite popular companies and enterprises, including: SAP, Qualcomm, IBM, Amazon, Intel, AMD, Unity, Baidu, Cisco, Samsung, Netflix, Facebook and hundreds more.
+Check the [Netdata stargazers on Github](https://github.com/netdata/netdata/stargazers). You will find people from popular companies and enterprises, including: SAP, Qualcomm, IBM, Amazon, Intel, AMD, Unity, Baidu, Cisco, Samsung, Netflix, Facebook and hundreds more.
 
 Netdata is also popular in universities, including New York University, Columbia University, New Jersey University, and dozens more.
 
