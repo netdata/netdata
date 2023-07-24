@@ -695,6 +695,12 @@ static inline void _handle_job_root(struct uni_http_response *resp, int method, 
 void handle_job_root(struct uni_http_response *resp, int method, struct module *mod, const char *job_id, void *post_payload, size_t post_payload_size)
 {
     if (strncmp(job_id, DYN_CONF_JOB_LIST, strlen(DYN_CONF_JOB_LIST)) == 0) {
+        if (mod->type != MOD_TYPE_ARRAY) {
+            resp->content = "module type is not job_array (can't get the list of jobs)";
+            resp->content_length = strlen(resp->content);
+            resp->status = HTTP_RESP_NOT_FOUND;
+            return;
+        }
         if (method != HTTP_METHOD_GET) {
             resp->content = "method not allowed (only GET)";
             resp->content_length = strlen(resp->content);
