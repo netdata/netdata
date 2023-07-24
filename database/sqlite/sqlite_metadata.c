@@ -820,9 +820,18 @@ static void check_dimension_metadata(struct metadata_wc *wc)
 
     internal_error(true, "METADATA: Checking dimensions starting after row %"PRIu64, last_row_id);
 
-    bool runtime_exceeded = run_cleanup_loop(res, wc, dimension_can_be_deleted, delete_dimension_uuid,
-        &total_checked, &total_deleted, METADATA_RUNTIME_THRESHOLD,
-        MAX_METADATA_CLEANUP, &last_row_id, false, false);
+    bool runtime_exceeded = run_cleanup_loop(
+        res,
+        wc,
+        dimension_can_be_deleted,
+        delete_dimension_uuid,
+        &total_checked,
+        &total_deleted,
+        METADATA_RUNTIME_THRESHOLD,
+        MAX_METADATA_CLEANUP,
+        &last_row_id,
+        false,
+        false);
 
     now = now_realtime_sec();
     if (total_deleted > 0 || runtime_exceeded)
@@ -833,10 +842,10 @@ static void check_dimension_metadata(struct metadata_wc *wc)
     }
 
     netdata_log_info(
-        "METADATA: Dimensions checked %u, deleted %u -- will resume after row %" PRIu64 " in %lld seconds",
+        "METADATA: Dimensions checked %u, deleted %u. Checks will %s in %lld seconds",
         total_checked,
         total_deleted,
-        last_row_id,
+        last_row_id ? "resume" : "restart",
         (long long)(next_execution_t - now));
 
     rc = sqlite3_finalize(res);
@@ -866,9 +875,18 @@ static void check_chart_metadata(struct metadata_wc *wc)
 
     internal_error(true, "METADATA: Checking charts starting after row %"PRIu64, last_row_id);
 
-    bool runtime_exceeded = run_cleanup_loop(res, wc, chart_can_be_deleted, delete_chart_uuid,
-                                             &total_checked, &total_deleted, METADATA_RUNTIME_THRESHOLD,
-                                             MAX_METADATA_CLEANUP, &last_row_id, true, false);
+    bool runtime_exceeded = run_cleanup_loop(
+        res,
+        wc,
+        chart_can_be_deleted,
+        delete_chart_uuid,
+        &total_checked,
+        &total_deleted,
+        METADATA_RUNTIME_THRESHOLD,
+        MAX_METADATA_CLEANUP,
+        &last_row_id,
+        true,
+        false);
 
     now = now_realtime_sec();
     if (total_deleted > 0 || runtime_exceeded)
@@ -878,10 +896,11 @@ static void check_chart_metadata(struct metadata_wc *wc)
         next_execution_t = now + METADATA_CHART_CHECK_INTERVAL;
     }
 
-    netdata_log_info("METADATA: Charts checked %u, deleted %u -- will resume after row %" PRIu64 " in %lld seconds",
+    netdata_log_info(
+        "METADATA: Charts checked %u, deleted %u. Checks will %s in %lld seconds",
         total_checked,
         total_deleted,
-        last_row_id,
+        last_row_id ? "resume" : "restart",
         (long long)(next_execution_t - now));
 
     rc = sqlite3_finalize(res);
@@ -912,9 +931,18 @@ static void check_label_metadata(struct metadata_wc *wc)
 
     internal_error(true,"METADATA: Checking charts labels starting after row %"PRIu64, last_row_id);
 
-    bool runtime_exceeded = run_cleanup_loop(res, wc, chart_can_be_deleted, delete_chart_uuid,
-                                             &total_checked, &total_deleted, METADATA_RUNTIME_THRESHOLD,
-                                             MAX_METADATA_CLEANUP, &last_row_id, false, true);
+    bool runtime_exceeded = run_cleanup_loop(
+        res,
+        wc,
+        chart_can_be_deleted,
+        delete_chart_uuid,
+        &total_checked,
+        &total_deleted,
+        METADATA_RUNTIME_THRESHOLD,
+        MAX_METADATA_CLEANUP,
+        &last_row_id,
+        false,
+        true);
 
     now = now_realtime_sec();
     if (total_deleted > 0 || runtime_exceeded)
@@ -925,10 +953,10 @@ static void check_label_metadata(struct metadata_wc *wc)
     }
 
     netdata_log_info(
-        "METADATA: Charts labels checked %u, deleted %u -- will resume after row %" PRIu64 " in %lld seconds",
+        "METADATA: Chart labels checked %u, deleted %u. Checks will %s in %lld seconds",
         total_checked,
         total_deleted,
-        last_row_id,
+        last_row_id ? "resume" : "restart",
         (long long)(next_execution_t - now));
 
     rc = sqlite3_finalize(res);
