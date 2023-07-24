@@ -424,7 +424,7 @@ Still, if you are already familiar with Prometheus and Grafana, Netdata integrat
 &nbsp;<br/>&nbsp;<br/>
 </details>
 
-### :cloud: How is Netdata different from DataDog, New Relic, Dynatrace, X SaaS Provider?
+### :raised_eyebrow: How is Netdata different from DataDog, New Relic, Dynatrace, X SaaS Provider?
 
 With Netdata your data are always on-prem and your metrics are always high-resolution.
 
