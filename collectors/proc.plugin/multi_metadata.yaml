@@ -431,7 +431,7 @@ modules:
       supported_platforms:
         include: [ "linux" ]
         exclude: []
-      multi_instance: true
+      multi_instance: false
       additional_permissions:
         description: ""
       default_behavior:
@@ -656,7 +656,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi_instance: false
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -1067,7 +1067,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi_instance: false
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -1174,7 +1174,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi_instance: false
+      multi_instance: true
       additional_permissions:
         description: ""
       default_behavior:
@@ -1519,7 +1519,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi_instance: true
+      multi_instance: false
       additional_permissions:
         description: ""
       default_behavior:
@@ -1607,7 +1607,20 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: "This integration monitors system memory errors detected and corrected by ECC RAM."
+        metrics_description: |
+          The Error Detection and Correction (EDAC) subsystem is detecting and reporting errors in the system's memory,
+          primarily ECC (Error-Correcting Code) memory errors.
+          
+          The collector provides data for:
+          
+          - Per memory controller (MC): correctable and uncorrectable errors. These can be of 2 kinds:
+            - errors related to a DIMM
+            - errors that cannot be associated with a DIMM
+          
+          - Per memory DIMM: correctable and uncorrectable errors. There are 2 kinds:
+            - memory controllers that can identify the physical DIMMS and report errors directly for them,
+            - memory controllers that report errors for memory address ranges that can be linked to dimms.
+              In this case the DIMMS reported may be more than the physical DIMMS installed.
         method_description: ""
       supported_platforms:
         include: []
@@ -1704,7 +1717,7 @@ modules:
             - name: dimm_location
               description: Location of the memory module.
             - name: dimm_mem_type
-              description: Type of the memory module. Usually either buffered or unbuffered memory.
+              description: Type of the memory module.
             - name: size
               description: The amount of memory in megabytes that this memory module manages.
           metrics:
@@ -1734,7 +1747,19 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: "Monitor NUMA metrics for efficient non-uniform memory access operations."
+        metrics_description: |
+          Information about NUMA (Non-Uniform Memory Access) nodes on the system.
+          
+          NUMA is a method of configuring a cluster of microprocessor in a multiprocessing system so that they can
+          share memory locally, improving performance and the ability of the system to be expanded. NUMA is used in a
+          symmetric multiprocessing (SMP) system.
+
+          In a NUMA system, processors, memory, and I/O devices are grouped together into cells, also known as nodes.
+          Each node has its own memory and set of I/O devices, and one or more processors. While a processor can access
+          memory in any of the nodes, it does so faster when accessing memory within its own node.
+
+          The collector provides statistics on memory allocations for processes running on the NUMA nodes, revealing the
+          efficiency of memory allocations in multi-node systems.
         method_description: ""
       supported_platforms:
         include: []
@@ -1811,15 +1836,23 @@ modules:
         description: ""
       keywords:
         - ksm
+        - samepage
+        - merging
       most_popular: false
     overview:
       data_collection:
-        metrics_description: "Examine KSM metrics for insights into memory deduplication operations."
+        metrics_description: |
+          Kernel Samepage Merging (KSM) is a memory-saving feature in Linux that enables the kernel to examine the
+          memory of different processes and identify identical pages. It then merges these identical pages into a
+          single page that the processes share. This is particularly useful for virtualization, where multiple virtual
+          machines might be running the same operating system or applications and have many identical pages.
+          
+          The collector provides information about the operation and effectiveness of KSM on your system.
         method_description: ""
       supported_platforms:
         include: []
         exclude: []
-      multi_instance: true
+      multi_instance: false
       additional_permissions:
         description: ""
       default_behavior:
@@ -1903,7 +1936,11 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: "This integration monitors ZRAM usage, compression ratios, and more."
+        metrics_description: |
+          zRAM, or compressed RAM, is a block device that uses a portion of your system's RAM as a block device.
+          The data written to this block device is compressed and stored in memory.
+          
+          The collectors provides information about the operation and the effectiveness of zRAM on your system.
         method_description: ""
       supported_platforms:
         include: []
@@ -1996,15 +2033,30 @@ modules:
       keywords:
         - ipc
         - semaphores
+        - shared memory
       most_popular: false
     overview:
       data_collection:
-        metrics_description: "Monitor Inter Process Communication performance for optimal process interaction."
+        metrics_description: |
+          IPC stands for Inter-Process Communication. It is a mechanism which allows processes to communicate with each
+          other and synchronize their actions.
+          
+          This collector exposes information about:
+
+          - Message Queues: This allows messages to be exchanged between processes. It's a more flexible method that
+            allows messages to be placed onto a queue and read at a later time.
+
+          - Shared Memory: This method allows for the fastest form of IPC because processes can exchange data by
+            reading/writing into shared memory segments.
+
+          - Semaphores: They are used to synchronize the operations performed by independent processes. So, if multiple
+            processes are trying to access a single shared resource, semaphores can ensure that only one process
+            accesses the resource at a given time.
         method_description: ""
       supported_platforms:
         include: []
         exclude: []
-      multi_instance: true
+      multi_instance: false
       additional_permissions:
         description: ""
       default_behavior:
@@ -2109,13 +2161,18 @@ modules:
         description: ""
       keywords:
         - disk
+        - disks
         - io
         - bcache
         - block devices
       most_popular: false
     overview:
       data_collection:
-        metrics_description: "This integration provides statistics about disk and Bcache I/O."
+        metrics_description: |
+          Detailed statistics for each of your system's disk devices and partitions.
+          The data is reported by the kernel and can be used to monitor disk activity on a Linux system.
+          
+          Get valuable insight into how your disks are performing and where potential bottlenecks might be.
         method_description: ""
       supported_platforms:
         include: []
