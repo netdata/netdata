@@ -424,6 +424,32 @@ Still, if you are already familiar with Prometheus and Grafana, Netdata integrat
 &nbsp;<br/>&nbsp;<br/>
 </details>
 
+### :cloud: How is Netdata different from DataDog, New Relic, Dynatrace, X SaaS Provider?
+
+With Netdata your data are always on-prem and your metrics are always high-resolution.
+
+<details><summary>Click to see detailed answer ...</summary>
+&nbsp;<br/>&nbsp;<br/>
+
+Most commercial monitoring providers face a significant challenge: they centralize all metrics to their infrastructure and this is, inevitably, expensive. It leads them to one or more of the following:
+
+  1. be unrealistically expensive
+  2. limit the number of metrics they collect
+  3. limit the resolution of the metrics they collect
+
+As a result they try to find a balance: collect the least possible data, but collect enough to have something useful out of it.
+
+We, at Netdata, see monitoring in a completely different way: **monitoring systems should be built bottom-up and be rich in insights**, so we focus on each component individually to collect, store, check and visualize everything related to each of them, and we make sure that all components are monitored. Each metric is important.
+
+This is why Netdata trains multiple machine-learning models per metric, based exclusively on their own past (no sampling of data, no sharing of trained models) to detect anomalies based on the specific use case and workload each component is used.
+
+This is also why Netdata alerts are attached to components (instances) and are configured with dynamic thresholds and rolling windows, instead of static values.
+
+The distributed nature of Netdata helps scaling this approach: your data is spread inside your infrastructure, as close to the edge as possible. Netdata is not one data lane. Each Netdata Agent is a data lane and all of them together build a massive distributed metrics processing pipeline that ensures all your infrastructure components and applications are monitored and operating as they should.
+
+&nbsp;<br/>&nbsp;<br/>
+</details>
+
 ### :cloud: Do I have to subscribe to Netdata Cloud?
 
 Subscribing to Netdata Cloud is optional but many users find it enhances their experience with Netdata.
