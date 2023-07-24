@@ -456,7 +456,7 @@ Netdata is evolving on a very fast pace. Everyday we take decisions on how the p
 Ideally these decisions should be data informed. _Is this the right area to work on now? Do our users really use that?
 How to prioritize between feature A and B? I believe that C is more important. A user said that D is the most important._
 
-Anonymous telemetry information can really help us take the best decisions. Our users that have anonymous telemetry enabled, contribute significantly to Netdata's roadmap. Without opening issues and without losing any time, they provide valuable anonymous information that helps us do the best for the project and the community.
+Anonymous telemetry information can really help us take the best decisions. Our users that have anonymous telemetry enabled, contribute significantly to Netdata's roadmap. Without losing any time, they provide valuable anonymous information that helps us do the best for the project and the community.
 
 We understand that this is not acceptable or not allowed in all environments. For this reason we have made it easy to disable telemetry when you need to:
 
