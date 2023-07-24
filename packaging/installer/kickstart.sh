@@ -257,14 +257,16 @@ telemetry_event() {
     TOTAL_RAM="$((TOTAL_RAM * 1024))"
   fi
 
+  MD5_PATH="$(exec <&- 2>&-; which md5sum || command -v md5sum || type md5sum)"
+
   if [ "${KERNEL_NAME}" = Darwin ] && command -v ioreg >/dev/null 2>&1; then
     DISTINCT_ID="macos-$(ioreg -rd1 -c IOPlatformExpertDevice | awk '/IOPlatformUUID/ { split($0, line, "\""); printf("%s\n", line[4]); }')"
-  elif [ -f /etc/machine-id ]; then
-    DISTINCT_ID="machine-$(cat /etc/machine-id)"
-  elif [ -f /var/db/dbus/machine-id ]; then
-    DISTINCT_ID="dbus-$(cat /var/db/dbus/machine-id)"
-  elif [ -f /var/lib/dbus/machine-id ]; then
-    DISTINCT_ID="dbus-$(cat /var/lib/dbus/machine-id)"
+  elif [ -f /etc/machine-id ] && [ -n "$MD5_PATH" ]; then
+    DISTINCT_ID="machine-$($MD5_PATH < /etc/machine-id | cut -f1 -d" ")"
+  elif [ -f /var/db/dbus/machine-id ] && [ -n "$MD5_PATH" ]; then
+    DISTINCT_ID="dbus-$($MD5_PATH < /var/db/dbus/machine-id | cut -f1 -d" ")"
+  elif [ -f /var/lib/dbus/machine-id ] && [ -n "$MD5_PATH" ]; then
+    DISTINCT_ID="dbus-$($MD5_PATH < /var/lib/dbus/machine-id | cut -f1 -d" ")"
   elif command -v uuidgen > /dev/null 2>&1; then
     DISTINCT_ID="uuid-$(uuidgen | tr '[:upper:]' '[:lower:]')"
   else
@@ -300,7 +302,8 @@ telemetry_event() {
     "system_kernel_name": "${KERNEL_NAME}",
     "system_kernel_version": "$(uname -r)",
     "system_architecture": "$(uname -m)",
-    "system_total_ram": "${TOTAL_RAM:-unknown}"
+    "system_total_ram": "${TOTAL_RAM:-unknown}",
+    "system_distinct_id": "${DISTINCT_ID}"
   }
 }
 EOF
