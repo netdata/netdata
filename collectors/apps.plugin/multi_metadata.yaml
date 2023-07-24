@@ -1,131 +1,60 @@
 name: apps.plugin
 modules:
-  - meta:
-      plugin_name: apps.plugin
-      module_name: system
-      alternative_monitored_instances: []
-      monitored_instance:
-        name: apps system
-        link: ''
-        categories: []
-        icon_filename: ''
-      related_resources:
-        integrations:
-          list: []
-      info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
-      most_popular: false
-    overview:
-      data_collection:
-        metrics_description: ''
-        method_description: ''
-      supported_platforms:
-        include: []
-        exclude: []
-      multi-instance: true
-      additional_permissions:
-        description: ''
-      default_behavior:
-        auto_detection:
-          description: ''
-        limits:
-          description: ''
-        performance_impact:
-          description: ''
-    setup:
-      prerequisites:
-        list: []
-      configuration:
-        file:
-          name: ''
-          description: ''
-        options:
-          description: ''
-          folding:
-            title: ''
-            enabled: true
-          list: []
-        examples:
-          folding:
-            enabled: true
-            title: ''
-          list: []
-    troubleshooting:
-      problems:
-        list: []
-    alerts: []
-    metrics:
-      folding:
-        title: Metrics
-        enabled: false
-      description: ""
-      availability: []
-      scopes:
-        - name: global
-          description: ""
-          labels: []
-          metrics:
-            - name: system.processes_state
-              description: System Processes State
-              unit: "processes"
-              chart_type: line
-              dimensions:
-                - name: running
-                - name: sleeping_interruptible
-                - name: sleeping_uninterruptible
-                - name: zombie
-                - name: stopped
+  # removed system.processes_state
   - meta:
       plugin_name: apps.plugin
       module_name: apps
-      alternative_monitored_instances: []
       monitored_instance:
-        name: apps apps
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: Applications
+        link: ""
+        categories:
+          - data-collection.processes-and-system-services
+        icon_filename: "netdata.png"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - applications
+        - processes
+        - os
+        - host monitoring
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "Monitor Applications for optimal software performance and resource usage."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -295,53 +224,59 @@ modules:
   - meta:
       plugin_name: apps.plugin
       module_name: groups
-      alternative_monitored_instances: []
       monitored_instance:
-        name: apps groups
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: User Groups
+        link: ""
+        categories:
+          - data-collection.processes-and-system-services
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - groups
+        - processes
+        - user auditing
+        - authorization
+        - os
+        - host monitoring
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration monitors resource utilization on a user groups context."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -511,53 +446,57 @@ modules:
   - meta:
       plugin_name: apps.plugin
       module_name: users
-      alternative_monitored_instances: []
       monitored_instance:
-        name: apps users
-        link: ''
-        categories: []
-        icon_filename: ''
+        name: Users
+        link: ""
+        categories:
+          - data-collection.processes-and-system-services
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
+        description: ""
+      keywords:
+        - users
+        - processes
+        - os
+        - host monitoring
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: "This integration monitors resource utilization on a user context."
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
-      multi-instance: true
+      multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -724,110 +663,3 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: a dimension per user
-  - meta:
-      plugin_name: apps.plugin
-      module_name: netdata
-      alternative_monitored_instances: []
-      monitored_instance:
-        name: apps netdata
-        link: ''
-        categories: []
-        icon_filename: ''
-      related_resources:
-        integrations:
-          list: []
-      info_provided_to_referring_integrations:
-        description: ''
-      keywords: []
-      most_popular: false
-    overview:
-      data_collection:
-        metrics_description: ''
-        method_description: ''
-      supported_platforms:
-        include: []
-        exclude: []
-      multi-instance: true
-      additional_permissions:
-        description: ''
-      default_behavior:
-        auto_detection:
-          description: ''
-        limits:
-          description: ''
-        performance_impact:
-          description: ''
-    setup:
-      prerequisites:
-        list: []
-      configuration:
-        file:
-          name: ''
-          description: ''
-        options:
-          description: ''
-          folding:
-            title: ''
-            enabled: true
-          list: []
-        examples:
-          folding:
-            enabled: true
-            title: ''
-          list: []
-    troubleshooting:
-      problems:
-        list: []
-    alerts: []
-    metrics:
-      folding:
-        title: Metrics
-        enabled: false
-      description: ""
-      availability: []
-      scopes:
-        - name: global
-          description: ""
-          labels: []
-          metrics:
-            - name: netdata.apps_cpu
-              description: Apps Plugin CPU
-              unit: "milliseconds/s"
-              chart_type: stacked
-              dimensions:
-                - name: user
-                - name: system
-            - name: netdata.apps_sizes
-              description: Apps Plugin Files
-              unit: "files/s"
-              chart_type: line
-              dimensions:
-                - name: calls
-                - name: files
-                - name: filenames
-                - name: inode_changes
-                - name: link_changes
-                - name: pids
-                - name: fds
-                - name: targets
-                - name: new_pids
-            - name: netdata.apps_fix
-              description: Apps Plugin Normalization Ratios
-              unit: "percentage"
-              chart_type: line
-              dimensions:
-                - name: utime
-                - name: stime
-                - name: gtime
-                - name: minflt
-                - name: majflt
-            - name: netdata.apps_children_fix
-              description: Apps Plugin Exited Children Normalization Ratios
-              unit: "percentage"
-              chart_type: line
-              dimensions:
-                - name: utime
-                - name: stime
-                - name: gtime
-                - name: minflt
-                - name: majflt

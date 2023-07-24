@@ -69,8 +69,6 @@ typedef struct netdata_syscall_stat {
     struct netdata_syscall_stat *next; // Link list
 } netdata_syscall_stat_t;
 
-typedef uint64_t netdata_idx_t;
-
 typedef struct netdata_publish_syscall {
     char *dimension;
     char *name;
@@ -169,6 +167,9 @@ typedef struct ebpf_tracepoint {
 #define NETDATA_EBPF_KERNEL_MEMORY "ebpf_kernel_memory"
 #define NETDATA_EBPF_HASH_TABLES_LOADED "ebpf_hash_tables_count"
 #define NETDATA_EBPF_HASH_TABLES_PER_CORE "ebpf_hash_tables_per_core"
+#define NETDATA_EBPF_HASH_TABLES_GLOBAL_ELEMENTS "ebpf_hash_tables_global_elements"
+#define NETDATA_EBPF_HASH_TABLES_INSERT_PID_ELEMENTS "ebpf_hash_tables_insert_pid_elements"
+#define NETDATA_EBPF_HASH_TABLES_REMOVE_PID_ELEMENTS "ebpf_hash_tables_remove_pid_elements"
 
 // Log file
 #define NETDATA_DEVELOPER_LOG_FILE "developer.log"
@@ -318,6 +319,9 @@ void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, 
 void ebpf_update_disabled_plugin_stats(ebpf_module_t *em);
 ARAL *ebpf_allocate_pid_aral(char *name, size_t size);
 void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe_links);
+
+void ebpf_read_global_table_stats(netdata_idx_t *stats, netdata_idx_t *values, int map_fd,
+                                  int maps_per_core, uint32_t begin, uint32_t end);
 
 extern ebpf_filesystem_partitions_t localfs[];
 extern ebpf_sync_syscalls_t local_syscalls[];

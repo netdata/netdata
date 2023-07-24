@@ -1,12 +1,12 @@
 meta:
   plugin_name: python.d.plugin
   module_name: retroshare
-  alternative_monitored_instances: []
   monitored_instance:
-    name: python.d retroshare
+    name: RetroShare
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.p2p
+    icon_filename: 'retroshare.png'
   related_resources:
     integrations:
       list: []
@@ -16,12 +16,12 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor RetroShare metrics for efficient peer-to-peer communication and file sharing. Enhance your communication and file sharing performance with real-time insights and alerts from Netdata.'
     method_description: ''
   supported_platforms:
     include: []
     exclude: []
-  multi-instance: true
+  multi_instance: true
   additional_permissions:
     description: ''
   default_behavior:
@@ -52,7 +52,11 @@ setup:
 troubleshooting:
   problems:
     list: []
-alerts: []
+alerts:
+- name: retroshare_dht_working
+  link: https://github.com/netdata/netdata/blob/master/health/health.d/retroshare.conf
+  metric: retroshare.dht
+  info: number of DHT peers
 metrics:
   folding:
     title: Metrics
@@ -60,28 +64,28 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: retroshare.bandwidth
-          description: RetroShare Bandwidth
-          unit: "kilobits/s"
-          chart_type: area
-          dimensions:
-            - name: Upload
-            - name: Download
-        - name: retroshare.peers
-          description: RetroShare Peers
-          unit: "peers"
-          chart_type: line
-          dimensions:
-            - name: All friends
-            - name: Connected friends
-        - name: retroshare.dht
-          description: Retroshare DHT
-          unit: "peers"
-          chart_type: line
-          dimensions:
-            - name: DHT nodes estimated
-            - name: RS nodes estimated
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: retroshare.bandwidth
+      description: RetroShare Bandwidth
+      unit: "kilobits/s"
+      chart_type: area
+      dimensions:
+      - name: Upload
+      - name: Download
+    - name: retroshare.peers
+      description: RetroShare Peers
+      unit: "peers"
+      chart_type: line
+      dimensions:
+      - name: All friends
+      - name: Connected friends
+    - name: retroshare.dht
+      description: Retroshare DHT
+      unit: "peers"
+      chart_type: line
+      dimensions:
+      - name: DHT nodes estimated
+      - name: RS nodes estimated

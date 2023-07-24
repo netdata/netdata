@@ -1,7 +1,6 @@
 meta:
   plugin_name: python.d.plugin
   module_name: changefinder
-  alternative_monitored_instances: []
   monitored_instance:
     name: python.d changefinder
     link: ''
@@ -21,7 +20,7 @@ overview:
   supported_platforms:
     include: []
     exclude: []
-  multi-instance: true
+  multi_instance: true
   additional_permissions:
     description: ''
   default_behavior:
@@ -60,19 +59,19 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: changefinder.scores
-          description: ChangeFinder
-          unit: "score"
-          chart_type: line
-          dimensions:
-            - name: a dimension per chart
-        - name: changefinder.flags
-          description: ChangeFinder
-          unit: "flag"
-          chart_type: stacked
-          dimensions:
-            - name: a dimension per chart
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: changefinder.scores
+      description: ChangeFinder
+      unit: "score"
+      chart_type: line
+      dimensions:
+      - name: a dimension per chart
+    - name: changefinder.flags
+      description: ChangeFinder
+      unit: "flag"
+      chart_type: stacked
+      dimensions:
+      - name: a dimension per chart

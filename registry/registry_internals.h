@@ -72,7 +72,7 @@ extern struct registry registry;
 // REGISTRY LOW-LEVEL REQUESTS (in registry-internals.c)
 REGISTRY_PERSON *registry_request_access(const char *person_guid, char *machine_guid, char *url, char *name, time_t when);
 REGISTRY_PERSON *registry_request_delete(const char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when);
-REGISTRY_MACHINE *registry_request_machine(const char *person_guid, char *request_machine);
+REGISTRY_MACHINE *registry_request_machine(const char *person_guid, char *request_machine, STRING **hostname);
 
 // REGISTRY LOG (in registry_log.c)
 void registry_log(char action, REGISTRY_PERSON *p, REGISTRY_MACHINE *m, STRING *u, const char *name);

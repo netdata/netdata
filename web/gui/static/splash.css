@@ -5,6 +5,7 @@
   --column-gap: 8px;
   --logo-color: #f1fff7;
   --button-text-green: #00cd51;
+  --border-color: #536775;
 }
 
 body {
@@ -135,6 +136,16 @@ iframe.hidden {
   display: flex;
   margin: 8px auto;
 }
+#agent-splash-screen .loading-message table {
+  display: none;
+  border-collapse: collapse;
+  border: 1px solid var(--border-color);
+  color: var(--font-color);
+}
+#agent-splash-screen.table .loading-message table {
+  display: table;
+  margin: 8px auto;
+}
 #agent-splash-screen .dashboard-buttons {
   width: 320px;
   margin: auto;
@@ -146,6 +157,9 @@ iframe.hidden {
   left: 0;
   right: 0;
   margin: auto;
+}
+.green {
+  color: var(--primary-green);
 }
 @keyframes glow {
   from {

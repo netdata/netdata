@@ -9,13 +9,14 @@ learn_rel_path: "Developers"
 
 # Redistributed software
 
-Netdata copyright info:
- Copyright 2016-2018, Costa Tsaousis.
- Copyright 2018, Netdata Inc.
- Released under [GPL v3 or later](https://raw.githubusercontent.com/netdata/netdata/master/LICENSE).
+Netdata copyright info:<br/>
+Copyright 2023, Netdata Inc.<br/>
+Released under [GPL v3 or later](https://raw.githubusercontent.com/netdata/netdata/master/LICENSE).
 
 Netdata uses SPDX license tags to identify the license for its files.
 Individual licenses referenced in the tags are available on the [SPDX project site](http://spdx.org/licenses/).
+
+Netdata redistributes the Netdata Cloud UI, licensed under [Netdata Cloud UI License v1.0 (NCUL1)](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/v2/LICENSE.md). Netdata Cloud UI includes [third party open-source software](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/v2/3D_PARTY_LICENSES.txt).
 
 Netdata redistributes the following third-party software.
 We have decided to redistribute all these, instead of using them

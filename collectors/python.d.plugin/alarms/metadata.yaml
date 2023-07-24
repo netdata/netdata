@@ -1,7 +1,6 @@
 meta:
   plugin_name: python.d.plugin
   module_name: alarms
-  alternative_monitored_instances: []
   monitored_instance:
     name: python.d alarms
     link: ''
@@ -21,7 +20,7 @@ overview:
   supported_platforms:
     include: []
     exclude: []
-  multi-instance: true
+  multi_instance: true
   additional_permissions:
     description: ''
   default_behavior:
@@ -60,19 +59,19 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: alarms.status
-          description: Alarms ({status mapping})
-          unit: "status"
-          chart_type: line
-          dimensions:
-            - name: a dimension per alarm
-        - name: alarms.status
-          description: Alarm Values
-          unit: "value"
-          chart_type: line
-          dimensions:
-            - name: a dimension per alarm
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: alarms.status
+      description: Alarms ({status mapping})
+      unit: "status"
+      chart_type: line
+      dimensions:
+      - name: a dimension per alarm
+    - name: alarms.status
+      description: Alarm Values
+      unit: "value"
+      chart_type: line
+      dimensions:
+      - name: a dimension per alarm

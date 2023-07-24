@@ -60,6 +60,7 @@ dist_web_DATA = \
     $(srcdir)/main.js \
     $(srcdir)/registry-access.html \
     $(srcdir)/registry-alert-redirect.html \
+    $(srcdir)/registry-hello.html \
     $(srcdir)/switch.html \
     version.txt \
     $(NULL)

@@ -485,7 +485,7 @@ The full [database query API](https://github.com/netdata/netdata/blob/master/web
      `,` or `|` instead of spaces)_ and the `match-ids` and `match-names` options affect the searches
      for dimensions.
 
-- `foreach DIMENSIONS` is optional, will always be the last parameter, and uses the same `,`/`|`
+- `foreach DIMENSIONS` is optional and works only with [templates](#alarm-line-alarm-or-template), will always be the last parameter, and uses the same `,`/`|`
      rules as the `of` parameter. Each dimension you specify in `foreach` will use the same rule
      to trigger an alarm. If you set both `of` and `foreach`, Netdata will ignore the `of` parameter
      and replace it with one of the dimensions you gave to `foreach`. This option allows you to
@@ -1068,18 +1068,18 @@ alarm to it.
 Check if user or system dimension is using more than 50% of cpu:
 
 ```yaml
- alarm: dim_template
-    on: system.cpu
-    os: linux
-lookup: average -3s percentage foreach system,user
- units: %
- every: 10s
-  warn: $this > 50
-  crit: $this > 80
+template: cpu_template
+      on: system.cpu
+      os: linux
+  lookup: average -1m foreach system,user
+   units: %
+   every: 10s
+    warn: $this > 50
+    crit: $this > 80
 ```
 
-The `lookup` line will calculate the average CPU usage from system and user in the last 3 seconds. Because we have
-the foreach in the `lookup` line, Netdata will create two independent alarms called `dim_template_system`
+The `lookup` line will calculate the average CPU usage from system and user over the last minute. Because we have
+the foreach in the `lookup` line, Netdata will create two independent alarms called `cpu_template_system`
 and `dim_template_user` that will have all the other parameters shared among them.
 
 ### Example 6 - CPU usage
@@ -1087,17 +1087,17 @@ and `dim_template_user` that will have all the other parameters shared among the
 Check if all dimensions are using more than 50% of cpu:
 
 ```yaml
- alarm: dim_template
-    on: system.cpu
-    os: linux
-lookup: average -3s percentage foreach *
- units: %
- every: 10s
-  warn: $this > 50
-  crit: $this > 80
+template: cpu_template
+      on: system.cpu
+      os: linux
+  lookup: average -1m foreach *
+   units: %
+   every: 10s
+    warn: $this > 50
+    crit: $this > 80
 ```
 
-The `lookup` line will calculate the average of CPU usage from system and user in the last 3 seconds. In this case
+The `lookup` line will calculate the average of CPU usage from system and user over the last minute. In this case
 Netdata will create alarms for all dimensions of the chart.
 
 ### Example 7 - Z-Score based alarm
@@ -1199,6 +1199,8 @@ Dimension templates can condense many individual entities into one—no more cop
 
 ### The fundamentals of `foreach`
 
+> **Note**: works only with [templates](#alarm-line-alarm-or-template).
+
 Our dimension templates update creates a new `foreach` parameter to the
 existing [`lookup` line](#alarm-line-lookup). This
 is where the magic happens.
@@ -1224,38 +1226,38 @@ Before dimension templates, you would need the following three entities:
 ```yaml
  alarm: cpu_system
     on: system.cpu
-lookup: average -10m percentage of system
+lookup: average -10m of system
  every: 1m
   warn: $this > 50
   crit: $this > 80
 
  alarm: cpu_user
     on: system.cpu
-lookup: average -10m percentage of user
+lookup: average -10m of user
  every: 1m
   warn: $this > 50
   crit: $this > 80
 
  alarm: cpu_nice
     on: system.cpu
-lookup: average -10m percentage of nice
+lookup: average -10m of nice
  every: 1m
   warn: $this > 50
   crit: $this > 80
 ```
 
-With dimension templates, you can condense these into a single alarm. Take note of the `alarm` and `lookup` lines.
+With dimension templates, you can condense these into a single template. Take note of the `alarm` and `lookup` lines.
 
 ```yaml
- alarm: cpu_template
-    on: system.cpu
-lookup: average -10m percentage foreach system,user,nice
- every: 1m
-  warn: $this > 50
-  crit: $this > 80
+template: cpu_template
+      on: system.cpu
+  lookup: average -10m foreach system,user,nice
+   every: 1m
+    warn: $this > 50
+    crit: $this > 80
 ```
 
-The `alarm` line specifies the naming scheme Netdata will use. You can use whatever naming scheme you'd like, with `.`
+The `template` line specifies the naming scheme Netdata will use. You can use whatever naming scheme you'd like, with `.`
 and `_` being the only allowed symbols.
 
 The `lookup` line has changed from `of` to `foreach`, and we're now passing three dimensions.

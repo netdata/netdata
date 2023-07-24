@@ -1,12 +1,12 @@
 meta:
   plugin_name: ioping.plugin
   module_name: ioping.plugin
-  alternative_monitored_instances: []
   monitored_instance:
-    name: ioping
+    name: IOPing
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.synthetic-checks
+    icon_filename: 'syslog.png'
   related_resources:
     integrations:
       list: []
@@ -16,12 +16,12 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Monitor IOPing metrics for efficient disk I/O latency tracking. Keep track of read/write speeds, latency, and error rates for optimized disk operations.'
     method_description: ''
   supported_platforms:
     include: []
     exclude: []
-  multi-instance: true
+  multi_instance: true
   additional_permissions:
     description: ''
   default_behavior:
@@ -52,7 +52,11 @@ setup:
 troubleshooting:
   problems:
     list: []
-alerts: []
+alerts:
+- name: ioping_disk_latency
+  link: https://github.com/netdata/netdata/blob/master/health/health.d/ioping.conf
+  metric: ioping.latency
+  info: average I/O latency over the last 10 seconds
 metrics:
   folding:
     title: Metrics
@@ -60,13 +64,13 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: disk
-      description: ""
-      labels: []
-      metrics:
-        - name: ioping.latency
-          description: Read Latency
-          unit: "microseconds"
-          chart_type: line
-          dimensions:
-            - name: latency
+  - name: disk
+    description: ""
+    labels: []
+    metrics:
+    - name: ioping.latency
+      description: Read Latency
+      unit: "microseconds"
+      chart_type: line
+      dimensions:
+      - name: latency

@@ -3,8 +3,6 @@
         return window.location.origin + window.location.pathname.replace(pathRegex, "")
       }
 
-      var doneAccess = false
-
       function doRegistryAccess(parentHelloData, originUrl) {
         const helloPromise = !parentHelloData
           ? fetch(originUrl + "/api/v1/registry?action=hello", { cache: "no-cache", credentials: "include" })
@@ -38,7 +36,6 @@
                 }
               }
               window.parent.postMessage(data, "*");
-              doneAccess = true
             })
           }
           doAccess(data.machine_guid, data.hostname)
@@ -65,8 +62,6 @@
       }
 
       window.addEventListener('message', function(event) {
-        if (doneAccess) return
-
         var isNetdataMessage = Array.isArray(event.data) ? event.data.length === 3 ? event.data[0] === "netdata-registry" : isValidHttpUrl(event.data[0]) : true
 
         if (!isNetdataMessage) return

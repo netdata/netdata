@@ -360,7 +360,7 @@ static inline int ebpf_fd_load_and_attach(struct fd_bpf *obj, ebpf_module_t *em)
     if (!ret) {
         ebpf_fd_set_hash_tables(obj);
 
-        ebpf_update_controller(fd_maps[NETDATA_CACHESTAT_CTRL].map_fd, em);
+        ebpf_update_controller(fd_maps[NETDATA_FD_CONTROLLER].map_fd, em);
     }
 
     return ret;
@@ -624,26 +624,24 @@ static void ebpf_fd_send_data(ebpf_module_t *em)
  *
  * Read the table with number of calls for all functions
  *
+ * @param stats         vector used to read data from control table.
  * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_fd_read_global_table(int maps_per_core)
+static void ebpf_fd_read_global_tables(netdata_idx_t *stats, int maps_per_core)
 {
-    uint32_t idx;
-    netdata_idx_t *val = fd_hash_values;
-    netdata_idx_t *stored = fd_values;
-    int fd = fd_maps[NETDATA_FD_GLOBAL_STATS].map_fd;
+    ebpf_read_global_table_stats(fd_hash_values,
+                                 fd_values,
+                                 fd_maps[NETDATA_FD_GLOBAL_STATS].map_fd,
+                                 maps_per_core,
+                                 NETDATA_KEY_CALLS_DO_SYS_OPEN,
+                                 NETDATA_FD_COUNTER);
 
-    for (idx = NETDATA_KEY_CALLS_DO_SYS_OPEN; idx < NETDATA_FD_COUNTER; idx++) {
-        if (!bpf_map_lookup_elem(fd, &idx, stored)) {
-            int i;
-            int end = (maps_per_core) ? ebpf_nprocs: 1;
-            netdata_idx_t total = 0;
-            for (i = 0; i < end; i++)
-                total += stored[i];
-
-            val[idx] = total;
-        }
-    }
+    ebpf_read_global_table_stats(stats,
+                                 fd_values,
+                                 fd_maps[NETDATA_FD_CONTROLLER].map_fd,
+                                 maps_per_core,
+                                 NETDATA_CONTROLLER_PID_TABLE_ADD,
+                                 NETDATA_CONTROLLER_END);
 }
 
 /**
@@ -1136,6 +1134,8 @@ static void fd_collector(ebpf_module_t *em)
     int maps_per_core = em->maps_per_core;
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
+    netdata_idx_t *stats = em->hash_table_stats;
+    memset(stats, 0, sizeof(em->hash_table_stats));
     while (!ebpf_exit_plugin && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
 
@@ -1144,7 +1144,7 @@ static void fd_collector(ebpf_module_t *em)
 
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
-        ebpf_fd_read_global_table(maps_per_core);
+        ebpf_fd_read_global_tables(stats, maps_per_core);
         pthread_mutex_lock(&collect_data_mutex);
         if (apps)
             read_fd_apps_table(maps_per_core);

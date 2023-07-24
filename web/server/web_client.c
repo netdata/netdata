@@ -1276,12 +1276,15 @@ void web_client_build_http_header(struct web_client *w) {
     if(unlikely(w->response.code != HTTP_RESP_OK))
         buffer_no_cacheable(w->response.data);
 
+    if(unlikely(!w->response.data->date))
+        w->response.data->date = now_realtime_sec();
+
     // set a proper expiration date, if not already set
     if(unlikely(!w->response.data->expires)) {
         if(w->response.data->options & WB_CONTENT_NO_CACHEABLE)
-            w->response.data->expires = w->timings.tv_ready.tv_sec + localhost->rrd_update_every;
+            w->response.data->expires = w->response.data->date + localhost->rrd_update_every;
         else
-            w->response.data->expires = w->timings.tv_ready.tv_sec + 86400;
+            w->response.data->expires = w->response.data->date + 86400;
     }
 
     // prepare the HTTP response header
@@ -1868,10 +1871,6 @@ void web_client_process_request(struct web_client *w) {
 
     w->response.sent = 0;
 
-    // set a proper last modified date
-    if(unlikely(!w->response.data->date))
-        w->response.data->date = w->timings.tv_ready.tv_sec;
-
     web_client_send_http_header(w);
 
     // enable sending immediately if we have data
@@ -2260,7 +2259,6 @@ ssize_t web_client_receive(struct web_client *w)
     return(bytes);
 }
 
-
 void web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string) {
     char buffer[NETDATA_WEB_REQUEST_URL_SIZE + 2];
     buffer[0] = '\0';
@@ -2282,29 +2280,24 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
     }
     else {
         // in non-stream mode, there is a path
-
         // FIXME - the way this is implemented, query string params never accept the symbol &, not even encoded as %26
         // To support the symbol & in query string params, we need to turn the url_query_string_decoded into a
         // dictionary and decode each of the parameters individually.
         // OR: in url_query_string_decoded use as separator a control character that cannot appear in the URL.
 
-        char *question_mark_start = strchr(path_and_query_string, '?');
-        if (question_mark_start)
-            url_decode_r(buffer, question_mark_start, NETDATA_WEB_REQUEST_URL_SIZE + 1);
+        url_decode_r(buffer, path_and_query_string, NETDATA_WEB_REQUEST_URL_SIZE + 1);
 
-        buffer[NETDATA_WEB_REQUEST_URL_SIZE + 1] = '\0';
-        buffer_strcat(w->url_query_string_decoded, buffer);
-
+        char *question_mark_start = strchr(buffer, '?');
         if (question_mark_start) {
+            buffer_strcat(w->url_query_string_decoded, question_mark_start);
             char c = *question_mark_start;
             *question_mark_start = '\0';
-            url_decode_r(buffer, path_and_query_string, NETDATA_WEB_REQUEST_URL_SIZE + 1);
+            buffer_strcat(w->url_path_decoded, buffer);
             *question_mark_start = c;
-        } else
-            url_decode_r(buffer, path_and_query_string, NETDATA_WEB_REQUEST_URL_SIZE + 1);
-
-        buffer[NETDATA_WEB_REQUEST_URL_SIZE + 1] = '\0';
-        buffer_strcat(w->url_path_decoded, buffer);
+        } else {
+            buffer_strcat(w->url_query_string_decoded, "");
+            buffer_strcat(w->url_path_decoded, buffer);
+        }
     }
 }
 

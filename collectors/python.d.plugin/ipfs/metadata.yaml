@@ -1,12 +1,12 @@
 meta:
   plugin_name: python.d.plugin
   module_name: ipfs
-  alternative_monitored_instances: []
   monitored_instance:
-    name: python.d ipfs
+    name: IPFS
     link: ''
-    categories: []
-    icon_filename: ''
+    categories:
+    - data-collection.storage-mount-points-and-filesystems
+    icon_filename: 'ipfs.png'
   related_resources:
     integrations:
       list: []
@@ -16,12 +16,12 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: 'Examine IPFS metrics for insights into distributed file system operations. Analyze node connectivity, data replication, and retrieval times for efficient distributed file handling.'
     method_description: ''
   supported_platforms:
     include: []
     exclude: []
-  multi-instance: true
+  multi_instance: true
   additional_permissions:
     description: ''
   default_behavior:
@@ -52,7 +52,11 @@ setup:
 troubleshooting:
   problems:
     list: []
-alerts: []
+alerts:
+- name: ipfs_datastore_usage
+  link: https://github.com/netdata/netdata/blob/master/health/health.d/ipfs.conf
+  metric: ipfs.repo_size
+  info: IPFS datastore utilization
 metrics:
   folding:
     title: Metrics
@@ -60,35 +64,35 @@ metrics:
   description: ""
   availability: []
   scopes:
-    - name: global
-      description: ""
-      labels: []
-      metrics:
-        - name: ipfs.bandwidth
-          description: IPFS Bandwidth
-          unit: "kilobits/s"
-          chart_type: line
-          dimensions:
-            - name: in
-            - name: out
-        - name: ipfs.peers
-          description: IPFS Peers
-          unit: "peers"
-          chart_type: line
-          dimensions:
-            - name: peers
-        - name: ipfs.repo_size
-          description: IPFS Repo Size
-          unit: "GiB"
-          chart_type: area
-          dimensions:
-            - name: avail
-            - name: size
-        - name: ipfs.repo_objects
-          description: IPFS Repo Objects
-          unit: "objects"
-          chart_type: line
-          dimensions:
-            - name: objects
-            - name: pinned
-            - name: recursive_pins
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: ipfs.bandwidth
+      description: IPFS Bandwidth
+      unit: "kilobits/s"
+      chart_type: line
+      dimensions:
+      - name: in
+      - name: out
+    - name: ipfs.peers
+      description: IPFS Peers
+      unit: "peers"
+      chart_type: line
+      dimensions:
+      - name: peers
+    - name: ipfs.repo_size
+      description: IPFS Repo Size
+      unit: "GiB"
+      chart_type: area
+      dimensions:
+      - name: avail
+      - name: size
+    - name: ipfs.repo_objects
+      description: IPFS Repo Objects
+      unit: "objects"
+      chart_type: line
+      dimensions:
+      - name: objects
+      - name: pinned
+      - name: recursive_pins

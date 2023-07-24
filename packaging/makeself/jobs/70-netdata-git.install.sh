@@ -7,12 +7,12 @@
 cd "${NETDATA_SOURCE_PATH}" || exit 1
 
 if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
-  export CFLAGS="-static -O2 -I/openssl-static/include -I/libnetfilter-acct-static/include/libnetfilter_acct -I/usr/include/libmnl -pipe"
+  export CFLAGS="-ffunction-sections -fdata-sections -static -O2 -funroll-loops -I/openssl-static/include -I/libnetfilter-acct-static/include/libnetfilter_acct -I/usr/include/libmnl -pipe"
 else
   export CFLAGS="-static -O1 -pipe -ggdb -Wall -Wextra -Wformat-signedness -DNETDATA_INTERNAL_CHECKS=1 -I/openssl-static/include -I/libnetfilter-acct-static/include/libnetfilter_acct -I/usr/include/libmnl"
 fi
 
-export LDFLAGS="-static -L/openssl-static/lib -L/libnetfilter-acct-static/lib -lnetfilter_acct -L/usr/lib -lmnl"
+export LDFLAGS="-Wl,--gc-sections -static -L/openssl-static/lib -L/libnetfilter-acct-static/lib -lnetfilter_acct -L/usr/lib -lmnl"
 
 # We export this to 'yes', installer sets this to .environment.
 # The updater consumes this one, so that it can tell whether it should update a static install or a non-static one
@@ -34,7 +34,8 @@ run ./netdata-installer.sh \
   --require-cloud \
   --use-system-protobuf \
   --dont-scrub-cflags-even-though-it-may-break-things \
-  --one-time-build
+  --one-time-build \
+  --enable-lto
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Finishing netdata install" || true

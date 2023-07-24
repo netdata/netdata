@@ -2205,33 +2205,25 @@ void *ebpf_socket_read_hash(void *ptr)
 /**
  * Read the hash table and store data to allocated vectors.
  *
+ * @param stats         vector used to read data from control table.
  * @param maps_per_core      do I need to read all cores?
  */
-static void read_hash_global_tables(int maps_per_core)
+static void ebpf_socket_read_hash_global_tables(netdata_idx_t *stats, int maps_per_core)
 {
-    uint64_t idx;
     netdata_idx_t res[NETDATA_SOCKET_COUNTER];
+    ebpf_read_global_table_stats(res,
+                                 socket_hash_values,
+                                 socket_maps[NETDATA_SOCKET_GLOBAL].map_fd,
+                                 maps_per_core,
+                                 NETDATA_KEY_CALLS_TCP_SENDMSG,
+                                 NETDATA_SOCKET_COUNTER);
 
-    netdata_idx_t *val = socket_hash_values;
-    size_t length = sizeof(netdata_idx_t);
-    if (maps_per_core)
-        length *= ebpf_nprocs;
-
-    int fd = socket_maps[NETDATA_SOCKET_GLOBAL].map_fd;
-    for (idx = 0; idx < NETDATA_SOCKET_COUNTER; idx++) {
-        if (!bpf_map_lookup_elem(fd, &idx, val)) {
-            uint64_t total = 0;
-            int i;
-            int end = (maps_per_core) ? ebpf_nprocs : 1;
-            for (i = 0; i < end; i++)
-                total += val[i];
-
-            res[idx] = total;
-            memset(socket_hash_values, 0, length);
-        } else {
-            res[idx] = 0;
-        }
-    }
+    ebpf_read_global_table_stats(stats,
+                                 socket_hash_values,
+                                 socket_maps[NETDATA_SOCKET_TABLE_CTRL].map_fd,
+                                 maps_per_core,
+                                 NETDATA_CONTROLLER_PID_TABLE_ADD,
+                                 NETDATA_CONTROLLER_END);
 
     socket_aggregated_data[NETDATA_IDX_TCP_SENDMSG].call = res[NETDATA_KEY_CALLS_TCP_SENDMSG];
     socket_aggregated_data[NETDATA_IDX_TCP_CLEANUP_RBUF].call = res[NETDATA_KEY_CALLS_TCP_CLEANUP_RBUF];
@@ -2930,6 +2922,8 @@ static void socket_collector(ebpf_module_t *em)
     int counter = update_every - 1;
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
+    netdata_idx_t *stats = em->hash_table_stats;
+    memset(stats, 0, sizeof(em->hash_table_stats));
     while (!ebpf_exit_plugin && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_exit_plugin || ++counter != update_every)
@@ -2939,7 +2933,7 @@ static void socket_collector(ebpf_module_t *em)
         netdata_apps_integration_flags_t socket_apps_enabled = em->apps_charts;
         if (socket_global_enabled) {
             read_listen_table();
-            read_hash_global_tables(maps_per_core);
+            ebpf_socket_read_hash_global_tables(stats, maps_per_core);
         }
 
         pthread_mutex_lock(&collect_data_mutex);

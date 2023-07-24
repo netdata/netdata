@@ -44,6 +44,7 @@ dist_healthconfig_DATA = \
     health.d/elasticsearch.conf \
     health.d/entropy.conf \
     health.d/exporting.conf \
+    health.d/file_descriptors.conf \
     health.d/geth.conf \
     health.d/ioping.conf \
     health.d/gearman.conf \

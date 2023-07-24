@@ -181,6 +181,17 @@ enum netdata_controller {
     NETDATA_CONTROLLER_APPS_ENABLED,
     NETDATA_CONTROLLER_APPS_LEVEL,
 
+    // These index show the number of elements
+    // stored inside hash tables.
+    //
+    // We have indexes to count increase and
+    // decrease events, because __sync_fetch_and_sub
+    // generates compilation errors.
+    NETDATA_CONTROLLER_PID_TABLE_ADD,
+    NETDATA_CONTROLLER_PID_TABLE_DEL,
+    NETDATA_CONTROLLER_TEMP_TABLE_ADD,
+    NETDATA_CONTROLLER_TEMP_TABLE_DEL,
+
     NETDATA_CONTROLLER_END
 };
 
@@ -278,6 +289,17 @@ enum ebpf_threads_status {
     NETDATA_THREAD_EBPF_NOT_RUNNING         // thread was never started
 };
 
+enum ebpf_global_table_values {
+    NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_ADD, // Count elements added inside PID table
+    NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_DEL, // Count elements removed from PID table
+    NETDATA_EBPF_GLOBAL_TABLE_TEMP_TABLE_ADD, // Count elements added inside TEMP table
+    NETDATA_EBPF_GLOBAL_TABLE_TEMP_TABLE_DEL,  // Count elements removed from TEMP table
+
+    NETDATA_EBPF_GLOBAL_TABLE_STATUS_END
+};
+
+typedef uint64_t netdata_idx_t;
+
 typedef struct ebpf_module {
     const char *thread_name;
     const char *config_name;
@@ -313,6 +335,8 @@ typedef struct ebpf_module {
     // period to run
     uint32_t running_time; // internal usage, this is used to reset a value when a new request happens.
     uint32_t lifetime;
+
+    netdata_idx_t hash_table_stats[NETDATA_EBPF_GLOBAL_TABLE_STATUS_END];
 } ebpf_module_t;
 
 #define EBPF_DEFAULT_LIFETIME 300
