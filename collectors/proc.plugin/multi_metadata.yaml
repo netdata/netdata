@@ -1374,13 +1374,26 @@ modules:
               chart_type: area
               dimensions:
                 - name: avail
-            - name: system.swap
+            - name: mem.swap
               description: System Swap
               unit: "MiB"
               chart_type: stacked
               dimensions:
                 - name: free
                 - name: used
+            - name: mem.swap_cached
+              description: Swap Memory Cached in RAM
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: cached
+            - name: mem.zswap
+              description: Zswap Usage
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: in-ram
+                - name: on-disk
             - name: mem.hwcorrupt
               description: Corrupted Memory detected by ECC
               unit: "MiB"
@@ -1420,7 +1433,7 @@ modules:
               dimensions:
                 - name: reclaimable
                 - name: unreclaimable
-            - name: mem.hugepage
+            - name: mem.hugepages
               description: Dedicated HugePages Memory
               unit: "MiB"
               chart_type: stacked
@@ -1429,13 +1442,59 @@ modules:
                 - name: used
                 - name: surplus
                 - name: reserved
-            - name: mem.transparent_hugepages
+            - name: mem.thp
               description: Transparent HugePages Memory
               unit: "MiB"
               chart_type: stacked
               dimensions:
                 - name: anonymous
                 - name: shmem
+            - name: mem.thp_details
+              description: Details of Transparent HugePages Usage
+              unit: "MiB"
+              chart_type: line
+              dimensions:
+                - name: ShmemPmdMapped
+                - name: FileHugePages
+                - name: FilePmdMapped
+            - name: mem.reclaiming
+              description: Memory Reclaiming
+              unit: "MiB"
+              chart_type: line
+              dimensions:
+                - name: Active
+                - name: Inactive
+                - name: Active(anon)
+                - name: Inactive(anon)
+                - name: Active(file)
+                - name: Inactive(file)
+                - name: Unevictable
+                - name: Mlocked
+            - name: mem.high_low
+              description: High and Low Used and Free Memory Areas
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: high_used
+                - name: low_used
+                - name: high_free
+                - name: low_free
+            - name: mem.cma
+              description: Contiguous Memory Allocator (CMA) Memory
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: free
+            - name: mem.directmaps
+              description: Direct Memory Mappings
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: 4k
+                - name: 2m
+                - name: 4m
+                - name: 1g
   - meta:
       plugin_name: proc.plugin
       module_name: /proc/pagetypeinfo
