@@ -71,7 +71,7 @@
       },
       "platform_info": {
         "type": "object",
-        "description": "References what platform this deployment info is for.",
+        "description": "References what platform this deployment info is for. In the parsed output, this will be replaced with a markdown string covering basic support information for this platform.",
         "properties": {
           "group": {
             "type": "string",
