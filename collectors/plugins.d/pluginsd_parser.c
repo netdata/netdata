@@ -1942,11 +1942,33 @@ static dyncfg_config_t get_plugin_config_cb(void *usr_ctx)
     return call_virtual_function_blocking(parser, "get_plugin_config", NULL, NULL);
 }
 
+static dyncfg_config_t get_plugin_config_schema_cb(void *usr_ctx)
+{
+    PARSER *parser = usr_ctx;
+    return call_virtual_function_blocking(parser, "get_plugin_config_schema", NULL, NULL);
+}
+
 static dyncfg_config_t get_module_config_cb(void *usr_ctx, const char *module_name)
 {
     PARSER *parser = usr_ctx;
     char buf[1024];
     snprintfz(buf, sizeof(buf), "get_module_config %s", module_name);
+    return call_virtual_function_blocking(parser, buf, NULL, NULL);
+}
+
+static dyncfg_config_t get_module_config_schema_cb(void *usr_ctx, const char *module_name)
+{
+    PARSER *parser = usr_ctx;
+    char buf[1024];
+    snprintfz(buf, sizeof(buf), "get_module_config_schema %s", module_name);
+    return call_virtual_function_blocking(parser, buf, NULL, NULL);
+}
+
+static dyncfg_config_t get_job_config_schema_cb(void *usr_ctx, const char *module_name)
+{
+    PARSER *parser = usr_ctx;
+    char buf[1024];
+    snprintfz(buf, sizeof(buf), "get_job_config_schema %s", module_name);
     return call_virtual_function_blocking(parser, buf, NULL, NULL);
 }
 
@@ -2022,6 +2044,7 @@ static inline PARSER_RC pluginsd_register_plugin(char **words __maybe_unused, si
     cfg->name = strdupz(words[1]);
     cfg->set_config_cb = set_plugin_config_cb;
     cfg->get_config_cb = get_plugin_config_cb;
+    cfg->get_config_schema_cb = get_plugin_config_schema_cb;
     cfg->cb_usr_ctx = parser;
 
     parser->user.cd->cfg_dict_item = register_plugin(cfg);
@@ -2058,9 +2081,11 @@ static inline PARSER_RC pluginsd_register_module(char **words __maybe_unused, si
 
     mod->set_config_cb = set_module_config_cb;
     mod->get_config_cb = get_module_config_cb;
+    mod->get_config_schema_cb = get_module_config_schema_cb;
     mod->config_cb_usr_ctx = parser;
 
     mod->get_job_config_cb = get_job_config_cb;
+    mod->get_job_config_schema_cb = get_job_config_schema_cb;
     mod->set_job_config_cb = set_job_config_cb;
     mod->delete_job_cb = delete_job_cb;
     mod->job_config_cb_usr_ctx = parser;

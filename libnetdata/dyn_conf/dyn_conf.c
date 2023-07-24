@@ -5,6 +5,7 @@
 #define DYN_CONF_PATH_MAX (4096)
 #define DYN_CONF_DIR VARLIB_DIR "/etc"
 
+#define DYN_CONF_JOB_SCHEMA "job_schema"
 #define DYN_CONF_SCHEMA "schema"
 #define DYN_CONF_MODULE_LIST "modules"
 #define DYN_CONF_JOB_LIST "jobs"
@@ -533,9 +534,12 @@ void handle_plugin_root(struct uni_http_response *resp, int method, struct confi
 void handle_module_root(struct uni_http_response *resp, int method, struct configurable_plugin *plugin, const char *module, void *post_payload, size_t post_payload_size)
 {
     if (strncmp(module, DYN_CONF_SCHEMA, strlen(DYN_CONF_SCHEMA)) == 0) {
-        resp->content = "not implemented yet";
-        resp->content_length = strlen(resp->content);
-        resp->status = HTTP_RESP_NOT_FOUND;
+        dyncfg_config_t cfg = plugin->get_config_schema_cb(plugin->cb_usr_ctx);
+        resp->content = mallocz(cfg.data_size);
+        memcpy(resp->content, cfg.data, cfg.data_size);
+        resp->status = HTTP_RESP_OK;
+        resp->content_free = freez;
+        resp->content_length = cfg.data_size;
         return;
     }
     if (strncmp(module, DYN_CONF_MODULE_LIST, strlen(DYN_CONF_MODULE_LIST)) == 0) {
@@ -694,6 +698,24 @@ static inline void _handle_job_root(struct uni_http_response *resp, int method, 
 
 void handle_job_root(struct uni_http_response *resp, int method, struct module *mod, const char *job_id, void *post_payload, size_t post_payload_size)
 {
+    if (strncmp(job_id, DYN_CONF_SCHEMA, strlen(DYN_CONF_SCHEMA)) == 0) {
+        dyncfg_config_t cfg = mod->get_config_schema_cb(mod->config_cb_usr_ctx, mod->name);
+        resp->content = mallocz(cfg.data_size);
+        memcpy(resp->content, cfg.data, cfg.data_size);
+        resp->status = HTTP_RESP_OK;
+        resp->content_free = freez;
+        resp->content_length = cfg.data_size;
+        return;
+    }
+    if (strncmp(job_id, DYN_CONF_JOB_SCHEMA, strlen(DYN_CONF_JOB_SCHEMA)) == 0) {
+        dyncfg_config_t cfg = mod->get_job_config_schema_cb(mod->job_config_cb_usr_ctx, mod->name);
+        resp->content = mallocz(cfg.data_size);
+        memcpy(resp->content, cfg.data, cfg.data_size);
+        resp->status = HTTP_RESP_OK;
+        resp->content_free = freez;
+        resp->content_length = cfg.data_size;
+        return;
+    }
     if (strncmp(job_id, DYN_CONF_JOB_LIST, strlen(DYN_CONF_JOB_LIST)) == 0) {
         if (mod->type != MOD_TYPE_ARRAY) {
             resp->content = "module type is not job_array (can't get the list of jobs)";
