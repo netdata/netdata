@@ -18,8 +18,8 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: "This collector creates an 'Alarms' menu with one line plot showing alarm states over time."
-    method_description: ''
+    metrics_description: "This collector creates an 'Alarms' menu with one line plot of `alarms.status`."
+    method_description: 'Alarm status is read from the Netdata agent rest api `/api/v1/alarms?all`'
   supported_platforms:
     include: []
     exclude: []
