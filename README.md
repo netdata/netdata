@@ -451,7 +451,7 @@ But it can easily be disabled. Our installation pages provide information on how
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
 
-Netdata is evolving on a very fast pace. Everyday we take decisions on how the product should evolve.
+Netdata is evolving on a very fast pace. Everyday we take decisions on how the project should evolve.
 
 Ideally these decisions should be data informed. _Is this the right area to work on now? Do our users really use that?
 How to prioritize between feature A and B? I believe that C is more important. A user said that D is the most important._
