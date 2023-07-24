@@ -3,19 +3,22 @@ meta:
   module_name: alarms
   monitored_instance:
     name: python.d alarms
-    link: ''
-    categories: []
+    link: 'https://learn.netdata.cloud/docs/data-collection/netdata-specific/alarms'
+    categories:
+      - data-collection.other
     icon_filename: ''
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
     description: ''
-  keywords: []
+  keywords:
+    - alarms
+    - netdata
   most_popular: false
 overview:
   data_collection:
-    metrics_description: ''
+    metrics_description: "This collector creates an 'Alarms' menu with one line plot showing alarm states over time."
     method_description: ''
   supported_platforms:
     include: []
