@@ -1275,12 +1275,28 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: "Monitor memory usage metrics for efficient system memory management."
+        metrics_description: |
+          `/proc/meminfo` provides detailed information about the system's current memory usage. It includes information
+          about different types of memory, RAM, Swap, ZSwap, HugePages, Transparent HugePages (THP), Kernel memory,
+          SLAB memory, memory mappings, and more.
+          
+          Monitoring /proc/meminfo can be useful for:
+
+          - **Performance Tuning**: Understanding your system's memory usage can help you make decisions about system
+            tuning and optimization. For example, if your system is frequently low on free memory, it might benefit
+            from more RAM.
+          
+          - **Troubleshooting**: If your system is experiencing problems, `/proc/meminfo` can provide clues about
+            whether memory usage is a factor. For example, if your system is slow and cached swap is high, it could
+            mean that your system is swapping out a lot of memory to disk, which can degrade performance.
+          
+          - **Capacity Planning**: By monitoring memory usage over time, you can understand trends and make informed
+            decisions about future capacity needs.
         method_description: ""
       supported_platforms:
         include: []
         exclude: []
-      multi_instance: true
+      multi_instance: false
       additional_permissions:
         description: ""
       default_behavior:
