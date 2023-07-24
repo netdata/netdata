@@ -619,7 +619,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         if(unlikely(!st_mem_transparent_hugepages)) {
             st_mem_transparent_hugepages = rrdset_create_localhost(
                     "mem"
-                    , "transparent_hugepages"
+                    , "thp"
                     , NULL
                     , "hugepages"
                     , NULL
@@ -806,7 +806,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , NULL
                     , "overview"
                     , NULL
-                    , "Direct Memory Mapping"
+                    , "Direct Memory Mappings"
                     , "MiB"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_MEMINFO_NAME
