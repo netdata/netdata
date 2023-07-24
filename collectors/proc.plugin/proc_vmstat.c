@@ -271,7 +271,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
 
         if(unlikely(!st_swapio)) {
             st_swapio = rrdset_create_localhost(
-                    "system"
+                    "mem"
                     , "swapio"
                     , NULL
                     , "swap"
@@ -280,7 +280,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
                     , "KiB/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_VMSTAT_NAME
-                    , NETDATA_CHART_PRIO_SYSTEM_SWAPIO
+                    , NETDATA_CHART_PRIO_MEM_SWAPIO
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -336,7 +336,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
                     "mem"
                     , "pgfaults"
                     , NULL
-                    , "system"
+                    , "page faults"
                     , NULL
                     , "Memory Page Faults"
                     , "faults/s"
@@ -372,7 +372,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
                     "mem"
                     , "oom_kill"
                     , NULL
-                    , "system"
+                    , "OOM kills"
                     , NULL
                     , "Out of Memory Kills"
                     , "kills/s"
@@ -505,7 +505,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
 
         if(unlikely(!st_zswapio)) {
             st_zswapio = rrdset_create_localhost(
-                    "system"
+                    "mem"
                     , "zswapio"
                     , NULL
                     , "zswap"
@@ -514,7 +514,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
                     , "KiB/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_VMSTAT_NAME
-                    , NETDATA_CHART_PRIO_SYSTEM_ZSWAPIO
+                    , NETDATA_CHART_PRIO_MEM_ZSWAPIO
                     , update_every
                     , RRDSET_TYPE_AREA
             );
