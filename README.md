@@ -466,15 +466,19 @@ The Netdata Agent dashboard and the Netdata Cloud dashboard are the same. Still,
   5. Central Dispatch of Alert Notifications (even when multiple independent parents are involved)
   6. Mobile App for Alert Notifications (coming soon)
 
-So, although it is not required, you can get the most out of your Netdata installation by using Netdata Cloud.
+So, although it is not required, you can get the most out of your Netdata setup by using Netdata Cloud.
+
+We encourage you to support Netdata by buying a Netdata Cloud subscription. A successful Netdata is a Netdata that evolves and gets improved to provide a simpler, faster and easier monitoring for all of us.
+
+For organizations that need a fully on-prem solution, we provide Netdata Cloud for on-prem installation. [Contact us for more information](mailto:info@netdata.cloud).
 
 &nbsp;<br/>&nbsp;<br/>
 </details>
 
 ### :raised_eyebrow: Is Netdata sending telemetry back home?
 
-We collect anonymous statistics to help us take informed decisions for the future of Netdata.
-But it can easily be disabled. Our installation pages provide information on how to do this.
+By default, we collect anonymous statistics to help us take informed decisions for the future of Netdata.
+But you can easily disable it. Our installation pages provide information on how to do this.
 
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
@@ -484,7 +488,7 @@ Netdata is evolving on a very fast pace. Everyday we take decisions on how the p
 Ideally these decisions should be data informed. _Is this the right area to work on now? Do our users really use that?
 How to prioritize between feature A and B? I believe that C is more important. A user said that D is the most important._
 
-Anonymous telemetry information can really help us take the best decisions. Our users that have anonymous telemetry enabled, contribute significantly to Netdata's roadmap. Without losing any time, they provide valuable anonymous information that helps us do the best for the project and the community.
+Anonymous telemetry information can help us take the best decisions. Our users that have anonymous telemetry enabled, contribute to Netdata's roadmap. They provide valuable anonymous information that helps us do the best for the project and the community.
 
 We understand that this is not acceptable or not allowed in all environments. For this reason we have made it easy to disable telemetry when you need to:
 
@@ -493,9 +497,9 @@ We understand that this is not acceptable or not allowed in all environments. Fo
 
 Either of these methods will disable anonymous telemetry information for your installation.
 
-Keep in mind that even with telemetry disabled, Netdata needs a [Netdata Registry](https://learn.netdata.cloud/docs/configuring/securing-netdata-agents/registry) for alert notifications' CTA to work. When you click on an alert notification, you go to the Netdata Registry, which finds the URL of the Netdata Agent that sent you the alert, and diverts your web browser to it, so that you can troubleshoot the issue. The Netdata Registry learns the URLs of your agents, as you visit their dashboards.
+Keep in mind that even with telemetry disabled, Netdata needs a [Netdata Registry](https://learn.netdata.cloud/docs/configuring/securing-netdata-agents/registry) for alert notifications' Call To Action (CTA) to work. When you click on an alert notification, you go to the Netdata Registry, which finds the URL of the Netdata Agent that sent you the alert, and diverts your web browser to it, so that you can troubleshoot the issue. The Netdata Registry learns the URLs of your agents, as you visit their dashboards (so each agent may have different URLs per user, depending on the user location).
 
-Every Netdata Agent can be a Netdata Registry. Just appoint one Netdata Agent as your registry, and the public Netdata Registry will not be used any more. For more information [check this guide](https://learn.netdata.cloud/docs/configuring/securing-netdata-agents/registry).
+Every Netdata Agent can be a Netdata Registry. Just appoint one Netdata Agent as your registry, and the gloabl Netdata Registry we run, will not be used any more. For more information [check this guide](https://learn.netdata.cloud/docs/configuring/securing-netdata-agents/registry).
 
 &nbsp;<br/>&nbsp;<br/>
 </details>
