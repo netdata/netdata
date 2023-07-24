@@ -802,7 +802,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         if(unlikely(!st_mem_directmap)) {
             st_mem_directmap = rrdset_create_localhost(
                     "mem"
-                    , "directmap"
+                    , "directmaps"
                     , NULL
                     , "overview"
                     , NULL
