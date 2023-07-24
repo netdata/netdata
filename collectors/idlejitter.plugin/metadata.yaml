@@ -20,7 +20,7 @@ overview:
   data_collection:
     metrics_description: >
       Monitor delays in timing for user processes caused by scheduling limitations to optimize the system to run
-      latency sensitive applications with minimal jitter, improving consistency and `quality of service.
+      latency sensitive applications with minimal jitter, improving consistency and quality of service.
     method_description: >
       A thread is spawned that requests to sleep for fixed amount of time. When the system wakes it up, it
       measures how many microseconds have passed. The difference between the requested and the actual duration of
