@@ -172,6 +172,7 @@ def load_metadata():
             continue
 
         data['_src_path'] = path
+        data['_index'] = 0
         ret.append(data)
 
     for path in multi:
@@ -187,9 +188,10 @@ def load_metadata():
             warn(f'Failed to validate { path } against the schema.', path)
             continue
 
-        for item in data['modules']:
+        for idx, item in enumerate(data['modules']):
             item['meta']['plugin_name'] = data['plugin_name']
             item['_src_path'] = path
+            item['_index'] = idx
             ret.append(item)
 
     return ret
@@ -215,6 +217,24 @@ def render_keys(integrations, categories):
 
     for item in integrations:
         item['id'] = make_id(item['meta'])
+
+    integrations.sort(key=lambda i: i['_index'])
+    integrations.sort(key=lambda i: i['_src_path'])
+    integrations.sort(key=lambda i: i['id'])
+
+    ids = {i['id']: False for i in integrations}
+
+    tmp_integrations = []
+
+    for i in integrations:
+        if ids[i['id']]:
+            first_path, first_index = ids[i['id']]
+            warn(f'Duplicate integration ID found at { i["_src_path"] } index { i["_index"] } (original definition at { first_path } index { first_index }), ignoring that integration.', i['_src_path'])
+        else:
+            tmp_integrations.append(i)
+            ids[i['id']] = (i['_src_path'], i['_index'])
+
+    integrations = tmp_integrations
 
     idmap = {i['id']: i for i in integrations}
 
@@ -267,6 +287,7 @@ def render_keys(integrations, categories):
             item[key] = data
 
         del item['_src_path']
+        del item['_index']
 
     return integrations
 
