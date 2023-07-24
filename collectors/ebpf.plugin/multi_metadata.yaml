@@ -5,50 +5,51 @@ modules:
       module_name: filedescriptor
       monitored_instance:
         name: ebpf filedescriptor
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.ebpf
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -160,50 +161,51 @@ modules:
       module_name: processes
       monitored_instance:
         name: ebpf processes
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.ebpf
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -344,50 +346,51 @@ modules:
       module_name: disk
       monitored_instance:
         name: ebpf disk
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.ebpf
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -415,50 +418,51 @@ modules:
       module_name: hardirq
       monitored_instance:
         name: ebpf hardirq
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.ebpf
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -486,50 +490,51 @@ modules:
       module_name: cachestat
       monitored_instance:
         name: ebpf cachestat
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.ebpf
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -651,50 +656,51 @@ modules:
       module_name: sync
       monitored_instance:
         name: ebpf sync
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.ebpf
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -703,7 +709,9 @@ modules:
       - name: sync_freq
         link: https://github.com/netdata/netdata/blob/master/health/health.d/synchronization.conf
         metric: mem.sync
-        info: number of sync() system calls. Every call causes all pending modifications to filesystem metadata and cached file data to be written to the underlying filesystems.
+        info:
+          number of sync() system calls. Every call causes all pending modifications to filesystem metadata and cached file data to be written to the
+          underlying filesystems.
     metrics:
       folding:
         title: Metrics
@@ -746,50 +754,51 @@ modules:
       module_name: mdflush
       monitored_instance:
         name: ebpf mdflush
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.ebpf
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -817,50 +826,51 @@ modules:
       module_name: swap
       monitored_instance:
         name: ebpf swap
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.ebpf
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -929,50 +939,51 @@ modules:
       module_name: oomkill
       monitored_instance:
         name: ebpf oomkill
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.ebpf
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1016,50 +1027,51 @@ modules:
       module_name: socket
       monitored_instance:
         name: ebpf socket
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.ebpf
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1308,50 +1320,51 @@ modules:
       module_name: dcstat
       monitored_instance:
         name: ebpf dcstat
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.ebpf
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1467,50 +1480,51 @@ modules:
       module_name: filesystem
       monitored_instance:
         name: ebpf filesystem
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.ebpf
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1570,50 +1584,51 @@ modules:
       module_name: shm
       monitored_instance:
         name: ebpf shm
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.ebpf
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1720,50 +1735,51 @@ modules:
       module_name: softirq
       monitored_instance:
         name: ebpf softirq
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.ebpf
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1791,50 +1807,51 @@ modules:
       module_name: mount
       monitored_instance:
         name: ebpf mount
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.ebpf
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -1870,50 +1887,51 @@ modules:
       module_name: vfs
       monitored_instance:
         name: ebpf vfs
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.ebpf
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
@@ -2236,50 +2254,51 @@ modules:
       module_name: process
       monitored_instance:
         name: ebpf process
-        link: ''
-        categories: []
-        icon_filename: ''
+        link: ""
+        categories:
+          - data-collection.ebpf
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords: []
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ''
-        method_description: ''
+        metrics_description: ""
+        method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: ''
+          description: ""
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list: []
       configuration:
         file:
-          name: ''
-          description: ''
+          name: ""
+          description: ""
         options:
-          description: ''
+          description: ""
           folding:
-            title: ''
+            title: ""
             enabled: true
           list: []
         examples:
           folding:
             enabled: true
-            title: ''
+            title: ""
           list: []
     troubleshooting:
       problems:
