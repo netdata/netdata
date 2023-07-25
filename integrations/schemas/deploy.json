@@ -53,12 +53,12 @@
                   "command"
                 ]
               }
-            },
-            "required": [
-              "method",
-              "commands"
-            ]
-          }
+            }
+          },
+          "required": [
+            "method",
+            "commands"
+          ]
         }
       },
       "additional_info": {
