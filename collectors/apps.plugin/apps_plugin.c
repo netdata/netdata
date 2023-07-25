@@ -1411,6 +1411,16 @@ static inline int read_proc_pid_limits(struct pid_stat *p, void *ptr) {
         proc_pid_limits_buffer[MAX_PROC_PID_LIMITS - 1] = '\0';
 
     p->limits.max_open_files = get_proc_pid_limits_limit(proc_pid_limits_buffer, PROC_PID_LIMITS_MAX_OPEN_FILES_KEY, sizeof(PROC_PID_LIMITS_MAX_OPEN_FILES_KEY) - 1, 0);
+    if(p->limits.max_open_files == 1) {
+        // it seems a bug in the kernel or something similar
+        // it sets max open files to 1 but the number of files
+        // the process has open are more than 1...
+        // https://github.com/netdata/netdata/issues/15443
+        p->limits.max_open_files = 0;
+        ret = 1;
+        goto cleanup;
+    }
+
     p->last_limits_collected_usec = p->io_collected_usec;
     read_limits = true;
 

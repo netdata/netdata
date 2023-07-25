@@ -58,7 +58,7 @@ static inline void registry_set_person_cookie(struct web_client *w, REGISTRY_PER
 static inline void registry_json_header(RRDHOST *host, struct web_client *w, const char *action, const char *status) {
     buffer_flush(w->response.data);
     w->response.data->content_type = CT_APPLICATION_JSON;
-    buffer_json_initialize(w->response.data, "\"", "\"", 0, true, true);
+    buffer_json_initialize(w->response.data, "\"", "\"", 0, true, false);
     buffer_json_member_add_string(w->response.data, "action", action);
     buffer_json_member_add_string(w->response.data, "status", status);
     buffer_json_member_add_string(w->response.data, "hostname", rrdhost_registry_hostname(host));
@@ -186,8 +186,11 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w) {
     }
     buffer_json_object_close(w->response.data);
 
-    buffer_json_member_add_string(w->response.data, "registry", registry.registry_to_announce);
+    CLOUD_STATUS status = cloud_status();
+    buffer_json_member_add_string(w->response.data, "cloud_status", cloud_status_to_string(status));
     buffer_json_member_add_string(w->response.data, "cloud_base_url", registry.cloud_base_url);
+
+    buffer_json_member_add_string(w->response.data, "registry", registry.registry_to_announce);
     buffer_json_member_add_boolean(w->response.data, "anonymous_statistics", netdata_anonymous_statistics_enabled);
 
     buffer_json_member_add_array(w->response.data, "nodes");
