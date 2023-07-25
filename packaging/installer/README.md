@@ -38,12 +38,6 @@ but we have some hints on what you might want to do next.
 Explore our [general advanced installation options and troubleshooting](#advanced-installation-options-and-troubleshooting), specific options
 for the [single line installer](#install-on-linux-with-one-line-installer), or [other installation methods](#other-installation-methods).
 
-#### Agent user interface
-
-To access the UI provided by the locally installed agent, open a browser and navigate to `http://NODE:19999`, replacing `NODE` with either `localhost` or
-the hostname/IP address of the remote node. You can also read more about
-[the agent dashboard](https://github.com/netdata/netdata/blob/master/web/gui/README.md).
-
 #### Configuration
 
 Discover the recommended way to [configure Netdata's settings or behavior](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) using our built-in
