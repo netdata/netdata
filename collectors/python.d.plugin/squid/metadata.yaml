@@ -100,6 +100,8 @@ setup:
       list:
         - name: Basic
           description: A basic configuration example.
+          folding:
+            enabled: false
           config: |
             example_job_name:
               name: 'local'
