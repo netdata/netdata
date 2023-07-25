@@ -6,14 +6,21 @@
 
 **Merged pull requests:**
 
+- apps.plugin limits tracing [\#15504](https://github.com/netdata/netdata/pull/15504) ([ktsaou](https://github.com/ktsaou))
+- Allow manage/health api call to be used without bearer [\#15503](https://github.com/netdata/netdata/pull/15503) ([MrZammler](https://github.com/MrZammler))
 - freeipmi flush keepalive msgs [\#15499](https://github.com/netdata/netdata/pull/15499) ([ilyam8](https://github.com/ilyam8))
+- add required properties to multi-module schema [\#15496](https://github.com/netdata/netdata/pull/15496) ([ilyam8](https://github.com/ilyam8))
+- docs: clarify health percentage option [\#15492](https://github.com/netdata/netdata/pull/15492) ([ilyam8](https://github.com/ilyam8))
 - Fix resource leak - CID 396310 [\#15491](https://github.com/netdata/netdata/pull/15491) ([stelfrag](https://github.com/stelfrag))
 - Improve the update of the alert chart name in the database [\#15490](https://github.com/netdata/netdata/pull/15490) ([stelfrag](https://github.com/stelfrag))
+- Add a machine distinct id to analytics [\#15485](https://github.com/netdata/netdata/pull/15485) ([MrZammler](https://github.com/MrZammler))
 - Add basic slabinfo metadata. [\#15484](https://github.com/netdata/netdata/pull/15484) ([Ferroin](https://github.com/Ferroin))
+- Update charts.d.plugin yaml [\#15483](https://github.com/netdata/netdata/pull/15483) ([Ancairon](https://github.com/Ancairon))
 - docs: note that health foreach works only with template [\#15478](https://github.com/netdata/netdata/pull/15478) ([ilyam8](https://github.com/ilyam8))
 - Yaml file updates [\#15477](https://github.com/netdata/netdata/pull/15477) ([Ancairon](https://github.com/Ancairon))
 - Rename most-popular to most\_popular in categories.yaml [\#15476](https://github.com/netdata/netdata/pull/15476) ([Ancairon](https://github.com/Ancairon))
 - Fix coverity issue [\#15475](https://github.com/netdata/netdata/pull/15475) ([stelfrag](https://github.com/stelfrag))
+- eBPF Yaml [\#15474](https://github.com/netdata/netdata/pull/15474) ([thiagoftsm](https://github.com/thiagoftsm))
 - Memory Controller \(MC\) and DIMM Error Detection And Correction \(EDAC\) [\#15473](https://github.com/netdata/netdata/pull/15473) ([ktsaou](https://github.com/ktsaou))
 - meta schema change multi-instance to multi\_instance [\#15470](https://github.com/netdata/netdata/pull/15470) ([ilyam8](https://github.com/ilyam8))
 - fix anchors [\#15469](https://github.com/netdata/netdata/pull/15469) ([Ancairon](https://github.com/Ancairon))
@@ -29,6 +36,7 @@
 - Store and transmit chart\_name to cloud in alert events [\#15441](https://github.com/netdata/netdata/pull/15441) ([MrZammler](https://github.com/MrZammler))
 - Add linux powercap metrics collector [\#15364](https://github.com/netdata/netdata/pull/15364) ([fhriley](https://github.com/fhriley))
 - Hash table charts [\#15323](https://github.com/netdata/netdata/pull/15323) ([thiagoftsm](https://github.com/thiagoftsm))
+- Drop support for native packages of Ubuntu 22.10 [\#15292](https://github.com/netdata/netdata/pull/15292) ([tkatsoulas](https://github.com/tkatsoulas))
 - Fix non-interactive options for apt-get and zypper. [\#15288](https://github.com/netdata/netdata/pull/15288) ([zeylos](https://github.com/zeylos))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
@@ -414,12 +422,6 @@
 - Update link from http to https [\#14864](https://github.com/netdata/netdata/pull/14864) ([Ancairon](https://github.com/Ancairon))
 - Fix js tag in documentation [\#14862](https://github.com/netdata/netdata/pull/14862) ([Ancairon](https://github.com/Ancairon))
 - Set a default registry unique id when there is none for statistics script [\#14861](https://github.com/netdata/netdata/pull/14861) ([MrZammler](https://github.com/MrZammler))
-- review usage of you to say user instead [\#14858](https://github.com/netdata/netdata/pull/14858) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Add labels for cgroup name [\#14856](https://github.com/netdata/netdata/pull/14856) ([thiagoftsm](https://github.com/thiagoftsm))
-- fix typo alerms -\> alarms [\#14854](https://github.com/netdata/netdata/pull/14854) ([slavox](https://github.com/slavox))
-- Add a checkpoint message to alerts stream [\#14847](https://github.com/netdata/netdata/pull/14847) ([MrZammler](https://github.com/MrZammler))
-- fix  \#14841 Exception funktion call Rados.mon\_command\(\) [\#14844](https://github.com/netdata/netdata/pull/14844) ([farax4de](https://github.com/farax4de))
-- Update parent child examples [\#14842](https://github.com/netdata/netdata/pull/14842) ([cakrit](https://github.com/cakrit))
 
 ## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
 
