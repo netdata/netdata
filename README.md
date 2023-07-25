@@ -386,14 +386,20 @@ Yes, you can!
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
 
-We suggest the following:
+Netdata has been designed to spread disk writes across time. Each metric is flushed to disk every 17 minutes, but metrics are flushed evenly across time, at an almost constant rate. Also, metrics are packed into bigger blocks we call `extents` and are compressed with LZ4 before saving them, to minimize the number of I/O operations made.
+
+Single nodes Agents (not Parents), you should have a constant rate of about 50 KiB/s or less, with some spikes above that every minute (flushing of tier 1) and higher spikes every hour (flushing of tier 2).
+
+Health Alerts and Machine-Learning run queries to evaluate their expressions and learn from the metric patterns. These are also spread over time, so there should be an almost constant read rate too.
+
+To make Netdata not use the disks at all, we suggest the following:
 
   1. Use database mode `alloc` or `ram` to disable writing metric data to disk.
   2. Configure streaming to push in real-time all metrics to a Netdata Parent. The Netdata Parent will maintain metrics on disk for this node.
   3. Disable ML and health on this node. The Netdata Parent will do them for this node.
   4. Use the Netdata Parent to access the dashboard.
 
-Using the above, the Netdata Agent on your production system will not need a disk.
+Using the above, the Netdata Agent on your production system will not use a disk.
 
 &nbsp;<br/>&nbsp;<br/>
 </details>
