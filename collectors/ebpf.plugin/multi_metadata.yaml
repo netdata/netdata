@@ -28,7 +28,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Monitor calls for functions responsible to open or close a file descriptor and possible errors."
-        method_description: "Attach tracing (kprobes and trampoline) to internal kernel functions according options used to compile kernel."
+        method_description: "Attach tracing (kprobe and trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
         include: []
         exclude: []
@@ -248,7 +248,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Monitor calls for function creating tasks (threads and processes) inside Linux kernel."
-        method_description: "Attach tracing (kprobes or tracepoint, and trampoline) to internal kernel functions."
+        method_description: "Attach tracing (kprobe or tracepoint, and trampoline) to internal kernel functions."
       supported_platforms:
         include: []
         exclude: []
@@ -693,7 +693,7 @@ modules:
           metrics:
             - name: system.hardirq_latency
               description: Hard IRQ latency
-              unit: "milisecondds"
+              unit: "milliseconds"
               chart_type: stacked
               dimensions:
                 - name: hardirq names
@@ -948,7 +948,7 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: "Monitor syscalls responsible to move data from memory to storage device."
+        metrics_description: "Monitor syscall responsible to move data from memory to storage device."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
         include: []
@@ -1989,7 +1989,7 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: "Monitor syscalls responsible to manipulate shared memory."
+        metrics_description: "Monitor syscall responsible to manipulate shared memory."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
         include: []
@@ -2143,7 +2143,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Monitor latency for each SoftIRQ available."
-        method_description: "Attach kprobes to internal kernel functions."
+        method_description: "Attach kprobe to internal kernel functions."
       supported_platforms:
         include: []
         exclude: []
@@ -2192,7 +2192,7 @@ modules:
           metrics:
             - name: system.softirq_latency
               description: Soft IRQ latency
-              unit: "miliseconds"
+              unit: "milliseconds"
               chart_type: stacked
               dimensions:
                 - name: soft IRQs
