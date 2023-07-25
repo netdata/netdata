@@ -124,7 +124,7 @@ modules:
       availability: []
       scopes:
         - name: cgroup
-          description: "These Metrics show grouped information per cgroup."
+          description: "These Metrics show grouped information per cgroup/service."
           labels: []
           metrics:
             - name: cgroup.fd_open
@@ -151,10 +151,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: close
-        - name: global
-          description: "These metrics show total number of calls to functions inside kernel."
-          labels: []
-          metrics:
             - name: services.file_open
               description: Number of open files
               unit: "calls/s"
@@ -179,6 +175,10 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
+        - name: global
+          description: "These metrics show total number of calls to functions inside kernel."
+          labels: []
+          metrics:
             - name: filesystem.file_descriptor
               description: Open and close calls
               unit: "calls/s"
@@ -414,7 +414,7 @@ modules:
               dimensions:
                 - name: a dimension per app group
         - name: cgroup
-          description: "These Metrics show grouped information per cgroup."
+          description: "These Metrics show grouped information per cgroup/service."
           labels: []
           metrics:
             - name: cgroup.process_create
