@@ -43,9 +43,10 @@ setup:
   configuration:
     file:
       name: 'netdata.conf'
+      section_name: '[plugin:proc:diskspace]'
       description: 'This is netdata main configuration file'
     options:
-      description: 'Options are inside `[plugin:proc:diskspace]`, you can also specify per mount point `[plugin:proc:diskspace:mounpoint]`'
+      description: 'You can also specify per mount point `[plugin:proc:diskspace:mountpoint]`'
       folding:
         title: 'Config options'
         enabled: true
