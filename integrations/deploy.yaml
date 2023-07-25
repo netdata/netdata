@@ -179,7 +179,7 @@
   keywords:
     - MacOS
     - mac
-  description: 'Run the following command on your OSX, macOS server to install and claim Netdata:"r'
+  description: 'Run the following command on your Intel based OSX, macOS servers to install and claim Netdata:"r'
   methods:
     - method: curl
       commands:
