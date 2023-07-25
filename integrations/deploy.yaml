@@ -5,7 +5,7 @@
     link: ''
     categories:
       - deploy.operating-systems
-    icon_filename: ''
+    icon_filename: 'linux.png'
   keywords:
     - linux
   description: 'Run the following command on your node to install and claim Netdata:"r'
@@ -31,7 +31,7 @@
             curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
             --stable-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
   additional_info: &ref_containers >
-    Did you know you can also deploy Netdata on your OS using Kubernetes or Docker?
+    Did you know you can also deploy Netdata on your OS using {% goToCategory categoryId="deploy.docker-kubernetes" %}Kubernetes{% /goToCategory %} or {% goToCategory categoryId="deploy.docker-kubernetes" %}Docker{% /goToCategory %}?
   related_resources: {}
   platform_info:
     group: ''
@@ -43,8 +43,490 @@
     <<: *linux_meta
     name: Ubuntu
     link: https://ubuntu.com/
-    icon: ''
+    icon: 'ubuntu.png'
   platform_info:
     group: 'include'
     distro: 'ubuntu'
   quick_start: -1
+- <<: *linux
+  id: deploy-debian
+  meta:
+    <<: *linux_meta
+    name: Debian
+    link: https://www.debian.org/
+    icon: 'debian.png'
+  platform_info:
+    group: 'include'
+    distro: 'debian'
+  quick_start: -1
+- <<: *linux
+  id: deploy-fedora
+  meta:
+    <<: *linux_meta
+    name: Fedora
+    link: https://www.fedoraproject.org/
+    icon: 'fedora.png'
+  platform_info:
+    group: 'include'
+    distro: 'fedora'
+  quick_start: -1
+- <<: *linux
+  id: deploy-rhel
+  meta:
+    <<: *linux_meta
+    name: Red Hat Enterprise Linux
+    link: https://www.redhat.com/en/technologies/linux-platforms/enterprise-linux
+    icon: 'rhel.png'
+  platform_info:
+    group: 'include'
+    distro: 'rhel'
+  quick_start: -1
+- <<: *linux
+  id: deploy-almalinux
+  meta:
+    <<: *linux_meta
+    name: Alma Linux
+    link: https://almalinux.org/
+    icon: 'alma.png'
+  platform_info:
+    group: 'include'
+    distro: 'almalinux'
+  quick_start: -1
+- <<: *linux
+  id: deploy-alpinelinux
+  meta:
+    <<: *linux_meta
+    name: Alpine Linux
+    link: https://www.alpinelinux.org/
+    icon: 'alpine.png'
+  platform_info:
+    group: 'include'
+    distro: 'alpinelinux'
+  quick_start: -1
+- <<: *linux
+  id: deploy-amazonlinux
+  meta:
+    <<: *linux_meta
+    name: Amazon Linux
+    link: https://aws.amazon.com/amazon-linux-2/
+    icon: 'amazonlinux.png'
+  platform_info:
+    group: 'include'
+    distro: 'amazonlinux'
+  quick_start: -1
+- <<: *linux
+  id: deploy-archlinux
+  meta:
+    <<: *linux_meta
+    name: Arch Linux
+    link: https://archlinux.org/
+    icon: 'archlinux.png'
+  platform_info:
+    group: 'include'
+    distro: 'archlinux'
+  quick_start: -1
+- <<: *linux
+  id: deploy-centos
+  meta:
+    <<: *linux_meta
+    name: CentOS
+    link: https://www.centos.org/
+    icon: 'centos.png'
+  platform_info:
+    group: 'include'
+    distro: 'centos'
+  quick_start: -1
+- <<: *linux
+  id: deploy-manjarolinux
+  meta:
+    <<: *linux_meta
+    name: Manjaro Linux
+    link: https://manjaro.org/
+    icon: 'manjaro.png'
+  platform_info:
+    group: 'include'
+    distro: 'archlinux'
+  quick_start: -1
+- <<: *linux
+  id: deploy-oraclelinux
+  meta:
+    <<: *linux_meta
+    name: Oracle Linux
+    link: https://www.oracle.com/linux/
+    icon: 'oraclelinux.png'
+  platform_info:
+    group: 'include'
+    distro: 'oraclelinux'
+  quick_start: -1
+- <<: *linux
+  id: deploy-opensuse
+  meta:
+    <<: *linux_meta
+    name: SUSE Linux
+    link: https://www.suse.com/
+    icon: 'openSUSE.png'
+    group: 'include'
+    distro: 'opensuse'
+  quick_start: -1
+-
+  id: deploy-macos
+  meta:
+    name: MacOS
+    link: ''
+    categories:
+      - deploy.operating-systems
+    icon_filename: ''
+  keywords:
+    - MacOS
+    - mac
+  description: 'Run the following command on your Intel based OSX, macOS servers to install and claim Netdata:"r'
+  methods:
+    - method: curl
+      commands:
+        - channel: nightly
+          command: >
+            curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh 
+            --nightly-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+        - channel: stable
+          command: >
+            curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh 
+            --stable-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+  additional_info: &ref_containers >
+    Did you know you can also deploy Netdata on your OS using {% goToCategory categoryId="deploy.docker-kubernetes" %}Kubernetes{% /goToCategory %} or {% goToCategory categoryId="deploy.docker-kubernetes" %}Docker{% /goToCategory %}?
+  related_resources: {}
+  platform_info:
+    group: 'include'
+    distro: 'macos'
+  quick_start: 1
+-
+  id: deploy-docker
+  meta:
+    name: Docker
+    link: ''
+    categories:
+      - deploy.docker-kubernetes
+    icon_filename: 'docker.png'
+  keywords:
+    - docker
+    - container
+    - containers
+  description: |
+    Install and connect new Docker containers
+    Find the commands for `docker run`, `docker compose` or `Docker Swarm`. On the last two you can copy the configs, then run `docker-compose up -d` in the same directory as the `docker-compose.yml`
+    ```
+    Netdata container requires different privileges and mounts to provide functionality similar to that provided by Netdata installed on the host. More info [here](https://learn.netdata.cloud/docs/installing/docker?_gl=1*f2xcnf*_ga*MTI1MTUwMzU0OS4xNjg2NjM1MDA1*_ga_J69Z2JCTFB*MTY5MDMxMDIyMS40MS4xLjE2OTAzMTAzNjkuNTguMC4w#create-a-new-netdata-agent-container)
+    Netdata will use the hostname from the container in which it is run instead of that of the host system. To change the default hostname check [here](https://learn.netdata.cloud/docs/agent/packaging/docker?_gl=1*i5weve*_ga*MTI1MTUwMzU0OS4xNjg2NjM1MDA1*_ga_J69Z2JCTFB*MTY5MDMxMjM4Ny40Mi4xLjE2OTAzMTIzOTAuNTcuMC4w#change-the-default-hostname)
+    ```
+  methods:
+    - method: Docker CLI
+      commands:
+        - channel: nightly
+          command: |
+            docker run -d --name=netdata \
+            --pid=host \
+            --network=host \
+            -v netdataconfig:/etc/netdata \
+            -v netdatalib:/var/lib/netdata \
+            -v netdatacache:/var/cache/netdata \
+            -v /etc/passwd:/host/etc/passwd:ro \
+            -v /etc/group:/host/etc/group:ro \
+            -v /proc:/host/proc:ro \
+            -v /sys:/host/sys:ro \
+            -v /etc/os-release:/host/etc/os-release:ro \
+            -v /var/run/docker.sock:/var/run/docker.sock:ro \
+            --restart unless-stopped \
+            --cap-add SYS_PTRACE \
+            --cap-add SYS_ADMIN \
+            --security-opt apparmor=unconfined \
+            netdata/netdata:edge \
+            -e NETDATA_CLAIM_TOKEN= {% claim_token %} \
+            -e NETDATA_CLAIM_URL={% claim_url %}
+        - channel: stable
+          command: |
+            docker run -d --name=netdata \
+            --pid=host \
+            --network=host \
+            -v netdataconfig:/etc/netdata \
+            -v netdatalib:/var/lib/netdata \
+            -v netdatacache:/var/cache/netdata \
+            -v /etc/passwd:/host/etc/passwd:ro \
+            -v /etc/group:/host/etc/group:ro \
+            -v /proc:/host/proc:ro \
+            -v /sys:/host/sys:ro \
+            -v /etc/os-release:/host/etc/os-release:ro \
+            -v /var/run/docker.sock:/var/run/docker.sock:ro \
+            --restart unless-stopped \
+            --cap-add SYS_PTRACE \
+            --cap-add SYS_ADMIN \
+            --security-opt apparmor=unconfined \
+            netdata/netdata:stable \
+            -e NETDATA_CLAIM_TOKEN= {% claim_token %} \
+            -e NETDATA_CLAIM_URL={% claim_url %}
+    - method: Docker Compose
+      commands:
+        - channel: nightly
+          command: |
+            version: '3'
+            services:
+              netdata:
+                image: netdata/netdata:edge
+                container_name: netdata
+                pid: host
+                network_mode: host
+                restart: unless-stopped
+                cap_add:
+                  - SYS_PTRACE
+                  - SYS_ADMIN
+                security_opt:
+                  - apparmor:unconfined
+                volumes:
+                  - netdataconfig:/etc/netdata
+                  - netdatalib:/var/lib/netdata
+                  - netdatacache:/var/cache/netdata
+                  - /etc/passwd:/host/etc/passwd:ro
+                  - /etc/group:/host/etc/group:ro
+                  - /proc:/host/proc:ro
+                  - /sys:/host/sys:ro
+                  - /etc/os-release:/host/etc/os-release:ro
+                  - /var/run/docker.sock:/var/run/docker.sock:ro
+                environment:
+            - NETDATA_CLAIM_TOKEN={% claim_token %}
+            - NETDATA_CLAIM_URL={% claim_url %}
+            - NETDATA_CLAIM_ROOMS=  
+            volumes:
+              netdataconfig:
+              netdatalib:
+              netdatacache:
+        - channel: stable
+          command: |
+            version: '3'
+            services:
+              netdata:
+                image: netdata/netdata:stable
+                container_name: netdata
+                pid: host
+                network_mode: host
+                restart: unless-stopped
+                cap_add:
+                  - SYS_PTRACE
+                  - SYS_ADMIN
+                security_opt:
+                  - apparmor:unconfined
+                volumes:
+                  - netdataconfig:/etc/netdata
+                  - netdatalib:/var/lib/netdata
+                  - netdatacache:/var/cache/netdata
+                  - /etc/passwd:/host/etc/passwd:ro
+                  - /etc/group:/host/etc/group:ro
+                  - /proc:/host/proc:ro
+                  - /sys:/host/sys:ro
+                  - /etc/os-release:/host/etc/os-release:ro
+                  - /var/run/docker.sock:/var/run/docker.sock:ro
+                environment:
+            - NETDATA_CLAIM_TOKEN={% claim_token %}
+            - NETDATA_CLAIM_URL={% claim_url %}
+            - NETDATA_CLAIM_ROOMS=  
+            volumes:
+              netdataconfig:
+              netdatalib:
+              netdatacache:
+    - method: Docker Swarm
+      commands:
+        - channel: nightly
+          command: |
+            version: '3'
+              services:
+                netdata:
+                  image: netdata/netdata:edge
+                  container_name: netdata
+                  ports:
+                    - 19999:19999
+                  restart: unless-stopped
+                  cap_add:
+                    - SYS_PTRACE
+                  security_opt:
+                    - apparmor:unconfined
+                  volumes:
+                    - netdataconfig:/etc/netdata
+                    - netdatalib:/var/lib/netdata
+                    - netdatacache:/var/cache/netdata
+                    - /etc/passwd:/host/etc/passwd:ro
+                    - /etc/group:/host/etc/group:ro
+                    - /proc:/host/proc:ro
+                    - /sys:/host/sys:ro
+                    - /etc/os-release:/host/etc/os-release:ro
+                    - /etc/hostname:/etc/hostname:ro
+                  environment:
+            - NETDATA_CLAIM_TOKEN={% claim_token %}
+            - NETDATA_CLAIM_URL={% claim_url %}
+            - NETDATA_CLAIM_ROOMS=
+                  deploy:
+                    mode: global
+              
+              volumes:
+                netdataconfig:
+                netdatalib:
+                netdatacache:
+        - channel: stable
+          command: |
+            version: '3'
+              services:
+                netdata:
+                  image: netdata/netdata:stable
+                  container_name: netdata
+                  ports:
+                    - 19999:19999
+                  restart: unless-stopped
+                  cap_add:
+                    - SYS_PTRACE
+                  security_opt:
+                    - apparmor:unconfined
+                  volumes:
+                    - netdataconfig:/etc/netdata
+                    - netdatalib:/var/lib/netdata
+                    - netdatacache:/var/cache/netdata
+                    - /etc/passwd:/host/etc/passwd:ro
+                    - /etc/group:/host/etc/group:ro
+                    - /proc:/host/proc:ro
+                    - /sys:/host/sys:ro
+                    - /etc/os-release:/host/etc/os-release:ro
+                    - /etc/hostname:/etc/hostname:ro
+                  environment:
+            - NETDATA_CLAIM_TOKEN={% claim_token %}
+            - NETDATA_CLAIM_URL={% claim_url %}
+            - NETDATA_CLAIM_ROOMS=
+                  deploy:
+                    mode: global
+              
+              volumes:
+                netdataconfig:
+                netdatalib:
+                netdatacache:
+  additional_info: ''
+  related_resources: {}
+  platform_info:
+    group: 'no_include'
+    distro: 'docker'
+  quick_start: 1
+-
+  id: deploy-kubernetes
+  meta:
+    name: Kubernetes
+    link: ''
+    categories:
+      - deploy.docker-kubernetes
+    icon_filename: 'kubernetes.png'
+  keywords:
+    - kubernetes
+    - container
+    - Orchestrator
+  description: |
+    **Use helm install to install Netdata on your Kubernetes cluster**
+    For a new installation use `helm install`` or for existing clusters add the content below to your `override.yamland`` then run `helm upgrade -f override.yml netdata netdata/netdata`
+  methods:
+    - method: Helm
+      commands:
+        - channel: nightly
+          command: |
+            helm install netdata netdata/netdata \
+            --set image.tag=latest \
+            --set parent.claiming.enabled="true" \
+            --set parent.claiming.token={% claim_token %} \
+            --set child.claiming.enabled="true" \
+            --set child.claiming.token={% claim_token %}
+        - channel: stable
+          command: |
+            helm install netdata netdata/netdata \
+            --set image.tag=stable \
+            --set parent.claiming.enabled="true" \
+            --set parent.claiming.token={% claim_token %} \
+            --set child.claiming.enabled="true" \
+            --set child.claiming.token={% claim_token %}
+    - method: Existing Cluster
+      commands:
+        - channel: nightly
+          command: |
+            image:
+              tag: latest
+              
+            restarter:
+              enabled: true
+              
+            parent:
+              claiming:
+                enabled: true
+                token: {% claim_token %}
+                rooms: 
+              
+            child:
+              claiming:
+                enabled: true
+                token: {% claim_token %}
+                rooms: 
+        - channel: stable
+          command: |
+            image:
+              tag: stable
+              
+            restarter:
+              enabled: true
+              
+            parent:
+              claiming:
+                enabled: true
+                token: {% claim_token %}
+                rooms: 
+              
+            child:
+              claiming:
+                enabled: true
+                token: {% claim_token %}
+                rooms: 
+  additional_info: ''
+  related_resources: {}
+  platform_info:
+    group: ''
+    distro: ''
+  quick_start: 1
+-
+  id: deploy-windows
+  meta:
+    name: Windows
+    link: ''
+    categories:
+      - deploy.operating-systems
+    icon_filename: 'windows.png'
+  keywords:
+    - windows
+  description: |
+    1. Install [Windows Exporter](https://github.com/prometheus-community/windows_exporter) on every Windows host you want to monitor.
+    2. Install Netdata agent on Linux, FreeBSD or Mac.
+    3. Configure Netdata to collect data remotely from your Windows hosts by adding one job per host to windows.conf file. See the [configuration section](https://learn.netdata.cloud/docs/data-collection/monitor-anything/System%20Metrics/Windows-machines#configuration) for details.
+    4. Enable virtual nodes configuration so the windows nodes are displayed as separate nodes.
+  methods:
+    - method: wget
+      commands:
+        - channel: nightly
+          command: >
+            wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
+            --nightly-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+        - channel: stable
+          command: >
+            wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
+            --stable-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+    - method: curl
+      commands:
+        - channel: nightly
+          command: >
+            curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
+            --nightly-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+        - channel: stable
+          command: >
+            curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
+            --stable-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+  additional_info: ''
+  related_resources: {}
+  platform_info:
+    group: ''
+    distro: ''
+  quick_start: 1
