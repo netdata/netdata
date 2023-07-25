@@ -605,10 +605,8 @@ int do_sys_class_drm(int update_every, usec_t dt) {
     (void)dt;
 
     static struct drm_config {
-        int do_gpu_util;
-        int do_mem_util;
-        int do_gpu_clk;
-        int do_mem_clk;
+        int do_utilization;
+        int do_clk_freq;
         int do_mem_usage;
         int do_mem_perc_usage;
     } config = {0};
@@ -624,24 +622,20 @@ int do_sys_class_drm(int update_every, usec_t dt) {
             return 1;
         }
 
-        config.do_gpu_util        = config_get_boolean( "plugin:proc:/sys/class/drm", "gpu utilization",  CONFIG_BOOLEAN_YES);
-        config.do_mem_util        = config_get_boolean( "plugin:proc:/sys/class/drm", "vram utilization", CONFIG_BOOLEAN_YES);
-        config.do_gpu_clk         = config_get_boolean( "plugin:proc:/sys/class/drm", "gpu frequency",    CONFIG_BOOLEAN_YES);
-        config.do_mem_clk         = config_get_boolean( "plugin:proc:/sys/class/drm", "vram frequency",   CONFIG_BOOLEAN_YES);
+        config.do_utilization     = config_get_boolean( "plugin:proc:/sys/class/drm", "utilization",      CONFIG_BOOLEAN_YES);
+        config.do_clk_freq        = config_get_boolean( "plugin:proc:/sys/class/drm", "clock frequency",  CONFIG_BOOLEAN_YES);
         config.do_mem_usage       = config_get_boolean( "plugin:proc:/sys/class/drm", "memory usage",     CONFIG_BOOLEAN_YES);
         config.do_mem_perc_usage  = config_get_boolean( "plugin:proc:/sys/class/drm", "memory percentage usage", CONFIG_BOOLEAN_YES);
 
         struct dirent *de = NULL;
         while(likely(de = readdir(drm_dir))) {
-            if(likely(de->d_type == DT_DIR
-                && (
-                    (de->d_name[0] == '.' && de->d_name[1] == '\0')
-                    || (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
-                    )))
-                continue;
+            if( de->d_type == DT_DIR && ((de->d_name[0] == '.' && de->d_name[1] == '\0') || 
+                 (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0'))) continue;
             
             if(likely(de->d_type == DT_LNK && !strncmp(de->d_name, "card", 4) && !strchr(de->d_name, '-'))) {
-                struct card *c = callocz(sizeof(struct card), 1);                
+                struct card *c = callocz(sizeof(struct card), 1);  
+
+                /* Get static info */              
 
                 char filename[FILENAME_MAX + 1];
                 snprintfz(filename, FILENAME_MAX, "%s/%s", drm_dir_name, de->d_name);
@@ -662,17 +656,25 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                 }
                 if(!amdgpu_ids[i].asic_id) c->id = amdgpu_ids[i];
 
-                snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, "device/gpu_busy_percent");
-                if(!read_single_number_file(filename, (unsigned long long *) &c->util_gpu)) 
-                    c->pathname_util_gpu = strdupz(filename);
-
-                snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, "device/mem_busy_percent");
-                if(!read_single_number_file(filename, (unsigned long long *) &c->util_mem)) 
-                    c->pathname_util_mem = strdupz(filename);
 
 
-                if( (config.do_gpu_util && c->pathname_util_gpu) || 
-                    (config.do_mem_util && c->pathname_util_mem)){
+                /* Initialize utilization metrics */
+
+                if(config.do_utilization){
+
+                    snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, "device/gpu_busy_percent");
+                    if(!read_single_number_file(filename, (unsigned long long *) &c->util_gpu)) 
+                        c->pathname_util_gpu = strdupz(filename);
+
+                    snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, "device/mem_busy_percent");
+                    if(!read_single_number_file(filename, (unsigned long long *) &c->util_mem)) 
+                        c->pathname_util_mem = strdupz(filename);
+
+                    config.do_utilization = c->pathname_util_gpu || 
+                                            c->pathname_util_mem ? CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_NO;
+                }
+
+                if(config.do_utilization){
 
                     c->st_util = rrdset_create_localhost(
                             "amdgpu"
@@ -691,12 +693,12 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                     rrdlabels_add(c->st_util->rrdlabels, "card", c->id.marketing_name, RRDLABEL_SRC_AUTO);
 
-                    if(config.do_gpu_util && c->pathname_util_gpu){
+                    if(c->pathname_util_gpu){
                         c->rd_util_gpu = rrddim_add(c->st_util, "GPU", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                         rrddim_set_by_pointer(c->st_util, c->rd_util_gpu, c->util_gpu);
                     }
 
-                    if(config.do_mem_util && c->pathname_util_mem){
+                    if(c->pathname_util_mem){
                         c->rd_util_mem = rrddim_add(c->st_util, "memory", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                         rrddim_set_by_pointer(c->st_util, c->rd_util_mem, c->util_mem);
                     }
@@ -705,17 +707,23 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                 }
 
 
-                snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, "device/pp_dpm_sclk");
-                if(!read_clk(c->ff_clk_gpu, filename, &c->clk_gpu)) 
-                    c->pathname_clk_gpu = strdupz(filename);
+                /* Initialize clock frequency metrics */
 
-                snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, "device/pp_dpm_mclk");
-                if(!read_clk(c->ff_clk_mem, filename, &c->clk_mem)) 
-                    c->pathname_clk_mem = strdupz(filename);
+                if(config.do_clk_freq){
 
-                
-                if( (config.do_gpu_clk && c->pathname_clk_gpu) || 
-                    (config.do_mem_clk && c->pathname_clk_mem)){
+                    snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, "device/pp_dpm_sclk");
+                    if(!read_clk(c->ff_clk_gpu, filename, &c->clk_gpu)) 
+                        c->pathname_clk_gpu = strdupz(filename);
+
+                    snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, "device/pp_dpm_mclk");
+                    if(!read_clk(c->ff_clk_mem, filename, &c->clk_mem)) 
+                        c->pathname_clk_mem = strdupz(filename);
+
+                    config.do_clk_freq = c->pathname_clk_gpu || 
+                                         c->pathname_clk_gpu ? CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_NO;
+                }
+
+                if(config.do_clk_freq){
 
                     c->st_clk = rrdset_create_localhost(
                             "amdgpu"
@@ -734,18 +742,22 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                     rrdlabels_add(c->st_clk->rrdlabels, "card", c->id.marketing_name, RRDLABEL_SRC_AUTO);
 
-                    if(config.do_gpu_clk && c->pathname_clk_gpu){
+                    if(c->pathname_clk_gpu){
                         c->rd_clk_gpu = rrddim_add(c->st_clk, "GPU", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                         rrddim_set_by_pointer(c->st_clk, c->rd_clk_gpu, c->clk_gpu);
                     }
 
-                    if(config.do_mem_clk && c->pathname_clk_mem){
+                    if(c->pathname_clk_mem){
                         c->rd_clk_mem = rrddim_add(c->st_clk, "memory", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                         rrddim_set_by_pointer(c->st_clk, c->rd_clk_mem, c->clk_mem);
                     }
 
                     rrdset_done(c->st_clk);
                 }
+
+
+                /* Initialize memory usage metrics */
+
 
                 if(config.do_mem_usage){
 
@@ -803,13 +815,10 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                     rrdset_done(c->st_mem_used);
                 }
 
-
-
-
-                netdata_log_debug(D_PROCFILE,"drm: path:%s, asic_id:%x, pci_rev_id:%x, name:%s, gpu_util:%d, mem_util:%d, clk_gpu:%llu, clk_mem%llu", 
-                                                    c->pathname, c->id.asic_id, c->id.pci_rev_id, 
-                                                    c->id.marketing_name, c->util_gpu, c->util_mem,
-                                                    c->clk_gpu, c->clk_mem);
+                // netdata_log_debug(D_PROCFILE,"drm: path:%s, asic_id:%x, pci_rev_id:%x, name:%s, gpu_util:%d, mem_util:%d, clk_gpu:%llu, clk_mem%llu", 
+                //                                     c->pathname, c->id.asic_id, c->id.pci_rev_id, 
+                //                                     c->id.marketing_name, c->util_gpu, c->util_mem,
+                //                                     c->clk_gpu, c->clk_mem);
                 
                 c->next = card_root;
                 card_root = c;
@@ -822,19 +831,23 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
     struct card *c = card_root;
     while(c) {
-        if(config.do_gpu_util && !read_single_number_file(c->pathname_util_gpu, (unsigned long long *) &c->util_gpu))
-            rrddim_set_by_pointer(c->st_util, c->rd_util_gpu, c->util_gpu);
-        if(config.do_mem_util && !read_single_number_file(c->pathname_util_mem, (unsigned long long *) &c->util_mem))
-            rrddim_set_by_pointer(c->st_util, c->rd_util_mem, c->util_mem);
+        if(config.do_utilization){
+            if(!read_single_number_file(c->pathname_util_gpu, (unsigned long long *) &c->util_gpu))
+                rrddim_set_by_pointer(c->st_util, c->rd_util_gpu, c->util_gpu);
+            if(!read_single_number_file(c->pathname_util_mem, (unsigned long long *) &c->util_mem))
+                rrddim_set_by_pointer(c->st_util, c->rd_util_mem, c->util_mem);
 
-        rrdset_done(c->st_util);
+            rrdset_done(c->st_util);
+        }
 
-        if(config.do_gpu_clk && !read_clk(c->ff_clk_gpu, (char *) c->pathname_clk_gpu, &c->clk_gpu))
-            rrddim_set_by_pointer(c->st_clk, c->rd_clk_gpu, c->clk_gpu);
-        if(config.do_mem_clk && !read_clk(c->ff_clk_mem, (char *) c->pathname_clk_mem, &c->clk_mem))
-            rrddim_set_by_pointer(c->st_clk, c->rd_clk_mem, c->clk_mem);
+        if(config.do_clk_freq){
+            if(!read_clk(c->ff_clk_gpu, (char *) c->pathname_clk_gpu, &c->clk_gpu))
+                rrddim_set_by_pointer(c->st_clk, c->rd_clk_gpu, c->clk_gpu);
+            if(!read_clk(c->ff_clk_mem, (char *) c->pathname_clk_mem, &c->clk_mem))
+                rrddim_set_by_pointer(c->st_clk, c->rd_clk_mem, c->clk_mem);
 
-        rrdset_done(c->st_clk);
+            rrdset_done(c->st_clk);
+        }
 
         if(config.do_mem_usage){
             if(!read_single_number_file(c->pathname_mem_used_vram, (unsigned long long *) &c->used_vram))
