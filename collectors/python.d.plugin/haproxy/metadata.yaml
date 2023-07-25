@@ -19,8 +19,8 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'Monitor HAProxy performance for ideal load balancing operations. Monitor session rates, queue lengths, and error rates to maintain balanced network traffic.'
-    method_description: 'Connects to the HAProxy instance via URL or UNIX socket.'
+    metrics_description: 'This collector monitors HAProxy metrics about frontend servers, backend servers, responses and more.'
+    method_description: 'It connects to the HAProxy instance via URL or UNIX socket.'
   supported_platforms:
     include: []
     exclude: []
@@ -53,7 +53,7 @@ setup:
 
         The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
 
-        Additionally, the following table contains all the options that can be configured inside a JOB definition.
+        Additionally, the following collapsed table contains all the options that can be configured inside a JOB definition.
 
         Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
       folding:

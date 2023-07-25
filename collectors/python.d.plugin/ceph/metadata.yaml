@@ -18,8 +18,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: |
-      Monitor Ceph metrics for efficient distributed storage system performance. Keep tabs on cluster health, data redundancy, and latency to ensure reliable storage operations. Metrics collected include Cluster statistics (usage, available, latency, objects, read/write rate), OSD usage and latency and Pool statistics (usage, read/write operations, read/write rate, number of objects).`
+    metrics_description: 'This collector monitors Ceph metrics about Cluster statistics, OSD usage, latency and Pool statistics.'
     method_description: 'Uses the `rados` python module to connect to a Ceph cluster.'
   supported_platforms:
     include: []
@@ -55,7 +54,7 @@ setup:
 
         The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
 
-        Additionally, the following table contains all the options that can be configured inside a JOB definition.
+        Additionally, the following collapsed table contains all the options that can be configured inside a JOB definition.
 
         Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
       folding:
@@ -121,7 +120,7 @@ metrics:
   availability: []
   scopes:
   - name: global
-    description: ""
+    description: "These metrics refer to the entire monitored application."
     labels: []
     metrics:
     - name: ceph.general_usage

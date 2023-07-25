@@ -20,8 +20,8 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'Monitor AM2320 metrics with Netdata for optimal temperature and humidity sensor performance. Improve your sensor performance with comprehensive dashboards and anomaly detection.'
-    method_description: 'This collector will try to contact an AM2320 sensor over i2c to retrieve temperature and humidity values.'
+    metrics_description: 'This collector monitors AM2320 sensor metrics about temperature and humidity.'
+    method_description: 'It retrieves temperature and humidity values by contacting an AM2320 sensor over i2c.'
   supported_platforms:
     include: []
     exclude: []
@@ -67,7 +67,7 @@ setup:
 
         The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
 
-        Additionally, the following table contains all the options that can be configured inside a JOB definition.
+        Additionally, the following collapsed table contains all the options that can be configured inside a JOB definition.
 
         Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
       folding:
