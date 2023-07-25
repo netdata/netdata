@@ -16,7 +16,7 @@ TEMPLATE_PATH = INTEGRATIONS_PATH / 'templates'
 OUTPUT_PATH = INTEGRATIONS_PATH / 'integrations.js'
 CATEGORIES_FILE = INTEGRATIONS_PATH / 'categories.yaml'
 REPO_PATH = INTEGRATIONS_PATH.parent
-SCHEMA_PATH = REPO_PATH / 'collectors' / 'metadata' / 'schemas'
+SCHEMA_PATH = INTEGRATIONS_PATH / 'schemas'
 GO_REPO_PATH = REPO_PATH / 'go.d.plugin'
 SINGLE_PATTERN = '*/metadata.yaml'
 MULTI_PATTERN = '*/multi_metadata.yaml'
@@ -66,12 +66,12 @@ def retrieve_from_filesystem(uri):
 registry = Registry(retrieve=retrieve_from_filesystem)
 
 SINGLE_VALIDATOR = Draft7Validator(
-    {'$ref': './single-module.json#'},
+    {'$ref': './collection-single-module.json#'},
     registry=registry,
 )
 
 MULTI_VALIDATOR = Draft7Validator(
-    {'$ref': './multi-module.json#'},
+    {'$ref': './collection-multi-module.json#'},
     registry=registry,
 )
 
@@ -191,7 +191,7 @@ def load_metadata():
 
         for idx, item in enumerate(data['modules']):
             item['meta']['plugin_name'] = data['plugin_name']
-            data['integration_type'] = 'collector'
+            item['integration_type'] = 'collector'
             item['_src_path'] = path
             item['_index'] = idx
             ret.append(item)
@@ -215,7 +215,9 @@ def render_keys(integrations, categories):
 
     default_cats, valid_cats = get_category_sets(categories)
 
-    collectors = [i for i in integrations if i['type'] == 'collector']
+    debug('Filtering integration types.')
+
+    collectors = [i for i in integrations if i['integration_type'] == 'collector']
 
     debug('Generating collector IDs.')
 
@@ -247,7 +249,7 @@ def render_keys(integrations, categories):
 
         related = []
 
-        for res in item['meta']['related_resources']['collectors']['list']:
+        for res in item['meta']['related_resources']['integrations']['list']:
             res_id = make_id(res)
 
             if res_id not in idmap.keys():
