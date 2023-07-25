@@ -157,7 +157,7 @@ Here is what you can put for `options` (these are standard Netdata API options):
 
     These fine tune various options of the API. Here is what you can use for badges (the API has more option, but only these are useful for badges):
 
-    -   `percentage`, instead of returning the value, calculate the percentage of the sum of the selected dimensions, versus the sum of all the dimensions of the chart. This also sets the units to `%`.
+    -   `percentage`, instead of returning a value, calculate the percentage of the sum of the values of the selected dimensions (selected sum / total sum * 100). This also sets the units to `%`.
 
     -   `absolute` or `abs`, turn all values positive and then sum them.
 

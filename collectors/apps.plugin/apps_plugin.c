@@ -1363,6 +1363,9 @@ static inline kernel_uint_t get_proc_pid_limits_limit(char *buf, const char *key
     char *v = &line[key_len];
     while(isspace(*v)) v++;
 
+    if(strcmp(v, "unlimited") == 0)
+        return 0;
+
     return str2ull(v, NULL);
 }
 
@@ -1377,6 +1380,7 @@ static inline int read_proc_pid_limits(struct pid_stat *p, void *ptr) {
     bool read_limits = false;
 
     errno = 0;
+    proc_pid_limits_buffer[0] = '\0';
 
     kernel_uint_t all_fds = pid_openfds_sum(p);
     if(all_fds < p->limits.max_open_files / 2 && p->io_collected_usec > p->last_limits_collected_usec && p->io_collected_usec - p->last_limits_collected_usec <= 60 * USEC_PER_SEC) {
@@ -1400,9 +1404,15 @@ static inline int read_proc_pid_limits(struct pid_stat *p, void *ptr) {
     if(bytes <= 0)
         goto cleanup;
 
-    read_limits = true;
+    // make it '\0' terminated
+    if(bytes < MAX_PROC_PID_LIMITS)
+        proc_pid_limits_buffer[bytes] = '\0';
+    else
+        proc_pid_limits_buffer[MAX_PROC_PID_LIMITS - 1] = '\0';
+
     p->limits.max_open_files = get_proc_pid_limits_limit(proc_pid_limits_buffer, PROC_PID_LIMITS_MAX_OPEN_FILES_KEY, sizeof(PROC_PID_LIMITS_MAX_OPEN_FILES_KEY) - 1, 0);
     p->last_limits_collected_usec = p->io_collected_usec;
+    read_limits = true;
 
     ret = 1;
 
@@ -1414,6 +1424,23 @@ cleanup:
 
     if(p->openfds_limits_percent > 100.0) {
         if(!(p->log_thrown & PID_LOG_LIMITS_DETAIL)) {
+            char *line;
+
+            if(!read_limits) {
+                proc_pid_limits_buffer[0] = '\0';
+                line = "NOT READ";
+            }
+            else {
+                line = strstr(proc_pid_limits_buffer, PROC_PID_LIMITS_MAX_OPEN_FILES_KEY);
+                if (line) {
+                    line++; // skip the initial newline
+
+                    char *end = strchr(line, '\n');
+                    if (end)
+                        *end = '\0';
+                }
+            }
+
             netdata_log_info(
                     "FDS_LIMITS: PID %d (%s) is using "
                     "%0.2f %% of its fds limits, "
@@ -1428,7 +1455,8 @@ cleanup:
                     "eventpolls = %llu "
                     "other = %llu "
                     "), open fds limit = %llu, "
-                    "%s",
+                    "%s, "
+                    "original line [%s]",
                     p->pid, p->comm, p->openfds_limits_percent, all_fds,
                     p->openfds.files,
                     p->openfds.pipes,
@@ -1441,7 +1469,8 @@ cleanup:
                     p->openfds.other,
                     p->limits.max_open_files,
                     read_limits ? "and we have read the limits AFTER counting the fds"
-                                : "but we have read the limits BEFORE counting the fds");
+                                : "but we have read the limits BEFORE counting the fds",
+                    line);
 
             p->log_thrown |= PID_LOG_LIMITS_DETAIL;
         }
