@@ -30,7 +30,8 @@ overview:
     description: ''
   default_behavior:
     auto_detection:
-      description: ''
+      description: |
+        It discovers instances of Netdata running on localhost, and gathers metrics from `http://127.0.0.1:19999/api/v1/alarms?all`. `CLEAR` status is mapped to `0`, `WARNING` to `1` and `CRITICAL` to `2`. Also, by default all alarms produced will be monitored.
     limits:
       description: ''
     performance_impact:

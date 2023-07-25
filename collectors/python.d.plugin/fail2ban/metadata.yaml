@@ -23,7 +23,7 @@ overview:
     metrics_description: |
       Monitor Fail2ban performance for prime intrusion prevention operations. Monitor ban counts, jail statuses, and failed login attempts to ensure robust network security.
     method_description: |
-      If no configuration is given, module will attempt to read log file at /var/log/fail2ban.log and conf file at /etc/fail2ban/jail.local. If conf file is not found default jail is ssh.
+      It collects metrics through reading the default log and configuration files of fail2ban.
   supported_platforms:
     include: []
     exclude: []
@@ -64,7 +64,8 @@ overview:
       ```
   default_behavior:
     auto_detection:
-      description: ''
+      description: |
+        By default the collector will attempt to read log file at /var/log/fail2ban.log and conf file at /etc/fail2ban/jail.local. If conf file is not found default jail is ssh.
     limits:
       description: ''
     performance_impact:
