@@ -50,7 +50,7 @@ modules:
           section_name: '[plugin:freeipmi]'
           description: "This is netdata main configuration file"
         options:
-          description: "This tool receives command line options that are visible when user run: ./usr/libexec/netdata/plugins.d/freeipmi.plugin --help"
+          description: "This tool receives command line options that are visible when user run: `./usr/libexec/netdata/plugins.d/freeipmi.plugin --help`"
           folding:
             title: "Config options"
             enabled: true
@@ -187,7 +187,7 @@ modules:
         section_name: '[plugin:freeipmi]'
         description: "This is netdata main configuration file"
         options:
-          description: "This tool receives command line options that are visible when user run: ./usr/libexec/netdata/plugins.d/freeipmi.plugin --help"
+          description: "This tool receives command line options that are visible when user run: `./usr/libexec/netdata/plugins.d/freeipmi.plugin --help`"
           folding:
             title: "Config options"
             enabled: true
