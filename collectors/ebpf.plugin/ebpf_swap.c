@@ -322,13 +322,13 @@ void ebpf_obsolete_swap_apps_charts(struct ebpf_module *em)
  */
 static void ebpf_obsolete_swap_global(ebpf_module_t *em)
 {
-    ebpf_write_chart_obsolete(NETDATA_EBPF_SYSTEM_GROUP,
+    ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP,
                               NETDATA_MEM_SWAP_CHART,
                               "Calls to access swap memory",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
                               NULL,
-                              NETDATA_CHART_PRIO_SYSTEM_SWAP_CALLS,
+                              NETDATA_CHART_PRIO_MEM_SWAP_CALLS,
                               em->update_every);
 }
 
@@ -914,12 +914,12 @@ static void ebpf_swap_allocate_global_vectors(int apps)
  */
 static void ebpf_create_swap_charts(int update_every)
 {
-    ebpf_create_chart(NETDATA_EBPF_SYSTEM_GROUP, NETDATA_MEM_SWAP_CHART,
+    ebpf_create_chart(NETDATA_EBPF_MEMORY_GROUP, NETDATA_MEM_SWAP_CHART,
                       "Calls to access swap memory",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
                       NULL,
                       NETDATA_EBPF_CHART_TYPE_LINE,
-                      NETDATA_CHART_PRIO_SYSTEM_SWAP_CALLS,
+                      NETDATA_CHART_PRIO_MEM_SWAP_CALLS,
                       ebpf_create_global_dimension,
                       swap_publish_aggregated, NETDATA_SWAP_END,
                       update_every, NETDATA_EBPF_MODULE_NAME_SWAP);

@@ -12,28 +12,55 @@ static int pressure_update_every = 0;
 
 static struct pressure resources[PRESSURE_NUM_RESOURCES] = {
     {
-        .some =
-            {.share_time = {.id = "cpu_some_pressure", .title = "CPU some pressure"},
-             .total_time = {.id = "cpu_some_pressure_stall_time", .title = "CPU some pressure stall time"}},
-        .full =
-            {.share_time = {.id = "cpu_full_pressure", .title = "CPU full pressure"},
-             .total_time = {.id = "cpu_full_pressure_stall_time", .title = "CPU full pressure stall time"}},
+        .some = {
+                .available = true,
+                .share_time = {.id = "cpu_some_pressure", .title = "CPU some pressure"},
+                .total_time = {.id = "cpu_some_pressure_stall_time", .title = "CPU some pressure stall time"}
+                },
+        .full = {
+                // Disable CPU full pressure.
+                // See https://github.com/torvalds/linux/commit/890d550d7dbac7a31ecaa78732aa22be282bb6b8
+                .available = false,
+                .share_time = {.id = "cpu_full_pressure", .title = "CPU full pressure"},
+                .total_time = {.id = "cpu_full_pressure_stall_time", .title = "CPU full pressure stall time"}
+                },
     },
     {
-        .some =
-            {.share_time = {.id = "memory_some_pressure", .title = "Memory some pressure"},
-             .total_time = {.id = "memory_some_pressure_stall_time", .title = "Memory some pressure stall time"}},
-        .full =
-            {.share_time = {.id = "memory_full_pressure", .title = "Memory full pressure"},
-             .total_time = {.id = "memory_full_pressure_stall_time", .title = "Memory full pressure stall time"}},
+        .some = {
+                .available = true,
+                .share_time = {.id = "memory_some_pressure", .title = "Memory some pressure"},
+                .total_time = {.id = "memory_some_pressure_stall_time", .title = "Memory some pressure stall time"}
+                },
+        .full = {
+                .available = true,
+                .share_time = {.id = "memory_full_pressure", .title = "Memory full pressure"},
+                .total_time = {.id = "memory_full_pressure_stall_time", .title = "Memory full pressure stall time"}
+                },
     },
     {
-        .some =
-            {.share_time = {.id = "io_some_pressure", .title = "I/O some pressure"},
-             .total_time = {.id = "io_some_pressure_stall_time", .title = "I/O some pressure stall time"}},
-        .full =
-            {.share_time = {.id = "io_full_pressure", .title = "I/O full pressure"},
-             .total_time = {.id = "io_full_pressure_stall_time", .title = "I/O full pressure stall time"}},
+        .some = {
+                .available = true,
+                .share_time = {.id = "io_some_pressure", .title = "I/O some pressure"},
+                .total_time = {.id = "io_some_pressure_stall_time", .title = "I/O some pressure stall time"}
+                },
+        .full = {
+                .available = true,
+                .share_time = {.id = "io_full_pressure", .title = "I/O full pressure"},
+                .total_time = {.id = "io_full_pressure_stall_time", .title = "I/O full pressure stall time"}
+                },
+    },
+    {
+        .some = {
+                // this is not available
+                .available = false,
+                .share_time = {.id = "irq_some_pressure", .title = "IRQ some pressure"},
+                .total_time = {.id = "irq_some_pressure_stall_time", .title = "IRQ some pressure stall time"}
+                },
+        .full = {
+                .available = true,
+                .share_time = {.id = "irq_full_pressure", .title = "IRQ full pressure"},
+                .total_time = {.id = "irq_full_pressure_stall_time", .title = "IRQ full pressure stall time"}
+                },
     },
 };
 
@@ -46,6 +73,7 @@ static struct resource_info {
         { .name = "cpu",    .family = "cpu",    .section_priority = NETDATA_CHART_PRIO_SYSTEM_CPU },
         { .name = "memory", .family = "ram",    .section_priority = NETDATA_CHART_PRIO_SYSTEM_RAM },
         { .name = "io",     .family = "disk",   .section_priority = NETDATA_CHART_PRIO_SYSTEM_IO },
+        { .name = "irq",    .family = "interrupts",  .section_priority = NETDATA_CHART_PRIO_SYSTEM_INTERRUPTS },
 };
 
 void update_pressure_charts(struct pressure_charts *pcs) {
@@ -65,7 +93,7 @@ void update_pressure_charts(struct pressure_charts *pcs) {
     }
 }
 
-static void proc_pressure_do_resource(procfile *ff, int res_idx, int some) {
+static void proc_pressure_do_resource(procfile *ff, int res_idx, size_t line, bool some) {
     struct pressure_charts *pcs;
     struct resource_info ri;
     pcs = some ? &resources[res_idx].some : &resources[res_idx].full;
@@ -93,9 +121,9 @@ static void proc_pressure_do_resource(procfile *ff, int res_idx, int some) {
             rrddim_add(pcs->share_time.st, some ? "some 300" : "full 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    pcs->share_time.value10 = strtod(procfile_lineword(ff, some ? 0 : 1, 2), NULL);
-    pcs->share_time.value60 = strtod(procfile_lineword(ff, some ? 0 : 1, 4), NULL);
-    pcs->share_time.value300 = strtod(procfile_lineword(ff, some ? 0 : 1, 6), NULL);
+    pcs->share_time.value10 = strtod(procfile_lineword(ff, line, 2), NULL);
+    pcs->share_time.value60 = strtod(procfile_lineword(ff, line, 4), NULL);
+    pcs->share_time.value300 = strtod(procfile_lineword(ff, line, 6), NULL);
 
     if (unlikely(!pcs->total_time.st)) {
         pcs->total_time.st = rrdset_create_localhost(
@@ -114,19 +142,19 @@ static void proc_pressure_do_resource(procfile *ff, int res_idx, int some) {
         pcs->total_time.rdtotal = rrddim_add(pcs->total_time.st, "time", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    pcs->total_time.value_total = str2ull(procfile_lineword(ff, some ? 0 : 1, 8), NULL) / 1000;
+    pcs->total_time.value_total = str2ull(procfile_lineword(ff, line, 8), NULL) / 1000;
 }
 
-static void proc_pressure_do_resource_some(procfile *ff, int res_idx) {
-    proc_pressure_do_resource(ff, res_idx, 1);
+static void proc_pressure_do_resource_some(procfile *ff, int res_idx, size_t line) {
+    proc_pressure_do_resource(ff, res_idx, line, true);
 }
 
-static void proc_pressure_do_resource_full(procfile *ff, int res_idx) {
-    proc_pressure_do_resource(ff, res_idx, 0);
+static void proc_pressure_do_resource_full(procfile *ff, int res_idx, size_t line) {
+    proc_pressure_do_resource(ff, res_idx, line, false);
 }
 
 int do_proc_pressure(int update_every, usec_t dt) {
-    int fail_count = 0;
+    int ok_count = 0;
     int i;
 
     static usec_t next_pressure_dt = 0;
@@ -161,56 +189,59 @@ int do_proc_pressure(int update_every, usec_t dt) {
                       , base_path
                       , resource_info[i].name);
 
+            do_some = resources[i].some.available ? CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_NO;
+            do_full = resources[i].full.available ? CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_NO;
+
             snprintfz(config_key, CONFIG_MAX_NAME, "enable %s some pressure", resource_info[i].name);
-            do_some = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_PRESSURE, config_key, CONFIG_BOOLEAN_YES);
+            do_some = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_PRESSURE, config_key, do_some);
             resources[i].some.enabled = do_some;
 
-            // Disable CPU full pressure.
-            // See https://github.com/torvalds/linux/commit/890d550d7dbac7a31ecaa78732aa22be282bb6b8
-            if (i == 0) {
-                do_full = CONFIG_BOOLEAN_NO;
-                resources[i].full.enabled = do_full;
-            } else {
-                snprintfz(config_key, CONFIG_MAX_NAME, "enable %s full pressure", resource_info[i].name);
-                do_full = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_PRESSURE, config_key, CONFIG_BOOLEAN_YES);
-                resources[i].full.enabled = do_full;
-            }
+            snprintfz(config_key, CONFIG_MAX_NAME, "enable %s full pressure", resource_info[i].name);
+            do_full = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_PRESSURE, config_key, do_full);
+            resources[i].full.enabled = do_full;
+
+            if(!do_full && !do_some)
+                continue;
 
             ff = procfile_open(filename, " =", PROCFILE_FLAG_DEFAULT);
             if (unlikely(!ff)) {
                 collector_error("Cannot read pressure information from %s.", filename);
-                fail_count++;
                 continue;
             }
         }
 
         ff = procfile_readall(ff);
         resource_info[i].pf = ff;
-        if (unlikely(!ff)) {
-            fail_count++;
+        if (unlikely(!ff))
             continue;
-        }
 
         size_t lines = procfile_lines(ff);
         if (unlikely(lines < 1)) {
             collector_error("%s has no lines.", procfile_filename(ff));
-            fail_count++;
             continue;
         }
 
-        if (do_some) {
-            proc_pressure_do_resource_some(ff, i);
-            update_pressure_charts(&resources[i].some);
-        }
-        if (do_full && lines > 2) {
-            proc_pressure_do_resource_full(ff, i);
-            update_pressure_charts(&resources[i].full);
+        for(size_t l = 0; l < lines ;l++) {
+            const char *key = procfile_lineword(ff, l, 0);
+            if(strcmp(key, "some") == 0) {
+                if(do_some) {
+                    proc_pressure_do_resource_some(ff, i, l);
+                    update_pressure_charts(&resources[i].some);
+                    ok_count++;
+                }
+            }
+            else if(strcmp(key, "full") == 0) {
+                if(do_full) {
+                    proc_pressure_do_resource_full(ff, i, l);
+                    update_pressure_charts(&resources[i].full);
+                    ok_count++;
+                }
+            }
         }
     }
 
-    if (PRESSURE_NUM_RESOURCES == fail_count) {
+    if(!ok_count)
         return 1;
-    }
 
     return 0;
 }

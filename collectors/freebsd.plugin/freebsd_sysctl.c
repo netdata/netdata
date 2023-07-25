@@ -1035,7 +1035,7 @@ int do_vm_stats_sys_v_swappgs(int update_every, usec_t dt) {
 
         if (unlikely(!st)) {
             st = rrdset_create_localhost(
-                    "system",
+                    "mem",
                     "swapio",
                     NULL,
                     "swap",
@@ -1044,7 +1044,7 @@ int do_vm_stats_sys_v_swappgs(int update_every, usec_t dt) {
                     "KiB/s",
                     "freebsd.plugin",
                     "vm.stats.vm.v_swappgs",
-                    NETDATA_CHART_PRIO_SYSTEM_SWAPIO,
+                    NETDATA_CHART_PRIO_MEM_SWAPIO,
                     update_every,
                     RRDSET_TYPE_AREA
             );
