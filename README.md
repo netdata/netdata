@@ -516,6 +516,27 @@ Check the [Netdata stargazers on Github](https://github.com/netdata/netdata/star
 
 Netdata is also popular in universities, including New York University, Columbia University, New Jersey University, and dozens more.
 
+As a general guide, Netdata seems ideal for:
+
+- **Infrastructure intensive organizations**<br/>
+  (hosting / cloud providers and companies having several hundreds / thousands of nodes)<br/>
+  that need a high-resolution, real-time monitoring solution to ensure all their components and applications are monitored holisticaly.
+  
+- **Technology operators**<br/>
+  that need a comprehensive and standardized solution to allow them run their operations round-the-clock in an efficient way, allowing them to automate most of their operations, give controlled access to operations' engineers, but also improve their skills over time.
+
+- **Technology startups**<br/>
+  that need a rich monitoring solution today.
+
+- **Freelancers**<br/>
+  who don't have the time or the energy to spare on complicated solutions with inferior results.
+
+- **Professional SysAdmins and DevOps**<br/>
+  who give attention to detail and they understand the value of bottom-up monitoring.
+
+- **all of us**<br/>
+  who are really tired and exhausted by the inneficiency of other monitoring solutions... :slightly_smiling_face:
+
 &nbsp;<br/>&nbsp;<br/>
 </details>
 
