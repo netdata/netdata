@@ -237,3 +237,13 @@ include:
     packages:
       <<: *ubuntu_packages
       repo_distro: ubuntu/focal
+no_include: # Info for platforms not covered in CI
+  - distro: docker
+    version: latest
+    packages:
+      arches:
+        - linux/i386
+        - linux/amd64
+        - linux/arm/v7
+        - linux/arm64
+        - linux/ppc64le

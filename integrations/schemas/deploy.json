@@ -1,0 +1,107 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "title": "Netdata deployment information meta.",
+  "items": {
+    "type": "object",
+    "description": "Individual entries for deployment information.",
+    "properties" :{
+      "id": {
+        "type": "string",
+        "description": "A unique ID for this integration."
+      },
+      "meta": {
+        "$ref": "./shared.json#/$defs/instance"
+      },
+      "keywords": {
+        "$ref": "./shared.json#/$defs/keywords"
+      },
+      "description": {
+        "type": "string",
+        "description": "Describes basic information about how to deploy on this platform."
+      },
+      "methods": {
+        "type": "array",
+        "description": "Describes the various ways to deploy on this platform.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "description": "The name of the installation method."
+            },
+            "commands": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "channel": {
+                    "type": "string",
+                    "description": "The release channel that this command is used for.",
+                    "enum": [
+                      "nightly",
+                      "stable"
+                    ]
+                  },
+                  "command": {
+                    "type": "string",
+                    "description": "The command to run for installing using this method."
+                  }
+                },
+                "required": [
+                  "channel",
+                  "command"
+                ]
+              }
+            },
+            "required": [
+              "method",
+              "commands"
+            ]
+          }
+        }
+      },
+      "additional_info": {
+        "type": "string",
+        "description": "Any additional information about this platform."
+      },
+      "related_resources": {
+        "type": "object",
+        "description": "TBD"
+      },
+      "platform_info": {
+        "type": "object",
+        "description": "References what platform this deployment info is for. In the parsed output, this will be replaced with a markdown string covering basic support information for this platform.",
+        "properties": {
+          "group": {
+            "type": "string",
+            "description": "Identifies the group that the platform is in. 'include' is used for platforms that are in auto-generated CI. 'no_include' is used for platforms that are not in auto-generated CI. An empty string indicates no associated platform information.",
+            "enum": [
+              "include",
+              "no_include",
+              ""
+            ]
+          },
+          "distro": {
+            "type": "string",
+            "description": "Identifies the platform within the group, based on the value of the 'distro' key."
+          }
+        },
+        "required": [
+          "group",
+          "distro"
+        ]
+      }
+    },
+    "required": [
+      "id",
+      "meta",
+      "keywords",
+      "description",
+      "methods",
+      "additional_info",
+      "related_resources",
+      "platform_info"
+    ]
+  }
+}
