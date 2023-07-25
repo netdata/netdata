@@ -107,6 +107,8 @@ setup:
       list:
         - name: Basic
           description: A basic example configuration.
+          folding:
+            enabled: false
           config: |
             localhost:
               name: 'local'
@@ -148,7 +150,7 @@ metrics:
   availability: []
   scopes:
     - name: global
-      description: ""
+      description: "These metrics refer to the entire monitored application."
       labels: []
       metrics:
         - name: hddtemp.temperatures
