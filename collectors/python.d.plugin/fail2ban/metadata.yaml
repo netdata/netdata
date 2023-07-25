@@ -3,7 +3,7 @@ meta:
   module_name: fail2ban
   monitored_instance:
     name: Fail2ban
-    link: ''
+    link: https://www.fail2ban.org/
     categories:
     - data-collection.authentication-and-authorization
     icon_filename: 'fail2ban.png'
@@ -12,18 +12,56 @@ meta:
       list: []
   info_provided_to_referring_integrations:
     description: ''
-  keywords: []
+  keywords:
+    - fail2ban
+    - security
+    - authentication
+    - authorization
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'Monitor Fail2ban performance for prime intrusion prevention operations. Monitor ban counts, jail statuses, and failed login attempts to ensure robust network security.'
-    method_description: ''
+    metrics_description: |
+      Monitor Fail2ban performance for prime intrusion prevention operations. Monitor ban counts, jail statuses, and failed login attempts to ensure robust network security.
+    method_description: |
+      If no configuration is given, module will attempt to read log file at /var/log/fail2ban.log and conf file at /etc/fail2ban/jail.local. If conf file is not found default jail is ssh.
   supported_platforms:
     include: []
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ''
+    description: |
+      The `fail2ban.log` file must be readable by the user `netdata`.
+        - change the file ownership and access permissions.
+        - update `/etc/logrotate.d/fail2ban`` to persist the changes after rotating the log file.
+
+      To change the file ownership and access permissions, execute the following:
+
+      ```shell
+      sudo chown root:netdata /var/log/fail2ban.log
+      sudo chmod 640 /var/log/fail2ban.log
+      ```
+
+      To persist the changes after rotating the log file, add `create 640 root netdata` to the `/etc/logrotate.d/fail2ban`:
+
+      ```shell
+      /var/log/fail2ban.log {
+
+          weekly
+          rotate 4
+          compress
+
+          delaycompress
+          missingok
+          postrotate
+              fail2ban-client flushlogs 1>/dev/null
+          endscript
+
+          # If fail2ban runs as non-root it still needs to have write access
+          # to logfiles.
+          # create 640 fail2ban adm
+          create 640 root netdata
+      }
+      ```
   default_behavior:
     auto_detection:
       description: ''
@@ -47,8 +85,16 @@ setup:
     examples:
       folding:
         enabled: true
-        title: ''
-      list: []
+        title: Config
+      list:
+        - name: Basic
+          folding:
+            enabled: false
+          description: A basic example configuration.
+          config: |
+            local:
+              log_path: '/var/log/fail2ban.log'
+              conf_path: '/etc/fail2ban/jail.local'
 troubleshooting:
   problems:
     list: []
@@ -64,7 +110,7 @@ metrics:
     description: ""
     labels: []
     metrics:
-    - name: fail2ban.faile_attempts
+    - name: fail2ban.failed_attempts
       description: Failed attempts
       unit: "attempts/s"
       chart_type: line
