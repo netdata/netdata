@@ -32,7 +32,7 @@ overview:
     description: ''
   default_behavior:
     auto_detection:
-      description: 'The plugin reads data from /proc/self/mountinfo and /proc/diskstats file.'
+      description: 'The plugin reads data from `/proc/self/mountinfo` and `/proc/diskstats file`.'
     limits:
       description: ''
     performance_impact:
