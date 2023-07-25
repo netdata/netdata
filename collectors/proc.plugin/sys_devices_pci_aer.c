@@ -5,11 +5,11 @@
 static char *pci_aer_dirname = NULL;
 
 typedef enum __attribute__((packed)) {
-    AER_DEV_NONFATAL,
-    AER_DEV_CORRECTABLE,
-    AER_DEV_FATAL,
-    AER_ROOTPORT_TOTAL_ERR_COR,
-    AER_ROOTPORT_TOTAL_ERR_FATAL,
+    AER_DEV_NONFATAL                    = (1 << 0),
+    AER_DEV_CORRECTABLE                 = (1 << 1),
+    AER_DEV_FATAL                       = (1 << 2),
+    AER_ROOTPORT_TOTAL_ERR_COR          = (1 << 3),
+    AER_ROOTPORT_TOTAL_ERR_FATAL        = (1 << 4),
 } AER_TYPE;
 
 struct aer_value {
@@ -57,7 +57,7 @@ static void add_pci_aer(const char *base_dir, const char *d_name, AER_TYPE type)
     a->type = type;
 }
 
-static bool recursively_find_pci_aer(const char *base_dir, const char *d_name, int depth) {
+static bool recursively_find_pci_aer(AER_TYPE types, const char *base_dir, const char *d_name, int depth) {
     if(depth > 100)
         return false;
 
@@ -75,22 +75,22 @@ static bool recursively_find_pci_aer(const char *base_dir, const char *d_name, i
             if(de->d_name[0] == '.')
                 continue;
 
-            recursively_find_pci_aer(buffer, de->d_name, depth + 1);
+            recursively_find_pci_aer(types, buffer, de->d_name, depth + 1);
         }
         else if(de->d_type == DT_REG) {
-            if(strcmp(de->d_name, "aer_dev_nonfatal") == 0) {
+            if((types & AER_DEV_NONFATAL) && strcmp(de->d_name, "aer_dev_nonfatal") == 0) {
                 add_pci_aer(buffer, de->d_name, AER_DEV_NONFATAL);
             }
-            else if(strcmp(de->d_name, "aer_dev_correctable") == 0) {
+            else if((types & AER_DEV_CORRECTABLE) && strcmp(de->d_name, "aer_dev_correctable") == 0) {
                 add_pci_aer(buffer, de->d_name, AER_DEV_CORRECTABLE);
             }
-            else if(strcmp(de->d_name, "aer_dev_fatal") == 0) {
+            else if((types & AER_DEV_FATAL) && strcmp(de->d_name, "aer_dev_fatal") == 0) {
                 add_pci_aer(buffer, de->d_name, AER_DEV_FATAL);
             }
-            else if(strcmp(de->d_name, "aer_rootport_total_err_cor") == 0) {
+            else if((types & AER_ROOTPORT_TOTAL_ERR_COR) && strcmp(de->d_name, "aer_rootport_total_err_cor") == 0) {
                 add_pci_aer(buffer, de->d_name, AER_ROOTPORT_TOTAL_ERR_COR);
             }
-            else if(strcmp(de->d_name, "aer_rootport_total_err_fatal") == 0) {
+            else if((types & AER_ROOTPORT_TOTAL_ERR_FATAL) && strcmp(de->d_name, "aer_rootport_total_err_fatal") == 0) {
                 add_pci_aer(buffer, de->d_name, AER_ROOTPORT_TOTAL_ERR_FATAL);
             }
         }
@@ -99,7 +99,7 @@ static bool recursively_find_pci_aer(const char *base_dir, const char *d_name, i
     return true;
 }
 
-static void find_all_pci_aer() {
+static void find_all_pci_aer(AER_TYPE types) {
     char name[FILENAME_MAX + 1];
     snprintfz(name, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices");
     pci_aer_dirname = config_get("plugin:proc:/sys/devices/pci/aer", "directory to monitor", name);
@@ -113,7 +113,7 @@ static void find_all_pci_aer() {
     struct dirent *de = NULL;
     while((de = readdir(dir))) {
         if(de->d_type == DT_DIR && de->d_name[0] == 'p' && de->d_name[1] == 'c' && de->d_name[2] == 'i' && isdigit(de->d_name[3]))
-            recursively_find_pci_aer(pci_aer_dirname, de->d_name, 1);
+            recursively_find_pci_aer(types, pci_aer_dirname, de->d_name, 1);
     }
     closedir(dir);
 }
@@ -192,15 +192,30 @@ static void add_label_from_link(struct aer_entry *a, const char *path, const cha
 
 int do_proc_sys_devices_pci_aer(int update_every, usec_t dt __maybe_unused) {
     if(unlikely(!aer_root)) {
+        int do_root_ports = CONFIG_BOOLEAN_AUTO;
+        int do_pci_slots = CONFIG_BOOLEAN_NO;
+
         char buffer[100 + 1] = "";
         rrdlabels_get_value_strcpyz(localhost->rrdlabels, buffer, 100, "_virtualization");
-        if(strcmp(buffer, "none") != 0)
+        if(strcmp(buffer, "none") != 0) {
             // no need to run on virtualized environments
+            do_root_ports = CONFIG_BOOLEAN_NO;
+            do_pci_slots = CONFIG_BOOLEAN_NO;
+        }
+
+        do_root_ports = config_get_boolean("plugin:proc:/sys/class/pci/aer", "enable root ports", do_root_ports);
+        do_pci_slots = config_get_boolean("plugin:proc:/sys/class/pci/aer", "enable pci slots", do_pci_slots);
+
+        if(!do_root_ports && !do_pci_slots)
             return 1;
 
         aer_root = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
         dictionary_register_insert_callback(aer_root, aer_insert_callback, NULL);
-        find_all_pci_aer();
+
+        AER_TYPE types = ((do_root_ports) ? (AER_ROOTPORT_TOTAL_ERR_COR|AER_ROOTPORT_TOTAL_ERR_FATAL) : 0) |
+                ((do_pci_slots) ? (AER_DEV_FATAL|AER_DEV_NONFATAL|AER_DEV_CORRECTABLE) : 0);
+
+        find_all_pci_aer(types);
 
         if(!dictionary_entries(aer_root))
             return 1;

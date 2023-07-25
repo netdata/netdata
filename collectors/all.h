@@ -121,11 +121,6 @@
 #define NETDATA_CHART_PRIO_MEM_ZRAM_EFFICIENCY        1603
 #define NETDATA_CHART_PRIO_MEM_FRAGMENTATION          1700
 
-// PCI
-
-#define NETDATA_CHART_PRIO_PCI_AER                    1800
-
-
 // Disks
 
 #define NETDATA_CHART_PRIO_DISK_IO                    2000
@@ -395,12 +390,9 @@
 
 #define NETDATA_CHART_PRIO_STATSD_PRIVATE            90000 // many charts
 
-// INTERNAL NETDATA INFO
+// PCI
 
-#define NETDATA_CHART_PRIO_CHECKS                    99999
-
-#define NETDATA_CHART_PRIO_NETDATA_TIMEX            132030
-#define NETDATA_CHART_PRIO_NETDATA_TC_TIME          1000100
+#define NETDATA_CHART_PRIO_PCI_AER                  100000
 
 // NETDATA ML CHARTS
 
