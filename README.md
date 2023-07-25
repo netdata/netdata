@@ -523,7 +523,7 @@ As a general guide, Netdata seems ideal for:
   that need a high-resolution, real-time monitoring solution to ensure all their components and applications are monitored holisticaly.
   
 - **Technology operators**<br/>
-  that need a comprehensive and standardized solution to allow them run their operations round-the-clock in an efficient way, allowing them to automate most of their operations, give controlled access to operations' engineers, but also improve their skills over time.
+  that need a comprehensive and standardized solution to allow them run their operations round-the-clock, allowing them to automate most of their operations and protect their environment by giving controlled access to their operations engineers, but also improve their skills over time.
 
 - **Technology startups**<br/>
   that need a rich monitoring solution today.
