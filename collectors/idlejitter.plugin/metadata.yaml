@@ -24,7 +24,7 @@ overview:
     method_description: >
       A thread is spawned that requests to sleep for fixed amount of time. When the system wakes it up, it
       measures how many microseconds have passed. The difference between the requested and the actual duration of
-      the sleep, is the idle jitter. This is done dozens of times per second to ensure we have a good average.
+      the sleep, is the idle jitter. This is done dozens of times per second to ensure we have a representative sample.
   supported_platforms:
     include: []
     exclude: []
@@ -48,7 +48,7 @@ setup:
       description: ''
     options:
       description: >
-        This integration only supports a single configuration option, and most users should not need to change it.
+        This integration only supports a single configuration option, and most users will not need to change it.
       folding:
         title: ''
         enabled: false
