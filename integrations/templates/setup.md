@@ -18,17 +18,21 @@ The configuration file name for this integration is `[[ entry.setup.configuratio
 Configuration for this specific integration is located in the `[[ entry.setup.configuration.file.section_name ]]` section within that file.
 [% endif %]
 
-[#
-The file format is YAML. Generally, the format is:
-
-```yaml
-update_every: 1
-autodetection_retry: 0
-jobs:
-  - name: some_name1
-  - name: some_name1
-```
-#]
+[% if entry.plugin_name == 'go.d.plugin' %]
+[% include 'setup/sample-go-config.md' %]
+[% elif entry.plugin_name == 'python.d.plugin' %]
+[% include 'setup/sample-python-config.md' %]
+[% elif entry.plugin_name == 'charts.d.plugin' %]
+[% include 'setup/sample-charts-config.md' %]
+[% elif entry.plugin_name == 'ioping.plugin' %]
+[% include 'setup/sample-charts-config.md' %]
+[% elif entry.plugin_name == 'apps.plugin' %]
+[% include 'setup/sample-apps-config.md' %]
+[% elif entry.plugin_name == 'ebpf.plugin' %]
+[% include 'setup/sample-netdata-config.md' %]
+[% elif entry.setup.configuration.file.name == 'netdata.conf' %]
+[% include 'setup/sample-netdata-config.md' %]
+[% endif %]
 
 You can edit the configuration file using the `edit-config` script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory).
