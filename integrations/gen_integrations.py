@@ -65,6 +65,11 @@ def retrieve_from_filesystem(uri):
 
 registry = Registry(retrieve=retrieve_from_filesystem)
 
+CATEGORY_VALIDATOR = Draft7Validator(
+    {'$ref': './categories.json#'},
+    registry=registry,
+)
+
 SINGLE_VALIDATOR = Draft7Validator(
     {'$ref': './collection-single-module.json#'},
     registry=registry,
@@ -151,6 +156,21 @@ def load_yaml(src):
         return False
 
     return data
+
+
+def load_categories():
+    categories = load_yaml(CATEGORIES_FILE)
+
+    if not categories:
+        sys.exit(1)
+
+    try:
+        CATEGORY_VALIDATOR.validate(categories)
+    except ValidationError:
+        warn(f'Failed to validate { CATEGORIES_FILE } against the schema.', CATEGORIES_FILE)
+        sys.exit(1)
+
+    return categories
 
 
 def load_metadata():
@@ -309,7 +329,7 @@ def render_integrations(categories, integrations):
 
 def main():
     metadata = load_metadata()
-    categories = load_yaml(CATEGORIES_FILE)
+    categories = load_categories()
     integrations = render_keys(metadata, categories)
     render_integrations(categories, integrations)
 
