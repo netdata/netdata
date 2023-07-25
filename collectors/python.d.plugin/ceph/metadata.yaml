@@ -29,7 +29,7 @@ overview:
     description: ''
   default_behavior:
     auto_detection:
-      description: 'The module by default will try to access /etc/ceph/ceph.conf and /etc/ceph/ceph.client.admin.keyring and will try to connect as `admin` to the ceph cluster.'
+      description: ''
     limits:
       description: ''
     performance_impact:
@@ -55,7 +55,7 @@ setup:
 
         The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
 
-        Additionally, the ceph plugin also supports the following: `config_file`, `keyring_file` and `rados_id` inside a JOB definition.
+        Additionally, the following table contains all the options that can be configured inside a JOB definition.
 
         Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
       folding:
@@ -84,12 +84,12 @@ setup:
           required: false
         - name: config_file
           description: Ceph config file
-          default_value: '/etc/ceph/ceph.conf'
-          required: false
+          default_value: ''
+          required: true
         - name: keyring_file
           description: Ceph keyring file. netdata user must be added into ceph group and keyring file must be read group permission.
-          default_value: '/etc/ceph/ceph.client.admin.keyring'
-          required: false
+          default_value: ''
+          required: true
         - name: rados_id
           description: A rados user id to use for connecting to the Ceph cluster.
           default_value: 'admin'
@@ -103,8 +103,8 @@ setup:
           description: A basic configuration to connect to a local Ceph cluster.
           config: |
             local:
-            config_file: '/etc/ceph/ceph.conf'
-            keyring_file: '/etc/ceph/ceph.client.admin.keyring'
+             config_file: '/etc/ceph/ceph.conf'
+             keyring_file: '/etc/ceph/ceph.client.admin.keyring'
 troubleshooting:
   problems:
     list: []

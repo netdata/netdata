@@ -29,7 +29,7 @@ overview:
     description: ''
   default_behavior:
     auto_detection:
-      description: 'If no configuration is provided the collector will fail to run.'
+      description: ''
     limits:
       description: ''
     performance_impact:
@@ -51,9 +51,9 @@ setup:
         * Global variables
         * One or more JOBS that can define multiple different instances to monitor.
 
-        The following options can be defined globally: `priority`, `penalty`, `autodetection_retry`, `update_every`, but can also be defined per JOB to override the global values.
+        The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
 
-        Additionally, the haproxy plugin also supports the following: `user`, `pass`, `url` and `socket` inside a JOB definition.
+        Additionally, the following table contains all the options that can be configured inside a JOB definition.
 
         Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
       folding:
