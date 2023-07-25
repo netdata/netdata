@@ -20,13 +20,18 @@ overview:
       Monitor Varnish metrics with Netdata for efficient HTTP accelerator performance. 
 
       Enhance your web performance with real-time Varnish metrics.
+
+      Provides HTTP accelerator global, Backends (VBE) and Storages (SMF, SMA, MSE) statistics using varnishstat tool.
+      
+      Note that both, Varnish-Cache (free and open source) and Varnish-Plus (Commercial/Enterprise version), are supported.
     method_description: ''
   supported_platforms:
     include: []
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ''
+    description: |
+      `netdata` user must be a member of the `varnish` group.
   default_behavior:
     auto_detection:
       description: ''
