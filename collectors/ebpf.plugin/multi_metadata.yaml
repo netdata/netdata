@@ -991,7 +991,7 @@ modules:
       configuration:
         file:
           name: "ebpf.d/sync.conf"
-          description: "Overwrite default and allows user to select charts visible on dashboard."
+          description: "Overwrite default configuration and allows user to select charts visible on dashboard."
         options:
           description: |
             This configuration file have two different sections. The `[global]` overwrites all default options, while `[syscalls]` allow user to select the syscall to monitor.
@@ -2171,7 +2171,7 @@ modules:
       configuration:
         file:
           name: "ebpf.d/filesystem.conf"
-          description: "Overwrite default and allows user to select charts visible on dashboard."
+          description: "Overwrite default configuration and allows user to select charts visible on dashboard."
         options:
           description: |
             This configuration file have two different sections. The `[global]` overwrites default options, while `[filesystem]` allow user to select the filesystems to monitor.
@@ -2336,8 +2336,7 @@ modules:
       configuration:
         file:
           name: "ebpf.d/shm.conf"
-          description: |
-            Overwrite default and allows user to select charts visible on dashboard.
+          description: "Overwrite default configuration and allows user to select charts visible on dashboard."
         options:
           description: |
             This configuration file have two different sections. The `[global]` overwrites all default options, while `[syscalls]` allow user to select the syscall to monitor.
@@ -2620,7 +2619,7 @@ modules:
       module_name: mount
       monitored_instance:
         name: eBPF Mount
-        link: ""
+        link: "https://kernel.org/"
         categories:
           - data-collection.ebpf
         icon_filename: "ebpf.jpg"
@@ -2644,27 +2643,69 @@ modules:
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ""
+        description: "The plugin needs setuid because it loads data inside kernel."
       default_behavior:
         auto_detection:
-          description: ""
+          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT, CONFIG_HAVE_SYSCALL_TRACEPOINTS), files inside debugfs, and presence of BTF files to decide which eBPF program will be attached."
         limits:
           description: ""
         performance_impact:
-          description: ""
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
-        list: []
+        list: |
+          - title: Compile kernel
+              description: |
+                Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+                When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+                with different names.
+
+                Now follow steps:
+                1. Copy the configuration file to /usr/src/linux/.config.
+                2. Select the necessary options: make oldconfig
+                3. Compile your kernel image: make bzImage
+                4. Compile your modules: make modules
+                5. Copy your new kernel image for boot loader directory
+                6. Install the new modules: make modules_install
+                7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+                8. Update your boot loader
+          - title: Debug Filesystem
+              description: |
+                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs`:
+
+                ```bash
+                $ sudo mount -t debugfs none /sys/kernel/debug/
+                ```
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "ebpf.d/mount.conf"
+          description: "Overwrite default configuration."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list: |
+            - name: update every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: ebpf load mode
+              description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
+              default_value: entry
+              required: false
+            - name: ebpf type format
+              description: "Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load)."
+              default_value: auto
+              required: false
+            - name: ebpf co-re tracing
+              description: "Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code)."
+              default_value: trampoline
+              required: false
+            - name: lifetime
+              description: Set default lifetime for thread when enabled by cloud.
+              default_value: 300
+              required: false
         examples:
           folding:
             enabled: true
@@ -2682,7 +2723,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "Calls for syscalls mount an umount."
           labels: []
           metrics:
             - name: mount_points.call
