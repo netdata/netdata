@@ -507,35 +507,34 @@ Every Netdata Agent can be a Netdata Registry. Just appoint one Netdata Agent as
 
 ### :office: Who uses Netdata?
 
-Netdata is a popular project...
+Netdata is a widely adopted project...
 
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
 
-Check the [Netdata stargazers on Github](https://github.com/netdata/netdata/stargazers). You will find people from popular companies and enterprises, including: SAP, Qualcomm, IBM, Amazon, Intel, AMD, Unity, Baidu, Cisco, Samsung, Netflix, Facebook and hundreds more.
+Browse the [Netdata stargazers on Github](https://github.com/netdata/netdata/stargazers) to discover users from renowned companies and enterprises, such as SAP, Qualcomm, IBM, Amazon, Intel, AMD, Unity, Baidu, Cisco, Samsung, Netflix, Facebook, and many others.
 
-Netdata is also popular in universities, including New York University, Columbia University, New Jersey University, and dozens more.
+Netdata also enjoys significant usage in academia, with notable institutions including New York University, Columbia University, New Jersey University, among several others.
 
-As a general guide, Netdata seems ideal for:
+In a nutshell, Netdata proves invaluable for:
 
 - **Infrastructure intensive organizations**<br/>
-  (hosting / cloud providers and companies having several hundreds / thousands of nodes)<br/>
-  that need a high-resolution, real-time monitoring solution to ensure all their components and applications are monitored holisticaly.
+  Such as hosting/cloud providers and companies with hundreds or thousands of nodes, who require a high-resolution, real-time monitoring solution for a comprehensive view of all their components and applications.
   
 - **Technology operators**<br/>
-  that need a comprehensive and standardized solution to allow them run their operations round-the-clock, allowing them to automate most of their operations and protect their environment by giving controlled access to their operations engineers, but also improve their skills over time.
+  Those in need of a standardized, comprehensive solution for round-the-clock operations. Netdata not only facilitates operational automation and provides controlled access for their operations engineers, but also enhances skill development over time.
 
 - **Technology startups**<br/>
-  that need a rich monitoring solution today.
+  Who seek a feature-rich monitoring solution from the get-go.
 
 - **Freelancers**<br/>
-  who don't have the time or the energy to spare on complicated solutions with inferior results.
+  Those seeking an efficient and straightforward solution without sacrificing performance and outcomes due to time or energy constraints.
 
 - **Professional SysAdmins and DevOps**<br/>
-  who give attention to detail and they understand the value of bottom-up monitoring.
+  Who appreciate the fine details and understand the value of holistic monitoring from the ground up.
 
-- **all of us**<br/>
-  who are really tired and exhausted by the inneficiency of other monitoring solutions... :slightly_smiling_face:
+- **Everyone else**<br/>
+  Those who are tired of the inefficiency in the monitoring industry and are seeking a breath of fresh air. :slightly_smiling_face:
 
 &nbsp;<br/>&nbsp;<br/>
 </details>
