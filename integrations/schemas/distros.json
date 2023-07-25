@@ -1,0 +1,153 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Platform support information for the Netdata agent.",
+  "properties": {
+    "platform_map": {
+      "type": "object",
+      "description": "Maps CPU architectures to Docker platform strings. Used by CI when generating build matrices.",
+      "patternProperties": {
+        "^.+$": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "arch_order": {
+      "type": "array",
+      "description": "Defines the CPU architecture sort order used when generating build matrices in CI.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "include": {
+      "type": "array",
+      "description": "Defines data for platforms that are included in CI.",
+      "items": {
+        "$ref": "#/$defs/platform"
+      }
+    }
+  },
+  "required": [
+    "platform_map",
+    "arch_order",
+    "include"
+  ],
+  "$defs": {
+    "platform": {
+      "type": "object",
+      "description": "Describes a platform.",
+      "properties": {
+        "distro": {
+          "type": "string",
+          "description": "The name of the platform.",
+          "pattern": "^[a-z][a-z0-9]*$"
+        },
+        "version": {
+          "type": "string",
+          "description": "Version identifier for the platform.",
+          "pattern": "^[a-z0-9][a-z.0-9]*$"
+        },
+        "support_type": {
+          "type": "string",
+          "description": "Defines the support tier that the platform is in.",
+          "enum": [
+            "Core",
+            "Intermediate",
+            "Community",
+            "Third-Party",
+            "Unsupported"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Any additional notes about the platform."
+        },
+        "eol_check": {
+          "description": "Indicates if EOL checks should be done for this platform. Only relevant if the platform is included in CI. If the value is a string, that value is used for the EOL check lookup, otherwise the value of the distro key is used.",
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9._-]*$"
+            }
+          ]
+        },
+        "base_image": {
+          "type": "string",
+          "description": "A string specifying the Docker image to be used for testing this platform.",
+          "pattern": "^[a-z][a-z0-9._/:-]*$"
+        },
+        "env_prep": {
+          "type": "string",
+          "description": "A string containing any shell commands that need to be run to prep the platform for testing in CI."
+        },
+        "jsonc_removal": {
+          "type": "string",
+          "description": "A string containing a shell command to uninstall JSON-C development files during CI checks."
+        },
+        "test": {
+          "type": "object",
+          "description": "Contains additional data for usage by CI.",
+          "properties": {
+            "ebpf-core": {
+              "type": "boolean",
+              "description": "If true, then eBPF CO-RE CI jobs should be run for this platform."
+            }
+          }
+        },
+        "packages": {
+          "type": "object",
+          "description": "Additional information about native packages for this platform.",
+          "properties": {
+            "type": {
+              "type": "string",
+              "description": "Indicates the type of native packages to build for the platform.",
+              "enum": [
+                "deb",
+                "rpm",
+                ""
+              ]
+            },
+            "arches": {
+              "type": "array",
+              "description": "A list of CPU architectures (specified in the usual manner for the platform) that native packages are built for for this platform.",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "repo_distro": {
+              "type": "string",
+              "description": "Identifies the repository name to be used when publishing packages for this platform.",
+              "minLength": 1
+            },
+            "alt_links": {
+              "type": "array",
+              "description": "A list of alternative repository names to be used when publishing packages for this platform.",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "required": [
+            "type",
+            "arches"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "distro",
+        "version",
+        "support_type",
+        "notes"
+      ]
+    }
+  }
+}
