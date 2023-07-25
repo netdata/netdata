@@ -2312,7 +2312,6 @@ modules:
     setup:
       prerequisites:
         list: |
-        list: |
           - title: Compile kernel
               description: |
                 Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
