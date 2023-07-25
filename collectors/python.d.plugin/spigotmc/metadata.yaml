@@ -3,15 +3,15 @@ meta:
   module_name: spigotmc
   monitored_instance:
     name: SpigotMC
-    link: ''
+    link: ""
     categories:
-    - data-collection.gaming
-    icon_filename: 'spigot.jfif'
+      - data-collection.gaming
+    icon_filename: "spigot.jfif"
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
+    description: ""
   keywords:
     - minecraft server
     - spigotmc server
@@ -29,25 +29,25 @@ overview:
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ''
+    description: ""
   default_behavior:
     auto_detection:
       description: By default, this collector will attempt to connect to a Spigot server running on the local host on port `25575`.
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
     list:
-     - title: Enable the Remote Console Protocol
-       description: |
-        Under your SpigotMC server's `server.properties` configuration file, you should set `enable-rcon` to `true`.
+      - title: Enable the Remote Console Protocol
+        description: |
+          Under your SpigotMC server's `server.properties` configuration file, you should set `enable-rcon` to `true`.
 
-        This will allow the Server to listen and respond to queries over the rcon protocol.
+          This will allow the Server to listen and respond to queries over the rcon protocol.
   configuration:
     file:
-      name: 'python.d/spigotmc.conf'
+      name: "python.d/spigotmc.conf"
     options:
       description: |
         There are 2 sections:
@@ -59,7 +59,7 @@ setup:
 
         Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
       folding:
-        title: 'Config options'
+        title: "Config options"
         enabled: true
       list:
         - name: update_every
@@ -79,7 +79,9 @@ setup:
           default_value: yes
           required: false
         - name: name
-          description: Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works.
+          description: >
+            Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed
+            running at any time. This allows autodetection to try several alternatives and pick the one that works.
           default_value: ""
           required: false
         - name: host
@@ -97,7 +99,7 @@ setup:
     examples:
       folding:
         enabled: true
-        title: 'Config'
+        title: "Config"
       list:
         - name: Basic
           description: A basic configuration example.
@@ -119,7 +121,7 @@ setup:
         - name: Multi-instance
           description: |
             > **Note**: When you define multiple jobs, their names must be unique.
-            
+
             Collecting metrics from local and remote instances.
           config: |
             local_server:
@@ -142,29 +144,29 @@ metrics:
   description: ""
   availability: []
   scopes:
-  - name: global
-    description: "These metrics refer to the entire monitored application."
-    labels: []
-    metrics:
-    - name: spigotmc.tps
-      description: Spigot Ticks Per Second
-      unit: "ticks"
-      chart_type: line
-      dimensions:
-      - name: 1 Minute Average
-      - name: 5 Minute Average
-      - name: 15 Minute Average
-    - name: spigotmc.users
-      description: Minecraft Users
-      unit: "users"
-      chart_type: area
-      dimensions:
-      - name: Users
-    - name: spigotmc.mem
-      description: Minecraft Memory Usage
-      unit: "MiB"
-      chart_type: line
-      dimensions:
-      - name: used
-      - name: allocated
-      - name: max
+    - name: global
+      description: "These metrics refer to the entire monitored application."
+      labels: []
+      metrics:
+        - name: spigotmc.tps
+          description: Spigot Ticks Per Second
+          unit: "ticks"
+          chart_type: line
+          dimensions:
+            - name: 1 Minute Average
+            - name: 5 Minute Average
+            - name: 15 Minute Average
+        - name: spigotmc.users
+          description: Minecraft Users
+          unit: "users"
+          chart_type: area
+          dimensions:
+            - name: Users
+        - name: spigotmc.mem
+          description: Minecraft Memory Usage
+          unit: "MiB"
+          chart_type: line
+          dimensions:
+            - name: used
+            - name: allocated
+            - name: max
