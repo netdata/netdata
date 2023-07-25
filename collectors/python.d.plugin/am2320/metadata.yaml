@@ -103,7 +103,7 @@ setup:
           description: A basic JOB configuration
           config: |
             local_sensor:
-             name: 'Local AM2320'
+              name: 'Local AM2320'
 troubleshooting:
   problems:
     list: []
