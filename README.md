@@ -475,35 +475,32 @@ For organizations that need a fully on-prem solution, we provide Netdata Cloud f
 &nbsp;<br/>&nbsp;<br/>
 </details>
 
-### :raised_eyebrow: Is Netdata sending telemetry back home?
+### :information_source: What does the anonymous telemetry collected by Netdata entail?
 
-By default, we collect anonymous statistics to help us take informed decisions for the future of Netdata.
-But you can easily disable it. Our installation pages provide information on how to do this.
+Your privacy is our utmost priority. As part of our commitment to improving Netdata, we rely on anonymous telemetry data from our users who choose to leave it enabled. This data greatly informs our decision-making processes and contributes to the future evolution of Netdata.
+
+Should you wish to disable telemetry, instructions for doing so are provided in our installation guides.
 
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
 
-Netdata is evolving on a very fast pace. Everyday we take decisions on how the project should evolve.
+Netdata is in a constant state of growth and evolution. The decisions that guide this development are ideally rooted in data. By analyzing anonymous telemetry data, we can answer questions such as: "What features are being used frequently?", "How do we prioritize between potential new features?" and "What elements of Netdata are most important to our users?"
 
-Ideally these decisions should be data informed. _Is this the right area to work on now? Do our users really use that?
-How to prioritize between feature A and B? I believe that C is more important. A user said that D is the most important._
+By leaving anonymous telemetry enabled, users indirectly contribute to shaping Netdata's roadmap, providing invaluable information that helps us prioritize our efforts for the project and the community.
 
-Anonymous telemetry information can help us take the best decisions. Our users that have anonymous telemetry enabled, contribute to Netdata's roadmap. They provide valuable anonymous information that helps us do the best for the project and the community.
+We are aware that for privacy or regulatory reasons, not all environments can allow telemetry. To cater to this, we have simplified the process of disabling telemetry:
 
-We understand that this is not acceptable or not allowed in all environments. For this reason we have made it easy to disable telemetry when you need to:
+- During installation, you can append `--disable-telemetry` to our `kickstart.sh` script, or
+- Create the file `/etc/netdata/.opt-out-from-anonymous-statistics` and then restart Netdata.
 
-- you can append `--disable-telemetry` to our `kickstart.sh` script when you install netdata, or
-- touch the file `/etc/netdata/.opt-out-from-anonymous-statistics` and restart Netdata
+These steps will disable the anonymous telemetry for your Netdata installation.
 
-Either of these methods will disable anonymous telemetry information for your installation.
+Please note, even with telemetry disabled, Netdata still requires a [Netdata Registry](https://learn.netdata.cloud/docs/configuring/securing-netdata-agents/registry) for alert notifications' Call To Action (CTA) functionality. When you click an alert notification, it redirects you to the Netdata Registry, which then directs your web browser to the specific Netdata Agent that issued the alert for further troubleshooting. The Netdata Registry learns the URLs of your agents when you visit their dashboards.
 
-Keep in mind that even with telemetry disabled, Netdata needs a [Netdata Registry](https://learn.netdata.cloud/docs/configuring/securing-netdata-agents/registry) for alert notifications' Call To Action (CTA) to work. When you click on an alert notification, you go to the Netdata Registry, which finds the URL of the Netdata Agent that sent you the alert, and diverts your web browser to it, so that you can troubleshoot the issue. The Netdata Registry learns the URLs of your agents, as you visit their dashboards (so each agent may have different URLs per user, depending on the user location).
-
-Every Netdata Agent can be a Netdata Registry. Just appoint one Netdata Agent as your registry, and the global Netdata Registry we run, will not be used any more. For more information [check this guide](https://learn.netdata.cloud/docs/configuring/securing-netdata-agents/registry).
+Any Netdata Agent can act as a Netdata Registry. Simply designate one Netdata Agent as your registry, and our global Netdata Registry will no longer be in use. For further information on this, please refer to [this guide](https://learn.netdata.cloud/docs/configuring/securing-netdata-agents/registry).
 
 &nbsp;<br/>&nbsp;<br/>
 </details>
-
 
 ### :office: Who uses Netdata?
 
