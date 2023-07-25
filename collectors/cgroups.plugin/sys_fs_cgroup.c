@@ -1860,6 +1860,7 @@ static inline void cgroup_free(struct cgroup *cg) {
     free_pressure(&cg->cpu_pressure);
     free_pressure(&cg->io_pressure);
     free_pressure(&cg->memory_pressure);
+    free_pressure(&cg->irq_pressure);
 
     freez(cg->id);
     freez(cg->intermediate_id);
