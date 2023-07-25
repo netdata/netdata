@@ -3,7 +3,7 @@ meta:
   module_name: alarms
   monitored_instance:
     name: python.d alarms
-    link: 'https://learn.netdata.cloud/docs/data-collection/netdata-specific/alarms'
+    link: https://learn.netdata.cloud/docs/data-collection/netdata-specific/alarms
     categories:
       - data-collection.other
     icon_filename: ''

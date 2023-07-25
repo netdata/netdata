@@ -1,0 +1,110 @@
+meta:
+  plugin_name: python.d.plugin
+  module_name: example
+  monitored_instance:
+    name: python.d alarms
+    link: https://learn.netdata.cloud/docs/data-collection/examples/example-module-in-python
+    categories:
+      - data-collection.other
+    icon_filename: ''
+  related_resources:
+    integrations:
+      list: []
+  info_provided_to_referring_integrations:
+    description: ''
+  keywords:
+    - example
+    - netdata
+    - python
+  most_popular: false
+overview:
+  data_collection:
+    metrics_description: |
+      Example collector that generates some random numbers as metrics.
+
+      If you want to write your own collector, read our [writing a new Python module](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/README.md#how-to-write-a-new-module) tutorial.
+    method_description: |
+      The `get_data()` function uses `random.randint()` to generate a random number which will be collected as a metric.
+  supported_platforms:
+    include: []
+    exclude: []
+  multi_instance: true
+  additional_permissions:
+    description: ''
+  default_behavior:
+    auto_detection:
+      description: ''
+    limits:
+      description: ''
+    performance_impact:
+      description: ''
+setup:
+  prerequisites:
+    list: []
+  configuration:
+    file:
+      name: python.d/example.conf
+      description: ''
+    options:
+      description: |
+        The following options can be defined globally: update_every, autodetection_retry.
+      folding:
+        title: Config options
+        enabled: true
+      list:
+        - name: update_every
+          description: Data collection frequency.
+          default_value: 1
+          required: false
+        - name: num_lines
+          description: The number of lines to create.
+          default_value: 4
+          required: true
+        - name: lower
+          description: The lower bound of numbers to randomly sample from.
+          default_value: 0
+          required: true
+        - name: upper
+          description: The upper bound of numbers to randomly sample from.
+          default_value: 100
+          required: true
+    examples:
+      folding:
+        enabled: true
+        title: Config
+      list:
+        - name: Basic
+          folding:
+            enabled: false
+          description: A basic example configuration.
+          config: |
+            four_lines:
+                name: "Four Lines"
+                update_every: 1
+                priority: 60000
+                penalty: yes
+                autodetection_retry: 0
+                num_lines: 4
+                lower: 0
+                upper: 100
+troubleshooting:
+  problems:
+    list: []
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: example.random
+      description: A random number
+      unit: number
+      chart_type: line
+      dimensions:
+      - random: a dimension per `num_lines`.
