@@ -44,7 +44,7 @@ setup:
         description: 'You can optionally create a rados_id to use instead of admin'
   configuration:
     file:
-      name: python.d/tor.conf
+      name: python.d/ceph.conf
     options:
       description: |
         There are 2 sections:
