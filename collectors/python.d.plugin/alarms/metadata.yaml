@@ -40,19 +40,85 @@ setup:
     list: []
   configuration:
     file:
-      name: ''
+      name: python.d/alarms.conf
       description: ''
     options:
-      description: ''
+      description: |
+        The following options can be defined globally: update_every, autodetection_retry.
       folding:
-        title: ''
+        title: Config options
         enabled: true
-      list: []
+      list:
+        - name: update_every
+          description: Data collection frequency.
+          default_value: 10
+          required: false
+        - name: url
+          description: Netdata agent alarms endpoint to collect from. Can be local or remote so long as reachable by agent.
+          default_value: http://127.0.0.1:19999/api/v1/alarms?all
+          required: true
+        - name: status_map
+          description: Mapping of alarm status to integer number that will be the metric value collected.
+          default_value: '{"CLEAR": 0, "WARNING": 1, "CRITICAL": 2}'
+          required: true
+        - name: collect_alarm_values
+          description: set to true to include a chart with calculated alarm values over time.
+          default_value: false
+          required: true
+        - name: alarm_status_chart_type
+          description: define the type of chart for plotting status over time e.g. 'line' or 'stacked'.
+          default_value: 'line'
+          required: true
+        - name: alarm_contains_words
+          description: |
+            A "," separated list of words you want to filter alarm names for. For example 'cpu,load' would filter for only alarms with "cpu" or "load" in alarm name. Default includes all.
+          default_value: ''
+          required: true
+        - name: alarm_excludes_words
+          description: |
+            A "," separated list of words you want to exclude based on alarm name. For example 'cpu,load' would exclude all alarms with "cpu" or "load" in alarm name. Default excludes None.
+          default_value: ''
+          required: true
     examples:
       folding:
         enabled: true
-        title: ''
-      list: []
+        title: Config
+      list:
+        - name: Basic
+          folding:
+            enabled: false
+          description: A basic example configuration.
+          config: |
+            jobs:
+              url: 'http://127.0.0.1:19999/api/v1/alarms?all'
+        - name: Advanced
+          folding:
+            enabled: true
+          description: |
+            An advanced example configuration with multiple jobs collecting different subsets of alarms for plotting on different charts.
+            "ML" job will collect status and values for all alarms with "ml_" in the name. Default job will collect status for all other alarms.
+          config: |
+            ML:
+              update_every: 5
+              url: 'http://127.0.0.1:19999/api/v1/alarms?all'
+              status_map:
+                CLEAR: 0
+                WARNING: 1
+                CRITICAL: 2
+              collect_alarm_values: true
+              alarm_status_chart_type: 'stacked'
+              alarm_contains_words: 'ml_'
+
+            Default:
+              update_every: 5
+              url: 'http://127.0.0.1:19999/api/v1/alarms?all'
+              status_map:
+                CLEAR: 0
+                WARNING: 1
+                CRITICAL: 2
+              collect_alarm_values: false
+              alarm_status_chart_type: 'stacked'
+              alarm_excludes_words: 'ml_'
 troubleshooting:
   problems:
     list: []
@@ -73,10 +139,10 @@ metrics:
       unit: "status"
       chart_type: line
       dimensions:
-      - name: a dimension per alarm
-    - name: alarms.status
+      - name: a dimension per alarm representing the latest status of the alarm.
+    - name: alarms.values
       description: Alarm Values
       unit: "value"
       chart_type: line
       dimensions:
-      - name: a dimension per alarm
+      - name: a dimension per alarm representing the latest collected value of the alarm.
