@@ -488,3 +488,45 @@
     group: ''
     distro: ''
   quick_start: 1
+-
+  id: deploy-windows
+  meta:
+    name: Windows
+    link: ''
+    categories:
+      - deploy.operating-systems
+    icon_filename: 'windows.png'
+  keywords:
+    - windows
+  description: |
+    1. Install [Windows Exporter](https://github.com/prometheus-community/windows_exporter) on every Windows host you want to monitor.
+    2. Install Netdata agent on Linux, FreeBSD or Mac.
+    3. Configure Netdata to collect data remotely from your Windows hosts by adding one job per host to windows.conf file. See the [configuration section](https://learn.netdata.cloud/docs/data-collection/monitor-anything/System%20Metrics/Windows-machines#configuration) for details.
+    4. Enable virtual nodes configuration so the windows nodes are displayed as separate nodes.
+  methods:
+    - method: wget
+      commands:
+        - channel: nightly
+          command: >
+            wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
+            --nightly-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+        - channel: stable
+          command: >
+            wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
+            --stable-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+    - method: curl
+      commands:
+        - channel: nightly
+          command: >
+            curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
+            --nightly-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+        - channel: stable
+          command: >
+            curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
+            --stable-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+  additional_info: ''
+  related_resources: {}
+  platform_info:
+    group: ''
+    distro: ''
+  quick_start: 1
