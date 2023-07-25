@@ -3180,7 +3180,7 @@ modules:
       module_name: process
       monitored_instance:
         name: eBPF Process
-        link: ""
+        link: "https://github.com/netdata/netdata/"
         categories:
           - data-collection.ebpf
         icon_filename: "ebpf.jpg"
@@ -3213,7 +3213,8 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list: []
+        list: |
+          To have these charts you need to compile netdata with flag `NETDATA_DEV_MODE`.
       configuration:
         file:
           name: ""
@@ -3241,7 +3242,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "How plugin is allocating memory."
           labels: []
           metrics:
             - name: netdata.ebpf_aral_stat_size
