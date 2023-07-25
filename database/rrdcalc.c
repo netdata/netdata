@@ -82,10 +82,14 @@ uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint3
         alarm_id = sql_get_alarm_id(host, chart, name, next_event_id, config_hash_id);
 
         if (!alarm_id) {
-            if (unlikely(!host->health_log.next_alarm_id))
-                host->health_log.next_alarm_id = (uint32_t)now_realtime_sec();
+            //check possible stored config hash as zeroes or null
+            alarm_id = sql_get_alarm_id_check_zero_hash(host, chart, name, next_event_id, config_hash_id);
+            if (!alarm_id) {
+                if (unlikely(!host->health_log.next_alarm_id))
+                    host->health_log.next_alarm_id = (uint32_t)now_realtime_sec();
 
-            alarm_id = host->health_log.next_alarm_id++;
+                alarm_id = host->health_log.next_alarm_id++;
+            }
         }
     }
 

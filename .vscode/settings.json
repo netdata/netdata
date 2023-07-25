@@ -1,0 +1,6 @@
+{
+    "yaml.schemas": {
+        "./integrations/schemas/collection-single-module.json": "/metadata.yaml",
+        "./integrations/schemas/collection-multi-module.json": "/multi_metadata.yaml",
+    }
+}
