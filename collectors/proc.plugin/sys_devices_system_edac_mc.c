@@ -121,6 +121,7 @@ static void find_all_mc() {
                     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(m->dimms, d, prev, next);
             }
         }
+        closedir(dir);
     }
 }
 

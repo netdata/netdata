@@ -409,12 +409,12 @@ int api_v2_claim(struct web_client *w, char *url) {
                     int ms = 0;
                     do {
                         status = cloud_status();
-                        if (status == CLOUD_STATUS_ONLINE)
+                        if (status == CLOUD_STATUS_ONLINE && __atomic_load_n(&localhost->node_id, __ATOMIC_RELAXED))
                             break;
 
-                        sleep_usec(100 * USEC_PER_MS);
-                        ms += 100;
-                    } while (ms < 5000);
+                        sleep_usec(50 * USEC_PER_MS);
+                        ms += 50;
+                    } while (ms < 10000);
                 }
                 break;
 
