@@ -91,6 +91,10 @@
           "group",
           "distro"
         ]
+      },
+      "quick_start": {
+        "type": "integer",
+        "description": "Indicates where the deploy integration should appear in the add nodes dialogue. A value less than 0 indicates that it should not appear on this dialogue."
       }
     },
     "required": [
@@ -101,7 +105,8 @@
       "methods",
       "additional_info",
       "related_resources",
-      "platform_info"
+      "platform_info",
+      "quick_start"
     ]
   }
 }

@@ -36,6 +36,7 @@
   platform_info:
     group: ''
     distro: ''
+  quick_start: 1
 - <<: *linux
   id: deploy-ubuntu
   meta:
@@ -46,3 +47,4 @@
   platform_info:
     group: 'include'
     distro: 'ubuntu'
+  quick_start: -1
