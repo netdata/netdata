@@ -79,9 +79,16 @@ setup:
       name: python.d/samba.conf
     options:
       description: |
-        The following options can be defined globally: priority, penalty, autodetection_retry, update_every.
+        There are 2 sections:
 
-        Every configuration job needs a `job_name` parameter.
+        * Global variables
+        * One or more JOBS that can define multiple different instances to monitor.
+
+        The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
+
+        Additionally, the following collapsed table contains all the options that can be configured inside a JOB definition.
+
+        Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
       folding:
         title: "Config options"
         enabled: true
