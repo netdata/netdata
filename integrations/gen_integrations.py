@@ -18,6 +18,7 @@ CATEGORIES_FILE = INTEGRATIONS_PATH / 'categories.yaml'
 REPO_PATH = INTEGRATIONS_PATH.parent
 SCHEMA_PATH = INTEGRATIONS_PATH / 'schemas'
 GO_REPO_PATH = REPO_PATH / 'go.d.plugin'
+DISTROS_FILE = REPO_PATH / '.github' / 'data' / 'distros.yml'
 SINGLE_PATTERN = '*/metadata.yaml'
 MULTI_PATTERN = '*/multi_metadata.yaml'
 
@@ -28,7 +29,11 @@ COLLECTOR_SOURCES = [
     GO_REPO_PATH / 'modules',
 ]
 
-RENDER_KEYS = [
+DEPLOY_SOURCES = [
+    INTEGRATIONS_PATH / 'deploy.yaml',
+]
+
+COLLECTOR_RENDER_KEYS = [
     'alerts',
     'metrics',
     'overview',
@@ -67,6 +72,11 @@ registry = Registry(retrieve=retrieve_from_filesystem)
 
 CATEGORY_VALIDATOR = Draft7Validator(
     {'$ref': './categories.json#'},
+    registry=registry,
+)
+
+DEPLOY_VALIDATOR = Draft7Validator(
+    {'$ref': './deploy.json#'},
     registry=registry,
 )
 
@@ -173,7 +183,7 @@ def load_categories():
     return categories
 
 
-def load_metadata():
+def load_collectors():
     ret = []
 
     single, multi = get_collector_metadata_entries()
@@ -219,6 +229,29 @@ def load_metadata():
     return ret
 
 
+def load_deploy():
+    ret = []
+
+    for path in DEPLOY_SOURCES:
+        debug(f'Loading { path }.')
+        data = load_yaml(path)
+
+        if not data:
+            continue
+
+        try:
+            DEPLOY_VALIDATOR.validate(data)
+        except ValidationError:
+            warn(f'Failed to validate { path } against the schema.', path)
+            continue
+
+        for idx, item in enumerate(data):
+            item['integration_type'] = 'deploy'
+            item['_src_path'] = path
+            item['_index'] = idx
+            ret.append(item)
+
+
 def make_id(meta):
     if 'monitored_instance' in meta:
         instance_name = meta['monitored_instance']['name'].replace(' ', '_')
@@ -230,27 +263,27 @@ def make_id(meta):
     return f'{ meta["plugin_name"] }-{ meta["module_name"] }-{ instance_name }'
 
 
-def render_keys(integrations, categories):
+def render_collectors(categories, collectors):
     debug('Computing default categories.')
 
     default_cats, valid_cats = get_category_sets(categories)
-
-    debug('Filtering integration types.')
-
-    collectors = [i for i in integrations if i['integration_type'] == 'collector']
 
     debug('Generating collector IDs.')
 
     for item in collectors:
         item['id'] = make_id(item['meta'])
 
+    ids = {i['id']: False for i in collectors}
+
+    debug('Sorting collectors.')
+
     collectors.sort(key=lambda i: i['_index'])
     collectors.sort(key=lambda i: i['_src_path'])
     collectors.sort(key=lambda i: i['id'])
 
-    ids = {i['id']: False for i in collectors}
-
     tmp_collectors = []
+
+    debug('Removing duplicate collectors.')
 
     for i in collectors:
         if ids[i['id']]:
@@ -261,6 +294,8 @@ def render_keys(integrations, categories):
             ids[i['id']] = (i['_src_path'], i['_index'])
 
     collectors = tmp_collectors
+
+    del tmp_collectors
 
     idmap = {i['id']: i for i in collectors}
 
@@ -307,7 +342,7 @@ def render_keys(integrations, categories):
                     'enabled': item['setup']['configuration']['examples']['folding']['enabled']
                 }
 
-        for key in RENDER_KEYS:
+        for key in COLLECTOR_RENDER_KEYS:
             template = get_jinja_env().get_template(f'{ key }.md')
             data = template.render(entry=item, related=related)
             item[key] = data
@@ -315,7 +350,54 @@ def render_keys(integrations, categories):
         del item['_src_path']
         del item['_index']
 
-    return collectors
+    return collectors, ids
+
+
+def render_deploy(distros, categories, deploy, ids):
+    debug('Sorting deployments.')
+
+    deploy.sort(key=lambda i: i['_index'])
+    deploy.sort(key=lambda i: i['_src_path'])
+    deploy.sort(key=lambda i: i['id'])
+
+    debug('Checking deployment ids.')
+
+    tmp_deploy = []
+
+    for i in deploy:
+        if ids.get(i['id'], False):
+            first_path, first_index = ids[i['id']]
+            warn(f'Duplicate integration ID found at { i["_src_path"] } index { i["_index"] } (original definition at { first_path } index { first_index }), ignoring that integration.', i['_src_path'])
+        else:
+            tmp_deploy.append(i)
+            ids[i['id']] = (i['_src_path'], i['_index'])
+
+    deploy = tmp_deploy
+
+    template = get_jinja_env().get_template('platform_info.md')
+
+    for item in deploy:
+        debug(f'Processing { item["id"] }.')
+
+        if item['platform_info']['group']:
+            entries = [
+                {
+                    'version': i['version'],
+                    'support': i['support_tier'],
+                    'arches': i.get('packages', {'arches': []}),
+                    'notes': i['notes'],
+                } for i in distros[item['platform_info']['group']] if i['distro'] == item['platform_info']['distro']
+            ]
+        else:
+            entries = []
+
+        data = template.render(entries=entries)
+        item['platform_info'] = data
+
+        del item['_src_path']
+        del item['_index']
+
+    return deploy
 
 
 def render_integrations(categories, integrations):
@@ -328,9 +410,14 @@ def render_integrations(categories, integrations):
 
 
 def main():
-    metadata = load_metadata()
     categories = load_categories()
-    integrations = render_keys(metadata, categories)
+    distros = load_yaml(DISTROS_FILE)
+    collectors = load_collectors()
+    deploy = load_deploy()
+    collectors, ids = render_collectors(categories, collectors)
+    deploy = render_deploy(distros, categories, deploy, ids)
+
+    integrations = collectors + deploy
     render_integrations(categories, integrations)
 
 
