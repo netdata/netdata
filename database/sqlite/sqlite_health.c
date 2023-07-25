@@ -1779,7 +1779,7 @@ void sql_update_alarm_with_config_hash(RRDHOST *host, uint32_t alarm_id, uint64_
     }
 }
 
-#define SQL_GET_ALARM_ID_CHECK_ZERO_HASH "select alarm_id, health_log_id from health_log where host_id = @host_id and chart = @chart and name = @name and (config_hash_id is null or hex(config_hash_id) = '00000000000000000000000000000000')"
+#define SQL_GET_ALARM_ID_CHECK_ZERO_HASH "select alarm_id, health_log_id from health_log where host_id = @host_id and chart = @chart and name = @name and (config_hash_id is null or config_hash_id = zeroblob(16))"
 uint32_t sql_get_alarm_id_check_zero_hash(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, uuid_t *config_hash_id)
 {
     int rc = 0;
