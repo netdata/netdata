@@ -168,8 +168,7 @@
     group: 'include'
     distro: 'opensuse'
   quick_start: -1
--
-  id: deploy-macos
+- id: deploy-macos
   meta:
     name: MacOS
     link: ''
@@ -185,21 +184,19 @@
       commands:
         - channel: nightly
           command: >
-            curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh 
+            curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
             --nightly-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
         - channel: stable
           command: >
-            curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh 
+            curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
             --stable-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
-  additional_info: &ref_containers >
-    Did you know you can also deploy Netdata on your OS using {% goToCategory categoryId="deploy.docker-kubernetes" %}Kubernetes{% /goToCategory %} or {% goToCategory categoryId="deploy.docker-kubernetes" %}Docker{% /goToCategory %}?
+  additional_info: *ref_containers
   related_resources: {}
   platform_info:
     group: 'include'
     distro: 'macos'
   quick_start: 5
--
-  id: deploy-docker
+- id: deploy-docker
   meta:
     name: Docker
     link: ''
@@ -290,9 +287,9 @@
                   - /etc/os-release:/host/etc/os-release:ro
                   - /var/run/docker.sock:/var/run/docker.sock:ro
                 environment:
-            - NETDATA_CLAIM_TOKEN={% claim_token %}
-            - NETDATA_CLAIM_URL={% claim_url %}
-            - NETDATA_CLAIM_ROOMS=  
+                  - NETDATA_CLAIM_TOKEN={% claim_token %}
+                  - NETDATA_CLAIM_URL={% claim_url %}
+                  - NETDATA_CLAIM_ROOMS=
             volumes:
               netdataconfig:
               netdatalib:
@@ -323,9 +320,9 @@
                   - /etc/os-release:/host/etc/os-release:ro
                   - /var/run/docker.sock:/var/run/docker.sock:ro
                 environment:
-            - NETDATA_CLAIM_TOKEN={% claim_token %}
-            - NETDATA_CLAIM_URL={% claim_url %}
-            - NETDATA_CLAIM_ROOMS=  
+                  - NETDATA_CLAIM_TOKEN={% claim_token %}
+                  - NETDATA_CLAIM_URL={% claim_url %}
+                  - NETDATA_CLAIM_ROOMS=
             volumes:
               netdataconfig:
               netdatalib:
@@ -335,81 +332,78 @@
         - channel: nightly
           command: |
             version: '3'
-              services:
-                netdata:
-                  image: netdata/netdata:edge
-                  container_name: netdata
-                  ports:
-                    - 19999:19999
-                  restart: unless-stopped
-                  cap_add:
-                    - SYS_PTRACE
-                  security_opt:
-                    - apparmor:unconfined
-                  volumes:
-                    - netdataconfig:/etc/netdata
-                    - netdatalib:/var/lib/netdata
-                    - netdatacache:/var/cache/netdata
-                    - /etc/passwd:/host/etc/passwd:ro
-                    - /etc/group:/host/etc/group:ro
-                    - /proc:/host/proc:ro
-                    - /sys:/host/sys:ro
-                    - /etc/os-release:/host/etc/os-release:ro
-                    - /etc/hostname:/etc/hostname:ro
-                  environment:
-            - NETDATA_CLAIM_TOKEN={% claim_token %}
-            - NETDATA_CLAIM_URL={% claim_url %}
-            - NETDATA_CLAIM_ROOMS=
-                  deploy:
-                    mode: global
-              
-              volumes:
-                netdataconfig:
-                netdatalib:
-                netdatacache:
+            services:
+              netdata:
+                image: netdata/netdata:edge
+                container_name: netdata
+                ports:
+                  - 19999:19999
+                restart: unless-stopped
+                cap_add:
+                  - SYS_PTRACE
+                security_opt:
+                  - apparmor:unconfined
+                volumes:
+                  - netdataconfig:/etc/netdata
+                  - netdatalib:/var/lib/netdata
+                  - netdatacache:/var/cache/netdata
+                  - /etc/passwd:/host/etc/passwd:ro
+                  - /etc/group:/host/etc/group:ro
+                  - /proc:/host/proc:ro
+                  - /sys:/host/sys:ro
+                  - /etc/os-release:/host/etc/os-release:ro
+                  - /etc/hostname:/etc/hostname:ro
+                environment:
+                  - NETDATA_CLAIM_TOKEN={% claim_token %}
+                  - NETDATA_CLAIM_URL={% claim_url %}
+                  - NETDATA_CLAIM_ROOMS=
+                deploy:
+                  mode: global
+            volumes:
+              netdataconfig:
+              netdatalib:
+              netdatacache:
         - channel: stable
           command: |
             version: '3'
-              services:
-                netdata:
-                  image: netdata/netdata:stable
-                  container_name: netdata
-                  ports:
-                    - 19999:19999
-                  restart: unless-stopped
-                  cap_add:
-                    - SYS_PTRACE
-                  security_opt:
-                    - apparmor:unconfined
-                  volumes:
-                    - netdataconfig:/etc/netdata
-                    - netdatalib:/var/lib/netdata
-                    - netdatacache:/var/cache/netdata
-                    - /etc/passwd:/host/etc/passwd:ro
-                    - /etc/group:/host/etc/group:ro
-                    - /proc:/host/proc:ro
-                    - /sys:/host/sys:ro
-                    - /etc/os-release:/host/etc/os-release:ro
-                    - /etc/hostname:/etc/hostname:ro
-                  environment:
-            - NETDATA_CLAIM_TOKEN={% claim_token %}
-            - NETDATA_CLAIM_URL={% claim_url %}
-            - NETDATA_CLAIM_ROOMS=
-                  deploy:
-                    mode: global
-              
-              volumes:
-                netdataconfig:
-                netdatalib:
-                netdatacache:
+            services:
+              netdata:
+                image: netdata/netdata:stable
+                container_name: netdata
+                ports:
+                  - 19999:19999
+                restart: unless-stopped
+                cap_add:
+                  - SYS_PTRACE
+                security_opt:
+                  - apparmor:unconfined
+                volumes:
+                  - netdataconfig:/etc/netdata
+                  - netdatalib:/var/lib/netdata
+                  - netdatacache:/var/cache/netdata
+                  - /etc/passwd:/host/etc/passwd:ro
+                  - /etc/group:/host/etc/group:ro
+                  - /proc:/host/proc:ro
+                  - /sys:/host/sys:ro
+                  - /etc/os-release:/host/etc/os-release:ro
+                  - /etc/hostname:/etc/hostname:ro
+                environment:
+                  - NETDATA_CLAIM_TOKEN={% claim_token %}
+                  - NETDATA_CLAIM_URL={% claim_url %}
+                  - NETDATA_CLAIM_ROOMS=
+                deploy:
+                  mode: global
+            volumes:
+              netdataconfig:
+              netdatalib:
+              netdatacache:
   additional_info: ''
   related_resources: {}
   platform_info:
     group: 'no_include'
     distro: 'docker'
   quick_start: 3
--
-  id: deploy-kubernetes
+- id: deploy-kubernetes
   meta:
     name: Kubernetes
     link: ''
@@ -448,48 +442,47 @@
           command: |
             image:
               tag: latest
-              
+
             restarter:
               enabled: true
-              
+
             parent:
               claiming:
                 enabled: true
                 token: {% claim_token %}
-                rooms: 
-              
+                rooms:
+
             child:
               claiming:
                 enabled: true
                 token: {% claim_token %}
-                rooms: 
+                rooms:
         - channel: stable
           command: |
             image:
               tag: stable
-              
+
             restarter:
               enabled: true
-              
+
             parent:
               claiming:
                 enabled: true
                 token: {% claim_token %}
-                rooms: 
-              
+                rooms:
+
             child:
               claiming:
                 enabled: true
                 token: {% claim_token %}
-                rooms: 
+                rooms:
   additional_info: ''
   related_resources: {}
   platform_info:
     group: ''
     distro: ''
   quick_start: 4
--
-  id: deploy-windows
+- id: deploy-windows
   meta:
     name: Windows
     link: ''
