@@ -9,6 +9,8 @@ learn_rel_path: "Integrations/Monitor/Devices"
 
 # Nvidia GPU collector
 
+> **Note** This python collector has been [depricated since v1.41.0](https://github.com/netdata/netdata/releases/tag/v1.41.0#v1410-deprecation-notice) and replaced by the [Go based nvidia_smi collector](https://github.com/netdata/go.d.plugin/tree/master/modules/nvidia_smi).
+
 Monitors performance metrics (memory usage, fan speed, pcie bandwidth utilization, temperature, etc.) using `nvidia-smi` cli tool.
 
 ## Requirements and Notes
