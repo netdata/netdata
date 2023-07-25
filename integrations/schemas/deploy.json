@@ -5,7 +5,7 @@
   "items": {
     "type": "object",
     "description": "Individual entries for deployment information.",
-    "properties" :{
+    "properties": {
       "id": {
         "type": "string",
         "description": "A unique ID for this integration."
