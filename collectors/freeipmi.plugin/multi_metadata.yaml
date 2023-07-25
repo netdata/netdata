@@ -48,13 +48,17 @@ modules:
         file:
           name: "netdata.conf"
           section_name: '[plugin:freeipmi]'
-          description: ""
+          description: "This is netdata main configuration file"
         options:
-          description: ""
+          description: "This tool receives command line options that are visible when user run: ./usr/libexec/netdata/plugins.d/freeipmi.plugin --help"
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list: |
+            - name: command options
+              description: Variable used to pass arguments for the plugin.
+              default_value: 1
+              required: false
         examples:
           folding:
             enabled: true
@@ -79,11 +83,11 @@ modules:
           description: ""
           labels:
             - name: sensor
-              description: TBD
+              description: The sensor name
             - name: type
-              description: TBD
+              description: One of 45 recognized sensor types (Battery, Voltage...)
             - name: component
-              description: TBD
+              description: One of 25 recognized components (Processor, Peripheral).
           metrics:
             - name: ipmi.sel
               description: IPMI Events
