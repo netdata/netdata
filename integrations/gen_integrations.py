@@ -21,7 +21,7 @@ GO_REPO_PATH = REPO_PATH / 'go.d.plugin'
 SINGLE_PATTERN = '*/metadata.yaml'
 MULTI_PATTERN = '*/multi_metadata.yaml'
 
-SOURCES = [
+COLLECTOR_SOURCES = [
     REPO_PATH / 'collectors',
     REPO_PATH / 'collectors' / 'charts.d.plugin',
     REPO_PATH / 'collectors' / 'python.d.plugin',
@@ -119,11 +119,11 @@ def get_category_sets(categories):
     return (default, valid)
 
 
-def get_metadata_entries():
+def get_collector_metadata_entries():
     single = []
     multi = []
 
-    for d in SOURCES:
+    for d in COLLECTOR_SOURCES:
         if d.exists() and d.is_dir():
             single.extend(d.glob(SINGLE_PATTERN))
             multi.extend(d.glob(MULTI_PATTERN))
@@ -156,7 +156,7 @@ def load_yaml(src):
 def load_metadata():
     ret = []
 
-    single, multi = get_metadata_entries()
+    single, multi = get_collector_metadata_entries()
 
     for path in single:
         debug(f'Loading { path }.')
@@ -171,6 +171,7 @@ def load_metadata():
             warn(f'Failed to validate { path } against the schema.', path)
             continue
 
+        data['integration_type'] = 'collector'
         data['_src_path'] = path
         data['_index'] = 0
         ret.append(data)
@@ -190,6 +191,7 @@ def load_metadata():
 
         for idx, item in enumerate(data['modules']):
             item['meta']['plugin_name'] = data['plugin_name']
+            data['integration_type'] = 'collector'
             item['_src_path'] = path
             item['_index'] = idx
             ret.append(item)
@@ -213,37 +215,39 @@ def render_keys(integrations, categories):
 
     default_cats, valid_cats = get_category_sets(categories)
 
-    debug('Generating integration IDs.')
+    collectors = [i for i in integrations if i['type'] == 'collector']
 
-    for item in integrations:
+    debug('Generating collector IDs.')
+
+    for item in collectors:
         item['id'] = make_id(item['meta'])
 
-    integrations.sort(key=lambda i: i['_index'])
-    integrations.sort(key=lambda i: i['_src_path'])
-    integrations.sort(key=lambda i: i['id'])
+    collectors.sort(key=lambda i: i['_index'])
+    collectors.sort(key=lambda i: i['_src_path'])
+    collectors.sort(key=lambda i: i['id'])
 
-    ids = {i['id']: False for i in integrations}
+    ids = {i['id']: False for i in collectors}
 
-    tmp_integrations = []
+    tmp_collectors = []
 
-    for i in integrations:
+    for i in collectors:
         if ids[i['id']]:
             first_path, first_index = ids[i['id']]
             warn(f'Duplicate integration ID found at { i["_src_path"] } index { i["_index"] } (original definition at { first_path } index { first_index }), ignoring that integration.', i['_src_path'])
         else:
-            tmp_integrations.append(i)
+            tmp_collectors.append(i)
             ids[i['id']] = (i['_src_path'], i['_index'])
 
-    integrations = tmp_integrations
+    collectors = tmp_collectors
 
-    idmap = {i['id']: i for i in integrations}
+    idmap = {i['id']: i for i in collectors}
 
-    for item in integrations:
+    for item in collectors:
         debug(f'Processing { item["id"] }.')
 
         related = []
 
-        for res in item['meta']['related_resources']['integrations']['list']:
+        for res in item['meta']['related_resources']['collectors']['list']:
             res_id = make_id(res)
 
             if res_id not in idmap.keys():
@@ -289,7 +293,7 @@ def render_keys(integrations, categories):
         del item['_src_path']
         del item['_index']
 
-    return integrations
+    return collectors
 
 
 def render_integrations(categories, integrations):
