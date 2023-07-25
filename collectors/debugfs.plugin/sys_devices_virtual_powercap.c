@@ -22,7 +22,7 @@ static bool get_measurement(const char *path, unsigned long long *energy_uj) {
     return read_single_number_file(path, energy_uj) == 0;
 }
 
-static struct zone_t *get_zone(const char *control_type, struct zone_t *parent, const char *dirname) {
+static struct zone_t *get_rapl_zone(const char *control_type __maybe_unused, struct zone_t *parent __maybe_unused, const char *dirname) {
     char temp[FILENAME_MAX + 1];
     snprintfz(temp, FILENAME_MAX, "%s/%s", dirname, "name");
 
@@ -61,7 +61,10 @@ static struct zone_t *get_zone(const char *control_type, struct zone_t *parent, 
     return zone;
 }
 
-static struct zone_t *look_for_rapl_zones(const char *control_type, struct zone_t *parent, const char *path) {
+static struct zone_t *look_for_rapl_zones(const char *control_type, struct zone_t *parent, const char *path, int depth) {
+    if(depth > 2)
+        return NULL;
+
     struct zone_t *base = NULL;
 
     DIR *dir = opendir(path);
@@ -79,12 +82,12 @@ static struct zone_t *look_for_rapl_zones(const char *control_type, struct zone_
         char zone_path[FILENAME_MAX + 1];
         snprintfz(zone_path, FILENAME_MAX, "%s/%s", path, de->d_name);
 
-        struct zone_t *zone = get_zone(control_type, parent, zone_path);
+        struct zone_t *zone = get_rapl_zone(control_type, parent, zone_path);
         if(zone) {
             DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(base, zone, prev, next);
 
             if(!parent)
-                zone->subzones = look_for_rapl_zones(control_type, zone, zone_path);
+                zone->subzones = look_for_rapl_zones(control_type, zone, zone_path, depth + 1);
         }
     }
 
@@ -107,11 +110,14 @@ static struct zone_t *get_main_rapl_zones(void) {
         if (de->d_type != DT_DIR || de->d_name[0] == '.')
             continue;
 
+        if(strncmp(de->d_name, "intel-rapl", 10) != 0)
+            continue;
+
         char control_type_path[FILENAME_MAX + 1];
         snprintfz(control_type_path, FILENAME_MAX, "%s/%s", dirname, de->d_name);
 
         collector_info("Looking at control type \"%s\"", de->d_name);
-        struct zone_t *zone = look_for_rapl_zones(de->d_name, NULL, control_type_path);
+        struct zone_t *zone = look_for_rapl_zones(de->d_name, NULL, control_type_path, 0);
         if(zone)
             DOUBLE_LINKED_LIST_APPEND_LIST_UNSAFE(base, zone, prev, next);
     }
@@ -120,7 +126,7 @@ static struct zone_t *get_main_rapl_zones(void) {
     return base;
 }
 
-int do_sys_devices_virtual_powercap(int update_every, const char *name) {
+int do_sys_devices_virtual_powercap(int update_every, const char *name __maybe_unused) {
 
     if (unlikely(!rapl_zones)) {
         rapl_zones = get_main_rapl_zones();
