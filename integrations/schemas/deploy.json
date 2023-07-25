@@ -5,7 +5,7 @@
   "items": {
     "type": "object",
     "description": "Individual entries for deployment information.",
-    "properties" :{
+    "properties": {
       "id": {
         "type": "string",
         "description": "A unique ID for this integration."
@@ -53,12 +53,12 @@
                   "command"
                 ]
               }
-            },
-            "required": [
-              "method",
-              "commands"
-            ]
-          }
+            }
+          },
+          "required": [
+            "method",
+            "commands"
+          ]
         }
       },
       "additional_info": {
