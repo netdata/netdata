@@ -251,6 +251,8 @@ def load_deploy():
             item['_index'] = idx
             ret.append(item)
 
+    return ret
+
 
 def make_id(meta):
     if 'monitored_instance' in meta:
@@ -383,7 +385,7 @@ def render_deploy(distros, categories, deploy, ids):
             entries = [
                 {
                     'version': i['version'],
-                    'support': i['support_tier'],
+                    'support': i['support_type'],
                     'arches': i.get('packages', {'arches': []}),
                     'notes': i['notes'],
                 } for i in distros[item['platform_info']['group']] if i['distro'] == item['platform_info']['distro']
