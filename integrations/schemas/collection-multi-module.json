@@ -9,7 +9,7 @@
       "type": "array",
       "description": "A list of single module templates",
       "items": {
-        "$ref": "./single-module.json"
+        "$ref": "./collection-single-module.json"
       }
     }
   },

@@ -1,0 +1,48 @@
+- &linux
+  id: deploy-linux-generic
+  meta: &linux_meta
+    name: Linux
+    link: ''
+    categories:
+      - deploy.operating-systems
+    icon_filename: ''
+  keywords:
+    - linux
+  description: 'Run the following command on your node to install and claim Netdata:"r'
+  methods:
+    - method: wget
+      commands:
+        - channel: nightly
+          command: >
+            wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
+            --nightly-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+        - channel: stable
+          command: >
+            wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
+            --stable-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+    - method: curl
+      commands:
+        - channel: nightly
+          command: >
+            curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
+            --nightly-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+        - channel: stable
+          command: >
+            curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
+            --stable-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+  additional_info: &ref_containers >
+    Did you know you can also deploy Netdata on your OS using Kubernetes or Docker?
+  related_resources: {}
+  platform_info:
+    group: ''
+    distro: ''
+- <<: *linux
+  id: deploy-ubuntu
+  meta:
+    <<: *linux_meta
+    name: Ubuntu
+    link: https://ubuntu.com/
+    icon: ''
+  platform_info:
+    group: 'include'
+    distro: 'ubuntu'
