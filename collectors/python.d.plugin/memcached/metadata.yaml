@@ -5,7 +5,7 @@ meta:
   module_name: memcached
   monitored_instance:
     name: Memcached
-    link: ""
+    link: https://memcached.org/
     categories:
       - data-collection.database-servers
     icon_filename: "memcached.png"
@@ -14,7 +14,11 @@ meta:
       list: []
   info_provided_to_referring_integrations:
     description: ""
-  keywords: []
+  keywords:
+    - memcached
+    - memcache
+    - cache
+    - database
   most_popular: false
 overview:
   data_collection:
