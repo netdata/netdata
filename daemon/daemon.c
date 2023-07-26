@@ -4,11 +4,11 @@
 #include <sched.h>
 
 char pidfile[FILENAME_MAX + 1] = "";
-char claimingdirectory[FILENAME_MAX + 1];
-char exepath[FILENAME_MAX + 1];
+char claiming_directory[FILENAME_MAX + 1];
+char netdata_exe_path[FILENAME_MAX + 1];
+char netdata_exe_file[FILENAME_MAX + 1];
 
-void get_netdata_execution_path(void)
-{
+void get_netdata_execution_path(void) {
     int ret;
     size_t exepath_size = 0;
     struct passwd *passwd = NULL;
@@ -17,14 +17,18 @@ void get_netdata_execution_path(void)
     passwd = getpwuid(getuid());
     user = (passwd && passwd->pw_name) ? passwd->pw_name : "";
 
-    exepath_size = sizeof(exepath) - 1;
-    ret = uv_exepath(exepath, &exepath_size);
+    exepath_size = sizeof(netdata_exe_file) - 1;
+    ret = uv_exepath(netdata_exe_file, &exepath_size);
     if (0 != ret) {
-        netdata_log_error("uv_exepath(\"%s\", %u) (user: %s) failed (%s).", exepath, (unsigned)exepath_size, user,
-              uv_strerror(ret));
+        netdata_log_error("uv_exepath(\"%s\", %u) (user: %s) failed (%s).", netdata_exe_file, (unsigned)exepath_size, user,
+                          uv_strerror(ret));
         fatal("Cannot start netdata without getting execution path.");
     }
-    exepath[exepath_size] = '\0';
+
+    netdata_exe_file[exepath_size] = '\0';
+
+    strcpy(netdata_exe_path, netdata_exe_file);
+    dirname(netdata_exe_path);
 }
 
 static void chown_open_file(int fd, uid_t uid, gid_t gid) {
@@ -99,7 +103,7 @@ void prepare_required_directories(uid_t uid, gid_t gid) {
     change_dir_ownership(netdata_configured_varlib_dir, uid, gid, false);
     change_dir_ownership(netdata_configured_lock_dir, uid, gid, false);
     change_dir_ownership(netdata_configured_log_dir, uid, gid, false);
-    change_dir_ownership(claimingdirectory, uid, gid, false);
+    change_dir_ownership(claiming_directory, uid, gid, false);
 
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/registry", netdata_configured_varlib_dir);
@@ -516,7 +520,7 @@ int become_daemon(int dont_fork, const char *user)
     sched_setscheduler_set();
 
     // Set claiming directory based on user config directory with correct ownership
-    snprintfz(claimingdirectory, FILENAME_MAX, "%s/cloud.d", netdata_configured_varlib_dir);
+    snprintfz(claiming_directory, FILENAME_MAX, "%s/cloud.d", netdata_configured_varlib_dir);
 
     if(user && *user) {
         if(become_user(user, pidfd) != 0) {
