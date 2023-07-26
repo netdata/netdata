@@ -60,10 +60,10 @@ setup:
           
           5. Run as a root 'rndc stats' to dump (BIND will create named.stats in new directory)
                     
-          To allow netdata to run 'rndc stats' change '/etc/bind/rndc.key' group to netdata:
+          To allow Netdata to run 'rndc stats' change '/etc/bind/rndc.key' group to netdata:
           `chown :netdata rndc.key`
           
-          The last BUT NOT least is to create bind-rndc.conf in logrotate.d/:
+          Last, BUT NOT least, is to create bind-rndc.conf in logrotate.d/:
           ```
           /var/log/bind/named.stats {
             
