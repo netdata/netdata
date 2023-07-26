@@ -1,9 +1,10 @@
+# yamllint disable rule:line-length
 meta:
   plugin_name: tc.plugin
   module_name: tc.plugin
   monitored_instance:
     name: tc
-    link: ""
+    link: "https://wiki.linuxfoundation.org/networking/iproute2"
     categories:
     - data-collection.networking-stack-and-network-interfaces
     icon_filename: "freeradius.png"
@@ -17,9 +18,10 @@ meta:
 overview:
   data_collection:
     metrics_description: "Examine tc metrics to gain insights into Linux traffic control operations. Study packet flow rates, queue lengths, and drop rates to optimize network traffic flow."
-    method_description: ""
+    method_description: "The plugin uses `tc` command to collect information about Traffic control."
   supported_platforms:
-    include: []
+    include:
+      - Linux
     exclude: []
   multi_instance: true
   additional_permissions:
