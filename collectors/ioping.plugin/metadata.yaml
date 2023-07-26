@@ -3,10 +3,10 @@ meta:
   module_name: ioping.plugin
   monitored_instance:
     name: IOPing
-    link: 'https://github.com/koct9i/ioping'
+    link: "https://github.com/koct9i/ioping"
     categories:
     - data-collection.synthetic-checks
-    icon_filename: 'syslog.png'
+    icon_filename: "syslog.png"
   related_resources:
     integrations:
       list: []
@@ -42,11 +42,11 @@ setup:
   configuration:
     file:
       name: "ioping.conf"
-      description: 'File with options to specify hardware to monitor and arguments for ioping command.'
+      description: "File with options to specify hardware to monitor and arguments for ioping command."
     options:
       description: ""
       folding:
-        title: 'Config options'
+        title: "Config options"
         enabled: true
       list:
         - name: update_every
@@ -68,7 +68,7 @@ setup:
     examples:
       folding:
         enabled: true
-        title: 'Config'
+        title: "Config"
       list:
         - name: Basic Configuration
           description: This Examplle has the minimum configuration necessary to have plugin running.
