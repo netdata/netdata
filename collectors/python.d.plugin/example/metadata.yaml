@@ -123,9 +123,9 @@ metrics:
   description: ""
   availability: []
   scopes:
-  - name: global
-    description: |
-      These metrics refer to the entire monitored application.
+    - name: global
+      description: |
+        These metrics refer to the entire monitored application.
     labels: []
     metrics:
     - name: example.random
