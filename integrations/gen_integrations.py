@@ -11,6 +11,9 @@ from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT7
 from ruamel.yaml import YAML, YAMLError
 
+AGENT_REPO = 'netdata/netdata'
+GO_REPO = 'netdata/go.d.plugin'
+
 INTEGRATIONS_PATH = Path(__file__).parent
 TEMPLATE_PATH = INTEGRATIONS_PATH / 'templates'
 OUTPUT_PATH = INTEGRATIONS_PATH / 'integrations.js'
@@ -23,18 +26,18 @@ SINGLE_PATTERN = '*/metadata.yaml'
 MULTI_PATTERN = '*/multi_metadata.yaml'
 
 COLLECTOR_SOURCES = [
-    REPO_PATH / 'collectors',
-    REPO_PATH / 'collectors' / 'charts.d.plugin',
-    REPO_PATH / 'collectors' / 'python.d.plugin',
-    GO_REPO_PATH / 'modules',
+    (AGENT_REPO, REPO_PATH / 'collectors'),
+    (AGENT_REPO, REPO_PATH / 'collectors' / 'charts.d.plugin'),
+    (AGENT_REPO, REPO_PATH / 'collectors' / 'python.d.plugin'),
+    (GO_REPO, GO_REPO_PATH / 'modules'),
 ]
 
 DEPLOY_SOURCES = [
-    INTEGRATIONS_PATH / 'deploy.yaml',
+    (AGENT_REPO, INTEGRATIONS_PATH / 'deploy.yaml'),
 ]
 
 EXPORTER_SOURCES = [
-    REPO_PATH / 'exporters'
+    (AGENT_REPO, REPO_PATH / 'exporters'),
 ]
 
 COLLECTOR_RENDER_KEYS = [
@@ -151,10 +154,13 @@ def get_collector_metadata_entries():
     single = []
     multi = []
 
-    for d in COLLECTOR_SOURCES:
+    for r, d in COLLECTOR_SOURCES:
         if d.exists() and d.is_dir():
-            single.extend(d.glob(SINGLE_PATTERN))
-            multi.extend(d.glob(MULTI_PATTERN))
+            for item in d.glob(SINGLE_PATTERN):
+                single.append((r, item))
+
+            for item in d.glob(MULTI_PATTERN):
+                multi.append((r, item))
 
     return (single, multi)
 
@@ -201,7 +207,7 @@ def load_collectors():
 
     single, multi = get_collector_metadata_entries()
 
-    for path in single:
+    for repo, path in single:
         debug(f'Loading { path }.')
         data = load_yaml(path)
 
@@ -216,10 +222,11 @@ def load_collectors():
 
         data['integration_type'] = 'collector'
         data['_src_path'] = path
+        data['_repo'] = repo
         data['_index'] = 0
         ret.append(data)
 
-    for path in multi:
+    for repo, path in multi:
         debug(f'Loading { path }.')
         data = load_yaml(path)
 
@@ -236,6 +243,7 @@ def load_collectors():
             item['meta']['plugin_name'] = data['plugin_name']
             item['integration_type'] = 'collector'
             item['_src_path'] = path
+            item['_repo'] = repo
             item['_index'] = idx
             ret.append(item)
 
@@ -245,7 +253,7 @@ def load_collectors():
 def load_deploy():
     ret = []
 
-    for path in DEPLOY_SOURCES:
+    for repo, path in DEPLOY_SOURCES:
         debug(f'Loading { path }.')
         data = load_yaml(path)
 
@@ -261,6 +269,7 @@ def load_deploy():
         for idx, item in enumerate(data):
             item['integration_type'] = 'deploy'
             item['_src_path'] = path
+            item['_repo'] = repo
             item['_index'] = idx
             ret.append(item)
 
@@ -270,7 +279,7 @@ def load_deploy():
 def load_exporters():
     ret = []
 
-    for section in EXPORTER_SOURCES:
+    for repo, section in EXPORTER_SOURCES:
         for path in section.glob(SINGLE_PATTERN):
             debug(f'Loading { path }.')
             data = load_yaml(path)
@@ -286,6 +295,7 @@ def load_exporters():
 
             data['integration_type'] = 'collector'
             data['_src_path'] = path
+            data['_repo'] = repo
             data['_index'] = 0
             ret.append(data)
 
@@ -301,6 +311,15 @@ def make_id(meta):
         instance_name = '000_unknown'
 
     return f'{ meta["plugin_name"] }-{ meta["module_name"] }-{ instance_name }'
+
+
+def make_edit_link(item):
+    if item['_repo'] == 'netdata/go.d.repo':
+        item_path = item['_src_path'].relative_to(GO_REPO_PATH)
+    else:
+        item_path = item['_src_path'].relative_to(REPO_PATH)
+
+    return f'https://github.com/{ item["_repo"] }/blob/master/{ item_path }'
 
 
 def render_collectors(categories, collectors, ids):
@@ -385,7 +404,10 @@ def render_collectors(categories, collectors, ids):
             data = template.render(entry=item, related=related)
             item[key] = data
 
+        item['edit_link'] = make_edit_link(item)
+
         del item['_src_path']
+        del item['_repo']
         del item['_index']
 
     return collectors, ids
@@ -430,9 +452,12 @@ def render_deploy(distros, categories, deploy, ids):
             entries = []
 
         data = template.render(entries=entries)
+
         item['platform_info'] = data
+        item['edit_link'] = make_edit_link(item)
 
         del item['_src_path']
+        del item['_repo']
         del item['_index']
 
     return deploy, ids
@@ -465,7 +490,10 @@ def render_exporters(categories, exporters, ids):
             data = template.render(entry=item)
             item[key] = data
 
+        item['edit_link'] = make_edit_link(item)
+
         del item['_src_path']
+        del item['_repo']
         del item['_index']
 
     return exporters, ids
