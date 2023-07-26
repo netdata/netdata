@@ -19,17 +19,17 @@ If the claiming process fails, the node will not appear at all in Netdata Cloud.
 
 First ensure that you:
 - Use the newest possible stable or nightly version of the agent (at least v1.32).
-- Your node can successfully issue an HTTPS request to https://api.netdata.cloud 
+- Your node can successfully issue an HTTPS request to https://app.netdata.cloud 
 
 Other possible causes differ between kickstart installations and Docker installations. 
 
 ### Verify your node can access Netdata Cloud
 
-If you run either `curl` or `wget` to do an HTTPS request to https://api.netdata.cloud, you should get 
+If you run either `curl` or `wget` to do an HTTPS request to https://app.netdata.cloud, you should get 
 back a 404 response. If you do not, check your network connectivity, domain resolution,  
 and firewall settings for outbound connections. 
 
-If your firewall is configured to completely prevent outbound connections, you need to whitelist `api.netdata.cloud` and `mqtt.netdata.cloud`.  If you can't whitelist domains in your firewall, you can whitelist the IPs that the hostnames resolve to, but keep in mind that they can change without any notice.
+If your firewall is configured to completely prevent outbound connections, you need to whitelist `app.netdata.cloud` and `mqtt.netdata.cloud`.  If you can't whitelist domains in your firewall, you can whitelist the IPs that the hostnames resolve to, but keep in mind that they can change without any notice.
 
 If you use an outbound proxy, you need to [take some extra steps]( https://github.com/netdata/netdata/blob/master/claim/README.md#connect-through-a-proxy).
 
@@ -100,7 +100,7 @@ process, but not have enough time to establish the ACLK connection.
 
 ### Verify that your firewall allows websockets
 
-The agent initiates an SSL connection to `api.netdata.cloud` and then upgrades that connection to use secure 
+The agent initiates an SSL connection to `app.netdata.cloud` and then upgrades that connection to use secure 
 websockets. Some firewalls completely prevent the use of websockets, even for outbound connections.
 
 ## Previously connected agent that can no longer connect
@@ -110,7 +110,7 @@ that it is currently not connected.
 
 ### Verify that network connectivity is still possible
 
-Verify that you can still issue HTTPS requests to api.netdata.cloud and that no firewall or proxy changes were made. 
+Verify that you can still issue HTTPS requests to app.netdata.cloud and that no firewall or proxy changes were made. 
 
 ### Verify that the claiming info is persisted
 
@@ -124,7 +124,7 @@ work this way, as we have unique node identification information under `/var/lib
 
 ### Verify that your IP is not blocked by Netdata Cloud
 
-Most of the nodes change IPs dynamically. It is possible that your current IP has been restricted from accessing `api.netdata.cloud` due to security concerns, usually because it was spamming Netdata Coud with too many
+Most of the nodes change IPs dynamically. It is possible that your current IP has been restricted from accessing `app.netdata.cloud` due to security concerns, usually because it was spamming Netdata Coud with too many
 failed requests (old versions of the agent).
 
 To verify this:
@@ -135,7 +135,7 @@ To verify this:
     sudo netdatacli aclk-state | grep "Banned By Cloud"
     ```
 
-    The output will contain a line indicating if the IP is banned from `api.netdata.cloud`:
+    The output will contain a line indicating if the IP is banned from `app.netdata.cloud`:
 
     ```bash
     Banned By Cloud: yes
