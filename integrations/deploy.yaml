@@ -43,7 +43,7 @@
     <<: *linux_meta
     name: Ubuntu
     link: https://ubuntu.com/
-    icon: 'ubuntu.png'
+    icon_filename: 'ubuntu.png'
   platform_info:
     group: 'include'
     distro: 'ubuntu'
@@ -54,7 +54,7 @@
     <<: *linux_meta
     name: Debian
     link: https://www.debian.org/
-    icon: 'debian.png'
+    icon_filename: 'debian.png'
   platform_info:
     group: 'include'
     distro: 'debian'
@@ -65,7 +65,7 @@
     <<: *linux_meta
     name: Fedora
     link: https://www.fedoraproject.org/
-    icon: 'fedora.png'
+    icon_filename: 'fedora.png'
   platform_info:
     group: 'include'
     distro: 'fedora'
@@ -76,7 +76,7 @@
     <<: *linux_meta
     name: Red Hat Enterprise Linux
     link: https://www.redhat.com/en/technologies/linux-platforms/enterprise-linux
-    icon: 'rhel.png'
+    icon_filename: 'rhel.png'
   platform_info:
     group: 'include'
     distro: 'rhel'
@@ -87,7 +87,7 @@
     <<: *linux_meta
     name: Alma Linux
     link: https://almalinux.org/
-    icon: 'alma.png'
+    icon_filename: 'alma.png'
   platform_info:
     group: 'include'
     distro: 'almalinux'
@@ -98,7 +98,7 @@
     <<: *linux_meta
     name: Alpine Linux
     link: https://www.alpinelinux.org/
-    icon: 'alpine.png'
+    icon_filename: 'alpine.png'
   platform_info:
     group: 'include'
     distro: 'alpinelinux'
@@ -109,7 +109,7 @@
     <<: *linux_meta
     name: Amazon Linux
     link: https://aws.amazon.com/amazon-linux-2/
-    icon: 'amazonlinux.png'
+    icon_filename: 'amazonlinux.png'
   platform_info:
     group: 'include'
     distro: 'amazonlinux'
@@ -120,7 +120,7 @@
     <<: *linux_meta
     name: Arch Linux
     link: https://archlinux.org/
-    icon: 'archlinux.png'
+    icon_filename: 'archlinux.png'
   platform_info:
     group: 'include'
     distro: 'archlinux'
@@ -131,7 +131,7 @@
     <<: *linux_meta
     name: CentOS
     link: https://www.centos.org/
-    icon: 'centos.png'
+    icon_filename: 'centos.png'
   platform_info:
     group: 'include'
     distro: 'centos'
@@ -142,7 +142,7 @@
     <<: *linux_meta
     name: Manjaro Linux
     link: https://manjaro.org/
-    icon: 'manjaro.png'
+    icon_filename: 'manjaro.png'
   platform_info:
     group: 'include'
     distro: 'archlinux'
@@ -153,7 +153,7 @@
     <<: *linux_meta
     name: Oracle Linux
     link: https://www.oracle.com/linux/
-    icon: 'oraclelinux.png'
+    icon_filename: 'oraclelinux.png'
   platform_info:
     group: 'include'
     distro: 'oraclelinux'
@@ -164,7 +164,7 @@
     <<: *linux_meta
     name: SUSE Linux
     link: https://www.suse.com/
-    icon: 'openSUSE.png'
+    icon_filename: 'openSUSE.png'
     group: 'include'
     distro: 'opensuse'
   quick_start: -1
