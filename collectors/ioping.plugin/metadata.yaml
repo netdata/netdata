@@ -36,11 +36,9 @@ overview:
 setup:
   prerequisites:
     list:
-      It is necessary to have the command `ioping` installed on your host. You can install the command by passing the argument `install` to the plugin:
-
-      ```bash
-      /usr/libexec/netdata/plugins.d/ioping.plugin install
-      ```
+      - title: Install ioping
+        description: |
+          You can install the command by passing the argument `install` to the plugin (`/usr/libexec/netdata/plugins.d/ioping.plugin install`).
   configuration:
     file:
       name: "ioping.conf"
