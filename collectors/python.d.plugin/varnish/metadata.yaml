@@ -25,7 +25,7 @@ overview:
   supported_platforms:
     include: []
     exclude: []
-  multi_instance: true
+  multi_instance: false
   additional_permissions:
     description: |
       `netdata` user must be a member of the `varnish` group.
