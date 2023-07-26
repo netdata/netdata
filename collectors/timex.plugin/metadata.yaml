@@ -19,7 +19,7 @@ meta:
 overview:
   data_collection:
     metrics_description: "Examine Timex metrics to gain insights into system clock operations. Study time sync status, clock drift, and adjustments to ensure accurate system timekeeping."
-    method_description: ""
+    method_description: "It uses system call adjtimex on Linux and ntp_adjtime on FreeBSD or Mac to monitor the system kernel clock synchronization state."
   supported_platforms:
     include: []
     exclude: []
@@ -38,14 +38,27 @@ setup:
     list: []
   configuration:
     file:
-      name: ""
-      description: ""
+      name: "netdata.conf"
+      section_name: "[plugin:timex]"
+      description: "The netdata main configuration file."
     options:
-      description: ""
+      description: "At least one option ('clock synchronization state', 'time offset') needs to be enable for collector to run."
       folding:
-        title: ""
+        title: "Config options"
         enabled: true
-      list: []
+      list:
+        - name: update every
+          description: Data collection frequency.
+          default_value: 1
+          required: false
+        - name: clock synchronization state
+          description: Make chart showing system clock synchronization state.
+          default_value: yes
+          required: true
+        - name: time offset
+          description: Make chart showing computed time offset between local system and reference clock
+          default_value: yes
+          required: true
     examples:
       folding:
         enabled: true
