@@ -1059,7 +1059,8 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
             w->response.data->expires = w->response.data->date + refresh;
             buffer_cacheable(w->response.data);
         }
-        else buffer_no_cacheable(w->response.data);
+        else
+            buffer_no_cacheable(w->response.data);
 
         if(!value_color) {
             switch(rc->status) {
