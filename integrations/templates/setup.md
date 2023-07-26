@@ -51,7 +51,7 @@ sudo ./edit-config [[ entry.setup.configuration.file.name ]]
 {% details summary="[[ entry.setup.configuration.options.folding.title ]]" %}
 [% endif %]
 | Name | Description | Default | Required |
-|:----:|-------------|:-------:|:--------:|
+|:----:|:-----------:|:-------:|:--------:|
 [% for item in entry.setup.configuration.options.list %]
 | [[ item.name ]] | [[ item.description ]] | [[ item.default ]] | [[ item.required ]] |
 [% endfor %]
