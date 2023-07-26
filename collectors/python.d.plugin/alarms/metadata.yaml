@@ -54,7 +54,7 @@ setup:
 
         The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
 
-        Additionally, the following table contains all the options that can be configured inside a JOB definition.
+        Additionally, the following collapsed table contains all the options that can be configured inside a JOB definition.
 
         Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
       folding:
@@ -78,12 +78,12 @@ setup:
           default_value: "line"
           required: true
         - name: alarm_contains_words
-          description: |
+          description: >
             A "," separated list of words you want to filter alarm names for. For example 'cpu,load' would filter for only alarms with "cpu" or "load" in alarm name. Default includes all.
           default_value: ""
           required: true
         - name: alarm_excludes_words
-          description: |
+          description: >
             A "," separated list of words you want to exclude based on alarm name. For example 'cpu,load' would exclude all alarms with "cpu" or "load" in alarm name. Default excludes None.
           default_value: ""
           required: true
