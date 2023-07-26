@@ -96,17 +96,21 @@ setup:
         enabled: true
         title: 'Config'
       list:
-      - name: Example config 
-        description: A typical example configuration, which is also the default.
+      - name: Example config 1
+        description: A typical example configuration
         config: |    
           localhost:
             name : 'local'
             url  : 'http://localhost:8080/manager/status?XML=true'
-
+      - name: Example config 2
+        description: A typical configuration for an ipv4 endpoints
+        config: |   
           localipv4:
             name : 'local'
             url  : 'http://127.0.0.1:8080/manager/status?XML=true'
-
+      - name: Example config 3
+        description: A typical configuration for an ipv6 endpoints
+        config: |   
           localipv6:
             name : 'local'
             url  : 'http://[::1]:8080/manager/status?XML=true'
