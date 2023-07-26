@@ -58,9 +58,11 @@ to work on these platforms with minimal user effort.
 
 | Platform                 | Version        | Official Native Packages               | Notes                                                                                                                                              |
 |--------------------------|----------------|----------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
-| Alpine Linux             | 3.17           | No                                     | The latest release of Alpine Linux is guaranteed to remain at **Core** tier due to usage for our Docker images                                     |
+| Alpine Linux             | 3.18           | No                                     | The latest release of Alpine Linux is guaranteed to remain at **Core** tier due to usage for our Docker images                                     |
 | Alma Linux               | 9.x            | x86\_64, AArch64                       | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                                                    |
 | Alma Linux               | 8.x            | x86\_64, AArch64                       | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                                                    |
+| Amazon Linux             | 2023           | x86\_64, AArch64         |                                                                                                      |
+| Amazon Linux             | 2              | x86\_64, AArch64         |                                                                                                      |
 | CentOS                   | 7.x            | x86\_64                                |                                                                                                                                                    |
 | Docker                   | 19.03 or newer | x86\_64, i386, ARMv7, AArch64, POWER8+ | See our [Docker documentation](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md) for more info on using Netdata on Docker |
 | Debian                   | 12.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
@@ -91,10 +93,10 @@ with minimal user effort.
 
 | Platform      | Version    | Official Native Packages | Notes                                                                                                |
 |---------------|------------|--------------------------|------------------------------------------------------------------------------------------------------|
+| Alpine Linux  | Edge       | No                       |                                                                                                      |
+| Alpine Linux  | 3.17       | No                       |                                                                                                      |
 | Alpine Linux  | 3.16       | No                       |                                                                                                      |
 | Alpine Linux  | 3.15       | No                       |                                                                                                      |
-| Amazon Linux  | 2023       | x86\_64, AArch64         | Scheduled for promotion to Core tier at some point after the release of v1.39.0 of the Netdata Agent |
-| Amazon Linux  | 2          | x86\_64, AArch64         | Scheduled for promotion to Core tier at some point after the release of v1.39.0 of the Netdata Agent |
 | Arch Linux    | Latest     | No                       | We officially recommend the community packages available for Arch Linux                              |
 | Manjaro Linux | Latest     | No                       | We officially recommend the community packages available for Arch Linux                              |
 | openSUSE      | Tumbleweed | x86\_64, AArch64         | Scheduled for promotion to Core tier at some point after the release of v1.41.0 of the Netdata Agent |
@@ -109,16 +111,14 @@ platforms, but may require some extra effort from users.
 
 | Platform     | Version    | Official Native Packages | Notes                                                                                                     |
 |--------------|------------|--------------------------|-----------------------------------------------------------------------------------------------------------|
-| Alpine Linux | Edge       | No                       |                                                                                                           |
 | Clear Linux  | Latest     | No                       |                                                                                                           |
 | Debian       | Sid        | No                       |                                                                                                           |
 | Fedora       | Rawhide    | No                       |                                                                                                           |
 | FreeBSD      | 13-STABLE  | No                       | Netdata is included in the FreeBSD Ports Tree, and this is the recommended installation method on FreeBSD |
-| FreeBSD      | 12-STABLE  | No                       | Netdata is included in the FreeBSD Ports Tree, and this is the recommended installation method on FreeBSD |
 | Gentoo       | Latest     | No                       |                                                                                                           |
+| macOS        | 13         | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies                         |
 | macOS        | 12         | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies                         |
 | macOS        | 11         | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies.                        |
-| macOS        | 10.15      | No                       | Requires Homebrew for dependencies.                                                                       |
 | openSUSE     | Tumbleweed | No                       |                                                                                                           |
 
 ## Third-party supported platforms

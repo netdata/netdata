@@ -69,7 +69,7 @@ When coming from the [Nodes tab](https://github.com/netdata/netdata/blob/master/
 If you want to connect a node that is running on a Linux environment, the script that will be provided to you by Netdata Cloud is the [kickstart](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#automatic-one-line-installation-script) which will install the Netdata Agent on your node, if it isn't already installed, and connect the node to Netdata Cloud. It should be similar to:
 
 ```bash
-wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://api.netdata.cloud
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
 ```
 
 The script should return `Agent was successfully claimed.`. If the connecting to Netdata Cloud process returns errors, or if you don't see
@@ -98,7 +98,7 @@ The default user is `netdata`. Yours may be different, so pay attention to the o
 and run the script.
 
 ```bash
-wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://api.netdata.cloud
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
 ```
 
 ### Connect an agent running in Docker
@@ -209,7 +209,7 @@ docker run -d --name=netdata \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
   -e NETDATA_CLAIM_TOKEN=TOKEN \
-  -e NETDATA_CLAIM_URL="https://api.netdata.cloud" \
+  -e NETDATA_CLAIM_URL="https://app.netdata.cloud" \
   -e NETDATA_CLAIM_ROOMS=ROOM1,ROOM2 \
   -e NETDATA_CLAIM_PROXY=PROXY \
  netdata/netdata
@@ -254,7 +254,7 @@ services:
     - /etc/os-release:/host/etc/os-release:ro
   environment:
     - NETDATA_CLAIM_TOKEN=TOKEN
-    - NETDATA_CLAIM_URL="https://api.netdata.cloud"
+    - NETDATA_CLAIM_URL="https://app.netdata.cloud"
     - NETDATA_CLAIM_ROOMS=ROOM1,ROOM2
 
 volumes:
@@ -275,7 +275,7 @@ Connect a _running Netdata Agent container_, where you don't want to recreate th
 `netdata` with the name of your running container:
 
 ```bash
-docker exec -it netdata netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://api.netdata.cloud
+docker exec -it netdata netdata-claim.sh -token=TOKEN -rooms=ROOM1,ROOM2 -url=https://app.netdata.cloud
 ```
 
 The values for `ROOM1,ROOM2` can be found by by going to Netdata Cloud, clicking the **Nodes** tab, clicking **Connect Nodes**, selecting **Docker**, and copying the `rooms=` value in the command provided.
@@ -288,7 +288,7 @@ you don't see the node in your Space after 60 seconds, see the [troubleshooting 
 To connect a node that is running on a macOS environment the script that will be provided to you by Netdata Cloud is the [kickstart](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/macos.md#install-netdata-with-our-automatic-one-line-installation-script) which will install the Netdata Agent on your node, if it isn't already installed, and connect the node to Netdata Cloud. It should be similar to:
 
 ```bash
-curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh --install-prefix /usr/local/ --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://api.netdata.cloud
+curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh --install-prefix /usr/local/ --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
 ```
 
 The script should return `Agent was successfully claimed.`. If the connecting to Netdata Cloud process returns errors, or if you don't see
@@ -329,7 +329,7 @@ You can now move on to connecting. When you connect with the [kickstart](https:/
 append the same proxy setting you added to `netdata.conf`.
 
 ```bash
-wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://api.netdata.cloud --claim-proxy http://[user:pass@]host:ip
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud --claim-proxy http://[user:pass@]host:ip
 ```
 
 Hit **Enter**. The script should return `Agent was successfully claimed.`. If the connecting to Netdata Cloud process returns errors, or if
@@ -566,7 +566,7 @@ using the [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md).
 
 | setting        | default                   | info                                                                                                                                   |
 |:-------------- |:------------------------- |:-------------------------------------------------------------------------------------------------------------------------------------- |
-| cloud base url | <https://api.netdata.cloud> | The URL for the Netdata Cloud web application. You should not change this. If you want to disable Cloud, change the `enabled` setting. |
+| cloud base url | <https://app.netdata.cloud> | The URL for the Netdata Cloud web application. You should not change this. If you want to disable Cloud, change the `enabled` setting. |
 | enabled        | yes                       | The runtime option to disable the [Agent-Cloud link](https://github.com/netdata/netdata/blob/master/aclk/README.md) and prevent your Agent from connecting to Netdata Cloud.         |
 
 ### Claiming script
@@ -580,7 +580,7 @@ using `sudo`, or as the user running the Agent (typically `netdata`), and passin
 -rooms=ROOM1,ROOM2,...
     where ROOMX is the War Room this node should be added to. This list is optional.
 -url=URL_BASE
-    where URL_BASE is the Netdata Cloud endpoint base URL. By default, this is https://api.netdata.cloud.
+    where URL_BASE is the Netdata Cloud endpoint base URL. By default, this is https://app.netdata.cloud.
 -id=AGENT_ID
     where AGENT_ID is the unique identifier of the Agent. This is the Agent's MACHINE_GUID by default.
 -hostname=HOSTNAME
