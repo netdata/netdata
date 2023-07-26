@@ -188,7 +188,7 @@
     link: ''
     categories:
       - deploy.operating-systems
-    icon_filename: ''
+    icon_filename: 'apple.png'
   most_popular: true
   keywords:
     - MacOS
@@ -226,10 +226,10 @@
   install_description: |
     Install and connect new Docker containers
     Find the commands for `docker run`, `docker compose` or `Docker Swarm`. On the last two you can copy the configs, then run `docker-compose up -d` in the same directory as the `docker-compose.yml`
-    ```
-    Netdata container requires different privileges and mounts to provide functionality similar to that provided by Netdata installed on the host. More info [here](https://learn.netdata.cloud/docs/installing/docker?_gl=1*f2xcnf*_ga*MTI1MTUwMzU0OS4xNjg2NjM1MDA1*_ga_J69Z2JCTFB*MTY5MDMxMDIyMS40MS4xLjE2OTAzMTAzNjkuNTguMC4w#create-a-new-netdata-agent-container)
-    Netdata will use the hostname from the container in which it is run instead of that of the host system. To change the default hostname check [here](https://learn.netdata.cloud/docs/agent/packaging/docker?_gl=1*i5weve*_ga*MTI1MTUwMzU0OS4xNjg2NjM1MDA1*_ga_J69Z2JCTFB*MTY5MDMxMjM4Ny40Mi4xLjE2OTAzMTIzOTAuNTcuMC4w#change-the-default-hostname)
-    ```
+
+    > Netdata container requires different privileges and mounts to provide functionality similar to that provided by Netdata installed on the host. More info [here](https://learn.netdata.cloud/docs/installing/docker?_gl=1*f2xcnf*_ga*MTI1MTUwMzU0OS4xNjg2NjM1MDA1*_ga_J69Z2JCTFB*MTY5MDMxMDIyMS40MS4xLjE2OTAzMTAzNjkuNTguMC4w#create-a-new-netdata-agent-container)
+    > Netdata will use the hostname from the container in which it is run instead of that of the host system. To change the default hostname check [here](https://learn.netdata.cloud/docs/agent/packaging/docker?_gl=1*i5weve*_ga*MTI1MTUwMzU0OS4xNjg2NjM1MDA1*_ga_J69Z2JCTFB*MTY5MDMxMjM4Ny40Mi4xLjE2OTAzMTIzOTAuNTcuMC4w#change-the-default-hostname)
+   
   methods:
     - method: Docker CLI
       commands:
@@ -432,7 +432,8 @@
     - Orchestrator
   install_description: |
     **Use helm install to install Netdata on your Kubernetes cluster**
-    For a new installation use `helm install`` or for existing clusters add the content below to your `override.yamland`` then run `helm upgrade -f override.yml netdata netdata/netdata`
+    For a new installation use `helm install` or for existing clusters add the content below to your `override.yaml` and then run `helm upgrade -f override.yml netdata netdata/netdata`
+
   methods:
     - method: Helm
       commands:
