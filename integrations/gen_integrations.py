@@ -33,6 +33,10 @@ DEPLOY_SOURCES = [
     INTEGRATIONS_PATH / 'deploy.yaml',
 ]
 
+EXPORTER_SOURCES = [
+    REPO_PATH / 'exporters'
+]
+
 COLLECTOR_RENDER_KEYS = [
     'alerts',
     'metrics',
@@ -40,6 +44,10 @@ COLLECTOR_RENDER_KEYS = [
     'related_resources',
     'setup',
     'troubleshooting',
+]
+
+EXPORTER_RENDER_KEYS = [
+    'setup',
 ]
 
 GITHUB_ACTIONS = os.environ.get('GITHUB_ACTIONS', False)
@@ -77,6 +85,11 @@ CATEGORY_VALIDATOR = Draft7Validator(
 
 DEPLOY_VALIDATOR = Draft7Validator(
     {'$ref': './deploy.json#'},
+    registry=registry,
+)
+
+EXPORTER_VALIDATOR = Draft7Validator(
+    {'$ref': './exporter.json#'},
     registry=registry,
 )
 
@@ -254,6 +267,31 @@ def load_deploy():
     return ret
 
 
+def load_exporters():
+    ret = []
+
+    for section in EXPORTER_SOURCES:
+        for path in section.glob(SINGLE_PATTERN):
+            debug(f'Loading { path }.')
+            data = load_yaml(path)
+
+            if not data:
+                continue
+
+            try:
+                EXPORTER_VALIDATOR.validate(data)
+            except ValidationError:
+                warn(f'Failed to validate { path } against the schema.', path)
+                continue
+
+            data['integration_type'] = 'collector'
+            data['_src_path'] = path
+            data['_index'] = 0
+            ret.append(data)
+
+    return ret
+
+
 def make_id(meta):
     if 'monitored_instance' in meta:
         instance_name = meta['monitored_instance']['name'].replace(' ', '_')
@@ -265,7 +303,7 @@ def make_id(meta):
     return f'{ meta["plugin_name"] }-{ meta["module_name"] }-{ instance_name }'
 
 
-def render_collectors(categories, collectors):
+def render_collectors(categories, collectors, ids):
     debug('Computing default categories.')
 
     default_cats, valid_cats = get_category_sets(categories)
@@ -274,8 +312,6 @@ def render_collectors(categories, collectors):
 
     for item in collectors:
         item['id'] = make_id(item['meta'])
-
-    ids = {i['id']: False for i in collectors}
 
     debug('Sorting collectors.')
 
@@ -288,7 +324,7 @@ def render_collectors(categories, collectors):
     debug('Removing duplicate collectors.')
 
     for i in collectors:
-        if ids[i['id']]:
+        if ids.get(i['id'], False):
             first_path, first_index = ids[i['id']]
             warn(f'Duplicate integration ID found at { i["_src_path"] } index { i["_index"] } (original definition at { first_path } index { first_index }), ignoring that integration.', i['_src_path'])
         else:
@@ -399,7 +435,40 @@ def render_deploy(distros, categories, deploy, ids):
         del item['_src_path']
         del item['_index']
 
-    return deploy
+    return deploy, ids
+
+
+def render_exporters(categories, exporters, ids):
+    debug('Sorting deployments.')
+
+    exporters.sort(key=lambda i: i['_index'])
+    exporters.sort(key=lambda i: i['_src_path'])
+    exporters.sort(key=lambda i: i['id'])
+
+    debug('Checking exporter ids.')
+
+    tmp_exporters = []
+
+    for i in exporters:
+        if ids.get(i['id'], False):
+            first_path, first_index = ids[i['id']]
+            warn(f'Duplicate integration ID found at { i["_src_path"] } index { i["_index"] } (original definition at { first_path } index { first_index }), ignoring that integration.', i['_src_path'])
+        else:
+            tmp_exporters.append(i)
+            ids[i['id']] = (i['_src_path'], i['_index'])
+
+    exporters = tmp_exporters
+
+    for item in exporters:
+        for key in COLLECTOR_RENDER_KEYS:
+            template = get_jinja_env().get_template(f'{ key }.md')
+            data = template.render(entry=item)
+            item[key] = data
+
+        del item['_src_path']
+        del item['_index']
+
+    return exporters, ids
 
 
 def render_integrations(categories, integrations):
@@ -416,10 +485,12 @@ def main():
     distros = load_yaml(DISTROS_FILE)
     collectors = load_collectors()
     deploy = load_deploy()
-    collectors, ids = render_collectors(categories, collectors)
-    deploy = render_deploy(distros, categories, deploy, ids)
+    exporters = load_exporters()
+    collectors, ids = render_collectors(categories, collectors, dict())
+    deploy, ids = render_deploy(distros, categories, deploy, ids)
+    exporters, ids = render_exporters(categories, exporters, ids)
 
-    integrations = collectors + deploy
+    integrations = collectors + deploy + exporters
     render_integrations(categories, integrations)
 
 
