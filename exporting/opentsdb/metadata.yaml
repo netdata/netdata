@@ -18,7 +18,7 @@ setup:
     list:
       - title: ''
         description: |
-			- OpenTSDB and Netdata, installed, configured and operational
+	   - OpenTSDB and Netdata, installed, configured and operational
   configuration:
     file: 
       name: 'exporting.conf'
@@ -36,28 +36,26 @@ setup:
           default_value: 'no'
           description: 'Accepts a space separated list of hostnames, IPs (IPv4 and IPv6) and ports to connect to. Netdata will use the first available to send the metrics..'
           required: true
-		  detailed_description: |
-			The format of each item in this list, is: [PROTOCOL:]IP[:PORT].
+          detailed_description: |
+	     The format of each item in this list, is: [PROTOCOL:]IP[:PORT].
 
-			PROTOCOL can be udp or tcp. tcp is the default and only supported by the current exporting engine.
+	     PROTOCOL can be udp or tcp. tcp is the default and only supported by the current exporting engine.
 
-			IP can be XX.XX.XX.XX (IPv4), or [XX:XX...XX:XX] (IPv6). For IPv6 you can to enclose the IP in [] to separate it from the port.
+	     IP can be XX.XX.XX.XX (IPv4), or [XX:XX...XX:XX] (IPv6). For IPv6 you can to enclose the IP in [] to separate it from the port.
 	
-			PORT can be a number of a service name. If omitted, the default port for the exporting connector will be used (graphite = 2003, opentsdb = 4242).
+	     PORT can be a number of a service name. If omitted, the default port for the exporting connector will be used (graphite = 2003, opentsdb = 4242).
 
-			Example IPv4:
+	     Example IPv4:
 
-				```yaml
-				destination = 10.11.14.2:4242 10.11.14.3:4242 10.11.14.4:4242
-				```
+		```yaml
+		destination = 10.11.14.2:4242 10.11.14.3:4242 10.11.14.4:4242
+		```
+             Example IPv6 and IPv4 together:
 
-			Example IPv6 and IPv4 together:
-
-				```yaml
-				destination = [ffff:...:0001]:2003 10.11.12.1:2003
-				```
-
-			When multiple servers are defined, Netdata will try the next one when the previous one fails.
+                ```yaml
+		destination = [ffff:...:0001]:2003 10.11.12.1:2003
+		```
+             When multiple servers are defined, Netdata will try the next one when the previous one fails.
         - name: 'username'
           default_value: 'my_username'
           description: 'Username for HTTP authentication'
@@ -94,20 +92,20 @@ setup:
           default_value: 'localhost *'
           description: 'Includes one or more space separated patterns, using * as wildcard (any number of times within each pattern). The patterns are checked against the hostname (the localhost is always checked as localhost), allowing us to filter which hosts will be sent to the external database when this Netdata is a central Netdata aggregating multiple hosts.'
           required: false	
-		  detailed_description: |
-			A pattern starting with `!` gives a negative match. So to match all hosts named `*db*` except hosts containing `*child*`, use `!*child* *db*` (so, the order is important: the first pattern matching the hostname will be used - positive or negative).
+	  detailed_description: |
+	     A pattern starting with `!` gives a negative match. So to match all hosts named `*db*` except hosts containing `*child*`, use `!*child* *db*` (so, the order is important: the first pattern matching the hostname will be used - positive or negative).
         - name: 'send charts matching'
           default_value: '*'
           description: 'Includes one or more space separated patterns, using * as wildcard (any number of times within each pattern). The patterns are checked against both chart id and chart name.'
           required: false	
-		  detailed_description: |
-			A pattern starting with ! gives a negative match. So to match all charts named apps.* except charts ending in *reads, use !*reads apps.* (so, the order is important: the first pattern matching the chart id or the chart name will be used - positive or negative). There is also a URL parameter filter that can be used while querying allmetrics. The URL parameter has a higher priority than the configuration option.
+	  detailed_description: |
+	    A pattern starting with ! gives a negative match. So to match all charts named apps.* except charts ending in *reads, use !*reads apps.* (so, the order is important: the first pattern matching the chart id or the chart name will be used - positive or negative). There is also a URL parameter filter that can be used while querying allmetrics. The URL parameter has a higher priority than the configuration option. 
         - name: 'send names instead of ids'
           default_value: ''
           description: 'Controls the metric names Netdata should send to the external database (yes|no).'
           required: false	
-		  detailed_description: |
-			Netdata supports names and IDs for charts and dimensions. Usually IDs are unique identifiers as read by the system and names are human friendly labels (also unique). Most charts and metrics have the same ID and name, but in several cases they are different: disks with device-mapper, interrupts, QoS classes, statsd synthetic charts, etc.
+	  detailed_description: |
+             Netdata supports names and IDs for charts and dimensions. Usually IDs are unique identifiers as read by the system and names are human friendly labels (also unique). Most charts and metrics have the same ID and name, but in several cases they are different : disks with device-mapper, interrupts, QoS classes, statsd synthetic charts, etc.
         - name: 'send configured labels'
           default_value: ''
           description: 'Controls if host labels defined in the `[host labels]` section in `netdata.conf` should be sent to the external database (yes|no).'
@@ -126,16 +124,16 @@ setup:
             enabled: false
           description: 'Add `:http` or `:https` modifiers to the connector type if you need to use other than a plaintext protocol. For example: `opentsdb:http:my_opentsdb_instance`, `opentsdb:https:my_opentsdb_instance`.'
           config: |
-			[opentsdb:my_opentsdb_instance]
-				enabled = yes
-				destination = localhost:4242
+             [opentsdb:my_opentsdb_instance]
+		enabled = yes
+		destination = localhost:4242
         - name: 'Example configuration with HTTP authentication'
           folding:
             enabled: false
           description: ''
           config: |
-			[opentsdb:my_opentsdb_instance]
-				enabled = yes
-				destination = localhost:4242
-				username = my_username
-				password = my_password				
+	     [opentsdb:my_opentsdb_instance]
+		enabled = yes
+		destination = localhost:4242
+		username = my_username
+		password = my_password				
