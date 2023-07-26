@@ -183,8 +183,7 @@ If this fails (i.e. `setcap` fails), `apps.plugin` is setuid to `root`.
 There are a few cases, like `docker` and `virtuozzo` containers, where `setcap` succeeds, but the capabilities
 are silently ignored (in `lxc` containers `setcap` fails).
 
-In these cases `setcap` succeeds but capabilities do not work, you will have to setuid
-to root `apps.plugin` by running these commands:
+In this case, you will have to setuid to root `apps.plugin` by running these commands:
 
 ```sh
 chown root:netdata /usr/libexec/netdata/plugins.d/apps.plugin
