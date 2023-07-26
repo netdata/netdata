@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Netdata notification mechanism metadata.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/entry"
+    },
+    {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
+    }
+  ],
+  "$def": {
+    "entry": {
+      "type": "object",
+      "description": "Data for a single notification method.",
+      "properties": {
+        "id": {
+          "$ref": "./shared.json#/$defs/id"
+        },
+        "meta": {
+          "$ref": "./shared.json#/$defs/instance"
+        },
+        "keywords": {
+          "$ref": "./shared.json#/$defs/keywords"
+        },
+        "overview": {
+          "type": "object",
+          "description": "General information about the notification method.",
+          "properties": {
+            "notification_description": {
+              "type": "string",
+              "description": "General description of what the notification method does."
+            },
+            "notification_limitations": {
+              "type": "string",
+              "description": "Explanation of any limitations of the notification method."
+            }
+          },
+          "required": [
+            "notification_description",
+            "notification_limitations"
+          ]
+        },
+        "setup": {
+          "$ref": "./shared.json#/$defs/setup"
+        }
+      },
+      "required": [
+        "id",
+        "meta",
+        "keywords",
+        "overview",
+        "setup"
+      ]
+    }
+  }
+}
