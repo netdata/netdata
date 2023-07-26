@@ -38,7 +38,14 @@ overview:
       description: ''
 setup:
   prerequisites:
-    list: []
+    list:
+      - title: Provide the necessary permissions
+        description: |
+          In order for the collector to work, you need to add the `netdata` user to the `varnish` user group, so that it can execute the `varnishstat` tool:
+          
+          ```
+          usermod -aG varnish netdata
+          ```
   configuration:
     file:
       name: python.d/varnish.conf
