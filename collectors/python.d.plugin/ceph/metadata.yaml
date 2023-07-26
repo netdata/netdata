@@ -100,6 +100,8 @@ setup:
       list:
         - name: Basic local Ceph cluster
           description: A basic configuration to connect to a local Ceph cluster.
+          folding:
+            enabled: false
           config: |
             local:
              config_file: '/etc/ceph/ceph.conf'
