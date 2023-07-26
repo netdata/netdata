@@ -154,26 +154,26 @@ metrics:
   description: ""
   availability: []
   scopes:
-  - name: global
-    description: |
-      These metrics refer to the entire monitored application.
-    labels: []
-    metrics:
-    - name: fail2ban.failed_attempts
-      description: Failed attempts
-      unit: "attempts/s"
-      chart_type: line
-      dimensions:
-      - name: a dimension per jail
-    - name: fail2ban.bans
-      description: Bans
-      unit: "bans/s"
-      chart_type: line
-      dimensions:
-      - name: a dimension per jail
-    - name: fail2ban.banned_ips
-      description: Banned IP addresses (since the last restart of netdata)
-      unit: "ips"
-      chart_type: line
-      dimensions:
-      - name: a dimension per jail
+    - name: global
+      description: |
+        These metrics refer to the entire monitored application.
+      labels: []
+      metrics:
+      - name: fail2ban.failed_attempts
+        description: Failed attempts
+        unit: "attempts/s"
+        chart_type: line
+        dimensions:
+        - name: a dimension per jail
+      - name: fail2ban.bans
+        description: Bans
+        unit: "bans/s"
+        chart_type: line
+        dimensions:
+        - name: a dimension per jail
+      - name: fail2ban.banned_ips
+        description: Banned IP addresses (since the last restart of netdata)
+        unit: "ips"
+        chart_type: line
+        dimensions:
+        - name: a dimension per jail

@@ -124,14 +124,14 @@ metrics:
   description: ""
   availability: []
   scopes:
-  - name: global
-    description: |
-      These metrics refer to the entire monitored application.
-    labels: []
-    metrics:
-    - name: example.random
-      description: A random number
-      unit: number
-      chart_type: line
-      dimensions:
-      - random: a dimension per `num_lines`.
+    - name: global
+      description: |
+        These metrics refer to the entire monitored application.
+      labels: []
+      metrics:
+      - name: example.random
+        description: A random number
+        unit: number
+        chart_type: line
+        dimensions:
+        - random: a dimension per `num_lines`.
