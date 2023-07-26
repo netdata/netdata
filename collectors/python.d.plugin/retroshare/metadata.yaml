@@ -4,40 +4,40 @@ meta:
   module_name: retroshare
   monitored_instance:
     name: RetroShare
-    link: 'https://retroshare.cc/'
+    link: "https://retroshare.cc/"
     categories:
-    - data-collection.p2p
-    icon_filename: 'retroshare.png'
+      - data-collection.p2p
+    icon_filename: "retroshare.png"
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
+    description: ""
   keywords:
     - retroshare
     - p2p
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'This collector monitors RetroShare statistics such as application bandwidth, peers, and DHT metrics.'
-    method_description: 'It connects to the RetroShare web interface to gather metrics.'
+    metrics_description: "This collector monitors RetroShare statistics such as application bandwidth, peers, and DHT metrics."
+    method_description: "It connects to the RetroShare web interface to gather metrics."
   supported_platforms:
     include: []
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ''
+    description: ""
   default_behavior:
     auto_detection:
-      description: 'The collector will attempt to connect and detect a RetroShare web interface through http://localhost:9090, even without any configuration.'
+      description: "The collector will attempt to connect and detect a RetroShare web interface through http://localhost:9090, even without any configuration."
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
     list:
-      - title: 'RetroShare web interface'
+      - title: "RetroShare web interface"
         description: |
           RetroShare needs to be configured to enable the RetroShare WEB Interface and allow access from the Netdata host.
   configuration:
@@ -77,11 +77,11 @@ setup:
           required: false
         - name: name
           description: Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works.
-          default_value: ''
+          default_value: ""
           required: false
         - name: url
           description: The URL to the RetroShare Web UI.
-          default_value: 'http://localhost:9090'
+          default_value: "http://localhost:9090"
           required: false
     examples:
       folding:
@@ -100,15 +100,15 @@ setup:
             remote:
              name: 'remote retroshare'
              url: 'http://1.2.3.4:9090'
-          
+
 troubleshooting:
   problems:
     list: []
 alerts:
-- name: retroshare_dht_working
-  link: https://github.com/netdata/netdata/blob/master/health/health.d/retroshare.conf
-  metric: retroshare.dht
-  info: number of DHT peers
+  - name: retroshare_dht_working
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/retroshare.conf
+    metric: retroshare.dht
+    info: number of DHT peers
 metrics:
   folding:
     title: Metrics
@@ -116,28 +116,28 @@ metrics:
   description: ""
   availability: []
   scopes:
-  - name: global
-    description: "These metrics refer to the entire monitored application."
-    labels: []
-    metrics:
-    - name: retroshare.bandwidth
-      description: RetroShare Bandwidth
-      unit: "kilobits/s"
-      chart_type: area
-      dimensions:
-      - name: Upload
-      - name: Download
-    - name: retroshare.peers
-      description: RetroShare Peers
-      unit: "peers"
-      chart_type: line
-      dimensions:
-      - name: All friends
-      - name: Connected friends
-    - name: retroshare.dht
-      description: Retroshare DHT
-      unit: "peers"
-      chart_type: line
-      dimensions:
-      - name: DHT nodes estimated
-      - name: RS nodes estimated
+    - name: global
+      description: "These metrics refer to the entire monitored application."
+      labels: []
+      metrics:
+        - name: retroshare.bandwidth
+          description: RetroShare Bandwidth
+          unit: "kilobits/s"
+          chart_type: area
+          dimensions:
+            - name: Upload
+            - name: Download
+        - name: retroshare.peers
+          description: RetroShare Peers
+          unit: "peers"
+          chart_type: line
+          dimensions:
+            - name: All friends
+            - name: Connected friends
+        - name: retroshare.dht
+          description: Retroshare DHT
+          unit: "peers"
+          chart_type: line
+          dimensions:
+            - name: DHT nodes estimated
+            - name: RS nodes estimated

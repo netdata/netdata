@@ -4,15 +4,15 @@ meta:
   module_name: go_expvar
   monitored_instance:
     name: Go applications
-    link: 'https://pkg.go.dev/expvar'
+    link: "https://pkg.go.dev/expvar"
     categories:
-    - data-collection.apm
-    icon_filename: 'go.png'
+      - data-collection.apm
+    icon_filename: "go.png"
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
+    description: ""
   keywords:
     - go
     - expvar
@@ -20,25 +20,25 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'This collector monitors Go applications that expose their metrics with the use of the `expvar` package from the Go standard library. It produces charts for Go runtime memory statistics and optionally any number of custom charts.'
-    method_description: 'It connects via http to gather the metrics exposed via the `expvar` package.'
+    metrics_description: "This collector monitors Go applications that expose their metrics with the use of the `expvar` package from the Go standard library. It produces charts for Go runtime memory statistics and optionally any number of custom charts."
+    method_description: "It connects via http to gather the metrics exposed via the `expvar` package."
   supported_platforms:
     include: []
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ''
+    description: ""
   default_behavior:
     auto_detection:
-      description: ''
+      description: ""
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
     list:
-      - title: 'Sample `expvar` usage in a Go application'
+      - title: "Sample `expvar` usage in a Go application"
         description: |
           The `expvar` package exposes metrics over HTTP and is very easy to use.
           Consider this minimal sample below:
@@ -142,27 +142,27 @@ setup:
           required: false
         - name: name
           description: Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works.
-          default_value: ''
+          default_value: ""
           required: false
         - name: url
           description: the URL and port of the expvar endpoint. Please include the whole path of the endpoint, as the expvar handler can be installed in a non-standard location.
-          default_value: ''
+          default_value: ""
           required: true
         - name: user
           description: If the URL is password protected, this is the username to use.
-          default_value: ''
+          default_value: ""
           required: false
         - name: pass
           description: If the URL is password protected, this is the password to use.
-          default_value: ''
+          default_value: ""
           required: false
         - name: collect_memstats
           description: Enables charts for Go runtime's memory statistics.
-          default_value: ''
+          default_value: ""
           required: false
         - name: extra_charts
           description: Defines extra data/charts to monitor, please see the example below.
-          default_value: ''
+          default_value: ""
           required: false
     examples:
       folding:
@@ -172,7 +172,7 @@ setup:
         - name: Monitor a Go app1 application
           description: |
             The example below sets a configuration for a Go application, called `app1`. Besides the `memstats`, the application also exposes two counters and the number of currently running Goroutines and updates these stats every second.
-            
+
             The `go_expvar` collector can monitor these as well with the use of the `extra_charts` configuration variable.
 
             The `extra_charts` variable is a YaML list of Netdata chart definitions.
@@ -269,50 +269,50 @@ metrics:
   description: ""
   availability: []
   scopes:
-  - name: global
-    description: "These metrics refer to the entire monitored application."
-    labels: []
-    metrics:
-    - name: expvar.memstats.heap
-      description: 'memory: size of heap memory structures'
-      unit: "KiB"
-      chart_type: line
-      dimensions:
-      - name: alloc
-      - name: inuse
-    - name: expvar.memstats.stack
-      description: 'memory: size of stack memory structures'
-      unit: "KiB"
-      chart_type: line
-      dimensions:
-      - name: inuse
-    - name: expvar.memstats.mspan
-      description: 'memory: size of mspan memory structures'
-      unit: "KiB"
-      chart_type: line
-      dimensions:
-      - name: inuse
-    - name: expvar.memstats.mcache
-      description: 'memory: size of mcache memory structures'
-      unit: "KiB"
-      chart_type: line
-      dimensions:
-      - name: inuse
-    - name: expvar.memstats.live_objects
-      description: 'memory: number of live objects'
-      unit: "objects"
-      chart_type: line
-      dimensions:
-      - name: live
-    - name: expvar.memstats.sys
-      description: 'memory: size of reserved virtual address space'
-      unit: "KiB"
-      chart_type: line
-      dimensions:
-      - name: sys
-    - name: expvar.memstats.gc_pauses
-      description: 'memory: average duration of GC pauses'
-      unit: "ns"
-      chart_type: line
-      dimensions:
-      - name: avg
+    - name: global
+      description: "These metrics refer to the entire monitored application."
+      labels: []
+      metrics:
+        - name: expvar.memstats.heap
+          description: "memory: size of heap memory structures"
+          unit: "KiB"
+          chart_type: line
+          dimensions:
+            - name: alloc
+            - name: inuse
+        - name: expvar.memstats.stack
+          description: "memory: size of stack memory structures"
+          unit: "KiB"
+          chart_type: line
+          dimensions:
+            - name: inuse
+        - name: expvar.memstats.mspan
+          description: "memory: size of mspan memory structures"
+          unit: "KiB"
+          chart_type: line
+          dimensions:
+            - name: inuse
+        - name: expvar.memstats.mcache
+          description: "memory: size of mcache memory structures"
+          unit: "KiB"
+          chart_type: line
+          dimensions:
+            - name: inuse
+        - name: expvar.memstats.live_objects
+          description: "memory: number of live objects"
+          unit: "objects"
+          chart_type: line
+          dimensions:
+            - name: live
+        - name: expvar.memstats.sys
+          description: "memory: size of reserved virtual address space"
+          unit: "KiB"
+          chart_type: line
+          dimensions:
+            - name: sys
+        - name: expvar.memstats.gc_pauses
+          description: "memory: average duration of GC pauses"
+          unit: "ns"
+          chart_type: line
+          dimensions:
+            - name: avg
