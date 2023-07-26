@@ -106,7 +106,8 @@ metrics:
   availability: []
   scopes:
     - name: global
-      description: ""
+      description: |
+        These metrics refer to the entire monitored application.
       labels: []
       metrics:
         - name: postfix.qemails
