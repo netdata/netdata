@@ -53,15 +53,15 @@ setup:
           description: Data collection frequency.
           default_value: 1s
           required: false
-        - name: ioping
-          description: The complete plugin path.
-          default_value: /usr/libexec/netdata/plugins.d/ioping
+        - name: destination
+          description: The directory/file/device to ioping.
+          default_value: ""
           required: false
         - name: request_size
           description: The request size in bytes to ioping the destination (symbolic modifiers are supported)
           default_value: 4k
           required: false
-        - name: ioping_options
+        - name: ioping_opts
           description: Options passed to `ioping` commands.
           default_value: -T 1000000
           required: false
@@ -69,7 +69,8 @@ setup:
       folding:
         enabled: true
         title: ''
-      list: []
+      list: |
+        destination="/dev/sda"
 troubleshooting:
   problems:
     list: []
