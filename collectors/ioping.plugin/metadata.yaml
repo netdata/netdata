@@ -3,7 +3,7 @@ meta:
   module_name: ioping.plugin
   monitored_instance:
     name: IOPing
-    link: ''
+    link: 'https://github.com/koct9i/ioping'
     categories:
     - data-collection.synthetic-checks
     icon_filename: 'syslog.png'
@@ -17,7 +17,7 @@ meta:
 overview:
   data_collection:
     metrics_description: 'Monitor IOPing metrics for efficient disk I/O latency tracking. Keep track of read/write speeds, latency, and error rates for optimized disk operations.'
-    method_description: ''
+    method_description: 'Plugin uses `ioping` command.'
   supported_platforms:
     include: []
     exclude: []
@@ -33,17 +33,38 @@ overview:
       description: ''
 setup:
   prerequisites:
-    list: []
+    list: |
+      It is necessary to have the command `ioping` installed on host. It is possible to install command passing as argument for plugin the option `install`:
+
+      ```bash
+      /usr/libexec/netdata/plugins.d/ioping.plugin install
+      ```
   configuration:
     file:
-      name: ''
-      description: ''
+      name: 'ioping.conf'
+      description: 'File with options to specify hardware to monitor and arguments for ioping command.'
     options:
       description: ''
       folding:
-        title: ''
+        title: 'Config options'
         enabled: true
-      list: []
+      list: |
+        - name: update_every
+          description: Data collection frequency.
+          default_value: 1s
+          required: false
+        - name: ioping
+          description: The complete plugin path.
+          default_value: /usr/libexec/netdata/plugins.d/ioping
+          required: false
+        - name: request_size
+          description: The request size in bytes to ioping the destination (symbolic modifiers are supported)
+          default_value: 4k
+          required: false
+        - name: ioping_options
+          description: Options passed to `ioping` commands.
+          default_value: -T 1000000
+          required: false
     examples:
       folding:
         enabled: true
