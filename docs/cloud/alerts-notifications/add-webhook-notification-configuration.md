@@ -140,7 +140,7 @@ server {
     ssl_client_certificate /path/to/Netdata_CA.pem;
 
     location / {
-        if ($ssl_client_s_dn !~ "CN=api.netdata.cloud") {
+        if ($ssl_client_s_dn !~ "CN=app.netdata.cloud") {
             return 403;
         }
        # ... existing location configuration ...
@@ -158,7 +158,7 @@ Listen 443
     SSLCACertificateFile "/path/to/Netdata_CA.pem"
 </VirtualHost>
 <Directory /var/www/>
-    Require expr "%{SSL_CLIENT_S_DN_CN} == 'api.netdata.cloud'"
+    Require expr "%{SSL_CLIENT_S_DN_CN} == 'app.netdata.cloud'"
     # ... existing directory configuration ...
 </Directory>
 ```

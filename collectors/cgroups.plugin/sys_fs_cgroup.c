@@ -62,6 +62,8 @@ static int cgroup_enable_pressure_io_some = CONFIG_BOOLEAN_AUTO;
 static int cgroup_enable_pressure_io_full = CONFIG_BOOLEAN_AUTO;
 static int cgroup_enable_pressure_memory_some = CONFIG_BOOLEAN_AUTO;
 static int cgroup_enable_pressure_memory_full = CONFIG_BOOLEAN_AUTO;
+static int cgroup_enable_pressure_irq_some = CONFIG_BOOLEAN_NO;
+static int cgroup_enable_pressure_irq_full = CONFIG_BOOLEAN_AUTO;
 
 static int cgroup_enable_systemd_services = CONFIG_BOOLEAN_YES;
 static int cgroup_enable_systemd_services_detailed_memory = CONFIG_BOOLEAN_NO;
@@ -828,6 +830,7 @@ struct cgroup {
     struct pressure cpu_pressure;
     struct pressure io_pressure;
     struct pressure memory_pressure;
+    struct pressure irq_pressure;
 
     // per cgroup charts
     RRDSET *st_cpu;
@@ -1451,28 +1454,33 @@ static inline void cgroup2_read_pressure(struct pressure *res) {
             return;
         }
 
-        res->some.share_time.value10 = strtod(procfile_lineword(ff, 0, 2), NULL);
-        res->some.share_time.value60 = strtod(procfile_lineword(ff, 0, 4), NULL);
-        res->some.share_time.value300 = strtod(procfile_lineword(ff, 0, 6), NULL);
-        res->some.total_time.value_total = str2ull(procfile_lineword(ff, 0, 8), NULL) / 1000; // us->ms
+        bool did_some = false, did_full = false;
 
-        if (lines > 2) {
-            res->full.share_time.value10 = strtod(procfile_lineword(ff, 1, 2), NULL);
-            res->full.share_time.value60 = strtod(procfile_lineword(ff, 1, 4), NULL);
-            res->full.share_time.value300 = strtod(procfile_lineword(ff, 1, 6), NULL);
-            res->full.total_time.value_total = str2ull(procfile_lineword(ff, 1, 8), NULL) / 1000; // us->ms
-        }
-
-        res->updated = 1;
-
-        if (unlikely(res->some.enabled == CONFIG_BOOLEAN_AUTO)) {
-            res->some.enabled = CONFIG_BOOLEAN_YES;
-            if (lines > 2) {
-                res->full.enabled = CONFIG_BOOLEAN_YES;
-            } else {
-                res->full.enabled = CONFIG_BOOLEAN_NO;
+        for(size_t l = 0; l < lines ;l++) {
+            const char *key = procfile_lineword(ff, l, 0);
+            if(strcmp(key, "some") == 0) {
+                res->some.share_time.value10 = strtod(procfile_lineword(ff, l, 2), NULL);
+                res->some.share_time.value60 = strtod(procfile_lineword(ff, l, 4), NULL);
+                res->some.share_time.value300 = strtod(procfile_lineword(ff, l, 6), NULL);
+                res->some.total_time.value_total = str2ull(procfile_lineword(ff, l, 8), NULL) / 1000; // us->ms
+                did_some = true;
+            }
+            else if(strcmp(key, "full") == 0) {
+                res->full.share_time.value10 = strtod(procfile_lineword(ff, l, 2), NULL);
+                res->full.share_time.value60 = strtod(procfile_lineword(ff, l, 4), NULL);
+                res->full.share_time.value300 = strtod(procfile_lineword(ff, l, 6), NULL);
+                res->full.total_time.value_total = str2ull(procfile_lineword(ff, l, 8), NULL) / 1000; // us->ms
+                did_full = true;
             }
         }
+
+        res->updated = (did_full || did_some) ? 1 : 0;
+
+        if(unlikely(res->some.enabled == CONFIG_BOOLEAN_AUTO))
+            res->some.enabled = (did_some) ? CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_NO;
+
+        if(unlikely(res->full.enabled == CONFIG_BOOLEAN_AUTO))
+            res->full.enabled = (did_full) ? CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_NO;
     }
 }
 
@@ -1637,6 +1645,7 @@ static inline void read_cgroup(struct cgroup *cg) {
         cgroup2_read_pressure(&cg->cpu_pressure);
         cgroup2_read_pressure(&cg->io_pressure);
         cgroup2_read_pressure(&cg->memory_pressure);
+        cgroup2_read_pressure(&cg->irq_pressure);
         cgroup_read_memory(&cg->memory, 1);
     }
 }
@@ -1851,6 +1860,7 @@ static inline void cgroup_free(struct cgroup *cg) {
     free_pressure(&cg->cpu_pressure);
     free_pressure(&cg->io_pressure);
     free_pressure(&cg->memory_pressure);
+    free_pressure(&cg->irq_pressure);
 
     freez(cg->id);
     freez(cg->intermediate_id);
@@ -2463,6 +2473,18 @@ static inline void discovery_update_filenames() {
                     netdata_log_debug(D_CGROUP, "memory.pressure filename for cgroup '%s': '%s'", cg->id, cg->memory_pressure.filename);
                 } else {
                     netdata_log_debug(D_CGROUP, "memory.pressure file for cgroup '%s': '%s' does not exist", cg->id, filename);
+                }
+            }
+
+            if (unlikely((cgroup_enable_pressure_irq_some || cgroup_enable_pressure_irq_full) && !cg->irq_pressure.filename)) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/irq.pressure", cgroup_unified_base, cg->id);
+                if (likely(stat(filename, &buf) != -1)) {
+                    cg->irq_pressure.filename = strdupz(filename);
+                    cg->irq_pressure.some.enabled = cgroup_enable_pressure_irq_some;
+                    cg->irq_pressure.full.enabled = cgroup_enable_pressure_irq_full;
+                    netdata_log_debug(D_CGROUP, "irq.pressure filename for cgroup '%s': '%s'", cg->id, cg->irq_pressure.filename);
+                } else {
+                    netdata_log_debug(D_CGROUP, "irq.pressure file for cgroup '%s': '%s' does not exist", cg->id, filename);
                 }
             }
         }
@@ -4635,6 +4657,112 @@ void update_cgroup_charts(int update_every) {
                         , cgroup_containers_chart_priority + 2360
                         , update_every
                         , RRDSET_TYPE_LINE
+                    );
+                    rrdset_update_rrdlabels(chart = pcs->total_time.st, cg->chart_labels);
+                    pcs->total_time.rdtotal = rrddim_add(chart, "time", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                }
+
+                update_pressure_charts(pcs);
+            }
+
+            res = &cg->irq_pressure;
+
+            if (likely(res->updated && res->some.enabled)) {
+                struct pressure_charts *pcs;
+                pcs = &res->some;
+
+                if (unlikely(!pcs->share_time.st)) {
+                    RRDSET *chart;
+                    snprintfz(title, CHART_TITLE_MAX, "IRQ some pressure");
+                    chart = pcs->share_time.st = rrdset_create_localhost(
+                            cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
+                    , "irq_some_pressure"
+                    , NULL
+                    , "interrupts"
+                    , k8s_is_kubepod(cg) ? "k8s.cgroup.irq_some_pressure" : "cgroup.irq_some_pressure"
+                    , title
+                    , "percentage"
+                    , PLUGIN_CGROUPS_NAME
+                    , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
+                    , cgroup_containers_chart_priority + 2310
+                    , update_every
+                    , RRDSET_TYPE_LINE
+                    );
+                    rrdset_update_rrdlabels(chart = pcs->share_time.st, cg->chart_labels);
+                    pcs->share_time.rd10 = rrddim_add(chart, "some 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                    pcs->share_time.rd60 = rrddim_add(chart, "some 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                    pcs->share_time.rd300 = rrddim_add(chart, "some 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                }
+
+                if (unlikely(!pcs->total_time.st)) {
+                    RRDSET *chart;
+                    snprintfz(title, CHART_TITLE_MAX, "IRQ some pressure stall time");
+                    chart = pcs->total_time.st = rrdset_create_localhost(
+                            cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
+                    , "irq_some_pressure_stall_time"
+                    , NULL
+                    , "interrupts"
+                    , k8s_is_kubepod(cg) ? "k8s.cgroup.irq_some_pressure_stall_time" : "cgroup.irq_some_pressure_stall_time"
+                    , title
+                    , "ms"
+                    , PLUGIN_CGROUPS_NAME
+                    , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
+                    , cgroup_containers_chart_priority + 2330
+                    , update_every
+                    , RRDSET_TYPE_LINE
+                    );
+                    rrdset_update_rrdlabels(chart = pcs->total_time.st, cg->chart_labels);
+                    pcs->total_time.rdtotal = rrddim_add(chart, "time", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                }
+
+                update_pressure_charts(pcs);
+            }
+
+            if (likely(res->updated && res->full.enabled)) {
+                struct pressure_charts *pcs;
+                pcs = &res->full;
+
+                if (unlikely(!pcs->share_time.st)) {
+                    RRDSET *chart;
+                    snprintfz(title, CHART_TITLE_MAX, "IRQ full pressure");
+
+                    chart = pcs->share_time.st = rrdset_create_localhost(
+                            cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
+                    , "irq_full_pressure"
+                    , NULL
+                    , "interrupts"
+                    , k8s_is_kubepod(cg) ? "k8s.cgroup.irq_full_pressure" : "cgroup.irq_full_pressure"
+                    , title
+                    , "percentage"
+                    , PLUGIN_CGROUPS_NAME
+                    , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
+                    , cgroup_containers_chart_priority + 2350
+                    , update_every
+                    , RRDSET_TYPE_LINE
+                    );
+
+                    rrdset_update_rrdlabels(chart = pcs->share_time.st, cg->chart_labels);
+                    pcs->share_time.rd10 = rrddim_add(chart, "full 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                    pcs->share_time.rd60 = rrddim_add(chart, "full 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                    pcs->share_time.rd300 = rrddim_add(chart, "full 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                }
+
+                if (unlikely(!pcs->total_time.st)) {
+                    RRDSET *chart;
+                    snprintfz(title, CHART_TITLE_MAX, "IRQ full pressure stall time");
+                    chart = pcs->total_time.st = rrdset_create_localhost(
+                            cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
+                    , "irq_full_pressure_stall_time"
+                    , NULL
+                    , "interrupts"
+                    , k8s_is_kubepod(cg) ? "k8s.cgroup.irq_full_pressure_stall_time" : "cgroup.irq_full_pressure_stall_time"
+                    , title
+                    , "ms"
+                    , PLUGIN_CGROUPS_NAME
+                    , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
+                    , cgroup_containers_chart_priority + 2370
+                    , update_every
+                    , RRDSET_TYPE_LINE
                     );
                     rrdset_update_rrdlabels(chart = pcs->total_time.st, cg->chart_labels);
                     pcs->total_time.rdtotal = rrddim_add(chart, "time", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);

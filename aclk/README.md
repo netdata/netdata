@@ -12,7 +12,7 @@ The Cloud App lives at app.netdata.cloud which currently resolves to the followi
 
 > ### Caution
 >
->This list of IPs can change without notice, we strongly advise you to whitelist following domains `api.netdata.cloud`, `mqtt.netdata.cloud`, if this is not an option in your case always verify the current domain resolution (e.g via the `host` command).
+>This list of IPs can change without notice, we strongly advise you to whitelist following domains `app.netdata.cloud`, `mqtt.netdata.cloud`, if this is not an option in your case always verify the current domain resolution (e.g via the `host` command).
 
 For a guide to connecting a node using the ACLK, plus additional troubleshooting and reference information, read our [connect to Cloud
 documentation](https://github.com/netdata/netdata/blob/master/claim/README.md).
@@ -35,7 +35,7 @@ configuration uses two settings:
 ```conf
 [global]
   enabled = yes
-  cloud base url = https://api.netdata.cloud
+  cloud base url = https://app.netdata.cloud
 ```
 
 If your Agent needs to use a proxy to access the internet, you must [set up a proxy for
@@ -96,7 +96,7 @@ must contain only `EOF`.
 ```bash
 [global]
     enabled = no
-    cloud base url = https://api.netdata.cloud
+    cloud base url = https://app.netdata.cloud
 EOF
 ```
 

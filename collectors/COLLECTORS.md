@@ -669,6 +669,7 @@ $ sudo systemctl restart netdata
 - [netdata-debsecan](https://github.com/nodiscc/netdata-debsecan) - Check/graph the number of CVEs in currently installed packages.
 - [netdata-logcount](https://github.com/nodiscc/netdata-logcount) - Check/graph the number of syslog messages, by level over time.
 - [netdata-apt](https://github.com/nodiscc/netdata-apt) - Check/graph and alert on the number of upgradeable packages, and available distribution upgrades.
+- [diskquota](https://github.com/netdata/community/tree/main/collectors/python.d.plugin/diskquota) - Monitors the defined quotas on one or more filesystems depending on configuration.
 
 ## Etc
 

@@ -51,4 +51,4 @@
     allow from = *
 
 [cloud]
-    cloud base url = https://api.netdata.cloud
+    cloud base url = https://app.netdata.cloud
