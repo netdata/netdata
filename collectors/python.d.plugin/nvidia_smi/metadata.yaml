@@ -1,4 +1,4 @@
-# # This collector will not appear in documentation, as the go version is preferred,
+# This collector will not appear in documentation, as the go version is preferred,
 # https://github.com/netdata/go.d.plugin/blob/master/modules/nvidia_smi/README.md
 # 
 # meta:
