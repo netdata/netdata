@@ -27,7 +27,7 @@
         demoFavourites: {"postgresql":["postgres"],"redis":["redis"],"dns-query":["dns_query"],"http-endpoints":["httpcheck"],"nginx":["web_log","nginx"],"apache":["apache"],"host-reachability":["ping"],"cassandra":["cassandra"],"coredns":["coredns"],"logind":["logind"],"iis":["iis"],"active-directory":["ad"],"windows":["windows","ad","iis","mssql","exchange","netframework"],"docker":["cgroup","docker"]},
         webpackPublicPath: "",
         agentApiUrl: searchParams.get("agent") || getBasename(),
-        version: "6.22.0",
+        version: "6.22.1",
         tracking: false,
         cookieDomain: ".netdata.cloud"
       }
@@ -143,7 +143,7 @@
 
 
 
-          if (window.localNetdataRegistry.cloudStatus === "disabled" && !/\/v2/.test(location.pathname)) {
+          if ((window.localNetdataRegistry.cloudStatus === "disabled" || window.localNetdataRegistry.cloudStatus === "unavailable") && !/\/v2/.test(location.pathname)) {
             goToOld("/v2")
             return
           }
