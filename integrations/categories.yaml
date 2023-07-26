@@ -215,12 +215,6 @@
           most_popular: false
           priority: -1
           children: []
-    - id: data-collection.notifications
-      name: Notifications
-      description: ""
-      most_popular: false
-      priority: -1
-      children: []
     - id: data-collection.networking-stack-and-network-interfaces
       name: Networking Stack and Network Interfaces
       description: ""
@@ -301,12 +295,6 @@
       children: []
     - id: data-collection.application-servers
       name: Application Servers
-      description: ""
-      most_popular: false
-      priority: -1
-      children: []
-    - id: data-collection.export
-      name: Export
       description: ""
       most_popular: false
       priority: -1
@@ -412,4 +400,28 @@
       description: ""
       most_popular: false
       priority: -1
+      children: []
+- id: export
+  name: exporters
+  description: "Exporter Integrations"
+  most_popular: true
+  priority: 4
+  children:
+- id: notify
+  name: notifications
+  description: "Notification Integrations"
+  most_popular: true
+  priority: 3
+  children:
+    - id: notify.agent
+      name: Per Agent Notifications
+      description: ""
+      most_popular: true
+      priority: 2
+      children: []
+    - id: notify.cloud
+      name: Centralized Cloud Notifications
+      description: ""
+      most_popular: true
+      priority: 1
       children: []
