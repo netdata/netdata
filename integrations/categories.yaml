@@ -1,20 +1,20 @@
 - id: deploy
   name: deploy
   description: ""
-  most_popular: false
-  priority: -1
+  most_popular: true
+  priority: 1
   children:
     - id: deploy.operating-systems
       name: Operating Systems
       description: ""
-      most_popular: false
-      priority: -1
+      most_popular: true
+      priority: 1
       children: []
     - id: deploy.docker-kubernetes
       name: Docker & Kubernetes
       description: ""
-      most_popular: false
-      priority: -1
+      most_popular: true
+      priority: 2
       children: []
     - id: deploy.provisioning-systems
       parent: deploy
@@ -26,8 +26,8 @@
 - id: data-collection
   name: data-collection
   description: ""
-  most_popular: false
-  priority: -1
+  most_popular: true
+  priority: 2
   children:
     - id: data-collection.other
       name: Other
@@ -50,14 +50,14 @@
     - id: data-collection.containers-and-vms
       name: Containers and VMs
       description: ""
-      most_popular: false
-      priority: -1
+      most_popular: true
+      priority: 6
       children: []
     - id: data-collection.database-servers
       name: Database Servers
       description: ""
-      most_popular: false
-      priority: -1
+      most_popular: true
+      priority: 1
       children: []
     - id: data-collection.kubernetes
       name: Kubernetes
@@ -74,8 +74,8 @@
     - id: data-collection.web-servers-and-web-proxies
       name: Web Servers and Web Proxies
       description: ""
-      most_popular: false
-      priority: -1
+      most_popular: true
+      priority: 2
       children: []
     - id: data-collection.cloud-provider-managed
       name: Cloud Provider Managed
@@ -98,8 +98,8 @@
     - id: data-collection.hardware-devices-and-sensors
       name: Hardware Devices and Sensors
       description: ""
-      most_popular: false
-      priority: -1
+      most_popular: true
+      priority: 4
       children: []
     - id: data-collection.macos-systems
       name: macOS Systems
@@ -110,8 +110,8 @@
     - id: data-collection.message-brokers
       name: Message Brokers
       description: ""
-      most_popular: false
-      priority: -1
+      most_popular: true
+      priority: 3
       children: []
     - id: data-collection.provisioning-systems
       name: Provisioning Systems
@@ -128,26 +128,26 @@
     - id: data-collection.linux-systems
       name: Linux Systems
       description: ""
-      most_popular: false
-      priority: -1
+      most_popular: true
+      priority: 5
       children:
         - id: data-collection.linux-systems.system-metrics
           name: System Metrics
           description: ""
-          most_popular: false
-          priority: -1
+          most_popular: true
+          priority: 1
           children: []
         - id: data-collection.linux-systems.memory-metrics
           name: Memory Metrics
           description: ""
-          most_popular: false
-          priority: -1
+          most_popular: true
+          priority: 3
           children: []
         - id: data-collection.linux-systems.cpu-metrics
           name: CPU Metrics
           description: ""
-          most_popular: false
-          priority: -1
+          most_popular: true
+          priority: 2
           children: []
         - id: data-collection.linux-systems.pressure-metrics
           name: Pressure Metrics
@@ -158,8 +158,8 @@
         - id: data-collection.linux-systems.network-metrics
           name: Network Metrics
           description: ""
-          most_popular: false
-          priority: -1
+          most_popular: true
+          priority: 5
           children: []
         - id: data-collection.linux-systems.ipc-metrics
           name: IPC Metrics
@@ -170,8 +170,8 @@
         - id: data-collection.linux-systems.disk-metrics
           name: Disk Metrics
           description: ""
-          most_popular: false
-          priority: -1
+          most_popular: true
+          priority: 4
           children: []
         - id: data-collection.linux-systems.firewall-metrics
           name: Firewall Metrics

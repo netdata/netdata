@@ -8,7 +8,7 @@
     icon_filename: 'linux.png'
   keywords:
     - linux
-  description: 'Run the following command on your node to install and claim Netdata:"r'
+  description: 'Run the following command on your node to install and claim Netdata:'
   methods:
     - method: wget
       commands:
@@ -179,7 +179,7 @@
   keywords:
     - MacOS
     - mac
-  description: 'Run the following command on your Intel based OSX, macOS servers to install and claim Netdata:"r'
+  description: 'Run the following command on your Intel based OSX, macOS servers to install and claim Netdata:'
   methods:
     - method: curl
       commands:
@@ -197,7 +197,7 @@
   platform_info:
     group: 'include'
     distro: 'macos'
-  quick_start: 4
+  quick_start: 5
 -
   id: deploy-docker
   meta:
@@ -487,7 +487,7 @@
   platform_info:
     group: ''
     distro: ''
-  quick_start: 5
+  quick_start: 4
 -
   id: deploy-windows
   meta:
