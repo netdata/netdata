@@ -6,13 +6,13 @@ meta:
     name: Fail2ban
     link: https://www.fail2ban.org/
     categories:
-    - data-collection.authentication-and-authorization
-    icon_filename: 'fail2ban.png'
+      - data-collection.authentication-and-authorization
+    icon_filename: "fail2ban.png"
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
+    description: ""
   keywords:
     - fail2ban
     - security
@@ -68,16 +68,16 @@ overview:
       description: |
         By default the collector will attempt to read log file at /var/log/fail2ban.log and conf file at /etc/fail2ban/jail.local. If conf file is not found default jail is ssh.
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
     list: []
   configuration:
     file:
-      name: ''
-      description: ''
+      name: ""
+      description: ""
     options:
       description: |
         There are 2 sections:
@@ -108,7 +108,7 @@ setup:
           required: false
         - name: exclude
           description: jails you want to exclude from autodetection.
-          default_value: ''
+          default_value: ""
           required: false
         - name: update_every
           description: Sets the default data collection frequency.
@@ -128,7 +128,7 @@ setup:
           required: false
         - name: name
           description: Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works.
-          default_value: ''
+          default_value: ""
           required: false
     examples:
       folding:
@@ -159,21 +159,21 @@ metrics:
         These metrics refer to the entire monitored application.
       labels: []
       metrics:
-      - name: fail2ban.failed_attempts
-        description: Failed attempts
-        unit: "attempts/s"
-        chart_type: line
-        dimensions:
-        - name: a dimension per jail
-      - name: fail2ban.bans
-        description: Bans
-        unit: "bans/s"
-        chart_type: line
-        dimensions:
-        - name: a dimension per jail
-      - name: fail2ban.banned_ips
-        description: Banned IP addresses (since the last restart of netdata)
-        unit: "ips"
-        chart_type: line
-        dimensions:
-        - name: a dimension per jail
+        - name: fail2ban.failed_attempts
+          description: Failed attempts
+          unit: "attempts/s"
+          chart_type: line
+          dimensions:
+            - name: a dimension per jail
+        - name: fail2ban.bans
+          description: Bans
+          unit: "bans/s"
+          chart_type: line
+          dimensions:
+            - name: a dimension per jail
+        - name: fail2ban.banned_ips
+          description: Banned IP addresses (since the last restart of netdata)
+          unit: "ips"
+          chart_type: line
+          dimensions:
+            - name: a dimension per jail

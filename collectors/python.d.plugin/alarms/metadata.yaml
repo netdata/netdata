@@ -7,12 +7,12 @@ meta:
     link: https://learn.netdata.cloud/docs/data-collection/netdata-specific/alarms
     categories:
       - data-collection.other
-    icon_filename: ''
+    icon_filename: ""
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
+    description: ""
   keywords:
     - alarms
     - netdata
@@ -28,22 +28,22 @@ overview:
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ''
+    description: ""
   default_behavior:
     auto_detection:
       description: |
         It discovers instances of Netdata running on localhost, and gathers metrics from `http://127.0.0.1:19999/api/v1/alarms?all`. `CLEAR` status is mapped to `0`, `WARNING` to `1` and `CRITICAL` to `2`. Also, by default all alarms produced will be monitored.
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
     list: []
   configuration:
     file:
       name: python.d/alarms.conf
-      description: ''
+      description: ""
     options:
       description: |
         There are 2 sections:
@@ -74,17 +74,17 @@ setup:
           required: true
         - name: alarm_status_chart_type
           description: define the type of chart for plotting status over time e.g. 'line' or 'stacked'.
-          default_value: 'line'
+          default_value: "line"
           required: true
         - name: alarm_contains_words
           description: |
             A "," separated list of words you want to filter alarm names for. For example 'cpu,load' would filter for only alarms with "cpu" or "load" in alarm name. Default includes all.
-          default_value: ''
+          default_value: ""
           required: true
         - name: alarm_excludes_words
           description: |
             A "," separated list of words you want to exclude based on alarm name. For example 'cpu,load' would exclude all alarms with "cpu" or "load" in alarm name. Default excludes None.
-          default_value: ''
+          default_value: ""
           required: true
         - name: update_every
           description: Sets the default data collection frequency.
@@ -104,7 +104,7 @@ setup:
           required: false
         - name: name
           description: Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works.
-          default_value: ''
+          default_value: ""
           required: false
     examples:
       folding:
@@ -162,15 +162,15 @@ metrics:
         These metrics refer to the entire monitored application.
       labels: []
       metrics:
-      - name: alarms.status
-        description: Alarms ({status mapping})
-        unit: "status"
-        chart_type: line
-        dimensions:
-        - name: a dimension per alarm representing the latest status of the alarm.
-      - name: alarms.values
-        description: Alarm Values
-        unit: "value"
-        chart_type: line
-        dimensions:
-        - name: a dimension per alarm representing the latest collected value of the alarm.
+        - name: alarms.status
+          description: Alarms ({status mapping})
+          unit: "status"
+          chart_type: line
+          dimensions:
+            - name: a dimension per alarm representing the latest status of the alarm.
+        - name: alarms.values
+          description: Alarm Values
+          unit: "value"
+          chart_type: line
+          dimensions:
+            - name: a dimension per alarm representing the latest collected value of the alarm.

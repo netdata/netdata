@@ -7,12 +7,12 @@ meta:
     link: https://learn.netdata.cloud/docs/data-collection/examples/example-module-in-python
     categories:
       - data-collection.other
-    icon_filename: ''
+    icon_filename: ""
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
+    description: ""
   keywords:
     - example
     - netdata
@@ -31,21 +31,21 @@ overview:
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ''
+    description: ""
   default_behavior:
     auto_detection:
-      description: ''
+      description: ""
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
     list: []
   configuration:
     file:
       name: python.d/example.conf
-      description: ''
+      description: ""
     options:
       description: |
         There are 2 sections:
@@ -92,7 +92,7 @@ setup:
           required: false
         - name: name
           description: Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works.
-          default_value: ''
+          default_value: ""
           required: false
     examples:
       folding:
@@ -129,9 +129,9 @@ metrics:
         These metrics refer to the entire monitored application.
       labels: []
       metrics:
-      - name: example.random
-        description: A random number
-        unit: number
-        chart_type: line
-        dimensions:
-        - random: a dimension per `num_lines`.
+        - name: example.random
+          description: A random number
+          unit: number
+          chart_type: line
+          dimensions:
+            - random: a dimension per `num_lines`.
