@@ -119,7 +119,6 @@ platforms, but may require some extra effort from users.
 | macOS        | 13         | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies                         |
 | macOS        | 12         | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies                         |
 | macOS        | 11         | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies.                        |
-| openSUSE     | Tumbleweed | No                       |                                                                                                           |
 
 ## Third-party supported platforms
 
