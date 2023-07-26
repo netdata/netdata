@@ -3,7 +3,7 @@ meta:
   module_name: nfacct.plugin
   monitored_instance:
     name: Netfilter
-    link: ''
+    link: 'https://www.netfilter.org/'
     categories:
     - data-collection.networking-stack-and-network-interfaces
     icon_filename: 'netfilter.png'
@@ -17,33 +17,43 @@ meta:
 overview:
   data_collection:
     metrics_description: 'Monitor Netfilter metrics for optimal packet filtering and manipulation. Keep tabs on packet counts, dropped packets, and error rates to secure network operations.'
-    method_description: ''
+    method_description: 'Netdata uses libmnl (https://www.netfilter.org/projects/libmnl/index.html) to collect information.'
   supported_platforms:
     include: []
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ''
+    description: 'This plugin needs setuid.'
   default_behavior:
     auto_detection:
-      description: ''
+      description: 'This plugin uses socket to connect with netfilter to collect data'
     limits:
       description: ''
     performance_impact:
       description: ''
 setup:
   prerequisites:
-    list: []
+    list: |
+      It is necessary to have `libmnl` installed on host.
   configuration:
     file:
-      name: ''
-      description: ''
+      name: 'netdata.conf'
+      section_name: '[plugin:nfacct]'
+      description: 'This is netdata main configuration file'
     options:
       description: ''
       folding:
-        title: ''
+        title: 'Config options'
         enabled: true
-      list: []
+      list: |
+        - name: update every
+          description: Data collection frequency.
+          default_value: 1
+          required: false
+        - name: command options
+          description: Additinal parameters for collector
+          default_value:
+          required: false
     examples:
       folding:
         enabled: true
