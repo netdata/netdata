@@ -2,72 +2,40 @@
 ---
 meta:
   plugin_name: python.d.plugin
-  module_name: fail2ban
+  module_name: example
   monitored_instance:
-    name: Fail2ban
-    link: https://www.fail2ban.org/
+    name: python.d alarms
+    link: https://learn.netdata.cloud/docs/data-collection/examples/example-module-in-python
     categories:
-      - data-collection.authentication-and-authorization
-    icon_filename: "fail2ban.png"
+      - data-collection.other
+    icon_filename: ""
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
     description: ""
   keywords:
-    - fail2ban
-    - security
-    - authentication
-    - authorization
+    - example
+    - netdata
+    - python
   most_popular: false
 overview:
   data_collection:
     metrics_description: |
-      Monitor Fail2ban performance for prime intrusion prevention operations. Monitor ban counts, jail statuses, and failed login attempts to ensure robust network security.
+      Example collector that generates some random numbers as metrics.
+
+      If you want to write your own collector, read our [writing a new Python module](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/README.md#how-to-write-a-new-module) tutorial.
     method_description: |
-      It collects metrics through reading the default log and configuration files of fail2ban.
+      The `get_data()` function uses `random.randint()` to generate a random number which will be collected as a metric.
   supported_platforms:
     include: []
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: |
-      The `fail2ban.log` file must be readable by the user `netdata`.
-        - change the file ownership and access permissions.
-        - update `/etc/logrotate.d/fail2ban`` to persist the changes after rotating the log file.
-
-      To change the file ownership and access permissions, execute the following:
-
-      ```shell
-      sudo chown root:netdata /var/log/fail2ban.log
-      sudo chmod 640 /var/log/fail2ban.log
-      ```
-
-      To persist the changes after rotating the log file, add `create 640 root netdata` to the `/etc/logrotate.d/fail2ban`:
-
-      ```shell
-      /var/log/fail2ban.log {
-
-          weekly
-          rotate 4
-          compress
-
-          delaycompress
-          missingok
-          postrotate
-              fail2ban-client flushlogs 1>/dev/null
-          endscript
-
-          # If fail2ban runs as non-root it still needs to have write access
-          # to logfiles.
-          # create 640 fail2ban adm
-          create 640 root netdata
-      }
-      ```
+    description: ""
   default_behavior:
     auto_detection:
-      description: |
-        By default the collector will attempt to read log file at /var/log/fail2ban.log and conf file at /etc/fail2ban/jail.local. If conf file is not found default jail is ssh.
+      description: ""
     limits:
       description: ""
     performance_impact:
@@ -77,7 +45,7 @@ setup:
     list: []
   configuration:
     file:
-      name: ""
+      name: python.d/example.conf
       description: ""
     options:
       description: |
@@ -95,21 +63,17 @@ setup:
         title: Config options
         enabled: true
       list:
-        - name: log_path
-          description: path to fail2ban.log.
-          default_value: /var/log/fail2ban.log
+        - name: num_lines
+          description: The number of lines to create.
+          default_value: 4
           required: false
-        - name: conf_path
-          description: path to jail.local/jail.conf.
-          default_value: /etc/fail2ban/jail.local
+        - name: lower
+          description: The lower bound of numbers to randomly sample from.
+          default_value: 0
           required: false
-        - name: conf_dir
-          description: path to jail.d/.
-          default_value: /etc/fail2ban/jail.d/
-          required: false
-        - name: exclude
-          description: jails you want to exclude from autodetection.
-          default_value: ""
+        - name: upper
+          description: The upper bound of numbers to randomly sample from.
+          default_value: 100
           required: false
         - name: update_every
           description: Sets the default data collection frequency.
@@ -141,9 +105,15 @@ setup:
             enabled: false
           description: A basic example configuration.
           config: |
-            local:
-              log_path: '/var/log/fail2ban.log'
-              conf_path: '/etc/fail2ban/jail.local'
+            four_lines:
+                name: "Four Lines"
+                update_every: 1
+                priority: 60000
+                penalty: yes
+                autodetection_retry: 0
+                num_lines: 4
+                lower: 0
+                upper: 100
 troubleshooting:
   problems:
     list: []
@@ -160,21 +130,9 @@ metrics:
         These metrics refer to the entire monitored application.
       labels: []
       metrics:
-        - name: fail2ban.failed_attempts
-          description: Failed attempts
-          unit: "attempts/s"
+        - name: example.random
+          description: A random number
+          unit: number
           chart_type: line
           dimensions:
-            - name: a dimension per jail
-        - name: fail2ban.bans
-          description: Bans
-          unit: "bans/s"
-          chart_type: line
-          dimensions:
-            - name: a dimension per jail
-        - name: fail2ban.banned_ips
-          description: Banned IP addresses (since the last restart of netdata)
-          unit: "ips"
-          chart_type: line
-          dimensions:
-            - name: a dimension per jail
+            - random: a dimension per `num_lines`.

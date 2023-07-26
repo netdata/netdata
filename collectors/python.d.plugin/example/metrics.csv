@@ -1,0 +1,2 @@
+metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
+example.random,,a dimension per `num_lines`,,A random number,line,,python.d.plugin,example
