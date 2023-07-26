@@ -1,53 +1,55 @@
+# yamllint disable rule:line-length
+---
 meta:
   plugin_name: timex.plugin
   module_name: timex.plugin
   monitored_instance:
     name: Timex
-    link: ''
+    link: ""
     categories:
     - data-collection.system-clock-and-ntp
-    icon_filename: 'syslog.png'
+    icon_filename: "syslog.png"
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
+    description: ""
   keywords: []
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'Examine Timex metrics to gain insights into system clock operations. Study time sync status, clock drift, and adjustments to ensure accurate system timekeeping.'
-    method_description: ''
+    metrics_description: "Examine Timex metrics to gain insights into system clock operations. Study time sync status, clock drift, and adjustments to ensure accurate system timekeeping."
+    method_description: ""
   supported_platforms:
     include: []
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ''
+    description: ""
   default_behavior:
     auto_detection:
-      description: ''
+      description: ""
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
     list: []
   configuration:
     file:
-      name: ''
-      description: ''
+      name: ""
+      description: ""
     options:
-      description: ''
+      description: ""
       folding:
-        title: ''
+        title: ""
         enabled: true
       list: []
     examples:
       folding:
         enabled: true
-        title: ''
+        title: ""
       list: []
 troubleshooting:
   problems:
