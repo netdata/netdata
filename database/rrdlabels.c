@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#define NETDATA_RRD_INTERNALS
-#include "rrd.h"
+#include "rrdlabels.h"
 
 // ----------------------------------------------------------------------------
 // labels sanitization
@@ -634,23 +633,6 @@ void rrdlabels_add_pair(DICTIONARY *dict, const char *string, RRDLABEL_SRC ls) {
     rrdlabels_add(dict, name, value, ls);
 }
 
-// ----------------------------------------------------------------------------
-// rrdlabels_get_value_to_buffer_or_null()
-
-void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const char *key, const char *quote, const char *null) {
-    if(!labels) return;
-
-    const DICTIONARY_ITEM *acquired_item = dictionary_get_and_acquire_item(labels, key);
-    RRDLABEL *lb = dictionary_acquired_item_value(acquired_item);
-
-    if(lb && lb->label_value)
-        buffer_sprintf(wb, "%s%s%s", quote, string2str(lb->label_value), quote);
-    else
-        buffer_strcat(wb, null);
-
-    dictionary_acquired_item_release(labels, acquired_item);
-}
-
 void rrdlabels_value_to_buffer_array_item_or_null(DICTIONARY *labels, BUFFER *wb, const char *key) {
     if(!labels) return;
 
@@ -1029,18 +1011,6 @@ void rrdlabels_to_buffer_json_members(DICTIONARY *labels, BUFFER *wb) {
     }
     dfe_done(lb);
 }
-
-void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels) {
-    if(!st->rrdlabels)
-        st->rrdlabels = rrdlabels_create();
-
-    if (new_rrdlabels)
-        rrdlabels_migrate_to_these(st->rrdlabels, new_rrdlabels);
-
-    rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
-    rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
-}
-
 
 // ----------------------------------------------------------------------------
 // rrdlabels unit test

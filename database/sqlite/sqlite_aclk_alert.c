@@ -430,7 +430,7 @@ void aclk_push_alert_events_for_all_hosts(void)
 {
     RRDHOST *host;
 
-    dfe_start_reentrant(rrdhost_root_index, host) {
+    dfe_start_reentrant(rrdb.rrdhost_root_index, host) {
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) || !rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS))
             continue;
 
@@ -504,7 +504,7 @@ void aclk_send_alarm_configuration(char *config_hash)
     if (unlikely(!config_hash))
         return;
 
-    struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *) localhost->aclk_sync_host_config;
+    struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *) rrdb.localhost->aclk_sync_host_config;
 
     if (unlikely(!wc))
         return;
@@ -529,7 +529,7 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
     sqlite3_stmt *res = NULL;
 
     struct aclk_sync_host_config *wc = NULL;
-    RRDHOST *host = find_host_by_node_id(node_id);
+    RRDHOST *host = rrdhost_find_by_node_id(node_id);
 
     if (unlikely(!host)) {
         freez(config_hash);
@@ -655,7 +655,7 @@ void aclk_start_alert_streaming(char *node_id, bool resets)
     if (uuid_parse(node_id, node_uuid))
         return;
 
-    RRDHOST *host = find_host_by_node_id(node_id);
+    RRDHOST *host = rrdhost_find_by_node_id(node_id);
 
     if (unlikely(!host))
         return;
@@ -689,7 +689,7 @@ void aclk_start_alert_streaming(char *node_id, bool resets)
 void sql_process_queue_removed_alerts_to_aclk(char *node_id)
 {
     struct aclk_sync_host_config *wc;
-    RRDHOST *host = find_host_by_node_id(node_id);
+    RRDHOST *host = rrdhost_find_by_node_id(node_id);
     freez(node_id);
 
     if (unlikely(!host || !(wc = host->aclk_sync_host_config)))
@@ -750,7 +750,7 @@ void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id __maybe_unus
     if (unlikely(!node_id || uuid_parse(node_id, node_uuid)))
         return;
 
-    RRDHOST *host = find_host_by_node_id(node_id);
+    RRDHOST *host = rrdhost_find_by_node_id(node_id);
     if (unlikely(!host)) {
         netdata_log_access("ACLK STA [%s (N/A)]: ACLK node id does not exist", node_id);
         return;
@@ -854,7 +854,7 @@ static int have_recent_alarm(RRDHOST *host, uint32_t alarm_id, uint32_t mark)
 void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
 {
 #ifdef ENABLE_ACLK
-    RRDHOST *host = find_host_by_node_id(node_id);
+    RRDHOST *host = rrdhost_find_by_node_id(node_id);
 
     if (unlikely(!host)) {
         netdata_log_access("AC [%s (N/A)]: Node id not found", node_id);
@@ -1039,7 +1039,7 @@ void aclk_send_alarm_checkpoint(char *node_id, char *claim_id __maybe_unused)
         return;
 
     struct aclk_sync_host_config *wc = NULL;
-    RRDHOST *host = find_host_by_node_id(node_id);
+    RRDHOST *host = rrdhost_find_by_node_id(node_id);
 
     if (unlikely(!host))
         return;

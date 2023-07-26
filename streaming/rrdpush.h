@@ -395,7 +395,7 @@ struct receiver_state {
     } exit;
 
     struct {
-        RRD_MEMORY_MODE mode;
+        STORAGE_ENGINE_ID storage_engine_id;
         int history;
         int update_every;
         int health_enabled; // CONFIG_BOOLEAN_YES, CONFIG_BOOLEAN_NO, CONFIG_BOOLEAN_AUTO
@@ -696,7 +696,7 @@ typedef struct rrdhost_status {
     struct {
         RRDHOST_DB_STATUS status;
         RRDHOST_DB_LIVENESS liveness;
-        RRD_MEMORY_MODE mode;
+        STORAGE_ENGINE_ID storage_engine_id;
         time_t first_time_s;
         time_t last_time_s;
         size_t metrics;

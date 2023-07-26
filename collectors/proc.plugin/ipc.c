@@ -327,7 +327,7 @@ int do_ipc(int update_every, usec_t dt) {
                         , PLUGIN_PROC_NAME
                         , "ipc"
                         , NETDATA_CHART_PRIO_SYSTEM_IPC_SEMAPHORES
-                        , localhost->rrd_update_every
+                        , rrdb.localhost->update_every
                         , RRDSET_TYPE_AREA
                 );
                 rd_semaphores = rrddim_add(st_semaphores, "semaphores", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -345,15 +345,15 @@ int do_ipc(int update_every, usec_t dt) {
                         , PLUGIN_PROC_NAME
                         , "ipc"
                         , NETDATA_CHART_PRIO_SYSTEM_IPC_SEM_ARRAYS
-                        , localhost->rrd_update_every
+                        , rrdb.localhost->update_every
                         , RRDSET_TYPE_AREA
                 );
                 rd_arrays = rrddim_add(st_arrays, "arrays", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
 
             // variables
-            semaphores_max = rrdvar_custom_host_variable_add_and_acquire(localhost, "ipc_semaphores_max");
-            arrays_max     = rrdvar_custom_host_variable_add_and_acquire(localhost, "ipc_semaphores_arrays_max");
+            semaphores_max = rrdvar_custom_host_variable_add_and_acquire(rrdb.localhost, "ipc_semaphores_max");
+            arrays_max     = rrdvar_custom_host_variable_add_and_acquire(rrdb.localhost, "ipc_semaphores_arrays_max");
         }
 
         struct stat stbuf;
@@ -373,8 +373,8 @@ int do_ipc(int update_every, usec_t dt) {
                 collector_error("Unable to fetch semaphore limits.");
             }
             else {
-                if(semaphores_max) rrdvar_custom_host_variable_set(localhost, semaphores_max, limits.semmns);
-                if(arrays_max)     rrdvar_custom_host_variable_set(localhost, arrays_max,     limits.semmni);
+                if(semaphores_max) rrdvar_custom_host_variable_set(rrdb.localhost, semaphores_max, limits.semmns);
+                if(arrays_max)     rrdvar_custom_host_variable_set(rrdb.localhost, arrays_max,     limits.semmni);
 
                 st_arrays->red = limits.semmni;
                 st_semaphores->red = limits.semmns;

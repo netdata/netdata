@@ -96,7 +96,7 @@ struct replication_query {
     size_t points_read;
     size_t points_generated;
 
-    STORAGE_ENGINE_BACKEND backend;
+    STORAGE_ENGINE_ID id;
     struct replication_request *rq;
 
     size_t dimensions;
@@ -162,7 +162,7 @@ static struct replication_query *replication_query_prepare(
         }
     }
 
-    q->backend = st->rrdhost->db[0].eng->backend;
+    q->id = st->rrdhost->db[0].id;
 
     // prepare our array of dimensions
     size_t count = 0;
@@ -184,7 +184,7 @@ static struct replication_query *replication_query_prepare(
         d->rda = dictionary_acquired_item_dup(rd_dfe.dict, rd_dfe.item);
         d->rd = rd;
 
-        storage_engine_query_init(q->backend, rd->tiers[0].db_metric_handle, &d->handle, q->query.after, q->query.before,
+        storage_engine_query_init(q->id, rd->tiers[0].db_metric_handle, &d->handle, q->query.after, q->query.before,
                      q->query.locked_data_collection ? STORAGE_PRIORITY_HIGH : STORAGE_PRIORITY_LOW);
         d->enabled = true;
         d->skip = false;
@@ -1406,7 +1406,7 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
         if(likely(workers))
             worker_is_busy(WORKER_JOB_FIND_CHART);
 
-        rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
+        rq->st = rrdset_find_by_id(rq->sender->host, string2str(rq->chart_id));
     }
 
     if(!rq->st) {
@@ -1601,7 +1601,7 @@ static void verify_all_hosts_charts_are_streaming_now(void) {
 
     size_t errors = 0;
     RRDHOST *host;
-    dfe_start_read(rrdhost_root_index, host)
+    dfe_start_read(rrdb.rrdhost_root_index, host)
         errors += verify_host_charts_are_streaming_now(host);
     dfe_done(host);
 
@@ -1695,8 +1695,8 @@ static int replication_pipeline_execute_next(void) {
     if(unlikely(!rtp.rqs)) {
         rtp.max_requests_ahead = (int)get_netdata_cpus() / 2;
 
-        if(rtp.max_requests_ahead > libuv_worker_threads * 2)
-            rtp.max_requests_ahead = libuv_worker_threads * 2;
+        if(rtp.max_requests_ahead > rrdb.libuv_worker_threads * 2)
+            rtp.max_requests_ahead = rrdb.libuv_worker_threads * 2;
 
         if(rtp.max_requests_ahead < 2)
             rtp.max_requests_ahead = 2;
@@ -1722,7 +1722,7 @@ static int replication_pipeline_execute_next(void) {
         if(rq->found) {
             if (!rq->st) {
                 worker_is_busy(WORKER_JOB_FIND_CHART);
-                rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
+                rq->st = rrdset_find_by_id(rq->sender->host, string2str(rq->chart_id));
             }
 
             if (rq->st && !rq->q) {
@@ -1896,7 +1896,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
 
         // statistics
         usec_t now_mono_ut = now_monotonic_usec();
-        if(unlikely(now_mono_ut - last_now_mono_ut > default_rrd_update_every * USEC_PER_SEC)) {
+        if(unlikely(now_mono_ut - last_now_mono_ut > rrdb.default_update_every * USEC_PER_SEC)) {
             last_now_mono_ut = now_mono_ut;
 
             worker_is_busy(WORKER_JOB_STATISTICS);

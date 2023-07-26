@@ -22,7 +22,7 @@
 
 struct analytics_data {
     char *netdata_config_stream_enabled;
-    char *netdata_config_memory_mode;
+    char *netdata_config_storage_engine_name;
     char *netdata_exporting_connectors;
     char *netdata_config_exporting_enabled;
     char *netdata_allmetrics_prometheus_used;

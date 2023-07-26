@@ -1139,8 +1139,8 @@ void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool r
 {
     // netdata_log_info("netdata_mmap('%s', %zu", filename, size);
 
-    // MAP_SHARED is used in memory mode map
-    // MAP_PRIVATE is used in memory mode ram and save
+    // MAP_SHARED is used in storage engine MAP
+    // MAP_PRIVATE is used in storage engine RAM and SAVE
 
     if(unlikely(!(flags & MAP_SHARED) && !(flags & MAP_PRIVATE)))
         fatal("Neither MAP_SHARED or MAP_PRIVATE were given to netdata_mmap()");

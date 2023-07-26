@@ -216,7 +216,7 @@ void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, bool
 static void rrdcontext_recalculate_retention_all_hosts(void) {
     rrdcontext_next_db_rotation_ut = 0;
     RRDHOST *host;
-    dfe_start_reentrant(rrdhost_root_index, host) {
+    dfe_start_reentrant(rrdb.rrdhost_root_index, host) {
         worker_is_busy(WORKER_JOB_RETENTION);
         rrdcontext_recalculate_host_retention(host, RRD_FLAG_UPDATE_REASON_DB_ROTATION, true);
     }
@@ -235,11 +235,9 @@ bool rrdmetric_update_retention(RRDMETRIC *rm) {
     }
     else {
         RRDHOST *rrdhost = rm->ri->rc->rrdhost;
-        for (size_t tier = 0; tier < storage_tiers; tier++) {
-            STORAGE_ENGINE *eng = rrdhost->db[tier].eng;
-
+        for (size_t tier = 0; tier < rrdb.storage_tiers; tier++) {
             time_t first_time_t, last_time_t;
-            if (eng->api.metric_retention_by_uuid(rrdhost->db[tier].instance, &rm->uuid, &first_time_t, &last_time_t)) {
+            if (storage_engine_metric_retention(rrdhost->db[tier].id, rrdhost->db[tier].instance, &rm->uuid, &first_time_t, &last_time_t)) {
                 if (first_time_t < min_first_time_t)
                     min_first_time_t = first_time_t;
 
@@ -436,7 +434,7 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jo
 
 static void rrdcontext_garbage_collect_for_all_hosts(void) {
     RRDHOST *host;
-    dfe_start_reentrant(rrdhost_root_index, host) {
+    dfe_start_reentrant(rrdb.rrdhost_root_index, host) {
         rrdcontext_garbage_collect_single_host(host, true);
     }
     dfe_done(host);
@@ -1104,7 +1102,7 @@ void *rrdcontext_main(void *ptr) {
                 size_t pp_queued_contexts_for_all_hosts = 0;
 
                 RRDHOST *host;
-                dfe_start_reentrant(rrdhost_root_index, host) {
+                dfe_start_reentrant(rrdb.rrdhost_root_index, host) {
                     if(unlikely(!service_running(SERVICE_CONTEXT))) break;
 
                     worker_is_busy(WORKER_JOB_HOSTS);

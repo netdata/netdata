@@ -961,8 +961,8 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
 
     int scale = (scale_str && *scale_str)?str2i(scale_str):100;
 
-    st = rrdset_find(host, chart);
-    if(!st) st = rrdset_find_byname(host, chart);
+    st = rrdset_find_by_id(host, chart);
+    if(!st) st = rrdset_find_by_name(host, chart);
     if(!st) {
         buffer_no_cacheable(w->response.data);
         buffer_svg(w->response.data, "chart not found", NAN, "", NULL, NULL, -1, scale, 0, -1, -1, NULL, NULL);
@@ -1111,7 +1111,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         ret = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
         // if the collected value is too old, don't calculate its value
-        if (rrdset_last_entry_s(st) >= (now_realtime_sec() - (st->update_every * gap_when_lost_iterations_above)))
+        if (rrdset_last_entry_s(st) >= (now_realtime_sec() - (st->update_every * rrdb.gap_when_lost_iterations_above)))
             ret = rrdset2value_api_v1(st, w->response.data, &n,
                                       (dimensions) ? buffer_tostring(dimensions) : NULL,
                                       points, after, before, group, group_options, 0, options,

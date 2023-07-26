@@ -215,7 +215,7 @@ static int store_claim_id(uuid_t *host_id, uuid_t *claim_id)
     int rc;
 
     if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        if (default_storage_engine_id == STORAGE_ENGINE_DBENGINE)
             error_report("Database has not been initialized");
         return 1;
     }
@@ -287,7 +287,7 @@ static int store_host_metadata(RRDHOST *host)
     int rc, param = 0;
 
     if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+        if (default_storage_engine_id != STORAGE_ENGINE_DBENGINE)
             return 0;
         error_report("Database has not been initialized");
         return 1;
@@ -313,7 +313,7 @@ static int store_host_metadata(RRDHOST *host)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, ++param, host->rrd_update_every);
+    rc = sqlite3_bind_int(res, ++param, host->update_every);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -333,7 +333,7 @@ static int store_host_metadata(RRDHOST *host)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, ++param, host->rrd_memory_mode);
+    rc = sqlite3_bind_int(res, ++param, host->storage_engine_id);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -384,7 +384,7 @@ static int add_host_sysinfo_key_value(const char *name, const char *value, uuid_
     int rc, param = 0;
 
     if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+        if (default_storage_engine_id != STORAGE_ENGINE_DBENGINE)
             return 0;
         error_report("Database has not been initialized");
         return 0;
@@ -475,7 +475,7 @@ static int store_chart_metadata(RRDSET *st)
     int rc, param = 0, store_rc = 0;
 
     if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+        if (default_storage_engine_id != STORAGE_ENGINE_DBENGINE)
             return 0;
         error_report("Database has not been initialized");
         return 1;
@@ -549,7 +549,7 @@ static int store_chart_metadata(RRDSET *st)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, ++param, st->rrd_memory_mode);
+    rc = sqlite3_bind_int(res, ++param, st->storage_engine_id);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -584,7 +584,7 @@ static int store_dimension_metadata(RRDDIM *rd)
     int rc, param = 0;
 
     if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+        if (default_storage_engine_id != STORAGE_ENGINE_DBENGINE)
             return 0;
         error_report("Database has not been initialized");
         return 1;
@@ -653,13 +653,13 @@ bind_fail:
 static bool dimension_can_be_deleted(uuid_t *dim_uuid __maybe_unused)
 {
 #ifdef ENABLE_DBENGINE
-    if(dbengine_enabled) {
+    if (rrdb.dbengine_enabled) {
         bool no_retention = true;
-        for (size_t tier = 0; tier < storage_tiers; tier++) {
-            if (!multidb_ctx[tier])
+        for (size_t tier = 0; tier < rrdb.storage_tiers; tier++) {
+            if (!rrdb.multidb_ctx[tier])
                 continue;
             time_t first_time_t = 0, last_time_t = 0;
-            if (rrdeng_metric_retention_by_uuid((void *) multidb_ctx[tier], dim_uuid, &first_time_t, &last_time_t)) {
+            if (rrdeng_metric_retention_by_uuid((void *) rrdb.multidb_ctx[tier], dim_uuid, &first_time_t, &last_time_t)) {
                 if (first_time_t > 0) {
                     no_retention = false;
                     break;
@@ -728,7 +728,7 @@ skip_run:
 static void cleanup_health_log(void)
 {
     RRDHOST *host;
-    dfe_start_reentrant(rrdhost_root_index, host) {
+    dfe_start_reentrant(rrdb.rrdhost_root_index, host) {
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))
             continue;
         sql_health_alarm_log_cleanup(host);
@@ -990,7 +990,7 @@ static void start_all_host_load_context(uv_work_t *req __maybe_unused)
     struct host_context_load_thread *hclt = callocz(max_threads, sizeof(*hclt));
 
     size_t thread_index;
-    dfe_start_reentrant(rrdhost_root_index, host) {
+    dfe_start_reentrant(rrdb.rrdhost_root_index, host) {
        if (rrdhost_flag_check(host, RRDHOST_FLAG_CONTEXT_LOAD_IN_PROGRESS) ||
            !rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
            continue;
@@ -1141,7 +1141,7 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
     if (!data->max_count)
         transaction_started = !db_execute(db_meta, "BEGIN TRANSACTION;");
 
-    dfe_start_reentrant(rrdhost_root_index, host) {
+    dfe_start_reentrant(rrdb.rrdhost_root_index, host) {
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) || !rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE))
             continue;
 
@@ -1335,7 +1335,7 @@ static void metadata_event_loop(void *arg)
                     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SCANNING_HOSTS)))
                         break;
 
-                    if (unittest_running)
+                    if (rrdb.unittest_running)
                         break;
 
                     data = mallocz(sizeof(*data));
@@ -1363,7 +1363,7 @@ static void metadata_event_loop(void *arg)
                     }
                     break;
                 case METADATA_LOAD_HOST_CONTEXT:;
-                    if (unittest_running)
+                    if (rrdb.unittest_running)
                         break;
 
                     data = callocz(1,sizeof(*data));

@@ -248,6 +248,7 @@ size_t judy_aral_structures(void);
 #define ABS(x) (((x) < 0)? (-(x)) : (x))
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
+#define CLAMP(value, min, max) MIN(MAX((value), (min)), (max))
 
 #define GUID_LEN 36
 
@@ -839,8 +840,6 @@ extern char *netdata_configured_host_prefix;
 
 // BEWARE: this exists in alarm-notify.sh
 #define DEFAULT_CLOUD_BASE_URL "https://app.netdata.cloud"
-
-#define RRD_STORAGE_TIERS 5
 
 static inline size_t struct_natural_alignment(size_t size) __attribute__((const));
 

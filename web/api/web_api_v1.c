@@ -494,8 +494,8 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
         goto cleanup;
     }
 
-    RRDSET *st = rrdset_find(host, chart);
-    if(!st) st = rrdset_find_byname(host, chart);
+    RRDSET *st = rrdset_find_by_id(host, chart);
+    if(!st) st = rrdset_find_by_name(host, chart);
     if(!st) {
         buffer_strcat(w->response.data, "Chart is not found: ");
         buffer_strcat_htmlescape(w->response.data, chart);
@@ -762,7 +762,7 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
         }
         else if(!strcmp(name, "tier")) {
             tier = str2ul(value);
-            if(tier < storage_tiers)
+            if(tier < rrdb.storage_tiers)
                 options |= RRDR_OPTION_SELECTED_TIER;
             else
                 tier = 0;
@@ -788,8 +788,8 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
 
     if(chart && !context) {
         // check if this is a specific chart
-        st = rrdset_find(host, chart);
-        if (!st) st = rrdset_find_byname(host, chart);
+        st = rrdset_find_by_id(host, chart);
+        if (!st) st = rrdset_find_by_name(host, chart);
     }
 
     long long before = (before_str && *before_str)?str2l(before_str):0;
@@ -1116,8 +1116,8 @@ static inline void web_client_api_request_v1_info_mirrored_hosts_status(BUFFER *
     buffer_json_add_array_item_object(wb);
 
     buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
-    buffer_json_member_add_uint64(wb, "hops", host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
-    buffer_json_member_add_boolean(wb, "reachable", (host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)));
+    buffer_json_member_add_uint64(wb, "hops", host->system_info ? host->system_info->hops : (host == rrdb.localhost) ? 0 : 1);
+    buffer_json_member_add_boolean(wb, "reachable", (host == rrdb.localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)));
 
     buffer_json_member_add_string(wb, "guid", host->machine_guid);
     buffer_json_member_add_uuid(wb, "node_id", host->node_id);
@@ -1140,12 +1140,12 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
 
     buffer_json_member_add_array(wb, "mirrored_hosts_status");
     rrdhost_foreach_read(host) {
-        if ((host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) {
+        if ((host == rrdb.localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) {
             web_client_api_request_v1_info_mirrored_hosts_status(wb, host);
         }
     }
     rrdhost_foreach_read(host) {
-        if ((host != localhost && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) {
+        if ((host != rrdb.localhost && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) {
             web_client_api_request_v1_info_mirrored_hosts_status(wb, host);
         }
     }
@@ -1257,10 +1257,10 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_json_member_add_boolean(wb, "aclk-available", false);
 #endif
 
-    buffer_json_member_add_string(wb, "memory-mode", rrd_memory_mode_name(host->rrd_memory_mode));
+    buffer_json_member_add_string(wb, "memory-mode", storage_engine_name(host->storage_engine_id));
 #ifdef ENABLE_DBENGINE
-    buffer_json_member_add_uint64(wb, "multidb-disk-quota", default_multidb_disk_quota_mb);
-    buffer_json_member_add_uint64(wb, "page-cache-size", default_rrdeng_page_cache_mb);
+    buffer_json_member_add_uint64(wb, "multidb-disk-quota", rrdb.default_multidb_disk_quota_mb);
+    buffer_json_member_add_uint64(wb, "page-cache-size", rrdb.default_rrdeng_page_cache_mb);
 #endif // ENABLE_DBENGINE
     buffer_json_member_add_boolean(wb, "web-enabled", web_server_mode != WEB_SERVER_MODE_NONE);
     buffer_json_member_add_boolean(wb, "stream-enabled", default_rrdpush_enabled);
@@ -1431,68 +1431,6 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
     return HTTP_RESP_NOT_FOUND;
 }
 #else
-static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
-    RRDENG_SIZE_STATS stats = rrdeng_size_statistics(multidb_ctx[tier]);
-
-    buffer_sprintf(wb,
-                   "\n\t\t\"default_granularity_secs\":%zu"
-                   ",\n\t\t\"sizeof_datafile\":%zu"
-                   ",\n\t\t\"sizeof_page_in_cache\":%zu"
-                   ",\n\t\t\"sizeof_point_data\":%zu"
-                   ",\n\t\t\"sizeof_page_data\":%zu"
-                   ",\n\t\t\"pages_per_extent\":%zu"
-                   ",\n\t\t\"datafiles\":%zu"
-                   ",\n\t\t\"extents\":%zu"
-                   ",\n\t\t\"extents_pages\":%zu"
-                   ",\n\t\t\"points\":%zu"
-                   ",\n\t\t\"metrics\":%zu"
-                   ",\n\t\t\"metrics_pages\":%zu"
-                   ",\n\t\t\"extents_compressed_bytes\":%zu"
-                   ",\n\t\t\"pages_uncompressed_bytes\":%zu"
-                   ",\n\t\t\"pages_duration_secs\":%lld"
-                   ",\n\t\t\"single_point_pages\":%zu"
-                   ",\n\t\t\"first_t\":%ld"
-                   ",\n\t\t\"last_t\":%ld"
-                   ",\n\t\t\"database_retention_secs\":%lld"
-                   ",\n\t\t\"average_compression_savings\":%0.2f"
-                   ",\n\t\t\"average_point_duration_secs\":%0.2f"
-                   ",\n\t\t\"average_metric_retention_secs\":%0.2f"
-                   ",\n\t\t\"ephemeral_metrics_per_day_percent\":%0.2f"
-                   ",\n\t\t\"average_page_size_bytes\":%0.2f"
-                   ",\n\t\t\"estimated_concurrently_collected_metrics\":%zu"
-                   ",\n\t\t\"currently_collected_metrics\":%zu"
-                   ",\n\t\t\"disk_space\":%zu"
-                   ",\n\t\t\"max_disk_space\":%zu"
-                   , stats.default_granularity_secs
-                   , stats.sizeof_datafile
-                   , stats.sizeof_page_in_cache
-                   , stats.sizeof_point_data
-                   , stats.sizeof_page_data
-                   , stats.pages_per_extent
-                   , stats.datafiles
-                   , stats.extents
-                   , stats.extents_pages
-                   , stats.points
-                   , stats.metrics
-                   , stats.metrics_pages
-                   , stats.extents_compressed_bytes
-                   , stats.pages_uncompressed_bytes
-                   , (long long)stats.pages_duration_secs
-                   , stats.single_point_pages
-                   , stats.first_time_s
-                   , stats.last_time_s
-                   , (long long)stats.database_retention_secs
-                   , stats.average_compression_savings
-                   , stats.average_point_duration_secs
-                   , stats.average_metric_retention_secs
-                   , stats.ephemeral_metrics_per_day_percent
-                   , stats.average_page_size_bytes
-                   , stats.estimated_concurrently_collected_metrics
-                   , stats.currently_collected_metrics
-                   , stats.disk_space
-                   , stats.max_disk_space
-                   );
-}
 int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struct web_client *w, char *url __maybe_unused) {
     if (!netdata_ready)
         return HTTP_RESP_BACKEND_FETCH_FAILED;
@@ -1500,7 +1438,7 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
 
-    if(!dbengine_enabled) {
+    if(!rrdb.dbengine_enabled) {
         buffer_strcat(wb, "dbengine is not enabled");
         return HTTP_RESP_NOT_FOUND;
     }
@@ -1508,9 +1446,9 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
     wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
     buffer_strcat(wb, "{");
-    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < rrdb.storage_tiers ;tier++) {
         buffer_sprintf(wb, "%s\n\t\"tier%zu\": {", tier?",":"", tier);
-        web_client_api_v1_dbengine_stats_for_tier(wb, tier);
+        rrdeng_size_statistics(rrdb.multidb_ctx[tier], wb);
         buffer_strcat(wb, "\n\t}");
     }
     buffer_strcat(wb, "\n}");

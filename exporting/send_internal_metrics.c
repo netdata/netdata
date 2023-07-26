@@ -19,7 +19,7 @@ void create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_
 
     *st_rusage = rrdset_create_localhost(
         "netdata", "exporting_main_thread_cpu", NULL, "exporting", "exporting_cpu_usage", "Netdata Main Exporting Thread CPU Usage",
-        "milliseconds/s", "exporting", NULL, 130600, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+        "milliseconds/s", "exporting", NULL, 130600, rrdb.localhost->update_every, RRDSET_TYPE_STACKED);
 
     *rd_user = rrddim_add(*st_rusage, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
     *rd_system = rrddim_add(*st_rusage, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);

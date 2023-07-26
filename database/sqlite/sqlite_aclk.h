@@ -38,7 +38,7 @@ static inline int uuid_parse_fix(char *in, uuid_t uuid)
 
 static inline int claimed()
 {
-    return localhost->aclk_state.claimed_id != NULL;
+    return rrdb.localhost->aclk_state.claimed_id != NULL;
 }
 
 #define TABLE_ACLK_ALERT "CREATE TABLE IF NOT EXISTS aclk_alert_%s (sequence_id INTEGER PRIMARY KEY, " \

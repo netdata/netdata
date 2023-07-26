@@ -913,15 +913,15 @@ void aclk_host_state_update(RRDHOST *host, int cmd)
             // node_id not found
             aclk_query_t create_query;
             create_query = aclk_query_new(REGISTER_NODE);
-            rrdhost_aclk_state_lock(localhost);
+            rrdhost_aclk_state_lock(rrdb.localhost);
             node_instance_creation_t node_instance_creation = {
-                .claim_id = localhost->aclk_state.claimed_id,
+                .claim_id = rrdb.localhost->aclk_state.claimed_id,
                 .hops = host->system_info->hops,
                 .hostname = rrdhost_hostname(host),
                 .machine_guid = host->machine_guid};
             create_query->data.bin_payload.payload =
                 generate_node_instance_creation(&create_query->data.bin_payload.size, &node_instance_creation);
-            rrdhost_aclk_state_unlock(localhost);
+            rrdhost_aclk_state_unlock(rrdb.localhost);
             create_query->data.bin_payload.topic = ACLK_TOPICID_CREATE_NODE;
             create_query->data.bin_payload.msg_name = "CreateNodeInstance";
             netdata_log_info("Registering host=%s, hops=%u", host->machine_guid, host->system_info->hops);
@@ -942,10 +942,10 @@ void aclk_host_state_update(RRDHOST *host, int cmd)
 
     node_state_update.capabilities = aclk_get_agent_capas();
 
-    rrdhost_aclk_state_lock(localhost);
-    node_state_update.claim_id = localhost->aclk_state.claimed_id;
+    rrdhost_aclk_state_lock(rrdb.localhost);
+    node_state_update.claim_id = rrdb.localhost->aclk_state.claimed_id;
     query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
-    rrdhost_aclk_state_unlock(localhost);
+    rrdhost_aclk_state_unlock(rrdb.localhost);
 
     netdata_log_info("Queuing status update for node=%s, live=%d, hops=%u",(char*)node_state_update.node_id, cmd,
          host->system_info->hops);
@@ -986,10 +986,10 @@ void aclk_send_node_instances()
             }
             node_state_update.capabilities = aclk_get_node_instance_capas(host);
 
-            rrdhost_aclk_state_lock(localhost);
-            node_state_update.claim_id = localhost->aclk_state.claimed_id;
+            rrdhost_aclk_state_lock(rrdb.localhost);
+            node_state_update.claim_id = rrdb.localhost->aclk_state.claimed_id;
             query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
-            rrdhost_aclk_state_unlock(localhost);
+            rrdhost_aclk_state_unlock(rrdb.localhost);
             netdata_log_info("Queuing status update for node=%s, live=%d, hops=%d",(char*)node_state_update.node_id,
                  list->live,
                  list->hops);
@@ -1010,10 +1010,10 @@ void aclk_send_node_instances()
             uuid_unparse_lower(list->host_id, (char*)node_instance_creation.machine_guid);
             create_query->data.bin_payload.topic = ACLK_TOPICID_CREATE_NODE;
             create_query->data.bin_payload.msg_name = "CreateNodeInstance";
-            rrdhost_aclk_state_lock(localhost);
-            node_instance_creation.claim_id = localhost->aclk_state.claimed_id,
+            rrdhost_aclk_state_lock(rrdb.localhost);
+            node_instance_creation.claim_id = rrdb.localhost->aclk_state.claimed_id,
             create_query->data.bin_payload.payload = generate_node_instance_creation(&create_query->data.bin_payload.size, &node_instance_creation);
-            rrdhost_aclk_state_unlock(localhost);
+            rrdhost_aclk_state_unlock(rrdb.localhost);
             netdata_log_info("Queuing registration for host=%s, hops=%d",(char*)node_instance_creation.machine_guid,
                  list->hops);
             freez((void *)node_instance_creation.machine_guid);
@@ -1124,9 +1124,9 @@ char *aclk_state(void)
                 buffer_sprintf(wb, "\n\tNode ID: %s\n", node_id);
             }
 
-            buffer_sprintf(wb, "\tStreaming Hops: %d\n\tRelationship: %s", host->system_info->hops, host == localhost ? "self" : "child");
+            buffer_sprintf(wb, "\tStreaming Hops: %d\n\tRelationship: %s", host->system_info->hops, host == rrdb.localhost ? "self" : "child");
 
-            if (host != localhost)
+            if (host != rrdb.localhost)
                 buffer_sprintf(wb, "\n\tStreaming Connection Live: %s", host->receiver ? "true" : "false");
 
             buffer_strcat(wb, "\n\tAlert Streaming Status:");
@@ -1270,10 +1270,10 @@ char *aclk_state_json(void)
         tmp = json_object_new_int(host->system_info->hops);
         json_object_object_add(nodeinstance, "streaming-hops", tmp);
 
-        tmp = json_object_new_string(host == localhost ? "self" : "child");
+        tmp = json_object_new_string(host == rrdb.localhost ? "self" : "child");
         json_object_object_add(nodeinstance, "relationship", tmp);
 
-        tmp = json_object_new_boolean((host->receiver || host == localhost));
+        tmp = json_object_new_boolean((host->receiver || host == rrdb.localhost));
         json_object_object_add(nodeinstance, "streaming-online", tmp);
 
         tmp = json_object_new_object();
@@ -1292,7 +1292,7 @@ char *aclk_state_json(void)
 }
 
 void add_aclk_host_labels(void) {
-    DICTIONARY *labels = localhost->rrdlabels;
+    DICTIONARY *labels = rrdb.localhost->rrdlabels;
 
 #ifdef ENABLE_ACLK
     rrdlabels_add(labels, "_aclk_available", "true", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
@@ -1324,5 +1324,5 @@ void aclk_queue_node_info(RRDHOST *host, bool immediate)
 {
     struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *) host->aclk_sync_host_config;
     if (likely(wc))
-        wc->node_info_send_time = (host == localhost || immediate) ? 1 : now_realtime_sec();
+        wc->node_info_send_time = (host == rrdb.localhost || immediate) ? 1 : now_realtime_sec();
 }

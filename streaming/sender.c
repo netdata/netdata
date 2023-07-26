@@ -657,7 +657,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
                  , rrdhost_hostname(host)
                  , rrdhost_registry_hostname(host)
                  , host->machine_guid
-                 , default_rrd_update_every
+                 , rrdb.default_update_every
                  , rrdhost_os(host)
                  , rrdhost_timezone(host)
                  , rrdhost_abbrev_timezone(host)

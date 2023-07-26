@@ -4,6 +4,7 @@
 #define NETDATA_PLUGIN_FREEBSD_H 1
 
 #include "daemon/common.h"
+#include "collectors/utils.h"
 
 #include <sys/sysctl.h>
 

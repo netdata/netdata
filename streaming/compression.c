@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "rrdpush.h"
 
 #ifdef ENABLE_RRDPUSH_COMPRESSION

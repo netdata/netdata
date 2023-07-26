@@ -25,7 +25,7 @@ struct array_printer {
 void analytics_log_data(void)
 {
     netdata_log_debug(D_ANALYTICS, "NETDATA_CONFIG_STREAM_ENABLED      : [%s]", analytics_data.netdata_config_stream_enabled);
-    netdata_log_debug(D_ANALYTICS, "NETDATA_CONFIG_MEMORY_MODE         : [%s]", analytics_data.netdata_config_memory_mode);
+    netdata_log_debug(D_ANALYTICS, "NETDATA_CONFIG_MEMORY_MODE         : [%s]", analytics_data.netdata_config_storage_engine_name);
     netdata_log_debug(D_ANALYTICS, "NETDATA_CONFIG_EXPORTING_ENABLED   : [%s]", analytics_data.netdata_config_exporting_enabled);
     netdata_log_debug(D_ANALYTICS, "NETDATA_EXPORTING_CONNECTORS       : [%s]", analytics_data.netdata_exporting_connectors);
     netdata_log_debug(D_ANALYTICS, "NETDATA_ALLMETRICS_PROMETHEUS_USED : [%s]", analytics_data.netdata_allmetrics_prometheus_used);
@@ -71,7 +71,7 @@ void analytics_log_data(void)
 void analytics_free_data(void)
 {
     freez(analytics_data.netdata_config_stream_enabled);
-    freez(analytics_data.netdata_config_memory_mode);
+    freez(analytics_data.netdata_config_storage_engine_name);
     freez(analytics_data.netdata_config_exporting_enabled);
     freez(analytics_data.netdata_exporting_connectors);
     freez(analytics_data.netdata_allmetrics_prometheus_used);
@@ -114,7 +114,7 @@ void analytics_free_data(void)
 /*
  * Set a numeric/boolean data with a value
  */
-void analytics_set_data(char **name, char *value)
+static void analytics_set_data(char **name, const char *value)
 {
     if (*name) {
         analytics_data.data_length -= strlen(*name);
@@ -127,7 +127,7 @@ void analytics_set_data(char **name, char *value)
 /*
  * Set a string data with a value
  */
-void analytics_set_data_str(char **name, char *value)
+static void analytics_set_data_str(char **name, const char *value)
 {
     size_t value_string_len;
     if (*name) {
@@ -215,7 +215,7 @@ void analytics_mirrored_hosts(void)
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))
             continue;
 
-        ((host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)) ? reachable++ : unreachable++);
+        ((host == rrdb.localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)) ? reachable++ : unreachable++);
 
         count++;
     }
@@ -235,7 +235,7 @@ void analytics_exporters(void)
     //decide if something else is more suitable (but probably not null)
     BUFFER *bi = buffer_create(1000, NULL);
     analytics_exporting_connectors(bi);
-    analytics_set_data_str(&analytics_data.netdata_exporting_connectors, (char *)buffer_tostring(bi));
+    analytics_set_data_str(&analytics_data.netdata_exporting_connectors, buffer_tostring(bi));
     buffer_free(bi);
 }
 
@@ -272,7 +272,7 @@ void analytics_collectors(void)
     char name[500];
     BUFFER *bt = buffer_create(1000, NULL);
 
-    rrdset_foreach_read(st, localhost) {
+    rrdset_foreach_read(st, rrdb.localhost) {
         if(!rrdset_is_available_for_viewers(st))
             continue;
 
@@ -349,7 +349,7 @@ void analytics_alarms_notifications(void)
     }
     freez(script);
 
-    analytics_set_data_str(&analytics_data.netdata_notification_methods, (char *)buffer_tostring(b));
+    analytics_set_data_str(&analytics_data.netdata_notification_methods, buffer_tostring(b));
 
     buffer_free(b);
 }
@@ -377,15 +377,15 @@ void analytics_https(void)
     analytics_exporting_connectors_ssl(b);
 
     buffer_strcat(b, netdata_ssl_streaming_sender_ctx &&
-                     rrdhost_flag_check(localhost, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED) &&
-                     SSL_connection(&localhost->sender->ssl) ? "streaming|" : "|");
+                     rrdhost_flag_check(rrdb.localhost, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED) &&
+                     SSL_connection(&rrdb.localhost->sender->ssl) ? "streaming|" : "|");
 
     buffer_strcat(b, netdata_ssl_web_server_ctx ? "web" : "");
 #else
     buffer_strcat(b, "||");
 #endif
 
-    analytics_set_data_str(&analytics_data.netdata_config_https_available, (char *)buffer_tostring(b));
+    analytics_set_data_str(&analytics_data.netdata_config_https_available, buffer_tostring(b));
     buffer_free(b);
 }
 
@@ -394,7 +394,7 @@ void analytics_charts(void)
     RRDSET *st;
     size_t c = 0;
 
-    rrdset_foreach_read(st, localhost)
+    rrdset_foreach_read(st, rrdb.localhost)
         if(rrdset_is_available_for_viewers(st)) c++;
     rrdset_foreach_done(st);
 
@@ -410,7 +410,7 @@ void analytics_metrics(void)
 {
     RRDSET *st;
     size_t dimensions = 0;
-    rrdset_foreach_read(st, localhost) {
+    rrdset_foreach_read(st, rrdb.localhost) {
         if (rrdset_is_available_for_viewers(st)) {
             RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
@@ -436,7 +436,7 @@ void analytics_alarms(void)
     size_t alarm_warn = 0, alarm_crit = 0, alarm_normal = 0;
     char b[21];
     RRDCALC *rc;
-    foreach_rrdcalc_in_rrdhost_read(localhost, rc) {
+    foreach_rrdcalc_in_rrdhost_read(rrdb.localhost, rc) {
         if (unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 
@@ -650,7 +650,7 @@ static const char *verify_or_create_required_directory(const char *dir) {
 void set_late_global_environment(struct rrdhost_system_info *system_info)
 {
     analytics_set_data(&analytics_data.netdata_config_stream_enabled, default_rrdpush_enabled ? "true" : "false");
-    analytics_set_data_str(&analytics_data.netdata_config_memory_mode, (char *)rrd_memory_mode_name(default_rrd_memory_mode));
+    analytics_set_data_str(&analytics_data.netdata_config_storage_engine_name, storage_engine_name(default_storage_engine_id));
 
 #ifdef DISABLE_CLOUD
     analytics_set_data(&analytics_data.netdata_host_cloud_enabled, "false");
@@ -663,10 +663,10 @@ void set_late_global_environment(struct rrdhost_system_info *system_info)
 #ifdef ENABLE_DBENGINE
     {
         char b[16];
-        snprintfz(b, 15, "%d", default_rrdeng_page_cache_mb);
+        snprintfz(b, 15, "%d", rrdb.default_rrdeng_page_cache_mb);
         analytics_set_data(&analytics_data.netdata_config_page_cache_size, b);
 
-        snprintfz(b, 15, "%d", default_multidb_disk_quota_mb);
+        snprintfz(b, 15, "%d", rrdb.default_multidb_disk_quota_mb);
         analytics_set_data(&analytics_data.netdata_config_multidb_disk_quota, b);
     }
 #endif
@@ -682,12 +682,12 @@ void set_late_global_environment(struct rrdhost_system_info *system_info)
     else
         analytics_set_data(&analytics_data.netdata_config_web_enabled, "true");
 
-    analytics_set_data_str(&analytics_data.netdata_config_release_channel, (char *)get_release_channel());
+    analytics_set_data_str(&analytics_data.netdata_config_release_channel, get_release_channel());
 
     {
         BUFFER *bi = buffer_create(1000, NULL);
         analytics_build_info(bi);
-        analytics_set_data_str(&analytics_data.netdata_buildinfo, (char *)buffer_tostring(bi));
+        analytics_set_data_str(&analytics_data.netdata_buildinfo, buffer_tostring(bi));
         buffer_free(bi);
     }
 
@@ -827,7 +827,7 @@ void set_global_environment()
 {
     {
         char b[16];
-        snprintfz(b, 15, "%d", default_rrd_update_every);
+        snprintfz(b, 15, "%d", rrdb.default_update_every);
         setenv("NETDATA_UPDATE_EVERY", b, 1);
     }
 
@@ -861,7 +861,7 @@ void set_global_environment()
 
     analytics_data.data_length = 0;
     analytics_set_data(&analytics_data.netdata_config_stream_enabled, "null");
-    analytics_set_data(&analytics_data.netdata_config_memory_mode, "null");
+    analytics_set_data(&analytics_data.netdata_config_storage_engine_name, "null");
     analytics_set_data(&analytics_data.netdata_config_exporting_enabled, "null");
     analytics_set_data(&analytics_data.netdata_exporting_connectors, "null");
     analytics_set_data(&analytics_data.netdata_allmetrics_prometheus_used, "null");
@@ -987,7 +987,7 @@ void send_statistics(const char *action, const char *action_result, const char *
         action_result,
         action_data,
         analytics_data.netdata_config_stream_enabled,
-        analytics_data.netdata_config_memory_mode,
+        analytics_data.netdata_config_storage_engine_name,
         analytics_data.netdata_config_exporting_enabled,
         analytics_data.netdata_exporting_connectors,
         analytics_data.netdata_allmetrics_prometheus_used,

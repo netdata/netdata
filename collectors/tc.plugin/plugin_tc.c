@@ -414,7 +414,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                 PLUGIN_TC_NAME,
                 NULL,
                 NETDATA_CHART_PRIO_TC_QOS,
-                localhost->rrd_update_every,
+                rrdb.localhost->update_every,
                 d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED);
 
             rrdlabels_add(d->st_bytes->rrdlabels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
@@ -475,7 +475,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                 PLUGIN_TC_NAME,
                 NULL,
                 NETDATA_CHART_PRIO_TC_QOS_PACKETS,
-                localhost->rrd_update_every,
+                rrdb.localhost->update_every,
                 d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED);
 
             rrdlabels_add(d->st_packets->rrdlabels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
@@ -539,7 +539,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                 PLUGIN_TC_NAME,
                 NULL,
                 NETDATA_CHART_PRIO_TC_QOS_DROPPED,
-                localhost->rrd_update_every,
+                rrdb.localhost->update_every,
                 d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED);
 
             rrdlabels_add(d->st_dropped->rrdlabels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
@@ -603,7 +603,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                 PLUGIN_TC_NAME,
                 NULL,
                 NETDATA_CHART_PRIO_TC_QOS_TOKENS,
-                localhost->rrd_update_every,
+                rrdb.localhost->update_every,
                 RRDSET_TYPE_LINE);
 
             rrdlabels_add(d->st_tokens->rrdlabels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
@@ -668,7 +668,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                 PLUGIN_TC_NAME,
                 NULL,
                 NETDATA_CHART_PRIO_TC_QOS_CTOKENS,
-                localhost->rrd_update_every,
+                rrdb.localhost->update_every,
                 RRDSET_TYPE_LINE);
 
             rrdlabels_add(d->st_ctokens->rrdlabels, "device", string2str(d->id), RRDLABEL_SRC_AUTO);
@@ -935,7 +935,7 @@ void *tc_main(void *ptr) {
         struct tc_device *device = NULL;
         struct tc_class *class = NULL;
 
-        snprintfz(command, TC_LINE_MAX, "exec %s %d", tc_script, localhost->rrd_update_every);
+        snprintfz(command, TC_LINE_MAX, "exec %s %d", tc_script, rrdb.localhost->update_every);
         netdata_log_debug(D_TC_LOOP, "executing '%s'", command);
 
         fp_child_output = netdata_popen(command, (pid_t *)&tc_child_pid, &fp_child_input);
@@ -1173,7 +1173,7 @@ void *tc_main(void *ptr) {
             goto cleanup;
         }
 
-        sleep((unsigned int) localhost->rrd_update_every);
+        sleep((unsigned int) rrdb.localhost->update_every);
     }
 
 cleanup: ; // added semi-colon to prevent older gcc error: label at end of compound statement

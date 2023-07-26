@@ -50,8 +50,8 @@ void *timex_main(void *ptr)
     netdata_thread_cleanup_push(timex_main_cleanup, ptr);
 
     int update_every = (int)config_get_number(CONFIG_SECTION_TIMEX, "update every", 10);
-    if (update_every < localhost->rrd_update_every)
-        update_every = localhost->rrd_update_every;
+    if (update_every < rrdb.localhost->update_every)
+        update_every = rrdb.localhost->update_every;
 
     int do_sync = config_get_boolean(CONFIG_SECTION_TIMEX, "clock synchronization state", CONFIG_BOOLEAN_YES);
     int do_offset = config_get_boolean(CONFIG_SECTION_TIMEX, "time offset", CONFIG_BOOLEAN_YES);

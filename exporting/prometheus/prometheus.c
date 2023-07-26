@@ -60,14 +60,14 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN
     }
 
     if (unlikely(
-            st->rrd_memory_mode == RRD_MEMORY_MODE_NONE &&
+            st->storage_engine_id == STORAGE_ENGINE_NONE &&
             !(EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED))) {
         netdata_log_debug(
             D_EXPORTING,
             "EXPORTING: not sending chart '%s' of host '%s' because its memory mode is '%s' and the exporting connector requires database access.",
             rrdset_id(st),
             rrdhost_hostname(host),
-            rrd_memory_mode_name(host->rrd_memory_mode));
+            storage_engine_name(host->storage_engine_id));
         return 0;
     }
 
@@ -957,7 +957,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
         prometheus_exporter_instance->before,
         output_options);
 
-    dfe_start_reentrant(rrdhost_root_index, host)
+    dfe_start_reentrant(rrdb.rrdhost_root_index, host)
     {
         rrd_stats_api_v1_charts_allmetrics_prometheus(
             prometheus_exporter_instance, host, filter_string, wb, prefix, exporting_options, 1, output_options);

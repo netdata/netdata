@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "plugin_proc.h"
+#include "collectors/utils.h"
 
 #define PLUGIN_PROC_MODULE_MDSTAT_NAME "/proc/mdstat"
 

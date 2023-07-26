@@ -12,61 +12,7 @@
 
 #define RRDENG_FD_BUDGET_PER_INSTANCE (50)
 
-extern int default_rrdeng_page_cache_mb;
-extern int default_rrdeng_extent_cache_mb;
-extern int db_engine_journal_check;
-extern int default_rrdeng_disk_quota_mb;
-extern int default_multidb_disk_quota_mb;
-extern struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
-extern size_t page_type_size[];
-extern size_t tier_page_size[];
-
-#define CTX_POINT_SIZE_BYTES(ctx) page_type_size[(ctx)->config.page_type]
-
-void rrdeng_generate_legacy_uuid(const char *dim_id, const char *chart_id, uuid_t *ret_uuid);
-
-STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *db_instance);
-STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
-void rrdeng_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle);
-STORAGE_METRIC_HANDLE *rrdeng_metric_dup(STORAGE_METRIC_HANDLE *db_metric_handle);
-
-STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every, STORAGE_METRICS_GROUP *smg);
-void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle);
-void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every);
-void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time_ut, NETDATA_DOUBLE n,
-                                     NETDATA_DOUBLE min_value,
-                                     NETDATA_DOUBLE max_value,
-                                     uint16_t count,
-                                     uint16_t anomaly_count,
-                                     SN_FLAGS flags);
-int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle);
-
-void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *rrddim_handle,
-                                    time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority);
-STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim_handle);
-
-
-int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *rrddim_handle);
-void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrddim_handle);
-time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
-time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
-time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *rrddim_handle);
-
-void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long *array);
-
-/* must call once before using anything */
-int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
-                       unsigned disk_space_mb, size_t tier);
-
-void rrdeng_readiness_wait(struct rrdengine_instance *ctx);
-void rrdeng_exit_mode(struct rrdengine_instance *ctx);
-
-int rrdeng_exit(struct rrdengine_instance *ctx);
-void rrdeng_prepare_exit(struct rrdengine_instance *ctx);
-bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *db_instance, uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s);
-
-extern STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
-extern void rrdeng_metrics_group_release(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg);
+#define CTX_POINT_SIZE_BYTES(ctx) rrdb.page_type_size[(ctx)->config.page_type]
 
 typedef struct rrdengine_size_statistics {
     size_t default_granularity_secs;
@@ -217,12 +163,5 @@ struct rrdeng_buffer_sizes {
 
 struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void);
 struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);
-
-RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx);
-size_t rrdeng_collectors_running(struct rrdengine_instance *ctx);
-bool rrdeng_is_legacy(STORAGE_INSTANCE *db_instance);
-
-size_t rrdeng_disk_space_max(STORAGE_INSTANCE *db_instance);
-size_t rrdeng_disk_space_used(STORAGE_INSTANCE *db_instance);
 
 #endif /* NETDATA_RRDENGINEAPI_H */

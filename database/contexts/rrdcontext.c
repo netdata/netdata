@@ -199,25 +199,8 @@ int rrdcontext_foreach_instance_with_rrdset_in_context(RRDHOST *host, const char
 // ACLK interface
 
 static bool rrdhost_check_our_claim_id(const char *claim_id) {
-    if(!localhost->aclk_state.claimed_id) return false;
-    return (strcasecmp(claim_id, localhost->aclk_state.claimed_id) == 0) ? true : false;
-}
-
-static RRDHOST *rrdhost_find_by_node_id(const char *node_id) {
-    uuid_t uuid;
-    if (uuid_parse(node_id, uuid))
-        return NULL;
-
-    RRDHOST *host = NULL;
-    dfe_start_read(rrdhost_root_index, host) {
-        if(!host->node_id) continue;
-
-        if(uuid_memcmp(&uuid, host->node_id) == 0)
-            break;
-    }
-    dfe_done(host);
-
-    return host;
+    if(!rrdb.localhost->aclk_state.claimed_id) return false;
+    return (strcasecmp(claim_id, rrdb.localhost->aclk_state.claimed_id) == 0) ? true : false;
 }
 
 void rrdcontext_hub_checkpoint_command(void *ptr) {
@@ -226,7 +209,7 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
     if(!rrdhost_check_our_claim_id(cmd->claim_id)) {
         netdata_log_error("RRDCONTEXT: received checkpoint command for claim_id '%s', node id '%s', but this is not our claim id. Ours '%s', received '%s'. Ignoring command.",
                           cmd->claim_id, cmd->node_id,
-                          localhost->aclk_state.claimed_id?localhost->aclk_state.claimed_id:"NOT SET",
+                          rrdb.localhost->aclk_state.claimed_id ? rrdb.localhost->aclk_state.claimed_id : "NOT SET",
                           cmd->claim_id);
 
         return;
@@ -288,7 +271,7 @@ void rrdcontext_hub_stop_streaming_command(void *ptr) {
     if(!rrdhost_check_our_claim_id(cmd->claim_id)) {
         netdata_log_error("RRDCONTEXT: received stop streaming command for claim_id '%s', node id '%s', but this is not our claim id. Ours '%s', received '%s'. Ignoring command.",
                           cmd->claim_id, cmd->node_id,
-                          localhost->aclk_state.claimed_id?localhost->aclk_state.claimed_id:"NOT SET",
+                          rrdb.localhost->aclk_state.claimed_id ? rrdb.localhost->aclk_state.claimed_id : "NOT SET",
                           cmd->claim_id);
 
         return;

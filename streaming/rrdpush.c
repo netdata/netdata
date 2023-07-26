@@ -96,7 +96,7 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
             STREAM_CAP_BINARY |
             STREAM_CAP_INTERPOLATED |
             STREAM_HAS_COMPRESSION |
-            (ieee754_doubles ? STREAM_CAP_IEEE754 : 0) |
+            (rrdb.ieee754_doubles ? STREAM_CAP_IEEE754 : 0) |
             (ml_capability ? STREAM_CAP_DATA_WITH_ML : 0) |
             0;
 }
@@ -140,7 +140,7 @@ int rrdpush_init() {
     default_rrdpush_seconds_to_replicate = config_get_number(CONFIG_SECTION_DB, "seconds to replicate", default_rrdpush_seconds_to_replicate);
     default_rrdpush_replication_step = config_get_number(CONFIG_SECTION_DB, "seconds per replication step", default_rrdpush_replication_step);
 
-    rrdhost_free_orphan_time_s    = config_get_number(CONFIG_SECTION_DB, "cleanup orphan hosts after secs", rrdhost_free_orphan_time_s);
+    rrdb.rrdhost_free_orphan_time_s = config_get_number(CONFIG_SECTION_DB, "cleanup orphan hosts after secs", rrdb.rrdhost_free_orphan_time_s);
 
 #ifdef ENABLE_RRDPUSH_COMPRESSION
     default_rrdpush_compression_enabled = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM,
@@ -801,7 +801,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
     rpt->ssl = NETDATA_SSL_UNSET_CONNECTION;
 #endif
 
-    rpt->config.update_every = default_rrd_update_every;
+    rpt->config.update_every = rrdb.default_update_every;
 
     // parse the parameters and fill rpt and rpt->system_info
 
@@ -1057,7 +1057,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         }
     }
 
-    if (strcmp(rpt->machine_guid, localhost->machine_guid) == 0) {
+    if (strcmp(rpt->machine_guid, rrdb.localhost->machine_guid) == 0) {
 
         rrdpush_receiver_takeover_web_connection(w, rpt);
 
