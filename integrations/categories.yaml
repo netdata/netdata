@@ -412,7 +412,7 @@
   description: "Notification Integrations"
   most_popular: true
   priority: 3
-  children: 
+  children:
     - id: notify.agent
       name: Per Agent Notifications
       description: ""
