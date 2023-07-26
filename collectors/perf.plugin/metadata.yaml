@@ -50,14 +50,14 @@ setup:
         title: "Config options"
         enabled: true
       list:
-      - name: update every
-        description: Data collection frequency.
-        default_value: 1
-        required: false
-      - name: command options
-        description: Command options that specify charts shown by plugin.
-        default_value: 1
-        required: true
+        - name: update every
+          description: Data collection frequency.
+          default_value: 1
+          required: false
+        - name: command options
+          description: Command options that specify charts shown by plugin.
+          default_value: 1
+          required: true
     examples:
       folding:
         enabled: true
