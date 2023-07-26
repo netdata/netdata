@@ -3,7 +3,7 @@ meta:
   module_name: perf.plugin
   monitored_instance:
     name: CPU performance
-    link: ""
+    link: "https://kernel.org/"
     categories:
     - data-collection.linux-systems
     icon_filename: "bolt.svg"
@@ -17,13 +17,13 @@ meta:
 overview:
   data_collection:
     metrics_description: "Monitor CPU performance to ensure optimal computational operations. Monitor core usage, load averages, and thermal throttling for seamless computation tasks."
-    method_description: ""
+    method_description: "Netdata uses syscall (2) to open a file descriptior to monitor the perf events."
   supported_platforms:
     include: []
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ""
+    description: "It needs setuid."
   default_behavior:
     auto_detection:
       description: ""
@@ -36,19 +36,38 @@ setup:
     list: []
   configuration:
     file:
-      name: ""
-      description: ""
+      name: "netdata.conf"
+      section_name: "[plugin:perf]"
+      description: "The main netdata configuration file."
     options:
-      description: ""
+      description: |
+        You can get the available options running:
+
+        ```bash
+        /usr/libexec/netdata/plugins.d/perf.plugin  --help`
+        ````
       folding:
-        title: ""
+        title: "Config options"
         enabled: true
-      list: []
+      list:
+      - name: update every
+        description: Data collection frequency.
+        default_value: 1
+        required: false
+      - name: command options
+        description: Command options that specify charts shown by plugin.
+        default_value: 1
+        required: true
     examples:
       folding:
         enabled: true
-        title: ""
-      list: []
+        title: "Config"
+      list:
+        - name: CPU cycles
+          description: Monitor CPU cycles.
+          config: |
+            [plugin:perf]
+                command options = cycles
 troubleshooting:
   problems:
     list: []
