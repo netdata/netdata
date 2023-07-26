@@ -47,7 +47,7 @@ setup:
 
           To set up BIND to dump stats do the following:
 
-          1. Add to 'named.conf.options' options {}: 
+          1. Add to 'named.conf.options' options {}:
           `statistics-file "/var/log/bind/named.stats";`
 
           2. Create bind/ directory in /var/log:
