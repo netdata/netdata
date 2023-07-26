@@ -78,7 +78,9 @@ CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, con
 
     snprintfz(command_buffer,
               CLAIMING_COMMAND_LENGTH,
-              "exec netdata-claim.sh %s -hostname=%s -id=%s -url=%s -noreload %s",
+              "\"%s%snetdata-claim.sh\" %s -hostname=%s -id=%s -url=%s -noreload %s",
+              netdata_exe_path[0] ? netdata_exe_path : "",
+              netdata_exe_path[0] ? "/" : "",
               proxy_flag,
               netdata_configured_hostname,
               rrdb.localhost->machine_guid,
