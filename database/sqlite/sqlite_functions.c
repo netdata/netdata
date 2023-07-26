@@ -593,15 +593,20 @@ static inline void set_host_node_id(RRDHOST *host, uuid_t *node_id)
 
     if (unlikely(!node_id)) {
         freez(host->node_id);
-        host->node_id = NULL;
+        __atomic_store_n(&host->node_id, NULL, __ATOMIC_RELAXED);
         return;
     }
 
     struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
 
-    if (unlikely(!host->node_id))
-        host->node_id = mallocz(sizeof(*host->node_id));
-    uuid_copy(*(host->node_id), *node_id);
+    if (unlikely(!host->node_id)) {
+        uuid_t *t = mallocz(sizeof(*host->node_id));
+        uuid_copy(*t, *node_id);
+        __atomic_store_n(&host->node_id, t, __ATOMIC_RELAXED);
+    }
+    else {
+        uuid_copy(*(host->node_id), *node_id);
+    }
 
     if (unlikely(!wc))
         sql_create_aclk_table(host, &host->host_uuid, node_id);
@@ -616,6 +621,14 @@ int update_node_id(uuid_t *host_id, uuid_t *node_id)
     sqlite3_stmt *res = NULL;
     RRDHOST *host = NULL;
     int rc = 2;
+
+    char host_guid[GUID_LEN + 1];
+    uuid_unparse_lower(*host_id, host_guid);
+    rrd_wrlock();
+    host = rrdhost_find_by_guid(host_guid);
+    if (likely(host))
+        set_host_node_id(host, node_id);
+    rrd_unlock();
 
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
@@ -645,14 +658,6 @@ int update_node_id(uuid_t *host_id, uuid_t *node_id)
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to store node instance information, rc = %d", rc);
     rc = sqlite3_changes(db_meta);
-
-    char host_guid[GUID_LEN + 1];
-    uuid_unparse_lower(*host_id, host_guid);
-    rrd_wrlock();
-    host = rrdhost_find_by_guid(host_guid);
-    if (likely(host))
-        set_host_node_id(host, node_id);
-    rrd_unlock();
 
 failed:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))

@@ -20,6 +20,8 @@ include:
   - &alpine
     distro: alpine
     version: edge
+    support_type: Community
+    notes: ''
     eol_check: false
     env_prep: |
       apk add -U bash
@@ -28,17 +30,30 @@ include:
     test:
       ebpf-core: true
   - <<: *alpine
+    version: "3.18"
+    support_type: Core
+    notes: ''
+    eol_check: true
+  - <<: *alpine
     version: "3.17"
+    support_type: Intermediate
+    notes: ''
     eol_check: true
   - <<: *alpine
     version: "3.16"
+    support_type: Intermediate
+    notes: ''
     eol_check: true
   - <<: *alpine
     version: "3.15"
+    support_type: Intermediate
+    notes: ''
     eol_check: true
 
   - distro: archlinux
     version: latest
+    support_type: Intermediate
+    notes: ''
     eol_check: false
     env_prep: |
       pacman --noconfirm -Syu && pacman --noconfirm -Sy grep libffi
@@ -48,6 +63,8 @@ include:
   - &alma
     distro: almalinux
     version: "9"
+    support_type: Core
+    notes: ''
     jsonc_removal: |
       dnf remove -y json-c-devel
     eol_check: true
@@ -74,6 +91,8 @@ include:
   - &amzn
     distro: amazonlinux
     version: "2"
+    support_type: Core
+    notes: ''
     eol_check: 'amazon-linux'
     packages: &amzn_packages
       type: rpm
@@ -92,6 +111,8 @@ include:
 
   - distro: centos
     version: "7"
+    support_type: Core
+    notes: ''
     eol_check: false
     packages:
       type: rpm
@@ -107,6 +128,8 @@ include:
   - &debian
     distro: debian
     version: "12"
+    support_type: Core
+    notes: ''
     base_image: debian:bookworm
     eol_check: true
     env_prep: |
@@ -143,6 +166,8 @@ include:
   - &fedora
     distro: fedora
     version: "38"
+    support_type: Core
+    notes: ''
     eol_check: true
     jsonc_removal: |
       dnf remove -y json-c-devel
@@ -165,6 +190,8 @@ include:
   - &opensuse
     distro: opensuse
     version: "tumbleweed"
+    support_type: Intermediate
+    notes: ''
     eol_check: true
     base_image: opensuse/tumbleweed
     jsonc_removal: |
@@ -179,12 +206,16 @@ include:
       ebpf-core: true
   - <<: *opensuse
     version: "15.5"
+    support_type: Core
+    notes: ''
     base_image: opensuse/leap:15.5
     packages:
       <<: *opensuse_packages
       repo_distro: opensuse/15.5
   - <<: *opensuse
     version: "15.4"
+    support_type: Core
+    notes: ''
     base_image: opensuse/leap:15.4
     packages:
       <<: *opensuse_packages
@@ -193,6 +224,8 @@ include:
   - &oracle
     distro: oraclelinux
     version: "8"
+    support_type: Core
+    notes: ''
     eol_check: true
     jsonc_removal: |
       dnf remove -y json-c-devel
@@ -213,6 +246,8 @@ include:
   - &ubuntu
     distro: ubuntu
     version: "22.04"
+    support_type: Core
+    notes: ''
     eol_check: true
     env_prep: |
       rm -f /etc/apt/apt.conf.d/docker && apt-get update
@@ -239,7 +274,9 @@ include:
       repo_distro: ubuntu/focal
 no_include: # Info for platforms not covered in CI
   - distro: docker
-    version: latest
+    version: "19.03 or newer"
+    support_type: Core
+    notes: ''
     packages:
       arches:
         - linux/i386
@@ -247,3 +284,46 @@ no_include: # Info for platforms not covered in CI
         - linux/arm/v7
         - linux/arm64
         - linux/ppc64le
+
+  - distro: clearlinux
+    version: latest
+    support_type: Community
+    notes: ''
+
+  - &rhel
+    distro: rhel
+    version: "9.x"
+    support_type: Core
+    notes: ''
+    packages:
+      arches:
+        - x86_64
+        - aarch64
+  - <<: *rhel
+    version: "8.x"
+  - <<: *rhel
+    version: "7.x"
+    packages:
+      arches:
+        - x86_64
+
+  - &freebsd
+    distro: freebsd
+    version: 13-STABLE
+    support_type: Community
+    notes: ''
+
+  - &macos
+    distro: macos
+    version: '13'
+    support_type: Community
+    notes: ''
+  - <<: *macos
+    version: '12'
+  - <<: *macos
+    version: '11'
+
+  - distro: gentoo
+    version: latest
+    support_type: Community
+    notes: ''
