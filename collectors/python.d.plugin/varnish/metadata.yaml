@@ -93,8 +93,15 @@ setup:
     examples:
       folding:
         enabled: true
-        title: ''
-      list: []
+        title: 'Config'
+      list:
+        - name: Basic
+          description: An example configuration.
+          folding:
+            enabled: false
+          config: |
+            job_name:
+              instance_name: '<name-of-varnishd-instance>'
 troubleshooting:
   problems:
     list: []
