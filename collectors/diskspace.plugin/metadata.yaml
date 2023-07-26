@@ -9,10 +9,16 @@ meta:
     icon_filename: 'hard-drive.svg'
   related_resources:
     integrations:
-      list: []
+      list: |
+        - plugin_name: ebpf.plugin
+          module_name: disk
   info_provided_to_referring_integrations:
     description: ''
-  keywords: []
+  keywords: |
+    - disk
+    - I/O
+    - space
+    - inode
   most_popular: false
 overview:
   data_collection:
@@ -26,7 +32,7 @@ overview:
     description: ''
   default_behavior:
     auto_detection:
-      description: ''
+      description: 'The plugin reads data from `/proc/self/mountinfo` and `/proc/diskstats file`.'
     limits:
       description: ''
     performance_impact:
@@ -36,14 +42,47 @@ setup:
     list: []
   configuration:
     file:
-      name: ''
-      description: ''
+      name: 'netdata.conf'
+      section_name: '[plugin:proc:diskspace]'
+      description: 'This is netdata main configuration file'
     options:
-      description: ''
+      description: 'You can also specify per mount point `[plugin:proc:diskspace:mountpoint]`'
       folding:
-        title: ''
+        title: 'Config options'
         enabled: true
-      list: []
+      list: |
+        - name: update every
+          description: Data collection frequency.
+          default_value: 1
+          required: false
+        - name: remove charts of unmounted disks
+          description: Remove chart when a device is unmounted on host.
+          default_value: yes
+          required: false
+        - name: check for new mount points every
+          description: Parse proc files frequency.
+          default_value: 15
+          required: false
+        - name: exclude space metrics on paths
+          description: Do not show metrics (charts) for listed paths. This option accepts netdata simple pattern.
+          default_value: /proc/* /sys/* /var/run/user/* /run/user/* /snap/* /var/lib/docker/*
+          required: false
+        - name: exclude space metrics on filesystems
+          description: Do not show metrics (charts) for listed filesystems. This option accepts netdata simple pattern.
+          default_value: *gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl autofs
+          required: false
+        - name: exclude inode metrics on filesystems
+          description: Do not show metrics (charts) for listed filesystems. This option accepts netdata simple pattern.
+          default_value: msdosfs msdos vfat overlayfs aufs* *unionfs
+          required: false
+        - name: space usage for all disks
+          description: Define if plugin will show metrics for space usage. When value is set to `auto` plugin will try to access information to display if filesystem or path was not discarded with previous option.
+          default_value: auto
+          required: false
+        - name: inodes usage for all disks
+          description: Define if plugin will show metrics for inode usage. When value is set to `auto` plugin will try to access information to display if filesystem or path was not discarded with previous option.
+          default_value: auto
+          required: false
     examples:
       folding:
         enabled: true
@@ -74,11 +113,11 @@ metrics:
     description: ""
     labels:
     - name: mount_point
-      description: TBD
+      description: Path used to mount a filesystem
     - name: filesystem
-      description: TBD
+      description: The filesystem used to format a partition.
     - name: mount_root
-      description: TBD
+      description: Root directory where mount points are present.
     metrics:
     - name: disk.space
       description: Disk Space Usage
