@@ -19,7 +19,8 @@ overview:
     metrics_description: "Monitor CPU performance to ensure optimal computational operations. Monitor core usage, load averages, and thermal throttling for seamless computation tasks."
     method_description: "Netdata uses syscall (2) to open a file descriptior to monitor the perf events."
   supported_platforms:
-    include: []
+    include:
+      - Linux
     exclude: []
   multi_instance: true
   additional_permissions:
