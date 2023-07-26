@@ -1,4 +1,5 @@
 # yamllint disable rule:line-length
+---
 meta:
   plugin_name: ioping.plugin
   module_name: ioping.plugin
