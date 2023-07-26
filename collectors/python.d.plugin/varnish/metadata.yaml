@@ -31,7 +31,7 @@ overview:
       `netdata` user must be a member of the `varnish` group.
   default_behavior:
     auto_detection:
-      description: ''
+      description: By default, if the permissions are satisfied, the `varnishstat` tool will be executed on the host.
     limits:
       description: ''
     performance_impact:
