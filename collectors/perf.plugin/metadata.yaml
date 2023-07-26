@@ -1,3 +1,4 @@
+# yamllint disable rule:line-length
 meta:
   plugin_name: perf.plugin
   module_name: perf.plugin
