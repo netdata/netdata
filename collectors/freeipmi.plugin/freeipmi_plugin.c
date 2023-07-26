@@ -1429,6 +1429,14 @@ static size_t send_ipmi_sel_metrics_to_netdata(struct netdata_ipmi_state *state)
 // main, command line arguments parsing
 
 int main (int argc, char **argv) {
+    // both threads (sensors and sel) crash
+    if (getenv("NETDATA_LISTENER_PORT")) {
+        collector_info("%s(): freeipmi not working in Docker on Alpine. Exiting...", __FUNCTION__);
+        fprintf(stdout, "DISABLE\n");
+        fflush(stdout);
+        exit(0);
+    }
+
     bool netdata_do_sel = IPMI_ENABLE_SEL_BY_DEFAULT;
 
     stderror = stderr;
