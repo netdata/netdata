@@ -118,6 +118,8 @@ setup:
       list:
         - name: Local simple config
           description: A basic configuration, specyfing the path to `ssacli`
+          folding:
+            enabled: false
           config: |
             local:
              ssacli_path: /usr/sbin/ssacli

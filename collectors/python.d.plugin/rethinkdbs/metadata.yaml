@@ -105,6 +105,8 @@ setup:
       list:
         - name: Local RethinkDB server
           description: An example of a configuration for a local RethinkDB server
+          folding:
+            enabled: false
           config: |
             localhost:
              name: 'local'

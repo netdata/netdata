@@ -97,6 +97,8 @@ setup:
       list:
         - name: Remote Icecast server
           description: Configure a remote icecast server
+          folding:
+            enabled: false
           config: |
             remote:
              url: 'http://1.2.3.4:8443/status-json.xsl'
