@@ -1,53 +1,55 @@
+# yamllint disable rule:line-length
+---
 meta:
   plugin_name: xenstat.plugin
   module_name: xenstat.plugin
   monitored_instance:
     name: Xen/XCP-ng
-    link: ''
+    link: ""
     categories:
     - data-collection.containers-and-vms
-    icon_filename: 'xen.png'
+    icon_filename: "xen.png"
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
+    description: ""
   keywords: []
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'Monitor Xen/XCP-ng with Netdata for streamlined virtual machine performance and resource management. Optimize virtualization operations with real-time insights, built-in alerts, and anomaly advisor.'
-    method_description: ''
+    metrics_description: "Monitor Xen/XCP-ng with Netdata for streamlined virtual machine performance and resource management. Optimize virtualization operations with real-time insights, built-in alerts, and anomaly advisor."
+    method_description: ""
   supported_platforms:
     include: []
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ''
+    description: ""
   default_behavior:
     auto_detection:
-      description: ''
+      description: ""
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
     list: []
   configuration:
     file:
-      name: ''
-      description: ''
+      name: ""
+      description: ""
     options:
-      description: ''
+      description: ""
       folding:
-        title: ''
+        title: ""
         enabled: true
       list: []
     examples:
       folding:
         enabled: true
-        title: ''
+        title: ""
       list: []
 troubleshooting:
   problems:
