@@ -68,9 +68,12 @@ setup:
     examples:
       folding:
         enabled: true
-        title: ''
-      list: |
-        destination="/dev/sda"
+        title: 'Config'
+      list:
+        - name: Basic Configuration
+          description: This Examplle has the minimum configuration necessary to have plugin running.
+          config: |
+            destination="/dev/sda"
 troubleshooting:
   problems:
     list: []
