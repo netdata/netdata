@@ -3,7 +3,7 @@ meta:
   module_name: varnish
   monitored_instance:
     name: Varnish
-    link: ''
+    link: https://varnish-cache.org/
     categories:
     - data-collection.web-servers-and-web-proxies
     icon_filename: 'varnish.png'
@@ -12,7 +12,13 @@ meta:
       list: []
   info_provided_to_referring_integrations:
     description: ''
-  keywords: []
+  keywords:
+    - varnish
+    - varnishstat
+    - varnishd
+    - cache
+    - web server
+    - web cache
   most_popular: false
 overview:
   data_collection:
