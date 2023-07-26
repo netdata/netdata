@@ -15,6 +15,7 @@ void buffer_reset(BUFFER *wb) {
     wb->options = 0;
     wb->date = 0;
     wb->expires = 0;
+    buffer_no_cacheable(wb);
 
     buffer_overflow_check(wb);
 }
@@ -254,6 +255,7 @@ BUFFER *buffer_create(size_t size, size_t *statistics)
     b->size = size;
     b->content_type = CT_TEXT_PLAIN;
     b->statistics = statistics;
+    buffer_no_cacheable(b);
     buffer_overflow_init(b);
     buffer_overflow_check(b);
 
@@ -317,6 +319,7 @@ void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value
         buffer_fast_strcat(wb, "{", 1);
 
     wb->content_type = CT_APPLICATION_JSON;
+    buffer_no_cacheable(wb);
 }
 
 void buffer_json_finalize(BUFFER *wb) {

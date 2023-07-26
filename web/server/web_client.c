@@ -1274,12 +1274,9 @@ void web_client_build_http_header(struct web_client *w) {
         w->response.data->date = now_realtime_sec();
 
     // set a proper expiration date, if not already set
-    if(unlikely(!w->response.data->expires)) {
-        if(w->response.data->options & WB_CONTENT_NO_CACHEABLE)
-            w->response.data->expires = w->response.data->date + rrdb.localhost->update_every;
-        else
-            w->response.data->expires = w->response.data->date + 86400;
-    }
+    if(unlikely(!w->response.data->expires))
+        w->response.data->expires = w->response.data->date +
+                ((w->response.data->options & WB_CONTENT_NO_CACHEABLE) ? 0 : 86400);
 
     // prepare the HTTP response header
     netdata_log_debug(D_WEB_CLIENT, "%llu: Generating HTTP header with response %d.", w->id, w->response.code);

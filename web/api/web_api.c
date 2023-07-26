@@ -32,6 +32,8 @@ static bool web_client_check_acl_and_bearer(struct web_client *w, WEB_CLIENT_ACL
 }
 
 int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_path_endpoint, struct web_api_command *api_commands) {
+    buffer_no_cacheable(w->response.data);
+
     if(unlikely(!url_path_endpoint || !*url_path_endpoint)) {
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "Which API command?");

@@ -1808,6 +1808,8 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
 
     if(!rrdr_relative_window_to_absolute(&qwr->after, &qwr->before, NULL))
         buffer_no_cacheable(wb);
+    else
+        buffer_cacheable(wb);
 
     if (qwr->before <= qwr->after) {
         resp = HTTP_RESP_BAD_REQUEST;

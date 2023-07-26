@@ -883,6 +883,11 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
     else if(format == DATASOURCE_JSONP)
         buffer_strcat(w->response.data, ");");
 
+    if(qt->internal.relative)
+        buffer_no_cacheable(w->response.data);
+    else
+        buffer_cacheable(w->response.data);
+
 cleanup:
     query_target_release(qt);
     onewayalloc_destroy(owa);
