@@ -56,7 +56,7 @@ setup:
         - name: destination
           description: The directory/file/device to ioping.
           default_value: ""
-          required: false
+          required: true
         - name: request_size
           description: The request size in bytes to ioping the destination (symbolic modifiers are supported)
           default_value: 4k
