@@ -9,25 +9,25 @@
               .then(function(response) { return response.json() })
           : Promise.resolve(parentHelloData)
 
-        helloPromise.then(function(data) {
+        helloPromise.then(function(helloData) {
           var retries = 3
-          var nodes = data.nodes || []
+          var nodes = helloData.nodes || []
 
           var doAccess = function(mg, nm, token) {
-            fetch(data.registry + '/api/v1/registry?action=access&machine=' + (mg || data.machine_guid) + '&name=' + encodeURIComponent(nm || data.hostname) + '&url=' + encodeURIComponent(originUrl) + '&agent=' + (data.agent ? data.agent.machine_guid : ""), { cache: "no-cache", credentials: "include", headers: { Authorization: 'Bearer ' + (token || localStorage.getItem("registry-netdata-token")) } })
+            fetch(helloData.registry + '/api/v1/registry?action=access&machine=' + (mg || helloData.machine_guid) + '&name=' + encodeURIComponent(nm || helloData.hostname) + '&url=' + encodeURIComponent(originUrl) + '&agent=' + (helloData.agent ? helloData.agent.machine_guid : ""), { cache: "no-cache", credentials: "include", headers: { Authorization: 'Bearer ' + (token || localStorage.getItem("registry-netdata-token")) } })
             .then(function(response) { return response.json() })
             .then(function(data) {
               var token = data.person_guid
 
               if (data.status === "redirect" && retries > 0) {
                 retries = retries - 1
-                doAccess(data.machine_guid, data.hostname, token)
+                doAccess(helloData.machine_guid, helloData.hostname, token)
               }
 
               if (data.status === "ok") {
                 localStorage.setItem("registry-netdata-token", token)
 
-                node = nodes.pop()
+                let node = nodes.pop()
 
                 if (!!node) {
                   setTimeout(function () {
@@ -38,7 +38,7 @@
               window.parent.postMessage(data, "*");
             })
           }
-          doAccess(data.machine_guid, data.hostname)
+          doAccess(helloData.machine_guid, helloData.hostname)
         })
       }
 

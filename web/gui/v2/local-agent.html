@@ -1,42 +1,42 @@
-<!doctype html><html><head><title>Netdata Agent Console</title><script>var pathsRegex = /\/(spaces|nodes|overview|alerts|dashboards|anomalies|events|cloud|v2)\/?.*/
-      var getBasename = function() {
+<!doctype html><html><head><title>Netdata Agent Console</title><script>let pathsRegex = /\/(spaces|nodes|overview|alerts|dashboards|anomalies|events|cloud|v2)\/?.*/
+      let getBasename = function() {
         return window.location.origin + window.location.pathname.replace(pathsRegex, "")
       }
-      var goToOld = function(path) {
-        var goToUrl = getBasename() + path;
+      let goToOld = function(path) {
+        let goToUrl = getBasename() + path;
         if (path === "/v2") {
-          var pathsRegex = /(\/(spaces|nodes|overview|alerts|dashboards|anomalies|events|cloud)\/?.*)/
+          let pathsRegex = /(\/(spaces|nodes|overview|alerts|dashboards|anomalies|events|cloud)\/?.*)/
           if (pathsRegex.test(window.location.origin + window.location.pathname)) {
             goToUrl = (window.location.origin + window.location.pathname).replace(pathsRegex, "/v2$1")
           }
         }
-        window.location.replace((goToUrl +  window.location.search).replace(/([^:]\/)\/+/g, "$1"))
+        window.location.replace(ensureOneSlash(goToUrl + window.location.search))
       }
-      var getAssetFile = function(path) {
+      let getAssetFile = function(path) {
         window.location.replace(__webpack_public_path__ + path)
       }
-      var searchParams = new URLSearchParams(location.search)
+      let ensureOneSlash = function(urlStr) {
+        return urlStr.replace(/([^:]\/)\/+/g, "$1")
+      }
+      let searchParams = new URLSearchParams(location.search)
       window.envSettings = {
         isAgent: true,
         apiUrl: "https://app.netdata.cloud",
         cloudUrl: "https://app.netdata.cloud",
-        uiUrl: "https://app.netdata.cloud",
         demoSlug: "netdata-demo",
         demoFavourites: {"postgresql":["postgres"],"redis":["redis"],"dns-query":["dns_query"],"http-endpoints":["httpcheck"],"nginx":["web_log","nginx"],"apache":["apache"],"host-reachability":["ping"],"cassandra":["cassandra"],"coredns":["coredns"],"logind":["logind"],"iis":["iis"],"active-directory":["ad"],"windows":["windows","ad","iis","mssql","exchange","netframework"],"docker":["cgroup","docker"]},
         webpackPublicPath: "",
         agentApiUrl: searchParams.get("agent") || getBasename(),
-        version: "6.21.3",
+        version: "6.22.0",
         tracking: false,
         cookieDomain: ".netdata.cloud"
       }
-
-      __webpack_public_path__ = (window.envSettings.webpackPublicPath ? "/" : (window.envSettings.agentApiUrl + "/v2/")).replace(/([^:]\/)\/+/g, "$1")
 
       function loadStyle(url, { media, insertAfter: aref, insertBefore: bref, rel, type } = {}) {
         rel = rel || 'stylesheet'
         type = type || 'text/css'
         return new Promise(function(resolve, reject) {
-          var link = document.createElement('link');
+          let link = document.createElement('link');
           link.type = type;
           link.rel = rel;
           link.href = url;
@@ -65,7 +65,7 @@
       }
 
       loadStyle(window.envSettings.agentApiUrl + "/v2/static/splash.css")
-      loadStyle(window.envSettings.agentApiUrl + "/v2/favicon.ico", {rel: "icon", type: "image/x-icon"})</script><meta name="application-name" content="netdata"/><meta http-equiv="Content-Type" content="text/html; charset=utf-8"/><meta charset="utf-8"/><meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/><meta name="viewport" content="width=device-width,height=device-height,initial-scale=1,minimum-scale=1"/><meta name="apple-mobile-web-app-capable" content="yes"/><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/></head><body><div id="app"><div id="agent-splash-screen" class="loading"><div class="hero"><div class="logo-container"><svg width="133" height="105" viewBox="0 0 133 105" fill="none" xmlns="http://www.w3.org/2000/svg" class="logo-blur"><path fill-rule="evenodd" clip-rule="evenodd" d="M81.697 105H55.0693L0.5 0.5H77.9598C108.079 0.554913 132.484 24.7711 132.5 54.6451C132.452 82.485 109.73 105 81.697 105Z" fill="rgba(0,171,68,0.1)"/></svg> <svg width="133" height="105" viewBox="0 0 133 105" fill="none" xmlns="http://www.w3.org/2000/svg" class="logo"><path fill-rule="evenodd" clip-rule="evenodd" d="M81.697 105H55.0693L0.5 0.5H77.9598C108.079 0.554913 132.484 24.7711 132.5 54.6451C132.452 82.485 109.73 105 81.697 105Z" fill="#DDFFEB"/></svg></div><div class="headings"><h1 class="title">Welcome to Netdata</h1><div class="loading-message"><p class="subtitle">Loading latest Netdata Cloud UI...</p><div class="flex-center">We couldn't load the latest Netdata Cloud UI. <a class="button ghost" href="javascript:location.reload();">You can try again <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18.364 8.05001L17.657 7.34301C16.318 6.00369 14.5472 5.18285 12.6598 5.02654C10.7724 4.87022 8.89077 5.38856 7.34966 6.48934C5.80855 7.59011 4.70794 9.20193 4.24365 11.038C3.77936 12.8741 3.98151 14.8153 4.81412 16.5164C5.64674 18.2174 7.05583 19.5678 8.79067 20.3275C10.5255 21.0871 12.4736 21.2067 14.2883 20.6648C16.103 20.123 17.6666 18.955 18.701 17.3685C19.7353 15.782 20.1733 13.8801 19.937 12.001M18.364 8.05001L14.121 8.05101M18.364 8.05001V3.80701" stroke="#00ab44" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a></div></div></div></div><div class="flex-center">Or you can load the <a class="button ghost" href="javascript:goToOld('/v1');">old single node dashboard</a> or a <a class="button ghost" href="javascript:goToOld('/v2');">local copy</a> of Netdata Cloud UI</div><div class="flex-center terms"><a href="javascript:getAssetFile('/LICENSE.md');">Netdata Cloud UI license</a></div></div></div><script>var status = {
+      loadStyle(window.envSettings.agentApiUrl + "/v2/favicon.ico", {rel: "icon", type: "image/x-icon"})</script><meta name="application-name" content="netdata"/><meta http-equiv="Content-Type" content="text/html; charset=utf-8"/><meta charset="utf-8"/><meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/><meta name="viewport" content="width=device-width,height=device-height,initial-scale=1,minimum-scale=1"/><meta name="apple-mobile-web-app-capable" content="yes"/><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/></head><body><div id="app"><div id="agent-splash-screen" class="loading"><div class="hero"><div class="logo-container"><svg width="133" height="105" viewBox="0 0 133 105" fill="none" xmlns="http://www.w3.org/2000/svg" class="logo-blur"><path fill-rule="evenodd" clip-rule="evenodd" d="M81.697 105H55.0693L0.5 0.5H77.9598C108.079 0.554913 132.484 24.7711 132.5 54.6451C132.452 82.485 109.73 105 81.697 105Z" fill="rgba(0,171,68,0.1)"/></svg> <svg width="133" height="105" viewBox="0 0 133 105" fill="none" xmlns="http://www.w3.org/2000/svg" class="logo"><path fill-rule="evenodd" clip-rule="evenodd" d="M81.697 105H55.0693L0.5 0.5H77.9598C108.079 0.554913 132.484 24.7711 132.5 54.6451C132.452 82.485 109.73 105 81.697 105Z" fill="#DDFFEB"/></svg></div><div class="headings"><h1 class="title">Welcome to Netdata</h1><div class="loading-message"><p class="subtitle">Loading latest Netdata UI...</p><div class="flex-center">We couldn't load the latest Netdata UI. <a class="button ghost" href="javascript:location.reload();">You can try again <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18.364 8.05001L17.657 7.34301C16.318 6.00369 14.5472 5.18285 12.6598 5.02654C10.7724 4.87022 8.89077 5.38856 7.34966 6.48934C5.80855 7.59011 4.70794 9.20193 4.24365 11.038C3.77936 12.8741 3.98151 14.8153 4.81412 16.5164C5.64674 18.2174 7.05583 19.5678 8.79067 20.3275C10.5255 21.0871 12.4736 21.2067 14.2883 20.6648C16.103 20.123 17.6666 18.955 18.701 17.3685C19.7353 15.782 20.1733 13.8801 19.937 12.001M18.364 8.05001L14.121 8.05101M18.364 8.05001V3.80701" stroke="#00ab44" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a></div></div></div></div><div class="flex-center">Or you can load the <a class="button ghost" href="javascript:goToOld('/v1');">old single node dashboard</a> or a <a class="button ghost" href="javascript:goToOld('/v2');">local copy</a> of Netdata UI</div><div class="flex-center terms"><a href="javascript:getAssetFile('/LICENSE.md');">Netdata UI license</a></div></div></div><script>let status = {
         TIMEOUT: 'timeout',
         SUCCESS: 'success',
         SKIPPED: 'skipped'
@@ -80,16 +80,16 @@
             return;
           }
 
-          var rejectWithTimeout = setTimeout(function() { reject(status.TIMEOUT) }, timeout);
+          let rejectWithTimeout = setTimeout(function() { reject(status.TIMEOUT) }, timeout);
 
-          var script = document.createElement('script');
+          let script = document.createElement('script');
           script.type = 'text/javascript';
           script.src = url;
           script.async = async;
           script.defer = defer;
 
           if (attrs) {
-            for (var attr in attrs) {
+            for (let attr in attrs) {
               script.setAttribute(attr, attrs[attr]);
             }
           }
@@ -120,11 +120,15 @@
       fetch(window.envSettings.agentApiUrl + "/api/v1/registry?action=hello", { cache: "no-cache", credentials: "include" })
         .then(function(response) { return response.json() })
         .then(function(data) {
-          var to = data.cloud_base_url.lastIndexOf('/');
+          let to = data.cloud_base_url.lastIndexOf('/');
           to = (to == -1 || to < data.cloud_base_url.length -2) ? data.cloud_base_url.length : to;
-          var cloudUrl = data.cloud_base_url.substring(0, to);
+          let cloudUrl = data.cloud_base_url.substring(0, to);
           window.envSettings.apiUrl = cloudUrl
+
+          cloudUrl = /api\.netdata\.cloud/.test(cloudUrl) ? "https://app.netdata.cloud" : cloudUrl
           window.envSettings.cloudUrl = cloudUrl
+          window.envSettings.webpackPublicPath = window.envSettings.webpackPublicPath ? cloudUrl : window.envSettings.webpackPublicPath
+          __webpack_public_path__ = ensureOneSlash(window.envSettings.webpackPublicPath ? (window.envSettings.webpackPublicPath + "/") : (window.envSettings.agentApiUrl + "/v2/"))
 
           window.localNetdataRegistry = {
             anonymousStatistics: data.anonymous_statistics,
@@ -133,8 +137,42 @@
             hostname: data.hostname,
             mg: data.agent.machine_guid,
             nd: data.agent.node_id,
-            claimId: data.agent.claim_id
+            claimId: data.agent.claim_id,
+            cloudStatus: data.cloud_status
           }
+
+
+
+          if (window.localNetdataRegistry.cloudStatus === "disabled" && !/\/v2/.test(location.pathname)) {
+            goToOld("/v2")
+            return
+          }
+
+          fetch(__webpack_public_path__ + "bundlesManifest."+ window.envSettings.version.toString().replace(/(\d+)\..+/, "$1") +".json")
+            .then(function(response) { return response.json() })
+            .then(function(data) {
+              Object.keys(data).forEach(function(k) {
+                if (/\.(map|ico|html)$/.test(data[k])) return
+                if (/static\//.test(data[k])) return
+
+                if (/\.css.*$/.test(data[k])) {
+                  loadStyle(ensureOneSlash(__webpack_public_path__ + data[k]))
+                  return
+                }
+
+                if (/\.js.*$/.test(data[k])) {
+                  loadScript(ensureOneSlash(__webpack_public_path__ + data[k]), {
+                    async: false,
+                  });
+                }
+                let el = document.getElementById('agent-splash-screen');
+                el.classList.remove("loading");
+              })
+            }).catch(function() {
+              let el = document.getElementById('agent-splash-screen');
+              el.classList.remove("loading");
+              el.classList.add("error");
+            });
 
           if (window.localNetdataRegistry.anonymousStatistics) {
             ;(function (w, d, s, l, i) {
@@ -172,10 +210,15 @@
               posthog.init("phc_hnhlqe6D2Q4IcQNrFItaqdXJAxQ8RcHkPAFAp74pubv", { api_host: "https://app.posthog.com", disable_session_recording: true, opt_in_site_apps: true } )
           }
 
-          var withoutNodes = JSON.parse(JSON.stringify(data))
-          withoutNodes.nodes = []
-          var iframe = document.createElement('iframe');
-          iframe.src = data.registry + "/registry-access.html?x=" + btoa(JSON.stringify(withoutNodes)) + "&originUrl=" + window.envSettings.agentApiUrl;
+          let withoutNodes = btoa(JSON.stringify({
+            registry: data.registry,
+            machine_guid: data.machine_guid,
+            hostname: data.hostname,
+            agent: data.agent,
+            nodes: []
+          }))
+          let iframe = document.createElement('iframe');
+          iframe.src = data.registry + "/registry-access.html?x=" + withoutNodes + "&originUrl=" + window.envSettings.agentApiUrl;
           iframe.style = { position: "absolute", left: "-99999999px" };
           iframe.width = 0 ;
           iframe.height = 0;
@@ -185,6 +228,7 @@
           document.body.appendChild(iframe);
 
           setTimeout(function () {
+            document.title = data.hostname + ': Netdata Agent Console';
             iframe.contentWindow.postMessage(["netdata-registry", window.envSettings.agentApiUrl, data], "*")
           }, 300);
 
@@ -193,48 +237,4 @@
 
             if (event.data.status === "disabled") console.error("Your netdata registry is disabled! Check your configuration.")
           });
-        })
-
-      fetch(window.envSettings.agentApiUrl + "/api/v1/info")
-        .then(function(response) { return response.json() })
-        .then(function(agent) {
-          window.localNetdataAgent = {
-            mg: agent.uid,
-            version: agent.version,
-            cloudEnabled: agent["cloud-enabled"],
-            cloudAvailable: agent["cloud-available"],
-            claimed: agent["agent-claimed"],
-            aclk: agent["aclk-available"]
-          }
-
-          if (!window.localNetdataAgent.cloudEnabled && /netdata\.cloud/.test("/bundlesManifest.6.json")) {
-            goToOld("/v2")
-            return
-          }
-
-          fetch(__webpack_public_path__ + "bundlesManifest."+ window.envSettings.version.toString().replace(/(\d+)\..+/, "$1") +".json")
-            .then(function(response) { return response.json() })
-            .then(function(data) {
-              Object.keys(data).forEach(function(k) {
-                if (/\.(map|ico|html)$/.test(data[k])) return
-                if (/static\//.test(data[k])) return
-
-                if (/\.css.*$/.test(data[k])) {
-                  loadStyle((__webpack_public_path__ + data[k]).replace(/([^:]\/)\/+/g, "$1"))
-                  return
-                }
-
-                if (/\.js.*$/.test(data[k])) {
-                  loadScript((__webpack_public_path__ + data[k]).replace(/([^:]\/)\/+/g, "$1"), {
-                    async: false,
-                  });
-                }
-                var el = document.getElementById('agent-splash-screen');
-                el.classList.remove("loading");
-              })
-            }).catch(function() {
-              var el = document.getElementById('agent-splash-screen');
-              el.classList.remove("loading");
-              el.classList.add("error");
-            });
-          })</script></body></html>
+        })</script></body></html>
