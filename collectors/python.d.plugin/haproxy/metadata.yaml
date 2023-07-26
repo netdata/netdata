@@ -1,318 +1,322 @@
-meta:
-  plugin_name: python.d.plugin
-  module_name: haproxy
-  monitored_instance:
-    name: HAProxy
-    link: 'https://www.haproxy.org/'
-    categories:
-    - data-collection.web-servers-and-web-proxies
-    icon_filename: 'haproxy.png'
-  related_resources:
-    integrations:
-      list: []
-  info_provided_to_referring_integrations:
-    description: ''
-  keywords:
-    - haproxy
-    - tcp
-    - balancer
-  most_popular: false
-overview:
-  data_collection:
-    metrics_description: 'This collector monitors HAProxy metrics about frontend servers, backend servers, responses and more.'
-    method_description: 'It connects to the HAProxy instance via URL or UNIX socket.'
-  supported_platforms:
-    include: []
-    exclude: []
-  multi_instance: true
-  additional_permissions:
-    description: ''
-  default_behavior:
-    auto_detection:
-      description: ''
-    limits:
-      description: ''
-    performance_impact:
-      description: ''
-setup:
-  prerequisites:
-    list:
-      - title: 'HAProxy setup for socket'
-        description: 'Socket must be readable and writable by the netdata user.'
-      - title: 'HAProxy setup for URL'
-        description: 'URL must have `stats uri <path>` present in the haproxy config, otherwise you will get HTTP 503 in the haproxy logs.'
-  configuration:
-    file:
-      name: python.d/haproxy.conf
-    options:
-      description: |
-        There are 2 sections:
+# This collector will not appear in documentation, as the go version is preferred,
+# https://github.com/netdata/go.d.plugin/blob/master/modules/haproxy/README.md
+#
+#
+#  meta:
+#   plugin_name: python.d.plugin
+#   module_name: haproxy
+#   monitored_instance:
+#     name: HAProxy
+#     link: 'https://www.haproxy.org/'
+#     categories:
+#     - data-collection.web-servers-and-web-proxies
+#     icon_filename: 'haproxy.png'
+#   related_resources:
+#     integrations:
+#       list: []
+#   info_provided_to_referring_integrations:
+#     description: ''
+#   keywords:
+#     - haproxy
+#     - tcp
+#     - balancer
+#   most_popular: false
+# overview:
+#   data_collection:
+#     metrics_description: 'This collector monitors HAProxy metrics about frontend servers, backend servers, responses and more.'
+#     method_description: 'It connects to the HAProxy instance via URL or UNIX socket.'
+#   supported_platforms:
+#     include: []
+#     exclude: []
+#   multi_instance: true
+#   additional_permissions:
+#     description: ''
+#   default_behavior:
+#     auto_detection:
+#       description: ''
+#     limits:
+#       description: ''
+#     performance_impact:
+#       description: ''
+# setup:
+#   prerequisites:
+#     list:
+#       - title: 'HAProxy setup for socket'
+#         description: 'Socket must be readable and writable by the netdata user.'
+#       - title: 'HAProxy setup for URL'
+#         description: 'URL must have `stats uri <path>` present in the haproxy config, otherwise you will get HTTP 503 in the haproxy logs.'
+#   configuration:
+#     file:
+#       name: python.d/haproxy.conf
+#     options:
+#       description: |
+#         There are 2 sections:
 
-        * Global variables
-        * One or more JOBS that can define multiple different instances to monitor.
+#         * Global variables
+#         * One or more JOBS that can define multiple different instances to monitor.
 
-        The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
+#         The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
 
-        Additionally, the following collapsed table contains all the options that can be configured inside a JOB definition.
+#         Additionally, the following collapsed table contains all the options that can be configured inside a JOB definition.
 
-        Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
-      folding:
-        title: "Config options"
-        enabled: true
-      list:
-        - name: update_every
-          description: Sets the default data collection frequency.
-          default_value: 5
-          required: false
-        - name: priority
-          description: Controls the order of charts at the netdata dashboard.
-          default_value: 60000
-          required: false
-        - name: autodetection_retry
-          description: Sets the job re-check interval in seconds.
-          default_value: 0
-          required: false
-        - name: penalty
-          description: Indicates whether to apply penalty to update_every in case of failures.
-          default_value: yes
-          required: false
-        - name: name
-          description: Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works.
-          default_value: ''
-          required: false
-        - name: user
-          description: Username if stats auth is used.
-          default_value: ''
-          required: false
-        - name: pass
-          description: Password if stats auth is used.
-          default_value: ''
-          required: false
-        - name: url
-          description: URL to the haproxy_stats endpoint. Also make sure the parameters `csv` and `norefresh` are provided.
-          default_value: ''
-          required: false
-        - name: socket
-          description: Unix socket path to the haproxy sock file.
-          default_value: ''
-          required: false
-    examples:
-      folding:
-        enabled: true
-        title: "Config"
-      list:
-        - name: URL method
-          description: Use a URL to specify the endpoint to check for haproxy statistics.
-          config: |
-            via_url:
-             user: 'username' # ONLY IF stats auth is used
-             pass: 'password' # # ONLY IF stats auth is used
-             url: 'http://ip.address:port/url;csv;norefresh'
-        - name: Local socket
-          description: Use a local socket to check for haproxy statistics.
-          config: |
-             via_socket:
-              socket: 'path/to/haproxy/sock'
-troubleshooting:
-  problems:
-    list: []
-alerts:
-- name: haproxy_backend_server_status
-  link: https://github.com/netdata/netdata/blob/master/health/health.d/haproxy.conf
-  metric: haproxy_hs.down
-  info: average number of failed haproxy backend servers over the last 10 seconds
-- name: haproxy_backend_status
-  link: https://github.com/netdata/netdata/blob/master/health/health.d/haproxy.conf
-  metric: haproxy_hb.down
-  info: average number of failed haproxy backends over the last 10 seconds
-metrics:
-  folding:
-    title: Metrics
-    enabled: false
-  description: ""
-  availability: []
-  scopes:
-  - name: global
-    description: 'These metrics refer to the entire monitored application.'
-    labels: []
-    metrics:
-    - name: haproxy_f.bin
-      description: Kilobytes In
-      unit: "KiB/s"
-      chart_type: line
-      dimensions:
-      - name: a dimension per frontend server
-    - name: haproxy_f.bout
-      description: Kilobytes Out
-      unit: "KiB/s"
-      chart_type: line
-      dimensions:
-      - name: a dimension per frontend server
-    - name: haproxy_f.scur
-      description: Sessions Active
-      unit: "sessions"
-      chart_type: line
-      dimensions:
-      - name: a dimension per frontend server
-    - name: haproxy_f.qcur
-      description: Session In Queue
-      unit: "sessions"
-      chart_type: line
-      dimensions:
-      - name: a dimension per frontend server
-    - name: haproxy_f.hrsp_1xx
-      description: HTTP responses with 1xx code
-      unit: "responses/s"
-      chart_type: line
-      dimensions:
-      - name: a dimension per frontend server
-    - name: haproxy_f.hrsp_2xx
-      description: HTTP responses with 2xx code
-      unit: "responses/s"
-      chart_type: line
-      dimensions:
-      - name: a dimension per frontend server
-    - name: haproxy_f.hrsp_3xx
-      description: HTTP responses with 3xx code
-      unit: "responses/s"
-      chart_type: line
-      dimensions:
-      - name: a dimension per frontend server
-    - name: haproxy_f.hrsp_4xx
-      description: HTTP responses with 4xx code
-      unit: "responses/s"
-      chart_type: line
-      dimensions:
-      - name: a dimension per frontend server
-    - name: haproxy_f.hrsp_5xx
-      description: HTTP responses with 5xx code
-      unit: "responses/s"
-      chart_type: line
-      dimensions:
-      - name: a dimension per frontend server
-    - name: haproxy_f.hrsp_other
-      description: HTTP responses with other codes (protocol error)
-      unit: "responses/s"
-      chart_type: line
-      dimensions:
-      - name: a dimension per frontend server
-    - name: haproxy_f.hrsp_total
-      description: HTTP responses
-      unit: "responses"
-      chart_type: line
-      dimensions:
-      - name: a dimension per frontend server
-    - name: haproxy_b.bin
-      description: Kilobytes In
-      unit: "KiB/s"
-      chart_type: line
-      dimensions:
-      - name: a dimension per backend server
-    - name: haproxy_b.bout
-      description: Kilobytes Out
-      unit: "KiB/s"
-      chart_type: line
-      dimensions:
-      - name: a dimension per backend server
-    - name: haproxy_b.scur
-      description: Sessions Active
-      unit: "sessions"
-      chart_type: line
-      dimensions:
-      - name: a dimension per backend server
-    - name: haproxy_b.qcur
-      description: Sessions In Queue
-      unit: "sessions"
-      chart_type: line
-      dimensions:
-      - name: a dimension per backend server
-    - name: haproxy_b.hrsp_1xx
-      description: HTTP responses with 1xx code
-      unit: "responses/s"
-      chart_type: line
-      dimensions:
-      - name: a dimension per backend server
-    - name: haproxy_b.hrsp_2xx
-      description: HTTP responses with 2xx code
-      unit: "responses/s"
-      chart_type: line
-      dimensions:
-      - name: a dimension per backend server
-    - name: haproxy_b.hrsp_3xx
-      description: HTTP responses with 3xx code
-      unit: "responses/s"
-      chart_type: line
-      dimensions:
-      - name: a dimension per backend server
-    - name: haproxy_b.hrsp_4xx
-      description: HTTP responses with 4xx code
-      unit: "responses/s"
-      chart_type: line
-      dimensions:
-      - name: a dimension per backend server
-    - name: haproxy_b.hrsp_5xx
-      description: HTTP responses with 5xx code
-      unit: "responses/s"
-      chart_type: line
-      dimensions:
-      - name: a dimension per backend server
-    - name: haproxy_b.hrsp_other
-      description: HTTP responses with other codes (protocol error)
-      unit: "responses/s"
-      chart_type: line
-      dimensions:
-      - name: a dimension per backend server
-    - name: haproxy_b.hrsp_total
-      description: HTTP responses (total)
-      unit: "responses/s"
-      chart_type: line
-      dimensions:
-      - name: a dimension per backend server
-    - name: haproxy_b.qtime
-      description: The average queue time over the 1024 last requests
-      unit: "milliseconds"
-      chart_type: line
-      dimensions:
-      - name: a dimension per backend server
-    - name: haproxy_b.ctime
-      description: The average connect time over the 1024 last requests
-      unit: "milliseconds"
-      chart_type: line
-      dimensions:
-      - name: a dimension per backend server
-    - name: haproxy_b.rtime
-      description: The average response time over the 1024 last requests
-      unit: "milliseconds"
-      chart_type: line
-      dimensions:
-      - name: a dimension per backend server
-    - name: haproxy_b.ttime
-      description: The average total session time over the 1024 last requests
-      unit: "milliseconds"
-      chart_type: line
-      dimensions:
-      - name: a dimension per backend server
-    - name: haproxy_hs.down
-      description: Backend Servers In DOWN State
-      unit: "failed servers"
-      chart_type: line
-      dimensions:
-      - name: a dimension per backend server
-    - name: haproxy_hs.up
-      description: Backend Servers In UP State
-      unit: "health servers"
-      chart_type: line
-      dimensions:
-      - name: a dimension per backend server
-    - name: haproxy_hb.down
-      description: Is Backend Failed?
-      unit: "boolean"
-      chart_type: line
-      dimensions:
-      - name: a dimension per backend server
-    - name: haproxy.idle
-      description: The Ratio Of Polling Time Vs Total Time
-      unit: "percentage"
-      chart_type: line
-      dimensions:
-      - name: idle
+#         Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
+#       folding:
+#         title: "Config options"
+#         enabled: true
+#       list:
+#         - name: update_every
+#           description: Sets the default data collection frequency.
+#           default_value: 5
+#           required: false
+#         - name: priority
+#           description: Controls the order of charts at the netdata dashboard.
+#           default_value: 60000
+#           required: false
+#         - name: autodetection_retry
+#           description: Sets the job re-check interval in seconds.
+#           default_value: 0
+#           required: false
+#         - name: penalty
+#           description: Indicates whether to apply penalty to update_every in case of failures.
+#           default_value: yes
+#           required: false
+#         - name: name
+#           description: Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works.
+#           default_value: ''
+#           required: false
+#         - name: user
+#           description: Username if stats auth is used.
+#           default_value: ''
+#           required: false
+#         - name: pass
+#           description: Password if stats auth is used.
+#           default_value: ''
+#           required: false
+#         - name: url
+#           description: URL to the haproxy_stats endpoint. Also make sure the parameters `csv` and `norefresh` are provided.
+#           default_value: ''
+#           required: false
+#         - name: socket
+#           description: Unix socket path to the haproxy sock file.
+#           default_value: ''
+#           required: false
+#     examples:
+#       folding:
+#         enabled: true
+#         title: "Config"
+#       list:
+#         - name: URL method
+#           description: Use a URL to specify the endpoint to check for haproxy statistics.
+#           config: |
+#             via_url:
+#              user: 'username' # ONLY IF stats auth is used
+#              pass: 'password' # # ONLY IF stats auth is used
+#              url: 'http://ip.address:port/url;csv;norefresh'
+#         - name: Local socket
+#           description: Use a local socket to check for haproxy statistics.
+#           config: |
+#              via_socket:
+#               socket: 'path/to/haproxy/sock'
+# troubleshooting:
+#   problems:
+#     list: []
+# alerts:
+# - name: haproxy_backend_server_status
+#   link: https://github.com/netdata/netdata/blob/master/health/health.d/haproxy.conf
+#   metric: haproxy_hs.down
+#   info: average number of failed haproxy backend servers over the last 10 seconds
+# - name: haproxy_backend_status
+#   link: https://github.com/netdata/netdata/blob/master/health/health.d/haproxy.conf
+#   metric: haproxy_hb.down
+#   info: average number of failed haproxy backends over the last 10 seconds
+# metrics:
+#   folding:
+#     title: Metrics
+#     enabled: false
+#   description: ""
+#   availability: []
+#   scopes:
+#   - name: global
+#     description: 'These metrics refer to the entire monitored application.'
+#     labels: []
+#     metrics:
+#     - name: haproxy_f.bin
+#       description: Kilobytes In
+#       unit: "KiB/s"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per frontend server
+#     - name: haproxy_f.bout
+#       description: Kilobytes Out
+#       unit: "KiB/s"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per frontend server
+#     - name: haproxy_f.scur
+#       description: Sessions Active
+#       unit: "sessions"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per frontend server
+#     - name: haproxy_f.qcur
+#       description: Session In Queue
+#       unit: "sessions"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per frontend server
+#     - name: haproxy_f.hrsp_1xx
+#       description: HTTP responses with 1xx code
+#       unit: "responses/s"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per frontend server
+#     - name: haproxy_f.hrsp_2xx
+#       description: HTTP responses with 2xx code
+#       unit: "responses/s"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per frontend server
+#     - name: haproxy_f.hrsp_3xx
+#       description: HTTP responses with 3xx code
+#       unit: "responses/s"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per frontend server
+#     - name: haproxy_f.hrsp_4xx
+#       description: HTTP responses with 4xx code
+#       unit: "responses/s"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per frontend server
+#     - name: haproxy_f.hrsp_5xx
+#       description: HTTP responses with 5xx code
+#       unit: "responses/s"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per frontend server
+#     - name: haproxy_f.hrsp_other
+#       description: HTTP responses with other codes (protocol error)
+#       unit: "responses/s"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per frontend server
+#     - name: haproxy_f.hrsp_total
+#       description: HTTP responses
+#       unit: "responses"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per frontend server
+#     - name: haproxy_b.bin
+#       description: Kilobytes In
+#       unit: "KiB/s"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per backend server
+#     - name: haproxy_b.bout
+#       description: Kilobytes Out
+#       unit: "KiB/s"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per backend server
+#     - name: haproxy_b.scur
+#       description: Sessions Active
+#       unit: "sessions"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per backend server
+#     - name: haproxy_b.qcur
+#       description: Sessions In Queue
+#       unit: "sessions"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per backend server
+#     - name: haproxy_b.hrsp_1xx
+#       description: HTTP responses with 1xx code
+#       unit: "responses/s"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per backend server
+#     - name: haproxy_b.hrsp_2xx
+#       description: HTTP responses with 2xx code
+#       unit: "responses/s"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per backend server
+#     - name: haproxy_b.hrsp_3xx
+#       description: HTTP responses with 3xx code
+#       unit: "responses/s"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per backend server
+#     - name: haproxy_b.hrsp_4xx
+#       description: HTTP responses with 4xx code
+#       unit: "responses/s"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per backend server
+#     - name: haproxy_b.hrsp_5xx
+#       description: HTTP responses with 5xx code
+#       unit: "responses/s"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per backend server
+#     - name: haproxy_b.hrsp_other
+#       description: HTTP responses with other codes (protocol error)
+#       unit: "responses/s"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per backend server
+#     - name: haproxy_b.hrsp_total
+#       description: HTTP responses (total)
+#       unit: "responses/s"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per backend server
+#     - name: haproxy_b.qtime
+#       description: The average queue time over the 1024 last requests
+#       unit: "milliseconds"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per backend server
+#     - name: haproxy_b.ctime
+#       description: The average connect time over the 1024 last requests
+#       unit: "milliseconds"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per backend server
+#     - name: haproxy_b.rtime
+#       description: The average response time over the 1024 last requests
+#       unit: "milliseconds"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per backend server
+#     - name: haproxy_b.ttime
+#       description: The average total session time over the 1024 last requests
+#       unit: "milliseconds"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per backend server
+#     - name: haproxy_hs.down
+#       description: Backend Servers In DOWN State
+#       unit: "failed servers"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per backend server
+#     - name: haproxy_hs.up
+#       description: Backend Servers In UP State
+#       unit: "health servers"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per backend server
+#     - name: haproxy_hb.down
+#       description: Is Backend Failed?
+#       unit: "boolean"
+#       chart_type: line
+#       dimensions:
+#       - name: a dimension per backend server
+#     - name: haproxy.idle
+#       description: The Ratio Of Polling Time Vs Total Time
+#       unit: "percentage"
+#       chart_type: line
+#       dimensions:
+#       - name: idle
