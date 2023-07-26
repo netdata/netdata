@@ -11,7 +11,7 @@ typedef struct metric METRIC;
 typedef struct mrg MRG;
 
 typedef struct mrg_entry {
-    uuid_t uuid;
+    uuid_t *uuid;
     Word_t section;
     time_t first_time_s;
     time_t last_time_s;

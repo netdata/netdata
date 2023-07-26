@@ -168,7 +168,7 @@ static inline bool metric_release_and_can_be_deleted(MRG *mrg __maybe_unused, ME
 }
 
 static inline METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
-    size_t partition = uuid_partition(mrg, &entry->uuid);
+    size_t partition = uuid_partition(mrg, entry->uuid);
 
     METRIC *allocation = aral_mallocz(mrg->index[partition].aral);
 
@@ -176,7 +176,7 @@ static inline METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *r
 
     size_t mem_before_judyl, mem_after_judyl;
 
-    Pvoid_t *sections_judy_pptr = JudyHSIns(&mrg->index[partition].uuid_judy, &entry->uuid, sizeof(uuid_t), PJE0);
+    Pvoid_t *sections_judy_pptr = JudyHSIns(&mrg->index[partition].uuid_judy, entry->uuid, sizeof(uuid_t), PJE0);
     if(unlikely(!sections_judy_pptr || sections_judy_pptr == PJERR))
         fatal("DBENGINE METRIC: corrupted UUIDs JudyHS array");
 
@@ -209,8 +209,7 @@ static inline METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *r
     }
 
     METRIC *metric = allocation;
-    // memcpy(metric->uuid, entry->uuid, sizeof(uuid_t));
-    uuid_copy(metric->uuid, entry->uuid);
+    uuid_copy(metric->uuid, *entry->uuid);
     metric->section = entry->section;
     metric->first_time_s = MAX(0, entry->first_time_s);
     metric->latest_time_s_clean = MAX(0, entry->last_time_s);
@@ -692,13 +691,12 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
     METRIC *metric = mrg_metric_get_and_acquire(mrg, uuid, section);
     if (!metric) {
         MRG_ENTRY entry = {
+                .uuid = uuid,
                 .section = section,
                 .first_time_s = first_time_s,
                 .last_time_s = last_time_s,
                 .latest_update_every_s = (uint32_t) update_every_s
         };
-        // memcpy(entry.uuid, *uuid, sizeof(uuid_t));
-        uuid_copy(entry.uuid, *uuid);
         metric = mrg_metric_add_and_acquire(mrg, entry, &added);
     }
 
@@ -790,13 +788,15 @@ int mrg_unittest(void) {
     METRIC *m1_t1, *m2_t1, *m3_t1, *m4_t1;
     bool ret;
 
+    uuid_t test_uuid;
+    uuid_generate(test_uuid);
     MRG_ENTRY entry = {
+            .uuid = &test_uuid,
             .section = 0,
             .first_time_s = 2,
             .last_time_s = 3,
             .latest_update_every_s = 4,
     };
-    uuid_generate(entry.uuid);
     m1_t0 = mrg_metric_add_and_acquire(mrg, entry, &ret);
     if(!ret)
         fatal("DBENGINE METRIC: failed to add metric");
@@ -808,7 +808,7 @@ int mrg_unittest(void) {
     if(ret)
         fatal("DBENGINE METRIC: managed to add the same metric twice");
 
-    m3_t0 = mrg_metric_get_and_acquire(mrg, &entry.uuid, entry.section);
+    m3_t0 = mrg_metric_get_and_acquire(mrg, entry.uuid, entry.section);
     if(m3_t0 != m1_t0)
         fatal("DBENGINE METRIC: cannot find the metric added");
 
@@ -832,7 +832,7 @@ int mrg_unittest(void) {
     if(ret)
         fatal("DBENGINE METRIC: managed to add the same metric twice in (section 0)");
 
-    m3_t1 = mrg_metric_get_and_acquire(mrg, &entry.uuid, entry.section);
+    m3_t1 = mrg_metric_get_and_acquire(mrg, entry.uuid, entry.section);
     if(m3_t1 != m1_t1)
         fatal("DBENGINE METRIC: cannot find the metric added (section %zu)", (size_t)entry.section);
 
@@ -846,7 +846,7 @@ int mrg_unittest(void) {
     if(!mrg_metric_release_and_delete(mrg, m1_t0))
         fatal("DBENGINE METRIC: cannot delete the first metric");
 
-    m4_t1 = mrg_metric_get_and_acquire(mrg, &entry.uuid, entry.section);
+    m4_t1 = mrg_metric_get_and_acquire(mrg, entry.uuid, entry.section);
     if(m4_t1 != m1_t1)
         fatal("DBENGINE METRIC: cannot find the metric added (section %zu), after deleting the first one", (size_t)entry.section);
 
