@@ -125,6 +125,7 @@ setup:
               host: '192.0.2.1'
               port: 3128
               request: 'cache_object://192.0.2.1:3128/counters'
+troubleshooting:
   problems:
     list: []
 alerts: []
