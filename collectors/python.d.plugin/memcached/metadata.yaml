@@ -92,8 +92,35 @@ setup:
     examples:
       folding:
         enabled: true
-        title: ""
-      list: []
+        title: "Config"
+      list:
+        - name: localhost
+          description: An example configuration for localhost.
+          folding:
+            enabled: false
+          config: |
+            localhost:
+              name: 'local'
+              host: 'localhost'
+              port: 11211
+        - name: localipv4
+          description: An example configuration for localipv4.
+          folding:
+            enabled: true
+          config: |
+            localhost:
+              name: 'local'
+              host: '127.0.0.1'
+              port: 11211
+        - name: localipv6
+          description: An example configuration for localipv6.
+          folding:
+            enabled: true
+          config: |
+            localhost:
+              name: 'local'
+              host: '::1'
+              port: 11211
 troubleshooting:
   problems:
     list: []
@@ -118,7 +145,7 @@ metrics:
   availability: []
   scopes:
     - name: global
-      description: ""
+      description: "These metrics refer to the entire monitored application."
       labels: []
       metrics:
         - name: memcached.cache
