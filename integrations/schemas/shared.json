@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Shared definitions used for all integrations schemas.",
+  "$defs": {
+    "instance": {
+      "type": "object",
+      "description": "Information about the integration instance.",
+      "properties": {
+        "name": {
+          "description": "Integration display name. Use official spelling for applications.",
+          "type": "string"
+        },
+        "link": {
+          "description": "Link to the instance official website if any.",
+          "type": "string"
+        },
+        "categories": {
+          "type": "array",
+          "description": "Category IDs that this integration falls into. IDs can be found in integrations/categories.yaml",
+          "items": {
+            "type": "string",
+            "description": "String defining integration category"
+          }
+        },
+        "icon_filename": {
+          "type": "string",
+          "description": "The filename of the integration's icon, as sourced from https://github.com/netdata/website/tree/master/themes/tailwind/static/img."
+        }
+      },
+      "required": [
+        "name",
+        "link",
+        "categories",
+        "icon_filename"
+      ]
+    },
+    "keywords": {
+      "type": "array",
+      "description": "An array of terms related to the integration.",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

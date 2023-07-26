@@ -27,7 +27,7 @@
               if (data.status === "ok") {
                 localStorage.setItem("registry-netdata-token", token)
 
-                node = nodes.pop()
+                let node = nodes.pop()
 
                 if (!!node) {
                   setTimeout(function () {

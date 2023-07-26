@@ -4,48 +4,109 @@ modules:
       plugin_name: ebpf.plugin
       module_name: filedescriptor
       monitored_instance:
-        name: ebpf filedescriptor
-        link: ""
+        name: eBPF Filedescriptor
+        link: "https://kernel.org/"
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
-          list: []
+          list:
+            - plugin_name: apps.plugin
+              module_name: apps
+            - plugin_name: cgroups.plugin
+              module_name: cgroups
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - file
+        - eBPF
+        - fd
+        - open
+        - close
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Monitor calls for functions responsible to open or close a file descriptor and possible errors."
+        method_description: "Attach tracing (kprobes and trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ""
+        description: "The plugin needs setuid because it loads data inside kernel."
       default_behavior:
         auto_detection:
-          description: ""
+          description: "It checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached."
         limits:
           description: ""
         performance_impact:
-          description: ""
+          description: "Depending of kernel version and frequency that files are open and close, this thread will add overhead everytime that an internal kernel function is called. The estimated additional period of time is at between 90-200ms per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Compile kernel
+            description: |
+              Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+              When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+              with different names.
+
+              Now follow steps:
+              1. Copy the configuration file to /usr/src/linux/.config.
+              2. Select the necessary options: make oldconfig
+              3. Compile your kernel image: make bzImage
+              4. Compile your modules: make modules
+              5. Copy your new kernel image for boot loader directory
+              6. Install the new modules: make modules_install
+              7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+              8. Update your boot loader
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "ebpf.d/fd.conf"
+          description: "Overwrite default configuration helping to reduce memory usage. You can also select charts visible on dashboard."
         options:
-          description: ""
+          description: |
+            All options are defined inside section `[global]`.
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: ebpf load mode
+              description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
+              default_value: entry
+              required: false
+            - name: apps
+              description: Enable or disable integration with apps.plugin
+              default_value: no
+              required: false
+            - name: cgroups
+              description: Enable or disable integration with cgroup.plugin
+              default_value: no
+              required: false
+            - name: pid table size
+              description: Number of elements stored inside hash tables used to monitor calls per PID.
+              default_value: 32768
+              required: false
+            - name: ebpf type format
+              description: "Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load)."
+              default_value: auto
+              required: false
+            - name: ebpf co-re tracing
+              description: "Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code)."
+              default_value: trampoline
+              required: false
+            - name: maps per core
+              description: Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information.
+              default_value: yes
+              required: false
+            - name: lifetime
+              description: Set default lifetime for thread when enabled by cloud.
+              default_value: 300
+              required: false
         examples:
           folding:
             enabled: true
@@ -63,7 +124,7 @@ modules:
       availability: []
       scopes:
         - name: cgroup
-          description: ""
+          description: "These Metrics show grouped information per cgroup."
           labels: []
           metrics:
             - name: cgroup.fd_open
@@ -91,7 +152,7 @@ modules:
               dimensions:
                 - name: close
         - name: global
-          description: ""
+          description: "These metrics show total number of calls executed for the host."
           labels: []
           metrics:
             - name: services.file_open
@@ -160,22 +221,26 @@ modules:
       plugin_name: ebpf.plugin
       module_name: processes
       monitored_instance:
-        name: ebpf processes
+        name: eBPF Processes
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - thread
+        - fork
+        - process
+        - eBPF
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Monitor calls for function creating tasks (threads and processes) inside Linux kernel."
+        method_description: "Attach tracing (kprobes and tracepoint) to internal kernel functions."
       supported_platforms:
         include: []
         exclude: []
@@ -345,22 +410,26 @@ modules:
       plugin_name: ebpf.plugin
       module_name: disk
       monitored_instance:
-        name: ebpf disk
+        name: eBPF Disk
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - hard Disk
+        - eBPF
+        - latency
+        - partition
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Measure latency for I/O events on disk."
+        method_description: "Attach tracepoints to internal kernel functions."
       supported_platforms:
         include: []
         exclude: []
@@ -417,22 +486,24 @@ modules:
       plugin_name: ebpf.plugin
       module_name: hardirq
       monitored_instance:
-        name: ebpf hardirq
+        name: eBPF Hardirq
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - HardIRQ
+        - eBPF
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Monitor latency for each HardIRQ available."
+        method_description: "Attach tracepoints to internal kernel functions."
       supported_platforms:
         include: []
         exclude: []
@@ -480,7 +551,7 @@ modules:
           labels: []
           metrics:
             - name: system.hardirq_latency
-              description: Hardware IRQ latency
+              description: Hard IRQ latency
               unit: "milisecondds"
               chart_type: stacked
               dimensions:
@@ -489,22 +560,25 @@ modules:
       plugin_name: ebpf.plugin
       module_name: cachestat
       monitored_instance:
-        name: ebpf cachestat
+        name: eBPF Cachestat
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - Page cache
+        - Hit ratio
+        - eBPF
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Monitor Linux page cache events giving for users a general vision about how his kernel is manipulating files."
+        method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
         include: []
         exclude: []
@@ -655,22 +729,26 @@ modules:
       plugin_name: ebpf.plugin
       module_name: sync
       monitored_instance:
-        name: ebpf sync
+        name: eBPF Sync
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - syscall
+        - eBPF
+        - hard disk
+        - memory
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Monitor syscalls responsible to move data from memory to storage device."
+        method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
         include: []
         exclude: []
@@ -753,22 +831,25 @@ modules:
       plugin_name: ebpf.plugin
       module_name: mdflush
       monitored_instance:
-        name: ebpf mdflush
+        name: eBPF MDflush
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - MD
+        - RAID
+        - eBPF
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Monitor when flush events happen between disks."
+        method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
         include: []
         exclude: []
@@ -825,22 +906,26 @@ modules:
       plugin_name: ebpf.plugin
       module_name: swap
       monitored_instance:
-        name: ebpf swap
+        name: eBPF SWAP
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - SWAP
+        - memory
+        - eBPF
+        - Hard Disk
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Monitors when swap has I/O events and applications executing events."
+        method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
         include: []
         exclude: []
@@ -938,22 +1023,24 @@ modules:
       plugin_name: ebpf.plugin
       module_name: oomkill
       monitored_instance:
-        name: ebpf oomkill
+        name: eBPF OOMkill
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - application
+        - memory
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Monitor applications that reach out of memory."
+        method_description: "Attach tracepoint to internal kernel functions."
       supported_platforms:
         include: []
         exclude: []
@@ -1026,22 +1113,28 @@ modules:
       plugin_name: ebpf.plugin
       module_name: socket
       monitored_instance:
-        name: ebpf socket
+        name: eBPF Socket
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - TCP
+        - UDP
+        - bandwidth
+        - server
+        - connection
+        - socket
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Monitor bandwidth consumption per application for protocols TCP and UDP."
+        method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
         include: []
         exclude: []
@@ -1319,22 +1412,25 @@ modules:
       plugin_name: ebpf.plugin
       module_name: dcstat
       monitored_instance:
-        name: ebpf dcstat
+        name: eBPF DCstat
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - Directory Cache
+        - File system
+        - eBPF
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Monitor directory cache events per application given an overall vision about files on memory or storage device."
+        method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
         include: []
         exclude: []
@@ -1479,22 +1575,31 @@ modules:
       plugin_name: ebpf.plugin
       module_name: filesystem
       monitored_instance:
-        name: ebpf filesystem
+        name: eBPF Filesystem
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - Filesystem
+        - ext4
+        - btrfs
+        - nfs
+        - xfs
+        - zfs
+        - eBPF
+        - latency
+        - I/O
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Monitor latency for main actions on filesystem like I/O events."
+        method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
         include: []
         exclude: []
@@ -1583,22 +1688,25 @@ modules:
       plugin_name: ebpf.plugin
       module_name: shm
       monitored_instance:
-        name: ebpf shm
+        name: eBPF SHM
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - syscall
+        - shared memory
+        - eBPF
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Monitor syscalls responsible to manipulate shared memory."
+        method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
         include: []
         exclude: []
@@ -1734,22 +1842,24 @@ modules:
       plugin_name: ebpf.plugin
       module_name: softirq
       monitored_instance:
-        name: ebpf softirq
+        name: eBPF SoftIRQ
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - SoftIRQ
+        - eBPF
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Monitor latency for each SoftIRQ available."
+        method_description: "Attach kprobes to internal kernel functions."
       supported_platforms:
         include: []
         exclude: []
@@ -1797,7 +1907,7 @@ modules:
           labels: []
           metrics:
             - name: system.softirq_latency
-              description: Software IRQ latency
+              description: Soft IRQ latency
               unit: "miliseconds"
               chart_type: stacked
               dimensions:
@@ -1806,22 +1916,26 @@ modules:
       plugin_name: ebpf.plugin
       module_name: mount
       monitored_instance:
-        name: ebpf mount
+        name: eBPF Mount
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - mount
+        - umount
+        - device
+        - eBPF
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Monitor calls for mount and umount syscall."
+        method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
         include: []
         exclude: []
@@ -1886,22 +2000,27 @@ modules:
       plugin_name: ebpf.plugin
       module_name: vfs
       monitored_instance:
-        name: ebpf vfs
+        name: eBPF VFS
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - virtual
+        - filesystem
+        - eBPF
+        - I/O
+        - files
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Monitor I/O events on Linux Virtual Filesystem."
+        method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
         include: []
         exclude: []
@@ -2253,22 +2372,25 @@ modules:
       plugin_name: ebpf.plugin
       module_name: process
       monitored_instance:
-        name: ebpf process
+        name: eBPF Process
         link: ""
         categories:
           - data-collection.ebpf
-        icon_filename: ""
+        icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      keywords: []
+      keywords:
+        - Memory
+        - plugin
+        - eBPF
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Monitor internal memory usage."
+        method_description: "Uses netdata internal statistic to monitor memory management by plugin."
       supported_platforms:
         include: []
         exclude: []

@@ -20,7 +20,7 @@ directory.
 
 ## Change dashboards and visualizations
 
-The Netdata Agent's [local dashboard](https://github.com/netdata/netdata/blob/master/web/gui/README.md), accessible
+The Netdata Agent's [local dashboard](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/accessing-netdata-dashboards.md), accessible
 at `http://NODE:19999` is highly configurable. If
 you use Netdata Cloud
 for [infrastructure monitoring](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md), you
