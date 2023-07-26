@@ -3,51 +3,51 @@ meta:
   module_name: tc.plugin
   monitored_instance:
     name: tc
-    link: ''
+    link: ""
     categories:
     - data-collection.networking-stack-and-network-interfaces
-    icon_filename: 'freeradius.png'
+    icon_filename: "freeradius.png"
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
+    description: ""
   keywords: []
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'Examine tc metrics to gain insights into Linux traffic control operations. Study packet flow rates, queue lengths, and drop rates to optimize network traffic flow.'
-    method_description: ''
+    metrics_description: "Examine tc metrics to gain insights into Linux traffic control operations. Study packet flow rates, queue lengths, and drop rates to optimize network traffic flow."
+    method_description: ""
   supported_platforms:
     include: []
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ''
+    description: ""
   default_behavior:
     auto_detection:
-      description: ''
+      description: ""
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
     list: []
   configuration:
     file:
-      name: ''
-      description: ''
+      name: ""
+      description: ""
     options:
-      description: ''
+      description: ""
       folding:
-        title: ''
+        title: ""
         enabled: true
       list: []
     examples:
       folding:
         enabled: true
-        title: ''
+        title: ""
       list: []
 troubleshooting:
   problems:
