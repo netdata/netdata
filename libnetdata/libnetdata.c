@@ -1968,7 +1968,7 @@ int hash256_string(const unsigned char *string, size_t size, char *hash) {
 }
 
 // Returns 1 if an absolute period was requested or 0 if it was a relative period
-bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t *now_ptr) {
+bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t *now_ptr, bool unittest_running) {
     time_t now = now_realtime_sec() - 1;
 
     if(now_ptr)

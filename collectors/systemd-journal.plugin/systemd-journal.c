@@ -262,7 +262,7 @@ static void function_systemd_journal(const char *transaction, char *function __m
         after_s = before_s - SYSTEMD_JOURNAL_DEFAULT_QUERY_DURATION;
     }
     else
-        rrdr_relative_window_to_absolute(&after_s, &before_s, &now_s);
+        rrdr_relative_window_to_absolute(&after_s, &before_s, &now_s, false);
 
     if(after_s > before_s) {
         time_t tmp = after_s;
