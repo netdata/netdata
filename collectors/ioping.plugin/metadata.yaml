@@ -33,7 +33,7 @@ overview:
       description: ''
 setup:
   prerequisites:
-    list: |
+    list:
       It is necessary to have the command `ioping` installed on your host. You can install the command by passing the argument `install` to the plugin:
 
       ```bash
@@ -48,7 +48,7 @@ setup:
       folding:
         title: 'Config options'
         enabled: true
-      list: |
+      list:
         - name: update_every
           description: Data collection frequency.
           default_value: 1s
