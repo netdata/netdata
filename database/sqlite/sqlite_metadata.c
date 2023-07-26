@@ -48,9 +48,8 @@
 #define DELETE_MISSING_NODE_INSTANCES "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);"
 
 #define METADATA_CMD_Q_MAX_SIZE (1024)              // Max queue size; callers will block until there is room
-#define METADATA_MAINTENANCE_FIRST_CHECK (120)     // Maintenance first run after agent startup in seconds
+#define METADATA_MAINTENANCE_FIRST_CHECK (3600)     // Maintenance first run after agent startup in seconds
 #define METADATA_MAINTENANCE_RETRY (60)             // Retry run if already running or last run did actual work
-#define METADATA_MAINTENANCE_REPEAT (60)            // Repeat time for main task
 #define METADATA_HEALTH_LOG_INTERVAL (3600)         // Repeat maintenance for health
 #define METADATA_DIM_CHECK_INTERVAL (3600)          // Repeat maintenance for dimensions
 #define METADATA_CHART_CHECK_INTERVAL (3600)        // Repeat maintenance for charts
@@ -95,20 +94,16 @@ struct metadata_database_cmdqueue {
 };
 
 typedef enum {
-    METADATA_FLAG_CLEANUP           = (1 << 0), // Cleanup is running
-    METADATA_FLAG_SCANNING_HOSTS    = (1 << 1), // Scanning of hosts in worker thread
-    METADATA_FLAG_SHUTDOWN          = (1 << 2), // Shutting down
+    METADATA_FLAG_PROCESSING    = (1 << 0), // store or cleanup
+    METADATA_FLAG_SHUTDOWN      = (1 << 1), // Shutting down
 } METADATA_FLAG;
-
-#define METADATA_WORKER_BUSY    (METADATA_FLAG_CLEANUP | METADATA_FLAG_SCANNING_HOSTS)
 
 struct metadata_wc {
     uv_thread_t thread;
     uv_loop_t *loop;
     uv_async_t async;
     uv_timer_t timer_req;
-    time_t check_metadata_after;
-    time_t check_hosts_after;
+    time_t metadata_check_after;
     volatile unsigned queue_size;
     METADATA_FLAG flags;
     struct completion init_complete;
@@ -803,6 +798,10 @@ static void check_dimension_metadata(struct metadata_wc *wc)
     static uint64_t last_row_id = 0;
 
     time_t now = now_realtime_sec();
+
+    if (!next_execution_t)
+        next_execution_t = now + METADATA_MAINTENANCE_FIRST_CHECK;
+
     if (next_execution_t && next_execution_t > now)
         return;
 
@@ -859,6 +858,10 @@ static void check_chart_metadata(struct metadata_wc *wc)
     static uint64_t last_row_id = 0;
 
     time_t now = now_realtime_sec();
+
+    if (!next_execution_t)
+        next_execution_t = now + METADATA_MAINTENANCE_FIRST_CHECK;
+
     if (next_execution_t && next_execution_t > now)
         return;
 
@@ -914,6 +917,10 @@ static void check_label_metadata(struct metadata_wc *wc)
     static uint64_t last_row_id = 0;
 
     time_t now = now_realtime_sec();
+
+    if (!next_execution_t)
+        next_execution_t = now + METADATA_MAINTENANCE_FIRST_CHECK;
+
     if (next_execution_t && next_execution_t > now)
         return;
 
@@ -1123,59 +1130,40 @@ static void timer_cb(uv_timer_t* handle)
 
    time_t now = now_realtime_sec();
 
-   if (wc->check_metadata_after && wc->check_metadata_after < now) {
-       cmd.opcode = METADATA_MAINTENANCE;
-       if (!metadata_enq_cmd_noblock(wc, &cmd))
-           wc->check_metadata_after = now + METADATA_MAINTENANCE_REPEAT;
-   }
-
-   if (wc->check_hosts_after && wc->check_hosts_after < now) {
+   if (wc->metadata_check_after && wc->metadata_check_after < now) {
        cmd.opcode = METADATA_SCAN_HOSTS;
        if (!metadata_enq_cmd_noblock(wc, &cmd))
-           wc->check_hosts_after = now + METADATA_HOST_CHECK_INTERVAL;
+           wc->metadata_check_after = now + METADATA_HOST_CHECK_INTERVAL;
    }
 }
 
-static void after_metadata_cleanup(uv_work_t *req, int status)
+void run_metadata_cleanup(struct metadata_wc *wc)
 {
-    UNUSED(status);
-
-    struct metadata_wc *wc = req->data;
-    metadata_flag_clear(wc, METADATA_FLAG_CLEANUP);
-}
-
-static void start_metadata_cleanup(uv_work_t *req)
-{
-    register_libuv_worker_jobs();
-
-    worker_is_busy(UV_EVENT_METADATA_CLEANUP);
-    struct metadata_wc *wc = req->data;
+    if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
+       return;
 
     check_dimension_metadata(wc);
     check_chart_metadata(wc);
     check_label_metadata(wc);
     cleanup_health_log(wc);
 
-    if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN))) {
-       worker_is_idle();
+    if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
        return;
-    }
 
     int free_pages = get_free_page_count(db_meta);
     int total_pages = get_database_page_count(db_meta);
+
     if (free_pages > (total_pages * METADATA_FREE_PAGES_THRESHOLD_PC / 100)) {
-       char sql[512];
+
        int do_free_pages = (int) (free_pages * METADATA_FREE_PAGES_VACUUM_PC / 100);
+       netdata_log_info("METADATA: Freeing %d database pages", do_free_pages);
 
-       netdata_log_info(
-           "METADATA: Total pages %d, free pages %d (releasing %d pages)", total_pages, free_pages, do_free_pages);
-
-       snprintfz(sql, 511, "PRAGMA incremental_vacuum(%d)", do_free_pages);
+       char sql[128];
+       snprintfz(sql, 127, "PRAGMA incremental_vacuum(%d)", do_free_pages);
        (void) db_execute(db_meta, sql);
     }
 
     (void) sqlite3_wal_checkpoint(db_meta, NULL);
-    worker_is_idle();
 }
 
 struct scan_metadata_payload {
@@ -1307,7 +1295,7 @@ static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
     struct scan_metadata_payload *data = req->data;
     struct metadata_wc *wc = data->wc;
 
-    metadata_flag_clear(wc, METADATA_FLAG_SCANNING_HOSTS);
+    metadata_flag_clear(wc, METADATA_FLAG_PROCESSING);
     internal_error(true, "METADATA: scanning hosts complete");
     if (unlikely(data->completion)) {
         completion_mark_complete(data->completion);
@@ -1495,9 +1483,11 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
                    (double)(all_ended_ut - all_started_ut) / USEC_PER_MS);
 
     if (unlikely(run_again))
-        wc->check_hosts_after = now_realtime_sec() + METADATA_HOST_CHECK_IMMEDIATE;
-    else
-        wc->check_hosts_after = now_realtime_sec() + METADATA_HOST_CHECK_INTERVAL;
+        wc->metadata_check_after = now_realtime_sec() + METADATA_HOST_CHECK_IMMEDIATE;
+    else {
+        wc->metadata_check_after = now_realtime_sec() + METADATA_HOST_CHECK_INTERVAL;
+        run_metadata_cleanup(wc);
+    }
     worker_is_idle();
 }
 
@@ -1517,10 +1507,8 @@ static void metadata_event_loop(void *arg)
     unsigned cmd_batch_size;
     struct metadata_wc *wc = arg;
     enum metadata_opcode opcode;
-    uv_work_t metadata_cleanup_worker;
 
     uv_thread_set_name_np(wc->thread, "METASYNC");
-//    service_register(SERVICE_THREAD_TYPE_EVENT_LOOP, NULL, NULL, NULL, true);
     loop = wc->loop = mallocz(sizeof(uv_loop_t));
     ret = uv_loop_init(loop);
     if (ret) {
@@ -1548,18 +1536,16 @@ static void metadata_event_loop(void *arg)
 
     struct metadata_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
-    metadata_flag_clear(wc, METADATA_FLAG_CLEANUP);
-    metadata_flag_clear(wc, METADATA_FLAG_SCANNING_HOSTS);
+    metadata_flag_clear(wc, METADATA_FLAG_PROCESSING);
 
-    wc->check_metadata_after = now_realtime_sec() + METADATA_MAINTENANCE_FIRST_CHECK;
-    wc->check_hosts_after    = now_realtime_sec() + METADATA_HOST_CHECK_FIRST_CHECK;
+    wc->metadata_check_after = now_realtime_sec() + METADATA_HOST_CHECK_FIRST_CHECK;
 
     int shutdown = 0;
     completion_mark_complete(&wc->init_complete);
     BUFFER *work_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
     struct scan_metadata_payload *data;
 
-    while (shutdown == 0 || (wc->flags & METADATA_WORKER_BUSY)) {
+    while (shutdown == 0 || (wc->flags & METADATA_FLAG_PROCESSING)) {
         uuid_t  *uuid;
         RRDHOST *host = NULL;
 
@@ -1611,7 +1597,7 @@ static void metadata_event_loop(void *arg)
                     store_host_and_system_info(host, NULL);
                     break;
                 case METADATA_SCAN_HOSTS:
-                    if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SCANNING_HOSTS)))
+                    if (unlikely(metadata_flag_check(wc, METADATA_FLAG_PROCESSING)))
                         break;
 
                     if (unittest_running)
@@ -1630,7 +1616,7 @@ static void metadata_event_loop(void *arg)
                     else
                         data->max_count = 5000;
 
-                    metadata_flag_set(wc, METADATA_FLAG_SCANNING_HOSTS);
+                    metadata_flag_set(wc, METADATA_FLAG_PROCESSING);
                     if (unlikely(
                             uv_queue_work(loop,&data->request,
                                           start_metadata_hosts,
@@ -1638,7 +1624,7 @@ static void metadata_event_loop(void *arg)
                         // Failed to launch worker -- let the event loop handle completion
                         cmd.completion = data->completion;
                         freez(data);
-                        metadata_flag_clear(wc, METADATA_FLAG_SCANNING_HOSTS);
+                        metadata_flag_clear(wc, METADATA_FLAG_PROCESSING);
                     }
                     break;
                 case METADATA_LOAD_HOST_CONTEXT:;
@@ -1652,17 +1638,6 @@ static void metadata_event_loop(void *arg)
                             uv_queue_work(loop,&data->request, start_all_host_load_context,
                                           after_start_host_load_context))) {
                         freez(data);
-                    }
-                    break;
-                case METADATA_MAINTENANCE:
-                    if (unlikely(metadata_flag_check(wc, METADATA_FLAG_CLEANUP)))
-                        break;
-
-                    metadata_cleanup_worker.data = wc;
-                    metadata_flag_set(wc, METADATA_FLAG_CLEANUP);
-                    if (unlikely(
-                            uv_queue_work(loop, &metadata_cleanup_worker, start_metadata_cleanup, after_metadata_cleanup))) {
-                        metadata_flag_clear(wc, METADATA_FLAG_CLEANUP);
                     }
                     break;
                 case METADATA_UNITTEST:;
@@ -1738,7 +1713,7 @@ void metadata_sync_shutdown_prepare(void)
 
     netdata_log_info("METADATA: Sending a scan host command");
     uint32_t max_wait_iterations = 2000;
-    while (unlikely(metadata_flag_check(&metasync_worker, METADATA_FLAG_SCANNING_HOSTS)) && max_wait_iterations--) {
+    while (unlikely(metadata_flag_check(&metasync_worker, METADATA_FLAG_PROCESSING)) && max_wait_iterations--) {
         if (max_wait_iterations == 1999)
             netdata_log_info("METADATA: Current worker is running; waiting to finish");
         sleep_usec(1000);
