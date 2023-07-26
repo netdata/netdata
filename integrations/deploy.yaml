@@ -197,7 +197,7 @@
   platform_info:
     group: 'include'
     distro: 'macos'
-  quick_start: 1
+  quick_start: 4
 -
   id: deploy-docker
   meta:
@@ -407,7 +407,7 @@
   platform_info:
     group: 'no_include'
     distro: 'docker'
-  quick_start: 1
+  quick_start: 3
 -
   id: deploy-kubernetes
   meta:
@@ -487,7 +487,7 @@
   platform_info:
     group: ''
     distro: ''
-  quick_start: 1
+  quick_start: 5
 -
   id: deploy-windows
   meta:
@@ -529,4 +529,4 @@
   platform_info:
     group: ''
     distro: ''
-  quick_start: 1
+  quick_start: 2
