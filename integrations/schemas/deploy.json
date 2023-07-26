@@ -7,8 +7,7 @@
     "description": "Individual entries for deployment information.",
     "properties": {
       "id": {
-        "type": "string",
-        "description": "A unique ID for this integration."
+        "$ref": "./shared.json#/$defs/id"
       },
       "meta": {
         "$ref": "./shared.json#/$defs/instance"

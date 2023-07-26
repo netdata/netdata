@@ -11,9 +11,7 @@
       "description": "An entry for a single category.",
       "properties": {
         "id": {
-          "type": "string",
-          "minLength": 1,
-          "description": "A unique ID for the category. Recommended format is a dot-separated list of categories that are parents of this category, followed by a unique value for this category. Must be URL safe."
+          "$ref": "./shared.json#/$defs/id"
         },
         "name": {
           "type": "string",
