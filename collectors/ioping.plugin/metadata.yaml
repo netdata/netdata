@@ -11,26 +11,26 @@ meta:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
+    description: ""
   keywords: []
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'Monitor IOPing metrics for efficient disk I/O latency tracking. Keep track of read/write speeds, latency, and error rates for optimized disk operations.'
-    method_description: 'Plugin uses `ioping` command.'
+    metrics_description: "Monitor IOPing metrics for efficient disk I/O latency tracking. Keep track of read/write speeds, latency, and error rates for optimized disk operations."
+    method_description: "Plugin uses `ioping` command."
   supported_platforms:
     include: []
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ''
+    description: ""
   default_behavior:
     auto_detection:
-      description: ''
+      description: ""
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
     list:
@@ -41,10 +41,10 @@ setup:
       ```
   configuration:
     file:
-      name: 'ioping.conf'
+      name: "ioping.conf"
       description: 'File with options to specify hardware to monitor and arguments for ioping command.'
     options:
-      description: ''
+      description: ""
       folding:
         title: 'Config options'
         enabled: true
