@@ -28,7 +28,7 @@ overview:
   data_collection:
     metrics_description: >
       Examine Linux Sensors metrics with Netdata for insights into hardware health and performance.
-      
+
       Enhance your system's reliability with real-time hardware health insights.
     method_description: >
       Reads system sensors information (temperature, voltage, electric current, power, etc.) via [lm-sensors](https://hwmon.wiki.kernel.org/lm_sensors).
