@@ -1,6 +1,6 @@
 # This collector will not appear in documentation, as the go version is preferred,
 # https://github.com/netdata/go.d.plugin/blob/master/modules/nvidia_smi/README.md
-# 
+#
 # meta:
 #   plugin_name: python.d.plugin
 #   module_name: nvidia_smi
