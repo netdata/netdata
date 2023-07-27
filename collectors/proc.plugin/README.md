@@ -597,7 +597,7 @@ Depending on the configuration, thte following charts will be provided:
 -  **GPU memory usage**
     VRAM, visible VRAM and GTT memory usage in bytes
 
--  **GPU memory percent usage**
+-  **GPU memory usage percentage**
     VRAM, visible VRAM and GTT memory % usage
 
 ### configuration

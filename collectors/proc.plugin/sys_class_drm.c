@@ -735,7 +735,7 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                             , RRDSET_TYPE_LINE
                     );
 
-                    rrdlabels_add(c->st_util->rrdlabels, "card", c->id.marketing_name, RRDLABEL_SRC_AUTO);
+                    rrdlabels_add(c->st_util->rrdlabels, "product_name", c->id.marketing_name, RRDLABEL_SRC_AUTO);
 
                     if(c->pathname_util_gpu)
                         c->rd_util_gpu = rrddim_add(c->st_util, "GPU", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -774,7 +774,7 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                             , RRDSET_TYPE_LINE
                     );
 
-                    rrdlabels_add(c->st_clk->rrdlabels, "card", c->id.marketing_name, RRDLABEL_SRC_AUTO);
+                    rrdlabels_add(c->st_clk->rrdlabels, "product_name", c->id.marketing_name, RRDLABEL_SRC_AUTO);
 
                     if(c->pathname_clk_gpu)
                         c->rd_clk_gpu = rrddim_add(c->st_clk, "GPU", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -817,7 +817,7 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                             , RRDSET_TYPE_AREA
                     );
 
-                    rrdlabels_add(c->st_mem_used->rrdlabels, "card", c->id.marketing_name, RRDLABEL_SRC_AUTO);
+                    rrdlabels_add(c->st_mem_used->rrdlabels, "product_name", c->id.marketing_name, RRDLABEL_SRC_AUTO);
 
                     if(c->pathname_mem_used_vram)
                         c->rd_mem_used_vram = rrddim_add(c->st_mem_used, "VRAM", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -858,7 +858,7 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                             , NULL
                             , "usage"
                             , "amdgpu.perc_usage"
-                            , "GPU memory percent usage"
+                            , "GPU memory usage percentage"
                             , "percentage"
                             , PLUGIN_PROC_NAME
                             , PLUGIN_PROC_MODULE_DRM_NAME
@@ -867,7 +867,7 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                             , RRDSET_TYPE_AREA
                     );
 
-                    rrdlabels_add(c->st_mem_perc->rrdlabels, "card", c->id.marketing_name, RRDLABEL_SRC_AUTO);
+                    rrdlabels_add(c->st_mem_perc->rrdlabels, "product_name", c->id.marketing_name, RRDLABEL_SRC_AUTO);
 
                     if(c->pathname_mem_used_vram && c->pathname_mem_total_vram)
                         c->rd_mem_perc_vram = rrddim_add(c->st_mem_perc, "VRAM", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
