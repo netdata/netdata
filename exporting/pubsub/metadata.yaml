@@ -49,12 +49,8 @@ setup:
 
             Example IPv4:
               ```yaml
-              destination = 10.11.14.2:4242 10.11.14.3:4242 10.11.14.4:4242
+              destination = pubsub.googleapis.com
               ```
-            Example IPv6 and IPv4 together:
-            ```yaml
-            destination = [ffff:...:0001]:2003 10.11.12.1:2003
-            ```
             When multiple servers are defined, Netdata will try the next one when the previous one fails.
         - name: 'username'
           default_value: 'my_username'
