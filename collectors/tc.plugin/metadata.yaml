@@ -26,7 +26,7 @@ overview:
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: "The plugin needs to access command `tc` to get the necessary metrics."
+    description: "The plugin needs to access command `tc` to get the necessary metrics. To achieve this netdata modifies permission of file `/usr/libexec/netdata/plugins.d/tc-qos-helper.sh`."
   default_behavior:
     auto_detection:
       description: ""
