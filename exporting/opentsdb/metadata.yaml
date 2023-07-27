@@ -43,7 +43,7 @@ setup:
             The format of each item in this list, is: [PROTOCOL:]IP[:PORT].
             - PROTOCOL can be udp or tcp. tcp is the default and only supported by the current exporting engine.
             - IP can be XX.XX.XX.XX (IPv4), or [XX:XX...XX:XX] (IPv6). For IPv6 you can to enclose the IP in [] to separate it from the port.
-	    - PORT can be a number of a service name. If omitted, the default port for the exporting connector will be used (opentsdb = 4242).
+            - PORT can be a number of a service name. If omitted, the default port for the exporting connector will be used (opentsdb = 4242).
 
             Example IPv4:
 	      ```yaml
@@ -77,17 +77,18 @@ setup:
         - name: 'update every'
           default_value: '10'
           description: |
-            The number of seconds between sending data to the external database. Netdata will add some randomness to this number, 
-            to prevent stressing the external server when many Netdata servers send data to the same database. This randomness does
-            not affect the quality of the data, only the time they are sent.
+            Frequency of sending sending data to the external database, in seconds.
           required: false
+	  detailed_description: |
+            Netdata will add some randomness to this number, to prevent stressing the external server when many Netdata servers
+	    send data to the same database. This randomness does not affect the quality of the data, only the time they are sent.
         - name: 'buffer on failures'
           default_value: '10'
           description: |
-            The number of iterations (each iteration is update every seconds) to buffer data, when the external database server is not
-            available. If the server fails to receive the data after that many failures, data loss on the connector instance is expected
-            (Netdata will also log it).
+            The number of iterations (`update every` seconds) to buffer data, when the external database server is not available. 
           required: false
+	  detailed_description: |
+            If the server fails to receive the data after that many failures, data loss on the connector instance is expected (Netdata will also log it).
         - name: 'timeout ms'
           default_value: '2 * update_every * 1000'
           description: 'The timeout in milliseconds to wait for the external database server to process the data.'
@@ -95,18 +96,19 @@ setup:
         - name: 'send hosts matching'
           default_value: 'localhost *'
           description: |
+            Hosts filter. Determines which hosts will be sent to OpenTSDB. The syntax is [simple patterns](https://github.com/netdata/netdata/tree/master/libnetdata/simple_pattern#simple-patterns).
+          required: false
+	  detailed_description: |
             Includes one or more space separated patterns, using * as wildcard (any number of times within each pattern).
             The patterns are checked against the hostname (the localhost is always checked as localhost), allowing us to
             filter which hosts will be sent to the external database when this Netdata is a central Netdata aggregating multiple hosts.
-          required: false
-	  detailed_description: |
+	    
             A pattern starting with `!` gives a negative match. So to match all hosts named `*db*` except hosts containing `*child*`,
             use `!*child* *db*` (so, the order is important: the first pattern matching the hostname will be used - positive or negative).
         - name: 'send charts matching'
           default_value: '*'
           description: |
-            Includes one or more space separated patterns, using * as wildcard (any number of times within each pattern).
-            The patterns are checked against both chart id and chart name.
+            One or more space separated patterns (use * as wildcard) checked against both chart id and chart name.
           required: false
 	  detailed_description: |
             A pattern starting with ! gives a negative match. So to match all charts named apps.* except charts ending in *reads,
@@ -134,7 +136,7 @@ setup:
         enabled: true
         title: ''
       list:
-        - name: 'Example configuration'
+        - name: 'Minimal configuration'
           folding:
             enabled: false
           description: |
@@ -144,7 +146,7 @@ setup:
             [opentsdb:my_opentsdb_instance]
               enabled = yes
               destination = localhost:4242
-        - name: 'Example configuration with HTTP authentication'
+        - name: 'HTTP authentication'
           folding:
             enabled: false
           description: ''
@@ -154,3 +156,21 @@ setup:
 		destination = localhost:4242
 		username = my_username
 		password = my_password
+        - name: 'Using `send hosts matching`'
+          folding:
+            enabled: false
+          description: ''
+          config: |
+	     [opentsdb:my_opentsdb_instance]
+		enabled = yes
+		destination = localhost:4242
+                send hosts matching = localhost *
+        - name: 'Using `send charts matching`'
+          folding:
+            enabled: false
+          description: ''
+          config: |
+	     [opentsdb:my_opentsdb_instance]
+		enabled = yes
+		destination = localhost:4242
+                send charts matching = *  
