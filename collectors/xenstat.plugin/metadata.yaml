@@ -5,7 +5,7 @@ meta:
   module_name: xenstat.plugin
   monitored_instance:
     name: Xen/XCP-ng
-    link: ""
+    link: "https://xenproject.org/"
     categories:
     - data-collection.containers-and-vms
     icon_filename: "xen.png"
@@ -25,27 +25,38 @@ overview:
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ""
+    description: "The plugin needs setuid."
   default_behavior:
     auto_detection:
-      description: ""
+      description: "Plugin is no installed when libs 'xen-dom0-libs-devel' and 'yajl-devel' are missed."
     limits:
       description: ""
     performance_impact:
       description: ""
 setup:
   prerequisites:
-    list: []
+    list: 
+      - title: Libraries
+        description: |
+          Install `xen-dom0-libs-devel` and `yajl-devel` using the package manager of your system.
+          Note: On Cent-OS systems you will need `centos-release-xen` repository and the required package for xen is `xen-devel`
+
+          Re-install Netdata from source. The installer will detect that the required libraries are now available and will also build xenstat.plugin.
   configuration:
     file:
-      name: ""
-      description: ""
+      name: "netdata.conf"
+      section_name: "[plugin:xenstat]"
+      description: "The netdata main configuration file."
     options:
       description: ""
       folding:
-        title: ""
+        title: "Config options"
         enabled: true
-      list: []
+      list:
+        - name: update every
+          description: Data collection frequency.
+          default_value: 1
+          required: false
     examples:
       folding:
         enabled: true
