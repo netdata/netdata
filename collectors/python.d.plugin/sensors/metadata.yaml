@@ -79,14 +79,7 @@ setup:
       list:
         - name: types
           description: The types of sensors to collect.
-          default_value: >
-            - temperature
-            - fan
-            - voltage
-            - current
-            - power
-            - energy
-            - humidity
+          default_value: "temperature, fan, voltage, current, power, energy, humidity"
           required: true
         - name: update_every
           description: Sets the default data collection frequency.
