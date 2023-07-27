@@ -1,0 +1,93 @@
+# yamllint disable rule:line-length
+---
+- id: 'notify-alerta'
+  meta:
+    name: 'Alerta'
+    link: 'https://alerta.io/'
+    categories:
+      - notify.agent
+    icon_filename: 'alerta.png'
+  keywords:
+    - Alerta
+  overview:
+    notification_description: |
+      The [Alerta](https://alerta.io/) monitoring system is a tool used to consolidate and de-duplicate alerts from multiple sources for quick ‘at-a-glance’ visualization. With just one system you can monitor alerts from many other monitoring tools on a single screen.
+      You can send Netdata alerts to Alerta to see alerts coming from many Netdata hosts or also from a multi-host Netdata configuration.
+    notification_limitations: ''
+  setup:
+    prerequisites:
+      list:
+        - title: ''
+          description: |
+            - A working Alerta instance
+            - An Alerta API key (if authentication in Alerta is enabled)
+            - Access to the terminal where Netdata Agent is running
+    configuration:
+      file:
+        name: 'health_alarm_notify.conf'
+      options:
+        description: 'The following options can be defined for this notification'
+        folding:
+          title: 'Config Options'
+          enabled: true
+        list:
+          - name: 'SEND_ALERTA'
+            default_value: ''
+            description: |
+              Set `SEND_ALERTA` to YES
+            required: true
+          - name: 'ALERTA_WEBHOOK_URL'
+            default_value: ''
+            description: |
+              set `ALERTA_WEBHOOK_URL` to the API url you defined when you installed the Alerta server.
+            required: true
+          - name: 'ALERTA_API_KEY'
+            default_value: ''
+            description: |
+              Set `ALERTA_API_KEY` to your API key.
+            required: true
+            detailed_description: |
+              You will need an API key to send messages from any source, if Alerta is configured to use authentication (recommended). To create a new API key:
+              1. Go to Configuration > API Keys.
+              2. Create a new API key called "netdata" with `write:alerts` permission.
+          - name: 'DEFAULT_RECIPIENT_ALERTA'
+            default_value: ''
+            description: |
+              Set `DEFAULT_RECIPIENT_ALERTA`` to the default recipient environment you want the alert notifications to be sent to.
+              All roles will default to this variable if left unconfigured.
+            required: true
+          - name: 'DEFAULT_RECIPIENT_CUSTOM'
+            default_value: ''
+            description: |
+              Set different recipient environments per role, by editing `DEFAULT_RECIPIENT_CUSTOM` with the environment name of your choice
+            required: false
+            detailed_description: |
+              The `DEFAULT_RECIPIENT_CUSTOM` can be edited in the following entries at the bottom of the same file:
+
+              ```
+              role_recipients_alerta[sysadmin]="Systems"
+              role_recipients_alerta[domainadmin]="Domains"
+              role_recipients_alerta[dba]="Databases Systems"
+              role_recipients_alerta[webmaster]="Marketing Development"
+              role_recipients_alerta[proxyadmin]="Proxy"
+              role_recipients_alerta[sitemgr]="Sites"
+              ```
+
+              The values you provide should be defined as environments in `/etc/alertad.conf` with `ALLOWED_ENVIRONMENTS` option.
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: 'Basic Configuration'
+            folding:
+              enabled: false
+            description: ''
+            config: |
+              #------------------------------------------------------------------------------
+              # alerta (alerta.io) global notification options
+
+              SEND_ALERTA="YES"
+              ALERTA_WEBHOOK_URL="http://yourserver/alerta/api"
+              ALERTA_API_KEY="INSERT_YOUR_API_KEY_HERE"
+              DEFAULT_RECIPIENT_ALERTA="Production"
