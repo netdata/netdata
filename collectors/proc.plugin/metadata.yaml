@@ -5252,33 +5252,33 @@ modules:
             - name: product_name
               description: GPU product name (e.g. AMD RX 6600)
           metrics:
-          - name: amdgpu.utilization
-            description: GPU utilization
-            unit: "percentage"
-            chart_type: line
-            dimensions:
-              - name: GPU
-              - name: memory
-          - name: amdgpu.frequency
-            description: GPU clock
-            unit: "MHz"
-            chart_type: line
-            dimensions:
-              - name: GPU
-              - name: memory
-          - name: amdgpu.usage
-            description: GPU memory usage
-            unit: "bytes"
-            chart_type: area
-            dimensions: 
-              - name: VRAM
-              - name: visible VRAM
-              - name: GTT
-          - name: amdgpu.perc_usage
-            description: GPU memory usage percentage
-            unit: "percentage"
-            chart_type: area
-            dimensions:
-              - name: VRAM
-              - name: visible VRAM
-              - name: GTT
+            - name: amdgpu.utilization
+              description: GPU utilization
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: GPU
+                - name: memory
+            - name: amdgpu.frequency
+              description: GPU clock
+              unit: "MHz"
+              chart_type: line
+              dimensions:
+                - name: GPU
+                - name: memory
+            - name: amdgpu.usage
+              description: GPU memory usage
+              unit: "bytes"
+              chart_type: area
+              dimensions:
+                - name: VRAM
+                - name: visible VRAM
+                - name: GTT
+            - name: amdgpu.perc_usage
+              description: GPU memory usage percentage
+              unit: "percentage"
+              chart_type: area
+              dimensions:
+                - name: VRAM
+                - name: visible VRAM
+                - name: GTT
