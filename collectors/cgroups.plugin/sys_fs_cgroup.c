@@ -474,6 +474,7 @@ void read_cgroup_plugin_configuration() {
                        " !*.mount "
                        " !*.partition "
                        " !*.service "
+                       " !*.service/udev "
                        " !*.socket "
                        " !*.slice "
                        " !*.swap "
