@@ -37,7 +37,7 @@ DEPLOY_SOURCES = [
 ]
 
 EXPORTER_SOURCES = [
-    (AGENT_REPO, REPO_PATH / 'exporters', True),
+    (AGENT_REPO, REPO_PATH / 'exporting', True),
 ]
 
 NOTIFICATION_SOURCES = [
@@ -106,7 +106,7 @@ EXPORTER_VALIDATOR = Draft7Validator(
 )
 
 NOTIFICATION_VALIDATOR = Draft7Validator(
-    {'$ref': './exporter.json#'},
+    {'$ref': './notification.json#'},
     registry=registry,
 )
 
@@ -298,7 +298,7 @@ def load_deploy():
 
     for repo, path, match in DEPLOY_SOURCES:
         if match and path.exists() and path.is_dir():
-            for file in DEPLOY_SOURCES.glob(SINGLE_PATTERN):
+            for file in path.glob(SINGLE_PATTERN):
                 ret.extend(_load_deploy_file(file, repo))
         elif not match and path.exists() and path.is_file():
             ret.extend(_load_deploy_file(path, repo))
@@ -332,7 +332,7 @@ def load_exporters():
 
     for repo, path, match in EXPORTER_SOURCES:
         if match and path.exists() and path.is_dir():
-            for file in DEPLOY_SOURCES.glob(SINGLE_PATTERN):
+            for file in path.glob(SINGLE_PATTERN):
                 ret.extend(_load_exporter_file(file, repo))
         elif not match and path.exists() and path.is_file():
             ret.extend(_load_exporter_file(path, repo))
@@ -376,9 +376,9 @@ def _load_notification_file(file, repo):
 def load_notifications():
     ret = []
 
-    for repo, path, match in EXPORTER_SOURCES:
+    for repo, path, match in NOTIFICATION_SOURCES:
         if match and path.exists() and path.is_dir():
-            for file in DEPLOY_SOURCES.glob(SINGLE_PATTERN):
+            for file in path.glob(SINGLE_PATTERN):
                 ret.extend(_load_notification_file(file, repo))
         elif not match and path.exists() and path.is_file():
             ret.extend(_load_notification_file(path, repo))
@@ -551,7 +551,7 @@ def render_exporters(categories, exporters, ids):
     exporters, ids = dedupe_integrations(exporters, ids)
 
     for item in exporters:
-        for key in COLLECTOR_RENDER_KEYS:
+        for key in EXPORTER_RENDER_KEYS:
             template = get_jinja_env().get_template(f'{ key }.md')
             data = template.render(entry=item)
             item[key] = data
@@ -575,7 +575,7 @@ def render_notifications(categories, notifications, ids):
     notifications, ids = dedupe_integrations(notifications, ids)
 
     for item in notifications:
-        for key in COLLECTOR_RENDER_KEYS:
+        for key in NOTIFICATION_RENDER_KEYS:
             template = get_jinja_env().get_template(f'{ key }.md')
             data = template.render(entry=item)
             item[key] = data
