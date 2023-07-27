@@ -26,7 +26,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: >
+    metrics_description: |
       Examine Linux Sensors metrics with Netdata for insights into hardware health and performance.
 
       Enhance your system's reliability with real-time hardware health insights.
