@@ -79,7 +79,7 @@ setup:
           description: |
             Frequency of sending sending data to the external database, in seconds.
           required: false
-	  detailed_description: |
+          detailed_description: |
             Netdata will add some randomness to this number, to prevent stressing the external server when many Netdata servers
 	    send data to the same database. This randomness does not affect the quality of the data, only the time they are sent.
         - name: 'buffer on failures'
