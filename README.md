@@ -82,7 +82,9 @@ It scales nicely from just a single server to thousands of servers, even in comp
 	<a href="https://singapore.netdata.rocks"><b>SINGAPORE</b></a> |
 	<a href="https://bangalore.netdata.rocks"><b>BANGALORE</b></a>
   <br/>
-  <i>They are clustered Netdata Parents. They all have the same data. <b>Select the one closer to you.</b></i>
+  	<i>They are clustered Netdata Parents. They all have the same data. <b>Select the one closer to you.</b></i>
+	<br/>
+	<i>All these run with default configuration. We only clustered them to have multi-node dashboards.</i>
 </p>
 
 ![Netdata Agent](https://github.com/netdata/netdata/assets/2662304/af4caa23-19be-46ef-9779-8fdad8d99d2a)
