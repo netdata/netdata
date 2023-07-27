@@ -46,7 +46,7 @@ setup:
             - PORT can be a number of a service name. If omitted, the default port for the exporting connector will be used (opentsdb = 4242).
 
             Example IPv4:
-	      ```yaml
+              ```yaml
               destination = 10.11.14.2:4242 10.11.14.3:4242 10.11.14.4:4242
 	      ```
             Example IPv6 and IPv4 together:
