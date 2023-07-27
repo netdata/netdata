@@ -1,4 +1,4 @@
-name: freeipmi.plugin
+plugin_name: freeipmi.plugin
 modules:
   - &module
     meta: &meta
@@ -18,13 +18,14 @@ modules:
       keywords:
         - sensors
         - ipmi
+        - freeipmi
       most_popular: true
-    overview:
+    overview: &overview
       data_collection:
-        metrics_description:
+        metrics_description: |
           "Monitor enterprise server sensor readings, event log entries, and hardware statuses to ensure reliable server operations."
         method_description: |
-          The plugin uses open source library IPMImonitoring to communitcate with sensors.
+          The plugin uses open source library IPMImonitoring to communicate with sensors.
       supported_platforms:
         include: []
         exclude: []
@@ -40,10 +41,12 @@ modules:
           description: "Linux kernel module for IPMI can create big overhead."
     setup:
       prerequisites:
-        list: |
-          If you have not previously used IPMI on your system, you will probably need to run the ipmimonitoring command as root to initiailze IPMI settings so that the Netdata plugin works correctly. It should return information about available seensors on the system.
+        list:
+          - title: Preliminary actions
+            description: |
+              If you have not previously used IPMI on your system, you will probably need to run the ipmimonitoring command as root to initialize IPMI settings so that the Netdata plugin works correctly. It should return information about available sensors on the system.
 
-          In some distributions libipmimonitoring.pc is located in a non-standard directory, which can cause building the plugin to fail when building Netdata from source. In that case you should find the file and link it to the standard pkg-config directory. Usually, running sudo ln -s /usr/lib/$(uname -m)-linux-gnu/pkgconfig/libipmimonitoring.pc/libipmimonitoring.pc /usr/lib/pkgconfig/libipmimonitoring.pc resolves this issue.
+              In some distributions libipmimonitoring.pc is located in a non-standard directory, which can cause building the plugin to fail when building Netdata from source. In that case you should find the file and link it to the standard pkg-config directory. Usually, running sudo ln -s /usr/lib/$(uname -m)-linux-gnu/pkgconfig/libipmimonitoring.pc/libipmimonitoring.pc /usr/lib/pkgconfig/libipmimonitoring.pc resolves this issue.
       configuration:
         file:
           name: "netdata.conf"
@@ -54,144 +57,7 @@ modules:
           folding:
             title: "Config options"
             enabled: true
-          list: |
-            - name: command options
-              description: Variable used to pass arguments for the plugin.
-              default_value: 1
-              required: false
-        examples:
-          folding:
-            enabled: true
-            title: ""
-          list: []
-    troubleshooting:
-      problems:
-        list: []
-    alerts:
-      - name: ipmi_sensor_state
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/ipmi.conf
-        metric: ipmi.sensor_state
-        info: IPMI sensor ${label:sensor} (${label:component}) state
-    metrics:
-      folding:
-        title: Metrics
-        enabled: false
-      description: ""
-      availability: []
-      scopes:
-        - name: sensor
-          description: ""
-          labels:
-            - name: sensor
-              description: The sensor name
-            - name: type
-              description: One of 45 recognized sensor types (Battery, Voltage...)
-            - name: component
-              description: One of 25 recognized components (Processor, Peripheral).
-          metrics:
-            - name: ipmi.sel
-              description: IPMI Events
-              unit: "events"
-              chart_type: area
-              dimensions:
-                - name: events
-            - name: ipmi.sensor_state
-              description: IPMI Sensors State
-              unit: "state"
-              chart_type: line
-              dimensions:
-                - name: nominal
-                - name: critical
-                - name: warning
-                - name: unknown
-            - name: ipmi.sensor_temperature_c
-              description: IPMI Sensor Temperature Celsius
-              unit: "Celsius"
-              chart_type: line
-              dimensions:
-                - name: temperature
-            - name: ipmi.sensor_temperature_f
-              description: IPMI Sensor Temperature Fahrenheit
-              unit: "Fahrenheit"
-              chart_type: line
-              dimensions:
-                - name: temperature
-            - name: ipmi.sensor_voltage
-              description: IPMI Sensor Voltage
-              unit: "Volts"
-              chart_type: line
-              dimensions:
-                - name: voltage
-            - name: ipmi.sensor_ampere
-              description: IPMI Sensor Current
-              unit: "Amps"
-              chart_type: line
-              dimensions:
-                - name: ampere
-            - name: ipmi.sensor_fan_speed
-              description: IPMI Sensor Fans Speed
-              unit: "RPM"
-              chart_type: line
-              dimensions:
-                - name: rotations
-            - name: ipmi.sensor_power
-              description: IPMI Sensor Power
-              unit: "Watts"
-              chart_type: line
-              dimensions:
-                - name: power
-            - name: ipmi.sensor_reading_percent
-              description: IPMI Sensor Reading Percentage
-              unit: "%"
-              chart_type: line
-              dimensions:
-                - name: percentage
-  - <<: *module
-    meta:
-      <<: *meta
-      monitored_instance:
-        <<: *monitored_instance
-        name: FreeIPMI
-        link: "https://www.gnu.org/software/freeipmi/"
-        icon_filename: "freeipmi.jpg"
-      keywords:
-        - sensors
-        - freeipmi
-      most_popular: true
-    overview:
-      data_collection:
-        metrics_description:
-          "Monitor enterprise server sensor readings, event log entries, and hardware statuses to ensure reliable server operations."
-        method_description: ""
-      supported_platforms:
-        include: []
-        exclude: []
-      multi_instance: true
-      additional_permissions: |
-        The plugin uses open source library IPMImonitoring to communitcate with sensors.
-      default_behavior:
-        auto_detection:
-          description: ""
-        limits:
-          description: ""
-        performance_impact:
-          description: "Linux kernel module for IPMI can create big overhead."
-    setup:
-      prerequisites:
-        list: |
-          If you have not previously used IPMI on your system, you will probably need to run the ipmimonitoring command as root to initiailze IPMI settings so that the Netdata plugin works correctly. It should return information about available seensors on the system.
-
-          In some distributions libipmimonitoring.pc is located in a non-standard directory, which can cause building the plugin to fail when building Netdata from source. In that case you should find the file and link it to the standard pkg-config directory. Usually, running sudo ln -s /usr/lib/$(uname -m)-linux-gnu/pkgconfig/libipmimonitoring.pc/libipmimonitoring.pc /usr/lib/pkgconfig/libipmimonitoring.pc resolves this issue.
-      configuration:
-        name: "netdata.conf"
-        section_name: '[plugin:freeipmi]'
-        description: "This is netdata main configuration file"
-        options:
-          description: "This tool receives command line options that are visible when user run: `./usr/libexec/netdata/plugins.d/freeipmi.plugin --help`"
-          folding:
-            title: "Config options"
-            enabled: true
-          list: |
+          list:
             - name: command options
               description: Variable used to pass arguments for the plugin.
               default_value: 1

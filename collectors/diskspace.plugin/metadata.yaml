@@ -3,18 +3,18 @@ meta:
   module_name: diskspace.plugin
   monitored_instance:
     name: Disk space
-    link: ''
+    link: ""
     categories:
-    - data-collection.linux-systems
-    icon_filename: 'hard-drive.svg'
+      - data-collection.linux-systems
+    icon_filename: "hard-drive.svg"
   related_resources:
     integrations:
-      list: |
+      list:
         - plugin_name: ebpf.plugin
           module_name: disk
   info_provided_to_referring_integrations:
-    description: ''
-  keywords: |
+    description: ""
+  keywords:
     - disk
     - I/O
     - space
@@ -22,35 +22,35 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'Monitor Disk space metrics for proficient storage management. Keep track of usage, free space, and error rates to prevent disk space issues.'
-    method_description: ''
+    metrics_description: "Monitor Disk space metrics for proficient storage management. Keep track of usage, free space, and error rates to prevent disk space issues."
+    method_description: ""
   supported_platforms:
     include: []
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ''
+    description: ""
   default_behavior:
     auto_detection:
-      description: 'The plugin reads data from `/proc/self/mountinfo` and `/proc/diskstats file`.'
+      description: "The plugin reads data from `/proc/self/mountinfo` and `/proc/diskstats file`."
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
     list: []
   configuration:
     file:
-      name: 'netdata.conf'
-      section_name: '[plugin:proc:diskspace]'
-      description: 'This is netdata main configuration file'
+      name: "netdata.conf"
+      section_name: "[plugin:proc:diskspace]"
+      description: "This is netdata main configuration file"
     options:
-      description: 'You can also specify per mount point `[plugin:proc:diskspace:mountpoint]`'
+      description: "You can also specify per mount point `[plugin:proc:diskspace:mountpoint]`"
       folding:
-        title: 'Config options'
+        title: "Config options"
         enabled: true
-      list: |
+      list:
         - name: update every
           description: Data collection frequency.
           default_value: 1
@@ -69,7 +69,7 @@ setup:
           required: false
         - name: exclude space metrics on filesystems
           description: Do not show metrics (charts) for listed filesystems. This option accepts netdata simple pattern.
-          default_value: *gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl autofs
+          default_value: "*gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl autofs"
           required: false
         - name: exclude inode metrics on filesystems
           description: Do not show metrics (charts) for listed filesystems. This option accepts netdata simple pattern.
@@ -86,22 +86,22 @@ setup:
     examples:
       folding:
         enabled: true
-        title: ''
+        title: ""
       list: []
 troubleshooting:
   problems:
     list: []
 alerts:
-- name: disk_space_usage
-  link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
-  metric: disk.space
-  info: disk ${label:mount_point} space utilization
-  os: "linux freebsd"
-- name: disk_inode_usage
-  link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
-  metric: disk.inodes
-  info: disk ${label:mount_point} inode utilization
-  os: "linux freebsd"
+  - name: disk_space_usage
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
+    metric: disk.space
+    info: disk ${label:mount_point} space utilization
+    os: "linux freebsd"
+  - name: disk_inode_usage
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
+    metric: disk.inodes
+    info: disk ${label:mount_point} inode utilization
+    os: "linux freebsd"
 metrics:
   folding:
     title: Metrics
@@ -109,29 +109,29 @@ metrics:
   description: ""
   availability: []
   scopes:
-  - name: mount point
-    description: ""
-    labels:
-    - name: mount_point
-      description: Path used to mount a filesystem
-    - name: filesystem
-      description: The filesystem used to format a partition.
-    - name: mount_root
-      description: Root directory where mount points are present.
-    metrics:
-    - name: disk.space
-      description: Disk Space Usage
-      unit: "GiB"
-      chart_type: stacked
-      dimensions:
-      - name: avail
-      - name: used
-      - name: reserved_for_root
-    - name: disk.inodes
-      description: Disk Files (inodes) Usage
-      unit: "inodes"
-      chart_type: stacked
-      dimensions:
-      - name: avail
-      - name: used
-      - name: reserved_for_root
+    - name: mount point
+      description: ""
+      labels:
+        - name: mount_point
+          description: Path used to mount a filesystem
+        - name: filesystem
+          description: The filesystem used to format a partition.
+        - name: mount_root
+          description: Root directory where mount points are present.
+      metrics:
+        - name: disk.space
+          description: Disk Space Usage
+          unit: "GiB"
+          chart_type: stacked
+          dimensions:
+            - name: avail
+            - name: used
+            - name: reserved_for_root
+        - name: disk.inodes
+          description: Disk Files (inodes) Usage
+          unit: "inodes"
+          chart_type: stacked
+          dimensions:
+            - name: avail
+            - name: used
+            - name: reserved_for_root

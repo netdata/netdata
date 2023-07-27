@@ -135,4 +135,4 @@ metrics:
           unit: number
           chart_type: line
           dimensions:
-            - random: a dimension per `num_lines`.
+            - name: random
