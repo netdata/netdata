@@ -95,21 +95,38 @@
       "type": "object",
       "properties": {
         "data_collection": {
-          "type": "object",
-          "description": "An overview of the collected metrics and a detailed description of the data collection method.",
-          "properties": {
-            "metrics_description": {
-              "type": "string",
-              "description": "Brief description of what metrics are collected. A suggested approach here is to talk about the areas covered (e.g. health, performance, errors) and the metric scopes."
+          "oneOf": [
+            {
+              "type": "object",
+              "description": "An overview of the collected metrics and a description of the data collection method.",
+              "properties": {
+                "description": {
+                  "type": "string",
+                  "description": "Brief description of what metrics are collected and how metrics are collected (e.g. HTTP requests, establish a TCP connection and send a command, a specific binary execution). A suggested approach here is to talk about the areas covered (e.g. health, performance, errors), the metric scopes, and to provide a detailed description of how the collector gathers metrics: how many connections are established, exact requests/commands executed, exact endpoints used."
+                }
+              },
+              "required": [
+                "description"
+              ]
             },
-            "method_description": {
-              "type": "string",
-              "description": "Description of how metrics are collected (e.g. HTTP requests, establish a TCP connection and send a command, a specific binary execution). A suggested approach here is to provide a detailed description of how the collector gathers metrics: how many connections are established, exact requests/commands executed, exact endpoints used."
+            {
+              "type": "object",
+              "description": "An overview of the collected metrics and a detailed description of the data collection method.",
+              "properties": {
+                "metrics_description": {
+                  "type": "string",
+                  "description": "Brief description of what metrics are collected. A suggested approach here is to talk about the areas covered (e.g. health, performance, errors) and the metric scopes."
+                },
+                "method_description": {
+                  "type": "string",
+                  "description": "Description of how metrics are collected (e.g. HTTP requests, establish a TCP connection and send a command, a specific binary execution). A suggested approach here is to provide a detailed description of how the collector gathers metrics: how many connections are established, exact requests/commands executed, exact endpoints used."
+                }
+              },
+              "required": [
+                "metrics_description",
+                "method_description"
+              ]
             }
-          },
-          "required": [
-            "metrics_description",
-            "method_description"
           ]
         },
         "supported_platforms": {
