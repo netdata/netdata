@@ -1,3 +1,4 @@
+# "$schema": "https://github.com/netdata/netdata/blob/master/integrations/schemas/collection-single-module.json"
 meta:
   plugin_name: python.d.plugin
   module_name: openldap
