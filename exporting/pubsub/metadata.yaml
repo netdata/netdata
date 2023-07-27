@@ -11,7 +11,7 @@ keywords:
   - exporter
   - Google Cloud
   - Pub Sub
-overview: 
+overview:
   exporter_description: |
     Export metrics to Google Cloud Pub/Sub Service
   exporter_limitations: ''
@@ -87,7 +87,7 @@ setup:
         - name: 'buffer on failures'
           default_value: '10'
           description: |
-            The number of iterations (`update every` seconds) to buffer data, when the external database server is not available. 
+            The number of iterations (`update every` seconds) to buffer data, when the external database server is not available.
           required: false
           detailed_description: |
             If the server fails to receive the data after that many failures, data loss on the connector instance is expected (Netdata will also log it).
@@ -143,8 +143,8 @@ setup:
             enabled: false
           description: |
             - Set the destination option to a Pub/Sub service endpoint. pubsub.googleapis.com is the default one.
-            - Create the credentials JSON file by following Google Cloud's authentication guide. 
-            - The user running the Agent (typically netdata) needs read access to google_cloud_credentials.json, which you can set 
+            - Create the credentials JSON file by following Google Cloud's authentication guide.
+            - The user running the Agent (typically netdata) needs read access to google_cloud_credentials.json, which you can set
               `chmod 400 google_cloud_credentials.json; chown netdata google_cloud_credentials.json`
             - Set the credentials file option to the full path of the file.
           config: |
