@@ -6,7 +6,7 @@ meta:
     link: ''
     categories:
       - data-collection.linux-systems.kernel-metrics
-    icon_filename: 'microchip.png'
+    icon_filename: 'linuxserver.svg'
   related_resources:
     integrations:
       list: []
