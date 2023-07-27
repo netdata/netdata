@@ -189,29 +189,21 @@ include:
 
   - &opensuse
     distro: opensuse
-    version: "tumbleweed"
-    support_type: Intermediate
+    version: "15.5"
+    support_type: Core
     notes: ''
     eol_check: true
-    base_image: opensuse/tumbleweed
+    base_image: opensuse/leap:15.5
     jsonc_removal: |
       zypper rm -y libjson-c-devel
     packages: &opensuse_packages
       type: rpm
-      repo_distro: opensuse/tumbleweed
+      repo_distro: opensuse/leap:15.4
       arches:
         - x86_64
         - aarch64
     test:
       ebpf-core: true
-  - <<: *opensuse
-    version: "15.5"
-    support_type: Core
-    notes: ''
-    base_image: opensuse/leap:15.5
-    packages:
-      <<: *opensuse_packages
-      repo_distro: opensuse/15.5
   - <<: *opensuse
     version: "15.4"
     support_type: Core
