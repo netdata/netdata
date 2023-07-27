@@ -201,7 +201,7 @@ metrics:
       dimensions:
       - name: uptime
   - name: tube
-    description: ""
+    description: "Metrics related to Beanstalk tubes. Each tube produces its own set of the following metrics."
     labels: []
     metrics:
     - name: beanstalk.jobs_rate
