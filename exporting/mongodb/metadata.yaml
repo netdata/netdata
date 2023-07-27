@@ -10,9 +10,9 @@ meta:
 keywords:
   - exporter
   - MongoDB
-overview: 
+overview:
   exporter_description: |
-    Use the MongoDB connector for the exporting engine to archive your agent's metrics to a MongoDB database 
+    Use the MongoDB connector for the exporting engine to archive your agent's metrics to a MongoDB database
     for long-term storage, further analysis, or correlation with data from other sources.
   exporter_limitations: ''
 setup:
@@ -86,7 +86,7 @@ setup:
         - name: 'buffer on failures'
           default_value: '10'
           description: |
-            The number of iterations (`update every` seconds) to buffer data, when the external database server is not available. 
+            The number of iterations (`update every` seconds) to buffer data, when the external database server is not available.
           required: false
           detailed_description: |
             If the server fails to receive the data after that many failures, data loss on the connector instance is expected (Netdata will also log it).
@@ -141,7 +141,7 @@ setup:
           folding:
             enabled: false
           description: |
-            The default socket timeout depends on the exporting connector update interval. 
+            The default socket timeout depends on the exporting connector update interval.
             The timeout is 500 ms shorter than the interval (but not less than 1000 ms). You can alter the timeout using the sockettimeoutms MongoDB URI option.
           config: |
             [mongodb:my_instance]
