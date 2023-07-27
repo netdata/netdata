@@ -11,7 +11,7 @@ keywords:
   - exporter
   - AWS
   - Kinesis
-overview: 
+overview:
   exporter_description: |
     Export metrics to AWS Kinesis Data Streams
   exporter_limitations: ''
@@ -33,7 +33,6 @@ setup:
     options:
       description: |
         Netdata automatically computes a partition key for every record with the purpose to distribute records across available shards evenly.
-        
         The following options can be defined for this exporter.
       folding:
         title: 'Config options'
@@ -93,7 +92,7 @@ setup:
         - name: 'buffer on failures'
           default_value: '10'
           description: |
-            The number of iterations (`update every` seconds) to buffer data, when the external database server is not available. 
+            The number of iterations (`update every` seconds) to buffer data, when the external database server is not available.
           required: false
           detailed_description: |
             If the server fails to receive the data after that many failures, data loss on the connector instance is expected (Netdata will also log it).
