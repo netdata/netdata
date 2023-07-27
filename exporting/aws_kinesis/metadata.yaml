@@ -34,14 +34,6 @@ setup:
             ```
           - `libcrypto`, `libssl`, and `libcurl` are also required to compile Netdata with Kinesis support enabled.
           - Next, Netdata should be re-installed from the source. The installer will detect that the required libraries are now available.
-#  git clone --recursive https://github.com/aws/aws-sdk-cpp.git
-#  cd aws-sdk-cpp/
-#  git submodule update --init --recursive
-#  mkdir BUILT
-#  cd  BUILT
-#  cmake -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_ONLY=kinesis ..
-#  make
-#  make install
   configuration:
     file:
       name: 'exporting.conf'
