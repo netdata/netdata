@@ -1,53 +1,66 @@
+# yamllint disable rule:line-length
+---
 meta:
   plugin_name: cups.plugin
   module_name: cups.plugin
   monitored_instance:
     name: CUPS
-    link: ''
+    link: "https://www.cups.org/"
     categories:
     - data-collection.hardware-devices-and-sensors
-    icon_filename: 'cups.png'
+    icon_filename: "cups.png"
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
+    description: ""
   keywords: []
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'Monitor CUPS performance for achieving optimal printing system operations. Monitor job statuses, queue lengths, and error rates to ensure smooth printing tasks.'
-    method_description: ''
+    metrics_description: "Monitor CUPS performance for achieving optimal printing system operations. Monitor job statuses, queue lengths, and error rates to ensure smooth printing tasks."
+    method_description: "The plugin uses CUPS shared library to connect and monitor the server."
   supported_platforms:
     include: []
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ''
+    description: "The plugin needs to access the server. Netdata sets permissions during installation time to reach the server through its library."
   default_behavior:
     auto_detection:
-      description: ''
+      description: "The plugin detects when CUPS server is running and tries to connect to it."
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
-    list: []
+    list:
+      - title: Minimum setup
+        description: "The CUPS server must be installed and running."
   configuration:
     file:
-      name: ''
-      description: ''
+      name: "netdata.conf"
+      section_name: "[plugin:cups]"
+      description: "The netdata main configuration file."
     options:
-      description: ''
+      description: ""
       folding:
-        title: ''
+        title: "Config options"
         enabled: true
-      list: []
+      list:
+        - name: update every
+          description: Data collection frequency.
+          default_value: 1
+          required: false
+        - name: command options
+          description: Additional parameters for the collector
+          default_value: ""
+          required: false
     examples:
       folding:
         enabled: true
-        title: ''
+        title: ""
       list: []
 troubleshooting:
   problems:
