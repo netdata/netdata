@@ -141,6 +141,8 @@ setup:
       list:
         - name: Default
           description: Default configuration.
+          folding:
+            enabled: false
           config: |
             local:
               name: 'local'
