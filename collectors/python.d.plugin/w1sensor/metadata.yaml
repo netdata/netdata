@@ -4,15 +4,15 @@ meta:
   module_name: w1sensor
   monitored_instance:
     name: 1-Wire Sensors
-    link: 'https://www.analog.com/en/product-category/1wire-temperature-sensors.html'
+    link: "https://www.analog.com/en/product-category/1wire-temperature-sensors.html"
     categories:
-    - data-collection.hardware-devices-and-sensors
-    icon_filename: '1-wire.png'
+      - data-collection.hardware-devices-and-sensors
+    icon_filename: "1-wire.png"
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
+    description: ""
   keywords:
     - temperature
     - sensor
@@ -20,26 +20,27 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'Monitor 1-Wire Sensors metrics with Netdata for optimal environmental conditions monitoring. Enhance your environmental monitoring with real-time insights and alerts.'
-    method_description: 'The collector uses the wire, w1_gpio, and w1_therm kernel modules. Currently temperature sensors are supported and automatically detected.'
+    metrics_description: "Monitor 1-Wire Sensors metrics with Netdata for optimal environmental conditions monitoring. Enhance your environmental monitoring with real-time insights and alerts."
+    method_description: "The collector uses the wire, w1_gpio, and w1_therm kernel modules. Currently temperature sensors are supported and automatically detected."
   supported_platforms:
-    include: [Linux]
+    include:
+      - Linux
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ''
+    description: ""
   default_behavior:
     auto_detection:
-      description: 'The collector will try to auto detect available 1-Wire devices.'
+      description: "The collector will try to auto detect available 1-Wire devices."
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
     list:
-      - title: 'Required Linux kernel modules'
-        description: 'Make sure `wire`, `w1_gpio`, and `w1_therm` kernel modules are loaded.'
+      - title: "Required Linux kernel modules"
+        description: "Make sure `wire`, `w1_gpio`, and `w1_therm` kernel modules are loaded."
   configuration:
     file:
       name: python.d/w1sensor.conf
@@ -77,11 +78,11 @@ setup:
           required: false
         - name: name
           description: Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works.
-          default_value: ''
+          default_value: ""
           required: false
         - name: name_<1-Wire id>
           description: This allows associating a human readable name with a sensor's 1-Wire identifier.
-          default_value: ''
+          default_value: ""
           required: false
     examples:
       folding:
@@ -105,13 +106,13 @@ metrics:
   description: ""
   availability: []
   scopes:
-  - name: global
-    description: "These metrics refer to the entire monitored application."
-    labels: []
-    metrics:
-    - name: w1sensor.temp
-      description: 1-Wire Temperature Sensor
-      unit: "Celsius"
-      chart_type: line
-      dimensions:
-      - name: a dimension per sensor
+    - name: global
+      description: "These metrics refer to the entire monitored application."
+      labels: []
+      metrics:
+        - name: w1sensor.temp
+          description: 1-Wire Temperature Sensor
+          unit: "Celsius"
+          chart_type: line
+          dimensions:
+            - name: a dimension per sensor
