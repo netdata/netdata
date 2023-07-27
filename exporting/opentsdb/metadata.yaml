@@ -21,7 +21,7 @@ setup:
     list:
       - title: ''
         description: |
-	  - OpenTSDB and Netdata, installed, configured and operational
+          - OpenTSDB and Netdata, installed, configured and operational.
   configuration:
     file:
       name: 'exporting.conf'
