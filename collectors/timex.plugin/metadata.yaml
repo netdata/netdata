@@ -42,7 +42,7 @@ setup:
       section_name: "[plugin:timex]"
       description: "The netdata main configuration file."
     options:
-      description: "At least one option ('clock synchronization state', 'time offset') needs to be enable for collector to run."
+      description: "At least one option ('clock synchronization state', 'time offset') needs to be enabled for this collector to run."
       folding:
         title: "Config options"
         enabled: true
