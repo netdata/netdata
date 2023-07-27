@@ -92,11 +92,13 @@ setup:
           required: false
     examples:
       folding:
-        enabled: false
+        enabled: true
         title: "Config"
       list:
         - name: Configuration of a remote boinc instance
           description: A basic JOB configuration for a remote boinc instance
+          folding:
+            enabled: false
           config: |
             remote:
              hostname: '1.2.3.4'
