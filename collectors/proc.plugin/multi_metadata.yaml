@@ -8,7 +8,7 @@ modules:
         link: ""
         categories:
           - data-collection.linux-systems.system-metrics
-        icon_filename: "syslog.png"
+        icon_filename: "linuxserver.svg"
       related_resources:
         integrations:
           list: []
@@ -307,7 +307,7 @@ modules:
         link: ""
         categories:
           - data-collection.linux-systems.system-metrics
-        icon_filename: "syslog.png"
+        icon_filename: "linuxserver.svg"
       related_resources:
         integrations:
           list: []
@@ -391,7 +391,7 @@ modules:
         link: ""
         categories:
           - data-collection.linux-systems.memory-metrics
-        icon_filename: "microchip.svg"
+        icon_filename: "linuxserver.svg"
       related_resources:
         integrations:
           list: []
@@ -610,7 +610,7 @@ modules:
         link: ""
         categories:
           - data-collection.linux-systems.cpu-metrics
-        icon_filename: "syslog.png"
+        icon_filename: "linuxserver.svg"
       related_resources:
         integrations:
           list: []
@@ -725,7 +725,7 @@ modules:
         link: ""
         categories:
           - data-collection.linux-systems.system-metrics
-        icon_filename: "syslog.png"
+        icon_filename: "linuxserver.svg"
       related_resources:
         integrations:
           list: []
@@ -854,7 +854,7 @@ modules:
         link: ""
         categories:
           - data-collection.linux-systems.pressure-metrics
-        icon_filename: "syslog.png"
+        icon_filename: "linuxserver.svg"
       related_resources:
         integrations:
           list: []
@@ -1028,7 +1028,7 @@ modules:
         link: ""
         categories:
           - data-collection.linux-systems.cpu-metrics
-        icon_filename: "syslog.png"
+        icon_filename: "linuxserver.svg"
       related_resources:
         integrations:
           list: []
@@ -1136,7 +1136,7 @@ modules:
         link: ""
         categories:
           - data-collection.linux-systems.network-metrics
-        icon_filename: "syslog.png"
+        icon_filename: "linuxserver.svg"
       related_resources:
         integrations:
           list: []
@@ -1261,7 +1261,7 @@ modules:
         link: ""
         categories:
           - data-collection.linux-systems.memory-metrics
-        icon_filename: "microchip.svg"
+        icon_filename: "linuxserver.svg"
       related_resources:
         integrations:
           list: []
@@ -1736,7 +1736,7 @@ modules:
         link: ""
         categories:
           - data-collection.linux-systems.memory-metrics
-        icon_filename: "syslog.png"
+        icon_filename: "linuxserver.svg"
       related_resources:
         integrations:
           list: []
@@ -2024,7 +2024,7 @@ modules:
         link: ""
         categories:
           - data-collection.linux-systems.ipc-metrics
-        icon_filename: "syslog.png"
+        icon_filename: "network-wired.svg"
       related_resources:
         integrations:
           list: []
@@ -4217,7 +4217,7 @@ modules:
         name: SCTP Statistics
         link: ""
         categories:
-          - data-collection.linux-systems.filesystem-metrics.nfs
+          - data-collection.linux-systems.network-metrics
         icon_filename: "network-wired.svg"
       related_resources:
         integrations:
@@ -4322,7 +4322,7 @@ modules:
         link: ""
         categories:
           - data-collection.linux-systems.firewall-metrics
-        icon_filename: "syslog.png"
+        icon_filename: "firewall.svg"
       related_resources:
         integrations:
           list: []
@@ -4443,7 +4443,7 @@ modules:
         link: ""
         categories:
           - data-collection.linux-systems.firewall-metrics
-        icon_filename: "syslog.png"
+        icon_filename: "firewall.svg"
       related_resources:
         integrations:
           list: []
@@ -4530,7 +4530,7 @@ modules:
         link: ""
         categories:
           - data-collection.linux-systems.filesystem-metrics.zfs
-        icon_filename: "zfs.svg"
+        icon_filename: "filesystem.svg"
       related_resources:
         integrations:
           list: []
@@ -4622,7 +4622,7 @@ modules:
         link: ""
         categories:
           - data-collection.linux-systems.filesystem-metrics.zfs
-        icon_filename: "microchip.svg"
+        icon_filename: "filesystem.svg"
       related_resources:
         integrations:
           list: []
@@ -4888,7 +4888,7 @@ modules:
         link: ""
         categories:
           - data-collection.linux-systems.filesystem-metrics.btrfs
-        icon_filename: "btrfs.svg"
+        icon_filename: "filesystem.svg"
       related_resources:
         integrations:
           list: []
