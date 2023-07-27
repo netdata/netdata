@@ -1,3 +1,5 @@
+# yamllint disable rule:line-length
+---
 plugin_name: ebpf.plugin
 modules:
   - meta:
@@ -28,20 +30,21 @@ modules:
     overview:
       data_collection:
         metrics_description: "Monitor calls for functions responsible to open or close a file descriptor and possible errors."
-        method_description: "Attach tracing (kprobes and trampoline) to internal kernel functions according options used to compile kernel."
+        method_description: "Attach tracing (kprobe and trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: "The plugin needs setuid because it loads data inside kernel."
+        description: "The plugin needs setuid because it loads data inside kernel. Netdata sets necessary permissions during installation time."
       default_behavior:
         auto_detection:
-          description: "It checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached."
+          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached."
         limits:
           description: ""
         performance_impact:
-          description: "Depending of kernel version and frequency that files are open and close, this thread will add overhead everytime that an internal kernel function is called. The estimated additional period of time is at between 90-200ms per call on kernels that do not have BTF technology."
+          description: "Depending of kernel version and frequency that files are open and close, this thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
         list:
@@ -124,7 +127,7 @@ modules:
       availability: []
       scopes:
         - name: cgroup
-          description: "These Metrics show grouped information per cgroup."
+          description: "These Metrics show grouped information per cgroup/service."
           labels: []
           metrics:
             - name: cgroup.fd_open
@@ -151,10 +154,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: close
-        - name: global
-          description: "These metrics show total number of calls executed for the host."
-          labels: []
-          metrics:
             - name: services.file_open
               description: Number of open files
               unit: "calls/s"
@@ -179,6 +178,28 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
+        - name: global
+          description: "These metrics show total number of calls to functions inside kernel."
+          labels: []
+          metrics:
+            - name: filesystem.file_descriptor
+              description: Open and close calls
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: open
+                - name: close
+            - name: filesystem.file_error
+              description: Open fails
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: open
+                - name: close
+        - name: apps
+          description: "These Metrics show grouped information per apps group."
+          labels: []
+          metrics:
             - name: apps.file_open
               description: Number of open files
               unit: "calls/s"
@@ -203,32 +224,22 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: a dimension per app group
-            - name: filesystem.file_descriptor
-              description: Open and close calls
-              unit: "calls/s"
-              chart_type: line
-              dimensions:
-                - name: open
-                - name: close
-            - name: filesystem.file_error
-              description: Open fails
-              unit: "calls/s"
-              chart_type: line
-              dimensions:
-                - name: open
-                - name: close
   - meta:
       plugin_name: ebpf.plugin
       module_name: processes
       monitored_instance:
         name: eBPF Processes
-        link: ""
+        link: "https://kernel.org/"
         categories:
           - data-collection.ebpf
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
-          list: []
+          list:
+            - plugin_name: apps.plugin
+              module_name: apps
+            - plugin_name: cgroups.plugin
+              module_name: cgroups
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -240,33 +251,89 @@ modules:
     overview:
       data_collection:
         metrics_description: "Monitor calls for function creating tasks (threads and processes) inside Linux kernel."
-        method_description: "Attach tracing (kprobes and tracepoint) to internal kernel functions."
+        method_description: "Attach tracing (kprobe or tracepoint, and trampoline) to internal kernel functions."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ""
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
-          description: ""
+          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT), files inside debugfs, and presence of BTF files to decide which eBPF program will be attached."
         limits:
           description: ""
         performance_impact:
-          description: ""
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called."
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Compile kernel
+            description: |
+                Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+                When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+                with different names.
+
+                Now follow steps:
+                1. Copy the configuration file to /usr/src/linux/.config.
+                2. Select the necessary options: make oldconfig
+                3. Compile your kernel image: make bzImage
+                4. Compile your modules: make modules
+                5. Copy your new kernel image for boot loader directory
+                6. Install the new modules: make modules_install
+                7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+                8. Update your boot loader
+          - title: Debug Filesystem
+            description: |
+                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "ebpf.d/process.conf"
+          description: "Overwrite default configuration helping to reduce memory usage. You can also select charts visible on dashboard."
         options:
-          description: ""
+          description: |
+            All options are defined inside section `[global]`.
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: ebpf load mode
+              description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
+              default_value: entry
+              required: false
+            - name: apps
+              description: Enable or disable integration with apps.plugin
+              default_value: no
+              required: false
+            - name: cgroups
+              description: Enable or disable integration with cgroup.plugin
+              default_value: no
+              required: false
+            - name: pid table size
+              description: Number of elements stored inside hash tables used to monitor calls per PID.
+              default_value: 32768
+              required: false
+            - name: ebpf type format
+              description: "Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load)."
+              default_value: auto
+              required: false
+            - name: ebpf co-re tracing
+              description: "Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code). This plugin will always try to attach a tracepoint, so option here will impact only function used to monitor task (thread and process) creation."
+              default_value: trampoline
+              required: false
+            - name: maps per core
+              description: Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information.
+              default_value: yes
+              required: false
+            - name: lifetime
+              description: Set default lifetime for thread when enabled by cloud.
+              default_value: 300
+              required: false
         examples:
           folding:
             enabled: true
@@ -284,7 +351,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show total number of calls to functions inside kernel."
           labels: []
           metrics:
             - name: system.process_thread
@@ -312,6 +379,10 @@ modules:
               chart_type: line
               dimensions:
                 - name: task
+        - name: apps
+          description: "These Metrics show grouped information per apps group."
+          labels: []
+          metrics:
             - name: apps.process_create
               description: Process started
               unit: "calls/s"
@@ -343,7 +414,7 @@ modules:
               dimensions:
                 - name: a dimension per app group
         - name: cgroup
-          description: ""
+          description: "These Metrics show grouped information per cgroup/service."
           labels: []
           metrics:
             - name: cgroup.process_create
@@ -411,7 +482,7 @@ modules:
       module_name: disk
       monitored_instance:
         name: eBPF Disk
-        link: ""
+        link: "https://kernel.org/"
         categories:
           - data-collection.ebpf
         icon_filename: "ebpf.jpg"
@@ -431,31 +502,63 @@ modules:
         metrics_description: "Measure latency for I/O events on disk."
         method_description: "Attach tracepoints to internal kernel functions."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ""
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
-          description: ""
+          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT), files inside debugfs, and presence of BTF files to decide which eBPF program will be attached."
         limits:
           description: ""
         performance_impact:
-          description: ""
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called."
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Compile kernel
+            description: |
+                Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+                When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+                with different names.
+
+                Now follow steps:
+                1. Copy the configuration file to /usr/src/linux/.config.
+                2. Select the necessary options: make oldconfig
+                3. Compile your kernel image: make bzImage
+                4. Compile your modules: make modules
+                5. Copy your new kernel image for boot loader directory
+                6. Install the new modules: make modules_install
+                7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+                8. Update your boot loader
+          - title: Debug Filesystem
+            description: |
+                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "ebpf.d/disk.conf"
+          description: "Overwrite default configuration reducing number of I/O events."
         options:
-          description: ""
+          description: |
+            All options are defined inside section `[global]`.
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: ebpf load mode
+              description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
+              default_value: entry
+              required: false
+            - name: lifetime
+              description: Set default lifetime for thread when enabled by cloud.
+              default_value: 300
+              required: false
         examples:
           folding:
             enabled: true
@@ -473,7 +576,7 @@ modules:
       availability: []
       scopes:
         - name: disk
-          description: ""
+          description: "These metrics measure latency for I/O events on every hard disk present on host."
           labels: []
           metrics:
             - name: disk.latency_io
@@ -487,7 +590,7 @@ modules:
       module_name: hardirq
       monitored_instance:
         name: eBPF Hardirq
-        link: ""
+        link: "https://kernel.org/"
         categories:
           - data-collection.ebpf
         icon_filename: "ebpf.jpg"
@@ -505,31 +608,63 @@ modules:
         metrics_description: "Monitor latency for each HardIRQ available."
         method_description: "Attach tracepoints to internal kernel functions."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ""
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
-          description: ""
+          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT), files inside debugfs, and presence of BTF files to decide which eBPF program will be attached."
         limits:
           description: ""
         performance_impact:
-          description: ""
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called."
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Compile kernel
+            description: |
+                Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+                When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+                with different names.
+
+                Now follow steps:
+                1. Copy the configuration file to /usr/src/linux/.config.
+                2. Select the necessary options: make oldconfig
+                3. Compile your kernel image: make bzImage
+                4. Compile your modules: make modules
+                5. Copy your new kernel image for boot loader directory
+                6. Install the new modules: make modules_install
+                7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+                8. Update your boot loader
+          - title: Debug Filesystem
+            description: |
+                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "ebpf.d/hardirq.conf"
+          description: "Overwrite default configuration reducing number of I/O events."
         options:
-          description: ""
+          description: |
+            All options are defined inside section `[global]`.
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: ebpf load mode
+              description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
+              default_value: entry
+              required: false
+            - name: lifetime
+              description: Set default lifetime for thread when enabled by cloud.
+              default_value: 300
+              required: false
         examples:
           folding:
             enabled: true
@@ -547,12 +682,12 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show latest timestamp for each hardIRQ available on host."
           labels: []
           metrics:
             - name: system.hardirq_latency
               description: Hard IRQ latency
-              unit: "milisecondds"
+              unit: "milliseconds"
               chart_type: stacked
               dimensions:
                 - name: hardirq names
@@ -561,13 +696,17 @@ modules:
       module_name: cachestat
       monitored_instance:
         name: eBPF Cachestat
-        link: ""
+        link: "https://kernel.org/"
         categories:
           - data-collection.ebpf
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
-          list: []
+          list:
+            - plugin_name: apps.plugin
+              module_name: apps
+            - plugin_name: cgroups.plugin
+              module_name: cgroups
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -580,31 +719,84 @@ modules:
         metrics_description: "Monitor Linux page cache events giving for users a general vision about how his kernel is manipulating files."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ""
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
-          description: ""
+          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached."
         limits:
           description: ""
         performance_impact:
-          description: ""
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Compile kernel
+            description: |
+              Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+              When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+              with different names.
+
+              Now follow steps:
+              1. Copy the configuration file to /usr/src/linux/.config.
+              2. Select the necessary options: make oldconfig
+              3. Compile your kernel image: make bzImage
+              4. Compile your modules: make modules
+              5. Copy your new kernel image for boot loader directory
+              6. Install the new modules: make modules_install
+              7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+              8. Update your boot loader
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "ebpf.d/cachestat.conf"
+          description: "Overwrite default configuration helping to reduce memory usage. You can also select charts visible on dashboard."
         options:
-          description: ""
+          description: |
+            All options are defined inside section `[global]`.
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: ebpf load mode
+              description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
+              default_value: entry
+              required: false
+            - name: apps
+              description: Enable or disable integration with apps.plugin
+              default_value: no
+              required: false
+            - name: cgroups
+              description: Enable or disable integration with cgroup.plugin
+              default_value: no
+              required: false
+            - name: pid table size
+              description: Number of elements stored inside hash tables used to monitor calls per PID.
+              default_value: 32768
+              required: false
+            - name: ebpf type format
+              description: "Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load)."
+              default_value: auto
+              required: false
+            - name: ebpf co-re tracing
+              description: "Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code)."
+              default_value: trampoline
+              required: false
+            - name: maps per core
+              description: Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information.
+              default_value: yes
+              required: false
+            - name: lifetime
+              description: Set default lifetime for thread when enabled by cloud.
+              default_value: 300
+              required: false
         examples:
           folding:
             enabled: true
@@ -622,7 +814,35 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show total number of calls to functions inside kernel."
+          labels: []
+          metrics:
+            - name: mem.cachestat_ratio
+              description: Hit ratio
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: ratio
+            - name: mem.cachestat_dirties
+              description: Number of dirty pages
+              unit: "page/s"
+              chart_type: line
+              dimensions:
+                - name: dirty
+            - name: mem.cachestat_hits
+              description: Number of accessed files
+              unit: "hits/s"
+              chart_type: line
+              dimensions:
+                - name: hit
+            - name: mem.cachestat_misses
+              description: Files out of page cache
+              unit: "misses/s"
+              chart_type: line
+              dimensions:
+                - name: miss
+        - name: apps
+          description: "These Metrics show grouped information per apps group."
           labels: []
           metrics:
             - name: apps.cachestat_ratio
@@ -649,54 +869,6 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: a dimension per app group
-            - name: services.cachestat_ratio
-              description: Hit ratio
-              unit: "%"
-              chart_type: line
-              dimensions:
-                - name: a dimension per systemd service
-            - name: services.cachestat_dirties
-              description: Number of dirty pages
-              unit: "page/s"
-              chart_type: line
-              dimensions:
-                - name: a dimension per systemd service
-            - name: services.cachestat_hits
-              description: Number of accessed files
-              unit: "hits/s"
-              chart_type: line
-              dimensions:
-                - name: a dimension per systemd service
-            - name: services.cachestat_misses
-              description: Files out of page cache
-              unit: "misses/s"
-              chart_type: line
-              dimensions:
-                - name: a dimension per systemd service
-            - name: mem.cachestat_ratio
-              description: Hit ratio
-              unit: "%"
-              chart_type: line
-              dimensions:
-                - name: ratio
-            - name: mem.cachestat_dirties
-              description: Number of dirty pages
-              unit: "page/s"
-              chart_type: line
-              dimensions:
-                - name: dirty
-            - name: mem.cachestat_hits
-              description: Number of accessed files
-              unit: "hits/s"
-              chart_type: line
-              dimensions:
-                - name: hit
-            - name: mem.cachestat_misses
-              description: Files out of page cache
-              unit: "misses/s"
-              chart_type: line
-              dimensions:
-                - name: miss
         - name: cgroup
           description: ""
           labels: []
@@ -725,12 +897,36 @@ modules:
               chart_type: line
               dimensions:
                 - name: miss
+            - name: services.cachestat_ratio
+              description: Hit ratio
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.cachestat_dirties
+              description: Number of dirty pages
+              unit: "page/s"
+              chart_type: line
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.cachestat_hits
+              description: Number of accessed files
+              unit: "hits/s"
+              chart_type: line
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.cachestat_misses
+              description: Files out of page cache
+              unit: "misses/s"
+              chart_type: line
+              dimensions:
+                - name: a dimension per systemd service
   - meta:
       plugin_name: ebpf.plugin
       module_name: sync
       monitored_instance:
         name: eBPF Sync
-        link: ""
+        link: "https://kernel.org/"
         categories:
           - data-collection.ebpf
         icon_filename: "ebpf.jpg"
@@ -747,34 +943,114 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: "Monitor syscalls responsible to move data from memory to storage device."
+        metrics_description: "Monitor syscall responsible to move data from memory to storage device."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ""
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
-          description: ""
+          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT, CONFIG_HAVE_SYSCALL_TRACEPOINTS), files inside debugfs, and presence of BTF files to decide which eBPF program will be attached."
         limits:
           description: ""
         performance_impact:
-          description: ""
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Compile kernel
+            description: |
+                Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+                When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+                with different names.
+
+                Now follow steps:
+                1. Copy the configuration file to /usr/src/linux/.config.
+                2. Select the necessary options: make oldconfig
+                3. Compile your kernel image: make bzImage
+                4. Compile your modules: make modules
+                5. Copy your new kernel image for boot loader directory
+                6. Install the new modules: make modules_install
+                7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+                8. Update your boot loader
+          - title: Debug Filesystem
+            description: |
+                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug`).
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "ebpf.d/sync.conf"
+          description: "Overwrite default configuration and allows user to select charts visible on dashboard."
         options:
-          description: ""
+          description: |
+            This configuration file have two different sections. The `[global]` overwrites all default options, while `[syscalls]` allow user to select the syscall to monitor.
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: ebpf load mode
+              description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
+              default_value: entry
+              required: false
+            - name: apps
+              description: Enable or disable integration with apps.plugin
+              default_value: no
+              required: false
+            - name: cgroups
+              description: Enable or disable integration with cgroup.plugin
+              default_value: no
+              required: false
+            - name: pid table size
+              description: Number of elements stored inside hash tables used to monitor calls per PID.
+              default_value: 32768
+              required: false
+            - name: ebpf type format
+              description: "Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load)."
+              default_value: auto
+              required: false
+            - name: ebpf co-re tracing
+              description: "Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code)."
+              default_value: trampoline
+              required: false
+            - name: maps per core
+              description: Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information.
+              default_value: yes
+              required: false
+            - name: lifetime
+              description: Set default lifetime for thread when enabled by cloud.
+              default_value: 300
+              required: false
+            - name: sync
+              description: Enable or disable monitoring for syscall `sync`
+              default_value: yes
+              required: false
+            - name: msync
+              description: Enable or disable monitoring for syscall `msync`
+              default_value: yes
+              required: false
+            - name: fsync
+              description: Enable or disable monitoring for syscall `fsync`
+              default_value: yes
+              required: false
+            - name: fdatasync
+              description: Enable or disable monitoring for syscall `fdatasync`
+              default_value: yes
+              required: false
+            - name: syncfs
+              description: Enable or disable monitoring for syscall `syncfs`
+              default_value: yes
+              required: false
+            - name: sync_file_range
+              description: Enable or disable monitoring for syscall `sync_file_range`
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -798,7 +1074,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show total number of calls to functions inside kernel."
           labels: []
           metrics:
             - name: mem.file_sync
@@ -832,7 +1108,7 @@ modules:
       module_name: mdflush
       monitored_instance:
         name: eBPF MDflush
-        link: ""
+        link: "https://kernel.org/"
         categories:
           - data-collection.ebpf
         icon_filename: "ebpf.jpg"
@@ -851,31 +1127,60 @@ modules:
         metrics_description: "Monitor when flush events happen between disks."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ""
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
-          description: ""
+          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached."
         limits:
           description: ""
         performance_impact:
-          description: ""
+          description: "This thread will add overhead every time that `md_flush_request` is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Compile kernel
+            description: |
+              Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+              When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+              with different names.
+
+              Now follow steps:
+              1. Copy the configuration file to /usr/src/linux/.config.
+              2. Select the necessary options: make oldconfig
+              3. Compile your kernel image: make bzImage
+              4. Compile your modules: make modules
+              5. Copy your new kernel image for boot loader directory
+              6. Install the new modules: make modules_install
+              7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+              8. Update your boot loader
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "ebpf.d/mdflush.conf"
+          description: "Overwrite default configuration reducing I/O events."
         options:
-          description: ""
+          description: |
+            All options are defined inside section `[global]`.
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: ebpf load mode
+              description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
+              default_value: entry
+              required: false
+            - name: lifetime
+              description: Set default lifetime for thread when enabled by cloud.
+              default_value: 300
+              required: false
         examples:
           folding:
             enabled: true
@@ -893,7 +1198,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "Number of times md_flush_request was called since last time."
           labels: []
           metrics:
             - name: mdstat.mdstat_flush
@@ -907,13 +1212,17 @@ modules:
       module_name: swap
       monitored_instance:
         name: eBPF SWAP
-        link: ""
+        link: "https://kernel.org/"
         categories:
           - data-collection.ebpf
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
-          list: []
+          list:
+            - plugin_name: apps.plugin
+              module_name: apps
+            - plugin_name: cgroups.plugin
+              module_name: cgroups
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -927,31 +1236,84 @@ modules:
         metrics_description: "Monitors when swap has I/O events and applications executing events."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ""
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
-          description: ""
+          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached."
         limits:
           description: ""
         performance_impact:
-          description: ""
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Compile kernel
+            description: |
+              Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+              When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+              with different names.
+
+              Now follow steps:
+              1. Copy the configuration file to /usr/src/linux/.config.
+              2. Select the necessary options: make oldconfig
+              3. Compile your kernel image: make bzImage
+              4. Compile your modules: make modules
+              5. Copy your new kernel image for boot loader directory
+              6. Install the new modules: make modules_install
+              7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+              8. Update your boot loader
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "ebpf.d/swap.conf"
+          description: "Overwrite default configuration helping to reduce memory usage. You can also select charts visible on dashboard."
         options:
-          description: ""
+          description: |
+            All options are defined inside section `[global]`.
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: ebpf load mode
+              description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
+              default_value: entry
+              required: false
+            - name: apps
+              description: Enable or disable integration with apps.plugin
+              default_value: no
+              required: false
+            - name: cgroups
+              description: Enable or disable integration with cgroup.plugin
+              default_value: no
+              required: false
+            - name: pid table size
+              description: Number of elements stored inside hash tables used to monitor calls per PID.
+              default_value: 32768
+              required: false
+            - name: ebpf type format
+              description: "Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load)."
+              default_value: auto
+              required: false
+            - name: ebpf co-re tracing
+              description: "Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code)."
+              default_value: trampoline
+              required: false
+            - name: maps per core
+              description: Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information.
+              default_value: yes
+              required: false
+            - name: lifetime
+              description: Set default lifetime for thread when enabled by cloud.
+              default_value: 300
+              required: false
         examples:
           folding:
             enabled: true
@@ -969,7 +1331,7 @@ modules:
       availability: []
       scopes:
         - name: cgroup
-          description: ""
+          description: "These Metrics show grouped information per cgroup/service."
           labels: []
           metrics:
             - name: cgroup.swap_read
@@ -984,10 +1346,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: write
-        - name: global
-          description: ""
-          labels: []
-          metrics:
             - name: services.swap_read
               description: Calls to <code>swap_readpage</code>.
               unit: "calls/s"
@@ -1000,6 +1358,10 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
+        - name: apps
+          description: "These Metrics show grouped information per apps group."
+          labels: []
+          metrics:
             - name: apps.swap_read_call
               description: Calls to function <code>swap_readpage</code>.
               unit: "calls/s"
@@ -1012,6 +1374,10 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: a dimension per app group
+        - name: global
+          description: "These metrics show total number of calls to functions inside kernel."
+          labels: []
+          metrics:
             - name: system.swapcalls
               description: Calls to access swap memory
               unit: "calls/s"
@@ -1024,13 +1390,17 @@ modules:
       module_name: oomkill
       monitored_instance:
         name: eBPF OOMkill
-        link: ""
+        link: "https://kernel.org/"
         categories:
           - data-collection.ebpf
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
-          list: []
+          list:
+            - plugin_name: apps.plugin
+              module_name: apps
+            - plugin_name: cgroups.plugin
+              module_name: cgroups
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -1042,29 +1412,49 @@ modules:
         metrics_description: "Monitor applications that reach out of memory."
         method_description: "Attach tracepoint to internal kernel functions."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ""
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
-          description: ""
+          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT), files inside debugfs, and presence of BTF files to decide which eBPF program will be attached."
         limits:
           description: ""
         performance_impact:
-          description: ""
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called."
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Compile kernel
+            description: |
+                Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+                When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+                with different names.
+
+                Now follow steps:
+                1. Copy the configuration file to /usr/src/linux/.config.
+                2. Select the necessary options: make oldconfig
+                3. Compile your kernel image: make bzImage
+                4. Compile your modules: make modules
+                5. Copy your new kernel image for boot loader directory
+                6. Install the new modules: make modules_install
+                7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+                8. Update your boot loader
+          - title: Debug Filesystem
+            description: |
+                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "ebpf.d/oomkill.conf"
+          description: "Overwrite default configuration reducing number of I/O events."
         options:
-          description: ""
+          description: |
+            Overwrite default configuration reducing number of I/O events
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
           list: []
         examples:
@@ -1074,7 +1464,19 @@ modules:
           list: []
     troubleshooting:
       problems:
-        list: []
+        list:
+          - name: update every
+            description: Data collection frequency.
+            default_value: 5
+            required: false
+          - name: ebpf load mode
+            description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
+            default_value: entry
+            required: false
+          - name: lifetime
+            description: Set default lifetime for thread when enabled by cloud.
+            default_value: 300
+            required: false
     alerts: []
     metrics:
       folding:
@@ -1084,7 +1486,7 @@ modules:
       availability: []
       scopes:
         - name: cgroup
-          description: ""
+          description: "These metrics show cgroup/service that reached OOM."
           labels: []
           metrics:
             - name: cgroup.oomkills
@@ -1093,16 +1495,16 @@ modules:
               chart_type: line
               dimensions:
                 - name: cgroup name
-        - name: global
-          description: ""
-          labels: []
-          metrics:
             - name: services.oomkills
               description: OOM kills. This chart is provided by eBPF plugin.
               unit: "kills"
               chart_type: line
               dimensions:
                 - name: a dimension per systemd service
+        - name: apps
+          description: "These metrics show cgroup/service that reached OOM."
+          labels: []
+          metrics:
             - name: apps.oomkills
               description: OOM kills
               unit: "kills"
@@ -1114,13 +1516,17 @@ modules:
       module_name: socket
       monitored_instance:
         name: eBPF Socket
-        link: ""
+        link: "https://kernel.org/"
         categories:
           - data-collection.ebpf
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
-          list: []
+          list:
+            - plugin_name: apps.plugin
+              module_name: apps
+            - plugin_name: cgroups.plugin
+              module_name: cgroups
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -1136,31 +1542,96 @@ modules:
         metrics_description: "Monitor bandwidth consumption per application for protocols TCP and UDP."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ""
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
-          description: ""
+          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached."
         limits:
           description: ""
         performance_impact:
-          description: ""
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Compile kernel
+            description: |
+              Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+              When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+              with different names.
+
+              Now follow steps:
+              1. Copy the configuration file to /usr/src/linux/.config.
+              2. Select the necessary options: make oldconfig
+              3. Compile your kernel image: make bzImage
+              4. Compile your modules: make modules
+              5. Copy your new kernel image for boot loader directory
+              6. Install the new modules: make modules_install
+              7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+              8. Update your boot loader
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "ebpf.d/network.conf"
+          description: "Overwrite default configuration helping to reduce memory usage. You can also select charts visible on dashboard."
         options:
-          description: ""
+          description: |
+            All options are defined inside section `[global]`. Options inside `network connections` are ignored for while.
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: ebpf load mode
+              description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
+              default_value: entry
+              required: false
+            - name: apps
+              description: Enable or disable integration with apps.plugin
+              default_value: no
+              required: false
+            - name: cgroups
+              description: Enable or disable integration with cgroup.plugin
+              default_value: no
+              required: false
+            - name: bandwidth table size
+              description: Number of elements stored inside hash tables used to monitor calls per PID.
+              default_value: 16384
+              required: false
+            - name: ipv4 connection table size
+              description: Number of elements stored inside hash tables used to monitor calls per IPV4 connections.
+              default_value: 16384
+              required: false
+            - name: ipv6 connection table size
+              description: Number of elements stored inside hash tables used to monitor calls per IPV6 connections.
+              default_value: 16384
+              required: false
+            - name: udp connection table size
+              description: Number of temporary elements stored inside hash tables used to monitor UDP connections.
+              default_value: 4096
+              required: false
+            - name: ebpf type format
+              description: "Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load)."
+              default_value: auto
+              required: false
+            - name: ebpf co-re tracing
+              description: "Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code)."
+              default_value: trampoline
+              required: false
+            - name: maps per core
+              description: Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information.
+              default_value: yes
+              required: false
+            - name: lifetime
+              description: Set default lifetime for thread when enabled by cloud.
+              default_value: 300
+              required: false
         examples:
           folding:
             enabled: true
@@ -1178,7 +1649,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show total number of calls to functions inside kernel."
           labels: []
           metrics:
             - name: ip.inbound_conn
@@ -1242,6 +1713,10 @@ modules:
               dimensions:
                 - name: received
                 - name: send
+        - name: apps
+          description: "These metrics show grouped information per apps group."
+          labels: []
+          metrics:
             - name: apps.outbound_conn_v4
               description: Calls to tcp_v4_connection
               unit: "connections/s"
@@ -1299,54 +1774,6 @@ modules:
             - name: services.net_conn_ipv4
               description: Calls to tcp_v4_connection
               unit: "connections/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per systemd service
-            - name: services.net_conn_ipv6
-              description: Calls to tcp_v6_connection
-              unit: "connections/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per systemd service
-            - name: services.net_bytes_recv
-              description: Bytes received
-              unit: "kilobits/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per systemd service
-            - name: services.net_bytes_sent
-              description: Bytes sent
-              unit: "kilobits/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per systemd service
-            - name: services.net_tcp_recv
-              description: Calls to tcp_cleanup_rbuf.
-              unit: "calls/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per systemd service
-            - name: services.net_tcp_send
-              description: Calls to tcp_sendmsg.
-              unit: "calls/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per systemd service
-            - name: services.net_tcp_retransmit
-              description: Calls to tcp_retransmit
-              unit: "calls/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per systemd service
-            - name: services.net_udp_send
-              description: Calls to udp_sendmsg
-              unit: "calls/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per systemd service
-            - name: services.net_udp_recv
-              description: Calls to udp_recvmsg
-              unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
@@ -1408,18 +1835,70 @@ modules:
               chart_type: line
               dimensions:
                 - name: received
+            - name: services.net_conn_ipv6
+              description: Calls to tcp_v6_connection
+              unit: "connections/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.net_bytes_recv
+              description: Bytes received
+              unit: "kilobits/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.net_bytes_sent
+              description: Bytes sent
+              unit: "kilobits/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.net_tcp_recv
+              description: Calls to tcp_cleanup_rbuf.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.net_tcp_send
+              description: Calls to tcp_sendmsg.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.net_tcp_retransmit
+              description: Calls to tcp_retransmit
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.net_udp_send
+              description: Calls to udp_sendmsg
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.net_udp_recv
+              description: Calls to udp_recvmsg
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per systemd service
   - meta:
       plugin_name: ebpf.plugin
       module_name: dcstat
       monitored_instance:
         name: eBPF DCstat
-        link: ""
+        link: "https://kernel.org/"
         categories:
           - data-collection.ebpf
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
-          list: []
+          list:
+            - plugin_name: apps.plugin
+              module_name: apps
+            - plugin_name: cgroups.plugin
+              module_name: cgroups
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -1432,31 +1911,84 @@ modules:
         metrics_description: "Monitor directory cache events per application given an overall vision about files on memory or storage device."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ""
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
-          description: ""
+          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached."
         limits:
           description: ""
         performance_impact:
-          description: ""
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Compile kernel
+            description: |
+              Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+              When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+              with different names.
+
+              Now follow steps:
+              1. Copy the configuration file to /usr/src/linux/.config.
+              2. Select the necessary options: make oldconfig
+              3. Compile your kernel image: make bzImage
+              4. Compile your modules: make modules
+              5. Copy your new kernel image for boot loader directory
+              6. Install the new modules: make modules_install
+              7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+              8. Update your boot loader
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "ebpf.d/dcstat.conf"
+          description: "Overwrite default configuration helping to reduce memory usage. You can also select charts visible on dashboard."
         options:
-          description: ""
+          description: |
+            All options are defined inside section `[global]`.
           folding:
-            title: ""
+            title: "Config option"
             enabled: true
-          list: []
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: ebpf load mode
+              description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
+              default_value: entry
+              required: false
+            - name: apps
+              description: Enable or disable integration with apps.plugin
+              default_value: no
+              required: false
+            - name: cgroups
+              description: Enable or disable integration with cgroup.plugin
+              default_value: no
+              required: false
+            - name: pid table size
+              description: Number of elements stored inside hash tables used to monitor calls per PID.
+              default_value: 32768
+              required: false
+            - name: ebpf type format
+              description: "Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load)."
+              default_value: auto
+              required: false
+            - name: ebpf co-re tracing
+              description: "Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code)."
+              default_value: trampoline
+              required: false
+            - name: maps per core
+              description: Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information.
+              default_value: yes
+              required: false
+            - name: lifetime
+              description: Set default lifetime for thread when enabled by cloud.
+              default_value: 300
+              required: false
         examples:
           folding:
             enabled: true
@@ -1473,8 +2005,8 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
-          description: ""
+        - name: apps
+          description: "These Metrics show grouped information per apps group."
           labels: []
           metrics:
             - name: apps.dc_ratio
@@ -1501,30 +2033,18 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: a dimension per app group
-            - name: services.dc_ratio
-              description: Percentage of files inside directory cache
-              unit: "%"
-              chart_type: line
-              dimensions:
-                - name: a dimension per systemd service
-            - name: services.dc_reference
-              description: Count file access
+        - name: filesystem
+          description: "These metrics show total number of calls to functions inside kernel."
+          labels: []
+          metrics:
+            - name: filesystem.dc_reference
+              description: Variables used to calculate hit ratio.
               unit: "files"
               chart_type: line
               dimensions:
-                - name: a dimension per systemd service
-            - name: services.dc_not_cache
-              description: Files not present inside directory cache
-              unit: "files"
-              chart_type: line
-              dimensions:
-                - name: a dimension per systemd service
-            - name: services.dc_not_found
-              description: Files not found
-              unit: "files"
-              chart_type: line
-              dimensions:
-                - name: a dimension per systemd service
+                - name: reference
+                - name: slow
+                - name: miss
             - name: filesystem.dc_hit_ratio
               description: Percentage of files inside directory cache
               unit: "%"
@@ -1559,24 +2079,36 @@ modules:
               chart_type: line
               dimensions:
                 - name: miss
-        - name: filesystem
-          description: ""
-          labels: []
-          metrics:
-            - name: filesystem.dc_reference
-              description: Variables used to calculate hit ratio.
+            - name: services.dc_ratio
+              description: Percentage of files inside directory cache
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.dc_reference
+              description: Count file access
               unit: "files"
               chart_type: line
               dimensions:
-                - name: reference
-                - name: slow
-                - name: miss
+                - name: a dimension per systemd service
+            - name: services.dc_not_cache
+              description: Files not present inside directory cache
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: a dimension per systemd service
+            - name: services.dc_not_found
+              description: Files not found
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: a dimension per systemd service
   - meta:
       plugin_name: ebpf.plugin
       module_name: filesystem
       monitored_instance:
         name: eBPF Filesystem
-        link: ""
+        link: "https://kernel.org/"
         categories:
           - data-collection.ebpf
         icon_filename: "ebpf.jpg"
@@ -1601,31 +2133,80 @@ modules:
         metrics_description: "Monitor latency for main actions on filesystem like I/O events."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ""
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
-          description: ""
+          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT), files inside debugfs, and presence of BTF files to decide which eBPF program will be attached."
         limits:
           description: ""
         performance_impact:
           description: ""
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Compile kernel
+            description: |
+              Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+              When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+              with different names.
+
+              Now follow steps:
+              1. Copy the configuration file to /usr/src/linux/.config.
+              2. Select the necessary options: make oldconfig
+              3. Compile your kernel image: make bzImage
+              4. Compile your modules: make modules
+              5. Copy your new kernel image for boot loader directory
+              6. Install the new modules: make modules_install
+              7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+              8. Update your boot loader
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "ebpf.d/filesystem.conf"
+          description: "Overwrite default configuration and allows user to select charts visible on dashboard."
         options:
-          description: ""
+          description: |
+            This configuration file have two different sections. The `[global]` overwrites default options, while `[filesystem]` allow user to select the filesystems to monitor.
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: ebpf load mode
+              description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
+              default_value: entry
+              required: false
+            - name: lifetime
+              description: Set default lifetime for thread when enabled by cloud.
+              default_value: 300
+              required: false
+            - name: btrfsdist
+              description: Enable or disable latency monitoring for functions associated with btrfs filesystem.
+              default_value: yes
+              required: false
+            - name: ext4dist
+              description: Enable or disable latency monitoring for functions associated with ext4 filesystem.
+              default_value: yes
+              required: false
+            - name: nfsdist
+              description: Enable or disable latency monitoring for functions associated with nfs filesystem.
+              default_value: yes
+              required: false
+            - name: xfsdist
+              description: Enable or disable latency monitoring for functions associated with xfs filesystem.
+              default_value: yes
+              required: false
+            - name: zfsdist
+              description: Enable or disable latency monitoring for functions associated with zfs filesystem.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -1643,7 +2224,7 @@ modules:
       availability: []
       scopes:
         - name: filesystem
-          description: ""
+          description: "Latency charts associate with filesystem actions."
           labels: []
           metrics:
             - name: filesystem.read_latency
@@ -1689,13 +2270,17 @@ modules:
       module_name: shm
       monitored_instance:
         name: eBPF SHM
-        link: ""
+        link: "https://kernel.org/"
         categories:
           - data-collection.ebpf
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
-          list: []
+          list:
+            - plugin_name: apps.plugin
+              module_name: apps
+            - plugin_name: cgroups.plugin
+              module_name: cgroups
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -1705,34 +2290,106 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: "Monitor syscalls responsible to manipulate shared memory."
+        metrics_description: "Monitor syscall responsible to manipulate shared memory."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ""
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
-          description: ""
+          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached."
         limits:
           description: ""
         performance_impact:
-          description: ""
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Compile kernel
+            description: |
+                Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+                When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+                with different names.
+
+                Now follow steps:
+                1. Copy the configuration file to /usr/src/linux/.config.
+                2. Select the necessary options: make oldconfig
+                3. Compile your kernel image: make bzImage
+                4. Compile your modules: make modules
+                5. Copy your new kernel image for boot loader directory
+                6. Install the new modules: make modules_install
+                7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+                8. Update your boot loader
+          - title: Debug Filesystem
+            description: |
+                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "ebpf.d/shm.conf"
+          description: "Overwrite default configuration and allows user to select charts visible on dashboard."
         options:
-          description: ""
+          description: |
+            This configuration file have two different sections. The `[global]` overwrites all default options, while `[syscalls]` allow user to select the syscall to monitor.
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: ebpf load mode
+              description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
+              default_value: entry
+              required: false
+            - name: apps
+              description: Enable or disable integration with apps.plugin
+              default_value: no
+              required: false
+            - name: cgroups
+              description: Enable or disable integration with cgroup.plugin
+              default_value: no
+              required: false
+            - name: pid table size
+              description: Number of elements stored inside hash tables used to monitor calls per PID.
+              default_value: 32768
+              required: false
+            - name: ebpf type format
+              description: "Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load)."
+              default_value: auto
+              required: false
+            - name: ebpf co-re tracing
+              description: "Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code)."
+              default_value: trampoline
+              required: false
+            - name: maps per core
+              description: Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information.
+              default_value: yes
+              required: false
+            - name: lifetime
+              description: Set default lifetime for thread when enabled by cloud.
+              default_value: 300
+              required: false
+            - name: shmget
+              description: Enable or disable monitoring for syscall `shmget`
+              default_value: yes
+              required: false
+            - name: shmat
+              description: Enable or disable monitoring for syscall `shmat`
+              default_value: yes
+              required: false
+            - name: shmdt
+              description: Enable or disable monitoring for syscall `shmdt`
+              default_value: yes
+              required: false
+            - name: shmctl
+              description: Enable or disable monitoring for syscall `shmctl`
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -1750,7 +2407,7 @@ modules:
       availability: []
       scopes:
         - name: cgroup
-          description: ""
+          description: "These Metrics show grouped information per cgroup/service."
           labels: []
           metrics:
             - name: cgroup.shmget
@@ -1777,10 +2434,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: ctl
-        - name: global
-          description: ""
-          labels: []
-          metrics:
             - name: services.shmget
               description: Calls to syscall <code>shmget(2)</code>.
               unit: "calls/s"
@@ -1805,6 +2458,10 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
+        - name: apps
+          description: "These Metrics show grouped information per apps group."
+          labels: []
+          metrics:
             - name: apps.shmget_call
               description: Calls to syscall <code>shmget(2)</code>.
               unit: "calls/s"
@@ -1829,6 +2486,10 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: a dimension per app group
+        - name: global
+          description: "These Metrics show number of calls for specified syscall."
+          labels: []
+          metrics:
             - name: system.shared_memory_calls
               description: Calls to shared memory system calls
               unit: "calls/s"
@@ -1843,7 +2504,7 @@ modules:
       module_name: softirq
       monitored_instance:
         name: eBPF SoftIRQ
-        link: ""
+        link: "https://kernel.org/"
         categories:
           - data-collection.ebpf
         icon_filename: "ebpf.jpg"
@@ -1859,33 +2520,65 @@ modules:
     overview:
       data_collection:
         metrics_description: "Monitor latency for each SoftIRQ available."
-        method_description: "Attach kprobes to internal kernel functions."
+        method_description: "Attach kprobe to internal kernel functions."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ""
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
-          description: ""
+          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT), files inside debugfs, and presence of BTF files to decide which eBPF program will be attached."
         limits:
           description: ""
         performance_impact:
-          description: ""
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called."
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Compile kernel
+            description: |
+                Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+                When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+                with different names.
+
+                Now follow steps:
+                1. Copy the configuration file to /usr/src/linux/.config.
+                2. Select the necessary options: make oldconfig
+                3. Compile your kernel image: make bzImage
+                4. Compile your modules: make modules
+                5. Copy your new kernel image for boot loader directory
+                6. Install the new modules: make modules_install
+                7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+                8. Update your boot loader
+          - title: Debug Filesystem
+            description: |
+                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "ebpf.d/softirq.conf"
+          description: "Overwrite default configuration reducing number of I/O events."
         options:
-          description: ""
+          description: |
+            All options are defined inside section `[global]`.
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: ebpf load mode
+              description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
+              default_value: entry
+              required: false
+            - name: lifetime
+              description: Set default lifetime for thread when enabled by cloud.
+              default_value: 300
+              required: false
         examples:
           folding:
             enabled: true
@@ -1903,12 +2596,12 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show latest timestamp for each softIRQ available on host."
           labels: []
           metrics:
             - name: system.softirq_latency
               description: Soft IRQ latency
-              unit: "miliseconds"
+              unit: "milliseconds"
               chart_type: stacked
               dimensions:
                 - name: soft IRQs
@@ -1917,7 +2610,7 @@ modules:
       module_name: mount
       monitored_instance:
         name: eBPF Mount
-        link: ""
+        link: "https://kernel.org/"
         categories:
           - data-collection.ebpf
         icon_filename: "ebpf.jpg"
@@ -1937,31 +2630,71 @@ modules:
         metrics_description: "Monitor calls for mount and umount syscall."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ""
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
-          description: ""
+          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT, CONFIG_HAVE_SYSCALL_TRACEPOINTS), files inside debugfs, and presence of BTF files to decide which eBPF program will be attached."
         limits:
           description: ""
         performance_impact:
-          description: ""
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Compile kernel
+            description: |
+                Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+                When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+                with different names.
+
+                Now follow steps:
+                1. Copy the configuration file to /usr/src/linux/.config.
+                2. Select the necessary options: make oldconfig
+                3. Compile your kernel image: make bzImage
+                4. Compile your modules: make modules
+                5. Copy your new kernel image for boot loader directory
+                6. Install the new modules: make modules_install
+                7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+                8. Update your boot loader
+          - title: Debug Filesystem
+            description: |
+                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "ebpf.d/mount.conf"
+          description: "Overwrite default configuration."
         options:
-          description: ""
+          description: |
+            All options are defined inside section `[global]`.
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: ebpf load mode
+              description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
+              default_value: entry
+              required: false
+            - name: ebpf type format
+              description: "Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load)."
+              default_value: auto
+              required: false
+            - name: ebpf co-re tracing
+              description: "Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code)."
+              default_value: trampoline
+              required: false
+            - name: lifetime
+              description: Set default lifetime for thread when enabled by cloud.
+              default_value: 300
+              required: false
         examples:
           folding:
             enabled: true
@@ -1979,7 +2712,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "Calls for syscalls mount an umount."
           labels: []
           metrics:
             - name: mount_points.call
@@ -2001,13 +2734,17 @@ modules:
       module_name: vfs
       monitored_instance:
         name: eBPF VFS
-        link: ""
+        link: "https://kernel.org/"
         categories:
           - data-collection.ebpf
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
-          list: []
+          list:
+            - plugin_name: apps.plugin
+              module_name: apps
+            - plugin_name: cgroups.plugin
+              module_name: cgroups
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -2022,31 +2759,84 @@ modules:
         metrics_description: "Monitor I/O events on Linux Virtual Filesystem."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ""
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
-          description: ""
+          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached."
         limits:
           description: ""
         performance_impact:
-          description: ""
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Compile kernel
+            description: |
+              Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+              When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+              with different names.
+
+              Now follow steps:
+              1. Copy the configuration file to /usr/src/linux/.config.
+              2. Select the necessary options: make oldconfig
+              3. Compile your kernel image: make bzImage
+              4. Compile your modules: make modules
+              5. Copy your new kernel image for boot loader directory
+              6. Install the new modules: make modules_install
+              7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+              8. Update your boot loader
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "ebpf.d/vfs.conf"
+          description: "Overwrite default configuration helping to reduce memory usage."
         options:
-          description: ""
+          description: |
+            All options are defined inside section `[global]`.
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: ebpf load mode
+              description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
+              default_value: entry
+              required: false
+            - name: apps
+              description: Enable or disable integration with apps.plugin
+              default_value: no
+              required: false
+            - name: cgroups
+              description: Enable or disable integration with cgroup.plugin
+              default_value: no
+              required: false
+            - name: pid table size
+              description: Number of elements stored inside hash tables used to monitor calls per PID.
+              default_value: 32768
+              required: false
+            - name: ebpf type format
+              description: "Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load)."
+              default_value: auto
+              required: false
+            - name: ebpf co-re tracing
+              description: "Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code)."
+              default_value: trampoline
+              required: false
+            - name: maps per core
+              description: Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information.
+              default_value: yes
+              required: false
+            - name: lifetime
+              description: Set default lifetime for thread when enabled by cloud.
+              default_value: 300
+              required: false
         examples:
           folding:
             enabled: true
@@ -2064,7 +2854,7 @@ modules:
       availability: []
       scopes:
         - name: cgroup
-          description: ""
+          description: "These Metrics show grouped information per cgroup/service."
           labels: []
           metrics:
             - name: cgroup.vfs_unlink
@@ -2145,10 +2935,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: create
-        - name: global
-          description: ""
-          labels: []
-          metrics:
             - name: services.vfs_unlink
               description: Files deleted
               unit: "calls/s"
@@ -2227,6 +3013,10 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
+        - name: global
+          description: "These Metrics show grouped information per cgroup/service."
+          labels: []
+          metrics:
             - name: filesystem.vfs_deleted_objects
               description: Remove files
               unit: "calls/s"
@@ -2290,6 +3080,10 @@ modules:
               chart_type: line
               dimensions:
                 - name: create
+        - name: apps
+          description: "These Metrics show grouped information per apps group."
+          labels: []
+          metrics:
             - name: apps.file_deleted
               description: Files deleted
               unit: "calls/s"
@@ -2373,7 +3167,7 @@ modules:
       module_name: process
       monitored_instance:
         name: eBPF Process
-        link: ""
+        link: "https://github.com/netdata/netdata/"
         categories:
           - data-collection.ebpf
         icon_filename: "ebpf.jpg"
@@ -2392,7 +3186,8 @@ modules:
         metrics_description: "Monitor internal memory usage."
         method_description: "Uses netdata internal statistic to monitor memory management by plugin."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
@@ -2406,7 +3201,9 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Netdata flags.
+            description: "To have these charts you need to compile netdata with flag `NETDATA_DEV_MODE`."
       configuration:
         file:
           name: ""
@@ -2434,7 +3231,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "How plugin is allocating memory."
           labels: []
           metrics:
             - name: netdata.ebpf_aral_stat_size
@@ -2499,3 +3296,15 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: aral
+            - name: netdata.ebpf_hash_tables_insert_pid_elements
+              description: Number of times an element was inserted in a hash table.
+              unit: "rows"
+              chart_type: line
+              dimensions:
+                - name: thread
+            - name: netdata.ebpf_hash_tables_remove_pid_elements
+              description: Number of times an element was removed in a hash table.
+              unit: "rows"
+              chart_type: line
+              dimensions:
+                - name: thread
