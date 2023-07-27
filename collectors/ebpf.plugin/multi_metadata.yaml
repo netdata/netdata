@@ -266,7 +266,7 @@ modules:
       prerequisites:
         list:
           - title: Compile kernel
-              description: |
+            description: |
                 Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
                 When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
                 with different names.
@@ -281,12 +281,8 @@ modules:
                 7. Generate an initial ramdisk image (`initrd`) if it is necessary.
                 8. Update your boot loader
           - title: Debug Filesystem
-              description: |
-                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs`:
-
-                ```bash
-                $ sudo mount -t debugfs none /sys/kernel/debug/
-                ```
+            description: |
+                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).
       configuration:
         file:
           name: "ebpf.d/process.conf"
@@ -297,7 +293,7 @@ modules:
           folding:
             title: "Config options"
             enabled: true
-          list: |
+          list:
             - name: update every
               description: Data collection frequency.
               default_value: 5
@@ -518,7 +514,7 @@ modules:
       prerequisites:
         list:
           - title: Compile kernel
-              description: |
+            description: |
                 Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
                 When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
                 with different names.
@@ -533,12 +529,8 @@ modules:
                 7. Generate an initial ramdisk image (`initrd`) if it is necessary.
                 8. Update your boot loader
           - title: Debug Filesystem
-              description: |
-                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs`:
-
-                ```bash
-                $ sudo mount -t debugfs none /sys/kernel/debug/
-                ```
+            description: |
+                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
       configuration:
         file:
           name: "ebpf.d/disk.conf"
@@ -549,7 +541,7 @@ modules:
           folding:
             title: "Config options"
             enabled: true
-          list: |
+          list:
             - name: update every
               description: Data collection frequency.
               default_value: 5
@@ -625,9 +617,9 @@ modules:
           description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called."
     setup:
       prerequisites:
-        list: |
+        list:
           - title: Compile kernel
-              description: |
+            description: |
                 Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
                 When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
                 with different names.
@@ -642,23 +634,19 @@ modules:
                 7. Generate an initial ramdisk image (`initrd`) if it is necessary.
                 8. Update your boot loader
           - title: Debug Filesystem
-              description: |
-                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs`:
-
-                ```bash
-                $ sudo mount -t debugfs none /sys/kernel/debug/
-                ```
+            description: |
+                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).
       configuration:
         file:
           name: "ebpf.d/hardirq.conf"
-          description: ""Overwrite default configuration reducing number of I/O events."
+          description: "Overwrite default configuration reducing number of I/O events."
         options:
           description: |
             All options are defined inside section `[global]`.
           folding:
             title: "Config options"
             enabled: true
-          list: |
+          list:
             - name: update every
               description: Data collection frequency.
               default_value: 5
@@ -708,7 +696,7 @@ modules:
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
-          list: |
+          list:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
@@ -739,7 +727,7 @@ modules:
           description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
-        list: |
+        list:
           - title: Compile kernel
             description: |
               Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
@@ -765,7 +753,7 @@ modules:
           folding:
             title: "Config options"
             enabled: true
-          list: |
+          list:
             - name: update every
               description: Data collection frequency.
               default_value: 5
@@ -965,9 +953,9 @@ modules:
           description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
-        list: |
+        list:
           - title: Compile kernel
-              description: |
+            description: |
                 Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
                 When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
                 with different names.
@@ -982,12 +970,8 @@ modules:
                 7. Generate an initial ramdisk image (`initrd`) if it is necessary.
                 8. Update your boot loader
           - title: Debug Filesystem
-              description: |
-                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs`:
-
-                ```bash
-                $ sudo mount -t debugfs none /sys/kernel/debug/
-                ```
+            description: |
+                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug`).
       configuration:
         file:
           name: "ebpf.d/sync.conf"
@@ -998,7 +982,7 @@ modules:
           folding:
             title: "Config options"
             enabled: true
-          list: |
+          list:
             - name: update every
               description: Data collection frequency.
               default_value: 5
@@ -1149,7 +1133,7 @@ modules:
           description: "This thread will add overhead every time that `md_flush_request` is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
-        list: |
+        list:
           - title: Compile kernel
             description: |
               Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
@@ -1175,7 +1159,7 @@ modules:
           folding:
             title: "Config options"
             enabled: true
-          list: |
+          list:
             - name: update every
               description: Data collection frequency.
               default_value: 5
@@ -1225,7 +1209,7 @@ modules:
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
-          list: |
+          list:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
@@ -1257,7 +1241,7 @@ modules:
           description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
-        list: |
+        list:
           - title: Compile kernel
             description: |
               Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
@@ -1283,7 +1267,7 @@ modules:
           folding:
             title: "Config options"
             enabled: true
-          list: |
+          list:
             - name: update every
               description: Data collection frequency.
               default_value: 5
@@ -1402,7 +1386,7 @@ modules:
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
-          list: |
+          list:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
@@ -1432,9 +1416,9 @@ modules:
           description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called."
     setup:
       prerequisites:
-        list: |
+        list:
           - title: Compile kernel
-              description: |
+            description: |
                 Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
                 When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
                 with different names.
@@ -1449,12 +1433,8 @@ modules:
                 7. Generate an initial ramdisk image (`initrd`) if it is necessary.
                 8. Update your boot loader
           - title: Debug Filesystem
-              description: |
-                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs`:
-
-                ```bash
-                $ sudo mount -t debugfs none /sys/kernel/debug/
-                ```
+            description: |
+                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).
       configuration:
         file:
           name: "ebpf.d/oomkill.conf"
@@ -1473,7 +1453,7 @@ modules:
           list: []
     troubleshooting:
       problems:
-        list: |
+        list:
           - name: update every
             description: Data collection frequency.
             default_value: 5
@@ -1531,7 +1511,7 @@ modules:
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
-          list: |
+          list:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
@@ -1565,7 +1545,7 @@ modules:
           description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
-        list: |
+        list:
           - title: Compile kernel
             description: |
               Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
@@ -1591,7 +1571,7 @@ modules:
           folding:
             title: "Config options"
             enabled: true
-          list: |
+          list:
             - name: update every
               description: Data collection frequency.
               default_value: 5
@@ -1902,7 +1882,7 @@ modules:
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
-          list: |
+          list:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
@@ -1933,7 +1913,7 @@ modules:
           description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
-        list: |
+        list:
           - title: Compile kernel
             description: |
               Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
@@ -1959,7 +1939,7 @@ modules:
           folding:
             title: "Config option"
             enabled: true
-          list: |
+          list:
             - name: update every
               description: Data collection frequency.
               default_value: 5
@@ -2154,7 +2134,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list: |
+        list:
           - title: Compile kernel
             description: |
               Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
@@ -2180,7 +2160,7 @@ modules:
           folding:
             title: "Config options"
             enabled: true
-          list: |
+          list:
             - name: update every
               description: Data collection frequency.
               default_value: 5
@@ -2282,7 +2262,7 @@ modules:
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
-          list: |
+          list:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
@@ -2313,9 +2293,9 @@ modules:
           description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
-        list: |
+        list:
           - title: Compile kernel
-              description: |
+            description: |
                 Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
                 When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
                 with different names.
@@ -2330,11 +2310,8 @@ modules:
                 7. Generate an initial ramdisk image (`initrd`) if it is necessary.
                 8. Update your boot loader
           - title: Debug Filesystem
-              description: |
-                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs`:
-
-                ```bash
-                $ sudo mount -t debugfs none /sys/kernel/debug/
+            description: |
+                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
       configuration:
         file:
           name: "ebpf.d/shm.conf"
@@ -2345,7 +2322,7 @@ modules:
           folding:
             title: "Config options"
             enabled: true
-          list: |
+          list:
             - name: update every
               description: Data collection frequency.
               default_value: 5
@@ -2544,9 +2521,9 @@ modules:
           description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called."
     setup:
       prerequisites:
-        list: |
+        list:
           - title: Compile kernel
-              description: |
+            description: |
                 Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
                 When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
                 with different names.
@@ -2561,12 +2538,8 @@ modules:
                 7. Generate an initial ramdisk image (`initrd`) if it is necessary.
                 8. Update your boot loader
           - title: Debug Filesystem
-              description: |
-                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs`:
-
-                ```bash
-                $ sudo mount -t debugfs none /sys/kernel/debug/
-                ```
+            description: |
+                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
       configuration:
         file:
           name: "ebpf.d/softirq.conf"
@@ -2577,7 +2550,7 @@ modules:
           folding:
             title: "Config options"
             enabled: true
-          list: |
+          list:
             - name: update every
               description: Data collection frequency.
               default_value: 5
@@ -2655,9 +2628,9 @@ modules:
           description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
-        list: |
+        list:
           - title: Compile kernel
-              description: |
+            description: |
                 Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
                 When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
                 with different names.
@@ -2672,12 +2645,8 @@ modules:
                 7. Generate an initial ramdisk image (`initrd`) if it is necessary.
                 8. Update your boot loader
           - title: Debug Filesystem
-              description: |
-                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs`:
-
-                ```bash
-                $ sudo mount -t debugfs none /sys/kernel/debug/
-                ```
+            description: |
+                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
       configuration:
         file:
           name: "ebpf.d/mount.conf"
@@ -2688,7 +2657,7 @@ modules:
           folding:
             title: "Config options"
             enabled: true
-          list: |
+          list:
             - name: update every
               description: Data collection frequency.
               default_value: 5
@@ -2754,7 +2723,7 @@ modules:
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
-          list: |
+          list:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
@@ -2787,7 +2756,7 @@ modules:
           description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
-        list: |
+        list:
           - title: Compile kernel
             description: |
               Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
@@ -2813,7 +2782,7 @@ modules:
           folding:
             title: "Config options"
             enabled: true
-          list: |
+          list:
             - name: update every
               description: Data collection frequency.
               default_value: 5
@@ -3213,8 +3182,9 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list: |
-          To have these charts you need to compile netdata with flag `NETDATA_DEV_MODE`.
+        list:
+          - title: Netdata flags.
+            description: "To have these charts you need to compile netdata with flag `NETDATA_DEV_MODE`."
       configuration:
         file:
           name: ""
