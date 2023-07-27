@@ -32,7 +32,7 @@
             curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
             --stable-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
   additional_info: &ref_containers >
-    Did you know you can also deploy Netdata on your OS using {% goToCategory categoryId="deploy.docker-kubernetes" %}Kubernetes{% /goToCategory %} or {% goToCategory categoryId="deploy.docker-kubernetes" %}Docker{% /goToCategory %}?
+    Did you know you can also deploy Netdata on your OS using {% goToCategory navigateToSettings=$navigateToSettings categoryId="deploy.docker-kubernetes" %}Kubernetes{% /goToCategory %} or {% goToCategory categoryId="deploy.docker-kubernetes" %}Docker{% /goToCategory %}?
   related_resources: {}
   platform_info:
     group: ''
