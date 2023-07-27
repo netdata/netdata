@@ -16,21 +16,21 @@
         - channel: nightly
           command: >
             wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --nightly-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+            --nightly-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
         - channel: stable
           command: >
             wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --stable-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+            --stable-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
     - method: curl
       commands:
         - channel: nightly
           command: >
             curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --nightly-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+            --nightly-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
         - channel: stable
           command: >
             curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --stable-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+            --stable-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
   additional_info: &ref_containers >
     Did you know you can also deploy Netdata on your OS using {% goToCategory categoryId="deploy.docker-kubernetes" %}Kubernetes{% /goToCategory %} or {% goToCategory categoryId="deploy.docker-kubernetes" %}Docker{% /goToCategory %}?
   related_resources: {}
@@ -200,11 +200,11 @@
         - channel: nightly
           command: >
             curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --nightly-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+            --nightly-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
         - channel: stable
           command: >
             curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --stable-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+            --stable-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
   additional_info: *ref_containers
   related_resources: {}
   platform_info:
@@ -251,9 +251,11 @@
             --cap-add SYS_PTRACE \
             --cap-add SYS_ADMIN \
             --security-opt apparmor=unconfined \
-            netdata/netdata:edge \
             -e NETDATA_CLAIM_TOKEN= {% claim_token %} \
-            -e NETDATA_CLAIM_URL={% claim_url %}
+            -e NETDATA_CLAIM_URL={% claim_url %} \
+            -e NETDATA_CLAIM_ROOMS={% $claim_rooms %} \
+            netdata/netdata:edge
+
         - channel: stable
           command: |
             docker run -d --name=netdata \
@@ -272,9 +274,10 @@
             --cap-add SYS_PTRACE \
             --cap-add SYS_ADMIN \
             --security-opt apparmor=unconfined \
-            netdata/netdata:stable \
             -e NETDATA_CLAIM_TOKEN= {% claim_token %} \
-            -e NETDATA_CLAIM_URL={% claim_url %}
+            -e NETDATA_CLAIM_URL={% claim_url %} \
+            -e NETDATA_CLAIM_ROOMS={% $claim_rooms %} \
+            netdata/netdata:stable
     - method: Docker Compose
       commands:
         - channel: nightly
@@ -305,7 +308,7 @@
                 environment:
                   - NETDATA_CLAIM_TOKEN={% claim_token %}
                   - NETDATA_CLAIM_URL={% claim_url %}
-                  - NETDATA_CLAIM_ROOMS=
+                  - NETDATA_CLAIM_ROOMS={% $claim_rooms %}
             volumes:
               netdataconfig:
               netdatalib:
@@ -338,7 +341,7 @@
                 environment:
                   - NETDATA_CLAIM_TOKEN={% claim_token %}
                   - NETDATA_CLAIM_URL={% claim_url %}
-                  - NETDATA_CLAIM_ROOMS=
+                  - NETDATA_CLAIM_ROOMS={% $claim_rooms %}
             volumes:
               netdataconfig:
               netdatalib:
@@ -372,7 +375,7 @@
                 environment:
                   - NETDATA_CLAIM_TOKEN={% claim_token %}
                   - NETDATA_CLAIM_URL={% claim_url %}
-                  - NETDATA_CLAIM_ROOMS=
+                  - NETDATA_CLAIM_ROOMS={% $claim_rooms %}
                 deploy:
                   mode: global
             volumes:
@@ -406,7 +409,7 @@
                 environment:
                   - NETDATA_CLAIM_TOKEN={% claim_token %}
                   - NETDATA_CLAIM_URL={% claim_url %}
-                  - NETDATA_CLAIM_ROOMS=
+                  - NETDATA_CLAIM_ROOMS={% $claim_rooms %}
                 deploy:
                   mode: global
             volumes:
@@ -443,16 +446,20 @@
             --set image.tag=latest \
             --set parent.claiming.enabled="true" \
             --set parent.claiming.token={% claim_token %} \
+            --set parent.claiming.rooms={% $claim_rooms %} \
             --set child.claiming.enabled="true" \
-            --set child.claiming.token={% claim_token %}
+            --set child.claiming.token={% claim_token %} \
+            --set child.claiming.rooms={% $claim_rooms %}
         - channel: stable
           command: |
             helm install netdata netdata/netdata \
             --set image.tag=stable \
             --set parent.claiming.enabled="true" \
             --set parent.claiming.token={% claim_token %} \
+            --set parent.claiming.rooms={% $claim_rooms %} \
             --set child.claiming.enabled="true" \
-            --set child.claiming.token={% claim_token %}
+            --set child.claiming.token={% claim_token %} \
+            --set child.claiming.rooms={% $claim_rooms %}
     - method: Existing Cluster
       commands:
         - channel: nightly
@@ -467,32 +474,29 @@
               claiming:
                 enabled: true
                 token: {% claim_token %}
-                rooms:
+                rooms: {% $claim_rooms %}
 
             child:
               claiming:
                 enabled: true
                 token: {% claim_token %}
-                rooms:
+                rooms: {% $claim_rooms %}
         - channel: stable
           command: |
             image:
               tag: stable
 
-            restarter:
-              enabled: true
-
             parent:
               claiming:
                 enabled: true
                 token: {% claim_token %}
-                rooms:
+                rooms: {% $claim_rooms %}
 
             child:
               claiming:
                 enabled: true
                 token: {% claim_token %}
-                rooms:
+                rooms: {% $claim_rooms %}
   additional_info: ''
   related_resources: {}
   most_popular: true
@@ -520,21 +524,21 @@
         - channel: nightly
           command: >
             wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --nightly-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+            --nightly-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
         - channel: stable
           command: >
             wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --stable-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+            --stable-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
     - method: curl
       commands:
         - channel: nightly
           command: >
             curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --nightly-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+            --nightly-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
         - channel: stable
           command: >
             curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --stable-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+            --stable-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
   additional_info: ''
   related_resources: {}
   most_popular: true
@@ -566,11 +570,11 @@
         - channel: nightly
           command: >
             wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --nightly-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+            --nightly-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
         - channel: stable
           command: >
             wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --stable-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+            --stable-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
   additional_info: |
     Netdata can also be installed via [FreeBSD ports](https://www.freshports.org/net-mgmt/netdata).
   related_resources: {}
