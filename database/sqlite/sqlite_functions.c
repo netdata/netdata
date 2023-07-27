@@ -34,8 +34,6 @@ const char *database_config[] = {
     "repeat text, host_labels text, p_db_lookup_dimensions text, p_db_lookup_method text, p_db_lookup_options int, "
     "p_db_lookup_after int, p_db_lookup_before int, p_update_every int, source text, chart_labels text);",
 
-    "CREATE INDEX IF NOT EXISTS alert_hash_index ON alert_hash (hash_id);",
-
     "CREATE TABLE IF NOT EXISTS host_info(host_id blob, system_key text NOT NULL, system_value text NOT NULL, "
     "date_created INT, PRIMARY KEY(host_id, system_key));",
 
@@ -75,6 +73,7 @@ const char *database_cleanup[] = {
     "DROP INDEX IF EXISTS ind_d1;",
     "DROP INDEX IF EXISTS ind_c1;",
     "DROP INDEX IF EXISTS ind_c2;",
+    "DROP INDEX IF EXISTS alert_hash_index;",
     NULL
 };
 
