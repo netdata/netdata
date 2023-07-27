@@ -3,7 +3,7 @@
 id: 'export-aws-kinesis'
 meta:
   name: 'AWS Kinesis'
-  link: 'https://graphite.readthedocs.io/en/latest/'
+  link: 'https://aws.amazon.com/kinesis/'
   categories:
     - export
   icon_filename: 'kinesis.png'
