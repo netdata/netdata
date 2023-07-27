@@ -973,7 +973,8 @@ static inline const char *rrdf_field_type_to_string(RRDF_FIELD_TYPE type) {
 typedef enum __attribute__((packed)) {
     RRDF_FIELD_VISUAL_VALUE,    // show the value, possibly applying a transformation
     RRDF_FIELD_VISUAL_BAR,      // show the value and a bar, respecting the max field to fill the bar at 100%
-    RRDF_FIELD_VISUAL_PILL,     // array of values (transformation is respected)
+    RRDF_FIELD_VISUAL_PILL,     //
+    RRDF_FIELD_VISUAL_MARKDOC,  //
 } RRDF_FIELD_VISUAL;
 
 static inline const char *rrdf_field_visual_to_string(RRDF_FIELD_VISUAL visual) {
@@ -987,6 +988,9 @@ static inline const char *rrdf_field_visual_to_string(RRDF_FIELD_VISUAL visual) 
 
         case RRDF_FIELD_VISUAL_PILL:
             return "pill";
+
+        case RRDF_FIELD_VISUAL_MARKDOC:
+            return "markdoc";
     }
 }
 

@@ -593,6 +593,7 @@ void facets_row_finished(FACETS *facets, usec_t usec) {
 
 void facets_report(FACETS *facets, BUFFER *wb) {
     buffer_json_member_add_boolean(wb, "show_ids", false);
+    buffer_json_member_add_boolean(wb, "has_history", true);
 
     buffer_json_member_add_object(wb, "pagination");
     buffer_json_member_add_boolean(wb, "enabled", true);

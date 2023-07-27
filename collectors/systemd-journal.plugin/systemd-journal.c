@@ -5,6 +5,8 @@
  *  GPL v3+
  */
 
+// TODO - 1) MARKDOC 2) QUERY
+
 #include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
@@ -25,6 +27,7 @@
 #define JOURNAL_PARAMETER_BEFORE                "before"
 #define JOURNAL_PARAMETER_ANCHOR                "anchor"
 #define JOURNAL_PARAMETER_LAST                  "last"
+#define JOURNAL_PARAMETER_QUERY                 "query"
 
 #define SYSTEMD_ALWAYS_VISIBLE_KEYS             NULL
 #define SYSTEMD_KEYS_EXCLUDED_FROM_FACETS       NULL
@@ -192,6 +195,7 @@ static void function_systemd_journal(const char *transaction, char *function __m
     facets_accepted_param(facets, JOURNAL_PARAMETER_BEFORE);
     facets_accepted_param(facets, JOURNAL_PARAMETER_ANCHOR);
     facets_accepted_param(facets, JOURNAL_PARAMETER_LAST);
+    facets_accepted_param(facets, JOURNAL_PARAMETER_QUERY);
 
     // register the fields in the order you want them on the dashboard
 
