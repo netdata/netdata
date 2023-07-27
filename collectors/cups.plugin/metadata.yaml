@@ -1,53 +1,55 @@
+# yamllint disable rule:line-length
+---
 meta:
   plugin_name: cups.plugin
   module_name: cups.plugin
   monitored_instance:
     name: CUPS
-    link: ''
+    link: ""
     categories:
     - data-collection.hardware-devices-and-sensors
-    icon_filename: 'cups.png'
+    icon_filename: "cups.png"
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
+    description: ""
   keywords: []
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'Monitor CUPS performance for achieving optimal printing system operations. Monitor job statuses, queue lengths, and error rates to ensure smooth printing tasks.'
-    method_description: ''
+    metrics_description: "Monitor CUPS performance for achieving optimal printing system operations. Monitor job statuses, queue lengths, and error rates to ensure smooth printing tasks."
+    method_description: ""
   supported_platforms:
     include: []
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ''
+    description: ""
   default_behavior:
     auto_detection:
-      description: ''
+      description: ""
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
     list: []
   configuration:
     file:
-      name: ''
-      description: ''
+      name: ""
+      description: ""
     options:
-      description: ''
+      description: ""
       folding:
-        title: ''
+        title: ""
         enabled: true
       list: []
     examples:
       folding:
         enabled: true
-        title: ''
+        title: ""
       list: []
 troubleshooting:
   problems:
