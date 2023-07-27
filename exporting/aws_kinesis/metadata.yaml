@@ -21,12 +21,27 @@ setup:
       - title: ''
         description: |
           - First [install](https://docs.aws.amazon.com/en_us/sdk-for-cpp/v1/developer-guide/setup.html) AWS SDK for C++
-            - If the AWS SDK for C++ is being installed from source, it is useful to set -DBUILD_ONLY=kinesis.
-            - Note, that the default installation path for the libraries is /usr/local/lib64.
-            - It is advisable to use the following options to cmake while building the AWS SDK to ensure 3rd party dependencies are installed:
-                `sudo cmake -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_ONLY=kinesis <aws-sdk-cpp sources>`
+          - Here are the instructions when building from source, to ensure 3rd party dependencies are installed:
+            ```bash
+            git clone --recursive https://github.com/aws/aws-sdk-cpp.git
+            cd aws-sdk-cpp/
+            git submodule update --init --recursive
+            mkdir BUILT
+            cd BUILT
+            cmake -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_ONLY=kinesis ..
+            make
+            make install
+            ```
           - `libcrypto`, `libssl`, and `libcurl` are also required to compile Netdata with Kinesis support enabled.
           - Next, Netdata should be re-installed from the source. The installer will detect that the required libraries are now available.
+#  git clone --recursive https://github.com/aws/aws-sdk-cpp.git
+#  cd aws-sdk-cpp/
+#  git submodule update --init --recursive
+#  mkdir BUILT
+#  cd  BUILT
+#  cmake -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_ONLY=kinesis ..
+#  make
+#  make install
   configuration:
     file:
       name: 'exporting.conf'
