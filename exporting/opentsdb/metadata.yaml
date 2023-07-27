@@ -7,13 +7,13 @@ meta:
   categories:
     - export
   icon_filename: 'opentsdb.png'
-keywords: 
+keywords:
   - exporter
   - OpenTSDB
   - scalable time series
 overview:
   exporter_description: |
-    Use the OpenTSDB connector for the exporting engine to archive your Netdata metrics to OpenTSDB databases for long-term storage, 
+    Use the OpenTSDB connector for the exporting engine to archive your Netdata metrics to OpenTSDB databases for long-term storage,
     further analysis, or correlation with data from other sources.
   exporter_limitations: ''
 setup:
@@ -83,14 +83,14 @@ setup:
           default_value: '10'
           description: |
 	    The number of seconds between sending data to the external database. Netdata will add some randomness to this number, 
-            to prevent stressing the external server when many Netdata servers send data to the same database. This randomness does 
+            to prevent stressing the external server when many Netdata servers send data to the same database. This randomness does
 	    not affect the quality of the data, only the time they are sent.
           required: false
         - name: 'buffer on failures'
           default_value: '10'
           description: |
-	    The number of iterations (each iteration is update every seconds) to buffer data, when the external database server is not 
-            available. If the server fails to receive the data after that many failures, data loss on the connector instance is expected 
+	    The number of iterations (each iteration is update every seconds) to buffer data, when the external database server is not
+            available. If the server fails to receive the data after that many failures, data loss on the connector instance is expected
 	    (Netdata will also log it).
           required: false
         - name: 'timeout ms'
@@ -100,31 +100,31 @@ setup:
         - name: 'send hosts matching'
           default_value: 'localhost *'
           description: |
-	    Includes one or more space separated patterns, using * as wildcard (any number of times within each pattern). 
-            The patterns are checked against the hostname (the localhost is always checked as localhost), allowing us to 
+	    Includes one or more space separated patterns, using * as wildcard (any number of times within each pattern).
+            The patterns are checked against the hostname (the localhost is always checked as localhost), allowing us to
 	    filter which hosts will be sent to the external database when this Netdata is a central Netdata aggregating multiple hosts.
           required: false
 	  detailed_description: |
-	     A pattern starting with `!` gives a negative match. So to match all hosts named `*db*` except hosts containing `*child*`, 
+	     A pattern starting with `!` gives a negative match. So to match all hosts named `*db*` except hosts containing `*child*`,
              use `!*child* *db*` (so, the order is important: the first pattern matching the hostname will be used - positive or negative).
         - name: 'send charts matching'
           default_value: '*'
           description: |
-	    Includes one or more space separated patterns, using * as wildcard (any number of times within each pattern). 
+	    Includes one or more space separated patterns, using * as wildcard (any number of times within each pattern).
             The patterns are checked against both chart id and chart name.
           required: false
 	  detailed_description: |
-	    A pattern starting with ! gives a negative match. So to match all charts named apps.* except charts ending in *reads, 
+	    A pattern starting with ! gives a negative match. So to match all charts named apps.* except charts ending in *reads,
             use !*reads apps.* (so, the order is important: the first pattern matching the chart id or the chart name will be used
-	    - positive or negative). There is also a URL parameter filter that can be used while querying allmetrics. The URL parameter 
+	    - positive or negative). There is also a URL parameter filter that can be used while querying allmetrics. The URL parameter
             has a higher priority than the configuration option.
         - name: 'send names instead of ids'
           default_value: ''
           description: 'Controls the metric names Netdata should send to the external database (yes|no).'
           required: false
 	  detailed_description: |
-             Netdata supports names and IDs for charts and dimensions. Usually IDs are unique identifiers as read by the system and names 
-	     are human friendly labels (also unique). Most charts and metrics have the same ID and name, but in several cases they are 
+             Netdata supports names and IDs for charts and dimensions. Usually IDs are unique identifiers as read by the system and names
+	     are human friendly labels (also unique). Most charts and metrics have the same ID and name, but in several cases they are
              different : disks with device-mapper, interrupts, QoS classes, statsd synthetic charts, etc.
         - name: 'send configured labels'
           default_value: ''
@@ -144,7 +144,7 @@ setup:
             enabled: false
           description: |
 	    Add `:http` or `:https` modifiers to the connector type if you need to use other than a plaintext protocol.
-            For example: `opentsdb:http:my_opentsdb_instance`, `opentsdb:https:my_opentsdb_instance`.'
+            For example: `opentsdb:http:my_opentsdb_instance`, `opentsdb:https:my_opentsdb_instance`.
           config: |
              [opentsdb:my_opentsdb_instance]
 		enabled = yes
