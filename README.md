@@ -584,16 +584,18 @@ Any Netdata Agent can act as a Netdata Registry. Simply designate one Netdata Ag
 &nbsp;<br/>&nbsp;<br/>
 </details>
 
-### :office: Who uses Netdata?
+### :smirk: Who uses Netdata?
 
 Netdata is a widely adopted project...
 
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
 
-Browse the [Netdata stargazers on Github](https://github.com/netdata/netdata/stargazers) to discover users from renowned companies and enterprises, such as AMD, Amazon, Baidu, Cisco, Delta Air Lines, Facebook, IBM, Intel, Netflix, Qualcomm, Riot Games, SAP, Samsung, Unity, Valve, and many others.
+Browse the [Netdata stargazers on Github](https://github.com/netdata/netdata/stargazers) to discover users from renowned companies and enterprises, such as AMD, Amazon, Baidu, Cisco, Delta, Facebook, IBM, Intel, Netflix, Qualcomm, Riot Games, SAP, Samsung, Unity, Valve, and many others.
 
 Netdata also enjoys significant usage in academia, with notable institutions including New York University, Columbia University, New Jersey University, among several others.
+
+And, Netdata is also used by numerous governmental organizations worldwide.
 
 In a nutshell, Netdata proves invaluable for:
 
@@ -613,7 +615,7 @@ In a nutshell, Netdata proves invaluable for:
   Who appreciate the fine details and understand the value of holistic monitoring from the ground up.
 
 - **Everyone else**<br/>
-  All of us, who are tired of the inefficiency in the monitoring industry and appreciate a breath of fresh air. :slightly_smiling_face:
+  All of us, who are tired of the inefficiency in the monitoring industry and would love a refreshing change and a breath of fresh air. :slightly_smiling_face:
 
 &nbsp;<br/>&nbsp;<br/>
 </details>
