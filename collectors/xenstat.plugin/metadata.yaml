@@ -28,7 +28,7 @@ overview:
     description: "The plugin needs setuid."
   default_behavior:
     auto_detection:
-      description: "Plugin is no installed when libs 'xen-dom0-libs-devel' and 'yajl-devel' are missed."
+      description: "This plugin requires the `xen-dom0-libs-devel` and `yajl-devel` libraries to be installed."
     limits:
       description: ""
     performance_impact:
