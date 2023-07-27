@@ -518,6 +518,7 @@ struct card {
     RRDSET  *st_util;
     RRDDIM  *rd_util_gpu;
     RRDDIM  *rd_util_mem;
+
     collected_number util_gpu;
     collected_number util_mem;
 
@@ -533,6 +534,7 @@ struct card {
     RRDSET *st_clk;
     RRDDIM *rd_clk_gpu;
     RRDDIM *rd_clk_mem;
+
     collected_number clk_gpu;
     collected_number clk_mem;
 
@@ -547,6 +549,7 @@ struct card {
     RRDDIM  *rd_mem_used_vram;
     RRDDIM  *rd_mem_used_vis_vram;
     RRDDIM  *rd_mem_used_gtt;
+
     collected_number used_vram;
     collected_number used_vis_vram;
     collected_number used_gtt;
@@ -555,21 +558,17 @@ struct card {
     const char *pathname_mem_total_vis_vram;
     const char *pathname_mem_total_gtt;
 
-    collected_number total_vram;
-    collected_number total_vis_vram;
-    collected_number total_gtt;
-
 
     /* Memory percentage usage */
-
-    const char *pathname_mem_perc_vram;
-    const char *pathname_mem_perc_vis_vram;
-    const char *pathname_mem_perc_gtt;
 
     RRDSET  *st_mem_perc;
     RRDDIM  *rd_mem_perc_vram;
     RRDDIM  *rd_mem_perc_vis_vram;
     RRDDIM  *rd_mem_perc_gtt;
+
+    collected_number total_vram;
+    collected_number total_vis_vram;
+    collected_number total_gtt;
     collected_number perc_vram;
     collected_number perc_vis_vram;
     collected_number perc_gtt;
@@ -579,6 +578,46 @@ struct card {
     struct card *next;
 };
 static struct card *card_root = NULL;
+
+static void card_free(struct card *c){
+    if(c->pathname) freez((void *) c->pathname);
+    if(c->id.marketing_name) freez((void *) c->id.marketing_name);
+
+    /* GPU and VRAM utilizations */
+    if(c->pathname_util_gpu) freez((void *) c->pathname_util_gpu);
+    if(c->pathname_util_mem) freez((void *) c->pathname_util_mem);
+    if(c->st_util) rrdset_is_obsolete(c->st_util);
+
+    /* GPU and VRAM clock frequencies */
+    if(c->pathname_clk_gpu) freez((void *) c->pathname_clk_gpu);
+    if(c->pathname_clk_mem) freez((void *) c->pathname_clk_mem);
+    if(c->st_clk) rrdset_is_obsolete(c->st_clk);
+    if(c->ff_clk_gpu) procfile_close(c->ff_clk_gpu);
+    if(c->ff_clk_mem) procfile_close(c->ff_clk_mem);
+
+    /* Memory usage */
+    if(c->pathname_mem_used_vram) freez((void *) c->pathname_mem_used_vram);
+    if(c->pathname_mem_used_vis_vram) freez((void *) c->pathname_mem_used_vis_vram);
+    if(c->pathname_mem_used_gtt) freez((void *) c->pathname_mem_used_gtt);
+    if(c->st_mem_used) rrdset_is_obsolete(c->st_mem_used);
+    
+    /* Memory percentage usage */
+    if(c->pathname_mem_total_vram) freez((void *) c->pathname_mem_total_vram);
+    if(c->pathname_mem_total_vis_vram) freez((void *) c->pathname_mem_total_vis_vram);
+    if(c->pathname_mem_total_gtt) freez((void *) c->pathname_mem_total_gtt);
+    if(c->st_mem_perc) rrdset_is_obsolete(c->st_mem_perc);
+
+    // remove card from linked list
+    if(c == card_root) card_root = c->next;
+    else {
+        struct card *last;
+        for(last = card_root; last && last->next != c; last = last->next);
+        if(last) last->next = c->next;
+    }
+
+    freez(c);
+
+}
 
 static int read_multiline_file(procfile *ff, char *pathname, collected_number *num){
     if(!ff) ff = procfile_open(pathname, NULL, PROCFILE_FLAG_DEFAULT);
@@ -606,10 +645,10 @@ int do_sys_class_drm(int update_every, usec_t dt) {
     (void)dt;
 
     static struct drm_config {
-        int do_utilization;
-        int do_clk_freq;
-        int do_mem_usage;
-        int do_mem_perc_usage;
+        int do_utilization,
+            do_clk_freq,
+            do_mem_usage,
+            do_mem_perc_usage;
     } config = {0};
     
     static DIR *drm_dir = NULL;
@@ -634,7 +673,7 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                  (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0'))) continue;
             
             if(likely(de->d_type == DT_LNK && !strncmp(de->d_name, "card", 4) && !strchr(de->d_name, '-'))) {
-                struct card *c = callocz(sizeof(struct card), 1);  
+                struct card *const c = callocz(sizeof(struct card), 1);  
 
                 /* Get static info */              
 
@@ -848,13 +887,21 @@ int do_sys_class_drm(int update_every, usec_t dt) {
         }
     }
 
-    struct card *c = card_root;
-    while(c) {
+
+    #define read_file_error(var_name) {\
+        collector_error("Cannot read %s for %s: [%s]", #var_name, c->pathname, c->id.marketing_name);\
+        card_free(c);\
+        break;\
+    }
+
+    for(struct card *c = card_root; c; c = c->next) {
         if(config.do_utilization){
             if(!read_single_number_file(c->pathname_util_gpu, (unsigned long long *) &c->util_gpu))
                 rrddim_set_by_pointer(c->st_util, c->rd_util_gpu, c->util_gpu);
+            else read_file_error(util_gpu);
             if(!read_single_number_file(c->pathname_util_mem, (unsigned long long *) &c->util_mem))
                 rrddim_set_by_pointer(c->st_util, c->rd_util_mem, c->util_mem);
+            else read_file_error(util_mem);
 
             rrdset_done(c->st_util);
         }
@@ -862,8 +909,10 @@ int do_sys_class_drm(int update_every, usec_t dt) {
         if(config.do_clk_freq){
             if(!read_multiline_file(c->ff_clk_gpu, (char *) c->pathname_clk_gpu, &c->clk_gpu))
                 rrddim_set_by_pointer(c->st_clk, c->rd_clk_gpu, c->clk_gpu);
+            else read_file_error(clk_gpu);
             if(!read_multiline_file(c->ff_clk_mem, (char *) c->pathname_clk_mem, &c->clk_mem))
                 rrddim_set_by_pointer(c->st_clk, c->rd_clk_mem, c->clk_mem);
+            else read_file_error(clk_mem);
 
             rrdset_done(c->st_clk);
         }
@@ -872,10 +921,10 @@ int do_sys_class_drm(int update_every, usec_t dt) {
             if(!read_single_number_file(c->pathname_mem_used_vram, (unsigned long long *) &c->used_vram)){
                 if(config.do_mem_usage)
                     rrddim_set_by_pointer(c->st_mem_used, c->rd_mem_used_vram, c->used_vram);
-                if(config.do_mem_perc_usage && c->total_vram) {
+                if(config.do_mem_perc_usage && c->total_vram)
                     rrddim_set_by_pointer(c->st_mem_perc, c->rd_mem_perc_vram, c->used_vram * 10000 / c->total_vram);
-                }
             }
+            else read_file_error(used_vram);
 
             if(!read_single_number_file(c->pathname_mem_used_vis_vram, (unsigned long long *) &c->used_vis_vram)){
                 if(config.do_mem_usage)
@@ -883,6 +932,7 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                 if(config.do_mem_perc_usage && c->total_vis_vram)
                     rrddim_set_by_pointer(c->st_mem_perc, c->rd_mem_perc_vis_vram, c->used_vis_vram * 10000 / c->total_vis_vram);
             }
+            else read_file_error(used_vis_vram);
                 
             if(!read_single_number_file(c->pathname_mem_used_gtt, (unsigned long long *) &c->used_gtt)){
                 if(config.do_mem_usage)
@@ -890,13 +940,11 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                 if(config.do_mem_perc_usage && c->total_gtt)
                     rrddim_set_by_pointer(c->st_mem_perc, c->rd_mem_perc_gtt, c->used_gtt * 10000 / c->total_gtt);
             }
+            else read_file_error(used_gtt);
                 
             if(config.do_mem_usage) rrdset_done(c->st_mem_used);
             if(config.do_mem_perc_usage) rrdset_done(c->st_mem_perc);
         }
-        
-        
-        c = c->next;
     }
 
     return 0;
