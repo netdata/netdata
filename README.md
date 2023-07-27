@@ -498,7 +498,7 @@ For organizations that need a fully on-prem solution, we provide Netdata Cloud f
 &nbsp;<br/>&nbsp;<br/>
 </details>
 
-### :information_source: What does the anonymous telemetry collected by Netdata entail?
+### :mag_right: What does the anonymous telemetry collected by Netdata entail?
 
 Your privacy is our utmost priority. As part of our commitment to improving Netdata, we rely on anonymous telemetry data from our users who choose to leave it enabled. This data greatly informs our decision-making processes and contributes to the future evolution of Netdata.
 
