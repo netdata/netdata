@@ -451,7 +451,7 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
 - [MegaRAID controllers](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/megacli/README.md):
   Collect adapter, physical drives, and
   battery stats using the `megacli` tool.
-- [NVIDIA GPU](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/nvidia_smi/README.md): Monitor
+- [NVIDIA GPU](https://github.com/netdata/go.d.plugin/blob/master/modules/nvidia_smi/README.md): Monitor
   performance metrics (memory usage, fan
   speed, pcie bandwidth utilization, temperature, and more) using the `nvidia-smi` tool.
 - [Sensors](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/sensors/README.md): Reads system
