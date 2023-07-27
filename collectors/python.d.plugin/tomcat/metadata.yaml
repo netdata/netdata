@@ -60,39 +60,39 @@ setup:
       folding:
         title: "Config options per job"
         enabled: true
-        list:
-          - name: update_every
-            description: Sets the default data collection frequency.
-            default_value: 5
-            required: false
-          - name: priority
-            description: Controls the order of charts at the netdata dashboard.
-            default_value: 60000
-            required: false
-          - name: autodetection_retry
-            description: Sets the job re-check interval in seconds.
-            default_value: 0
-            required: false
-          - name: penalty
-            description: Indicates whether to apply penalty to update_every in case of failures.
-            default_value: yes
-            required: false
-          - name: url
-            description: The URL of the Tomcat server's status endpoint. Always add the suffix ?XML=true.
-            default_value: no
-            required: true
-          - name: user
-            description: A valid user with read permission to access the /manager/status endpoint of the server. Required if the endpoint is password protected
-            default_value: no
-            required: no
-          - name: pass
-            description: A valid password for the user in question. Required if the endpoint is password protected
-            default_value: no
-            required: no
-          - name: connector_name
-            description: The connector component that communicates with a web connector via the AJP protocol, e.g ajp-bio-8009
-            default_value: null
-            required: false
+      list:
+        - name: update_every
+          description: Sets the default data collection frequency.
+          default_value: 5
+          required: false
+        - name: priority
+          description: Controls the order of charts at the netdata dashboard.
+          default_value: 60000
+          required: false
+        - name: autodetection_retry
+          description: Sets the job re-check interval in seconds.
+          default_value: 0
+          required: false
+        - name: penalty
+          description: Indicates whether to apply penalty to update_every in case of failures.
+          default_value: yes
+          required: false
+        - name: url
+          description: The URL of the Tomcat server's status endpoint. Always add the suffix ?XML=true.
+          default_value: no
+          required: true
+        - name: user
+          description: A valid user with read permission to access the /manager/status endpoint of the server. Required if the endpoint is password protected
+          default_value: no
+          required: false
+        - name: pass
+          description: A valid password for the user in question. Required if the endpoint is password protected
+          default_value: no
+          required: false
+        - name: connector_name
+          description: The connector component that communicates with a web connector via the AJP protocol, e.g ajp-bio-8009
+          default_value: ""
+          required: false
     examples:
       folding:
         enabled: true
