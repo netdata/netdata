@@ -5078,7 +5078,7 @@ modules:
         link: ""
         categories:
           - data-collection.linux-systems.power-supply-metrics
-        icon_filename: "microchip.svg"
+        icon_filename: "powersupply.svg"
       related_resources:
         integrations:
           list: []
