@@ -128,7 +128,7 @@ metrics:
   scopes:
     - name: chip
       description: >
-        The chip name as reported by `sensors -u`.
+        Metrics related to chips. Each chip provides a set of the following metrics, each having the chip name in the metric name as reported by `sensors -u`.
       labels: []
       metrics:
         - name: sensors.temperature
