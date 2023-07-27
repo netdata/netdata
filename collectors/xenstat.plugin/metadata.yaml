@@ -35,7 +35,7 @@ overview:
       description: ""
 setup:
   prerequisites:
-    list: 
+    list:
       - title: Libraries
         description: |
           Install `xen-dom0-libs-devel` and `yajl-devel` using the package manager of your system.
