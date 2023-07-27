@@ -4,40 +4,40 @@ meta:
   module_name: boinc
   monitored_instance:
     name: BOINC
-    link: 'https://boinc.berkeley.edu/'
+    link: "https://boinc.berkeley.edu/"
     categories:
-    - data-collection.distributed-computing-systems
-    icon_filename: 'bolt.svg'
+      - data-collection.distributed-computing-systems
+    icon_filename: "bolt.svg"
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
+    description: ""
   keywords:
     - boinc
     - distributed
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'This collector monitors task counts for the Berkeley Open Infrastructure Networking Computing (BOINC) distributed computing client.'
-    method_description: 'It uses the same RPC interface that the BOINC monitoring GUI does.'
+    metrics_description: "This collector monitors task counts for the Berkeley Open Infrastructure Networking Computing (BOINC) distributed computing client."
+    method_description: "It uses the same RPC interface that the BOINC monitoring GUI does."
   supported_platforms:
     include: []
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ''
+    description: ""
   default_behavior:
     auto_detection:
-      description: 'By default, the module will try to auto-detect the password to the RPC interface by looking in `/var/lib/boinc` for this file (this is the location most Linux distributions use for a system-wide BOINC installation), so things may just work without needing configuration for a local system.'
+      description: "By default, the module will try to auto-detect the password to the RPC interface by looking in `/var/lib/boinc` for this file (this is the location most Linux distributions use for a system-wide BOINC installation), so things may just work without needing configuration for a local system."
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
     list:
-      - title: 'Boinc RPC interface'
+      - title: "Boinc RPC interface"
         description: BOINC requires use of a password to access it's RPC interface. You can find this password in the `gui_rpc_auth.cfg` file in your BOINC directory.
   configuration:
     file:
@@ -76,19 +76,19 @@ setup:
           required: false
         - name: name
           description: Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works.
-          default_value: ''
+          default_value: ""
           required: false
         - name: hostname
           description: Define a hostname where boinc is running.
-          default_value: 'localhost'
+          default_value: "localhost"
           required: false
         - name: port
           description: The port of boinc RPC interface.
-          default_value: ''
+          default_value: ""
           required: false
         - name: password
           description: Provide a password to connect to a boinc RPC interface.
-          default_value: ''
+          default_value: ""
           required: false
     examples:
       folding:
@@ -102,30 +102,47 @@ setup:
              hostname: '1.2.3.4'
              port: 1234
              password: 'some-password'
+        - name: Multi-instance
+          description: |
+            > **Note**: When you define multiple jobs, their names must be unique.
+
+            Collecting metrics from local and remote instances.
+          config: |
+            localhost:
+              name: 'local'
+              host: '127.0.0.1'
+              port: 1234
+              password: 'some-password'
+
+            remote_job:
+              name: 'remote'
+              host: '192.0.2.1'
+              port: 1234
+              password: some-other-password
 troubleshooting:
   problems:
     list: []
 alerts:
-- name: boinc_total_tasks
-  link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
-  metric: boinc.tasks
-  info: average number of total tasks over the last 10 minutes
-  os: "*"
-- name: boinc_active_tasks
-  link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
-  metric: boinc.tasks
-  info: average number of active tasks over the last 10 minutes
-  os: "*"
-- name: boinc_compute_errors
-  link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
-  metric: boinc.states
-  info: average number of compute errors over the last 10 minutes
-  os: "*"
-- name: boinc_upload_errors
-  link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
-  metric: boinc.states
-  info: average number of failed uploads over the last 10 minutes
-  os: "*"
+  - name: boinc_total_tasks
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
+    metric: boinc.tasks
+    info: average number of total tasks over the last 10 minutes
+    os: "*"
+  - name: boinc_active_tasks
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
+    metric: boinc.tasks
+    info: average number of active tasks over the last 10 minutes
+    os: "*"
+  - name: boinc_compute_errors
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
+    metric: boinc.states
+    info: average number of compute errors over the last 10 minutes
+    os: "*"
+  - name: boinc_upload_errors
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf
+    metric: boinc.states
+    info: average number of failed uploads over the last 10 minutes
+    os: "*"
 metrics:
   folding:
     title: Metrics
@@ -133,46 +150,46 @@ metrics:
   description: ""
   availability: []
   scopes:
-  - name: global
-    description: "These metrics refer to the entire monitored application."
-    labels: []
-    metrics:
-    - name: boinc.tasks
-      description: Overall Tasks
-      unit: "tasks"
-      chart_type: line
-      dimensions:
-      - name: Total
-      - name: Active
-    - name: boinc.states
-      description: Tasks per State
-      unit: "tasks"
-      chart_type: line
-      dimensions:
-      - name: New
-      - name: Downloading
-      - name: Ready to Run
-      - name: Compute Errors
-      - name: Uploading
-      - name: Uploaded
-      - name: Aborted
-      - name: Failed Uploads
-    - name: boinc.sched
-      description: Tasks per Scheduler State
-      unit: "tasks"
-      chart_type: line
-      dimensions:
-      - name: Uninitialized
-      - name: Preempted
-      - name: Scheduled
-    - name: boinc.process
-      description: Tasks per Process State
-      unit: "tasks"
-      chart_type: line
-      dimensions:
-      - name: Uninitialized
-      - name: Executing
-      - name: Suspended
-      - name: Aborted
-      - name: Quit
-      - name: Copy Pending
+    - name: global
+      description: "These metrics refer to the entire monitored application."
+      labels: []
+      metrics:
+        - name: boinc.tasks
+          description: Overall Tasks
+          unit: "tasks"
+          chart_type: line
+          dimensions:
+            - name: Total
+            - name: Active
+        - name: boinc.states
+          description: Tasks per State
+          unit: "tasks"
+          chart_type: line
+          dimensions:
+            - name: New
+            - name: Downloading
+            - name: Ready to Run
+            - name: Compute Errors
+            - name: Uploading
+            - name: Uploaded
+            - name: Aborted
+            - name: Failed Uploads
+        - name: boinc.sched
+          description: Tasks per Scheduler State
+          unit: "tasks"
+          chart_type: line
+          dimensions:
+            - name: Uninitialized
+            - name: Preempted
+            - name: Scheduled
+        - name: boinc.process
+          description: Tasks per Process State
+          unit: "tasks"
+          chart_type: line
+          dimensions:
+            - name: Uninitialized
+            - name: Executing
+            - name: Suspended
+            - name: Aborted
+            - name: Quit
+            - name: Copy Pending
