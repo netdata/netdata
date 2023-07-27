@@ -391,7 +391,7 @@ With the streaming feature of Netdata Agents, we can support monitoring ephemera
     
   - :rocket: In addition, Netdata Cloud provides virtually unlimited horizontal scalability. It "merges" all the Netdata parents you have into one unified infrastructure at query time. Netdata Cloud itself is probably the biggest single installation monitoring platform ever created, currently monitoring about 100k online servers with about 10k servers changing state (added/removed) per day!
 
-The following chart comes from a single Netdata Parent. As you can see, 244 nodes stream to it metrics of about 20k running containers. On this specific chart there are 3 dimensions per container, so a total of about 60k time-series queries are made for each single chart view.
+The following chart comes from a single Netdata Parent. As you can see, 244 nodes stream to it metrics of about 20k running containers. On this specific chart there are 3 dimensions per container, so a total of about 60k time-series queries are needed to present it.
 
 ![image](https://github.com/netdata/netdata/assets/2662304/33db4aed-86af-4018-a547-e70643308f25)
 
