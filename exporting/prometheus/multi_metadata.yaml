@@ -13,7 +13,7 @@
     - Prometheus
     - remote write
     - time series
-  overview: 
+  overview:
     exporter_description: |
       Use the Prometheus remote write exporting connector to archive your Netdata metrics to the external storage provider of your choice for long-term storage and further analysis.
     exporter_limitations: 'The remote write exporting connector does not support buffer on failures.'
