@@ -4,15 +4,15 @@ meta:
   module_name: exim
   monitored_instance:
     name: Exim
-    link: 'https://www.exim.org/'
+    link: "https://www.exim.org/"
     categories:
-    - data-collection.mail-servers
-    icon_filename: 'exim.jpg'
+      - data-collection.mail-servers
+    icon_filename: "exim.jpg"
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
+    description: ""
   keywords:
     - exim
     - mail
@@ -20,32 +20,32 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'This collector monitors Exim mail queue.'
-    method_description: 'It uses the `exim` command line binary to get the statistics.'
+    metrics_description: "This collector monitors Exim mail queue."
+    method_description: "It uses the `exim` command line binary to get the statistics."
   supported_platforms:
     include: []
     exclude: []
   multi_instance: false
   additional_permissions:
-    description: ''
+    description: ""
   default_behavior:
     auto_detection:
-      description: 'Assuming setup prerequisites are met, the collector will try to gather statistics using the method described above, even without any configuration.'
+      description: "Assuming setup prerequisites are met, the collector will try to gather statistics using the method described above, even without any configuration."
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
     list:
-      - title: 'Exim configuration - local installation'
+      - title: "Exim configuration - local installation"
         description: |
           The module uses the `exim` binary, which can only be executed as root by default. We need to allow other users to `exim` binary. We solve that adding `queue_list_requires_admin` statement in exim configuration and set to `false`, because it is `true` by default. On many Linux distributions, the default location of `exim` configuration is in `/etc/exim.conf`.
 
           1. Edit the `exim` configuration with your preferred editor and add:
           `queue_list_requires_admin = false`
           2. Restart `exim` and Netdata
-      - title: 'Exim configuration - WHM (CPanel) server'
+      - title: "Exim configuration - WHM (CPanel) server"
         description: |
           On a WHM server, you can reconfigure `exim` over the WHM interface with the following steps.
 
@@ -92,11 +92,11 @@ setup:
           required: false
         - name: name
           description: Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works.
-          default_value: ''
+          default_value: ""
           required: false
         - name: command
           description: Path and command to the `exim` binary
-          default_value: 'exim -bpc'
+          default_value: "exim -bpc"
           required: false
     examples:
       folding:
@@ -119,13 +119,13 @@ metrics:
   description: ""
   availability: []
   scopes:
-  - name: global
-    description: "These metrics refer to the entire monitored application."
-    labels: []
-    metrics:
-    - name: exim.qemails
-      description: Exim Queue Emails
-      unit: "emails"
-      chart_type: line
-      dimensions:
-      - name: emails
+    - name: global
+      description: "These metrics refer to the entire monitored application."
+      labels: []
+      metrics:
+        - name: exim.qemails
+          description: Exim Queue Emails
+          unit: "emails"
+          chart_type: line
+          dimensions:
+            - name: emails
