@@ -85,9 +85,9 @@ setup:
         - name: 'buffer on failures'
           default_value: '10'
           description: |
-            The number of iterations (`update every` seconds) to buffer data, when the external database server is not available. 
+            The number of iterations (`update every` seconds) to buffer data, when the external database server is not available.
           required: false
-	  detailed_description: |
+          detailed_description: |
             If the server fails to receive the data after that many failures, data loss on the connector instance is expected (Netdata will also log it).
         - name: 'timeout ms'
           default_value: '2 * update_every * 1000'
