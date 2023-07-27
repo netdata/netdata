@@ -30,7 +30,7 @@ overview:
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: "It needs setuid."
+    description: "It needs setuid to use necessary syscall to collect perf events. Netada sets the permission during installation time."
   default_behavior:
     auto_detection:
       description: ""
