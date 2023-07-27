@@ -73,19 +73,6 @@ setup:
         - name: Change the collection frequency
           description: Specify a custom collection frequence (update_every) for this collector
           config: |
-            # no need for shebang - this file is loaded from charts.d.plugin
-
-            # netdata
-            # real-time performance and health monitoring, done right!
-            # (C) 2018 Costa Tsaousis <costa@tsaousis.gr>
-            # GPL v3+
-
-            # nothing fancy to configure.
-            # this module will run
-            # iw dev - to find wireless devices in AP mode
-            # iw ${dev} station dump - to get connected clients
-            # based on the above, it generates several charts
-
             # the data collection frequency
             # if unset, will inherit the netdata update frequency
             ap_update_every=10

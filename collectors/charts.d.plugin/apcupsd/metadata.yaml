@@ -68,7 +68,7 @@ setup:
           default_value: 1
           required: false
         - name: apcupsd_priority
-          description: The charts priority on the dashboard
+          description: The charts priority on the dashboard.
           default_value: 90000
           required: false
         - name: apcupsd_retries
@@ -83,13 +83,6 @@ setup:
         - name: Multiple apcupsd sources
           description: Specify a multiple apcupsd sources along with a custom update interval
           config: |
-            # no need for shebang - this file is loaded from charts.d.plugin
-
-            # netdata
-            # real-time performance and health monitoring, done right!
-            # (C) 2018 Costa Tsaousis <costa@tsaousis.gr>
-            # GPL v3+
-
             # add all your APC UPSes in this array - uncomment it too
             declare -A apcupsd_sources=(
                 ["local"]="127.0.0.1:3551",

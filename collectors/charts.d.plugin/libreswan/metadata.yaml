@@ -99,14 +99,6 @@ setup:
         - name: Run `ipsec` without sudo
           description: Run the `ipsec` utility without sudo
           config: |
-            # no need for shebang - this file is loaded from charts.d.plugin
-
-            # netdata
-            # real-time performance and health monitoring, done right!
-            # (C) 2018 Costa Tsaousis <costa@tsaousis.gr>
-            # GPL v3+
-            #
-
             # the data collection frequency
             # if unset, will inherit the netdata update frequency
             #libreswan_update_every=1

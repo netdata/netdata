@@ -1,54 +1,106 @@
+# yamllint disable rule:line-length
+---
 meta:
   plugin_name: charts.d.plugin
   module_name: opensips
   monitored_instance:
     name: OpenSIPS
-    link: ''
+    link: "https://opensips.org/"
     categories:
-    - data-collection.telephony-servers
-    icon_filename: 'opensips.png'
+      - data-collection.telephony-servers
+    icon_filename: "opensips.png"
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
-  keywords: []
+    description: ""
+  keywords:
+    - opensips
+    - sip
+    - voice
+    - video
+    - stream
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'Examine OpenSIPS metrics for insights into SIP server operations. Study call rates, error rates, and response times for reliable voice over IP services.'
-    method_description: ''
+    metrics_description: "Examine OpenSIPS metrics for insights into SIP server operations. Study call rates, error rates, and response times for reliable voice over IP services."
+    method_description: "The collector uses the `opensipsctl` command line utility to gather OpenSIPS metrics."
   supported_platforms:
     include: []
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ''
+    description: ""
   default_behavior:
     auto_detection:
-      description: ''
+      description: "The collector will attempt to call `opensipsctl` along with a default number of parameters, even without any configuration."
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
-    list: []
+    list:
+      - title: "Required software"
+        description: "The collector requires the `opensipsctl` to be installed."
   configuration:
     file:
-      name: ''
-      description: ''
+      name: charts.d/opensips.conf
     options:
-      description: ''
+      description: |
+        The config file is sourced by the charts.d plugin. It's a standard bash file.
+
+        The following collapsed table contains all the options that can be configured for the opensips collector.
       folding:
-        title: ''
+        title: "Config options"
         enabled: true
-      list: []
+      list:
+        - name: opensips_opts
+          description: Specify parameters to the `opensipsctl` command. If the default value fails to get global status, set here whatever options are needed to connect to the opensips server.
+          default_value: "fifo get_statistics all"
+          required: false
+        - name: opensips_cmd
+          description: If `opensipsctl` is not in $PATH, specify it's full path here.
+          default_value: ""
+          required: false
+        - name: opensips_timeout
+          description: How long to wait for `opensipsctl` to respond.
+          default_value: 2
+          required: false
+        - name: opensips_update_every
+          description: The data collection frequency. If unset, will inherit the netdata update frequency.
+          default_value: 5
+          required: false
+        - name: opensips_priority
+          description: The charts priority on the dashboard.
+          default_value: 80000
+          required: false
+        - name: opensips_retries
+          description: The number of retries to do in case of failure before disabling the collector.
+          default_value: 10
+          required: false
     examples:
       folding:
-        enabled: true
-        title: ''
-      list: []
+        enabled: false
+        title: "Config"
+      list:
+        - name: Custom `opensipsctl` command
+          description: Set a custom path to the `opensipsctl` command
+          config: |
+            #opensips_opts="fifo get_statistics all"
+            opensips_cmd=/opt/opensips/bin/opensipsctl
+            #opensips_timeout=2
+
+            # the data collection frequency
+            # if unset, will inherit the netdata update frequency
+            #opensips_update_every=5
+
+            # the charts priority on the dashboard
+            #opensips_priority=80000
+
+            # the number of retries to do in case of failure
+            # before disabling the module
+            #opensips_retries=10
 troubleshooting:
   problems:
     list: []
@@ -60,156 +112,156 @@ metrics:
   description: ""
   availability: []
   scopes:
-  - name: global
-    description: ""
-    labels: []
-    metrics:
-    - name: opensips.dialogs_active
-      description: OpenSIPS Active Dialogs
-      unit: "dialogs"
-      chart_type: area
-      dimensions:
-      - name: active
-      - name: early
-    - name: opensips.users
-      description: OpenSIPS Users
-      unit: "users"
-      chart_type: line
-      dimensions:
-      - name: registered
-      - name: location
-      - name: contacts
-      - name: expires
-    - name: opensips.registrar
-      description: OpenSIPS Registrar
-      unit: "registrations/s"
-      chart_type: line
-      dimensions:
-      - name: accepted
-      - name: rejected
-    - name: opensips.transactions
-      description: OpenSIPS Transactions
-      unit: "transactions/s"
-      chart_type: line
-      dimensions:
-      - name: UAS
-      - name: UAC
-    - name: opensips.core_rcv
-      description: OpenSIPS Core Receives
-      unit: "queries/s"
-      chart_type: line
-      dimensions:
-      - name: requests
-      - name: replies
-    - name: opensips.core_fwd
-      description: OpenSIPS Core Forwards
-      unit: "queries/s"
-      chart_type: line
-      dimensions:
-      - name: requests
-      - name: replies
-    - name: opensips.core_drop
-      description: OpenSIPS Core Drops
-      unit: "queries/s"
-      chart_type: line
-      dimensions:
-      - name: requests
-      - name: replies
-    - name: opensips.core_err
-      description: OpenSIPS Core Errors
-      unit: "queries/s"
-      chart_type: line
-      dimensions:
-      - name: requests
-      - name: replies
-    - name: opensips.core_bad
-      description: OpenSIPS Core Bad
-      unit: "queries/s"
-      chart_type: line
-      dimensions:
-      - name: bad_URIs_rcvd
-      - name: unsupported_methods
-      - name: bad_msg_hdr
-    - name: opensips.tm_replies
-      description: OpenSIPS TM Replies
-      unit: "replies/s"
-      chart_type: line
-      dimensions:
-      - name: received
-      - name: relayed
-      - name: local
-    - name: opensips.transactions_status
-      description: OpenSIPS Transactions Status
-      unit: "transactions/s"
-      chart_type: line
-      dimensions:
-      - name: 2xx
-      - name: 3xx
-      - name: 4xx
-      - name: 5xx
-      - name: 6xx
-    - name: opensips.transactions_inuse
-      description: OpenSIPS InUse Transactions
-      unit: "transactions"
-      chart_type: line
-      dimensions:
-      - name: inuse
-    - name: opensips.sl_replies
-      description: OpenSIPS SL Replies
-      unit: "replies/s"
-      chart_type: line
-      dimensions:
-      - name: 1xx
-      - name: 2xx
-      - name: 3xx
-      - name: 4xx
-      - name: 5xx
-      - name: 6xx
-      - name: sent
-      - name: error
-      - name: ACKed
-    - name: opensips.dialogs
-      description: OpenSIPS Dialogs
-      unit: "dialogs/s"
-      chart_type: line
-      dimensions:
-      - name: processed
-      - name: expire
-      - name: failed
-    - name: opensips.net_waiting
-      description: OpenSIPS Network Waiting
-      unit: "kilobytes"
-      chart_type: line
-      dimensions:
-      - name: UDP
-      - name: TCP
-    - name: opensips.uri_checks
-      description: OpenSIPS URI Checks
-      unit: "checks / sec"
-      chart_type: line
-      dimensions:
-      - name: positive
-      - name: negative
-    - name: opensips.traces
-      description: OpenSIPS Traces
-      unit: "traces / sec"
-      chart_type: line
-      dimensions:
-      - name: requests
-      - name: replies
-    - name: opensips.shmem
-      description: OpenSIPS Shared Memory
-      unit: "kilobytes"
-      chart_type: line
-      dimensions:
-      - name: total
-      - name: used
-      - name: real_used
-      - name: max_used
-      - name: free
-    - name: opensips.shmem_fragment
-      description: OpenSIPS Shared Memory Fragmentation
-      unit: "fragments"
-      chart_type: line
-      dimensions:
-      - name: fragments
+    - name: global
+      description: "These metrics refer to the entire monitored application."
+      labels: []
+      metrics:
+        - name: opensips.dialogs_active
+          description: OpenSIPS Active Dialogs
+          unit: "dialogs"
+          chart_type: area
+          dimensions:
+            - name: active
+            - name: early
+        - name: opensips.users
+          description: OpenSIPS Users
+          unit: "users"
+          chart_type: line
+          dimensions:
+            - name: registered
+            - name: location
+            - name: contacts
+            - name: expires
+        - name: opensips.registrar
+          description: OpenSIPS Registrar
+          unit: "registrations/s"
+          chart_type: line
+          dimensions:
+            - name: accepted
+            - name: rejected
+        - name: opensips.transactions
+          description: OpenSIPS Transactions
+          unit: "transactions/s"
+          chart_type: line
+          dimensions:
+            - name: UAS
+            - name: UAC
+        - name: opensips.core_rcv
+          description: OpenSIPS Core Receives
+          unit: "queries/s"
+          chart_type: line
+          dimensions:
+            - name: requests
+            - name: replies
+        - name: opensips.core_fwd
+          description: OpenSIPS Core Forwards
+          unit: "queries/s"
+          chart_type: line
+          dimensions:
+            - name: requests
+            - name: replies
+        - name: opensips.core_drop
+          description: OpenSIPS Core Drops
+          unit: "queries/s"
+          chart_type: line
+          dimensions:
+            - name: requests
+            - name: replies
+        - name: opensips.core_err
+          description: OpenSIPS Core Errors
+          unit: "queries/s"
+          chart_type: line
+          dimensions:
+            - name: requests
+            - name: replies
+        - name: opensips.core_bad
+          description: OpenSIPS Core Bad
+          unit: "queries/s"
+          chart_type: line
+          dimensions:
+            - name: bad_URIs_rcvd
+            - name: unsupported_methods
+            - name: bad_msg_hdr
+        - name: opensips.tm_replies
+          description: OpenSIPS TM Replies
+          unit: "replies/s"
+          chart_type: line
+          dimensions:
+            - name: received
+            - name: relayed
+            - name: local
+        - name: opensips.transactions_status
+          description: OpenSIPS Transactions Status
+          unit: "transactions/s"
+          chart_type: line
+          dimensions:
+            - name: 2xx
+            - name: 3xx
+            - name: 4xx
+            - name: 5xx
+            - name: 6xx
+        - name: opensips.transactions_inuse
+          description: OpenSIPS InUse Transactions
+          unit: "transactions"
+          chart_type: line
+          dimensions:
+            - name: inuse
+        - name: opensips.sl_replies
+          description: OpenSIPS SL Replies
+          unit: "replies/s"
+          chart_type: line
+          dimensions:
+            - name: 1xx
+            - name: 2xx
+            - name: 3xx
+            - name: 4xx
+            - name: 5xx
+            - name: 6xx
+            - name: sent
+            - name: error
+            - name: ACKed
+        - name: opensips.dialogs
+          description: OpenSIPS Dialogs
+          unit: "dialogs/s"
+          chart_type: line
+          dimensions:
+            - name: processed
+            - name: expire
+            - name: failed
+        - name: opensips.net_waiting
+          description: OpenSIPS Network Waiting
+          unit: "kilobytes"
+          chart_type: line
+          dimensions:
+            - name: UDP
+            - name: TCP
+        - name: opensips.uri_checks
+          description: OpenSIPS URI Checks
+          unit: "checks / sec"
+          chart_type: line
+          dimensions:
+            - name: positive
+            - name: negative
+        - name: opensips.traces
+          description: OpenSIPS Traces
+          unit: "traces / sec"
+          chart_type: line
+          dimensions:
+            - name: requests
+            - name: replies
+        - name: opensips.shmem
+          description: OpenSIPS Shared Memory
+          unit: "kilobytes"
+          chart_type: line
+          dimensions:
+            - name: total
+            - name: used
+            - name: real_used
+            - name: max_used
+            - name: free
+        - name: opensips.shmem_fragment
+          description: OpenSIPS Shared Memory Fragmentation
+          unit: "fragments"
+          chart_type: line
+          dimensions:
+            - name: fragments
