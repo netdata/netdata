@@ -6,7 +6,8 @@ meta:
   monitored_instance:
     name: python.d zscores
     link: https://en.wikipedia.org/wiki/Standard_score
-    categories: []
+    categories:
+      - data-collection.other
     icon_filename: ""
   related_resources:
     integrations:
