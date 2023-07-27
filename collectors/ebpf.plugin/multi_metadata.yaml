@@ -1,3 +1,5 @@
+# yamllint disable rule:line-length
+---
 plugin_name: ebpf.plugin
 modules:
   - meta:
@@ -30,7 +32,8 @@ modules:
         metrics_description: "Monitor calls for functions responsible to open or close a file descriptor and possible errors."
         method_description: "Attach tracing (kprobe and trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
@@ -250,7 +253,8 @@ modules:
         metrics_description: "Monitor calls for function creating tasks (threads and processes) inside Linux kernel."
         method_description: "Attach tracing (kprobe or tracepoint, and trampoline) to internal kernel functions."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
@@ -498,7 +502,8 @@ modules:
         metrics_description: "Measure latency for I/O events on disk."
         method_description: "Attach tracepoints to internal kernel functions."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
@@ -603,7 +608,8 @@ modules:
         metrics_description: "Monitor latency for each HardIRQ available."
         method_description: "Attach tracepoints to internal kernel functions."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
@@ -713,7 +719,8 @@ modules:
         metrics_description: "Monitor Linux page cache events giving for users a general vision about how his kernel is manipulating files."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
@@ -939,7 +946,8 @@ modules:
         metrics_description: "Monitor syscall responsible to move data from memory to storage device."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
@@ -1119,7 +1127,8 @@ modules:
         metrics_description: "Monitor when flush events happen between disks."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
@@ -1227,7 +1236,8 @@ modules:
         metrics_description: "Monitors when swap has I/O events and applications executing events."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
@@ -1402,7 +1412,8 @@ modules:
         metrics_description: "Monitor applications that reach out of memory."
         method_description: "Attach tracepoint to internal kernel functions."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
@@ -1531,7 +1542,8 @@ modules:
         metrics_description: "Monitor bandwidth consumption per application for protocols TCP and UDP."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
@@ -1899,7 +1911,8 @@ modules:
         metrics_description: "Monitor directory cache events per application given an overall vision about files on memory or storage device."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
@@ -2120,7 +2133,8 @@ modules:
         metrics_description: "Monitor latency for main actions on filesystem like I/O events."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
@@ -2279,7 +2293,8 @@ modules:
         metrics_description: "Monitor syscall responsible to manipulate shared memory."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
@@ -2507,7 +2522,8 @@ modules:
         metrics_description: "Monitor latency for each SoftIRQ available."
         method_description: "Attach kprobe to internal kernel functions."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
@@ -2614,7 +2630,8 @@ modules:
         metrics_description: "Monitor calls for mount and umount syscall."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
@@ -2742,7 +2759,8 @@ modules:
         metrics_description: "Monitor I/O events on Linux Virtual Filesystem."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
@@ -3168,7 +3186,8 @@ modules:
         metrics_description: "Monitor internal memory usage."
         method_description: "Uses netdata internal statistic to monitor memory management by plugin."
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
