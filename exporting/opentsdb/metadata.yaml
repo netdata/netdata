@@ -98,7 +98,7 @@ setup:
           description: |
             Hosts filter. Determines which hosts will be sent to OpenTSDB. The syntax is [simple patterns](https://github.com/netdata/netdata/tree/master/libnetdata/simple_pattern#simple-patterns).
           required: false
-	  detailed_description: |
+          detailed_description: |
             Includes one or more space separated patterns, using * as wildcard (any number of times within each pattern).
             The patterns are checked against the hostname (the localhost is always checked as localhost), allowing us to
             filter which hosts will be sent to the external database when this Netdata is a central Netdata aggregating multiple hosts.
@@ -110,7 +110,7 @@ setup:
           description: |
             One or more space separated patterns (use * as wildcard) checked against both chart id and chart name.
           required: false
-	  detailed_description: |
+          detailed_description: |
             A pattern starting with ! gives a negative match. So to match all charts named apps.* except charts ending in *reads,
             use !*reads apps.* (so, the order is important: the first pattern matching the chart id or the chart name will be used,
             positive or negative). There is also a URL parameter filter that can be used while querying allmetrics. The URL parameter
@@ -119,7 +119,7 @@ setup:
           default_value: ''
           description: 'Controls the metric names Netdata should send to the external database (yes|no).'
           required: false
-	  detailed_description: |
+          detailed_description: |
             Netdata supports names and IDs for charts and dimensions. Usually IDs are unique identifiers as read by the system and names
             are human friendly labels (also unique). Most charts and metrics have the same ID and name, but in several cases they are
             different : disks with device-mapper, interrupts, QoS classes, statsd synthetic charts, etc.
