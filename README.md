@@ -548,13 +548,13 @@ In a nutshell, Netdata proves invaluable for:
   Who seek a feature-rich monitoring solution from the get-go.
 
 - **Freelancers**<br/>
-  Those seeking an efficient and straightforward solution without sacrificing performance and outcomes due to time or energy constraints.
+  Who seek simple, efficient and straightforward solution without sacrificing performance and outcomes.
 
 - **Professional SysAdmins and DevOps**<br/>
   Who appreciate the fine details and understand the value of holistic monitoring from the ground up.
 
 - **Everyone else**<br/>
-  Those who are tired of the inefficiency in the monitoring industry and are seeking a breath of fresh air. :slightly_smiling_face:
+  All of us, who are tired of the inefficiency in the monitoring industry and appreciate a breath of fresh air. :slightly_smiling_face:
 
 &nbsp;<br/>&nbsp;<br/>
 </details>
