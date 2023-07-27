@@ -1,53 +1,67 @@
+# yamllint disable rule:line-length
+---
 meta:
   plugin_name: xenstat.plugin
   module_name: xenstat.plugin
   monitored_instance:
     name: Xen/XCP-ng
-    link: ''
+    link: "https://xenproject.org/"
     categories:
-    - data-collection.containers-and-vms
-    icon_filename: 'xen.png'
+      - data-collection.containers-and-vms
+    icon_filename: "xen.png"
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
+    description: ""
   keywords: []
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'Monitor Xen/XCP-ng with Netdata for streamlined virtual machine performance and resource management. Optimize virtualization operations with real-time insights, built-in alerts, and anomaly advisor.'
-    method_description: ''
+    metrics_description: "This collector monitors XenServer and XCP-ng host and domains statistics."
+    method_description: ""
   supported_platforms:
     include: []
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ''
+    description: "The plugin needs setuid."
   default_behavior:
     auto_detection:
-      description: ''
+      description: "This plugin requires the `xen-dom0-libs-devel` and `yajl-devel` libraries to be installed."
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
-    list: []
+    list:
+      - title: Libraries
+        description: |
+          1. Install `xen-dom0-libs-devel` and `yajl-devel` using the package manager of your system.
+
+            Note: On Cent-OS systems you will need `centos-release-xen` repository and the required package for xen is `xen-devel`
+
+          2. Re-install Netdata from source. The installer will detect that the required libraries are now available and will also build xenstat.plugin.
   configuration:
     file:
-      name: ''
-      description: ''
+      name: "netdata.conf"
+      section_name: "[plugin:xenstat]"
+      description: "The netdata main configuration file."
     options:
-      description: ''
+      description: ""
       folding:
-        title: ''
+        title: "Config options"
         enabled: true
-      list: []
+      list:
+        - name: update every
+          description: Data collection frequency.
+          default_value: 1
+          required: false
     examples:
       folding:
         enabled: true
-        title: ''
+        title: ""
       list: []
 troubleshooting:
   problems:
@@ -60,122 +74,122 @@ metrics:
   description: ""
   availability: []
   scopes:
-  - name: global
-    description: ""
-    labels: []
-    metrics:
-    - name: xenstat.mem
-      description: Memory Usage
-      unit: "MiB"
-      chart_type: stacked
-      dimensions:
-      - name: free
-      - name: used
-    - name: xenstat.domains
-      description: Number of Domains
-      unit: "domains"
-      chart_type: line
-      dimensions:
-      - name: domains
-    - name: xenstat.cpus
-      description: Number of CPUs
-      unit: "cpus"
-      chart_type: line
-      dimensions:
-      - name: cpus
-    - name: xenstat.cpu_freq
-      description: CPU Frequency
-      unit: "MHz"
-      chart_type: line
-      dimensions:
-      - name: frequency
-  - name: xendomain
-    description: ""
-    labels: []
-    metrics:
-    - name: xendomain.states
-      description: Domain States
-      unit: "boolean"
-      chart_type: line
-      dimensions:
-      - name: running
-      - name: blocked
-      - name: paused
-      - name: shutdown
-      - name: crashed
-      - name: dying
-    - name: xendomain.cpu
-      description: CPU Usage (100% = 1 core)
-      unit: "percentage"
-      chart_type: line
-      dimensions:
-      - name: used
-    - name: xendomain.mem
-      description: Memory Reservation
-      unit: "MiB"
-      chart_type: line
-      dimensions:
-      - name: maximum
-      - name: current
-    - name: xendomain.vcpu
-      description: CPU Usage per VCPU
-      unit: "percentage"
-      chart_type: line
-      dimensions:
-      - name: a dimension per vcpu
-  - name: xendomain, vbd
-    description: ""
-    labels: []
-    metrics:
-    - name: xendomain.oo_req_vbd
-      description: VBD{%u} Out Of Requests
-      unit: "requests/s"
-      chart_type: line
-      dimensions:
-      - name: requests
-    - name: xendomain.requests_vbd
-      description: VBD{%u} Requests
-      unit: "requests/s"
-      chart_type: line
-      dimensions:
-      - name: read
-      - name: write
-    - name: xendomain.sectors_vbd
-      description: VBD{%u} Read/Written Sectors
-      unit: "sectors/s"
-      chart_type: line
-      dimensions:
-      - name: read
-      - name: write
-  - name: xendomain, network
-    description: ""
-    labels: []
-    metrics:
-    - name: xendomain.bytes_network
-      description: Network{%u} Received/Sent Bytes
-      unit: "kilobits/s"
-      chart_type: line
-      dimensions:
-      - name: received
-      - name: sent
-    - name: xendomain.packets_network
-      description: Network{%u} Received/Sent Packets
-      unit: "packets/s"
-      chart_type: line
-      dimensions:
-      - name: received
-      - name: sent
-    - name: xendomain.errors_network
-      description: Network{%u} Receive/Transmit Errors
-      unit: "errors/s"
-      chart_type: line
-      dimensions:
-      - name: received
-      - name: sent
-    - name: xendomain.drops_network
-      description: Network{%u} Receive/Transmit Drops
-      unit: "drops/s"
-      chart_type: line
-      dimensions:
-      - name: received
-      - name: sent
+    - name: global
+      description: "These metrics refer to the entire monitored application."
+      labels: []
+      metrics:
+        - name: xenstat.mem
+          description: Memory Usage
+          unit: "MiB"
+          chart_type: stacked
+          dimensions:
+            - name: free
+            - name: used
+        - name: xenstat.domains
+          description: Number of Domains
+          unit: "domains"
+          chart_type: line
+          dimensions:
+            - name: domains
+        - name: xenstat.cpus
+          description: Number of CPUs
+          unit: "cpus"
+          chart_type: line
+          dimensions:
+            - name: cpus
+        - name: xenstat.cpu_freq
+          description: CPU Frequency
+          unit: "MHz"
+          chart_type: line
+          dimensions:
+            - name: frequency
+    - name: xendomain
+      description: "Metrics related to Xen domains. Each domain provides its own set of the following metrics."
+      labels: []
+      metrics:
+        - name: xendomain.states
+          description: Domain States
+          unit: "boolean"
+          chart_type: line
+          dimensions:
+            - name: running
+            - name: blocked
+            - name: paused
+            - name: shutdown
+            - name: crashed
+            - name: dying
+        - name: xendomain.cpu
+          description: CPU Usage (100% = 1 core)
+          unit: "percentage"
+          chart_type: line
+          dimensions:
+            - name: used
+        - name: xendomain.mem
+          description: Memory Reservation
+          unit: "MiB"
+          chart_type: line
+          dimensions:
+            - name: maximum
+            - name: current
+        - name: xendomain.vcpu
+          description: CPU Usage per VCPU
+          unit: "percentage"
+          chart_type: line
+          dimensions:
+            - name: a dimension per vcpu
+    - name: xendomain vbd
+      description: "Metrics related to Xen domain Virtual Block Device. Each VBD provides its own set of the following metrics."
+      labels: []
+      metrics:
+        - name: xendomain.oo_req_vbd
+          description: VBD{%u} Out Of Requests
+          unit: "requests/s"
+          chart_type: line
+          dimensions:
+            - name: requests
+        - name: xendomain.requests_vbd
+          description: VBD{%u} Requests
+          unit: "requests/s"
+          chart_type: line
+          dimensions:
+            - name: read
+            - name: write
+        - name: xendomain.sectors_vbd
+          description: VBD{%u} Read/Written Sectors
+          unit: "sectors/s"
+          chart_type: line
+          dimensions:
+            - name: read
+            - name: write
+    - name: xendomain network
+      description: "Metrics related to Xen domain network interfaces. Each network interface provides its own set of the following metrics."
+      labels: []
+      metrics:
+        - name: xendomain.bytes_network
+          description: Network{%u} Received/Sent Bytes
+          unit: "kilobits/s"
+          chart_type: line
+          dimensions:
+            - name: received
+            - name: sent
+        - name: xendomain.packets_network
+          description: Network{%u} Received/Sent Packets
+          unit: "packets/s"
+          chart_type: line
+          dimensions:
+            - name: received
+            - name: sent
+        - name: xendomain.errors_network
+          description: Network{%u} Receive/Transmit Errors
+          unit: "errors/s"
+          chart_type: line
+          dimensions:
+            - name: received
+            - name: sent
+        - name: xendomain.drops_network
+          description: Network{%u} Receive/Transmit Drops
+          unit: "drops/s"
+          chart_type: line
+          dimensions:
+            - name: received
+            - name: sent
