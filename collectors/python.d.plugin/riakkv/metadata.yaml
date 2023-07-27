@@ -1,9 +1,10 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/netdata/netdata/master/integrations/schemas/collection-single-module.json
 meta:
   plugin_name: python.d.plugin
   module_name: riakkv
   monitored_instance:
     name: RiakKV
-    link: ''
+    link: 'https://riak.com/products/riak-kv/index.html'
     categories:
     - data-collection.database-servers
     icon_filename: 'riak.svg'
@@ -12,12 +13,15 @@ meta:
       list: []
   info_provided_to_referring_integrations:
     description: ''
-  keywords: []
+  keywords:
+  - database
+  - nosql
+  - big data
   most_popular: false
 overview:
   data_collection:
     metrics_description: 'Examine RiakKV metrics for optimal key-value database performance. Netdata provides comprehensive dashboards and anomaly detection for efficient database operations.'
-    method_description: ''
+    method_description: 'This collector readσ the database stats from /stats endpoint.'
   supported_platforms:
     include: []
     exclude: []
@@ -26,29 +30,68 @@ overview:
     description: ''
   default_behavior:
     auto_detection:
-      description: ''
+      description: 'If the /stats endpoint is accessible by netdata, it will autodetect'
     limits:
       description: ''
     performance_impact:
       description: ''
 setup:
   prerequisites:
-    list: []
+    list: 
+    - title: Configure Riak KV to enable /stats endpoint
+      description: |
+        You can follow the Riak KV configuration reference documentation for how to enable this.
+
+        Source : https://docs.riak.com/riak/kv/2.2.3/configuring/reference/#client-interfaces
   configuration:
     file:
-      name: ''
-      description: ''
+      name: 'python.d/riakkv.conf'
     options:
-      description: ''
+      description: |
+        There are 2 sections:
+
+        * Global variables
+        * One or more JOBS that can define multiple different instances to monitor.
+
+        The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
+
+        Additionally, the following collapsed table contains all the options that can be configured inside a JOB definition.
+
+        Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
       folding:
-        title: ''
+        title: 'Config options'
         enabled: true
-      list: []
+      list:
+      - name: update_every
+        description: Sets the default data collection frequency.
+        default_value: 5
+        required: false
+      - name: priority
+        description: Controls the order of charts at the netdata dashboard.
+        default_value: 60000
+        required: false
+      - name: autodetection_retry
+        description: Sets the job re-check interval in seconds.
+        default_value: 0
+        required: false
+      - name: penalty
+        description: Indicates whether to apply penalty to update_every in case of failures.
+        default_value: yes
+        required: false
+      - name: url
+        description: The url of the server
+        default_value: no
+        required: false
     examples:
       folding:
         enabled: true
-        title: ''
-      list: []
+        title: 'Config'
+      list:
+      - name: Basic (default)
+        description: A basic example configuration per job 
+        config: |
+          local:
+          url  : 'http://localhost:8098/stats'
 troubleshooting:
   problems:
     list: []
@@ -81,7 +124,7 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ""
+  description: "This collector provide metrics about throughput, latency, elarng usage resource and general load/health metrics"
   availability: []
   scopes:
   - name: global
