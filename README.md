@@ -501,7 +501,7 @@ Even if you're already using Nagios, Icinga, Zabbix, or similar tools, you can u
 &nbsp;<br/>&nbsp;<br/>
 </details>
 
-### :raised_eyebrow: I feel overwhelmed by the amount of information in Netdata. What should I do?
+### :flushed: I feel overwhelmed by the amount of information in Netdata. What should I do?
 
 Netdata is designed to provide comprehensive insights, but we understand that the richness of information might sometimes feel overwhelming. Here are some tips on how to navigate and utilize Netdata effectively...
 
