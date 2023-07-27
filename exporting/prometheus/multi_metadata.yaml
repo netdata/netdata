@@ -1,3 +1,5 @@
+# yamllint disable rule:line-length
+---
 id: 'export-prometheus-remote'
 meta: &meta
   name: 'Prometheus Remote Write'
