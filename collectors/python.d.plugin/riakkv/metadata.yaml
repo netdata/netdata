@@ -21,7 +21,7 @@ meta:
 overview:
   data_collection:
     metrics_description: 'Examine RiakKV metrics for optimal key-value database performance. Netdata provides comprehensive dashboards and anomaly detection for efficient database operations.'
-    method_description: 'This collector readσ the database stats from /stats endpoint.'
+    method_description: 'This collector reads the database stats from /stats endpoint.'
   supported_platforms:
     include: []
     exclude: []
