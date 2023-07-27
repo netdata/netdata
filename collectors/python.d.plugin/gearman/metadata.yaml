@@ -13,7 +13,9 @@ meta:
       list: []
   info_provided_to_referring_integrations:
     description: ''
-  keywords: []
+  keywords:
+    - gearman
+    - gearman job server
   most_popular: false
 overview:
   data_collection:
@@ -105,9 +107,24 @@ setup:
           description: A basic host and port gearman configuration for localhost.
           config: |
             localhost:
-             name: 'local'
-             host: 'localhost'
-             port: 4730
+              name: 'local'
+              host: 'localhost'
+              port: 4730
+        - name: Multi-instance
+          description: |
+            > **Note**: When you define multiple jobs, their names must be unique.
+
+            Collecting metrics from local and remote instances.
+          config: |
+            localhost:
+              name: 'local'
+              host: 'localhost'
+              port: 4730
+
+            remote:
+              name: 'remote'
+              host: '192.0.2.1'
+              port: 4730
 troubleshooting:
   problems:
     list: []
@@ -135,7 +152,7 @@ metrics:
       - name: Pending
       - name: Running
   - name: gearman job
-    description: ""
+    description: "Metrics related to Gearman jobs. Each job produces its own set of the following metrics."
     labels: []
     metrics:
     - name: gearman.single_job
