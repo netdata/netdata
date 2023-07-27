@@ -692,7 +692,10 @@ failed:
         error_report("HEALTH [N/A]: Failed to finalize the prepared statement for injecting removed event.");
 }
 
-#define SQL_SELECT_MAX_UNIQUE_ID "SELECT MAX(hld.unique_id) from health_log_detail hld, health_log hl where hl.host_id = @host_id; and hl.health_log_id = hld.health_log_id"
+#define SQL_SELECT_MAX_UNIQUE_ID                                                                                       \
+    "SELECT MAX(hld.unique_id) FROM health_log_detail hld, health_log hl "                                             \
+    "WHERE hl.host_id = @host_id AND hl.health_log_id = hld.health_log_id"
+
 uint32_t sql_get_max_unique_id (RRDHOST *host)
 {
     int rc;
