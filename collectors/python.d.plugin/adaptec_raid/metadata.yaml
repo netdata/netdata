@@ -19,7 +19,8 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: "Assess Adaptec RAID hardware storage controllers with Netdata for RAID controller performance and operational metrics. Monitor the performance of your RAID controller with comprehensive dashboards and anomaly detection."
+    metrics_description: |
+      This collector monitors Adaptec RAID hardware storage controller metrics about both physical and logical drives.
     method_description: |
       It uses the arcconf command line utility (from adaptec) to monitor your raid controller.
 
