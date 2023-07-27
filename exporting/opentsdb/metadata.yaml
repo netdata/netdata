@@ -151,7 +151,7 @@ setup:
             enabled: false
           description: ''
           config: |
-	     [opentsdb:my_opentsdb_instance]
+            [opentsdb:my_opentsdb_instance]
 		enabled = yes
 		destination = localhost:4242
 		username = my_username
