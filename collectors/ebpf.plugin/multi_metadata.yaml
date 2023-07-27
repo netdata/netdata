@@ -37,7 +37,7 @@ modules:
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: "The plugin needs setuid because it loads data inside kernel."
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
           description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached."
@@ -258,7 +258,7 @@ modules:
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: "The plugin needs setuid because it loads data inside kernel."
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
           description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT), files inside debugfs, and presence of BTF files to decide which eBPF program will be attached."
@@ -507,7 +507,7 @@ modules:
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: "The plugin needs setuid because it loads data inside kernel."
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
           description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT), files inside debugfs, and presence of BTF files to decide which eBPF program will be attached."
@@ -613,7 +613,7 @@ modules:
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: "The plugin needs setuid because it loads data inside kernel."
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
           description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT), files inside debugfs, and presence of BTF files to decide which eBPF program will be attached."
@@ -724,7 +724,7 @@ modules:
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: "The plugin needs setuid because it loads data inside kernel."
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
           description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached."
@@ -951,7 +951,7 @@ modules:
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: "The plugin needs setuid because it loads data inside kernel."
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
           description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT, CONFIG_HAVE_SYSCALL_TRACEPOINTS), files inside debugfs, and presence of BTF files to decide which eBPF program will be attached."
@@ -1132,7 +1132,7 @@ modules:
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: "The plugin needs setuid because it loads data inside kernel."
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
           description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached."
@@ -1241,7 +1241,7 @@ modules:
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: "The plugin needs setuid because it loads data inside kernel."
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
           description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached."
@@ -1417,7 +1417,7 @@ modules:
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: "The plugin needs setuid because it loads data inside kernel."
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
           description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT), files inside debugfs, and presence of BTF files to decide which eBPF program will be attached."
@@ -1547,7 +1547,7 @@ modules:
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: "The plugin needs setuid because it loads data inside kernel."
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
           description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached."
@@ -1916,7 +1916,7 @@ modules:
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: "The plugin needs setuid because it loads data inside kernel."
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
           description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached."
@@ -2138,7 +2138,7 @@ modules:
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: "The plugin needs setuid because it loads data inside kernel."
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
           description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT), files inside debugfs, and presence of BTF files to decide which eBPF program will be attached."
@@ -2298,7 +2298,7 @@ modules:
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: "The plugin needs setuid because it loads data inside kernel."
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
           description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached."
@@ -2527,7 +2527,7 @@ modules:
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: "The plugin needs setuid because it loads data inside kernel."
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
           description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT), files inside debugfs, and presence of BTF files to decide which eBPF program will be attached."
@@ -2635,7 +2635,7 @@ modules:
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: "The plugin needs setuid because it loads data inside kernel."
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
           description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT, CONFIG_HAVE_SYSCALL_TRACEPOINTS), files inside debugfs, and presence of BTF files to decide which eBPF program will be attached."
@@ -2764,7 +2764,7 @@ modules:
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: "The plugin needs setuid because it loads data inside kernel."
+        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
       default_behavior:
         auto_detection:
           description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached."
