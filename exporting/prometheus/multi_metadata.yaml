@@ -1,0 +1,436 @@
+# yamllint disable rule:line-length
+---
+- &promexport
+  id: 'export-prometheus-remote'
+  meta: &meta
+    name: 'Prometheus Remote Write'
+    link: 'https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage'
+    categories:
+      - export
+    icon_filename: 'prometheus.png'
+  keywords:
+    - exporter
+    - Prometheus
+    - remote write
+    - time series
+  overview:
+    exporter_description: |
+      Use the Prometheus remote write exporting connector to archive your Netdata metrics to the external storage provider of your choice for long-term storage and further analysis.
+    exporter_limitations: 'The remote write exporting connector does not support buffer on failures.'
+  setup:
+    prerequisites:
+      list:
+        - title: ''
+          description: |
+            - Netdata and the external storage provider of your choice, installed, configured and operational.
+            - `protobuf` and `snappy` libraries installed.
+            - Netdata reinstalled after the libraries.
+    configuration:
+      file:
+        name: 'exporting.conf'
+      options:
+        description: 'The following options can be defined for this exporter.'
+        folding:
+          title: 'Config options'
+          enabled: true
+        list:
+          - name: 'enabled'
+            default_value: 'no'
+            description: 'Enables or disables an exporting connector instance (yes|no).'
+            required: true
+          - name: 'destination'
+            default_value: 'no'
+            description: 'Accepts a space separated list of hostnames, IPs (IPv4 and IPv6) and ports to connect to. Netdata will use the first available to send the metrics.'
+            required: true
+            detailed_description: |
+              The format of each item in this list, is: [PROTOCOL:]IP[:PORT].
+              - PROTOCOL can be udp or tcp. tcp is the default and only supported by the current exporting engine.
+              - IP can be XX.XX.XX.XX (IPv4), or [XX:XX...XX:XX] (IPv6). For IPv6 you can to enclose the IP in [] to separate it from the port.
+              - PORT can be a number of a service name. If omitted, the default port for the exporting connector will be used.
+
+              Example IPv4:
+                ```yaml
+                destination = 10.11.14.2:2003 10.11.14.3:4242 10.11.14.4:2003
+                ```
+              Example IPv6 and IPv4 together:
+              ```yaml
+              destination = [ffff:...:0001]:2003 10.11.12.1:2003
+              ```
+              When multiple servers are defined, Netdata will try the next one when the previous one fails.
+          - name: 'username'
+            default_value: 'my_username'
+            description: 'Username for HTTP authentication'
+            required: false
+          - name: 'password'
+            default_value: 'my_password'
+            description: 'Password for HTTP authentication'
+            required: false
+          - name: 'data source'
+            default_value: ''
+            description: 'Selects the kind of data that will be sent to the external database. (as collected|average|sum)'
+            required: false
+          - name: 'hostname'
+            default_value: '[global].hostname'
+            description: 'The hostname to be used for sending data to the external database server.'
+            required: false
+          - name: 'prefix'
+            default_value: 'netdata'
+            description: 'The prefix to add to all metrics.'
+            required: false
+          - name: 'update every'
+            default_value: '10'
+            description: |
+              Frequency of sending sending data to the external database, in seconds.
+            required: false
+            detailed_description: |
+              Netdata will add some randomness to this number, to prevent stressing the external server when many Netdata servers
+              send data to the same database. This randomness does not affect the quality of the data, only the time they are sent.
+          - name: 'buffer on failures'
+            default_value: '10'
+            description: |
+              The number of iterations (`update every` seconds) to buffer data, when the external database server is not available.
+            required: false
+            detailed_description: |
+              If the server fails to receive the data after that many failures, data loss on the connector instance is expected (Netdata will also log it).
+          - name: 'timeout ms'
+            default_value: '20000'
+            description: 'The timeout in milliseconds to wait for the external database server to process the data.'
+            required: false
+          - name: 'send hosts matching'
+            default_value: 'localhost *'
+            description: |
+              Hosts filter. Determines which hosts will be sent to the external database. The syntax is [simple patterns](https://github.com/netdata/netdata/tree/master/libnetdata/simple_pattern#simple-patterns).
+            required: false
+            detailed_description: |
+              Includes one or more space separated patterns, using * as wildcard (any number of times within each pattern).
+              The patterns are checked against the hostname (the localhost is always checked as localhost), allowing us to
+              filter which hosts will be sent to the external database when this Netdata is a central Netdata aggregating multiple hosts.
+
+              A pattern starting with `!` gives a negative match. So to match all hosts named `*db*` except hosts containing `*child*`,
+              use `!*child* *db*` (so, the order is important: the first pattern matching the hostname will be used - positive or negative).
+          - name: 'send charts matching'
+            default_value: '*'
+            description: |
+              One or more space separated patterns (use * as wildcard) checked against both chart id and chart name.
+            required: false
+            detailed_description: |
+              A pattern starting with ! gives a negative match. So to match all charts named apps.* except charts ending in *reads,
+              use !*reads apps.* (so, the order is important: the first pattern matching the chart id or the chart name will be used,
+              positive or negative). There is also a URL parameter filter that can be used while querying allmetrics. The URL parameter
+              has a higher priority than the configuration option.
+          - name: 'send names instead of ids'
+            default_value: ''
+            description: 'Controls the metric names Netdata should send to the external database (yes|no).'
+            required: false
+            detailed_description: |
+              Netdata supports names and IDs for charts and dimensions. Usually IDs are unique identifiers as read by the system and names
+              are human friendly labels (also unique). Most charts and metrics have the same ID and name, but in several cases they are
+              different : disks with device-mapper, interrupts, QoS classes, statsd synthetic charts, etc.
+          - name: 'send configured labels'
+            default_value: ''
+            description: 'Controls if host labels defined in the `[host labels]` section in `netdata.conf` should be sent to the external database (yes|no).'
+            required: false
+          - name: 'send automatic labels'
+            default_value: ''
+            description: 'Controls if automatically created labels, like `_os_name` or `_architecture` should be sent to the external database (yes|no).'
+            required: false
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: 'Example configuration'
+            folding:
+              enabled: false
+            description: 'Basic example configuration for Prometheus remote write.'
+            config: |
+             [prometheus_remote_write:my_instance]
+                 enabled = yes
+                 destination = 10.11.14.2:2003
+                 remote write URL path = /receive
+          - name: 'Example configuration with HTTPS and HTTP authentication'
+            folding:
+              enabled: false
+            description: 'Add `:https` modifier to the connector type if you need to use the TLS/SSL protocol. For example: `remote_write:https:my_instance`.'
+            config: |
+              [prometheus_remote_write:https:my_instance]
+                  enabled = yes
+                  destination = 10.11.14.2:2003
+                  remote write URL path = /receive
+                  username = my_username
+                  password = my_password
+- <<: *promexport
+  id: 'export-appoptics'
+  meta:
+    <<: *meta
+    name: AppOptics
+    link: https://www.solarwinds.com/appoptics
+    icon_filename: appoptics.svg
+    keywords:
+      - app optics
+      - AppOptics
+      - Solarwinds
+- <<: *promexport
+  id: 'export-azure-data'
+  meta:
+    <<: *meta
+    name: Azure Data Explorer
+    link: https://azure.microsoft.com/en-us/pricing/details/data-explorer/
+    icon_filename: azure.svg
+    keywords:
+      - Azure Data Explorer
+      - Azure
+- <<: *promexport
+  id: 'export-azure-event'
+  meta:
+    <<: *meta
+    name: Azure Event Hub
+    link: https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-about
+    icon_filename: azure.svg
+    keywords:
+      - Azure Event Hub
+      - Azure
+- <<: *promexport
+  id: 'export-newrelic'
+  meta:
+    <<: *meta
+    name: NewRelic
+    link: https://newrelic.com/
+    icon_filename: newrelic.png
+    keywords:
+      - export
+      - NewRelic
+      - prometheus
+      - remote write
+- <<: *promexport
+  id: 'export-quasar'
+  meta:
+    <<: *meta
+    name: QuasarDB
+    link: https://doc.quasar.ai/master/
+    icon_filename: quasardb.png
+    keywords:
+      - export
+      - quasar
+      - quasarDB
+      - prometheus
+      - remote write
+- <<: *promexport
+  id: 'export-splunk'
+  meta:
+    <<: *meta
+    name: Splunk SignalFx
+    link: https://www.splunk.com/en_us/products/observability.html
+    icon_filename: splunk.png
+    keywords:
+      - export
+      - splunk
+      - signalfx
+      - prometheus
+      - remote write
+- <<: *promexport
+  id: 'export-tikv'
+  meta:
+    <<: *meta
+    name: TiKV
+    link: https://tikv.org/
+    icon_filename: tikv.png
+    keywords:
+      - export
+      - TiKV
+      - prometheus
+      - remote write
+- <<: *promexport
+  id: 'export-thanos'
+  meta:
+    <<: *meta
+    name: Thanos
+    link: https://thanos.io/
+    icon_filename: thanos.png
+    keywords:
+      - export
+      - thanos
+      - prometheus
+      - remote write
+- <<: *promexport
+  id: 'export-victoria'
+  meta:
+    <<: *meta
+    name: VictoriaMetrics
+    link: https://victoriametrics.com/products/open-source/
+    icon_filename: victoriametrics.png
+    keywords:
+      - export
+      - victoriametrics
+      - prometheus
+      - remote write
+- <<: *promexport
+  id: 'export-vmware'
+  meta:
+    <<: *meta
+    name: VMware Aria
+    link: https://www.vmware.com/products/aria-operations-for-applications.html
+    icon_filename: vmware-aria.png
+    keywords:
+      - export
+      - VMware
+      - Aria
+      - Tanzu
+      - prometheus
+      - remote write
+- <<: *promexport
+  id: 'export-chronix'
+  meta:
+    <<: *meta
+    name: Chronix
+    link: https://dbdb.io/db/chronix
+    icon_filename: chronix.png
+    keywords:
+      - export
+      - chronix
+      - prometheus
+      - remote write
+- <<: *promexport
+  id: 'export-cortex'
+  meta:
+    <<: *meta
+    name: Cortex
+    link: https://cortexmetrics.io/
+    icon_filename: cortex.png
+    keywords:
+      - export
+      - cortex
+      - prometheus
+      - remote write
+- <<: *promexport
+  id: 'export-crate'
+  meta:
+    <<: *meta
+    name: CrateDB
+    link: https://crate.io/
+    icon_filename: crate.svg
+    keywords:
+      - export
+      - CrateDB
+      - prometheus
+      - remote write
+- <<: *promexport
+  id: 'export-elastic'
+  meta:
+    <<: *meta
+    name: ElasticSearch
+    link: https://www.elastic.co/
+    icon_filename: elasticsearch.svg
+    keywords:
+      - export
+      - ElasticSearch
+      - prometheus
+      - remote write
+- <<: *promexport
+  id: 'export-gnocchi'
+  meta:
+    <<: *meta
+    name: Gnocchi
+    link: https://wiki.openstack.org/wiki/Gnocchi
+    icon_filename: gnocchi.svg
+    keywords:
+      - export
+      - Gnocchi
+      - prometheus
+      - remote write
+- <<: *promexport
+  id: 'export-bigquery'
+  meta:
+    <<: *meta
+    name: Google BigQuery
+    link: https://cloud.google.com/bigquery/
+    icon_filename: bigquery.png
+    keywords:
+      - export
+      - Google BigQuery
+      - prometheus
+      - remote write
+- <<: *promexport
+  id: 'export-irondb'
+  meta:
+    <<: *meta
+    name: IRONdb
+    link: https://docs.circonus.com/irondb/
+    icon_filename: irondb.png
+    keywords:
+      - export
+      - IRONdb
+      - prometheus
+      - remote write
+- <<: *promexport
+  id: 'export-kafka'
+  meta:
+    <<: *meta
+    name: Kafka
+    link: https://kafka.apache.org/
+    icon_filename: kafka.png
+    keywords:
+      - export
+      - Kafka
+      - prometheus
+      - remote write
+- <<: *promexport
+  id: 'export-m3db'
+  meta:
+    <<: *meta
+    name: M3DB
+    link: https://m3db.io/
+    icon_filename: m3db.png
+    keywords:
+      - export
+      - M3DB
+      - prometheus
+      - remote write
+- <<: *promexport
+  id: 'export-metricfire'
+  meta:
+    <<: *meta
+    name: MetricFire
+    link: https://www.metricfire.com/
+    icon_filename: metricfire.png
+    keywords:
+      - export
+      - MetricFire
+      - prometheus
+      - remote write
+- <<: *promexport
+  id: 'export-pgsql'
+  meta:
+    <<: *meta
+    name: PostgreSQL
+    link: https://www.postgresql.org/
+    icon_filename: postgres.png
+    keywords:
+      - export
+      - PostgreSQL
+      - prometheus
+      - remote write
+- <<: *promexport
+  id: 'export-wavefront'
+  meta:
+    <<: *meta
+    name: Wavefront
+    link: https://docs.wavefront.com/wavefront_data_ingestion.html
+    icon_filename: wavefront.png
+    keywords:
+      - export
+      - Wavefront
+      - prometheus
+      - remote write
+- <<: *promexport
+  id: 'export-timescaledb'
+  meta:
+    <<: *meta
+    name: TimescaleDB
+    link: https://www.timescale.com/
+    icon_filename: timescale.png
+    keywords:
+      - export
+      - TimescaleDB
+      - prometheus
+      - remote write
