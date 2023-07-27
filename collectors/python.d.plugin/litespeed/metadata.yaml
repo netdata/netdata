@@ -4,15 +4,15 @@ meta:
   module_name: litespeed
   monitored_instance:
     name: Litespeed
-    link: 'https://www.litespeedtech.com/products/litespeed-web-server'
+    link: "https://www.litespeedtech.com/products/litespeed-web-server"
     categories:
-    - data-collection.web-servers-and-web-proxies
-    icon_filename: 'litespeed.svg'
+      - data-collection.web-servers-and-web-proxies
+    icon_filename: "litespeed.svg"
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
+    description: ""
   keywords:
     - litespeed
     - web
@@ -20,21 +20,21 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'Examine Litespeed metrics for insights into web server operations. Analyze request rates, response times, and error rates for efficient web service delivery.'
-    method_description: 'The collector uses the statistics under /tmp/lshttpd to gather the metrics.'
+    metrics_description: "Examine Litespeed metrics for insights into web server operations. Analyze request rates, response times, and error rates for efficient web service delivery."
+    method_description: "The collector uses the statistics under /tmp/lshttpd to gather the metrics."
   supported_platforms:
     include: []
     exclude: []
   multi_instance: false
   additional_permissions:
-    description: ''
+    description: ""
   default_behavior:
     auto_detection:
-      description: 'If no configuration is present, the collector will attempt to read files under /tmp/lshttpd/.'
+      description: "If no configuration is present, the collector will attempt to read files under /tmp/lshttpd/."
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
     list: []
@@ -75,11 +75,11 @@ setup:
           required: false
         - name: name
           description: Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works.
-          default_value: ''
+          default_value: ""
           required: false
         - name: path
           description: Use a different path than the default, where the lightspeed stats files reside.
-          default_value: '/tmp/lshttpd/'
+          default_value: "/tmp/lshttpd/"
           required: false
     examples:
       folding:
@@ -103,65 +103,65 @@ metrics:
   description: ""
   availability: []
   scopes:
-  - name: global
-    description: "These metrics refer to the entire monitored application."
-    labels: []
-    metrics:
-    - name: litespeed.net_throughput
-      description: Network Throughput HTTP
-      unit: "kilobits/s"
-      chart_type: area
-      dimensions:
-      - name: in
-      - name: out
-    - name: litespeed.net_throughput
-      description: Network Throughput HTTPS
-      unit: "kilobits/s"
-      chart_type: area
-      dimensions:
-      - name: in
-      - name: out
-    - name: litespeed.connections
-      description: Connections HTTP
-      unit: "conns"
-      chart_type: stacked
-      dimensions:
-      - name: free
-      - name: used
-    - name: litespeed.connections
-      description: Connections HTTPS
-      unit: "conns"
-      chart_type: stacked
-      dimensions:
-      - name: free
-      - name: used
-    - name: litespeed.requests
-      description: Requests
-      unit: "requests/s"
-      chart_type: line
-      dimensions:
-      - name: requests
-    - name: litespeed.requests_processing
-      description: Requests In Processing
-      unit: "requests"
-      chart_type: line
-      dimensions:
-      - name: processing
-    - name: litespeed.cache
-      description: Public Cache Hits
-      unit: "hits/s"
-      chart_type: line
-      dimensions:
-      - name: hits
-    - name: litespeed.cache
-      description: Private Cache Hits
-      unit: "hits/s"
-      chart_type: line
-      dimensions:
-      - name: hits
-    - name: litespeed.static
-      description: Static Hits
-      unit: "hits/s"
-      chart_type: line
-      dimensions:
-      - name: hits
+    - name: global
+      description: "These metrics refer to the entire monitored application."
+      labels: []
+      metrics:
+        - name: litespeed.net_throughput
+          description: Network Throughput HTTP
+          unit: "kilobits/s"
+          chart_type: area
+          dimensions:
+            - name: in
+            - name: out
+        - name: litespeed.net_throughput
+          description: Network Throughput HTTPS
+          unit: "kilobits/s"
+          chart_type: area
+          dimensions:
+            - name: in
+            - name: out
+        - name: litespeed.connections
+          description: Connections HTTP
+          unit: "conns"
+          chart_type: stacked
+          dimensions:
+            - name: free
+            - name: used
+        - name: litespeed.connections
+          description: Connections HTTPS
+          unit: "conns"
+          chart_type: stacked
+          dimensions:
+            - name: free
+            - name: used
+        - name: litespeed.requests
+          description: Requests
+          unit: "requests/s"
+          chart_type: line
+          dimensions:
+            - name: requests
+        - name: litespeed.requests_processing
+          description: Requests In Processing
+          unit: "requests"
+          chart_type: line
+          dimensions:
+            - name: processing
+        - name: litespeed.cache
+          description: Public Cache Hits
+          unit: "hits/s"
+          chart_type: line
+          dimensions:
+            - name: hits
+        - name: litespeed.cache
+          description: Private Cache Hits
+          unit: "hits/s"
+          chart_type: line
+          dimensions:
+            - name: hits
+        - name: litespeed.static
+          description: Static Hits
+          unit: "hits/s"
+          chart_type: line
+          dimensions:
+            - name: hits
