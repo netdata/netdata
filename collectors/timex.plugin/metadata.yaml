@@ -65,7 +65,7 @@ setup:
         title: "Config"
       list:
         - name: Basic
-          description: A basic configuration example
+          description: A basic configuration example.
           config: |
             [plugin:timex]
               update every = 1
