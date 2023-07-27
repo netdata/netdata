@@ -13,7 +13,7 @@
     - graphite
     - remote write
     - time series
-  overview: 
+  overview:
     exporter_description: |
       Use the Graphite connector for the exporting engine to archive your Netdata metrics to Graphite providers for long-term storage,
       further analysis, or correlation with data from other sources.
