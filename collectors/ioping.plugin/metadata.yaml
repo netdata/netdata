@@ -71,7 +71,7 @@ setup:
         title: "Config"
       list:
         - name: Basic Configuration
-          description: This Examplle has the minimum configuration necessary to have plugin running.
+          description: This example has the minimum configuration necessary to have the plugin running.
           config: |
             destination="/dev/sda"
 troubleshooting:
