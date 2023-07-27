@@ -4,40 +4,40 @@ meta:
   module_name: gearman
   monitored_instance:
     name: Gearman
-    link: 'http://gearman.org/'
+    link: "http://gearman.org/"
     categories:
-    - data-collection.distributed-computing-systems
-    icon_filename: 'gearman.png'
+      - data-collection.distributed-computing-systems
+    icon_filename: "gearman.png"
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
+    description: ""
   keywords:
     - gearman
     - gearman job server
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'Monitor Gearman metrics for proficient system task distribution. Track job counts, worker statuses, and queue lengths for effective distributed task management.'
-    method_description: 'This collector connects to a Gearman instance via either TCP or unix socket.'
+    metrics_description: "Monitor Gearman metrics for proficient system task distribution. Track job counts, worker statuses, and queue lengths for effective distributed task management."
+    method_description: "This collector connects to a Gearman instance via either TCP or unix socket."
   supported_platforms:
     include: []
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ''
+    description: ""
   default_behavior:
     auto_detection:
-      description: 'When no configuration file is found, the collector tries to connect to TCP/IP socket: localhost:4730.'
+      description: "When no configuration file is found, the collector tries to connect to TCP/IP socket: localhost:4730."
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
     list:
-      - title: 'Socket permissions'
+      - title: "Socket permissions"
         description: The gearman UNIX socket should have read permission for user netdata.
   configuration:
     file:
@@ -76,35 +76,37 @@ setup:
           required: false
         - name: name
           description: Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works.
-          default_value: ''
+          default_value: ""
           required: false
         - name: host
           description: URL or IP where gearman is running.
-          default_value: 'localhost'
+          default_value: "localhost"
           required: false
         - name: port
           description: Port of URL or IP where gearman is running.
-          default_value: '4730'
+          default_value: "4730"
           required: false
         - name: tls
           description: Use tls to connect to gearman.
-          default_value: 'false'
+          default_value: "false"
           required: false
         - name: cert
           description: Provide a certificate file if needed to connect to a TLS gearman instance.
-          default_value: ''
+          default_value: ""
           required: false
         - name: key
           description: Provide a key file if needed to connect to a TLS gearman instance.
-          default_value: ''
+          default_value: ""
           required: false
     examples:
       folding:
-        enabled: false
+        enabled: true
         title: "Config"
       list:
         - name: Local gearman service
           description: A basic host and port gearman configuration for localhost.
+          folding:
+            enabled: false
           config: |
             localhost:
               name: 'local'
@@ -129,10 +131,10 @@ troubleshooting:
   problems:
     list: []
 alerts:
-- name: gearman_workers_queued
-  link: https://github.com/netdata/netdata/blob/master/health/health.d/gearman.conf
-  metric: gearman.single_job
-  info: average number of queued jobs over the last 10 minutes
+  - name: gearman_workers_queued
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/gearman.conf
+    metric: gearman.single_job
+    info: average number of queued jobs over the last 10 minutes
 metrics:
   folding:
     title: Metrics
@@ -140,26 +142,26 @@ metrics:
   description: ""
   availability: []
   scopes:
-  - name: global
-    description: "These metrics refer to the entire monitored application."
-    labels: []
-    metrics:
-    - name: gearman.total_jobs
-      description: Total Jobs
-      unit: "Jobs"
-      chart_type: line
-      dimensions:
-      - name: Pending
-      - name: Running
-  - name: gearman job
-    description: "Metrics related to Gearman jobs. Each job produces its own set of the following metrics."
-    labels: []
-    metrics:
-    - name: gearman.single_job
-      description: '{job_name}'
-      unit: "Jobs"
-      chart_type: stacked
-      dimensions:
-      - name: Pending
-      - name: Idle
-      - name: Runnning
+    - name: global
+      description: "These metrics refer to the entire monitored application."
+      labels: []
+      metrics:
+        - name: gearman.total_jobs
+          description: Total Jobs
+          unit: "Jobs"
+          chart_type: line
+          dimensions:
+            - name: Pending
+            - name: Running
+    - name: gearman job
+      description: "Metrics related to Gearman jobs. Each job produces its own set of the following metrics."
+      labels: []
+      metrics:
+        - name: gearman.single_job
+          description: "{job_name}"
+          unit: "Jobs"
+          chart_type: stacked
+          dimensions:
+            - name: Pending
+            - name: Idle
+            - name: Runnning
