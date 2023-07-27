@@ -3,7 +3,7 @@ meta:
   module_name: uwsgi
   monitored_instance:
     name: uWSGI
-    link: ''
+    link: 'https://github.com/unbit/uwsgi/tree/2.0.21'
     categories:
     - data-collection.web-servers-and-web-proxies
     icon_filename: 'uwsgi.png'
@@ -12,43 +12,113 @@ meta:
       list: []
   info_provided_to_referring_integrations:
     description: ''
-  keywords: []
+  keywords:
+  - application server
+  - python
+  - web applications
   most_popular: false
 overview:
   data_collection:
     metrics_description: 'Monitor uWSGI performance for optimal application server operations. Monitor request rates, worker statuses, and error rates to ensure efficient application delivery.'
-    method_description: ''
+    method_description: "Collect every metric exposed for the stats server of the uWSGI, either for stats socket or for the web server's TCP/IP socket."
   supported_platforms:
     include: []
     exclude: []
-  multi_instance: true
+  multi_instance: false
   additional_permissions:
     description: ''
   default_behavior:
     auto_detection:
-      description: ''
+      description: 'If the uWSGI is deployed on the same environment with the Agent, netdata will autodetect it'
     limits:
       description: ''
     performance_impact:
       description: ''
 setup:
   prerequisites:
-    list: []
+    list: 
+    - title: Enable the uWSGI Stats server
+      description: |
+        Make sure that you uWSGI exposes it's metrics via a Stats server.
+
+        Source: https://uwsgi-docs.readthedocs.io/en/latest/StatsServer.html
   configuration:
     file:
-      name: ''
-      description: ''
+      name: 'python.d/uwsgi.conf'
     options:
-      description: ''
+      description: |
+        There are 2 sections:
+
+        * Global variables
+        * One or more JOBS that can define multiple different instances to monitor.
+
+        The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
+
+        Additionally, the following collapsed table contains all the options that can be configured inside a JOB definition.
+
+        Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.      
       folding:
-        title: ''
+        title: 'Config options'
         enabled: true
-      list: []
+      list:
+      - name: update_every
+        description: Sets the default data collection frequency.
+        default_value: 5
+        required: false
+      - name: priority
+        description: Controls the order of charts at the netdata dashboard.
+        default_value: 60000
+        required: false
+      - name: autodetection_retry
+        description: Sets the job re-check interval in seconds.
+        default_value: 0
+        required: false
+      - name: penalty
+        description: Indicates whether to apply penalty to update_every in case of failures.
+        default_value: yes
+        required: false
+      - name: name
+        description: the JOB's name as it will appear at the dashboard (by default is the job_name)
+        default_value: job_name
+        required: false
+      - name: socket
+        description: The 'path/to/uwsgistats.sock'
+        default_value: no
+        required: false
+      - name: host
+        description: The host to connect to
+        default_value: no
+        required: false
+      - name: port
+        description: The port to connect to
+        default_value: no
+        required: false
     examples:
       folding:
         enabled: true
-        title: ''
-      list: []
+        title: 'Config'
+      list:
+      - name: Basic (default out-of-the-box)
+        description: A basic example configuration, one job will run at a time. Autodetect mechanism uses it by default.
+        config: |
+          socket:
+            name     : 'local'
+            socket   : '/tmp/stats.socket'
+
+          localhost:
+            name     : 'local'
+            host     : 'localhost'
+            port     : 1717
+
+          localipv4:
+            name     : 'local'
+            host     : '127.0.0.1'
+            port     : 1717
+
+          localipv6:
+            name     : 'local'
+            host     : '::1'
+            port     : 1717
 troubleshooting:
   problems:
     list: []
@@ -61,7 +131,7 @@ metrics:
   availability: []
   scopes:
   - name: global
-    description: ""
+    description: "This collector provides quantitive and performance metrics for your uWSGI server"
     labels: []
     metrics:
     - name: uwsgi.requests
