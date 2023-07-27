@@ -30,6 +30,21 @@
 
 <hr class="solid">
 
+<p align="center">
+  <b>Live Demo Netdata Agents</b><br/>
+	<a href="https://frankfurt.netdata.rocks"><b>FRANKFURT</b></a> |
+	<a href="https://newyork.netdata.rocks"><b>NEWYORK</b></a> |
+	<a href="https://atlanta.netdata.rocks"><b>ATLANTA</b></a> |
+	<a href="https://sanfrancisco.netdata.rocks"><b>SANFRANCISCO</b></a> |
+	<a href="https://toronto.netdata.rocks"><b>TORONTO</b></a> |
+	<a href="https://singapore.netdata.rocks"><b>SINGAPORE</b></a> |
+	<a href="https://bangalore.netdata.rocks"><b>BANGALORE</b></a>
+  <br/>
+  <i>They are clustered Netdata Parents. They all have the same data. <b>Select the one closer to you.</b></i>
+</p>
+
+<hr class="solid">
+
 MENU: **[WHAT IS NEW](#whats-new-and-coming)** | **[GETTING STARTED](#getting-started)** | **[HOW IT WORKS](#how-it-works)** | **[FAQ](#faq)** | **[DOCS](#book-documentation)** | **[COMMUNITY](#tada-community)** | **[CONTRIBUTE](#pray-contribute)**
 
 Netdata collects metrics per second and presents them in beautiful low-latency dashboards. It is designed to run on all of your physical and virtual servers, cloud deployments, Kubernetes clusters, and edge/IoT devices, to monitor your systems, containers and applications.
