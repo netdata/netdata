@@ -512,15 +512,20 @@ Netdata is indeed a very comprehensive monitoring tool. It's designed to provide
 
 Here are some suggestions on how to manage and navigate this wealth of information:
 
-  1. **Start with the Overview Dashboard**: Netdata's Overview Dashboard provides a high-level summary of your system's status. We have added summary tiles on almost every section, you reveal the information that is more important. This is a great place to start, as it can help you identify any major issues or trends at a glance.
+  1. **Start with the Overview Dashboard**<br/>
+      Netdata's Overview Dashboard provides a high-level summary of your system's status. We have added summary tiles on almost every section, you reveal the information that is more important. This is a great place to start, as it can help you identify any major issues or trends at a glance.
 
-  2. **Use the Search Feature**: If you're looking for specific information, you can use the search feature to find the relevant metrics or charts. This can help you avoid scrolling through all the data.
+  2. **Use the Search Feature**<br/>
+     If you're looking for specific information, you can use the search feature to find the relevant metrics or charts. This can help you avoid scrolling through all the data.
 
-  3. **Customize your Dashboards**: Netdata allows you to create custom dashboards, which can help you focus on the metrics that are most important to you. Sign-in to Netdata and there you can have your custom dashboards.
+  3. **Customize your Dashboards**<br/>
+     Netdata allows you to create custom dashboards, which can help you focus on the metrics that are most important to you. Sign-in to Netdata and there you can have your custom dashboards. (coming soon to the agent dashboard too)
 
-  4. **Leverage Netdata's Anomaly Detection**: Netdata uses machine learning to detect anomalies in your metrics. This can help you identify potential issues before they become major problems. We have added an `AR` button above the dashboard table of contents to reveal the anomaly rate per section so that you can easily spot what could need your attention.
+  4. **Leverage Netdata's Anomaly Detection**<br/>
+     Netdata uses machine learning to detect anomalies in your metrics. This can help you identify potential issues before they become major problems. We have added an `AR` button above the dashboard table of contents to reveal the anomaly rate per section so that you can easily spot what could need your attention.
 
-  5. **Take Advantage of Netdata's Documentation**: Netdata has extensive documentation that can help you understand the different metrics and how to interpret them. You can also find tutorials, guides, and best practices there.
+  5. **Take Advantage of Netdata's Documentation and Blogs**<br/>
+     Netdata has extensive documentation that can help you understand the different metrics and how to interpret them. You can also find tutorials, guides, and best practices there.
 
 Remember, it's not necessary to understand every single metric or chart right away. Netdata is a powerful tool, and it can take some time to fully explore and understand all of its features. Start with the basics and gradually delve into more complex metrics as you become more comfortable with the tool.
 
