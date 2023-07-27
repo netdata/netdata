@@ -19,6 +19,7 @@ meta:
     - standard score
     - standard deviation
     - anomaly detection
+    - statistical anomaly detection
   most_popular: false
 overview:
   data_collection:
