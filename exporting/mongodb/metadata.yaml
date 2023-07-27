@@ -37,7 +37,7 @@ setup:
           description: 'Enables or disables an exporting connector instance (yes|no).'
           required: true
         - name: 'destination'
-          default_value: 'pubsub.googleapis.com'
+          default_value: 'localhost'
           description: 'Accepts a space separated list of hostnames, IPs (IPv4 and IPv6) and ports to connect to. Netdata will use the first available to send the metrics.'
           required: true
           detailed_description: |
@@ -48,7 +48,7 @@ setup:
 
             Example IPv4:
               ```yaml
-              destination = 10.11.14.2:4242 10.11.14.3:4242 10.11.14.4:4242
+              destination = 10.11.14.2:27017 10.11.14.3:4242 10.11.14.4:27017
               ```
             Example IPv6 and IPv4 together:
             ```yaml
