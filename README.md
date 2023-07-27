@@ -473,6 +473,35 @@ The distributed nature of Netdata helps scaling this approach: your data is spre
 &nbsp;<br/>&nbsp;<br/>
 </details>
 
+### :raised_eyebrow: How is Netdata different from Nagios, Icinga, Zabbix, etc?
+
+Netdata offers real-time, comprehensive monitoring, with a user-friendly interface and the ability to monitor everything, without any custom configuration required.
+
+<details><summary>Click to see detailed answer ...</summary>
+&nbsp;<br/>&nbsp;<br/>
+
+While Nagios, Icinga, Zabbix, and other similar tools are powerful and highly customizable, they can be complex to set up and manage. Their flexibility often comes at the cost of ease-of-use, especially for users who are not systems administrators or do not have extensive experience with these tools. Additionally, these tools generally require you to know what you want to monitor in advance and configure it explicitly.
+
+Netdata, on the other hand, takes a different approach. It provides a "ready to use" monitoring solution with a focus on simplicity and comprehensiveness. It automatically detects and starts monitoring many different system metrics and applications out-of-the-box, without any need for custom configuration. 
+
+In comparison to these traditional monitoring tools, Netdata:
+
+  - Provides real-time, high-resolution metrics, as opposed to the often minute-level granularity that tools like Nagios, Icinga, and Zabbix provide.
+
+  - Automatically generates meaningful, organized, and interactive visualizations of the collected data. Unlike other tools, where you have to manually create and organize graphs and dashboards, Netdata takes care of this for you.
+
+  - Applies machine learning to each individual metric to detect anomalies, providing more insightful and relevant alerts than static thresholds.
+
+  - Is designed to be distributed, so your data is spread inside your infrastructure, as close to the edge as possible. This approach is more scalable and avoids the potential bottleneck of a single centralized server.
+
+  - Has a more modern and user-friendly interface, making it easy for anyone, not just experienced administrators, to understand the health and performance of their systems.
+
+Even if you're already using Nagios, Icinga, Zabbix, or similar tools, you can use Netdata alongside them to augment your existing monitoring capabilities with real-time insights and user-friendly dashboards.
+
+&nbsp;<br/>&nbsp;<br/>
+</details>
+
+
 ### :cloud: Do I have to subscribe to Netdata Cloud?
 
 Subscribing to Netdata Cloud is optional but many users find it enhances their experience with Netdata.
