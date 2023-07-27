@@ -152,25 +152,25 @@ setup:
           description: ''
           config: |
             [opentsdb:my_opentsdb_instance]
-		enabled = yes
-		destination = localhost:4242
-		username = my_username
-		password = my_password
+                enabled = yes
+                destination = localhost:4242
+                username = my_username
+                password = my_password
         - name: 'Using `send hosts matching`'
           folding:
             enabled: false
           description: ''
           config: |
-	     [opentsdb:my_opentsdb_instance]
-		enabled = yes
-		destination = localhost:4242
+            [opentsdb:my_opentsdb_instance]
+                enabled = yes
+                destination = localhost:4242
                 send hosts matching = localhost *
         - name: 'Using `send charts matching`'
           folding:
             enabled: false
           description: ''
           config: |
-	     [opentsdb:my_opentsdb_instance]
-		enabled = yes
-		destination = localhost:4242
+            [opentsdb:my_opentsdb_instance]
+                enabled = yes
+                destination = localhost:4242
                 send charts matching = *
