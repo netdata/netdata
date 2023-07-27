@@ -25,7 +25,7 @@ overview:
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: "The plugin needs to access the server. Netdata sets permissions during installation time to reach the server trough its library."
+    description: "The plugin needs to access the server. Netdata sets permissions during installation time to reach the server through its library."
   default_behavior:
     auto_detection:
       description: "The plugin detects when CUPS server is running and tries to connect to it."
