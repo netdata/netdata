@@ -214,7 +214,7 @@
 - id: deploy-docker
   meta:
     name: Docker
-    link: ''
+    link: 'https://www.docker.com/'
     categories:
       - deploy.docker-kubernetes
     icon_filename: 'docker.png'
@@ -503,7 +503,7 @@
 - id: deploy-windows
   meta:
     name: Windows
-    link: ''
+    link: 'https://www.microsoft.com/en-us/windows'
     categories:
       - deploy.operating-systems
     icon_filename: 'windows.png'
@@ -513,7 +513,7 @@
     1. Install [Windows Exporter](https://github.com/prometheus-community/windows_exporter) on every Windows host you want to monitor.
     2. Install Netdata agent on Linux, FreeBSD or Mac.
     3. Configure Netdata to collect data remotely from your Windows hosts by adding one job per host to windows.conf file. See the [configuration section](https://learn.netdata.cloud/docs/data-collection/monitor-anything/System%20Metrics/Windows-machines#configuration) for details.
-    4. Enable virtual nodes configuration so the windows nodes are displayed as separate nodes.
+    4. Enable [virtual nodes](https://learn.netdata.cloud/docs/data-collection/windows-systems#virtual-nodes) configuration so the windows nodes are displayed as separate nodes.
   methods:
     - method: wget
       commands:
@@ -542,3 +542,39 @@
     group: ''
     distro: ''
   quick_start: 2
+- id: deploy-freebsd
+  meta:
+    name: FreeBSD
+    link: 'https://www.freebsd.org/'
+    categories:
+      - deploy.operating-systems
+    icon_filename: 'freebsd.jpg'
+  most_popular: true
+  keywords:
+    - freebsd
+  install_description: |
+    ## Install dependencies
+    Please install the following packages using the command below:
+
+    ```pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof liblz4 libuv json-c cmake gmake```
+    This step needs root privileges. Please respond in the affirmative for any relevant prompts during the installation process.
+    
+    Run the following command on your node to install and claim Netdata:
+  methods:
+    - method: wget
+      commands:
+        - channel: nightly
+          command: >
+            wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
+            --nightly-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+        - channel: stable
+          command: >
+            wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
+            --stable-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
+  additional_info: |
+    Netdata can also be installed via [FreeBSD ports](https://www.freshports.org/net-mgmt/netdata).
+  related_resources: {}
+  platform_info:
+    group: 'include'
+    distro: 'freebsd'
+  quick_start: 6
