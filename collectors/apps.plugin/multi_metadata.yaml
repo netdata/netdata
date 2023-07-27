@@ -1,4 +1,4 @@
-name: apps.plugin
+plugin_name: apps.plugin
 modules:
   # removed system.processes_state
   - meta:

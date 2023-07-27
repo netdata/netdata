@@ -33,8 +33,10 @@ overview:
       description: ''
 setup:
   prerequisites:
-    list: |
-      It is necessary to have `libmnl` installed on host.
+    list:
+      - title: Install required packages
+        description: |
+          Install `libmnl-dev` and `libnetfilter-acct-dev` using the package manager of your system.
   configuration:
     file:
       name: 'netdata.conf'
@@ -45,14 +47,14 @@ setup:
       folding:
         title: 'Config options'
         enabled: true
-      list: |
+      list:
         - name: update every
           description: Data collection frequency.
           default_value: 1
           required: false
         - name: command options
           description: Additinal parameters for collector
-          default_value:
+          default_value: ""
           required: false
     examples:
       folding:
