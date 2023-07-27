@@ -1,4 +1,4 @@
-name: cgroups.plugin
+plugin_name: cgroups.plugin
 modules:
   - &module
     meta: &meta

@@ -1,4 +1,4 @@
-name: ebpf.plugin
+plugin_name: ebpf.plugin
 modules:
   - meta:
       plugin_name: ebpf.plugin

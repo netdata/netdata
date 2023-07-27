@@ -56,7 +56,7 @@ setup:
         - name: loop time in ms
           description: >
             Specifies the target time for the data collection thread to sleep, measured in miliseconds.
-          default: 20
+          default_value: 20
           required: false
     examples:
       folding:

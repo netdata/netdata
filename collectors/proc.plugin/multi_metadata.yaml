@@ -1,4 +1,4 @@
-name: proc.plugin
+plugin_name: proc.plugin
 modules:
   - meta:
       plugin_name: proc.plugin

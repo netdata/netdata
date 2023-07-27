@@ -1,4 +1,4 @@
-name: debugfs.plugin
+plugin_name: debugfs.plugin
 modules:
   - meta:
       plugin_name: debugfs.plugin

@@ -1,4 +1,4 @@
-name: freebsd.plugin
+plugin_name: freebsd.plugin
 modules:
   - meta:
       plugin_name: freebsd.plugin

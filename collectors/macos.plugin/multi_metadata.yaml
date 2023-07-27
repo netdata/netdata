@@ -1,4 +1,4 @@
-name: macos.plugin
+plugin_name: macos.plugin
 modules:
   - meta:
       plugin_name: macos.plugin
