@@ -26,18 +26,23 @@ SINGLE_PATTERN = '*/metadata.yaml'
 MULTI_PATTERN = '*/multi_metadata.yaml'
 
 COLLECTOR_SOURCES = [
-    (AGENT_REPO, REPO_PATH / 'collectors'),
-    (AGENT_REPO, REPO_PATH / 'collectors' / 'charts.d.plugin'),
-    (AGENT_REPO, REPO_PATH / 'collectors' / 'python.d.plugin'),
-    (GO_REPO, GO_REPO_PATH / 'modules'),
+    (AGENT_REPO, REPO_PATH / 'collectors', True),
+    (AGENT_REPO, REPO_PATH / 'collectors' / 'charts.d.plugin', True),
+    (AGENT_REPO, REPO_PATH / 'collectors' / 'python.d.plugin', True),
+    (GO_REPO, GO_REPO_PATH / 'modules', True),
 ]
 
 DEPLOY_SOURCES = [
-    (AGENT_REPO, INTEGRATIONS_PATH / 'deploy.yaml'),
+    (AGENT_REPO, INTEGRATIONS_PATH / 'deploy.yaml', False),
 ]
 
 EXPORTER_SOURCES = [
-    (AGENT_REPO, REPO_PATH / 'exporters'),
+    (AGENT_REPO, REPO_PATH / 'exporters', True),
+]
+
+NOTIFICATION_SOURCES = [
+    (AGENT_REPO, REPO_PATH / 'health' / 'notifications', True),
+    (AGENT_REPO, INTEGRATIONS_PATH / 'notifications.yaml', False),
 ]
 
 COLLECTOR_RENDER_KEYS = [
@@ -50,6 +55,10 @@ COLLECTOR_RENDER_KEYS = [
 ]
 
 EXPORTER_RENDER_KEYS = [
+    'setup',
+]
+
+NOTIFICATION_RENDER_KEYS = [
     'setup',
 ]
 
@@ -92,6 +101,11 @@ DEPLOY_VALIDATOR = Draft7Validator(
 )
 
 EXPORTER_VALIDATOR = Draft7Validator(
+    {'$ref': './exporter.json#'},
+    registry=registry,
+)
+
+NOTIFICATION_VALIDATOR = Draft7Validator(
     {'$ref': './exporter.json#'},
     registry=registry,
 )
@@ -154,13 +168,18 @@ def get_collector_metadata_entries():
     single = []
     multi = []
 
-    for r, d in COLLECTOR_SOURCES:
-        if d.exists() and d.is_dir():
+    for r, d, m in COLLECTOR_SOURCES:
+        if d.exists() and d.is_dir() and m:
             for item in d.glob(SINGLE_PATTERN):
                 single.append((r, item))
 
             for item in d.glob(MULTI_PATTERN):
                 multi.append((r, item))
+        elif d.exists() and d.is_file() and not m:
+            if d.match(SINGLE_PATTERN):
+                single.append(d)
+            elif d.match(MULTI_PATTERN):
+                multi.append(d)
 
     return (single, multi)
 
@@ -250,54 +269,119 @@ def load_collectors():
     return ret
 
 
+def _load_deploy_file(file, repo):
+    ret = []
+    debug(f'Loading { file }.')
+    data = load_yaml(file)
+
+    if not data:
+        return []
+
+    try:
+        DEPLOY_VALIDATOR.validate(data)
+    except ValidationError:
+        warn(f'Failed to validate { file } against the schema.', file)
+        return []
+
+    for idx, item in enumerate(data):
+        item['integration_type'] = 'deploy'
+        item['_src_path'] = file
+        item['_repo'] = repo
+        item['_index'] = idx
+        ret.append(item)
+
+    return ret
+
+
 def load_deploy():
     ret = []
 
-    for repo, path in DEPLOY_SOURCES:
-        debug(f'Loading { path }.')
-        data = load_yaml(path)
-
-        if not data:
-            continue
-
-        try:
-            DEPLOY_VALIDATOR.validate(data)
-        except ValidationError:
-            warn(f'Failed to validate { path } against the schema.', path)
-            continue
-
-        for idx, item in enumerate(data):
-            item['integration_type'] = 'deploy'
-            item['_src_path'] = path
-            item['_repo'] = repo
-            item['_index'] = idx
-            ret.append(item)
+    for repo, path, match in DEPLOY_SOURCES:
+        if match and path.exists() and path.is_dir():
+            for file in DEPLOY_SOURCES.glob(SINGLE_PATTERN):
+                ret.extend(_load_deploy_file(file, repo))
+        elif not match and path.exists() and path.is_file():
+            ret.extend(_load_deploy_file(path, repo))
 
     return ret
+
+
+def _load_exporter_file(file, repo):
+    debug(f'Loading { file }.')
+    data = load_yaml(file)
+
+    if not data:
+        return []
+
+    try:
+        EXPORTER_VALIDATOR.validate(data)
+    except ValidationError:
+        warn(f'Failed to validate { file } against the schema.', file)
+        return []
+
+    data['integration_type'] = 'exporter'
+    data['_src_path'] = file
+    data['_repo'] = repo
+    data['_index'] = 0
+
+    return [data]
 
 
 def load_exporters():
     ret = []
 
-    for repo, section in EXPORTER_SOURCES:
-        for path in section.glob(SINGLE_PATTERN):
-            debug(f'Loading { path }.')
-            data = load_yaml(path)
+    for repo, path, match in EXPORTER_SOURCES:
+        if match and path.exists() and path.is_dir():
+            for file in DEPLOY_SOURCES.glob(SINGLE_PATTERN):
+                ret.extend(_load_exporter_file(file, repo))
+        elif not match and path.exists() and path.is_file():
+            ret.extend(_load_exporter_file(path, repo))
 
-            if not data:
-                continue
+    return ret
 
-            try:
-                EXPORTER_VALIDATOR.validate(data)
-            except ValidationError:
-                warn(f'Failed to validate { path } against the schema.', path)
-                continue
 
-            data['integration_type'] = 'collector'
-            data['_src_path'] = path
-            data['_repo'] = repo
-            data['_index'] = 0
-            ret.append(data)
+def _load_notification_file(file, repo):
+    debug(f'Loading { file }.')
+    data = load_yaml(file)
+
+    if not data:
+        return []
+
+    try:
+        NOTIFICATION_VALIDATOR.validate(data)
+    except ValidationError:
+        warn(f'Failed to validate { file } against the schema.', file)
+        return []
+
+    if 'id' in data:
+        data['integration_type'] = 'notification'
+        data['_src_path'] = file
+        data['_repo'] = repo
+        data['_index'] = 0
+
+        return [data]
+    else:
+        ret = []
+
+        for idx, item in enumerate(data):
+            item['integration_type'] = 'notification'
+            item['_src_path'] = file
+            item['_repo'] = repo
+            item['_index'] = idx
+            ret.append(item)
+
+        return ret
+
+
+def load_notifications():
+    ret = []
+
+    for repo, path, match in EXPORTER_SOURCES:
+        if match and path.exists() and path.is_dir():
+            for file in DEPLOY_SOURCES.glob(SINGLE_PATTERN):
+                ret.extend(_load_notification_file(file, repo))
+        elif not match and path.exists() and path.is_file():
+            ret.extend(_load_notification_file(path, repo))
 
     return ret
 
@@ -322,6 +406,26 @@ def make_edit_link(item):
     return f'https://github.com/{ item["_repo"] }/blob/master/{ item_path }'
 
 
+def sort_integrations(integrations):
+    integrations.sort(key=lambda i: i['_index'])
+    integrations.sort(key=lambda i: i['_src_path'])
+    integrations.sort(key=lambda i: i['id'])
+
+
+def dedupe_integrations(integrations, ids):
+    tmp_integrations = []
+
+    for i in integrations:
+        if ids.get(i['id'], False):
+            first_path, first_index = ids[i['id']]
+            warn(f'Duplicate integration ID found at { i["_src_path"] } index { i["_index"] } (original definition at { first_path } index { first_index }), ignoring that integration.', i['_src_path'])
+        else:
+            tmp_integrations.append(i)
+            ids[i['id']] = (i['_src_path'], i['_index'])
+
+    return tmp_integrations, ids
+
+
 def render_collectors(categories, collectors, ids):
     debug('Computing default categories.')
 
@@ -334,25 +438,11 @@ def render_collectors(categories, collectors, ids):
 
     debug('Sorting collectors.')
 
-    collectors.sort(key=lambda i: i['_index'])
-    collectors.sort(key=lambda i: i['_src_path'])
-    collectors.sort(key=lambda i: i['id'])
-
-    tmp_collectors = []
+    sort_integrations(collectors)
 
     debug('Removing duplicate collectors.')
 
-    for i in collectors:
-        if ids.get(i['id'], False):
-            first_path, first_index = ids[i['id']]
-            warn(f'Duplicate integration ID found at { i["_src_path"] } index { i["_index"] } (original definition at { first_path } index { first_index }), ignoring that integration.', i['_src_path'])
-        else:
-            tmp_collectors.append(i)
-            ids[i['id']] = (i['_src_path'], i['_index'])
-
-    collectors = tmp_collectors
-
-    del tmp_collectors
+    collectors, ids = dedupe_integrations(collectors, ids)
 
     idmap = {i['id']: i for i in collectors}
 
@@ -416,23 +506,11 @@ def render_collectors(categories, collectors, ids):
 def render_deploy(distros, categories, deploy, ids):
     debug('Sorting deployments.')
 
-    deploy.sort(key=lambda i: i['_index'])
-    deploy.sort(key=lambda i: i['_src_path'])
-    deploy.sort(key=lambda i: i['id'])
+    sort_integrations(deploy)
 
     debug('Checking deployment ids.')
 
-    tmp_deploy = []
-
-    for i in deploy:
-        if ids.get(i['id'], False):
-            first_path, first_index = ids[i['id']]
-            warn(f'Duplicate integration ID found at { i["_src_path"] } index { i["_index"] } (original definition at { first_path } index { first_index }), ignoring that integration.', i['_src_path'])
-        else:
-            tmp_deploy.append(i)
-            ids[i['id']] = (i['_src_path'], i['_index'])
-
-    deploy = tmp_deploy
+    deploy, ids = dedupe_integrations(deploy, ids)
 
     template = get_jinja_env().get_template('platform_info.md')
 
@@ -464,25 +542,13 @@ def render_deploy(distros, categories, deploy, ids):
 
 
 def render_exporters(categories, exporters, ids):
-    debug('Sorting deployments.')
+    debug('Sorting exporters.')
 
-    exporters.sort(key=lambda i: i['_index'])
-    exporters.sort(key=lambda i: i['_src_path'])
-    exporters.sort(key=lambda i: i['id'])
+    sort_integrations(exporters)
 
     debug('Checking exporter ids.')
 
-    tmp_exporters = []
-
-    for i in exporters:
-        if ids.get(i['id'], False):
-            first_path, first_index = ids[i['id']]
-            warn(f'Duplicate integration ID found at { i["_src_path"] } index { i["_index"] } (original definition at { first_path } index { first_index }), ignoring that integration.', i['_src_path'])
-        else:
-            tmp_exporters.append(i)
-            ids[i['id']] = (i['_src_path'], i['_index'])
-
-    exporters = tmp_exporters
+    exporters, ids = dedupe_integrations(exporters, ids)
 
     for item in exporters:
         for key in COLLECTOR_RENDER_KEYS:
@@ -497,6 +563,30 @@ def render_exporters(categories, exporters, ids):
         del item['_index']
 
     return exporters, ids
+
+
+def render_notifications(categories, notifications, ids):
+    debug('Sorting notifications.')
+
+    sort_integrations(notifications)
+
+    debug('Checking notification ids.')
+
+    notifications, ids = dedupe_integrations(notifications, ids)
+
+    for item in notifications:
+        for key in COLLECTOR_RENDER_KEYS:
+            template = get_jinja_env().get_template(f'{ key }.md')
+            data = template.render(entry=item)
+            item[key] = data
+
+        item['edit_link'] = make_edit_link(item)
+
+        del item['_src_path']
+        del item['_repo']
+        del item['_index']
+
+    return notifications, ids
 
 
 def render_integrations(categories, integrations):
@@ -514,11 +604,14 @@ def main():
     collectors = load_collectors()
     deploy = load_deploy()
     exporters = load_exporters()
+    notifications = load_notifications()
+
     collectors, ids = render_collectors(categories, collectors, dict())
     deploy, ids = render_deploy(distros, categories, deploy, ids)
     exporters, ids = render_exporters(categories, exporters, ids)
+    notifications, ids = render_notifications(categories, notifications, ids)
 
-    integrations = collectors + deploy + exporters
+    integrations = collectors + deploy + exporters + notifications
     render_integrations(categories, integrations)
 
 
