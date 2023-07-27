@@ -214,7 +214,7 @@
 - id: deploy-docker
   meta:
     name: Docker
-    link: 'https://www.apple.com/macos/ventura/'
+    link: 'https://www.docker.com/'
     categories:
       - deploy.docker-kubernetes
     icon_filename: 'docker.png'
@@ -571,17 +571,8 @@
           command: >
             wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
             --stable-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
-    - method: curl
-      commands:
-        - channel: nightly
-          command: >
-            curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --nightly-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
-        - channel: stable
-          command: >
-            curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --stable-channel --claim-token {% claim_token %} --claim-url {% claim_url %}
-  additional_info: *ref_containers
+  additional_info: |
+    Netdata can also be installed via [FreeBSD ports](https://www.freshports.org/net-mgmt/netdata).
   related_resources: {}
   platform_info:
     group: 'include'
