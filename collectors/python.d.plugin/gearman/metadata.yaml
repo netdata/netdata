@@ -7,7 +7,7 @@ meta:
     link: "http://gearman.org/"
     categories:
       - data-collection.distributed-computing-systems
-    icon_filename: "gearman.png"
+    icon_filename: "gearman.svg"
   related_resources:
     integrations:
       list: []

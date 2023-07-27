@@ -188,7 +188,7 @@
     link: ''
     categories:
       - deploy.operating-systems
-    icon_filename: 'apple.png'
+    icon_filename: 'apple.svg'
   most_popular: true
   keywords:
     - MacOS
@@ -217,7 +217,7 @@
     link: 'https://www.docker.com/'
     categories:
       - deploy.docker-kubernetes
-    icon_filename: 'docker.png'
+    icon_filename: 'docker.svg'
   most_popular: true
   keywords:
     - docker
@@ -428,7 +428,7 @@
     link: ''
     categories:
       - deploy.docker-kubernetes
-    icon_filename: 'kubernetes.png'
+    icon_filename: 'kubernetes.svg'
   keywords:
     - kubernetes
     - container
@@ -552,7 +552,7 @@
     link: 'https://www.freebsd.org/'
     categories:
       - deploy.operating-systems
-    icon_filename: 'freebsd.jpg'
+    icon_filename: 'freebsd.svg'
   most_popular: true
   keywords:
     - freebsd

@@ -6,7 +6,7 @@ meta:
     link: 'https://www.dovecot.org/'
     categories:
     - data-collection.mail-servers
-    icon_filename: 'dovecot.png'
+    icon_filename: 'dovecot.svg'
   related_resources:
     integrations:
       list: []
