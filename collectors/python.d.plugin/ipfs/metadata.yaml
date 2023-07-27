@@ -3,7 +3,7 @@ meta:
   module_name: ipfs
   monitored_instance:
     name: IPFS
-    link: ''
+    link: 'https://ipfs.tech/'
     categories:
     - data-collection.storage-mount-points-and-filesystems
     icon_filename: 'ipfs.png'
@@ -17,7 +17,7 @@ meta:
 overview:
   data_collection:
     metrics_description: 'Examine IPFS metrics for insights into distributed file system operations. Analyze node connectivity, data replication, and retrieval times for efficient distributed file handling.'
-    method_description: ''
+    method_description: 'It connects to http endpoint of the IPFS server'
   supported_platforms:
     include: []
     exclude: []
@@ -26,9 +26,13 @@ overview:
     description: ''
   default_behavior:
     auto_detection:
-      description: ''
+      description: 'If the endpoint is accesible by the Agent, netdata will autodetect it'
     limits:
-      description: ''
+      description: |
+        Calls to the following endpoints are disabled due to IPFS bugs:
+
+        /api/v0/stats/repo (https://github.com/ipfs/go-ipfs/issues/3874)
+        /api/v0/pin/ls (https://github.com/ipfs/go-ipfs/issues/7528)
     performance_impact:
       description: ''
 setup:
@@ -36,19 +40,68 @@ setup:
     list: []
   configuration:
     file:
-      name: ''
-      description: ''
+      name: 'python.d/ipfs.conf'
     options:
-      description: ''
+      description: |
+        There are 2 sections:
+
+        * Global variables
+        * One or more JOBS that can define multiple different instances to monitor.
+
+        The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
+
+        Additionally, the following collapsed table contains all the options that can be configured inside a JOB definition.
+
+        Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
       folding:
         title: ''
         enabled: true
-      list: []
+      list:
+      - name: update_every
+        description: Sets the default data collection frequency.
+        default_value: 5
+        required: false
+      - name: priority
+        description: Controls the order of charts at the netdata dashboard.
+        default_value: 60000
+        required: false
+      - name: autodetection_retry
+        description: Sets the job re-check interval in seconds.
+        default_value: 0
+        required: false
+      - name: penalty
+        description: Indicates whether to apply penalty to update_every in case of failures.
+        default_value: yes
+        required: false
+      - name: name
+        description: The JOB's name as it will appear at the dashboard (by default is the job_name)
+        default_value: job_name
+        required: false
+      - name: url
+        description: URL to the IPFS API
+        default_value: no
+        required: true
+      - name: repoapi
+        description: Collect repo metrics.
+        default_value: no
+        required: false
+      - name: pinapi
+        description: Set status of IPFS pinned object polling.
+        default_value: no
+        required: false
     examples:
       folding:
         enabled: true
-        title: ''
-      list: []
+        title: 'Config'
+      list:
+      - name: Basic (default out-of-the-box)
+        description: A basic example configuration, one job will run at a time. Autodetect mechanism uses it by default.
+        config: |
+          localhost:
+            name: 'local'
+            url: 'http://localhost:5001'
+            repoapi: no
+            pinapi: no
 troubleshooting:
   problems:
     list: []
@@ -61,7 +114,7 @@ metrics:
   folding:
     title: Metrics
     enabled: false
-  description: ""
+  description: "This collector provides quality and performance metrics for an IPFS server"
   availability: []
   scopes:
   - name: global

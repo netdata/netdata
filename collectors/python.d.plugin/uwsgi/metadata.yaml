@@ -56,7 +56,7 @@ setup:
 
         Additionally, the following collapsed table contains all the options that can be configured inside a JOB definition.
 
-        Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.      
+        Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
       folding:
         title: 'Config options'
         enabled: true
@@ -78,7 +78,7 @@ setup:
         default_value: yes
         required: false
       - name: name
-        description: the JOB's name as it will appear at the dashboard (by default is the job_name)
+        description: The JOB's name as it will appear at the dashboard (by default is the job_name)
         default_value: job_name
         required: false
       - name: socket
