@@ -33,7 +33,7 @@
           enabled: true
         list:
           - name: 'SEND_PD'
-            default_value: ''
+            default_value: 'YES'
             description: "Set `SEND_PD` to YES"
             required: true
           - name: 'DEFAULT_RECIPIENT_PD'
