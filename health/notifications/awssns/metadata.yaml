@@ -118,7 +118,6 @@
             config: |
               #------------------------------------------------------------------------------
               # Amazon SNS notifications
-              
               SEND_AWSSNS="YES"
               AWSSNS_MESSAGE_FORMAT="${status} on ${host} at ${date}: ${chart} ${value_string}"
               DEFAULT_RECIPIENT_AWSSNS="arn:aws:sns:us-east-2:123456789012:MyTopic"
