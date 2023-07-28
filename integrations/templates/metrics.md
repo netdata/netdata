@@ -42,4 +42,8 @@ Metrics:
 [% if entry.metrics.folding.enabled %]
 {% /details %}
 [% endif %]
+[% else %]
+## Metrics
+
+[[ entry.metrics.description ]]
 [% endif %]
