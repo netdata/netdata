@@ -125,7 +125,7 @@ metrics:
   availability: []
   scopes:
     - name: IPSEC tunnel
-      description: "These metrics refer to the entire monitored application."
+      description: "Metrics related to IPSEC tunnels. Each tunnel provides its own set of the following metrics."
       labels: []
       metrics:
         - name: libreswan.net

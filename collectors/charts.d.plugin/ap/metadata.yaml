@@ -6,7 +6,7 @@ meta:
     link: "https://learn.netdata.cloud/docs/data-collection/networking-stack-and-network-interfaces/linux-access-points"
     categories:
       - data-collection.networking-stack-and-network-interfaces
-    icon_filename: "netdata.png"
+    icon_filename: "network-wired.svg"
   related_resources:
     integrations:
       list: []

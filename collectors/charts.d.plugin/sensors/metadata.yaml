@@ -122,7 +122,7 @@ metrics:
   availability: []
   scopes:
     - name: sensor chip
-      description: "These metrics refer to the entire monitored application."
+      description: "Metrics related to sensor chips. Each chip provides its own set of the following metrics."
       labels: []
       metrics:
         - name: sensors.temp

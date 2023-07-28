@@ -128,7 +128,7 @@ metrics:
   availability: []
   scopes:
     - name: ups
-      description: "These metrics refer to the entire monitored application."
+      description: "Metrics related to UPS. Each UPS provides its own set of the following metrics."
       labels: []
       metrics:
         - name: apcupsd.charge
