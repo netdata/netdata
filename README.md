@@ -312,7 +312,7 @@ The core of Netdata is developed in C. We have our own `libnetdata`, that provid
 
 The above, and many more, allow Netdata developers to work on the application fast and with confidence. Most of the business logic in Netdata is a work of mixing the above.
 
-Netdata metric collection plugins can be developed in any language. Most of our application collectors though are developed in [Go](https://github.com/netdata/go.d.plugin).
+Netdata data collection plugins can be developed in any language. Most of our application collectors though are developed in [Go](https://github.com/netdata/go.d.plugin).
 
 </details>
 
@@ -385,7 +385,7 @@ Netdata is designed to scale and can handle large volumes of data.
 &nbsp;<br/>&nbsp;<br/>
 Netdata is a distributed monitoring solution. You can scale it to infinity by spreading Netdata servers across your infrastructure.
 
-With the streaming feature  Agents, we can support monitoring ephemeral servers but also allow the creation of "monitoring islands" where metrics are aggregated to a few servers (Netdata Parents) for increased retention, or for offloading production systems.
+With the streaming feature of the Agent, we can support monitoring ephemeral servers but also allow the creation of "monitoring islands" where metrics are aggregated to a few servers (Netdata Parents) for increased retention, or for offloading production systems.
 
   - :airplane: Netdata Parents provide great vertical scalability, so you can have as big parents as the CPU, RAM and Disk resources you can dedicate to them. In our lab we constantly stress test Netdata Parents with several million metrics collected per second, to ensure it is reliable, stable, and robust at scale.
     
