@@ -2791,10 +2791,10 @@ modules:
       module_name: getifaddrs
       monitored_instance:
         name: freebsd getifaddrs
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "network.svg"
       related_resources:
         integrations:
           list: []
@@ -2804,8 +2804,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect traffic per network interface."
+        method_description: "The plugin uses `getifaddrs` functiion to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -2824,14 +2824,63 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd:getifaddrs"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: enable new interfaces detected at runtime
+              description: Enable or disable possibility to discover new interface after plugin starts.
+              default_value: auto
+              required: false
+            - name: total bandwidth for physical interfaces
+              description: Enable or disable total bandwidth for physical interfaces  metric.
+              default_value: auto
+              required: false
+            - name: total packets for physical interfaces
+              description: Enable or disable total packets for physical interfaces metric.
+              default_value: auto
+              required: false
+            - name: total bandwidth for ipv4 interface
+              description: Enable or disable total bandwidth for IPv4 interface metric.
+              default_value: auto
+              required: false
+            - name: total bandwidth for ipv6 interfaces
+              description: Enable or disable total bandwidth for ipv6 interfaces metric.
+              default_value: auto
+              required: false
+            - name: bandwidth for all interfaces
+              description: Enable or disable bandwidth for all interfaces metric.
+              default_value: auto
+              required: false
+            - name: packets for all interfaces
+              description: Enable or disable packets for all interfaces metric.
+              default_value: auto
+              required: false
+            - name: errors for all interfaces
+              description: Enable or disable errors for all interfaces metric.
+              default_value: auto
+              required: false
+            - name: drops for all interfaces
+              description: Enable or disable drops for all interfaces metric.
+              default_value: auto
+              required: false
+            - name: collisions for all interface
+              description: Enable or disable collisions for all interface metric.
+              default_value: auto
+              required: false
+            - name: disable by default interfaces matching
+              description: Do not display data for intterfaces listed.
+              default_value: lo*
+              required: false
+            - name: set physical interfaces for system.net
+              description: Do not show network traffic for listed interfaces.
+              default_value: igb* ix* cxl* em* ixl* ixlv* bge* ixgbe* vtnet* vmx* re* igc* dwc*
+              required: false
         examples:
           folding:
             enabled: true
