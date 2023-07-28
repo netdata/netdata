@@ -322,10 +322,10 @@ modules:
       module_name: dev.cpu.temperature
       monitored_instance:
         name: freebsd dev.cpu.temperature
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.org"
       related_resources:
         integrations:
           list: []
@@ -335,8 +335,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Get current CPU temperature"
+        method_description: "The plugin uses `sysctl`` functiion to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -355,14 +355,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: dev.cpu.temperature
+              description: Enable or disable CPU temperature charts.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
