@@ -6,7 +6,7 @@ meta:
     link: https://www.samba.org/samba/
     categories:
       - data-collection.storage-mount-points-and-filesystems
-    icon_filename: "samba.jpg"
+    icon_filename: "samba.svg"
   related_resources:
     integrations:
       list: []

@@ -802,7 +802,7 @@ modules:
       monitored_instance:
         name: Systemd Services
         link: ""
-        icon_filename: systemd.png
+        icon_filename: systemd.svg
         categories:
           - data-collection.systemd
         keywords:
