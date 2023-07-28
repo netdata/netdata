@@ -1,3 +1,5 @@
+# yamllint disable rule:line-length
+---
 plugin_name: macos.plugin
 modules:
   - meta:
@@ -8,7 +10,7 @@ modules:
         link: "https://www.apple.com/macos"
         categories:
           - data-collection.macos-systems
-        icon_filename: "apple.svg"
+        icon_filename: "macos.svg"
       related_resources:
         integrations:
           list: []
@@ -22,7 +24,11 @@ modules:
     overview:
       data_collection:
         metrics_description: "Monitor MacOS metrics for efficient operating system performance."
-        method_description: ""
+        method_description: |
+          The plugin uses three different methods to collect data:
+            - The function `sysctlbyname` is called to collect network, swap, loadavg, and boot time.
+            - The functtion `host_statistic` is called to collect CPU and Virtual memory data;
+            - The function `IOServiceGetMatchingServices` to collect storage information.
       supported_platforms:
         include:
           - macOS
@@ -42,19 +48,234 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          description: "The netdata main configuration file."
         options:
-          description: ""
+          description: |
+            There are three sections in the file which you can configure:
+
+            - `[plugin:macos:sysctl]` - Enable or disable monitoring for network, swap, loadavg, and boot time.
+            - `[plugin:macos:mach_smi]` - Enable or disable monitoring for CPU and Virtual memory.
+            - `[plugin:macos:iokit]` - Enable or disable monitoring for storage device.
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: enable load average
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of load average metrics (load1, load5, load15).
+              default_value: yes
+              required: false
+            - name: system swap
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of system swap metrics (free, used).
+              default_value: yes
+              required: false
+            - name: bandwidth
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of network bandwidth metrics (received, sent).
+              default_value: yes
+              required: false
+            - name: ipv4 TCP packets
+              description: Enable or disable monitoring of IPv4 TCP total packets metrics (received, sent).
+              section_name: plugin:macos:sysctl
+              default_value: yes
+              required: false
+            - name: ipv4 TCP errors
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of IPv4 TCP packets metrics (Input Errors, Checksum, Retransmission segments).
+              default_value: yes
+              required: false
+            - name: ipv4 TCP handshake issues
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of IPv4 TCP handshake metrics (Established Resets, Active Opens, Passive Opens, Attempt Fails).
+              default_value: yes
+              required: false
+            - name: ECN packets
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ECN statistics metrics (InCEPkts, InNoECTPkts).
+              default_value: auto
+              required: false
+            - name: TCP SYN cookies
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of TCP SYN cookies metrics (received, sent, failed).
+              default_value: auto
+              required: false
+            - name: TCP out-of-order queue
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of TCP out-of-order queue metrics (inqueue).
+              default_value: auto
+              required: false
+            - name: TCP connection aborts
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of TCP connection aborts metrics (Bad Data, User closed, No memory, Timeout).
+              default_value: auto
+              required: false
+            - name: ipv4 UDP packets
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ipv4 UDP packets metrics (sent, received.).
+              default_value: yes
+              required: false
+            - name: ipv4 UDP errors
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ipv4 UDP errors metrics (Recieved Buffer error, Input Errors, No Ports, IN Checksum Errors, Ignore Multi).
+              default_value: yes
+              required: false
+            - name: ipv4 icmp packets
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of IPv4 ICMP packets metrics (sent, received, in error, OUT error, IN Checksum error).
+              default_value: yes
+              required: false
+            - name: ipv4 icmp messages
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ipv4 ICMP messages metrics (I/O messages, I/O Errors, In Checksum).
+              default_value: yes
+              required: false
+            - name: ipv4 packets
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ipv4 packets metrics (received, sent, forwarded, delivered).
+              default_value: yes
+              required: false
+            - name: ipv4 fragments sent
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of IPv4 fragments sent metrics (ok, fails, creates).
+              default_value: yes
+              required: false
+            - name: ipv4 fragments assembly
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of IPv4 fragments assembly metrics (ok, failed, all).
+              default_value: yes
+              required: false
+            - name: ipv4 errors
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of IPv4 errors metrics (I/O discard, I/O HDR errors, In Addr errors, In Unknown protos, OUT No Routes).
+              default_value: yes
+              required: false
+            - name: ipv6 packets
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of IPv6 packets metrics (received, sent, forwarded, delivered).
+              default_value: auto
+              required: false
+            - name: ipv6 fragments sent
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of IPv6 fragments sent metrics (ok, failed, all).
+              default_value: auto
+              required: false
+            - name: ipv6 fragments assembly
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of IPv6 fragments assembly metrics (ok, failed, timeout, all).
+              default_value: auto
+              required: false
+            - name: ipv6 errors
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of IPv6 errors metrics (I/O Discards, In Hdr Errors, In Addr Errors, In Truncaedd Packets, I/O No Routes).
+              default_value: auto
+              required: false
+            - name: icmp
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ICMP metrics (sent, received).
+              default_value: auto
+              required: false
+            - name: icmp redirects
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ICMP redirects metrics (received, sent).
+              default_value: auto
+              required: false
+            - name: icmp errors
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ICMP metrics (I/O Errors, In Checksums, In Destination Unreachable, In Packet too big, In Time Exceeds, In Parm Problem, Out Dest Unreachable, Out Timee Exceeds, Out Parm Problems.).
+              default_value: auto
+              required: false
+            - name: icmp echos
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ICMP echos metrics (I/O Echos, I/O Echo Reply).
+              default_value: auto
+              required: false
+            - name: icmp router
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ICMP router metrics (I/O Solicits, I/O Advertisements).
+              default_value: auto
+              required: false
+            - name: icmp neighbor
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ICMP neighbor metrics (I/O Solicits, I/O Advertisements).
+              default_value: auto
+              required: false
+            - name: icmp types
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ICMP types metrics (I/O Type1, I/O Type128, I/O Type129, Out Type133, Out Type135, In Type136, Out Type145).
+              default_value: auto
+              required: false
+            - name: space usage for all disks
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of space usage for all disks metrics (available, used, reserved for root).
+              default_value: yes
+              required: false
+            - name: inodes usage for all disks
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of inodes usage for all disks metrics (available, used, reserved for root).
+              default_value: yes
+              required: false
+            - name: bandwidth
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of bandwidth metrics (received, sent).
+              default_value: yes
+              required: false
+            - name: system uptime
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of system uptime metrics (uptime).
+              default_value: yes
+              required: false
+            - name: cpu utilization
+              section_name: plugin:macos:mach_smi
+              description: Enable or disable monitoring of CPU utilization metrics (user, nice, system, idel).
+              default_value: yes
+              required: false
+            - name: system ram
+              section_name: plugin:macos:mach_smi
+              description: Enable or disable monitoring of system RAM metrics (Active, Wired, throttled, compressor, inactive, purgeable, speculative, free).
+              default_value: yes
+              required: false
+            - name: swap i/o
+              section_name: plugin:macos:mach_smi
+              description: Enable or disable monitoring of SWAP I/O metrics (I/O Swap).
+              default_value: yes
+              required: false
+            - name: memory page faults
+              section_name: plugin:macos:mach_smi
+              description: Enable or disable monitoring of memory page faults metrics (memory, cow, I/O page, compress, decompress, zero fill, reactivate, purge).
+              default_value: yes
+              required: false
+            - name: disk i/o
+              section_name: plugin:macos:iokit
+              description: Enable or disable monitoring of disk I/O metrics (In, Out).
+              default_value: yes
+              required: false
         examples:
           folding:
-            enabled: true
-            title: ""
-          list: []
+            enabled: false
+            title: "Config"
+          list:
+            - name: Disable swap monitoring.
+              folding:
+                enabled: true
+              description: A basic example that discards swap monitoring
+              config: |
+                [plugin:macos:sysctl]
+                  system swap = no
+                [plugin:macos:mach_smi]
+                  swap i/o = no
+            - name: Disable complete Machine SMI section.
+              folding:
+                enabled: true
+              description: A basic example that discards swap monitoring
+              config: |
+                [plugin:macos:mach_smi]
+                  cpu utilization = no
+                  system ram = no
+                  swap i/o = no
+                  memory page faults = no
+                  disk i/o = no
     troubleshooting:
       problems:
         list: []
@@ -72,7 +293,8 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: |
+            These metrics refer to hardware and network monitoring.
           labels: []
           metrics:
             - name: system.cpu
