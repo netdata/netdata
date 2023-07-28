@@ -40,7 +40,7 @@
             required: true
           - name: 'GOTIFY_APP_URL'
             default_value: ''
-            description: "Set `GOTIFY_APP_URL`  to point to your Gotify instance, for example `https://push.example.domain/`"
+            description: "Set `GOTIFY_APP_URL` to point to your Gotify instance, for example `https://push.example.domain/`"
             required: true
       examples:
         folding:
