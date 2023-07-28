@@ -31,7 +31,7 @@
           enabled: true
         list:
           - name: 'SEND_OPSGENIE'
-            default_value: ''
+            default_value: 'YES'
             description: "Set `SEND_OPSGENIE` to YES"
             required: true
           - name: 'OPSGENIE_API_KEY'
