@@ -586,32 +586,26 @@ This module monitors every AMD GPU card discovered at agent startup.
 
 ### Monitored GPU metrics
 
-Depending on the configuration, thte following charts will be provided:
+The following charts will be provided:
 
 -   **GPU utilization**
-    GPU and memory % utilization
-
--   **GPU clock**
-    GPU and memory clock frequency in MHz
-
--  **GPU memory usage**
-    VRAM, visible VRAM and GTT memory usage in bytes
-
--  **GPU memory usage percentage**
-    VRAM, visible VRAM and GTT memory % usage
+-   **GPU memory utilization**
+-   **GPU clock frequency**
+-   **GPU memory clock frequency**
+-   **VRAM memory usage percentage**
+-   **VRAM memory usage**
+-   **visible VRAM memory usage percentage**
+-   **visible VRAM memory usage**
+-   **GTT memory usage percentage**
+-   **GTT memory usage**
 
 ### configuration
 
-Default configuration will monitor all available metrics:
+The `drm` path can be configured if it differs from the default:
 
 ```
 [plugin:proc:/sys/class/drm]
   # directory to monitor = /sys/class/drm
-  # utilization = yes
-  # clock frequency = yes
-  # memory usage = yes
-  # memory percentage usage = yes
-
 ```
 
 > [!NOTE]  

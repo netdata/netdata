@@ -4,6 +4,7 @@
 
 #define PLUGIN_PROC_MODULE_DRM_NAME "/sys/class/drm"
 #define CONFIG_SECTION_PLUGIN_PROC_DRM "plugin:proc:/sys/class/drm"
+#define AMDGPU_CHART_TYPE "amdgpu"
 
 /*
  * Copyright (C) 2023 Advanced Micro Devices, Inc. All rights reserved.
@@ -20,6 +21,21 @@ struct amdgpu_id_struct {
     uint32_t pci_rev_id;
     const char *marketing_name;
 };
+
+/* 
+ * About amdgpu_ids list:
+ * ------------------------------------------------------------------------
+ * Copyright (C) 2023 Advanced Micro Devices, Inc. All rights reserved.
+ *
+ * The list is copied from:
+ * https://raw.githubusercontent.com/Syllo/nvtop/master/src/amdgpu_ids.h
+ * 
+ * which is modified from libdrm (MIT License):
+ *
+ * URL: https://gitlab.freedesktop.org/mesa/drm/-/blob/main/data/amdgpu.ids
+ * ------------------------------------------------------------------------
+ * **IMPORTANT**: The amdgpu_ids has to be modified after new GPU releases. 
+ * ------------------------------------------------------------------------*/
 
 static struct amdgpu_id_struct amdgpu_ids[] = {
     {0x1309, 0x00, "AMD Radeon R7 Graphics"},
@@ -538,7 +554,7 @@ struct card {
     collected_number clk_mem;
 
 
-    /* Memory usage */
+    /* GPU memory usage */
 
     const char *pathname_mem_used_vram;
     const char *pathname_mem_total_vram;
@@ -608,7 +624,7 @@ static void card_free(struct card *c){
     if(c->ff_clk_mem) procfile_close(c->ff_clk_mem);
 
 
-    /* Memory usage */
+    /* GPU memory usage */
     if(c->pathname_mem_used_vram) freez((void *) c->pathname_mem_used_vram);
     if(c->pathname_mem_total_vram) freez((void *) c->pathname_mem_total_vram);
     if(c->st_mem_usage_perc_vram) rrdset_is_obsolete(c->st_mem_usage_perc_vram);
@@ -662,13 +678,6 @@ static int read_multiline_file(procfile *ff, char *pathname, collected_number *n
 
 int do_sys_class_drm(int update_every, usec_t dt) {
     (void)dt;
-
-    static struct drm_config {
-        int do_utilization,
-            do_clk_freq,
-            do_mem_usage_perc,
-            do_mem_usage;
-    } config = {0};
     
     static DIR *drm_dir = NULL;
 
@@ -682,11 +691,6 @@ int do_sys_class_drm(int update_every, usec_t dt) {
             collector_error("Cannot read directory '%s'", drm_dir_name);
             return 1;
         }
-
-        config.do_utilization     = config_get_boolean( CONFIG_SECTION_PLUGIN_PROC_DRM, "utilization"               , CONFIG_BOOLEAN_YES);
-        config.do_clk_freq        = config_get_boolean( CONFIG_SECTION_PLUGIN_PROC_DRM, "clock frequency"           , CONFIG_BOOLEAN_YES);
-        config.do_mem_usage_perc  = config_get_boolean( CONFIG_SECTION_PLUGIN_PROC_DRM, "memory usage percentage"   , CONFIG_BOOLEAN_YES);
-        config.do_mem_usage       = config_get_boolean( CONFIG_SECTION_PLUGIN_PROC_DRM, "memory usage"              , CONFIG_BOOLEAN_YES);
 
         struct dirent *de = NULL;
         while(likely(de = readdir(drm_dir))) {
@@ -727,33 +731,21 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                         prop_pathname = strdupz(filename);                                       \
                 }
 
-
-
-
-
                 char id[RRD_ID_LENGTH_MAX + 1];
 
-                /* Initialize utilization metrics */
+                /* Initialize GPU and VRAM utilization metrics */
 
-                if(config.do_utilization){
-
-                    set_prop_pathname("device/gpu_busy_percent", c->pathname_util_gpu, NULL);
-                    set_prop_pathname("device/mem_busy_percent", c->pathname_util_mem, NULL);
-
-                    config.do_utilization = c->pathname_util_gpu || 
-                                            c->pathname_util_mem ? 
-                                                CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_NO;
-                }
-
-                if(config.do_utilization && c->pathname_util_gpu){
-                    // snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", "gpu_utilization", fname);
+                set_prop_pathname("device/gpu_busy_percent", c->pathname_util_gpu, NULL);
+                
+                if(c->pathname_util_gpu){
+                    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", "gpu_utilization", c->id.marketing_name);
 
                     c->st_util_gpu = rrdset_create_localhost(
-                            "amdgpu"
-                            , "gpu_utilization"
+                            AMDGPU_CHART_TYPE
+                            , id
                             , NULL
                             , "utilization"
-                            , NULL
+                            , AMDGPU_CHART_TYPE ".gpu_utilization"
                             , "GPU utilization"
                             , "percentage"
                             , PLUGIN_PROC_NAME
@@ -769,15 +761,18 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                 }
 
-                if(config.do_utilization && c->pathname_util_mem){
+                set_prop_pathname("device/mem_busy_percent", c->pathname_util_mem, NULL);
+
+                if(c->pathname_util_mem){
+                    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", "gpu_mem_utilization", c->id.marketing_name);
 
                     c->st_util_mem = rrdset_create_localhost(
-                            "amdgpu"
-                            , "mem_utilization"
+                            AMDGPU_CHART_TYPE
+                            , id
                             , NULL
                             , "utilization"
-                            , NULL
-                            , "Memory utilization"
+                            , AMDGPU_CHART_TYPE ".gpu_mem_utilization"
+                            , "GPU memory utilization"
                             , "percentage"
                             , PLUGIN_PROC_NAME
                             , PLUGIN_PROC_MODULE_DRM_NAME
@@ -793,29 +788,19 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                 }
 
 
+                /* Initialize GPU and VRAM clock frequency metrics */
 
-
-
-                /* Initialize clock frequency metrics */
-
-                if(config.do_clk_freq){        
-
-                    set_prop_pathname("device/pp_dpm_sclk", c->pathname_clk_gpu, c->ff_clk_gpu);
-                    set_prop_pathname("device/pp_dpm_mclk", c->pathname_clk_mem, c->ff_clk_mem);
-
-                    config.do_clk_freq = c->pathname_clk_gpu || 
-                                         c->pathname_clk_gpu ? 
-                                            CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_NO;
-                }
-
-                if(config.do_clk_freq && c->pathname_clk_gpu){
+                set_prop_pathname("device/pp_dpm_sclk", c->pathname_clk_gpu, c->ff_clk_gpu);
+                
+                if(c->pathname_clk_gpu){
+                    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", "gpu_clk_frequency", c->id.marketing_name);
 
                     c->st_clk_gpu = rrdset_create_localhost(
-                            "amdgpu"
-                            , "gpu_frequency"
+                            AMDGPU_CHART_TYPE
+                            , id
                             , NULL
                             , "frequency"
-                            , NULL
+                            , AMDGPU_CHART_TYPE ".gpu_clk_frequency"
                             , "GPU clock frequency"
                             , "MHz"
                             , PLUGIN_PROC_NAME
@@ -831,15 +816,18 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                 }
 
-                if(config.do_clk_freq && c->pathname_clk_mem){
+                set_prop_pathname("device/pp_dpm_mclk", c->pathname_clk_mem, c->ff_clk_mem);
+
+                if(c->pathname_clk_mem){
+                    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", "gpu_mem_clk_frequency", c->id.marketing_name);
 
                     c->st_clk_mem = rrdset_create_localhost(
-                            "amdgpu"
-                            , "mem_frequency"
+                            AMDGPU_CHART_TYPE
+                            , id
                             , NULL
                             , "frequency"
-                            , NULL
-                            , "Memory clock frequency"
+                            , AMDGPU_CHART_TYPE ".gpu_mem_clk_frequency"
+                            , "GPU memory clock frequency"
                             , "MHz"
                             , PLUGIN_PROC_NAME
                             , PLUGIN_PROC_MODULE_DRM_NAME
@@ -855,49 +843,21 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                 }
 
 
+                /* Initialize GPU memory usage metrics */
 
-
-
-                /* Initialize memory usage metrics */
-
-                if(config.do_mem_usage_perc || config.do_mem_usage){
-
-                    set_prop_pathname("device/mem_info_vram_used",      c->pathname_mem_used_vram,      NULL);
-                    set_prop_pathname("device/mem_info_vram_total",     c->pathname_mem_total_vram,     NULL);
-                    if(c->pathname_mem_total_vram) c->total_vram = tmp_val;
-
-                    set_prop_pathname("device/mem_info_vis_vram_used",  c->pathname_mem_used_vis_vram,  NULL);
-                    set_prop_pathname("device/mem_info_vis_vram_total", c->pathname_mem_total_vis_vram, NULL);
-                    if(c->pathname_mem_total_vis_vram) c->total_vis_vram = tmp_val;
-                    
-                    set_prop_pathname("device/mem_info_gtt_used",       c->pathname_mem_used_gtt,       NULL);
-                    set_prop_pathname("device/mem_info_gtt_total",      c->pathname_mem_total_gtt,      NULL);
-                    if(c->pathname_mem_total_gtt) c->total_gtt = tmp_val;
-
-                    
-                }
-
-                if(config.do_mem_usage_perc)
-                    config.do_mem_usage_perc =  (c->pathname_mem_used_vram      && c->pathname_mem_total_vram)      || 
-                                                (c->pathname_mem_used_vis_vram  && c->pathname_mem_total_vis_vram)  || 
-                                                (c->pathname_mem_used_gtt       && c->pathname_mem_total_gtt) ? 
-                                                    CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_NO;
-
-                if(config.do_mem_usage)
-                    config.do_mem_usage =   (c->pathname_mem_used_vram      && c->pathname_mem_total_vram)      || 
-                                            (c->pathname_mem_used_vis_vram  && c->pathname_mem_total_vis_vram)  || 
-                                            (c->pathname_mem_used_gtt       && c->pathname_mem_total_gtt) ? 
-                                                CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_NO;
+                set_prop_pathname("device/mem_info_vram_used",      c->pathname_mem_used_vram,      NULL);
+                set_prop_pathname("device/mem_info_vram_total",     c->pathname_mem_total_vram,     NULL);
+                if(c->pathname_mem_total_vram) c->total_vram = tmp_val;
                 
-                
-                if(config.do_mem_usage_perc && c->pathname_mem_used_vram && c->pathname_mem_total_vram){
+                if(c->pathname_mem_used_vram && c->pathname_mem_total_vram){
+                    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", "gpu_mem_vram_usage_perc", c->id.marketing_name);
 
                     c->st_mem_usage_perc_vram = rrdset_create_localhost(
-                            "amdgpu"
-                            , "mem_vram_usage_perc"
+                            AMDGPU_CHART_TYPE
+                            , id
                             , NULL
                             , "memory_usage"
-                            , NULL
+                            , AMDGPU_CHART_TYPE ".gpu_mem_vram_usage_perc"
                             , "VRAM memory usage percentage"
                             , "percentage"
                             , PLUGIN_PROC_NAME
@@ -910,16 +870,16 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                     rrdlabels_add(c->st_mem_usage_perc_vram->rrdlabels, "product_name", c->id.marketing_name, RRDLABEL_SRC_AUTO);
 
                     c->rd_mem_used_perc_vram = rrddim_add(c->st_mem_usage_perc_vram, "used", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
-                }
 
-                if(config.do_mem_usage && c->pathname_mem_used_vram && c->pathname_mem_total_vram){
+
+                    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", "gpu_mem_vram_usage", c->id.marketing_name);
 
                     c->st_mem_usage_vram = rrdset_create_localhost(
-                            "amdgpu"
-                            , "mem_vram_usage"
+                            AMDGPU_CHART_TYPE
+                            , id
                             , NULL
                             , "memory_usage"
-                            , NULL
+                            , AMDGPU_CHART_TYPE ".gpu_mem_vram_usage"
                             , "VRAM memory usage"
                             , "bytes"
                             , PLUGIN_PROC_NAME
@@ -936,14 +896,19 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                 }
 
-                if(config.do_mem_usage_perc && c->pathname_mem_used_vis_vram && c->pathname_mem_total_vis_vram){
+                set_prop_pathname("device/mem_info_vis_vram_used",  c->pathname_mem_used_vis_vram,  NULL);
+                set_prop_pathname("device/mem_info_vis_vram_total", c->pathname_mem_total_vis_vram, NULL);
+                if(c->pathname_mem_total_vis_vram) c->total_vis_vram = tmp_val;
+
+                if(c->pathname_mem_used_vis_vram && c->pathname_mem_total_vis_vram){
+                    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", "gpu_mem_vis_vram_usage_perc", c->id.marketing_name);
 
                     c->st_mem_usage_perc_vis_vram = rrdset_create_localhost(
-                            "amdgpu"
-                            , "mem_vis_vram_usage_perc"
+                            AMDGPU_CHART_TYPE
+                            , id
                             , NULL
                             , "memory_usage"
-                            , NULL
+                            , AMDGPU_CHART_TYPE ".gpu_mem_vis_vram_usage_perc"
                             , "visible VRAM memory usage percentage"
                             , "percentage"
                             , PLUGIN_PROC_NAME
@@ -956,16 +921,16 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                     rrdlabels_add(c->st_mem_usage_perc_vis_vram->rrdlabels, "product_name", c->id.marketing_name, RRDLABEL_SRC_AUTO);
 
                     c->rd_mem_used_perc_vis_vram = rrddim_add(c->st_mem_usage_perc_vis_vram, "used", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
-                }
 
-                if(config.do_mem_usage && c->pathname_mem_used_vis_vram && c->pathname_mem_total_vis_vram){
+
+                    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", "gpu_mem_vis_vram_usage", c->id.marketing_name);
 
                     c->st_mem_usage_vis_vram = rrdset_create_localhost(
-                            "amdgpu"
-                            , "mem_vis_vram_usage"
+                            AMDGPU_CHART_TYPE
+                            , id
                             , NULL
                             , "memory_usage"
-                            , NULL
+                            , AMDGPU_CHART_TYPE ".gpu_mem_vis_vram_usage"
                             , "visible VRAM memory usage"
                             , "bytes"
                             , PLUGIN_PROC_NAME
@@ -982,14 +947,19 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                 }
 
-                if(config.do_mem_usage_perc && c->pathname_mem_used_gtt && c->pathname_mem_total_gtt){
+                set_prop_pathname("device/mem_info_gtt_used",       c->pathname_mem_used_gtt,       NULL);
+                set_prop_pathname("device/mem_info_gtt_total",      c->pathname_mem_total_gtt,      NULL);
+                if(c->pathname_mem_total_gtt) c->total_gtt = tmp_val;
+
+                if(c->pathname_mem_used_gtt && c->pathname_mem_total_gtt){
+                    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", "gpu_mem_gtt_usage_perc", c->id.marketing_name);
 
                     c->st_mem_usage_perc_gtt = rrdset_create_localhost(
-                            "amdgpu"
-                            , "mem_gtt_usage_perc"
+                            AMDGPU_CHART_TYPE
+                            , id
                             , NULL
                             , "memory_usage"
-                            , NULL
+                            , AMDGPU_CHART_TYPE ".gpu_mem_gtt_usage_perc"
                             , "GTT memory usage percentage"
                             , "percentage"
                             , PLUGIN_PROC_NAME
@@ -1002,16 +972,15 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                     rrdlabels_add(c->st_mem_usage_perc_gtt->rrdlabels, "product_name", c->id.marketing_name, RRDLABEL_SRC_AUTO);
 
                     c->rd_mem_used_perc_gtt = rrddim_add(c->st_mem_usage_perc_gtt, "used", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
-                }
 
-                if(config.do_mem_usage && c->pathname_mem_used_gtt && c->pathname_mem_total_gtt){
+                    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", "gpu_mem_gtt_usage", c->id.marketing_name);
 
                     c->st_mem_usage_gtt = rrdset_create_localhost(
-                            "amdgpu"
-                            , "mem_gtt_usage"
+                            AMDGPU_CHART_TYPE
+                            , id
                             , NULL
                             , "memory_usage"
-                            , NULL
+                            , AMDGPU_CHART_TYPE ".gpu_mem_gtt_usage"
                             , "GTT memory usage"
                             , "bytes"
                             , PLUGIN_PROC_NAME
@@ -1028,8 +997,6 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                 }
 
-
-                
                 c->next = card_root;
                 card_root = c;
             }
@@ -1044,85 +1011,84 @@ int do_sys_class_drm(int update_every, usec_t dt) {
     }
 
     for(struct card *c = card_root; c; c = c->next) {
-        if(config.do_utilization){
+        
+        /* Do GPU and VRAM utilization update */
 
-            if(!read_single_number_file(c->pathname_util_gpu, (unsigned long long *) &c->util_gpu)){
-                rrddim_set_by_pointer(c->st_util_gpu, c->rd_util_gpu, c->util_gpu);
-                rrdset_done(c->st_util_gpu);
-            }
-            else read_file_error(util_gpu);
-
-            if(!read_single_number_file(c->pathname_util_mem, (unsigned long long *) &c->util_mem)){
-                rrddim_set_by_pointer(c->st_util_mem, c->rd_util_mem, c->util_mem);
-                rrdset_done(c->st_util_mem);
-            }
-            else read_file_error(util_mem);
+        if(likely(!read_single_number_file(c->pathname_util_gpu, (unsigned long long *) &c->util_gpu))){
+            rrddim_set_by_pointer(c->st_util_gpu, c->rd_util_gpu, c->util_gpu);
+            rrdset_done(c->st_util_gpu);
         }
+        else read_file_error(util_gpu);
 
-        if(config.do_clk_freq){
-
-            if(!read_multiline_file(c->ff_clk_gpu, (char *) c->pathname_clk_gpu, &c->clk_gpu)){
-                rrddim_set_by_pointer(c->st_clk_gpu, c->rd_clk_gpu, c->clk_gpu);
-                rrdset_done(c->st_clk_gpu);
-            }
-            else read_file_error(clk_gpu);
-
-            if(!read_multiline_file(c->ff_clk_mem, (char *) c->pathname_clk_mem, &c->clk_mem)){
-                rrddim_set_by_pointer(c->st_clk_mem, c->rd_clk_mem, c->clk_mem);
-                rrdset_done(c->st_clk_mem);
-            }
-            else read_file_error(clk_mem);
+        if(likely(!read_single_number_file(c->pathname_util_mem, (unsigned long long *) &c->util_mem))){
+            rrddim_set_by_pointer(c->st_util_mem, c->rd_util_mem, c->util_mem);
+            rrdset_done(c->st_util_mem);
         }
+        else read_file_error(util_mem);
 
-        if(config.do_mem_usage_perc || config.do_mem_usage){
 
-            if(likely(
-                    !read_single_number_file(c->pathname_mem_used_vram, (unsigned long long *) &c->used_vram) && 
-                    c->total_vram)){
-                if(config.do_mem_usage_perc){
-                    rrddim_set_by_pointer(c->st_mem_usage_perc_vram, c->rd_mem_used_perc_vram, c->used_vram * 10000 / c->total_vram);
-                    rrdset_done(c->st_mem_usage_perc_vram);
-                }
+        /* Do GPU and VRAM clock frequency update */
 
-                if(config.do_mem_usage){
-                    rrddim_set_by_pointer(c->st_mem_usage_vram, c->rd_mem_used_vram, c->used_vram);
-                    rrddim_set_by_pointer(c->st_mem_usage_vram, c->rd_mem_free_vram, c->total_vram - c->used_vram);
-                    rrdset_done(c->st_mem_usage_vram);
-                }
-            }
-            else read_file_error(used_vram);
-
-            if(likely(
-                    !read_single_number_file(c->pathname_mem_used_vis_vram, (unsigned long long *) &c->used_vis_vram) &&
-                    c->total_vis_vram)){
-                if(config.do_mem_usage_perc){
-                    rrddim_set_by_pointer(c->st_mem_usage_perc_vis_vram, c->rd_mem_used_perc_vis_vram, c->used_vis_vram * 10000 / c->total_vis_vram);
-                    rrdset_done(c->st_mem_usage_perc_vis_vram);
-                }
-
-                if(config.do_mem_usage){
-                    rrddim_set_by_pointer(c->st_mem_usage_vis_vram, c->rd_mem_used_vis_vram, c->used_vis_vram);
-                    rrddim_set_by_pointer(c->st_mem_usage_vis_vram, c->rd_mem_free_vis_vram, c->total_vis_vram - c->used_vis_vram);
-                    rrdset_done(c->st_mem_usage_vis_vram);
-                }
-            }
-            else read_file_error(used_vis_vram);
-
-            if(likely(!read_single_number_file(c->pathname_mem_used_gtt, (unsigned long long *) &c->used_gtt) &&
-                    c->total_gtt)){
-                if(config.do_mem_usage_perc){
-                    rrddim_set_by_pointer(c->st_mem_usage_perc_gtt, c->rd_mem_used_perc_gtt, c->used_gtt * 10000 / c->total_gtt);
-                    rrdset_done(c->st_mem_usage_perc_gtt);
-                }
-
-                if(config.do_mem_usage){
-                    rrddim_set_by_pointer(c->st_mem_usage_gtt, c->rd_mem_used_gtt, c->used_gtt);
-                    rrddim_set_by_pointer(c->st_mem_usage_gtt, c->rd_mem_free_gtt, c->total_gtt - c->used_gtt);
-                    rrdset_done(c->st_mem_usage_gtt);
-                }
-            }
-            else read_file_error(used_gtt);
+        if(likely(!read_multiline_file(c->ff_clk_gpu, (char *) c->pathname_clk_gpu, &c->clk_gpu))){
+            rrddim_set_by_pointer(c->st_clk_gpu, c->rd_clk_gpu, c->clk_gpu);
+            rrdset_done(c->st_clk_gpu);
         }
+        else read_file_error(clk_gpu);
+
+        if(likely(!read_multiline_file(c->ff_clk_mem, (char *) c->pathname_clk_mem, &c->clk_mem))){
+            rrddim_set_by_pointer(c->st_clk_mem, c->rd_clk_mem, c->clk_mem);
+            rrdset_done(c->st_clk_mem);
+        }
+        else read_file_error(clk_mem);
+
+
+        /* Do GPU memory usage update */
+
+        if(likely(!read_single_number_file(c->pathname_mem_used_vram, (unsigned long long *) &c->used_vram) && 
+                c->total_vram)){
+
+            rrddim_set_by_pointer(  c->st_mem_usage_perc_vram, 
+                                    c->rd_mem_used_perc_vram, 
+                                    c->used_vram * 10000 / c->total_vram);
+            rrdset_done(c->st_mem_usage_perc_vram);
+
+            rrddim_set_by_pointer(c->st_mem_usage_vram, c->rd_mem_used_vram, c->used_vram);
+            rrddim_set_by_pointer(c->st_mem_usage_vram, c->rd_mem_free_vram, c->total_vram - c->used_vram);
+            rrdset_done(c->st_mem_usage_vram);
+
+        }
+        else read_file_error(used_vram);
+
+        if(likely(!read_single_number_file(c->pathname_mem_used_vis_vram, (unsigned long long *) &c->used_vis_vram) &&
+                c->total_vis_vram)){
+
+            rrddim_set_by_pointer(  c->st_mem_usage_perc_vis_vram, 
+                                    c->rd_mem_used_perc_vis_vram, 
+                                    c->used_vis_vram * 10000 / c->total_vis_vram);
+            rrdset_done(c->st_mem_usage_perc_vis_vram);
+        
+            rrddim_set_by_pointer(c->st_mem_usage_vis_vram, c->rd_mem_used_vis_vram, c->used_vis_vram);
+            rrddim_set_by_pointer(c->st_mem_usage_vis_vram, c->rd_mem_free_vis_vram, c->total_vis_vram - c->used_vis_vram);
+            rrdset_done(c->st_mem_usage_vis_vram);
+            
+        }
+        else read_file_error(used_vis_vram);
+
+        if(likely(!read_single_number_file(c->pathname_mem_used_gtt, (unsigned long long *) &c->used_gtt) &&
+                c->total_gtt)){
+                    
+            rrddim_set_by_pointer(  c->st_mem_usage_perc_gtt, 
+                                    c->rd_mem_used_perc_gtt, 
+                                    c->used_gtt * 10000 / c->total_gtt);
+            rrdset_done(c->st_mem_usage_perc_gtt);
+        
+            rrddim_set_by_pointer(c->st_mem_usage_gtt, c->rd_mem_used_gtt, c->used_gtt);
+            rrddim_set_by_pointer(c->st_mem_usage_gtt, c->rd_mem_free_gtt, c->total_gtt - c->used_gtt);
+            rrdset_done(c->st_mem_usage_gtt);
+            
+        }
+        else read_file_error(used_gtt);
+
     }
 
     return 0;

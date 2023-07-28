@@ -5201,7 +5201,7 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: "This integration monitors AMD GPU metrics, such as utilization and memory usage."
+        metrics_description: "This integration monitors AMD GPU metrics, such as utilization, clock frequency and memory usage."
         method_description: ""
       supported_platforms:
         include:
@@ -5252,33 +5252,66 @@ modules:
             - name: product_name
               description: GPU product name (e.g. AMD RX 6600)
           metrics:
-            - name: amdgpu.utilization
+            - name: amdgpu.gpu_utilization
               description: GPU utilization
               unit: "percentage"
               chart_type: line
               dimensions:
-                - name: GPU
-                - name: memory
-            - name: amdgpu.frequency
-              description: GPU clock
+                - name: utilization
+            - name: amdgpu.gpu_mem_utilization
+              description: GPU memory utilization
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: utilization
+            - name: amdgpu.gpu_clk_frequency
+              description: GPU clock frequency
               unit: "MHz"
               chart_type: line
               dimensions:
-                - name: GPU
-                - name: memory
-            - name: amdgpu.usage
-              description: GPU memory usage
+                - name: frequency
+            - name: amdgpu.gpu_mem_clk_frequency
+              description: GPU memory clock frequency
+              unit: "MHz"
+              chart_type: line
+              dimensions:
+                - name: frequency
+            - name: amdgpu.gpu_mem_vram_usage_perc
+              description: VRAM memory usage percentage
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: amdgpu.gpu_mem_vram_usage
+              description: VRAM memory usage
               unit: "bytes"
               chart_type: area
               dimensions:
-                - name: VRAM
-                - name: visible VRAM
-                - name: GTT
-            - name: amdgpu.perc_usage
-              description: GPU memory usage percentage
+                - name: used
+                - name: free
+            - name: amdgpu.gpu_mem_vis_vram_usage_perc
+              description: visible VRAM memory usage percentage
               unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: amdgpu.gpu_mem_vis_vram_usage
+              description: visible VRAM memory usage
+              unit: "bytes"
               chart_type: area
               dimensions:
-                - name: VRAM
-                - name: visible VRAM
-                - name: GTT
+                - name: used
+                - name: free
+            - name: amdgpu.gpu_mem_gtt_usage_perc
+              description: GTT memory usage percentage
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: amdgpu.gpu_mem_gtt_usage
+              description: GTT memory usage
+              unit: "bytes"
+              chart_type: area
+              dimensions:
+                - name: used
+                - name: free
