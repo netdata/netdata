@@ -3085,7 +3085,7 @@ modules:
             title: "Config options"
             enabled: true
           list:
-            - name: enable new mount points detected at runtime 
+            - name: enable new mount points detected at runtime
               description: Cheeck new mount points during runtime.
               default_value: auto
               required: false
