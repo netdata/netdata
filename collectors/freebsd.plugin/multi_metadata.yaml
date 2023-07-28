@@ -1,3 +1,5 @@
+# yamllint disable rule:line-length
+---
 plugin_name: freebsd.plugin
 modules:
   - meta:
@@ -19,7 +21,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "System Load Average"
-        method_description: "The plugin uses `sysctl`` functiion to collect necessary data."
+        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -206,10 +208,10 @@ modules:
       module_name: kern.cp_time
       monitored_instance:
         name: freebsd kern.cp_time
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -219,8 +221,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Total CPU utilization"
+        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -239,14 +241,18 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          description: "plugin:freebsd"
         options:
-          description: ""
+          description: "The netdata main configuration file."
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: kern.cp_time
+              description: Enable or disable Total CPU usage.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
