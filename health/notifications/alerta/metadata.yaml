@@ -53,7 +53,7 @@
           - name: 'DEFAULT_RECIPIENT_ALERTA'
             default_value: ''
             description: |
-              Set `DEFAULT_RECIPIENT_ALERTA`` to the default recipient environment you want the alert notifications to be sent to.
+              Set `DEFAULT_RECIPIENT_ALERTA` to the default recipient environment you want the alert notifications to be sent to.
               All roles will default to this variable if left unconfigured.
             required: true
           - name: 'DEFAULT_RECIPIENT_CUSTOM'
