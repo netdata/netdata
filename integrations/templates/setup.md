@@ -1,3 +1,6 @@
+[% if entry.setup.description %]
+[[ entry.setup.description ]]
+[% else %]
 [% if entry.setup.prerequisites.list %]
 ### Prerequisites
 
@@ -86,5 +89,6 @@ sudo ./edit-config [[ entry.setup.configuration.file.name ]]
 {% /details %}
 [% endif %]
 [% endfor %]
+[% endif %]
 [% endif %]
 [% endif %]
