@@ -105,7 +105,6 @@ typedef struct {} dbengine_config_t;
 static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
     UNUSED(cfg);
 
-#ifdef ENABLE_DBENGINE
     rrdb.use_direct_io = config_get_boolean(CONFIG_SECTION_DB, "dbengine use direct io", rrdb.use_direct_io);
 
     unsigned read_num = (unsigned)config_get_number(CONFIG_SECTION_DB, "dbengine pages per extent", MAX_PAGES_PER_EXTENT);
@@ -242,15 +241,6 @@ static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
         rrdeng_readiness_wait(rrdb.multidb_ctx[tier]);
 
     rrdb.dbengine_enabled = true;
-#else
-    rrdb.storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", 1);
-    if(rrdb.storage_tiers != 1) {
-        netdata_log_error("DBENGINE is not available on '%s', so only 1 database tier can be supported.", hostname);
-        rrdb.storage_tiers = 1;
-        config_set_number(CONFIG_SECTION_DB, "storage tiers", rrdb.storage_tiers);
-    }
-    rrdb.dbengine_enabled = false;
-#endif
 }
 
 static void init_host_indexes() {
@@ -290,8 +280,18 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
         if (default_storage_engine_id == STORAGE_ENGINE_DBENGINE || rrdpush_receiver_needs_dbengine()) {
             netdata_log_info("DBENGINE: Initializing ...");
 
+#ifdef ENABLE_DBENGINE
             dbengine_config_t cfg;
             dbengine_init(hostname, &cfg);
+#else
+            rrdb.storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", 1);
+            if(rrdb.storage_tiers != 1) {
+                netdata_log_error("DBENGINE is not available on '%s', so only 1 database tier can be supported.", hostname);
+                rrdb.storage_tiers = 1;
+                config_set_number(CONFIG_SECTION_DB, "storage tiers", rrdb.storage_tiers);
+            }
+            rrdb.dbengine_enabled = false;
+#endif // ENABLE_DBENGINE
         }
         else {
             netdata_log_info("DBENGINE: Not initializing ...");
