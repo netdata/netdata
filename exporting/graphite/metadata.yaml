@@ -175,7 +175,7 @@
                   # send names instead of ids = yes
                   # send charts matching = *
                   # send hosts matching = localhost *
-- <<: *promexport
+- <<: *graphexport
   id: 'export-blueflood'
   meta:
     <<: *meta
@@ -186,7 +186,7 @@
       - export
       - Blueflood
       - graphite
-- <<: *promexport
+- <<: *graphexport
   id: 'export-influxdb'
   meta:
     <<: *meta
@@ -198,7 +198,7 @@
       - Influx
       - export
       - graphite
-- <<: *promexport
+- <<: *graphexport
   id: 'export-kairosdb'
   meta:
     <<: *meta
