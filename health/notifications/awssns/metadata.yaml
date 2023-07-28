@@ -44,8 +44,12 @@
           title: 'Config Options'
           enabled: true
         list:
-          - name: 'SEND_AWSNS'
+          - name: 'aws path'
             default_value: ''
+            description: "The full path of the aws command. If empty, the system `$PATH` will be searched for it. If not found, Amazon SNS notifications will be silently disabled."
+            required: true
+          - name: 'SEND_AWSNS'
+            default_value: 'YES'
             description: "Set `SEND_AWSNS` to YES"
             required: true
           - name: 'AWSSNS_MESSAGE_FORMAT'
@@ -94,7 +98,7 @@
           - name: 'DEFAULT_RECIPIENT_AWSSNS'
             default_value: ''
             description: "Set `DEFAULT_RECIPIENT_AWSSNS` to the Topic ARN you noted down upon creating the Topic."
-            required: false
+            required: true
             detailed_description: >
               All roles will default to this variable if left unconfigured.
               The `DEFAULT_RECIPIENT_AWSSNS` can be edited in the following entries at the bottom of the same file:
