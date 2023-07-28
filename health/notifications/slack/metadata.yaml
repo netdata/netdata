@@ -31,7 +31,7 @@
           enabled: true
         list:
           - name: 'SEND_SLACK'
-            default_value: ''
+            default_value: 'YES'
             description: "Set `SEND_SLACK` to YES"
             required: true
           - name: 'SLACK_WEBHOOK_URL'
@@ -41,7 +41,7 @@
           - name: 'DEFAULT_RECIPIENT_SLACK'
             default_value: ''
             description: "Set `DEFAULT_RECIPIENT_SLACK` to the Slack channel your Slack app is set to send messages to. The syntax for channels is `#channel` or `channel`."
-            required: false
+            required: true
       examples:
         folding:
           enabled: true
