@@ -43,13 +43,13 @@
               ```
               [[facility.level][@host[:port]]/]prefix
               ```
-              
+
               prefix defines what the log messages are prefixed with. By default, all lines are prefixed with 'netdata'.
-              
+
               The facility and level are the standard syslog facility and level options, for more info on them see your local logger and syslog documentation. By default, Netdata will log to the local6 facility, with a log level dependent on the type of message (crit for CRITICAL, warning for WARNING, and info for everything else).
-              
+
               You can configure sending directly to remote log servers by specifying a host (and optionally a port). However, this has a somewhat high overhead, so it is much preferred to use your local syslog daemon to handle the forwarding of messages to remote systems (pretty much all of them allow at least simple forwarding, and most of the really popular ones support complex queueing and routing of messages to remote log servers).
-              
+
               You can define multiple recipients like this: daemon.notice@loghost:514/netdata daemon.notice@loghost2:514/netdata.
               All roles will default to this variable if left unconfigured.
           - name: 'SEND_SYSLOG '
@@ -58,7 +58,7 @@
             required: true
             detailed_description: >
               You can then have different recipients per role, by editing DEFAULT_RECIPIENT_SYSLOG with the recipient you want, in the following entries at the bottom of the same file:
-              
+
               ```
               role_recipients_syslog[sysadmin]="daemon.notice@loghost1:514/netdata"
               role_recipients_syslog[domainadmin]="daemon.notice@loghost2:514/netdata"
@@ -79,7 +79,7 @@
             config: |
               #------------------------------------------------------------------------------
               # syslog notifications
-              
+
               SEND_SYSLOG="YES"
               SYSLOG_FACILITY='local6'
               DEFAULT_RECIPIENT_SYSLOG="daemon.notice@loghost6:514/netdata"
