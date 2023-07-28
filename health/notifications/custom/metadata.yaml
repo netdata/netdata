@@ -35,7 +35,7 @@
           - name: 'DEFAULT_RECIPIENT_CUSTOM'
             default_value: ''
             description: "The `DEFAULT_RECIPIENT_CUSTOM` value is dependent on how you handle the `${to}` variable inside the `custom_sender()` function."
-            required: false
+            required: true
             detailed_description: >
               All roles will default to this variable if left unconfigured. You can edit `DEFAULT_RECIPIENT_CUSTOM` with the variable you want, in the following entries at the bottom of the same file:
               ```
