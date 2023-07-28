@@ -65,6 +65,12 @@
       most_popular: false
       priority: -1
       children: []
+     - id: data-collection.notifications
+      name: Notifications
+      description: ""
+      most_popular: false
+      priority: -1
+      children: []     
     - id: data-collection.service-discovery-registry
       name: Service Discovery / Registry
       description: ""
