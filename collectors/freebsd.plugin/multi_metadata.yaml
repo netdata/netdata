@@ -747,7 +747,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "plugin:freebsd"
+          section_name: "[plugin:freebsd]"
           description: "The netdata main configuration file."
         options:
           description: ""
