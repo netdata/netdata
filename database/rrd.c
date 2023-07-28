@@ -102,6 +102,7 @@ static void *dbengine_tier_init(void *ptr) {
 
 typedef struct {
     bool use_direct_io;
+    size_t storage_tiers;
 } dbengine_config_t;
 
 static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
@@ -113,18 +114,6 @@ static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
     else {
         netdata_log_error("Invalid dbengine pages per extent %u given. Using %u.", read_num, rrdeng_pages_per_extent);
         config_set_number(CONFIG_SECTION_DB, "dbengine pages per extent", rrdeng_pages_per_extent);
-    }
-
-    rrdb.storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", rrdb.storage_tiers);
-    if (rrdb.storage_tiers < 1) {
-        netdata_log_error("At least 1 storage tier is required. Assuming 1.");
-        rrdb.storage_tiers = 1;
-        config_set_number(CONFIG_SECTION_DB, "storage tiers", rrdb.storage_tiers);
-    }
-    if (rrdb.storage_tiers > RRD_STORAGE_TIERS) {
-        netdata_log_error("Up to %d storage tier are supported. Assuming %d.", RRD_STORAGE_TIERS, RRD_STORAGE_TIERS);
-        rrdb.storage_tiers = RRD_STORAGE_TIERS;
-        config_set_number(CONFIG_SECTION_DB, "storage tiers", rrdb.storage_tiers);
     }
 
     bool parallel_initialization = (rrdb.storage_tiers <= (size_t)get_netdata_cpus()) ? true : false;
@@ -285,7 +274,20 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
 
             cfg.use_direct_io = config_get_boolean(CONFIG_SECTION_DB, "dbengine use direct io", rrdb.use_direct_io);
 
+            cfg.storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", rrdb.storage_tiers);
+            if (cfg.storage_tiers < 1) {
+                netdata_log_error("At least 1 storage tier is required. Assuming 1.");
+                cfg.storage_tiers = 1;
+                config_set_number(CONFIG_SECTION_DB, "storage tiers", cfg.storage_tiers);
+            }
+            if (cfg.storage_tiers > RRD_STORAGE_TIERS) {
+                netdata_log_error("Up to %d storage tier are supported. Assuming %d.", RRD_STORAGE_TIERS, RRD_STORAGE_TIERS);
+                cfg.storage_tiers = RRD_STORAGE_TIERS;
+                config_set_number(CONFIG_SECTION_DB, "storage tiers", cfg.storage_tiers);
+            }
+
             rrdb.use_direct_io = cfg.use_direct_io;
+            rrdb.storage_tiers = cfg.storage_tiers;
 
             dbengine_init(hostname, &cfg);
 #else
