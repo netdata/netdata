@@ -37,7 +37,7 @@
           enabled: true
         list:
           - name: 'sendsms'
-            default_value: ''
+            default_value: 'YES'
             description: "Set the path for `sendsms`, otherwise Netdata will search for it in your system `$PATH:`"
             required: true
             detailed_description: >
@@ -52,7 +52,7 @@
           - name: 'DEFAULT_RECIPIENT_SMS'
             default_value: ''
             description: "Set DEFAULT_RECIPIENT_SMS to the phone number you want the alert notifications to be sent to. You can define multiple phone numbers like this: PHONE1 PHONE2."
-            required: false
+            required: true
             detailed_description: >
               All roles will default to this variable if left unconfigured.
 
