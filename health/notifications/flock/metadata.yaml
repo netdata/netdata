@@ -30,7 +30,7 @@
           enabled: true
         list:
           - name: 'SEND_FLOCK'
-            default_value: ''
+            default_value: 'YES'
             description: "Set `SEND_FLOCK` to YES"
             required: true
           - name: 'FLOCK_WEBHOOK_URL'
@@ -40,7 +40,7 @@
           - name: 'DEFAULT_RECIPIENT_FLOCK'
             default_value: ''
             description: "Set `DEFAULT_RECIPIENT_FLOCK` to  the Flock channel you want the alert notifications to be sent to. All roles will default to this variable if left unconfigured."
-            required: false
+            required: true
             detailed_description: >
               You can have different channels per role, by editing DEFAULT_RECIPIENT_FLOCK with the channel you want, in the following entries at the bottom of the same file:
               ```
