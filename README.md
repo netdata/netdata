@@ -312,7 +312,7 @@ The core of Netdata is developed in C. We have our own `libnetdata`, that provid
 
 The above, and many more, allow Netdata developers to work on the application fast and with confidence. Most of the business logic in Netdata is a work of mixing the above.
 
-Netdata data metric collection plugins can be developed in any language. Most of our application collectors though are developed in [Go](https://github.com/netdata/go.d.plugin).
+Netdata metric collection plugins can be developed in any language. Most of our application collectors though are developed in [Go](https://github.com/netdata/go.d.plugin).
 
 </details>
 
