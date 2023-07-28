@@ -1801,10 +1801,10 @@ modules:
       module_name: net.inet.tcp.states
       monitored_instance:
         name: freebsd net.inet.tcp.states
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "network.svg"
       related_resources:
         integrations:
           list: []
@@ -1834,14 +1834,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: net.inet.tcp.states
+              description: Enable or disable TCP state metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -1878,10 +1883,10 @@ modules:
       module_name: net.inet.tcp.stats
       monitored_instance:
         name: freebsd net.inet.tcp.stats
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "network.svg"
       related_resources:
         integrations:
           list: []
@@ -1891,8 +1896,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect overall information about TCP connections."
+        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -1911,14 +1916,47 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: ipv4 TCP packets
+              description: Enable or disable ipv4 TCP packets metric.
+              default_value: yes
+              required: false
+            - name: ipv4 TCP errors
+              description: Enable or disable pv4 TCP errors metric.
+              default_value: yes
+              required: false
+            - name: ipv4 TCP handshake issues
+              description: Enable or disable ipv4 TCP handshake issue metric.
+              default_value: yes
+              required: false
+            - name: TCP connection aborts
+              description: Enable or disable TCP connection aborts metric.
+              default_value: auto
+              required: false
+            - name: TCP out-of-order queue
+              description: Enable or disable TCP out-of-order queue metric.
+              default_value: auto
+              required: false
+            - name: TCP SYN cookies
+              description: Enable or disable TCP SYN cookies metric.
+              default_value: auto
+              required: false
+            - name: TCP listen issues
+              description: Enable or disable TCP listen issues metric.
+              default_value: auto
+              required: false
+            - name: ECN packets
+              description: Enable or disable ECN packets metric.
+              default_value: auto
+              required: false
         examples:
           folding:
             enabled: true
@@ -2032,10 +2070,10 @@ modules:
       module_name: net.inet.udp.stats
       monitored_instance:
         name: freebsd net.inet.udp.stats
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "network.svg"
       related_resources:
         integrations:
           list: []
