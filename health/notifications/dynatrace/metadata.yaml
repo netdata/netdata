@@ -34,7 +34,7 @@
           enabled: true
         list:
           - name: 'SEND_DYNATRACE'
-            default_value: ''
+            default_value: 'YES'
             description: "Set `SEND_DYNATRACE` to YES"
             required: true
           - name: 'DYNATRACE_SERVER'
