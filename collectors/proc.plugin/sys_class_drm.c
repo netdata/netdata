@@ -6,16 +6,6 @@
 #define CONFIG_SECTION_PLUGIN_PROC_DRM "plugin:proc:/sys/class/drm"
 #define AMDGPU_CHART_TYPE "amdgpu"
 
-/*
- * Copyright (C) 2023 Advanced Micro Devices, Inc. All rights reserved.
- *
- * This file is modified from libdrm. MIT License.
- *
- * URL: https://gitlab.freedesktop.org/mesa/drm/-/blob/main/data/amdgpu.ids
- * The amdgpu_ids has to be modified after new GPU release.
- *
- */
-
 struct amdgpu_id_struct {
     uint32_t asic_id;
     uint32_t pci_rev_id;
