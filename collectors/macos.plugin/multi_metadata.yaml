@@ -49,7 +49,6 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: [plugin:macos:...]
           description: "The netdata main configuration file."
         options:
           description: |
