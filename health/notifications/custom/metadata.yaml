@@ -56,13 +56,13 @@
               custom_sender() {
                   # example human readable SMS
                   local msg="${host} ${status_message}: ${alarm} ${raised_for}"
-              
+
                   # limit it to 160 characters and encode it for use in a URL
                   urlencode "${msg:0:160}" >/dev/null; msg="${REPLY}"
-              
+
                   # a space separated list of the recipients to send alarms to
                   to="${1}"
-              
+
                   for phone in ${to}; do
                     httpcode=$(docurl -X POST \
                           --data-urlencode "From=XXX" \
@@ -70,7 +70,7 @@
                           --data-urlencode "Body=${msg}" \
                           -u "${accountsid}:${accounttoken}" \
                       https://domain.website.com/)
-              
+
                     if [ "${httpcode}" = "200" ]; then
                       info "sent custom notification ${msg} to ${phone}"
                       sent=$((sent + 1))
@@ -132,21 +132,21 @@
             config: |
               #------------------------------------------------------------------------------
               # custom notifications
-              
+
               SEND_CUSTOM="YES"
               DEFAULT_RECIPIENT_CUSTOM=""
-              
+
               # The custom_sender() is a custom function to do whatever you need to do
               custom_sender() {
                   # example human readable SMS
                   local msg="${host} ${status_message}: ${alarm} ${raised_for}"
-              
+
                   # limit it to 160 characters and encode it for use in a URL
                   urlencode "${msg:0:160}" >/dev/null; msg="${REPLY}"
-              
+
                   # a space separated list of the recipients to send alarms to
                   to="${1}"
-              
+
                   for phone in ${to}; do
                     httpcode=$(docurl -X POST \
                           --data-urlencode "From=XXX" \
@@ -154,7 +154,7 @@
                           --data-urlencode "Body=${msg}" \
                           -u "${accountsid}:${accounttoken}" \
                       https://domain.website.com/)
-              
+
                     if [ "${httpcode}" = "200" ]; then
                       info "sent custom notification ${msg} to ${phone}"
                       sent=$((sent + 1))
