@@ -90,7 +90,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "Monitoring for number of threads running or waiting."
           labels: []
           metrics:
             - name: system.load
@@ -181,7 +181,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show an overall vision about processes running."
           labels: []
           metrics:
             - name: system.active_processes
@@ -290,7 +290,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show statistic about CPU usage."
           labels: []
           metrics:
             - name: system.cpu
@@ -385,7 +385,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "This metric show latest CPU temperature."
           labels: []
           metrics:
             - name: cpu.temperature
@@ -462,7 +462,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "The metric shows status of CPU frequency, it is direct affected by system load."
           labels: []
           metrics:
             - name: cpu.scaling_cur_freq
@@ -539,7 +539,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics give information about system interrupts."
           labels: []
           metrics:
             - name: system.intr
@@ -622,7 +622,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "The metric show counters for device interrupt."
           labels: []
           metrics:
             - name: system.dev_intr
@@ -699,7 +699,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "This metric shows total software interrupt."
           labels: []
           metrics:
             - name: system.soft_intr
@@ -776,7 +776,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "The metric count the number of context switches happening on host."
           labels: []
           metrics:
             - name: system.ctxt
@@ -864,7 +864,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "This metric shows the SWAP usage."
           labels: []
           metrics:
             - name: system.swap
@@ -962,7 +962,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "This metric shows statistics about RAM usage."
           labels: []
           metrics:
             - name: system.ram
@@ -1056,7 +1056,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "This metric shows events happening on SWAP."
           labels: []
           metrics:
             - name: system.swapio
@@ -1134,7 +1134,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "The number of page faults happened on host."
           labels: []
           metrics:
             - name: mem.pgfaults
@@ -1225,7 +1225,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics shows counters for semaphores on host."
           labels: []
           metrics:
             - name: system.ipc_semaphores
@@ -1308,7 +1308,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics give status about current shared memory segments."
           labels: []
           metrics:
             - name: system.ipc_shared_mem_segs
@@ -1391,7 +1391,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show statistic about total IPC messages."
           labels: []
           metrics:
             - name: system.ipc_msq_queues
@@ -1481,7 +1481,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "How long the system is running."
           labels: []
           metrics:
             - name: system.uptime
@@ -1579,7 +1579,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show statistic about softnet status."
           labels: []
           metrics:
             - name: system.softnet_stat
@@ -1721,7 +1721,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics give a general vision about I/O events on disks."
           labels: []
           metrics:
             - name: system.io
@@ -1869,7 +1869,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "A counter for TCP connections."
           labels: []
           metrics:
             - name: ipv4.tcpsock
@@ -1998,7 +1998,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show statistics about TCP connections."
           labels: []
           metrics:
             - name: ipv4.tcppackets
@@ -2147,7 +2147,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show detailed information about UDP connections."
           labels: []
           metrics:
             - name: ipv4.udppackets
@@ -2243,7 +2243,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show detailed information about ICMP connections."
           labels: []
           metrics:
             - name: ipv4.icmp
@@ -2350,7 +2350,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show general information about IPv4 connections."
           labels: []
           metrics:
             - name: ipv4.packets
@@ -2469,7 +2469,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show general information about IPv6 connections."
           labels: []
           metrics:
             - name: ipv6.packets
