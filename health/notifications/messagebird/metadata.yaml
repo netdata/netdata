@@ -47,7 +47,7 @@
             required: false
             detailed_description: >
               All roles will default to this variable if left unconfigured.
-              
+
               You can then have different recipients per role, by editing `DEFAULT_RECIPIENT_MESSAGEBIRD` with the number you want, in the following entries at the bottom of the same file:
               ```
               role_recipients_messagebird[sysadmin]="+15555555555"
@@ -69,7 +69,7 @@
             config: |
               #------------------------------------------------------------------------------
               # Messagebird (messagebird.com) SMS options
-              
+
               SEND_MESSAGEBIRD="YES"
               MESSAGEBIRD_ACCESS_KEY="XXXXXXXX"
               MESSAGEBIRD_NUMBER="XXXXXXX"
