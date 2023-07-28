@@ -55,7 +55,7 @@ modules:
           description: |
             There are three sections in the file which you can configure:
 
-            - `[plugin:macos:sysctl"]` - Enable or disable monitoring for network, swap, loadavg, and boot time.
+            - `[plugin:macos:sysctl]` - Enable or disable monitoring for network, swap, loadavg, and boot time.
             - `[plugin:macos:mach_smi]` - Enable or disable monitoring for CPU and Virtual memory.
             - `[plugin:macos:iokit]` - Enable or disable monitoring for storage device.
           folding:
@@ -254,9 +254,29 @@ modules:
               required: false
         examples:
           folding:
-            enabled: true
-            title: ""
-          list: []
+            enabled: false
+            title: "Config"
+          list:
+            - name: Disable swap monitoring.
+              folding:
+                enabled: true
+              description: A basic example that discards swap monitoring
+              config: |
+                [plugin:macos:sysctl]
+                  system swap = no
+                [plugin:macos:mach_smi]
+                  swap i/o = no
+            - name: Disable complete Machine SMI section.
+              folding:
+                enabled: true
+              description: A basic example that discards swap monitoring
+              config: |
+                [plugin:macos:mach_smi]
+                  cpu utilization = no
+                  system ram = no
+                  swap i/o = no
+                  memory page faults = no
+                  disk i/o = no
     troubleshooting:
       problems:
         list: []
