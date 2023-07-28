@@ -12,8 +12,6 @@
   overview:
     notification_description: |
       Send notifications to Prowl using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
-      
-      
     notification_limitations: |
       - Because of how Netdata integrates with Prowl, there is a hard limit of at most 1000 notifications per hour (starting from the first notification sent). Any alerts beyond the first thousand in an hour will be dropped.
       - Warning messages will be sent with the 'High' priority, critical messages will be sent with the 'Emergency' priority, and all other messages will be sent with the normal priority. Opening the notification's associated URL will take you to the Netdata dashboard of the system that issued the alert, directly to the chart that it triggered on.
@@ -43,7 +41,7 @@
             required: false
             detailed_description: >
               All roles will default to this variable if left unconfigured.
-              
+
               The `DEFAULT_RECIPIENT_PROWL` can be edited in the following entries at the bottom of the same file:
               ```
               role_recipients_prowl[sysadmin]="AAAAAAAA"
@@ -65,6 +63,6 @@
             config: |
               #------------------------------------------------------------------------------
               # iOS Push Notifications
-              
+
               SEND_PROWL="YES"
               DEFAULT_RECIPIENT_PROWL="XXXXXXXXXX"
