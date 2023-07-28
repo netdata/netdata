@@ -1917,7 +1917,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "plugin:freebsd"
+          section_name: "plugin:freebsd:net.inet.tcp.stats"
           description: "The netdata main configuration file."
         options:
           description: ""
@@ -2083,8 +2083,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Show information about UDP connections."
+        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -2103,14 +2103,23 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd:net.inet.udp.stats"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: ipv4 UDP packets
+              description: Enable or disable ipv4 UDP packets metric.
+              default_value: yes
+              required: false
+            - name: ipv4 UDP errors
+              description: Enable or disable ipv4 UDP errors metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
