@@ -598,6 +598,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
     buffer_json_member_add_object(wb, "pagination");
     buffer_json_member_add_boolean(wb, "enabled", true);
     buffer_json_member_add_string(wb, "key", "anchor");
+    buffer_json_member_add_string(wb, "column", "timestamp");
     buffer_json_object_close(wb);
 
     buffer_json_member_add_array(wb, "accepted_params");
