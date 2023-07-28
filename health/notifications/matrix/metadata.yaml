@@ -32,7 +32,7 @@
           enabled: true
         list:
           - name: 'SEND_MATRIX'
-            default_value: ''
+            default_value: 'YES'
             description: "Set `SEND_MATRIX` to YES"
             required: true
           - name: 'MATRIX_HOMESERVER'
@@ -51,7 +51,7 @@
           - name: 'DEFAULT_RECIPIENT_MATRIX'
             default_value: ''
             description: "Set `DEFAULT_RECIPIENT_MATRIX`  to the rooms you want the alert notifications to be sent to. The format is `!roomid:homeservername`."
-            required: false
+            required: true
             detailed_description: >
               The room ids are unique identifiers and can be obtained from the room settings in a Matrix client (e.g. Riot).
               You can define multiple rooms like this: !roomid1:homeservername `!roomid2:homeservername`.
