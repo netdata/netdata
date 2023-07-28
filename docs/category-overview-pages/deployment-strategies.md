@@ -49,7 +49,7 @@ An Agent connected to a Parent is called a _Child_. It will _stream_ metrics to 
 
 When using Cloud, it is recommended that just the Parent is connected to Cloud. Child Agents can then be configured to have short retention, in RAM instead of on Disk, and have alerting and other features disabled. Because they don't need to connect to Cloud themselves, those children can then be further secured by not allowing outbound traffic.
 
-![image](https://github.com/netdata/netdata/assets/116741/6ae2b10c-7f7d-4503-aac4-0a9381c6f80b)
+![image](https://github.com/netdata/netdata/assets/116741/cb65698d-a6b7-43ee-a2d1-c30d0a46f084)
 
 This setup allows for leaner Child nodes and is good for setups with more than a handful of nodes. Metrics data remains accessible if the Child node is temporarily unavailable or decommissioned, although there is no failover in case the Parent becomes unavailable.
 
@@ -60,7 +60,7 @@ For high availability, Parents can be configured to stream data for their childr
 
 With both Parent Agents connected to Cloud, Cloud will route queries to either Parent transparently, depending on their availability. Alerts trigger on either Parent will stream to Cloud, and Cloud will deduplicate and debounce state changes to prevent spurious notifications.
 
-![image](https://github.com/netdata/netdata/assets/116741/cb65698d-a6b7-43ee-a2d1-c30d0a46f084)
+![image](https://github.com/netdata/netdata/assets/116741/6ae2b10c-7f7d-4503-aac4-0a9381c6f80b)
 
 
 ## Configuration Details
