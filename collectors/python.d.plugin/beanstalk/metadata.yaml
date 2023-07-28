@@ -7,7 +7,7 @@ meta:
     link: "https://beanstalkd.github.io/"
     categories:
       - data-collection.message-brokers
-    icon_filename: "beanstalk.png"
+    icon_filename: "beanstalk.svg"
   related_resources:
     integrations:
       list: []
