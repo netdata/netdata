@@ -48,7 +48,7 @@
             required: false
             detailed_description: >
               All roles will default to this variable if lest unconfigured.
-              
+
               You can then have different SMS recipients per role, by editing `DEFAULT_RECIPIENT_KAVENEGAR` with the SMS recipients you want, in the following entries at the bottom of the same file:
               ```
               role_recipients_kavenegar[sysadmin]="09100000000"
@@ -72,7 +72,7 @@
             config: |
               #------------------------------------------------------------------------------
               # Kavenegar (Kavenegar.com) SMS options
-              
+
               SEND_KAVENEGAR="YES"
               KAVENEGAR_API_KEY="XXXXXXXXXXXX"
               KAVENEGAR_SENDER="YYYYYYYY"
