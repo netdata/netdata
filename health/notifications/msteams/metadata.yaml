@@ -45,9 +45,9 @@
             description: "Set `DEFAULT_RECIPIENT_MSTEAMS` to the encoded Microsoft Teams channel name you want the alert notifications to be sent to."
             required: false
             detailed_description: >
-              In Microsoft Teams the channel name is encoded in the URI after /IncomingWebhook/. You can define multiple channels like this: CHANNEL1 CHANNEL2. 
+              In Microsoft Teams the channel name is encoded in the URI after /IncomingWebhook/. You can define multiple channels like this: CHANNEL1 CHANNEL2.
               All roles will default to this variable if left unconfigured.
-              
+
               You can then have different channels per role, by editing `DEFAULT_RECIPIENT_MSTEAMS` with the channel you want, in the following entries at the bottom of the same file:
               ```
               role_recipients_msteams[sysadmin]="CHANNEL1"
@@ -69,7 +69,7 @@
             config: |
               #------------------------------------------------------------------------------
               # Microsoft Teams (office.com) global notification options
-              
+
               SEND_MSTEAMS="YES"
               MSTEAMS_WEBHOOK_URL="https://outlook.office.com/webhook/XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX@XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX/IncomingWebhook/CHANNEL/XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
               DEFAULT_RECIPIENT_MSTEAMS="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
