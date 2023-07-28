@@ -875,6 +875,8 @@ struct rrdb {
     size_t storage_tiers;
     bool use_direct_io;
 
+    bool parallel_initialization;
+
     size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
     RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS];
 

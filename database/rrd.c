@@ -103,6 +103,7 @@ static void *dbengine_tier_init(void *ptr) {
 typedef struct {
     bool use_direct_io;
     size_t storage_tiers;
+    bool parallel_initialization;
 } dbengine_config_t;
 
 static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
@@ -115,9 +116,6 @@ static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
         netdata_log_error("Invalid dbengine pages per extent %u given. Using %u.", read_num, rrdeng_pages_per_extent);
         config_set_number(CONFIG_SECTION_DB, "dbengine pages per extent", rrdeng_pages_per_extent);
     }
-
-    bool parallel_initialization = (rrdb.storage_tiers <= (size_t)get_netdata_cpus()) ? true : false;
-    parallel_initialization = config_get_boolean(CONFIG_SECTION_DB, "dbengine parallel initialization", parallel_initialization);
 
     struct dbengine_initialization tiers_init[RRD_STORAGE_TIERS] = {};
 
@@ -189,7 +187,7 @@ static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
         strncpyz(tiers_init[tier].path, dbenginepath, FILENAME_MAX);
         tiers_init[tier].ret = 0;
 
-        if(parallel_initialization) {
+        if(rrdb.parallel_initialization) {
             char tag[NETDATA_THREAD_TAG_MAX + 1];
             snprintfz(tag, NETDATA_THREAD_TAG_MAX, "DBENGINIT[%zu]", tier);
             netdata_thread_create(&tiers_init[tier].thread, tag, NETDATA_THREAD_OPTION_JOINABLE,
@@ -202,7 +200,7 @@ static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
     for (size_t tier = 0; tier < rrdb.storage_tiers ;tier++) {
         void *ptr;
 
-        if(parallel_initialization)
+        if(rrdb.parallel_initialization)
             netdata_thread_join(tiers_init[tier].thread, &ptr);
 
         if(tiers_init[tier].ret != 0) {
@@ -286,8 +284,12 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
                 config_set_number(CONFIG_SECTION_DB, "storage tiers", cfg.storage_tiers);
             }
 
+            cfg.parallel_initialization = (cfg.storage_tiers <= (size_t) get_netdata_cpus()) ? true : false;
+            cfg.parallel_initialization = config_get_boolean(CONFIG_SECTION_DB, "dbengine parallel initialization", cfg.parallel_initialization);
+
             rrdb.use_direct_io = cfg.use_direct_io;
             rrdb.storage_tiers = cfg.storage_tiers;
+            rrdb.parallel_initialization = cfg.parallel_initialization;
 
             dbengine_init(hostname, &cfg);
 #else
@@ -378,6 +380,7 @@ struct rrdb rrdb = {
     .dbengine_enabled = false,
     .storage_tiers = 3,
     .use_direct_io = true,
+    .parallel_initialization = false,
     .storage_tiers_grouping_iterations = {
         1,
         60,
