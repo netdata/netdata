@@ -798,58 +798,6 @@ EXIT_PLUGIN:
     return resp;
 }
 
-#ifdef DYNCFG_DUMMY_PLUGIN
-
-static int set_current_config_dummy(void *usr_ctx, dyncfg_config_t *config)
-{
-    UNUSED(usr_ctx);
-    error_report("DYNCFG set_current_config_dummy: %s", config->data);
-    return 0;
-}
-
-struct configurable_plugin dummy_plugin = {
-    .name = "dummy_plugin",
-    .modules = NULL,
-    .schema = NULL,
-    .set_config_cb = set_current_config_dummy
-};
-
-const char *default_config = "{\n\t\"info\": \"I'am dummy_plugin and this is my current configuration\",\n\t\"update_every\": 5\n}";
-const char *module1_default_config = "{\n\t\"info\": \"I'am module1 and this is my current configuration\",\n\t\"update_every\": 5\n}";
-#define JOB_MODULE_DEFAULT_CONFIG "{\n\t\"info\": \"I'am module1 and this is my current configuration\",\n\t\"update_every\": 5\n}"
-
-struct module job_module = {
-    .default_config = {
-        .data = JOB_MODULE_DEFAULT_CONFIG,
-        .data_size = strlen(JOB_MODULE_DEFAULT_CONFIG)
-    },
-    .name = "job_module",
-    .type = MOD_TYPE_ARRAY,
-};
-
-void register_dummy_plugin()
-{
-    // register a plugin
-    dummy_plugin.default_config.data = default_config;
-    dummy_plugin.default_config.data_size = strlen(default_config);
-    register_plugin(&dummy_plugin);
-
-    // register a module
-    struct module *m = callocz(1, sizeof(struct module));
-    m->name = "module1";
-    m->type = MOD_TYPE_SINGLE;
-
-    m->default_config.data = module1_default_config;
-    m->default_config.data_size = strlen(module1_default_config);
-
-    struct configurable_plugin *plg = get_plugin_by_name("dummy_plugin");
-    register_module(plg, m);
-
-    register_module(plg, &job_module);
-}
-
-#endif
-
 void plugin_del_cb(const DICTIONARY_ITEM *item, void *value, void *data)
 {
     UNUSED(item);
@@ -871,10 +819,6 @@ int dyn_conf_init(void)
 
     plugins_dict = dictionary_create(DICT_OPTION_VALUE_LINK_DONT_CLONE);
     dictionary_register_delete_callback(plugins_dict, plugin_del_cb, NULL);
-
-#ifdef DYNCFG_DUMMY_PLUGIN
-    register_dummy_plugin();
-#endif
 
     return 0;
 }
