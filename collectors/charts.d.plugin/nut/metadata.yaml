@@ -12,7 +12,11 @@ meta:
       list: []
   info_provided_to_referring_integrations:
     description: ''
-  keywords: []
+  keywords:
+    - nut
+    - network ups tools
+    - ups
+    - pdu
   most_popular: false
 overview:
   data_collection:
