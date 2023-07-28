@@ -55,7 +55,7 @@
             required: false
             detailed_description: >
               All roles will default to this variable if left unconfigured.
-              
+
               You can then have different phone numbers per role, by editing `DEFAULT_RECIPIENT_SMS` with the phone number you want, in the following entries at the bottom of the same file:
               ```
               role_recipients_sms[sysadmin]="PHONE1"
