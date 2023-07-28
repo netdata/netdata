@@ -140,7 +140,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "plugin:freebsd:vm.vmtotal"
+          section_name: "[plugin:freebsd:vm.vmtotal]"
           description: ""
         options:
           description: ""
