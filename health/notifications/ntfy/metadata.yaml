@@ -32,7 +32,7 @@
           enabled: true
         list:
           - name: 'SEND_NTFY'
-            default_value: ''
+            default_value: 'YES'
             description: "Set `SEND_NTFY` to YES"
             required: true
           - name: 'DEFAULT_RECIPIENT_NTFY'
