@@ -6,7 +6,7 @@ meta:
   link: 'https://cloud.google.com/pubsub'
   categories:
     - export
-  icon_filename: 'googlecloud.png'
+  icon_filename: 'pubsub.png'
 keywords:
   - exporter
   - Google Cloud

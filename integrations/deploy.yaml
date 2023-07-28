@@ -56,7 +56,7 @@
     <<: *linux_meta
     name: Debian
     link: https://www.debian.org/
-    icon_filename: 'debian.png'
+    icon_filename: 'debian.svg'
   most_popular: false
   platform_info:
     group: 'include'
@@ -104,7 +104,7 @@
     <<: *linux_meta
     name: Alpine Linux
     link: https://www.alpinelinux.org/
-    icon_filename: 'alpine.png'
+    icon_filename: 'alpine.svg'
   most_popular: false
   platform_info:
     group: 'include'
@@ -164,7 +164,7 @@
     <<: *linux_meta
     name: Oracle Linux
     link: https://www.oracle.com/linux/
-    icon_filename: 'oraclelinux.png'
+    icon_filename: 'oraclelinux.svg'
   most_popular: false
   platform_info:
     group: 'include'
@@ -188,11 +188,12 @@
     link: ''
     categories:
       - deploy.operating-systems
-    icon_filename: 'apple.png'
+    icon_filename: 'macos.svg'
   most_popular: true
   keywords:
     - MacOS
     - mac
+    - apple
   install_description: 'Run the following command on your Intel based OSX, macOS servers to install and claim Netdata:'
   methods:
     - method: curl
@@ -217,7 +218,7 @@
     link: 'https://www.docker.com/'
     categories:
       - deploy.docker-kubernetes
-    icon_filename: 'docker.png'
+    icon_filename: 'docker.svg'
   most_popular: true
   keywords:
     - docker
@@ -428,7 +429,7 @@
     link: ''
     categories:
       - deploy.docker-kubernetes
-    icon_filename: 'kubernetes.png'
+    icon_filename: 'kubernetes.svg'
   keywords:
     - kubernetes
     - container
@@ -510,7 +511,7 @@
     link: 'https://www.microsoft.com/en-us/windows'
     categories:
       - deploy.operating-systems
-    icon_filename: 'windows.png'
+    icon_filename: 'windows.svg'
   keywords:
     - windows
   install_description: |
@@ -552,7 +553,7 @@
     link: 'https://www.freebsd.org/'
     categories:
       - deploy.operating-systems
-    icon_filename: 'freebsd.jpg'
+    icon_filename: 'freebsd.svg'
   most_popular: true
   keywords:
     - freebsd

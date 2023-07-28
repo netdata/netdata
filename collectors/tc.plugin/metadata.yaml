@@ -1,54 +1,67 @@
+# yamllint disable rule:line-length
+---
 meta:
   plugin_name: tc.plugin
   module_name: tc.plugin
   monitored_instance:
-    name: tc
-    link: ''
+    name: tc QoS classes
+    link: "https://wiki.linuxfoundation.org/networking/iproute2"
     categories:
-    - data-collection.networking-stack-and-network-interfaces
-    icon_filename: 'freeradius.png'
+      - data-collection.networking-stack-and-network-interfaces
+    icon_filename: "netdata.png"
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
+    description: ""
   keywords: []
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'Examine tc metrics to gain insights into Linux traffic control operations. Study packet flow rates, queue lengths, and drop rates to optimize network traffic flow.'
-    method_description: ''
+    metrics_description: "Examine tc metrics to gain insights into Linux traffic control operations. Study packet flow rates, queue lengths, and drop rates to optimize network traffic flow."
+    method_description: "The plugin uses `tc` command to collect information about Traffic control."
   supported_platforms:
-    include: []
+    include:
+      - Linux
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ''
+    description: "The plugin needs to access command `tc` to get the necessary metrics. To achieve this netdata modifies permission of file `/usr/libexec/netdata/plugins.d/tc-qos-helper.sh`."
   default_behavior:
     auto_detection:
-      description: ''
+      description: ""
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
     list: []
   configuration:
     file:
-      name: ''
-      description: ''
+      name: "netdata.conf"
+      section_name: "[plugin:tc]"
+      description: "The main configuration file."
     options:
-      description: ''
+      description: ""
       folding:
-        title: ''
+        title: "Config option"
         enabled: true
-      list: []
+      list:
+        - name: script to run to get tc values
+          description: Path to script `tc-qos-helper.sh`
+          default_value: "usr/libexec/netdata/plugins.d/tc-qos-helper.s"
+          required: false
     examples:
       folding:
-        enabled: true
-        title: ''
-      list: []
+        enabled: false
+        title: "Config"
+      list:
+        - name: Basic
+          description: A basic example configuration.
+          config: |
+            [plugin:tc]
+              script to run to get tc values = /usr/libexec/netdata/plugins.d/tc-qos-helper.sh
 troubleshooting:
   problems:
     list: []
@@ -60,43 +73,43 @@ metrics:
   description: ""
   availability: []
   scopes:
-  - name: network device, direction
-    description: ""
-    labels:
-    - name: device
-      description: TBD
-    - name: name
-      description: TBD
-    - name: family
-      description: TBD
-    metrics:
-    - name: tc.qos
-      description: Class Usage
-      unit: "kilobits/s"
-      chart_type: stacked
-      dimensions:
-      - name: a dimension per class
-    - name: tc.qos_packets
-      description: Class Packets
-      unit: "packets/s"
-      chart_type: stacked
-      dimensions:
-      - name: a dimension per class
-    - name: tc.qos_dropped
-      description: Class Dropped Packets
-      unit: "packets/s"
-      chart_type: stacked
-      dimensions:
-      - name: a dimension per class
-    - name: tc.qos_tokens
-      description: Class Tokens
-      unit: "tokens"
-      chart_type: line
-      dimensions:
-      - name: a dimension per class
-    - name: tc.qos_ctokens
-      description: Class cTokens
-      unit: "ctokens"
-      chart_type: line
-      dimensions:
-      - name: a dimension per class
+    - name: network device direction
+      description: "Metrics related to QoS network device directions. Each direction (in/out) produces its own set of the following metrics."
+      labels:
+        - name: device
+          description: The network interface.
+        - name: device_name
+          description: The network interface name
+        - name: group
+          description: The device family
+      metrics:
+        - name: tc.qos
+          description: Class Usage
+          unit: "kilobits/s"
+          chart_type: stacked
+          dimensions:
+            - name: a dimension per class
+        - name: tc.qos_packets
+          description: Class Packets
+          unit: "packets/s"
+          chart_type: stacked
+          dimensions:
+            - name: a dimension per class
+        - name: tc.qos_dropped
+          description: Class Dropped Packets
+          unit: "packets/s"
+          chart_type: stacked
+          dimensions:
+            - name: a dimension per class
+        - name: tc.qos_tokens
+          description: Class Tokens
+          unit: "tokens"
+          chart_type: line
+          dimensions:
+            - name: a dimension per class
+        - name: tc.qos_ctokens
+          description: Class cTokens
+          unit: "ctokens"
+          chart_type: line
+          dimensions:
+            - name: a dimension per class

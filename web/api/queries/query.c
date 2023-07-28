@@ -17,7 +17,7 @@
 #include "percentile/percentile.h"
 #include "trimmed_mean/trimmed_mean.h"
 
-#define QUERY_PLAN_MIN_POINTS 400
+#define QUERY_PLAN_MIN_POINTS 10
 #define POINTS_TO_EXPAND_QUERY 5
 
 // ----------------------------------------------------------------------------

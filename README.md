@@ -207,8 +207,8 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
    You can also use Netdata Parents to:
 
-   - Offload your production systems (the parents runs ML, alerts, queries, etc for all its children)
-   - Secure your production systems (the parents accept user connections, for all its children)
+   - Offload your production systems (the parents runs ML, alerts, queries, etc for all their children)
+   - Secure your production systems (the parents accept user connections, for all their children)
 
 ### 5. **Connect to Netdata Cloud** :cloud:
 
@@ -387,9 +387,13 @@ Netdata is a distributed monitoring solution. You can scale it to infinity by sp
 
 With the streaming feature of Netdata Agents, we can support monitoring ephemeral servers, but also allow the creation of "monitoring islands" where metrics are aggregated to a few servers (Netdata Parents) for increased retention, or for offloading production systems.
 
-  - :airplane: Netdata Parents provide great vertical scalability, so you can have as big parents as the CPU, RAM and Disk resources you can dedicate to them. In our lab we constantly stress test Netdata Parents with about 2 million metrics collected per second.
+  - :airplane: Netdata Parents provide great vertical scalability, so you can have as big parents as the CPU, RAM and Disk resources you can dedicate to them. In our lab we constantly stress test Netdata Parents with several million metrics collected per second, to ensure it reliable, stable and robust at scale.
     
   - :rocket: In addition, Netdata Cloud provides virtually unlimited horizontal scalability. It "merges" all the Netdata parents you have into one unified infrastructure at query time. Netdata Cloud itself is probably the biggest single installation monitoring platform ever created, currently monitoring about 100k online servers with about 10k servers changing state (added/removed) per day!
+
+Example: the following chart comes from a single Netdata Parent. As you can see on it, 244 nodes stream to it metrics of about 20k running containers. On this specific chart there are 3 dimensions per container, so a total of about 60k time-series queries are needed to present it.
+
+![image](https://github.com/netdata/netdata/assets/2662304/33db4aed-86af-4018-a547-e70643308f25)
 
 &nbsp;<br/>&nbsp;<br/>
 </details>
@@ -473,6 +477,65 @@ The distributed nature of Netdata helps scaling this approach: your data is spre
 &nbsp;<br/>&nbsp;<br/>
 </details>
 
+### :raised_eyebrow: How is Netdata different from Nagios, Icinga, Zabbix, etc?
+
+Netdata offers real-time, comprehensive monitoring, with a user-friendly interface and the ability to monitor everything, without any custom configuration required.
+
+<details><summary>Click to see detailed answer ...</summary>
+&nbsp;<br/>&nbsp;<br/>
+
+While Nagios, Icinga, Zabbix, and other similar tools are powerful and highly customizable, they can be complex to set up and manage. Their flexibility often comes at the cost of ease-of-use, especially for users who are not systems administrators or do not have extensive experience with these tools. Additionally, these tools generally require you to know what you want to monitor in advance and configure it explicitly.
+
+Netdata, on the other hand, takes a different approach. It provides a "ready to use" monitoring solution with a focus on simplicity and comprehensiveness. It automatically detects and starts monitoring many different system metrics and applications out-of-the-box, without any need for custom configuration. 
+
+In comparison to these traditional monitoring tools, Netdata:
+
+  - Provides real-time, high-resolution metrics, as opposed to the often minute-level granularity that tools like Nagios, Icinga, and Zabbix provide.
+
+  - Automatically generates meaningful, organized, and interactive visualizations of the collected data. Unlike other tools, where you have to manually create and organize graphs and dashboards, Netdata takes care of this for you.
+
+  - Applies machine learning to each individual metric to detect anomalies, providing more insightful and relevant alerts than static thresholds.
+
+  - Is designed to be distributed, so your data is spread inside your infrastructure, as close to the edge as possible. This approach is more scalable and avoids the potential bottleneck of a single centralized server.
+
+  - Has a more modern and user-friendly interface, making it easy for anyone, not just experienced administrators, to understand the health and performance of their systems.
+
+Even if you're already using Nagios, Icinga, Zabbix, or similar tools, you can use Netdata alongside them to augment your existing monitoring capabilities with real-time insights and user-friendly dashboards.
+
+&nbsp;<br/>&nbsp;<br/>
+</details>
+
+### :flushed: I feel overwhelmed by the amount of information in Netdata. What should I do?
+
+Netdata is designed to provide comprehensive insights, but we understand that the richness of information might sometimes feel overwhelming. Here are some tips on how to navigate and utilize Netdata effectively...
+
+<details><summary>Click to see detailed answer ...</summary>
+&nbsp;<br/>&nbsp;<br/>
+
+Netdata is indeed a very comprehensive monitoring tool. It's designed to provide you with as much information as possible about your system and applications, so that you can understand and address any issues that arise. However, we understand that the sheer amount of data can sometimes be overwhelming.
+
+Here are some suggestions on how to manage and navigate this wealth of information:
+
+  1. **Start with the Overview Dashboard**<br/>
+      Netdata's Overview Dashboard provides a high-level summary of your system's status. We have added summary tiles on almost every section, you reveal the information that is more important. This is a great place to start, as it can help you identify any major issues or trends at a glance.
+
+  2. **Use the Search Feature**<br/>
+     If you're looking for specific information, you can use the search feature to find the relevant metrics or charts. This can help you avoid scrolling through all the data.
+
+  3. **Customize your Dashboards**<br/>
+     Netdata allows you to create custom dashboards, which can help you focus on the metrics that are most important to you. Sign-in to Netdata and there you can have your custom dashboards. (coming soon to the agent dashboard too)
+
+  4. **Leverage Netdata's Anomaly Detection**<br/>
+     Netdata uses machine learning to detect anomalies in your metrics. This can help you identify potential issues before they become major problems. We have added an `AR` button above the dashboard table of contents to reveal the anomaly rate per section so that you can easily spot what could need your attention.
+
+  5. **Take Advantage of Netdata's Documentation and Blogs**<br/>
+     Netdata has extensive documentation that can help you understand the different metrics and how to interpret them. You can also find tutorials, guides, and best practices there.
+
+Remember, it's not necessary to understand every single metric or chart right away. Netdata is a powerful tool, and it can take some time to fully explore and understand all of its features. Start with the basics and gradually delve into more complex metrics as you become more comfortable with the tool.
+
+&nbsp;<br/>&nbsp;<br/>
+</details>
+
 ### :cloud: Do I have to subscribe to Netdata Cloud?
 
 Subscribing to Netdata Cloud is optional but many users find it enhances their experience with Netdata.
@@ -525,16 +588,18 @@ Any Netdata Agent can act as a Netdata Registry. Simply designate one Netdata Ag
 &nbsp;<br/>&nbsp;<br/>
 </details>
 
-### :office: Who uses Netdata?
+### :smirk: Who uses Netdata?
 
 Netdata is a widely adopted project...
 
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
 
-Browse the [Netdata stargazers on Github](https://github.com/netdata/netdata/stargazers) to discover users from renowned companies and enterprises, such as AMD, Amazon, Baidu, Cisco, Delta Air Lines, Facebook, IBM, Intel, Netflix, Qualcomm, Riot Games, SAP, Samsung, Unity, Valve, and many others.
+Browse the [Netdata stargazers on Github](https://github.com/netdata/netdata/stargazers) to discover users from renowned companies and enterprises, such as AMD, Amazon, Baidu, Cisco, Delta, Facebook, IBM, Intel, Netflix, Qualcomm, Riot Games, SAP, Samsung, Unity, Valve, and many others.
 
 Netdata also enjoys significant usage in academia, with notable institutions including New York University, Columbia University, New Jersey University, among several others.
+
+And, Netdata is also used by numerous governmental organizations worldwide.
 
 In a nutshell, Netdata proves invaluable for:
 
@@ -548,13 +613,13 @@ In a nutshell, Netdata proves invaluable for:
   Who seek a feature-rich monitoring solution from the get-go.
 
 - **Freelancers**<br/>
-  Who seek simple, efficient and straightforward solution without sacrificing performance and outcomes.
+  Who seek a simple, efficient and straightforward solution without sacrificing performance and outcomes.
 
 - **Professional SysAdmins and DevOps**<br/>
   Who appreciate the fine details and understand the value of holistic monitoring from the ground up.
 
 - **Everyone else**<br/>
-  All of us, who are tired of the inefficiency in the monitoring industry and appreciate a breath of fresh air. :slightly_smiling_face:
+  All of us, who are tired of the inefficiency in the monitoring industry and would love a refreshing change and a breath of fresh air. :slightly_smiling_face:
 
 &nbsp;<br/>&nbsp;<br/>
 </details>
