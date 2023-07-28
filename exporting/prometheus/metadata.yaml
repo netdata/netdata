@@ -165,7 +165,7 @@
     <<: *meta
     name: AppOptics
     link: https://www.solarwinds.com/appoptics
-    icon_filename: appoptics.png
+    icon_filename: 'appoptics.png'
     keywords:
       - app optics
       - AppOptics
@@ -176,7 +176,7 @@
     <<: *meta
     name: Azure Data Explorer
     link: https://azure.microsoft.com/en-us/pricing/details/data-explorer/
-    icon_filename: azuredataex.jpg
+    icon_filename: 'azuredataex.jpg'
     keywords:
       - Azure Data Explorer
       - Azure
@@ -186,7 +186,7 @@
     <<: *meta
     name: Azure Event Hub
     link: https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-about
-    icon_filename: azureeventhub.png
+    icon_filename: 'azureeventhub.png'
     keywords:
       - Azure Event Hub
       - Azure
@@ -196,7 +196,7 @@
     <<: *meta
     name: NewRelic
     link: https://newrelic.com/
-    icon_filename: newrelic.png
+    icon_filename: 'newrelic.png'
     keywords:
       - export
       - NewRelic
@@ -208,7 +208,7 @@
     <<: *meta
     name: QuasarDB
     link: https://doc.quasar.ai/master/
-    icon_filename: quasardb.png
+    icon_filename: 'quasardb.png'
     keywords:
       - export
       - quasar
@@ -221,7 +221,7 @@
     <<: *meta
     name: Splunk SignalFx
     link: https://www.splunk.com/en_us/products/observability.html
-    icon_filename: splunk.png
+    icon_filename: 'splunk.png'
     keywords:
       - export
       - splunk
@@ -234,7 +234,7 @@
     <<: *meta
     name: TiKV
     link: https://tikv.org/
-    icon_filename: tikv.png
+    icon_filename: 'tikv.png'
     keywords:
       - export
       - TiKV
@@ -246,7 +246,7 @@
     <<: *meta
     name: Thanos
     link: https://thanos.io/
-    icon_filename: thanos.png
+    icon_filename: 'thanos.png'
     keywords:
       - export
       - thanos
@@ -258,7 +258,7 @@
     <<: *meta
     name: VictoriaMetrics
     link: https://victoriametrics.com/products/open-source/
-    icon_filename: victoriametrics.png
+    icon_filename: 'victoriametrics.png'
     keywords:
       - export
       - victoriametrics
@@ -270,7 +270,7 @@
     <<: *meta
     name: VMware Aria
     link: https://www.vmware.com/products/aria-operations-for-applications.html
-    icon_filename: vmware-aria.png
+    icon_filename: 'vmware-aria.png'
     keywords:
       - export
       - VMware
@@ -284,7 +284,7 @@
     <<: *meta
     name: Chronix
     link: https://dbdb.io/db/chronix
-    icon_filename: chronix.png
+    icon_filename: 'chronix.png'
     keywords:
       - export
       - chronix
@@ -296,7 +296,7 @@
     <<: *meta
     name: Cortex
     link: https://cortexmetrics.io/
-    icon_filename: cortex.png
+    icon_filename: 'cortex.png'
     keywords:
       - export
       - cortex
@@ -308,7 +308,7 @@
     <<: *meta
     name: CrateDB
     link: https://crate.io/
-    icon_filename: crate.svg
+    icon_filename: 'crate.svg'
     keywords:
       - export
       - CrateDB
@@ -320,7 +320,7 @@
     <<: *meta
     name: ElasticSearch
     link: https://www.elastic.co/
-    icon_filename: elasticsearch.svg
+    icon_filename: 'elasticsearch.svg'
     keywords:
       - export
       - ElasticSearch
@@ -332,7 +332,7 @@
     <<: *meta
     name: Gnocchi
     link: https://wiki.openstack.org/wiki/Gnocchi
-    icon_filename: gnocchi.svg
+    icon_filename: 'gnocchi.svg'
     keywords:
       - export
       - Gnocchi
@@ -344,7 +344,7 @@
     <<: *meta
     name: Google BigQuery
     link: https://cloud.google.com/bigquery/
-    icon_filename: bigquery.png
+    icon_filename: 'bigquery.png'
     keywords:
       - export
       - Google BigQuery
@@ -356,7 +356,7 @@
     <<: *meta
     name: IRONdb
     link: https://docs.circonus.com/irondb/
-    icon_filename: irondb.png
+    icon_filename: 'irondb.png'
     keywords:
       - export
       - IRONdb
@@ -368,7 +368,7 @@
     <<: *meta
     name: Kafka
     link: https://kafka.apache.org/
-    icon_filename: kafka.png
+    icon_filename: 'kafka.png'
     keywords:
       - export
       - Kafka
@@ -380,7 +380,7 @@
     <<: *meta
     name: M3DB
     link: https://m3db.io/
-    icon_filename: m3db.png
+    icon_filename: 'm3db.png'
     keywords:
       - export
       - M3DB
@@ -392,7 +392,7 @@
     <<: *meta
     name: MetricFire
     link: https://www.metricfire.com/
-    icon_filename: metricfire.png
+    icon_filename: 'metricfire.png'
     keywords:
       - export
       - MetricFire
@@ -404,7 +404,7 @@
     <<: *meta
     name: PostgreSQL
     link: https://www.postgresql.org/
-    icon_filename: postgres.png
+    icon_filename: 'postgres.png'
     keywords:
       - export
       - PostgreSQL
@@ -416,7 +416,7 @@
     <<: *meta
     name: Wavefront
     link: https://docs.wavefront.com/wavefront_data_ingestion.html
-    icon_filename: wavefront.png
+    icon_filename: 'wavefront.png'
     keywords:
       - export
       - Wavefront
@@ -428,7 +428,7 @@
     <<: *meta
     name: TimescaleDB
     link: https://www.timescale.com/
-    icon_filename: timescale.png
+    icon_filename: 'timescale.png'
     keywords:
       - export
       - TimescaleDB
