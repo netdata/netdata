@@ -77,6 +77,7 @@ static int ssl_init()
     if(!accept_ctx.ssl_ctx)
     {
         // output error log
+        netdata_log_error("Could not allocate a new SSL_CTX");
         return -1;
     }
 
