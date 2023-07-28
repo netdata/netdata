@@ -1,5 +1,3 @@
-# yamllint disable rule:line-length
----
 meta:
   plugin_name: python.d.plugin
   module_name: pandas
