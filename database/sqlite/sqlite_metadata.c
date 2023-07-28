@@ -48,7 +48,7 @@
 #define DELETE_MISSING_NODE_INSTANCES "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);"
 
 #define METADATA_CMD_Q_MAX_SIZE (1024)              // Max queue size; callers will block until there is room
-#define METADATA_MAINTENANCE_FIRST_CHECK (3600)     // Maintenance first run after agent startup in seconds
+#define METADATA_MAINTENANCE_FIRST_CHECK (1800)     // Maintenance first run after agent startup in seconds
 #define METADATA_MAINTENANCE_RETRY (60)             // Retry run if already running or last run did actual work
 #define METADATA_HEALTH_LOG_INTERVAL (3600)         // Repeat maintenance for health
 #define METADATA_DIM_CHECK_INTERVAL (3600)          // Repeat maintenance for dimensions
@@ -977,6 +977,10 @@ static void cleanup_health_log(struct metadata_wc *wc)
     static time_t next_execution_t = 0;
 
     time_t now = now_realtime_sec();
+
+    if (!next_execution_t)
+        next_execution_t = now + METADATA_MAINTENANCE_FIRST_CHECK;
+
     if (next_execution_t && next_execution_t > now)
         return;
 
