@@ -207,8 +207,8 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
    You can also use Netdata Parents to:
 
-   - Offload your production systems (the parents runs ML, alerts, queries, etc for all its children)
-   - Secure your production systems (the parents accept user connections, for all its children)
+   - Offload your production systems (the parents runs ML, alerts, queries, etc for all their children)
+   - Secure your production systems (the parents accept user connections, for all their children)
 
 ### 5. **Connect to Netdata Cloud** :cloud:
 
@@ -387,9 +387,13 @@ Netdata is a distributed monitoring solution. You can scale it to infinity by sp
 
 With the streaming feature of Netdata Agents, we can support monitoring ephemeral servers, but also allow the creation of "monitoring islands" where metrics are aggregated to a few servers (Netdata Parents) for increased retention, or for offloading production systems.
 
-  - :airplane: Netdata Parents provide great vertical scalability, so you can have as big parents as the CPU, RAM and Disk resources you can dedicate to them. In our lab we constantly stress test Netdata Parents with about 2 million metrics collected per second.
+  - :airplane: Netdata Parents provide great vertical scalability, so you can have as big parents as the CPU, RAM and Disk resources you can dedicate to them. In our lab we constantly stress test Netdata Parents with several million metrics collected per second, to ensure it reliable, stable and robust at scale.
     
   - :rocket: In addition, Netdata Cloud provides virtually unlimited horizontal scalability. It "merges" all the Netdata parents you have into one unified infrastructure at query time. Netdata Cloud itself is probably the biggest single installation monitoring platform ever created, currently monitoring about 100k online servers with about 10k servers changing state (added/removed) per day!
+
+Example: the following chart comes from a single Netdata Parent. As you can see on it, 244 nodes stream to it metrics of about 20k running containers. On this specific chart there are 3 dimensions per container, so a total of about 60k time-series queries are needed to present it.
+
+![image](https://github.com/netdata/netdata/assets/2662304/33db4aed-86af-4018-a547-e70643308f25)
 
 &nbsp;<br/>&nbsp;<br/>
 </details>
@@ -501,7 +505,7 @@ Even if you're already using Nagios, Icinga, Zabbix, or similar tools, you can u
 &nbsp;<br/>&nbsp;<br/>
 </details>
 
-### :raised_eyebrow: I feel overwhelmed by the amount of information in Netdata. What should I do?
+### :flushed: I feel overwhelmed by the amount of information in Netdata. What should I do?
 
 Netdata is designed to provide comprehensive insights, but we understand that the richness of information might sometimes feel overwhelming. Here are some tips on how to navigate and utilize Netdata effectively...
 
@@ -584,16 +588,18 @@ Any Netdata Agent can act as a Netdata Registry. Simply designate one Netdata Ag
 &nbsp;<br/>&nbsp;<br/>
 </details>
 
-### :office: Who uses Netdata?
+### :smirk: Who uses Netdata?
 
 Netdata is a widely adopted project...
 
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
 
-Browse the [Netdata stargazers on Github](https://github.com/netdata/netdata/stargazers) to discover users from renowned companies and enterprises, such as AMD, Amazon, Baidu, Cisco, Delta Air Lines, Facebook, IBM, Intel, Netflix, Qualcomm, Riot Games, SAP, Samsung, Unity, Valve, and many others.
+Browse the [Netdata stargazers on Github](https://github.com/netdata/netdata/stargazers) to discover users from renowned companies and enterprises, such as AMD, Amazon, Baidu, Cisco, Delta, Facebook, IBM, Intel, Netflix, Qualcomm, Riot Games, SAP, Samsung, Unity, Valve, and many others.
 
 Netdata also enjoys significant usage in academia, with notable institutions including New York University, Columbia University, New Jersey University, among several others.
+
+And, Netdata is also used by numerous governmental organizations worldwide.
 
 In a nutshell, Netdata proves invaluable for:
 
@@ -607,13 +613,13 @@ In a nutshell, Netdata proves invaluable for:
   Who seek a feature-rich monitoring solution from the get-go.
 
 - **Freelancers**<br/>
-  Who seek simple, efficient and straightforward solution without sacrificing performance and outcomes.
+  Who seek a simple, efficient and straightforward solution without sacrificing performance and outcomes.
 
 - **Professional SysAdmins and DevOps**<br/>
   Who appreciate the fine details and understand the value of holistic monitoring from the ground up.
 
 - **Everyone else**<br/>
-  All of us, who are tired of the inefficiency in the monitoring industry and appreciate a breath of fresh air. :slightly_smiling_face:
+  All of us, who are tired of the inefficiency in the monitoring industry and would love a refreshing change and a breath of fresh air. :slightly_smiling_face:
 
 &nbsp;<br/>&nbsp;<br/>
 </details>

@@ -1,54 +1,90 @@
+# yamllint disable rule:line-length
+---
 meta:
   plugin_name: charts.d.plugin
   module_name: ap
   monitored_instance:
     name: Access Points
-    link: ''
+    link: "https://learn.netdata.cloud/docs/data-collection/networking-stack-and-network-interfaces/linux-access-points"
     categories:
-    - data-collection.networking-stack-and-network-interfaces
-    icon_filename: 'netdata.png'
+      - data-collection.networking-stack-and-network-interfaces
+    icon_filename: "network-wired.svg"
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
-  keywords: []
+    description: ""
+  keywords:
+    - ap
+    - access
+    - point
+    - wireless
+    - network
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'Maintain surveillance over Access Points, ensuring optimal wireless network connectivity and performance. Monitor and troubleshoot in realtime for high-quality network operations.'
-    method_description: ''
+    metrics_description: "The ap collector visualizes data related to wireless access points."
+    method_description: "It uses the `iw` command line utility to detect access points. For each interface that is of `type AP`, it then runs `iw INTERFACE station dump` and collects statistics."
   supported_platforms:
-    include: []
+    include: [Linux]
     exclude: []
-  multi_instance: true
+  multi_instance: false
   additional_permissions:
-    description: ''
+    description: ""
   default_behavior:
     auto_detection:
-      description: ''
+      description: "The plugin is able to auto-detect if you are running access points on your linux box."
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
-    list: []
+    list:
+      - title: "`iw` utility."
+        description: "Make sure the `iw` utility is installed."
   configuration:
     file:
-      name: ''
-      description: ''
+      name: charts.d/ap.conf
     options:
-      description: ''
+      description: |
+        The config file is sourced by the charts.d plugin. It's a standard bash file.
+
+        The following collapsed table contains all the options that can be configured for the ap collector.
       folding:
-        title: ''
+        title: "Config options"
         enabled: true
-      list: []
+      list:
+        - name: ap_update_every
+          description: The data collection frequency. If unset, will inherit the netdata update frequency.
+          default_value: 1
+          required: false
+        - name: ap_priority
+          description: Controls the order of charts at the netdata dashboard.
+          default_value: 6900
+          required: false
+        - name: ap_retries
+          description: The number of retries to do in case of failure before disabling the collector.
+          default_value: 10
+          required: false
     examples:
       folding:
-        enabled: true
-        title: ''
-      list: []
+        enabled: false
+        title: "Config"
+      list:
+        - name: Change the collection frequency
+          description: Specify a custom collection frequence (update_every) for this collector
+          config: |
+            # the data collection frequency
+            # if unset, will inherit the netdata update frequency
+            ap_update_every=10
+
+            # the charts priority on the dashboard
+            #ap_priority=6900
+
+            # the number of retries to do in case of failure
+            # before disabling the module
+            #ap_retries=10
 troubleshooting:
   problems:
     list: []
@@ -60,48 +96,48 @@ metrics:
   description: ""
   availability: []
   scopes:
-  - name: wireless device
-    description: ""
-    labels: []
-    metrics:
-    - name: ap.clients
-      description: Connected clients to ${ssid} on ${dev}
-      unit: "clients"
-      chart_type: line
-      dimensions:
-      - name: clients
-    - name: ap.net
-      description: Bandwidth for ${ssid} on ${dev}
-      unit: "kilobits/s"
-      chart_type: area
-      dimensions:
-      - name: received
-      - name: sent
-    - name: ap.packets
-      description: Packets for ${ssid} on ${dev}
-      unit: "packets/s"
-      chart_type: line
-      dimensions:
-      - name: received
-      - name: sent
-    - name: ap.issues
-      description: Transmit Issues for ${ssid} on ${dev}
-      unit: "issues/s"
-      chart_type: line
-      dimensions:
-      - name: retries
-      - name: failures
-    - name: ap.signal
-      description: Average Signal for ${ssid} on ${dev}
-      unit: "dBm"
-      chart_type: line
-      dimensions:
-      - name: average signal
-    - name: ap.bitrate
-      description: Bitrate for ${ssid} on ${dev}
-      unit: "Mbps"
-      chart_type: line
-      dimensions:
-      - name: receive
-      - name: transmit
-      - name: expected
+    - name: wireless device
+      description: "These metrics refer to the entire monitored application."
+      labels: []
+      metrics:
+        - name: ap.clients
+          description: Connected clients to ${ssid} on ${dev}
+          unit: "clients"
+          chart_type: line
+          dimensions:
+            - name: clients
+        - name: ap.net
+          description: Bandwidth for ${ssid} on ${dev}
+          unit: "kilobits/s"
+          chart_type: area
+          dimensions:
+            - name: received
+            - name: sent
+        - name: ap.packets
+          description: Packets for ${ssid} on ${dev}
+          unit: "packets/s"
+          chart_type: line
+          dimensions:
+            - name: received
+            - name: sent
+        - name: ap.issues
+          description: Transmit Issues for ${ssid} on ${dev}
+          unit: "issues/s"
+          chart_type: line
+          dimensions:
+            - name: retries
+            - name: failures
+        - name: ap.signal
+          description: Average Signal for ${ssid} on ${dev}
+          unit: "dBm"
+          chart_type: line
+          dimensions:
+            - name: average signal
+        - name: ap.bitrate
+          description: Bitrate for ${ssid} on ${dev}
+          unit: "Mbps"
+          chart_type: line
+          dimensions:
+            - name: receive
+            - name: transmit
+            - name: expected

@@ -1,72 +1,125 @@
+# yamllint disable rule:line-length
+---
 meta:
   plugin_name: charts.d.plugin
   module_name: apcupsd
   monitored_instance:
     name: APC UPS
-    link: ''
+    link: "https://www.apc.com"
     categories:
-    - data-collection.ups
-    icon_filename: 'apc.png'
+      - data-collection.ups
+    icon_filename: "apc.png"
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
-  keywords: []
+    description: ""
+  keywords:
+    - ups
+    - apc
+    - power
+    - supply
+    - battery
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'Monitor APC UPS performance with Netdata for optimal uninterruptible power supply operations. Enhance your power supply reliability with real-time APC UPS metrics.'
-    method_description: ''
+    metrics_description: "Monitor APC UPS performance with Netdata for optimal uninterruptible power supply operations. Enhance your power supply reliability with real-time APC UPS metrics."
+    method_description: "The collector uses the `apcaccess` tool to contact the `apcupsd` daemon and get the APC UPS statistics."
   supported_platforms:
     include: []
     exclude: []
-  multi_instance: true
+  multi_instance: false
   additional_permissions:
-    description: ''
+    description: ""
   default_behavior:
     auto_detection:
-      description: ''
+      description: "By default, with no configuration provided, the collector will try to contact 127.0.0.1:3551 with using the `apcaccess` utility."
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
-    list: []
+    list:
+      - title: "Required software"
+        description: "Make sure the `apcaccess` and `apcupsd` are installed and running."
   configuration:
     file:
-      name: ''
-      description: ''
+      name: charts.d/apcupsd.conf
     options:
-      description: ''
+      description: |
+        The config file is sourced by the charts.d plugin. It's a standard bash file.
+
+        The following collapsed table contains all the options that can be configured for the apcupsd collector.
       folding:
-        title: ''
+        title: "Config options"
         enabled: true
-      list: []
+      list:
+        - name: apcupsd_sources
+          description: This is an array of apcupsd sources. You can have multiple entries there. Please refer to the example below on how to set it.
+          default_value: "127.0.0.1:3551"
+          required: false
+        - name: apcupsd_timeout
+          description: How long to wait for apcupsd to respond.
+          default_value: 3
+          required: false
+        - name: apcupsd_update_every
+          description: The data collection frequency. If unset, will inherit the netdata update frequency.
+          default_value: 1
+          required: false
+        - name: apcupsd_priority
+          description: The charts priority on the dashboard.
+          default_value: 90000
+          required: false
+        - name: apcupsd_retries
+          description: The number of retries to do in case of failure before disabling the collector.
+          default_value: 10
+          required: false
     examples:
       folding:
-        enabled: true
-        title: ''
-      list: []
+        enabled: false
+        title: "Config"
+      list:
+        - name: Multiple apcupsd sources
+          description: Specify a multiple apcupsd sources along with a custom update interval
+          config: |
+            # add all your APC UPSes in this array - uncomment it too
+            declare -A apcupsd_sources=(
+                ["local"]="127.0.0.1:3551",
+                ["remote"]="1.2.3.4:3551"
+            )
+
+            # how long to wait for apcupsd to respond
+            #apcupsd_timeout=3
+
+            # the data collection frequency
+            # if unset, will inherit the netdata update frequency
+            apcupsd_update_every=5
+
+            # the charts priority on the dashboard
+            #apcupsd_priority=90000
+
+            # the number of retries to do in case of failure
+            # before disabling the module
+            #apcupsd_retries=10
 troubleshooting:
   problems:
     list: []
 alerts:
-- name: apcupsd_ups_charge
-  link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
-  metric: apcupsd.charge
-  info: average UPS charge over the last minute
-  os: "*"
-- name: apcupsd_10min_ups_load
-  link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
-  metric: apcupsd.load
-  info: average UPS load over the last 10 minutes
-  os: "*"
-- name: apcupsd_last_collected_secs
-  link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
-  metric: apcupsd.load
-  info: number of seconds since the last successful data collection
+  - name: apcupsd_ups_charge
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
+    metric: apcupsd.charge
+    info: average UPS charge over the last minute
+    os: "*"
+  - name: apcupsd_10min_ups_load
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
+    metric: apcupsd.load
+    info: average UPS load over the last 10 minutes
+    os: "*"
+  - name: apcupsd_last_collected_secs
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
+    metric: apcupsd.load
+    info: number of seconds since the last successful data collection
 metrics:
   folding:
     title: Metrics
@@ -74,71 +127,71 @@ metrics:
   description: ""
   availability: []
   scopes:
-  - name: ups
-    description: ""
-    labels: []
-    metrics:
-    - name: apcupsd.charge
-      description: UPS Charge
-      unit: "percentage"
-      chart_type: area
-      dimensions:
-      - name: charge
-    - name: apcupsd.battery.voltage
-      description: UPS Battery Voltage
-      unit: "Volts"
-      chart_type: line
-      dimensions:
-      - name: voltage
-      - name: nominal
-    - name: apcupsd.input.voltage
-      description: UPS Input Voltage
-      unit: "Volts"
-      chart_type: line
-      dimensions:
-      - name: voltage
-      - name: min
-      - name: max
-    - name: apcupsd.output.voltage
-      description: UPS Output Voltage
-      unit: "Volts"
-      chart_type: line
-      dimensions:
-      - name: absolute
-      - name: nominal
-    - name: apcupsd.input.frequency
-      description: UPS Input Voltage
-      unit: "Hz"
-      chart_type: line
-      dimensions:
-      - name: frequency
-    - name: apcupsd.load
-      description: UPS Load
-      unit: "percentage"
-      chart_type: area
-      dimensions:
-      - name: load
-    - name: apcupsd.load_usage
-      description: UPS Load Usage
-      unit: "Watts"
-      chart_type: area
-      dimensions:
-      - name: load
-    - name: apcupsd.temperature
-      description: UPS Temperature
-      unit: "Celsius"
-      chart_type: line
-      dimensions:
-      - name: temp
-    - name: apcupsd.time
-      description: UPS Time Remaining
-      unit: "Minutes"
-      chart_type: area
-      dimensions:
-      - name: time
-    - name: apcupsd.online
-      description: UPS ONLINE flag
-      unit: "boolean"
-      chart_type: line
-      dimensions:
-      - name: online
+    - name: ups
+      description: "Metrics related to UPS. Each UPS provides its own set of the following metrics."
+      labels: []
+      metrics:
+        - name: apcupsd.charge
+          description: UPS Charge
+          unit: "percentage"
+          chart_type: area
+          dimensions:
+            - name: charge
+        - name: apcupsd.battery.voltage
+          description: UPS Battery Voltage
+          unit: "Volts"
+          chart_type: line
+          dimensions:
+            - name: voltage
+            - name: nominal
+        - name: apcupsd.input.voltage
+          description: UPS Input Voltage
+          unit: "Volts"
+          chart_type: line
+          dimensions:
+            - name: voltage
+            - name: min
+            - name: max
+        - name: apcupsd.output.voltage
+          description: UPS Output Voltage
+          unit: "Volts"
+          chart_type: line
+          dimensions:
+            - name: absolute
+            - name: nominal
+        - name: apcupsd.input.frequency
+          description: UPS Input Voltage
+          unit: "Hz"
+          chart_type: line
+          dimensions:
+            - name: frequency
+        - name: apcupsd.load
+          description: UPS Load
+          unit: "percentage"
+          chart_type: area
+          dimensions:
+            - name: load
+        - name: apcupsd.load_usage
+          description: UPS Load Usage
+          unit: "Watts"
+          chart_type: area
+          dimensions:
+            - name: load
+        - name: apcupsd.temperature
+          description: UPS Temperature
+          unit: "Celsius"
+          chart_type: line
+          dimensions:
+            - name: temp
+        - name: apcupsd.time
+          description: UPS Time Remaining
+          unit: "Minutes"
+          chart_type: area
+          dimensions:
+            - name: time
+        - name: apcupsd.online
+          description: UPS ONLINE flag
+          unit: "boolean"
+          chart_type: line
+          dimensions:
+            - name: online

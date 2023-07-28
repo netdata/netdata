@@ -1,54 +1,118 @@
+# yamllint disable rule:line-length
+---
 meta:
   plugin_name: charts.d.plugin
   module_name: libreswan
   monitored_instance:
     name: Libreswan
-    link: ''
+    link: "https://libreswan.org/"
     categories:
-    - data-collection.vpns
-    icon_filename: 'libreswan.png'
+      - data-collection.vpns
+    icon_filename: "libreswan.png"
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
-  keywords: []
+    description: ""
+  keywords:
+    - vpn
+    - libreswan
+    - network
+    - ipsec
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'Monitor Libreswan performance for optimal IPsec VPN operations. Improve your VPN operations with Netdata''s real-time metrics and built-in alerts.'
-    method_description: ''
+    metrics_description: "Monitor Libreswan performance for optimal IPsec VPN operations. Improve your VPN operations with Netdata''s real-time metrics and built-in alerts."
+    method_description: "The collector uses the `ipsec` command to collect the information it needs."
   supported_platforms:
     include: []
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ''
+    description: ""
   default_behavior:
     auto_detection:
-      description: ''
+      description: ""
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
-    list: []
+    list:
+      - title: "Permissions to execute `ipsec`"
+        description: |
+          The plugin executes 2 commands to collect all the information it needs:
+
+          ```sh
+          ipsec whack --status
+          ipsec whack --trafficstatus
+          ```
+
+          The first command is used to extract the currently established tunnels, their IDs and their names.
+          The second command is used to extract the current uptime and traffic.
+
+          Most probably user `netdata` will not be able to query libreswan, so the `ipsec` commands will be denied.
+          The plugin attempts to run `ipsec` as `sudo ipsec ...`, to get access to libreswan statistics.
+
+          To allow user `netdata` execute `sudo ipsec ...`, create the file `/etc/sudoers.d/netdata` with this content:
+
+          ```
+          netdata ALL = (root) NOPASSWD: /sbin/ipsec whack --status
+          netdata ALL = (root) NOPASSWD: /sbin/ipsec whack --trafficstatus
+          ```
+
+          Make sure the path `/sbin/ipsec` matches your setup (execute `which ipsec` to find the right path).
   configuration:
     file:
-      name: ''
-      description: ''
+      name: charts.d/libreswan.conf
     options:
-      description: ''
+      description: |
+        The config file is sourced by the charts.d plugin. It's a standard bash file.
+
+        The following collapsed table contains all the options that can be configured for the libreswan collector.
       folding:
-        title: ''
+        title: "Config options"
         enabled: true
-      list: []
+      list:
+        - name: libreswan_update_every
+          description: The data collection frequency. If unset, will inherit the netdata update frequency.
+          default_value: 1
+          required: false
+        - name: libreswan_priority
+          description: The charts priority on the dashboard
+          default_value: 90000
+          required: false
+        - name: libreswan_retries
+          description: The number of retries to do in case of failure before disabling the collector.
+          default_value: 10
+          required: false
+        - name: libreswan_sudo
+          description: Whether to run `ipsec` with `sudo` or not.
+          default_value: 1
+          required: false
     examples:
       folding:
-        enabled: true
-        title: ''
-      list: []
+        enabled: false
+        title: "Config"
+      list:
+        - name: Run `ipsec` without sudo
+          description: Run the `ipsec` utility without sudo
+          config: |
+            # the data collection frequency
+            # if unset, will inherit the netdata update frequency
+            #libreswan_update_every=1
+
+            # the charts priority on the dashboard
+            #libreswan_priority=90000
+
+            # the number of retries to do in case of failure
+            # before disabling the module
+            #libreswan_retries=10
+
+            # set to 1, to run ipsec with sudo (the default)
+            # set to 0, to run ipsec without sudo
+            libreswan_sudo=0
 troubleshooting:
   problems:
     list: []
@@ -60,20 +124,20 @@ metrics:
   description: ""
   availability: []
   scopes:
-  - name: IPSEC tunnel
-    description: ""
-    labels: []
-    metrics:
-    - name: libreswan.net
-      description: LibreSWAN Tunnel ${name} Traffic
-      unit: "kilobits/s"
-      chart_type: area
-      dimensions:
-      - name: in
-      - name: out
-    - name: libreswan.uptime
-      description: LibreSWAN Tunnel ${name} Uptime
-      unit: "seconds"
-      chart_type: line
-      dimensions:
-      - name: uptime
+    - name: IPSEC tunnel
+      description: "Metrics related to IPSEC tunnels. Each tunnel provides its own set of the following metrics."
+      labels: []
+      metrics:
+        - name: libreswan.net
+          description: LibreSWAN Tunnel ${name} Traffic
+          unit: "kilobits/s"
+          chart_type: area
+          dimensions:
+            - name: in
+            - name: out
+        - name: libreswan.uptime
+          description: LibreSWAN Tunnel ${name} Uptime
+          unit: "seconds"
+          chart_type: line
+          dimensions:
+            - name: uptime

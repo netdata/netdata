@@ -6,7 +6,7 @@ meta:
     link: "https://github.com/unbit/uwsgi/tree/2.0.21"
     categories:
       - data-collection.web-servers-and-web-proxies
-    icon_filename: "uwsgi.png"
+    icon_filename: "uwsgi.svg"
   related_resources:
     integrations:
       list: []

@@ -1,17 +1,19 @@
+# yamllint disable rule:line-length
+---
 meta:
   plugin_name: charts.d.plugin
   module_name: sensors
   monitored_instance:
     name: Linux Sensors (sysfs)
-    link: ''
+    link: "https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface"
     categories:
       - data-collection.hardware-devices-and-sensors
-    icon_filename: 'microchip.svg'
+    icon_filename: "microchip.svg"
   related_resources:
     integrations:
       list: []
   info_provided_to_referring_integrations:
-    description: ''
+    description: ""
   keywords:
     - sensors
     - sysfs
@@ -21,39 +23,93 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: "Examine Linux Sensors metrics with Netdata for insights into hardware health and performance. Enhance your system's reliability with real-time hardware health insights."
-    method_description: ''
+    metrics_description: |
+      Use this collector when `lm-sensors` doesn't work on your device (e.g. for RPi temperatures).
+      For all other cases use the [Python collector](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/sensors), which supports multiple jobs, is more efficient and performs calculations on top of the kernel provided values."
+    method_description: |
+      It will provide charts for all configured system sensors, by reading sensors directly from the kernel.
+      The values graphed are the raw hardware values of the sensors.
   supported_platforms:
-    include: []
+    include: [Linux]
     exclude: []
   multi_instance: true
   additional_permissions:
-    description: ''
+    description: ""
   default_behavior:
     auto_detection:
-      description: ''
+      description: "By default, the collector will try to read entries under `/sys/devices`"
     limits:
-      description: ''
+      description: ""
     performance_impact:
-      description: ''
+      description: ""
 setup:
   prerequisites:
     list: []
   configuration:
     file:
-      name: ''
-      description: ''
+      name: charts.d/sensors.conf
     options:
-      description: ''
+      description: |
+        The config file is sourced by the charts.d plugin. It's a standard bash file.
+
+        The following collapsed table contains all the options that can be configured for the sensors collector.
       folding:
-        title: ''
+        title: "Config options"
         enabled: true
-      list: []
+      list:
+        - name: sensors_sys_dir
+          description: The directory the kernel exposes sensor data.
+          default_value: "/sys/devices"
+          required: false
+        - name: sensors_sys_depth
+          description: How deep in the tree to check for sensor data.
+          default_value: 10
+          required: false
+        - name: sensors_source_update
+          description: If set to 1, the script will overwrite internal script functions with code generated ones.
+          default_value: 1
+          required: false
+        - name: sensors_update_every
+          description: The data collection frequency. If unset, will inherit the netdata update frequency.
+          default_value: 1
+          required: false
+        - name: sensors_priority
+          description: The charts priority on the dashboard.
+          default_value: 90000
+          required: false
+        - name: sensors_retries
+          description: The number of retries to do in case of failure before disabling the collector.
+          default_value: 10
+          required: false
     examples:
       folding:
-        enabled: true
-        title: ''
-      list: []
+        enabled: false
+        title: "Config"
+      list:
+        - name: Set sensors path depth
+          description: Set a different sensors path depth
+          config: |
+            # the directory the kernel keeps sensor data
+            #sensors_sys_dir="/sys/devices"
+
+            # how deep in the tree to check for sensor data
+            sensors_sys_depth=5
+
+            # if set to 1, the script will overwrite internal
+            # script functions with code generated ones
+            # leave to 1, is faster
+            #sensors_source_update=1
+
+            # the data collection frequency
+            # if unset, will inherit the netdata update frequency
+            #sensors_update_every=
+
+            # the charts priority on the dashboard
+            #sensors_priority=90000
+
+            # the number of retries to do in case of failure
+            # before disabling the module
+            #sensors_retries=10
 troubleshooting:
   problems:
     list: []
@@ -65,49 +121,49 @@ metrics:
   description: ""
   availability: []
   scopes:
-  - name: sensor chip
-    description: ""
-    labels: []
-    metrics:
-    - name: sensors.temp
-      description: Temperature
-      unit: "Celsius"
-      chart_type: line
-      dimensions:
-      - name: '{filename}'
-    - name: sensors.volt
-      description: Voltage
-      unit: "Volts"
-      chart_type: line
-      dimensions:
-      - name: '{filename}'
-    - name: sensors.curr
-      description: Current
-      unit: "Ampere"
-      chart_type: line
-      dimensions:
-      - name: '{filename}'
-    - name: sensors.power
-      description: Power
-      unit: "Watt"
-      chart_type: line
-      dimensions:
-      - name: '{filename}'
-    - name: sensors.fans
-      description: Fans Speed
-      unit: "Rotations / Minute"
-      chart_type: line
-      dimensions:
-      - name: '{filename}'
-    - name: sensors.energy
-      description: Energy
-      unit: "Joule"
-      chart_type: area
-      dimensions:
-      - name: '{filename}'
-    - name: sensors.humidity
-      description: Humidity
-      unit: "Percent"
-      chart_type: line
-      dimensions:
-      - name: '{filename}'
+    - name: sensor chip
+      description: "Metrics related to sensor chips. Each chip provides its own set of the following metrics."
+      labels: []
+      metrics:
+        - name: sensors.temp
+          description: Temperature
+          unit: "Celsius"
+          chart_type: line
+          dimensions:
+            - name: "{filename}"
+        - name: sensors.volt
+          description: Voltage
+          unit: "Volts"
+          chart_type: line
+          dimensions:
+            - name: "{filename}"
+        - name: sensors.curr
+          description: Current
+          unit: "Ampere"
+          chart_type: line
+          dimensions:
+            - name: "{filename}"
+        - name: sensors.power
+          description: Power
+          unit: "Watt"
+          chart_type: line
+          dimensions:
+            - name: "{filename}"
+        - name: sensors.fans
+          description: Fans Speed
+          unit: "Rotations / Minute"
+          chart_type: line
+          dimensions:
+            - name: "{filename}"
+        - name: sensors.energy
+          description: Energy
+          unit: "Joule"
+          chart_type: area
+          dimensions:
+            - name: "{filename}"
+        - name: sensors.humidity
+          description: Humidity
+          unit: "Percent"
+          chart_type: line
+          dimensions:
+            - name: "{filename}"

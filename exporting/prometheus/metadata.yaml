@@ -165,7 +165,7 @@
     <<: *meta
     name: AppOptics
     link: https://www.solarwinds.com/appoptics
-    icon_filename: appoptics.svg
+    icon_filename: appoptics.png
     keywords:
       - app optics
       - AppOptics
@@ -176,7 +176,7 @@
     <<: *meta
     name: Azure Data Explorer
     link: https://azure.microsoft.com/en-us/pricing/details/data-explorer/
-    icon_filename: azure.svg
+    icon_filename: azuredataex.jpg
     keywords:
       - Azure Data Explorer
       - Azure
@@ -186,7 +186,7 @@
     <<: *meta
     name: Azure Event Hub
     link: https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-about
-    icon_filename: azure.svg
+    icon_filename: azureeventhub.png
     keywords:
       - Azure Event Hub
       - Azure

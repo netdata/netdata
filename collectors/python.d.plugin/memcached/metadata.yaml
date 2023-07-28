@@ -8,7 +8,7 @@ meta:
     link: https://memcached.org/
     categories:
       - data-collection.database-servers
-    icon_filename: "memcached.png"
+    icon_filename: "memcached.svg"
   related_resources:
     integrations:
       list: []

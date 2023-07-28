@@ -1,3 +1,0 @@
-metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-gearman.total_jobs,,"Pending, Running",Jobs,Total Jobs,line,,python.d.plugin,gearman
-gearman.single_job,gearman job,"Pending, Idle, Runnning",Jobs,{job_name},stacked,,python.d.plugin,gearman

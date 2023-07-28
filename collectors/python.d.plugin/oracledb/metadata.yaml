@@ -3,11 +3,11 @@ meta:
   plugin_name: python.d.plugin
   module_name: oracledb
   monitored_instance:
-    name: OracleDB
+    name: Oracle DB
     link: "https://docs.oracle.com/en/database/oracle/oracle-database/"
     categories:
       - data-collection.database-servers
-    icon_filename: "oracle.jpeg"
+    icon_filename: "oracle.svg"
   related_resources:
     integrations:
       list: []

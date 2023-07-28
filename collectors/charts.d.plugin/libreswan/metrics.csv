@@ -1,3 +1,0 @@
-metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-libreswan.net,IPSEC tunnel,"in, out",kilobits/s,"LibreSWAN Tunnel ${name} Traffic",area,,charts.d.plugin,libreswan
-libreswan.uptime,IPSEC tunnel,uptime,seconds,"LibreSWAN Tunnel ${name} Uptime",line,,charts.d.plugin,libreswan

@@ -8,7 +8,7 @@ meta:
     link: https://varnish-cache.org/
     categories:
     - data-collection.web-servers-and-web-proxies
-    icon_filename: 'varnish.png'
+    icon_filename: 'varnish.svg'
   related_resources:
     integrations:
       list: []
