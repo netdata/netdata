@@ -41,9 +41,9 @@
             required: true
             detailed_description: >
               You can define multiple recipient URLs like this: https://SERVER1/TOPIC1 https://SERVER2/TOPIC2
-              
+
               All roles will default to this variable if left unconfigured.
-              
+
               You can then have different servers and/or topics per role, by editing DEFAULT_RECIPIENT_NTFY with the server-topic combination you want, in the following entries at the bottom of the same file:
               ```
               role_recipients_ntfy[sysadmin]="https://SERVER1/TOPIC1"
