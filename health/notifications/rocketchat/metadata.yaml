@@ -44,7 +44,7 @@
             required: false
             detailed_description: >
               All roles will default to this variable if left unconfigured.
-              
+
               The `DEFAULT_RECIPIENT_ROCKETCHAT` can be edited in the following entries at the bottom of the same file:
               ```
               role_recipients_rocketchat[sysadmin]="systems"
@@ -66,7 +66,7 @@
             config: |
               #------------------------------------------------------------------------------
               # rocketchat (rocket.chat) global notification options
-              
+
               SEND_ROCKETCHAT="YES"
               ROCKETCHAT_WEBHOOK_URL="<your_incoming_webhook_url>"
               DEFAULT_RECIPIENT_ROCKETCHAT="monitoring_alarms"
