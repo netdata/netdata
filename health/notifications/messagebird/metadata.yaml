@@ -30,7 +30,7 @@
           enabled: true
         list:
           - name: 'SEND_MESSAGEBIRD'
-            default_value: ''
+            default_value: 'YES'
             description: "Set `SEND_MESSAGEBIRD` to YES"
             required: true
           - name: 'MESSAGEBIRD_ACCESS_KEY'
@@ -44,7 +44,7 @@
           - name: 'DEFAULT_RECIPIENT_MESSAGEBIRD'
             default_value: ''
             description: "Set `DEFAULT_RECIPIENT_MESSAGEBIRD` to the number you want the alert notification to be sent as an SMS. You can define multiple recipients like this: +15555555555 +17777777777."
-            required: false
+            required: true
             detailed_description: >
               All roles will default to this variable if left unconfigured.
 
