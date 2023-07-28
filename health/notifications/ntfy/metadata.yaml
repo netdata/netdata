@@ -64,4 +64,4 @@
             description: ''
             config: |
               SEND_NTFY="YES"
-              DEFAULT_RECIPIENT_NTFY="https://ntfy.sh/netdata-X7seHg7d3Tw9zGOk https://ntfy.sh/netdata-oIPm4IK1IlUtlA30" 
+              DEFAULT_RECIPIENT_NTFY="https://ntfy.sh/netdata-X7seHg7d3Tw9zGOk https://ntfy.sh/netdata-oIPm4IK1IlUtlA30"
