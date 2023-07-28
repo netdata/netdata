@@ -29,7 +29,7 @@
           enabled: true
         list:
           - name: 'SEND_CUSTOM'
-            default_value: ''
+            default_value: 'YES'
             description: "Set `SEND_CUSTOM` to YES"
             required: true
           - name: 'DEFAULT_RECIPIENT_CUSTOM'
