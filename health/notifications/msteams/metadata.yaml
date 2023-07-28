@@ -33,7 +33,7 @@
           enabled: true
         list:
           - name: 'SEND_MSTEAMS'
-            default_value: ''
+            default_value: 'YES'
             description: "Set `SEND_MSTEAMS` to YES"
             required: true
           - name: 'MSTEAMS_WEBHOOK_URL'
@@ -43,7 +43,7 @@
           - name: 'DEFAULT_RECIPIENT_MSTEAMS'
             default_value: ''
             description: "Set `DEFAULT_RECIPIENT_MSTEAMS` to the encoded Microsoft Teams channel name you want the alert notifications to be sent to."
-            required: false
+            required: true
             detailed_description: >
               In Microsoft Teams the channel name is encoded in the URI after /IncomingWebhook/. You can define multiple channels like this: CHANNEL1 CHANNEL2.
               All roles will default to this variable if left unconfigured.
