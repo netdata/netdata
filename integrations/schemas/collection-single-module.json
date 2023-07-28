@@ -211,7 +211,7 @@
       ]
     },
     "setup": {
-      "$ref": "./shared.json#/$defs/setup"
+      "$ref": "./shared.json#/$defs/full_setup"
     },
     "troubleshooting": {
       "type": "object",

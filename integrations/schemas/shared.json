@@ -46,7 +46,20 @@
         "type": "string"
       }
     },
-    "setup": {
+    "short_setup": {
+      "type": "object",
+      "description": "Simplified information about how to enable and configure the integration.",
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "A description of how to enable and configure the integration."
+        }
+      },
+      "required": [
+        "description"
+      ]
+    },
+    "full_setup": {
       "type": "object",
       "description": "Complete information that is needed to enable and configure the integration.",
       "properties": {
