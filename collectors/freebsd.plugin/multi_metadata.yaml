@@ -50,7 +50,7 @@ modules:
             enabled: true
           list:
             - name: vm.loadavg
-              description: Enable or disable load average chart.
+              description: Enable or disable load average metric.
               default_value: yes
               required: false
         examples:
@@ -109,7 +109,7 @@ modules:
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: "freebsd.jpg"
+        icon_filename: "memory.svg"
       related_resources:
         integrations:
           list: []
@@ -365,7 +365,7 @@ modules:
             enabled: true
           list:
             - name: dev.cpu.temperature
-              description: Enable or disable CPU temperature charts.
+              description: Enable or disable CPU temperature metric.
               default_value: yes
               required: false
         examples:
@@ -442,7 +442,7 @@ modules:
             enabled: true
           list:
             - name: dev.cpu.0.freq
-              description: Enable or disable CPU Scaling frequency charts.
+              description: Enable or disable CPU Scaling frequency metric.
               default_value: yes
               required: false
         examples:
@@ -519,7 +519,7 @@ modules:
             enabled: true
           list:
             - name: hw.intrcnt
-              description: Enable or disable Interrupts chart.
+              description: Enable or disable Interrupts metric.
               default_value: yes
               required: false
         examples:
@@ -602,7 +602,7 @@ modules:
             enabled: true
           list:
             - name: vm.stats.sys.v_intr
-              description: Enable or disable device interrupts chart.
+              description: Enable or disable device interrupts metric.
               default_value: yes
               required: false
         examples:
@@ -679,7 +679,7 @@ modules:
             enabled: true
           list:
             - name: vm.stats.sys.v_soft
-              description: Enable or disable software inerrupts chart.
+              description: Enable or disable software inerrupts metric.
               default_value: yes
               required: false
         examples:
@@ -713,10 +713,10 @@ modules:
       module_name: vm.stats.sys.v_swtch
       monitored_instance:
         name: freebsd vm.stats.sys.v_swtch
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -726,8 +726,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "CPU context switch"
+        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -746,14 +746,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: vm.stats.sys.v_swtch
+              description: Enable or disable CPU context switch metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -794,7 +799,7 @@ modules:
         link: ""
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -804,8 +809,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect information about SWAP memory."
+        method_description: "The plugin uses `sysctlnametomib` functiion to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -824,14 +829,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: vm.swap_info
+              description: Enable or disable SWAP metrics.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -869,10 +879,10 @@ modules:
       module_name: system.ram
       monitored_instance:
         name: freebsd system.ram
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "memory.svg"
       related_resources:
         integrations:
           list: []
@@ -882,8 +892,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Show information about system memory usage."
+        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -902,14 +912,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: system.ram
+              description: Enable or disable system RAM metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -973,10 +988,10 @@ modules:
       module_name: vm.stats.vm.v_swappgs
       monitored_instance:
         name: freebsd vm.stats.vm.v_swappgs
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "memory.svg"
       related_resources:
         integrations:
           list: []
@@ -986,7 +1001,7 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
+        metrics_description: "The metric swap amount of data read from and written to SWAP."
         method_description: ""
       supported_platforms:
         include: []
@@ -1006,14 +1021,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: vm.stats.vm.v_swappgs
+              description: Enable or disable infoormation about SWAP I/O metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
