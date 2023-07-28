@@ -73,10 +73,7 @@ static int ssl_init()
 #else
     accept_ctx.ssl_ctx = SSL_CTX_new(TLS_server_method());
 #endif
-    // Check if accept_ctx.ssl_ctx is NULL, otherwise SSL_CTX_set_options will crash
-    if(!accept_ctx.ssl_ctx)
-    {
-        // output error log
+    if (!accept_ctx.ssl_ctx) {
         netdata_log_error("Could not allocate a new SSL_CTX");
         return -1;
     }
