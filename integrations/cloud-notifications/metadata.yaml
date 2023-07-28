@@ -470,7 +470,7 @@
           * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For webhook:
             - Webhook URL - webhook URL is the url of the service that Netdata will send notifications to. In order to keep the communication secured, we only accept HTTPS urls.
             - Extra headers - these are optional key-value pairs that you can set to be included in the HTTP requests sent to the webhook URL.
-            - Authentication Mechanism - Netdata webhook integration supports 3 different authentication mechanisms. 
+            - Authentication Mechanism - Netdata webhook integration supports 3 different authentication mechanisms.
               * Mutual TLS (recommended) - default authentication mechanism used if no other method is selected.
               * Basic - the client sends a request with an Authorization header that includes a base64-encoded string in the format **username:password**. These will settings will be required inputs.
               * Bearer - the client sends a request with an Authorization header that includes a **bearer token**. This setting will be a required input.
