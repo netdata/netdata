@@ -59,6 +59,9 @@ struct job
 
     //state reported by config
     enum job_status status; // reported by plugin, enum as this has to be interpreted by UI
+    int state; // code reported by plugin which can mean anything plugin wants
+    char *reason; // reported by plugin, can be NULL (optional)
+
     usec_t last_state_update;
 
     struct module *module;
@@ -104,6 +107,8 @@ struct configurable_plugin {
 DICTIONARY_ITEM *register_plugin(struct configurable_plugin *plugin);
 void unregister_plugin(DICTIONARY_ITEM *plugin);
 int register_module(struct configurable_plugin *plugin, struct module *module);
+
+void report_job_status(struct configurable_plugin *plugin, const char *module_name, const char *job_name, enum job_status status, int status_code, char *reason);
 
 // API to be used by the web server(s)
 json_object *get_list_of_plugins_json();

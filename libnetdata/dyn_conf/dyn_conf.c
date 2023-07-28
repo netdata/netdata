@@ -468,22 +468,22 @@ int register_module(struct configurable_plugin *plugin, struct module *module)
 
 void handle_dyncfg_root(struct uni_http_response *resp, int method)
 {
-        if (method != HTTP_METHOD_GET) {
+    if (method != HTTP_METHOD_GET) {
         resp->content = "method not allowed";
         resp->content_length = strlen(resp->content);
         resp->status = HTTP_RESP_METHOD_NOT_ALLOWED;
         return;
-        }
-        json_object *obj = get_list_of_plugins_json();
-        json_object *wrapper = json_object_new_object();
-        json_object_object_add(wrapper, "configurable_plugins", obj);
+    }
+    json_object *obj = get_list_of_plugins_json();
+    json_object *wrapper = json_object_new_object();
+    json_object_object_add(wrapper, "configurable_plugins", obj);
     resp->content = strdupz(json_object_to_json_string_ext(wrapper, JSON_C_TO_STRING_PRETTY));
-        json_object_put(wrapper);
+    json_object_put(wrapper);
     resp->status = HTTP_RESP_OK;
     resp->content_type = CT_APPLICATION_JSON;
     resp->content_free = freez;
     resp->content_length = strlen(resp->content);
-    }
+}
 
 void handle_plugin_root(struct uni_http_response *resp, int method, struct configurable_plugin *plugin, void *post_payload, size_t post_payload_size)
 {
@@ -497,7 +497,7 @@ void handle_plugin_root(struct uni_http_response *resp, int method, struct confi
             resp->content_free = free;
             resp->content_length = cfg.data_size;
             return;
-    }
+        }
         case HTTP_METHOD_PUT:
         {
             const char *response;
@@ -567,7 +567,7 @@ void handle_module_root(struct uni_http_response *resp, int method, struct confi
         resp->status = HTTP_RESP_NOT_FOUND;
         return;
     }
-        if (method == HTTP_METHOD_GET) {
+    if (method == HTTP_METHOD_GET) {
         dyncfg_config_t cfg = mod->get_config_cb(mod->config_cb_usr_ctx, mod->name);
         resp->content = mallocz(cfg.data_size);
         memcpy(resp->content, cfg.data, cfg.data_size);
@@ -575,18 +575,18 @@ void handle_module_root(struct uni_http_response *resp, int method, struct confi
         resp->content_free = free;
         resp->content_length = cfg.data_size;
         return;
-        } else if (method == HTTP_METHOD_PUT) {
+    } else if (method == HTTP_METHOD_PUT) {
         const char *response;
-            if (post_payload == NULL) {
+        if (post_payload == NULL) {
             resp->content = "no payload";
             resp->content_length = strlen(resp->content);
             resp->status = HTTP_RESP_BAD_REQUEST;
             return;
-            }
-            dyncfg_config_t cont = {
-                .data = post_payload,
-                .data_size = post_payload_size
-            };
+        }
+        dyncfg_config_t cont = {
+            .data = post_payload,
+            .data_size = post_payload_size
+        };
         response = set_module_config(mod, cont);
         if (response == NULL) {
             resp->status = HTTP_RESP_OK;
@@ -602,7 +602,7 @@ void handle_module_root(struct uni_http_response *resp, int method, struct confi
     resp->content = "method not allowed";
     resp->content_length = strlen(resp->content);
     resp->status = HTTP_RESP_METHOD_NOT_ALLOWED;
-    }
+}
 
 static inline void _handle_job_root(struct uni_http_response *resp, int method, struct module *mod, const char *job_id, void *post_payload, size_t post_payload_size, struct job *job)
 {
@@ -654,16 +654,16 @@ static inline void _handle_job_root(struct uni_http_response *resp, int method, 
         }
         case HTTP_METHOD_PUT:
         {
-        if (post_payload == NULL) {
+            if (post_payload == NULL) {
                 resp->content = "missing payload";
                 resp->content_length = strlen(resp->content);
                 resp->status = HTTP_RESP_BAD_REQUEST;
                 return;
-        }
-        dyncfg_config_t cont = {
-            .data = post_payload,
-            .data_size = post_payload_size
-        };
+            }
+            dyncfg_config_t cont = {
+                .data = post_payload,
+                .data_size = post_payload_size
+            };
             if(set_job_config(job, cont)) {
                 resp->status = HTTP_RESP_BAD_REQUEST;
                 resp->content = "failed to set job config";
@@ -806,6 +806,43 @@ void plugin_del_cb(const DICTIONARY_ITEM *item, void *value, void *data)
     dictionary_destroy(plugin->modules);
     freez(plugin->name);
     freez(plugin);
+}
+
+void report_job_status(struct configurable_plugin *plugin, const char *module_name, const char *job_name, enum job_status status, int status_code, char *reason)
+{
+    DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(plugins_dict, plugin->name);
+    if (item == NULL) {
+        netdata_log_error("plugin %s not found", plugin->name);
+        return;
+    }
+    struct configurable_plugin *plug = dictionary_acquired_item_value(item);
+    struct module *mod = get_module_by_name(plug, module_name);
+    if (mod == NULL) {
+        netdata_log_error("module %s not found", module_name);
+        goto EXIT_PLUGIN;
+    }
+    if (mod->type != MOD_TYPE_ARRAY) {
+        netdata_log_error("module %s is not array", module_name);
+        goto EXIT_PLUGIN;
+    }
+    DICTIONARY_ITEM *job_item = dictionary_get_and_acquire_item(mod->jobs, job_name);
+    if (job_item == NULL) {
+        netdata_log_error("job %s not found", job_name);
+        goto EXIT_PLUGIN;
+    }
+    struct job *job = dictionary_acquired_item_value(job_item);
+    job->status = status;
+    job->state = status_code;
+    if (job->reason != NULL) {
+        freez(job->reason);
+    }
+    job->reason = reason;
+    job->last_state_update = now_realtime_usec();
+
+    dictionary_acquired_item_release(mod->jobs, job_item);
+
+EXIT_PLUGIN:
+    dictionary_acquired_item_release(plugins_dict, item);
 }
 
 int dyn_conf_init(void)
