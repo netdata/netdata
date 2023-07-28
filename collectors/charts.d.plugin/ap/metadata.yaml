@@ -26,7 +26,7 @@ overview:
   supported_platforms:
     include: [Linux]
     exclude: []
-  multi_instance: true
+  multi_instance: false
   additional_permissions:
     description: ""
   default_behavior:
