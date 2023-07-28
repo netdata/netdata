@@ -320,7 +320,7 @@ Netdata metric collection plugins can be developed in any language. Most of our 
 
 ### :shield: Is Netdata secure?
 
-Of course, it is! We do our best to ensure it is!
+Of course it is! We do our best to ensure it is!
 
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
