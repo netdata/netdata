@@ -100,7 +100,11 @@ static void *dbengine_tier_init(void *ptr) {
 }
 #endif
 
-static void dbengine_init(const char *hostname) {
+typedef struct {} dbengine_config_t;
+
+static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
+    UNUSED(cfg);
+
 #ifdef ENABLE_DBENGINE
     rrdb.use_direct_io = config_get_boolean(CONFIG_SECTION_DB, "dbengine use direct io", rrdb.use_direct_io);
 
@@ -285,7 +289,9 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
 
         if (default_storage_engine_id == STORAGE_ENGINE_DBENGINE || rrdpush_receiver_needs_dbengine()) {
             netdata_log_info("DBENGINE: Initializing ...");
-            dbengine_init(hostname);
+
+            dbengine_config_t cfg;
+            dbengine_init(hostname, &cfg);
         }
         else {
             netdata_log_info("DBENGINE: Not initializing ...");
