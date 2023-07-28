@@ -215,7 +215,7 @@ It scales nicely from just a single server to thousands of servers, even in comp
    Optionally, [sign-in](https://app.netdata.cloud/sign-in) to [Netdata Cloud](https://www.netdata.cloud/) and claim your Netdata Agents and Parents.
    If you connect your Netdata Parents, there is no need to connect your Netdata Agents. They will be connected via the Parents.
    
-   When your Netdata is connected to Netdata Cloud, you can (on top of the above):
+   When your Netdata nodes are connected to Netdata Cloud, you can (on top of the above):
 
    - Organize your infra in spaces and rooms
    - Create, manage, and share **custom dashboards**
