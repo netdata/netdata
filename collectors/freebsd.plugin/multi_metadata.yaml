@@ -242,7 +242,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          description: "plugin:freebsd"
+          description: "[plugin:freebsd]"
         options:
           description: "The netdata main configuration file."
           folding:
