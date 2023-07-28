@@ -673,7 +673,7 @@ What is a contribution? All the following are highly valuable to Netdata:
    Join our community on Github, Discord and Reddit. Generally, Netdata is relatively easy to set up and configure, but still people may need a little push in the right direction to use it effectively. Supporting other members is a great contribution by itself!
 
 5. **Add or improve integrations you need**<br/>
-   Integrations are generally easier and simpler to develop. If you want to contribute code to Netdata, we suggest you start with integrations you need that, Netdata may not currently support.
+   Integrations are generally easier and simpler to develop. If you want to contribute code to Netdata, we suggest you; start with integrations you need that Netdata may not currently support.
 
 General information about contributions:
 
