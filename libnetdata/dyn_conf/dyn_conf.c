@@ -777,6 +777,7 @@ struct uni_http_response dyn_conf_process_http_request(int method, const char *p
         handle_module_root(&resp, method, plug, module, post_payload, post_payload_size);
         goto EXIT_PLUGIN;
     }
+    // for modules we do not do get_and_acquire as modules are never removed (only together with the plugin)
     struct module *mod = get_module_by_name(plug, module);
     if (mod == NULL) {
         resp.content = "module not found";
