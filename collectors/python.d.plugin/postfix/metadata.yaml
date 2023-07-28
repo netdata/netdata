@@ -8,7 +8,7 @@ meta:
     link: https://www.postfix.org/
     categories:
       - data-collection.mail-servers
-    icon_filename: "postfix.png"
+    icon_filename: "postfix.svg"
   related_resources:
     integrations:
       list: []

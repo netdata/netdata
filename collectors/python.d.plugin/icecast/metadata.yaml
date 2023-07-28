@@ -6,7 +6,7 @@ meta:
     link: 'https://icecast.org/'
     categories:
     - data-collection.media-streaming-servers
-    icon_filename: 'icecast.png'
+    icon_filename: 'icecast.svg'
   related_resources:
     integrations:
       list: []

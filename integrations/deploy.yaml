@@ -188,7 +188,7 @@
     link: ''
     categories:
       - deploy.operating-systems
-    icon_filename: 'macos.svg'
+    icon_filename: 'apple.svg'
   most_popular: true
   keywords:
     - MacOS

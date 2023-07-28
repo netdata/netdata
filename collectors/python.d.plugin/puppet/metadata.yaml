@@ -6,7 +6,7 @@ meta:
     link: "https://www.puppet.com/"
     categories:
       - data-collection.provisioning-systems
-    icon_filename: "puppet.jpeg"
+    icon_filename: "puppet.svg"
   related_resources:
     integrations:
       list: []
