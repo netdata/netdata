@@ -19,10 +19,10 @@
         - title: 'Netdata Access'
           description: |
             - A Netdata Cloud account
-            - Access to the Netdata Space as an administrator
+            - Access to the Netdata Space as an **administrator**
         - title: 'Discord Server Configuration'
           description: |
-            You need to have a Discord server able to receive [webhook integrations](https://support.discord.com/hc/en-us/articles/228383668).
+            You need to have a Discord server able to receive [webhooks integrations](https://support.discord.com/hc/en-us/articles/228383668).
             Steps to configure your Discord server to receive notifications from Netdata:
 
             1. Go to `Server Settings` --> `Integrations`
@@ -49,6 +49,380 @@
                 - Webhook URL - URL provided on Discord for the channel you want to receive your notifications.
                 - Thread name - if the Discord channel is a **Forum channel** you will need to provide the thread name as well
 
+
+    configuration:
+      file:
+        name: ''
+        description: ''
+      options:
+        description: ''
+        folding:
+          title: ''
+          enabled: true
+        list:
+          - name: ''
+            default_value: ''
+            description: ''
+            required: false
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: ''
+            folding:
+              enabled: false
+            description: ''
+            config: ''
+- id: 'notify-pagerduty'
+  meta:
+    name: 'PagerDuty'
+    link: 'https://www.pagerduty.com/'
+    categories:
+      - notify.cloud
+    icon_filename: 'pagerduty.png'
+  keywords:
+    - pagerduty
+  overview:
+    notification_description: "From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on PagerDuty."
+    notification_limitations: ''
+  setup:
+    prerequisites:
+      list:
+        - title: 'Netdata Access'
+          description: |
+            - A Netdata Cloud account
+            - Access to the Netdata Space as an **administrator**
+            - The Netdata Space needs to be on **Business** plan or higher
+        - title: 'Discord Server Configuration'
+          description: |
+            You need to have a PagerDuty service to receive events using webhooks.
+            Steps to configure your PagerDuty to receive notifications from Netdata:
+
+            1. Create a service to receive events from your services directory page on PagerDuty
+            2. At step 3, select `Events API V2` Integration or **View Webhooks** if you already have some defined
+            3. Once the service is created you will be redirected to its configuration page, where you can copy the **integration key**, that you will need need to add to your notification configuration on Netdata UI.
+
+        - title: ''
+          description: |
+            
+            ## Configuration Steps
+
+            1. Click on the **Space settings** cog (located above your profile icon)
+            2. Click on the **Notification** tab
+            3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
+            4. On the **PagerDuty** card click on **+ Add**
+            5. A modal will be presented to you to enter the required details to enable the configuration:
+              * **Notification settings** are Netdata specific settings
+                - Configuration name - you can optionally provide a name for your configuration you can easily refer to it
+                - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
+                - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
+              * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For PagerDuty:
+                - Integration Key - is a 32 character key provided by PagerDuty to receive events on your service.
+
+
+    configuration:
+      file:
+        name: ''
+        description: ''
+      options:
+        description: ''
+        folding:
+          title: ''
+          enabled: true
+        list:
+          - name: ''
+            default_value: ''
+            description: ''
+            required: false
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: ''
+            folding:
+              enabled: false
+            description: ''
+            config: ''
+- id: 'notify-slack'
+  meta:
+    name: 'Slack'
+    link: 'https://slack.com/'
+    categories:
+      - notify.cloud
+    icon_filename: 'slack.png'
+  keywords:
+    - slack
+  overview:
+    notification_description: "From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on Slack."
+    notification_limitations: ''
+  setup:
+    prerequisites:
+      list:
+        - title: 'Netdata Access'
+          description: |
+            - A Netdata Cloud account
+            - Access to the Netdata Space as an **administrator**
+            - The Netdata Space needs to be on **Business** plan or higher
+        - title: 'Slack Server Configuration'
+          description: |
+            You need to have a Slack app on your workspace to receive the Webhooks.
+            Steps to configure your Slack to receive notifications from Netdata:
+
+            1. Create an app to receive webhook integrations. Check [Create an app](https://api.slack.com/apps?new_app=1) from Slack documentation for further details
+            2. Install the app on your workspace
+            3. Configure Webhook URLs for your workspace
+              - On your app go to **Incoming Webhooks** and click on **activate incoming webhooks**
+              - At the bottom of **Webhook URLs for Your Workspace** section you have **Add New Webhook to Workspace**
+              - After pressing that specify the channel where you want your notifications to be delivered
+              - Once completed copy the Webhook URL that you will need to add to your notification configuration on Netdata UI
+            
+            For more details please check Slacks's article [Incoming webhooks for Slack](https://slack.com/help/articles/115005265063-Incoming-webhooks-for-Slack).
+
+        - title: ''
+          description: |
+            
+            ## Configuration Steps
+
+            1. Click on the **Space settings** cog (located above your profile icon)
+            2. Click on the **Notification** tab
+            3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
+            4. On the **Slack** card click on **+ Add**
+            5. A modal will be presented to you to enter the required details to enable the configuration:
+              * **Notification settings** are Netdata specific settings
+                - Configuration name - you can optionally provide a name for your configuration you can easily refer to it
+                - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
+                - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
+              * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Slack:
+                - Webhook URL - URL provided on Slack for the channel you want to receive your notifications.
+
+
+    configuration:
+      file:
+        name: ''
+        description: ''
+      options:
+        description: ''
+        folding:
+          title: ''
+          enabled: true
+        list:
+          - name: ''
+            default_value: ''
+            description: ''
+            required: false
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: ''
+            folding:
+              enabled: false
+            description: ''
+            config: ''
+- id: 'notify-opsgenie'
+  meta:
+    name: 'Opsgenie'
+    link: 'https://www.atlassian.com/software/opsgenie'
+    categories:
+      - notify.cloud
+    icon_filename: 'opsgenie.png'
+  keywords:
+    - opsgenie
+    - atlassian
+  overview:
+    notification_description: "From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on Opsgenie."
+    notification_limitations: ''
+  setup:
+    prerequisites:
+      list:
+        - title: 'Netdata Access'
+          description: |
+            - A Netdata Cloud account
+            - Access to the Netdata Space as an **administrator**
+            - The Netdata Space needs to be on **Business** plan or higher
+        - title: 'Opsgenie Configuration'
+          description: |
+            You need to have permissions on Opsgenie to add new integrations.
+            Steps to configure your Opsgenie to receive notifications from Netdata:
+
+            1. Go to integrations tab of your team, click **Add integration**
+            2. Pick **API** from available integrations. Copy your API Key and press **Save Integration**.
+            3. Paste copied API key into the corresponding field in **Integration configuration** section of Opsgenie modal window in Netdata.
+
+        - title: ''
+          description: |
+            
+            ## Configuration Steps
+
+            1. Click on the **Space settings** cog (located above your profile icon)
+            2. Click on the **Notification** tab
+            3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
+            4. On the **Opsgenie** card click on **+ Add**
+            5. A modal will be presented to you to enter the required details to enable the configuration:
+              * **Notification settings** are Netdata specific settings
+                - Configuration name - you can optionally provide a name for your configuration you can easily refer to it
+                - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
+                - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
+              * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Opsgenie:
+                - API Key - a key provided on Opsgenie for the channel you want to receive your notifications.
+
+
+    configuration:
+      file:
+        name: ''
+        description: ''
+      options:
+        description: ''
+        folding:
+          title: ''
+          enabled: true
+        list:
+          - name: ''
+            default_value: ''
+            description: ''
+            required: false
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: ''
+            folding:
+              enabled: false
+            description: ''
+            config: ''
+- id: 'notify-mattermost'
+  meta:
+    name: 'Mattermost'
+    link: 'https://mattermost.com/'
+    categories:
+      - notify.cloud
+    icon_filename: 'mattermost.png'
+  keywords:
+    - mattermost
+  overview:
+    notification_description: "From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on Mattermost."
+    notification_limitations: ''
+  setup:
+    prerequisites:
+      list:
+        - title: 'Netdata Access'
+          description: |
+            - A Netdata Cloud account
+            - Access to the Netdata Space as an **administrator**
+            - The Netdata Space needs to be on **Business** plan or higher
+        - title: 'Mattermost Configuration'
+          description: |
+            You need to have a Mattermost app on your workspace to receive the webhooks.
+            Steps to configure your Mattermost to receive notifications from Netdata:
+
+            1. In Mattermost, go to Product menu > Integrations > Incoming Webhook
+              - If you don’t have the Integrations option, incoming webhooks may not be enabled on your Mattermost server or may be disabled for non-admins. They can be enabled by a System Admin from System Console > Integrations > Integration Management. Once incoming webhooks are enabled, continue with the steps below.
+            2. Select Add Incoming Webhook and add a name and description for the webhook. The description can be up to 500 characters
+            3. Select the channel to receive webhook payloads, then select Add to create the webhook
+            4. You will end up with a webhook endpoint that looks like below:
+              `https://your-mattermost-server.com/hooks/xxx-generatedkey-xxx`
+
+              - Treat this endpoint as a secret. Anyone who has it will be able to post messages to your Mattermost instance.
+            
+            For more details please check Mattermost's article [Incoming webhooks for Mattermost](https://developers.mattermost.com/integrate/webhooks/incoming/).
+
+        - title: ''
+          description: |
+            
+            ## Configuration Steps
+
+            1. Click on the **Space settings** cog (located above your profile icon)
+            2. Click on the **Notification** tab
+            3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
+            4. On the **Mattermost** card click on **+ Add**
+            5. A modal will be presented to you to enter the required details to enable the configuration:
+              * **Notification settings** are Netdata specific settings
+                - Configuration name - you can optionally provide a name for your configuration you can easily refer to it
+                - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
+                - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
+              * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Mattermost:
+                - Webhook URL - URL provided on Mattermost for the channel you want to receive your notifications
+
+    configuration:
+      file:
+        name: ''
+        description: ''
+      options:
+        description: ''
+        folding:
+          title: ''
+          enabled: true
+        list:
+          - name: ''
+            default_value: ''
+            description: ''
+            required: false
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: ''
+            folding:
+              enabled: false
+            description: ''
+            config: ''
+- id: 'notify-rocketchat'
+  meta:
+    name: 'RocketChat'
+    link: 'https://www.rocket.chat/'
+    categories:
+      - notify.cloud
+    icon_filename: 'rocketchat.png'
+  keywords:
+    - rocketchat
+  overview:
+    notification_description: "From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on RocketChat."
+    notification_limitations: ''
+  setup:
+    prerequisites:
+      list:
+        - title: 'Netdata Access'
+          description: |
+            - A Netdata Cloud account
+            - Access to the Netdata Space as an **administrator**
+            - The Netdata Space needs to be on **Business** plan or higher
+        - title: 'RocketChat Configuration'
+          description: |
+            You need to have a RocketChat app on your workspace to receive the webhooks.
+            Steps to configure your RocketChat to receive notifications from Netdata:
+
+            1. In RocketChat, Navigate to Administration > Workspace > Integrations.
+            2. Click **+New** at the top right corner.
+            3. For more details about each parameter, check [create-a-new-incoming-webhook](https://docs.rocket.chat/use-rocket.chat/workspace-administration/integrations#create-a-new-incoming-webhook).
+            4. After configuring integration, click Save.
+            5. You will end up with a webhook endpoint that looks like below:
+              `https://your-server.rocket.chat/hooks/YYYYYYYYYYYYYYYYYYYYYYYY/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`
+              - Treat this endpoint as a secret. Anyone who has it will be able to post messages to your RocketChat instance.
+
+            
+            For more details please check RocketChat's article Incoming webhooks for [RocketChat](https://docs.rocket.chat/use-rocket.chat/workspace-administration/integrations/).
+
+        - title: ''
+          description: |
+            
+            ## Configuration Steps
+
+            1. Click on the **Space settings** cog (located above your profile icon)
+            2. Click on the **Notification** tab
+            3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
+            4. On the **RocketChat** card click on **+ Add**
+            5. A modal will be presented to you to enter the required details to enable the configuration:
+              * **Notification settings** are Netdata specific settings
+                - Configuration name - you can optionally provide a name for your configuration you can easily refer to it
+                - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
+                - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
+              * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For RocketChat:
+                - Webhook URL - URL provided on RocketChat for the channel you want to receive your notifications.
 
     configuration:
       file:
