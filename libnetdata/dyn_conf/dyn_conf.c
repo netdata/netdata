@@ -156,8 +156,14 @@ static int _get_list_of_jobs_json_cb(const DICTIONARY_ITEM *item, void *entry, v
     json_object_object_add(json_job, "name", json_item);
     json_item = json_object_new_string(job_status2str(job->status));
     json_object_object_add(json_job, "state", json_item);
-    json_item = json_object_new_uint64(job->last_state_update);
-    json_object_object_add(json_job, "last_state_update", json_item);
+    int64_t last_state_update_s  = job->last_state_update / USEC_PER_SEC;
+    int64_t last_state_update_us = job->last_state_update % USEC_PER_SEC;
+
+    json_item = json_object_new_int64(last_state_update_s);
+    json_object_object_add(json_job, "last_state_update_s", json_item);
+
+    json_item = json_object_new_int64(last_state_update_us);
+    json_object_object_add(json_job, "last_state_update_us", json_item);
 
     json_object_array_add(obj, json_job);
 
