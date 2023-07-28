@@ -2275,10 +2275,10 @@ modules:
       module_name: net.inet.ip.stats
       monitored_instance:
         name: freebsd net.inet.ip.stats
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "network.svg"
       related_resources:
         integrations:
           list: []
@@ -2288,8 +2288,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect IP stats"
+        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -2308,14 +2308,31 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd:net.inet.ip.stats"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: ipv4 packets
+              description: Enable or disable IPv4 packets metric.
+              default_value: yes
+              required: false
+            - name: ipv4 fragments sent
+              description: Enable or disable IPv4 fragments sent metric.
+              default_value: yes
+              required: false
+            - name: ipv4 fragments assembly
+              description: Enable or disable IPv4 fragments assembly metric.
+              default_value: yes
+              required: false
+            - name: ipv4 errors
+              description: Enable or disable IPv4 errors metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -2377,10 +2394,10 @@ modules:
       module_name: net.inet6.ip6.stats
       monitored_instance:
         name: freebsd net.inet6.ip6.stats
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "network.svg"
       related_resources:
         integrations:
           list: []
@@ -2390,8 +2407,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect information abou IPv6 stats."
+        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -2410,14 +2427,31 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd:net.inet6.ip6.stats"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: ipv6 packets
+              description: Enable or disable ipv6 packet metric.
+              default_value: auto
+              required: false
+            - name: ipv6 fragments sent
+              description: Enable or disable ipv6 fragments sent metric.
+              default_value: auto
+              required: false
+            - name: ipv6 fragments assembly
+              description: Enable or disable ipv6 fragments assembly metric.
+              default_value: auto
+              required: false
+            - name: ipv6 errors
+              description: Enable or disable ipv6 errors metric.
+              default_value: auto
+              required: false
         examples:
           folding:
             enabled: true
@@ -2481,10 +2515,10 @@ modules:
       module_name: net.inet6.icmp6.stats
       monitored_instance:
         name: freebsd net.inet6.icmp6.stats
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "network.svg"
       related_resources:
         integrations:
           list: []
@@ -2494,8 +2528,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect information abou IPv6 ICMP"
+        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -2514,14 +2548,43 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd:net.inet6.icmp6.stats"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: icmp
+              description: Enable or disable ICMP metric.
+              default_value: auto
+              required: false
+            - name: icmp redirects
+              description: Enable or disable ICMP redirects metric.
+              default_value: auto
+              required: false
+            - name: icmp errors
+              description: Enable or disable ICMP errors metric.
+              default_value: auto
+              required: false
+            - name: icmp echos
+              description: Enable or disable ICMP echos metric.
+              default_value: auto
+              required: false
+            - name: icmp router
+              description: Enable or disable ICMP router metric.
+              default_value: auto
+              required: false
+            - name: icmp neighbor
+              description: Enable or disable ICMP neighbor metric.
+              default_value: auto
+              required: false
+            - name: icmp types
+              description: Enable or disable ICMP types metric.
+              default_value: auto
+              required: false
         examples:
           folding:
             enabled: true
@@ -2618,10 +2681,10 @@ modules:
       module_name: ipfw
       monitored_instance:
         name: freebsd ipfw
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "firewall.svg"
       related_resources:
         integrations:
           list: []
@@ -2631,8 +2694,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect information about FreeBSD firewall."
+        method_description: "The plugin uses RAW socket to communicate with kernel and collect data."
       supported_platforms:
         include: []
         exclude: []
@@ -2651,14 +2714,27 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd:ipfw"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: counters for static rules
+              description: Enable or disable counters for static rules  metric.
+              default_value: yes
+              required: false
+            - name: number of dynamic rules
+              description: Enable or disable number of dynamic rules metric.
+              default_value: yes
+              required: false
+            - name: allocated memory
+              description: Enable or disable allocated memory metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
