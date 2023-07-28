@@ -522,7 +522,7 @@ def render_deploy(distros, categories, deploy, ids):
                 {
                     'version': i['version'],
                     'support': i['support_type'],
-                    'arches': i.get('packages', {'arches': []}),
+                    'arches': i.get('packages', {'arches': []})['arches'],
                     'notes': i['notes'],
                 } for i in distros[item['platform_info']['group']] if i['distro'] == item['platform_info']['distro']
             ]
