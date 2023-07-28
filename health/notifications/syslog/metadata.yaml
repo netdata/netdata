@@ -39,7 +39,7 @@
             required: true
             detailed_description: >
               Targets are defined as follows:
-              
+
               ```
               [[facility.level][@host[:port]]/]prefix
               ```
