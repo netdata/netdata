@@ -207,8 +207,8 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
    You can also use Netdata Parents to:
 
-   - Offload your production systems (the parents runs ML, alerts, queries, etc for all its children)
-   - Secure your production systems (the parents accept user connections, for all its children)
+   - Offload your production systems (the parents runs ML, alerts, queries, etc for all their children)
+   - Secure your production systems (the parents accept user connections, for all their children)
 
 ### 5. **Connect to Netdata Cloud** :cloud:
 
