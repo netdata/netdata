@@ -49,7 +49,7 @@
             description: "Set `SEND_AWSNS` to YES"
             required: true
           - name: 'AWSSNS_MESSAGE_FORMAT'
-            default_value: ''
+            default_value: '${status} on ${host} at ${date}: ${chart} ${value_string}'
             description: "Set `AWSSNS_MESSAGE_FORMAT` to to the string that you want the alert to be sent into."
             required: true
             detailed_description: >
