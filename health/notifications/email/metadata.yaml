@@ -18,7 +18,7 @@
       list:
         - title: ''
           description: |
-            - A working sendmail command for email alerts to work. Almost all MTAs provide a sendmail interface. Netdata sends all emails as user netdata, so make sure your sendmail works for local users.
+            - A working sendmail command is required for email alerts to work. Almost all MTAs provide a sendmail interface. Netdata sends all emails as user netdata, so make sure your sendmail works for local users.
             - Access to the terminal where Netdata Agent is running
     configuration:
       file:
