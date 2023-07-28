@@ -6,7 +6,7 @@ meta:
     link: 'https://ceph.io/'
     categories:
     - data-collection.storage-mount-points-and-filesystems
-    icon_filename: 'ceph.png'
+    icon_filename: 'ceph.svg'
   related_resources:
     integrations:
       list: []

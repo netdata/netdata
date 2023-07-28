@@ -6,7 +6,7 @@ meta:
     link: 'https://www.torproject.org/'
     categories:
     - data-collection.vpns
-    icon_filename: 'tor.png'
+    icon_filename: 'tor.svg'
   related_resources:
     integrations:
       list: []

@@ -6,7 +6,7 @@ meta:
     link: 'https://buy.hpe.com/us/en/software/server-management-software/server-management-software/smart-array-management-software/hpe-smart-storage-administrator/p/5409020'
     categories:
     - data-collection.storage-mount-points-and-filesystems
-    icon_filename: 'hp.jpeg'
+    icon_filename: 'hp.svg'
   related_resources:
     integrations:
       list: []

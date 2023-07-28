@@ -6,7 +6,7 @@ meta:
     link: "https://ipfs.tech/"
     categories:
       - data-collection.storage-mount-points-and-filesystems
-    icon_filename: "ipfs.png"
+    icon_filename: "ipfs.svg"
   related_resources:
     integrations:
       list: []

@@ -6,7 +6,7 @@ meta:
     link: "https://www.microchip.com/en-us/products/storage"
     categories:
       - data-collection.storage-mount-points-and-filesystems
-    icon_filename: "adaptec.png"
+    icon_filename: "adaptec.svg"
   related_resources:
     integrations:
       list: []
