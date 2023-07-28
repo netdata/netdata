@@ -104,18 +104,11 @@ typedef struct {
     bool use_direct_io;
     size_t storage_tiers;
     bool parallel_initialization;
+    unsigned rrdeng_pages_per_extent;
 } dbengine_config_t;
 
 static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
     UNUSED(cfg);
-
-    unsigned read_num = (unsigned)config_get_number(CONFIG_SECTION_DB, "dbengine pages per extent", MAX_PAGES_PER_EXTENT);
-    if (read_num > 0 && read_num <= MAX_PAGES_PER_EXTENT)
-        rrdb.rrdeng_pages_per_extent = read_num;
-    else {
-        netdata_log_error("Invalid dbengine pages per extent %u given. Using %u.", read_num, rrdb.rrdeng_pages_per_extent);
-        config_set_number(CONFIG_SECTION_DB, "dbengine pages per extent", rrdb.rrdeng_pages_per_extent);
-    }
 
     struct dbengine_initialization tiers_init[RRD_STORAGE_TIERS] = {};
 
@@ -284,12 +277,21 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
                 config_set_number(CONFIG_SECTION_DB, "storage tiers", cfg.storage_tiers);
             }
 
+            unsigned read_num = (unsigned)config_get_number(CONFIG_SECTION_DB, "dbengine pages per extent", rrdb.rrdeng_pages_per_extent);
+            if (read_num > 0 && read_num <= rrdb.rrdeng_pages_per_extent)
+                cfg.rrdeng_pages_per_extent = read_num;
+            else {
+                netdata_log_error("Invalid dbengine pages per extent %u given. Using %u.", read_num, rrdb.rrdeng_pages_per_extent);
+                config_set_number(CONFIG_SECTION_DB, "dbengine pages per extent", cfg.rrdeng_pages_per_extent);
+            }
+
             cfg.parallel_initialization = (cfg.storage_tiers <= (size_t) get_netdata_cpus()) ? true : false;
             cfg.parallel_initialization = config_get_boolean(CONFIG_SECTION_DB, "dbengine parallel initialization", cfg.parallel_initialization);
 
             rrdb.use_direct_io = cfg.use_direct_io;
             rrdb.storage_tiers = cfg.storage_tiers;
             rrdb.parallel_initialization = cfg.parallel_initialization;
+            rrdb.rrdeng_pages_per_extent = cfg.rrdeng_pages_per_extent;
 
             dbengine_init(hostname, &cfg);
 #else
