@@ -55,10 +55,12 @@ COLLECTOR_RENDER_KEYS = [
 ]
 
 EXPORTER_RENDER_KEYS = [
+    'overview',
     'setup',
 ]
 
 NOTIFICATION_RENDER_KEYS = [
+    'overview',
     'setup',
 ]
 
@@ -492,6 +494,11 @@ def render_collectors(categories, collectors, ids):
         for key in COLLECTOR_RENDER_KEYS:
             template = get_jinja_env().get_template(f'{ key }.md')
             data = template.render(entry=item, related=related)
+
+            if 'variables' in item['meta']['monitored_instance']:
+                template = get_jinja_env().from_string(data)
+                data = template.render(variables=item['meta']['monitored_instance']['variables'])
+
             item[key] = data
 
         item['edit_link'] = make_edit_link(item)
@@ -554,6 +561,11 @@ def render_exporters(categories, exporters, ids):
         for key in EXPORTER_RENDER_KEYS:
             template = get_jinja_env().get_template(f'{ key }.md')
             data = template.render(entry=item)
+
+            if 'variables' in item['meta']:
+                template = get_jinja_env().from_string(data)
+                data = template.render(variables=item['meta']['variables'])
+
             item[key] = data
 
         item['edit_link'] = make_edit_link(item)
@@ -578,6 +590,11 @@ def render_notifications(categories, notifications, ids):
         for key in NOTIFICATION_RENDER_KEYS:
             template = get_jinja_env().get_template(f'{ key }.md')
             data = template.render(entry=item)
+
+            if 'variables' in item['meta']:
+                template = get_jinja_env().from_string(data)
+                data = template.render(variables=item['meta']['variables'])
+
             item[key] = data
 
         item['edit_link'] = make_edit_link(item)
