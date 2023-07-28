@@ -9,8 +9,6 @@ rrdeng_stats_t rrdeng_reserved_file_descriptors = 0;
 rrdeng_stats_t global_pg_cache_over_half_dirty_events = 0;
 rrdeng_stats_t global_flushing_pressure_page_deletions = 0;
 
-unsigned rrdeng_pages_per_extent = MAX_PAGES_PER_EXTENT;
-
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < (RRDENG_OPCODE_MAX + 2)
 #error Please increase WORKER_UTILIZATION_MAX_JOB_TYPES to at least (RRDENG_MAX_OPCODE + 2)
 #endif
@@ -839,7 +837,7 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
     uLong crc;
 
     for(descr = base, Index = 0, count = 0, uncompressed_payload_length = 0;
-        descr && count != rrdeng_pages_per_extent;
+        descr && count != rrdb.rrdeng_pages_per_extent;
         descr = descr->link.next, Index++) {
 
         uncompressed_payload_length += descr->page_length;

@@ -111,10 +111,10 @@ static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
 
     unsigned read_num = (unsigned)config_get_number(CONFIG_SECTION_DB, "dbengine pages per extent", MAX_PAGES_PER_EXTENT);
     if (read_num > 0 && read_num <= MAX_PAGES_PER_EXTENT)
-        rrdeng_pages_per_extent = read_num;
+        rrdb.rrdeng_pages_per_extent = read_num;
     else {
-        netdata_log_error("Invalid dbengine pages per extent %u given. Using %u.", read_num, rrdeng_pages_per_extent);
-        config_set_number(CONFIG_SECTION_DB, "dbengine pages per extent", rrdeng_pages_per_extent);
+        netdata_log_error("Invalid dbengine pages per extent %u given. Using %u.", read_num, rrdb.rrdeng_pages_per_extent);
+        config_set_number(CONFIG_SECTION_DB, "dbengine pages per extent", rrdb.rrdeng_pages_per_extent);
     }
 
     struct dbengine_initialization tiers_init[RRD_STORAGE_TIERS] = {};
@@ -381,6 +381,7 @@ struct rrdb rrdb = {
     .storage_tiers = 3,
     .use_direct_io = true,
     .parallel_initialization = false,
+    .rrdeng_pages_per_extent = MAX_PAGES_PER_EXTENT,
     .storage_tiers_grouping_iterations = {
         1,
         60,

@@ -877,6 +877,8 @@ struct rrdb {
 
     bool parallel_initialization;
 
+    unsigned rrdeng_pages_per_extent;
+
     size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
     RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS];
 

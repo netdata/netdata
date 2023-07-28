@@ -1372,7 +1372,7 @@ static RRDENG_SIZE_STATS rrdeng_size_statistics_internal(struct rrdengine_instan
     stats.sizeof_page_in_cache = 0; // struct_natural_alignment(sizeof(struct page_cache_descr));
     stats.sizeof_point_data = rrdb.page_type_size[ctx->config.page_type];
     stats.sizeof_page_data = rrdb.tier_page_size[ctx->config.tier];
-    stats.pages_per_extent = rrdeng_pages_per_extent;
+    stats.pages_per_extent = rrdb.rrdeng_pages_per_extent;
 
 //    stats.sizeof_metric_in_index = 40;
 //    stats.sizeof_page_in_index = 24;

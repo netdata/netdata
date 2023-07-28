@@ -1100,7 +1100,7 @@ void pgc_and_mrg_initialize(void)
             "main_cache",
             main_cache_size,
             main_cache_free_clean_page_callback,
-            (size_t) rrdeng_pages_per_extent,
+            (size_t) rrdb.rrdeng_pages_per_extent,
             main_cache_flush_dirty_page_init_callback,
             main_cache_flush_dirty_page_callback,
             10,
