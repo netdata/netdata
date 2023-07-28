@@ -73,6 +73,12 @@ static int ssl_init()
 #else
     accept_ctx.ssl_ctx = SSL_CTX_new(TLS_server_method());
 #endif
+    // Check if accept_ctx.ssl_ctx is NULL, otherwise SSL_CTX_set_options will crash
+    if(!accept_ctx.ssl_ctx)
+    {
+        // output error log
+        return -1;
+    }
 
     SSL_CTX_set_options(accept_ctx.ssl_ctx, SSL_OP_NO_SSLv2);
 
