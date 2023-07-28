@@ -45,6 +45,22 @@
             "notification_limitations"
           ]
         },
+        "global_setup": {
+            "type": "object",
+            "description": "Flags that show which global setup sections are relevant for this notification method.",
+            "properties": {
+                "severity_filtering": {
+                    "type": "boolean"
+                },
+                "http_proxy": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "severity_filtering",
+                "http_proxy"
+            ]
+        },
         "setup": {
           "oneOf": [
             {
