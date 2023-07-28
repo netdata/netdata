@@ -5,7 +5,7 @@ meta:
     name: Netata
     link: 'https://github.com/netdata/netdata/'
     categories:
-    - data-collection.other
+      - data-collection.other
     icon_filename: 'netfilter.png'
   related_resources:
     integrations:
@@ -81,13 +81,13 @@ metrics:
   description: ""
   availability: []
   scopes:
-  - name: global
+    - name: global
     description: ""
     labels: []
     metrics:
-    - name: profile.ChartID
-      description: A chart genrated with information from configuration file.
-      unit: "profile_units"
-      chart_type: line
-      dimensions:
-      - name: dim_NUMBER
+      - name: profile.ChartID
+        description: A chart genrated with information from configuration file.
+        unit: "profile_units"
+        chart_type: line
+        dimensions:
+          - name: dim_NUMBER
