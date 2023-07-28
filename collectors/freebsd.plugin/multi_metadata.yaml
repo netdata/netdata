@@ -290,7 +290,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: "These metrics show statistic about CPU usage."
+          description: "These metrics show CPU usage statistics."
           labels: []
           metrics:
             - name: system.cpu
@@ -539,7 +539,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: "These metrics give information about system interrupts."
+          description: "These metrics show system interrupts frequency."
           labels: []
           metrics:
             - name: system.intr
@@ -622,7 +622,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: "The metric show counters for device interrupt."
+          description: "The metric show device interrupt frequency."
           labels: []
           metrics:
             - name: system.dev_intr
@@ -699,7 +699,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: "This metric shows total software interrupt."
+          description: "This metric shows software interrupt frequency."
           labels: []
           metrics:
             - name: system.soft_intr
@@ -962,7 +962,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: "This metric shows statistics about RAM usage."
+          description: "This metric shows RAM usage statistics."
           labels: []
           metrics:
             - name: system.ram
@@ -1391,7 +1391,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: "These metrics show statistic about total IPC messages."
+          description: "These metrics show statistics IPC messages statistics."
           labels: []
           metrics:
             - name: system.ipc_msq_queues
@@ -1579,7 +1579,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: "These metrics show statistic about softnet status."
+          description: "These metrics show statistics about softnet stats."
           labels: []
           metrics:
             - name: system.softnet_stat
@@ -1998,7 +1998,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: "These metrics show statistics about TCP connections."
+          description: "These metrics show TCP connections statistics."
           labels: []
           metrics:
             - name: ipv4.tcppackets
@@ -2147,7 +2147,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: "These metrics show detailed information about UDP connections."
+          description: "These metrics show UDP connections statistics."
           labels: []
           metrics:
             - name: ipv4.udppackets
@@ -2243,7 +2243,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: "These metrics show detailed information about ICMP connections."
+          description: "These metrics show ICMP connections statistics."
           labels: []
           metrics:
             - name: ipv4.icmp
@@ -2350,7 +2350,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: "These metrics show general information about IPv4 connections."
+          description: "These metrics show IPv4 connections statistics."
           labels: []
           metrics:
             - name: ipv4.packets
@@ -2602,7 +2602,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "Collect IPv6 ICMP traffic statistics."
           labels: []
           metrics:
             - name: ipv6.icmp
@@ -2752,7 +2752,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "Theese metrics show FreeBSD firewall statistics."
           labels: []
           metrics:
             - name: ipfw.mem
@@ -2965,7 +2965,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "General overview about network traffic."
           labels: []
           metrics:
             - name: system.net
@@ -3132,7 +3132,7 @@ modules:
       availability: []
       scopes:
         - name: mount point
-          description: ""
+          description: "These metrics show detailss about mount point usages."
           labels: []
           metrics:
             - name: disk.space
@@ -3223,7 +3223,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show detailed information about ZFS filesystem."
           labels: []
           metrics:
             - name: zfs.arc_size
