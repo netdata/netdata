@@ -2083,7 +2083,7 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: "Show information about UDP connections."
+        metrics_description: "Collect information about UDP connections."
         method_description: "The plugin uses `sysctl` functiion to collect necessary data."
       supported_platforms:
         include: []
@@ -2172,10 +2172,10 @@ modules:
       module_name: net.inet.icmp.stats
       monitored_instance:
         name: freebsd net.inet.icmp.stats
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "network.svg"
       related_resources:
         integrations:
           list: []
@@ -2185,8 +2185,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect information about ICMP traffic."
+        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -2205,14 +2205,27 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd:net.inet.icmp.stats"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: IPv4 ICMP packets
+              description: Enable or disable IPv4 ICMP packets metric.
+              default_value: yes
+              required: false
+            - name: IPv4 ICMP error
+              description: Enable or disable IPv4 ICMP error metric.
+              default_value: yes
+              required: false
+            - name: IPv4 ICMP messages
+              description: Enable or disable IPv4 ICMP messages metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
