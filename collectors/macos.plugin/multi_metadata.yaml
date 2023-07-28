@@ -274,7 +274,8 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: |
+            These metrics refer to hardware and network monitoring.
           labels: []
           metrics:
             - name: system.cpu
