@@ -433,7 +433,7 @@ modules:
       configuration:
         file:
           name: "Config options"
-          section_name: "plugin:freebsd"
+          section_name: "[plugin:freebsd]"
           description: "The netdata main configuration file"
         options:
           description: ""
