@@ -120,7 +120,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Collect Virtual Memory information from host."
-        method_description: "The plugin uses function `sysctl` to collect data." 
+        method_description: "The plugin uses function `sysctl` to collect data."
       supported_platforms:
         include: []
         exclude: []
@@ -1495,10 +1495,10 @@ modules:
       module_name: net.isr
       monitored_instance:
         name: freebsd net.isr
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -1508,8 +1508,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect information about system softnet stat."
+        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -1528,14 +1528,23 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd:net.isr"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: netisr
+              description: Enable or disable general vision about softnet stat metrics.
+              default_value: yes
+              required: false
+            - name: netisr per core
+              description: Enable or disable softnet stat metric per core.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -1600,10 +1609,10 @@ modules:
       module_name: devstat
       monitored_instance:
         name: freebsd devstat
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "hard-drive.svg"
       related_resources:
         integrations:
           list: []
@@ -1613,8 +1622,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect information per hard disk available on host."
+        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -1633,14 +1642,63 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd:kern.devstat"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: enable new disks detected at runtime
+              description: Enable or disable possibility to detect new disks.
+              default_value: auto
+              required: false
+            - name: performance metrics for pass devices
+              description: Enable or disable metrics for disks with type `PASS`.
+              default_value: auto
+              required: false
+            - name: total bandwidth for all disks
+              description: Enable or disable total bandwidth metric for all disks.
+              default_value: yes
+              required: false
+            - name: bandwidth for all disks
+              description: Enable or disable bandwidth for all disks metric.
+              default_value: auto
+              required: false
+            - name: operations for all disks
+              description: Enable or disable operations for all disks metric.
+              default_value: auto
+              required: false
+            - name: queued operations for all disks
+              description: Enable or disable queued operations for all disks  metric.
+              default_value: auto
+              required: false
+            - name: utilization percentage for all disks
+              description: Enable or disable utilization percentage for all disks metric.
+              default_value: auto
+              required: false
+            - name: i/o time for all disks 
+              description: Enable or disable I/O time for all disks metric.
+              default_value: auto
+              required: false
+            - name: average completed i/o time for all disks
+              description: Enable or disable average completed I/O time for all disks metric.
+              default_value: auto
+              required: false
+            - name: average completed i/o bandwidth for all disks
+              description: Enable or disable average completed I/O bandwidth for all disks metric.
+              default_value: auto
+              required: false
+            - name: average service time for all disks
+              description: Enable or disable average service time for all disks metric.
+              default_value: auto
+              required: false
+            - name: disable by default disks matching
+              description: Do not create charts for disks listed.
+              default_value: ""
+              required: false
         examples:
           folding:
             enabled: true
