@@ -1628,7 +1628,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
 
 // Returns the number of bytes read from the file if file_size is not NULL.
 // The actual buffer has an extra byte set to zero (not included in the count).
-char *read_by_filename(char *filename, long *file_size)
+char *read_by_filename(const char *filename, long *file_size)
 {
     FILE *f = fopen(filename, "r");
     if (!f)

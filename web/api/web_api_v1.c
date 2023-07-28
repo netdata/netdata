@@ -1462,6 +1462,64 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
 }
 #endif
 
+#ifdef NETDATA_DEV_MODE
+int web_client_api_request_v1_logs(RRDHOST *host __maybe_unused, struct web_client *w, char *url __maybe_unused) {
+    if (!netdata_ready)
+        return HTTP_RESP_BACKEND_FETCH_FAILED;
+
+    const char *kind = NULL;
+
+    while (url) {
+        char *value = strsep_skip_consecutive_separators(&url, "&");
+        if (!value || !*value)
+            continue;
+
+        char *name = strsep_skip_consecutive_separators(&value, "=");
+        if(!name || !*name)
+            continue;
+
+        if (!name || !*name || !value || !*value)
+            return HTTP_RESP_NOT_FOUND;
+
+
+        if (!strncmp(name, "kind", strlen("kind"))) {
+            kind = value;
+        }
+    }
+
+    if (!kind)
+        return HTTP_RESP_NOT_FOUND;
+
+    const char *filename = NULL;
+
+    if (!strcmp(kind, "error"))
+        filename = stderr_filename;
+    else if (!strcmp(kind, "access"))
+        filename = stdaccess_filename;
+    else if (!strcmp(kind, "collector"))
+        filename = stdcollector_filename;
+    else if (!strcmp(kind, "health"))
+        filename = stdhealth_filename;
+    else {
+        return HTTP_RESP_NOT_FOUND;
+    }
+
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+
+    long file_size = 0;
+    char *contents = read_by_filename(filename, &file_size);
+    if (!contents)
+        return HTTP_RESP_BACKEND_FETCH_FAILED;
+
+    buffer_fast_strcat(wb, contents, file_size);
+    freez(contents);
+
+    buffer_no_cacheable(wb);
+    return HTTP_RESP_OK;
+}
+#endif
+
 static struct web_api_command api_commands_v1[] = {
         { "info",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_info                       },
         { "data",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_data                       },
@@ -1497,6 +1555,10 @@ static struct web_api_command api_commands_v1[] = {
         {"functions",            0, WEB_CLIENT_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_functions },
 
         { "dbengine_stats",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_dbengine_stats },
+
+#ifdef NETDATA_DEV_MODE
+        { "logs",                0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_logs },
+#endif
 
         // terminator
         { NULL,                  0, WEB_CLIENT_ACL_NONE,      NULL },
