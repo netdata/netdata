@@ -129,16 +129,16 @@ json_object *get_list_of_modules_json(struct configurable_plugin *plugin)
     return obj;
 }
 
-const char *job_state2str(enum job_state state)
+const char *job_status2str(enum job_status status)
 {
-    switch (state) {
-        case JOB_STATE_UNKNOWN:
+    switch (status) {
+        case JOB_STATUS_UNKNOWN:
             return "unknown";
-        case JOB_STATE_STOPPED:
+        case JOB_STATUS_STOPPED:
             return "stopped";
-        case JOB_STATE_RUNNING:
+        case JOB_STATUS_RUNNING:
             return "running";
-        case JOB_STATE_ERROR:
+        case JOB_STATUS_ERROR:
             return "error";
         default:
             return "unknown";
@@ -154,7 +154,7 @@ static int _get_list_of_jobs_json_cb(const DICTIONARY_ITEM *item, void *entry, v
     json_object *json_job = json_object_new_object();
     json_object *json_item = json_object_new_string(job->name);
     json_object_object_add(json_job, "name", json_item);
-    json_item = json_object_new_string(job_state2str(job->state));
+    json_item = json_object_new_string(job_status2str(job->state));
     json_object_object_add(json_job, "state", json_item);
     json_item = json_object_new_uint64(job->last_state_update);
     json_object_object_add(json_job, "last_state_update", json_item);
@@ -320,7 +320,7 @@ static const char *set_module_config(struct module *mod, dyncfg_config_t cfg)
 struct job *job_new()
 {
     struct job *job = callocz(1, sizeof(struct job));
-    job->state = JOB_STATE_UNKNOWN;
+    job->state = JOB_STATUS_UNKNOWN;
     job->last_state_update = now_realtime_usec();
     return job;
 }

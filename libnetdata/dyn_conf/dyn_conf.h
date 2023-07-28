@@ -30,12 +30,22 @@ typedef struct dyncfg_config dyncfg_config_t;
 struct configurable_plugin;
 struct module;
 
-enum job_state {
-    JOB_STATE_UNKNOWN = 0, // State used until plugin reports first status
-    JOB_STATE_STOPPED,
-    JOB_STATE_RUNNING,
-    JOB_STATE_ERROR
+enum job_status {
+    JOB_STATUS_UNKNOWN = 0, // State used until plugin reports first status
+    JOB_STATUS_STOPPED,
+    JOB_STATUS_RUNNING,
+    JOB_STATUS_ERROR
 };
+
+inline enum job_status str2job_state(const char *state_name) {
+    if (strcmp(state_name, "stopped") == 0)
+        return JOB_STATUS_STOPPED;
+    else if (strcmp(state_name, "running") == 0)
+        return JOB_STATUS_RUNNING;
+    else if (strcmp(state_name, "error") == 0)
+        return JOB_STATUS_ERROR;
+    return JOB_STATUS_UNKNOWN;
+}
 
 enum set_config_result {
     SET_CONFIG_ACCEPTED = 0,
@@ -47,7 +57,8 @@ struct job
 {
     char *name;
 
-    enum job_state state;
+    //state reported by config
+    enum job_status status; // reported by plugin, enum as this has to be interpreted by UI
     usec_t last_state_update;
 
     struct module *module;
