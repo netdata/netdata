@@ -5,7 +5,7 @@ modules:
       module_name: /sys/kernel/debug/extfrag
       monitored_instance:
         name: System Memory Fragmentation
-        link: ''
+        link: 'https://kernel.org/'
         categories:
           - data-collection.linux-systems.memory-metrics
         icon_filename: 'microchip.png'
@@ -22,7 +22,7 @@ modules:
     overview:
       data_collection:
         metrics_description: 'Collects memory fragmentation statistics from the Linux kernel'
-        method_description: ''
+        method_description: 'Parse data froom `debugfs` or `proc` filesystem.'
       supported_platforms:
         include:
           - Linux
@@ -46,17 +46,32 @@ modules:
           description: ''
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: 'filesystem'
+            description: >
+              The debugfs filesystem must be mounted on your host for plugin to collect data.
+              You can run the command-line (`sudo mount -t debugfs none /sys/kernel/debug/`) to mount it locally.
+              It is also recommended to modify your fstab (5) avoiding necessity to mount the filesystem
+              before starting netdata.
       configuration:
         file:
-          name: ''
-          description: ''
+          name: 'netdata.conf'
+          section_name: '[plugin:debugfs]'
+          description: 'This is netdata main configuration file.'
         options:
           description: ''
           folding:
-            title: ''
+            title: 'Config options'
             enabled: true
-          list: []
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: command options
+              description: Additinal parameters for collector
+              default_value: ""
+              required: false
         examples:
           folding:
             enabled: true
