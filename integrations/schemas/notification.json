@@ -46,7 +46,14 @@
           ]
         },
         "setup": {
-          "$ref": "./shared.json#/$defs/setup"
+          "oneOf": [
+            {
+              "$ref": "./shared.json#/$defs/short_setup"
+            },
+            {
+              "$ref": "./shared.json#/$defs/full_setup"
+            }
+          ]
         }
       },
       "required": [
