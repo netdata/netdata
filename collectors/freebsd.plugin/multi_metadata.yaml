@@ -1071,10 +1071,10 @@ modules:
       module_name: vm.stats.vm.v_pgfaults
       monitored_instance:
         name: freebsd vm.stats.vm.v_pgfaults
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "memory.svg"
       related_resources:
         integrations:
           list: []
@@ -1084,8 +1084,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect memory page faults events."
+        method_description: "The plugin uses `sysctl` functiion to collect necessary data"
       supported_platforms:
         include: []
         exclude: []
@@ -1104,14 +1104,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: vm.stats.vm.v_pgfaults
+              description: Enable or disable Memory page fault metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -1147,10 +1152,10 @@ modules:
       module_name: kern.ipc.sem
       monitored_instance:
         name: freebsd kern.ipc.sem
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -1160,7 +1165,7 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
+        metrics_description: "Collect information about semaphore."
         method_description: ""
       supported_platforms:
         include: []
@@ -1180,14 +1185,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: kern.ipc.sem
+              description: Enable or disable semaphore metrics.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -1235,10 +1245,10 @@ modules:
       module_name: kern.ipc.shm
       monitored_instance:
         name: freebsd kern.ipc.shm
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "memory.svg"
       related_resources:
         integrations:
           list: []
@@ -1248,8 +1258,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect shared memory information."
+        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -1268,14 +1278,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: kern.ipc.shm
+              description: Enable or disable shared memory metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -1313,10 +1328,10 @@ modules:
       module_name: kern.ipc.msq
       monitored_instance:
         name: freebsd kern.ipc.msq
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -1326,7 +1341,7 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
+        metrics_description: "Collect number of IPC message Queues"
         method_description: ""
       supported_platforms:
         include: []
@@ -1346,14 +1361,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: kern.ipc.msq
+              description: Enable or disable IPC message queue metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -1398,10 +1418,10 @@ modules:
       module_name: uptime
       monitored_instance:
         name: freebsd uptime
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -1411,8 +1431,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Show period of time server is up."
+        method_description: "The plugin uses `clock_gettime` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -1431,14 +1451,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: vm.loadavg
+              description: Enable or disable load average metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
