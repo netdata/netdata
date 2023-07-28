@@ -1186,7 +1186,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "plugin:freebsd"
+          section_name: "[plugin:freebsd]"
           description: "The netdata main configuration file."
         options:
           description: ""
@@ -1279,7 +1279,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "plugin:freebsd"
+          section_name: "[plugin:freebsd]"
           description: "The netdata main configuration file."
         options:
           description: ""
@@ -1362,7 +1362,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "plugin:freebsd"
+          section_name: "[plugin:freebsd]"
           description: "The netdata main configuration file."
         options:
           description: ""
@@ -1452,7 +1452,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "plugin:freebsd"
+          section_name: "[plugin:freebsd]"
           description: "The netdata main configuration file."
         options:
           description: ""
@@ -1529,7 +1529,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "plugin:freebsd:net.isr"
+          section_name: "[plugin:freebsd:net.isr]"
           description: "The netdata main configuration file."
         options:
           description: ""
@@ -1643,7 +1643,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "plugin:freebsd:kern.devstat"
+          section_name: "[plugin:freebsd:kern.devstat]"
           description: "The netdata main configuration file."
         options:
           description: ""
@@ -1835,7 +1835,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "plugin:freebsd"
+          section_name: "[plugin:freebsd]"
           description: "The netdata main configuration file."
         options:
           description: ""
@@ -1917,7 +1917,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "plugin:freebsd:net.inet.tcp.stats"
+          section_name: "[plugin:freebsd:net.inet.tcp.stats]"
           description: "The netdata main configuration file."
         options:
           description: ""
@@ -2104,7 +2104,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "plugin:freebsd:net.inet.udp.stats"
+          section_name: "[plugin:freebsd:net.inet.udp.stats]"
           description: "The netdata main configuration file."
         options:
           description: ""
@@ -2206,7 +2206,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "plugin:freebsd:net.inet.icmp.stats"
+          section_name: "[plugin:freebsd:net.inet.icmp.stats]"
           description: "The netdata main configuration file."
         options:
           description: ""
@@ -2309,7 +2309,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "plugin:freebsd:net.inet.ip.stats"
+          section_name: "[plugin:freebsd:net.inet.ip.stats]"
           description: "The netdata main configuration file."
         options:
           description: ""
@@ -2428,7 +2428,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "plugin:freebsd:net.inet6.ip6.stats"
+          section_name: "[plugin:freebsd:net.inet6.ip6.stats]"
           description: "The netdata main configuration file."
         options:
           description: ""
@@ -2549,7 +2549,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "plugin:freebsd:net.inet6.icmp6.stats"
+          section_name: "[plugin:freebsd:net.inet6.icmp6.stats]"
           description: "The netdata main configuration file."
         options:
           description: ""
@@ -2715,7 +2715,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "plugin:freebsd:ipfw"
+          section_name: "[plugin:freebsd:ipfw]"
           description: "The netdata main configuration file."
         options:
           description: ""
@@ -2825,7 +2825,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "plugin:freebsd:getifaddrs"
+          section_name: "[plugin:freebsd:getifaddrs]"
           description: "The netdata main configuration file."
         options:
           description: ""
@@ -3077,7 +3077,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "plugin:freebsd:getmntinfo"
+          section_name: "[plugin:freebsd:getmntinfo]"
           description: "The netdata main configuration file."
         options:
           description: ""
@@ -3190,7 +3190,7 @@ modules:
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "plugin:freebsd:zfs_arcstats"
+          section_name: "[plugin:freebsd:zfs_arcstats]"
           description: "The netdata main configuration file."
         options:
           description: ""
