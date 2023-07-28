@@ -72,7 +72,7 @@
             config: |
               #------------------------------------------------------------------------------
               # Twilio (twilio.com) SMS options
-              
+
               SEND_TWILIO="YES"
               TWILIO_ACCOUNT_SID="xxxxxxxxx"
               TWILIO_ACCOUNT_TOKEN="xxxxxxxxxx"
