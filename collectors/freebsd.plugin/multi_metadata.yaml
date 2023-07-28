@@ -50,7 +50,7 @@ modules:
             enabled: true
           list:
             - name: vm.loadavg
-              description: Enable or disable load average charts.
+              description: Enable or disable load average chart.
               default_value: yes
               required: false
         examples:
@@ -399,10 +399,10 @@ modules:
       module_name: dev.cpu.0.freq
       monitored_instance:
         name: freebsd dev.cpu.0.freq
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -412,8 +412,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Read current CPU Scaling frequency."
+        method_description: "Current CPU Scaling Frequency"
       supported_platforms:
         include: []
         exclude: []
@@ -432,14 +432,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "Config options"
+          section_name: "plugin:freebsd"
+          description: "The netdata main configuration file"
         options:
           description: ""
           folding:
             title: ""
             enabled: true
-          list: []
+          list:
+            - name: dev.cpu.0.freq
+              description: Enable or disable CPU Scaling frequency charts.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -471,10 +476,10 @@ modules:
       module_name: hw.intrcnt
       monitored_instance:
         name: freebsd hw.intrcnt
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -484,8 +489,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Get total number of interrupts"
+        method_description: "The plugin uses `sysctl`` functiion to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -504,14 +509,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config option"
             enabled: true
-          list: []
+          list:
+            - name: hw.intrcnt
+              description: Enable or disable Interrupts chart.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -549,10 +559,10 @@ modules:
       module_name: vm.stats.sys.v_intr
       monitored_instance:
         name: freebsd vm.stats.sys.v_intr
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -562,8 +572,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Device interrupts"
+        method_description: "The plugin uses `sysctl`` functiion to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -582,14 +592,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config option"
             enabled: true
-          list: []
+          list:
+            - name: vm.stats.sys.v_intr
+              description: Enable or disable device interrupts chart.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -621,10 +636,10 @@ modules:
       module_name: vm.stats.sys.v_soft
       monitored_instance:
         name: freebsd vm.stats.sys.v_soft
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -634,8 +649,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Software Interrupt"
+        method_description: "vm.stats.sys.v_soft"
       supported_platforms:
         include: []
         exclude: []
@@ -654,14 +669,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config option"
             enabled: true
-          list: []
+          list:
+            - name: vm.stats.sys.v_soft
+              description: Enable or disable software inerrupts chart.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
