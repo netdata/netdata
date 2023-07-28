@@ -12,12 +12,16 @@ meta:
       list: []
   info_provided_to_referring_integrations:
     description: ''
-  keywords: []
+  keywords:
+    - nut
+    - network ups tools
+    - ups
+    - pdu
   most_popular: false
 overview:
   data_collection:
     metrics_description: 'Examine UPS/PDU metrics with Netdata for insights into power device performance. Improve your power device performance with comprehensive dashboards and anomaly detection.'
-    method_description: ''
+    method_description: 'This collector uses the `nut` (Network UPS Tools) to query statistics for multiple UPS devices.'
   supported_platforms:
     include: []
     exclude: []
@@ -33,22 +37,83 @@ overview:
       description: ''
 setup:
   prerequisites:
-    list: []
+    list:
+      - title: "Required software"
+        description: "Make sure the Network UPS Tools (`nut`) is installed and can detect your UPS devices."
   configuration:
     file:
-      name: ''
-      description: ''
+      name: charts.d/nut.conf
     options:
-      description: ''
+      description: |
+        The config file is sourced by the charts.d plugin. It's a standard bash file.
+
+        The following collapsed table contains all the options that can be configured for the nut collector.
       folding:
-        title: ''
+        title: "Config options"
         enabled: true
-      list: []
+      list:
+        - name: nut_ups
+          description: A space separated list of UPS names. If empty, the list returned by `upsc -l` will be used.
+          default_value: ""
+          required: false
+        - name: nut_names
+          description: Each line represents an alias for one UPS. If empty, the FQDN will be used.
+          default_value: ""
+          required: false
+        - name: nut_timeout
+          description: How long to wait for nut to respond.
+          default_value: 2
+          required: false
+        - name: nut_clients_chart
+          description: Set this to 1 to enable another chart showing the number of UPS clients connected to `upsd`.
+          default_value: 1
+          required: false
+        - name: nut_update_every
+          description: The data collection frequency. If unset, will inherit the netdata update frequency.
+          default_value: 2
+          required: false
+        - name: nut_priority
+          description: The charts priority on the dashboard
+          default_value: 90000
+          required: false
+        - name: nut_retries
+          description: The number of retries to do in case of failure before disabling the collector.
+          default_value: 10
+          required: false
     examples:
       folding:
         enabled: true
-        title: ''
-      list: []
+        title: "Config"
+      list:
+        - name: Provide names to UPS devices
+          description: Map aliases to UPS devices
+          config: |
+            # a space separated list of UPS names
+            # if empty, the list returned by 'upsc -l' will be used
+            #nut_ups=
+
+            # each line represents an alias for one UPS
+            # if empty, the FQDN will be used
+            nut_names["XXXXXX"]="UPS-office"
+            nut_names["YYYYYY"]="UPS-rack"
+
+            # how much time in seconds, to wait for nut to respond
+            #nut_timeout=2
+
+            # set this to 1, to enable another chart showing the number
+            # of UPS clients connected to upsd
+            #nut_clients_chart=1
+
+            # the data collection frequency
+            # if unset, will inherit the netdata update frequency
+            #nut_update_every=2
+
+            # the charts priority on the dashboard
+            #nut_priority=90000
+
+            # the number of retries to do in case of failure
+            # before disabling the module
+            #nut_retries=10
 troubleshooting:
   problems:
     list: []
@@ -75,7 +140,7 @@ metrics:
   availability: []
   scopes:
   - name: ups
-    description: ""
+    description: "Metrics related to UPS. Each UPS provides its own set of the following metrics."
     labels: []
     metrics:
     - name: nut.charge
