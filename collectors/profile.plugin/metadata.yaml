@@ -2,7 +2,7 @@ meta:
   plugin_name: profile.plugin
   module_name: profile.plugin
   monitored_instance:
-    name: Netata
+    name: Netdata
     link: 'https://github.com/netdata/netdata/'
     categories:
       - data-collection.other
@@ -16,7 +16,7 @@ meta:
   most_popular: false
 overview:
   data_collection:
-    metrics_description: 'An example plugin that generate random charts according information given.'
+    metrics_description: 'A plugin to backfill the agent with random data. '
     method_description: 'Uses internal functions of c++ library.'
   supported_platforms:
     include: []
