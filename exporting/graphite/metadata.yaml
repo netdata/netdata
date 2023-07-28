@@ -175,36 +175,36 @@
                   # send names instead of ids = yes
                   # send charts matching = *
                   # send hosts matching = localhost *
-- <<: *promexport
+- <<: *graphexport
   id: 'export-blueflood'
   meta:
     <<: *meta
     name: Blueflood
     link: http://blueflood.io/
-    icon_filename: blueflood.png
+    icon_filename: 'blueflood.png'
     keywords:
       - export
       - Blueflood
       - graphite
-- <<: *promexport
+- <<: *graphexport
   id: 'export-influxdb'
   meta:
     <<: *meta
     name: InfluxDB
     link: https://www.influxdata.com/
-    icon_filename: influxdb.svg
+    icon_filename: 'influxdb.svg'
     keywords:
       - InfluxDB
       - Influx
       - export
       - graphite
-- <<: *promexport
+- <<: *graphexport
   id: 'export-kairosdb'
   meta:
     <<: *meta
     name: KairosDB
     link: https://kairosdb.github.io/
-    icon_filename: kairos.png
+    icon_filename: 'kairos.png'
     keywords:
       - KairosDB
       - kairos
