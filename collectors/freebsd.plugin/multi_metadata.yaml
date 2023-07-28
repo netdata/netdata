@@ -1,3 +1,5 @@
+# yamllint disable rule:line-length
+---
 plugin_name: freebsd.plugin
 modules:
   - meta:
@@ -5,10 +7,10 @@ modules:
       module_name: vm.loadavg
       monitored_instance:
         name: freebsd vm.loadavg
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -18,8 +20,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "System Load Average"
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -38,14 +40,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: vm.loadavg
+              description: Enable or disable load average metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -83,7 +90,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "Monitoring for number of threads running or waiting."
           labels: []
           metrics:
             - name: system.load
@@ -99,10 +106,10 @@ modules:
       module_name: vm.vmtotal
       monitored_instance:
         name: freebsd vm.vmtotal
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "memory.svg"
       related_resources:
         integrations:
           list: []
@@ -112,8 +119,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect Virtual Memory information from host."
+        method_description: "The plugin calls function `sysctl` to collect data."
       supported_platforms:
         include: []
         exclude: []
@@ -132,14 +139,27 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:vm.vmtotal]"
           description: ""
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config Options"
             enabled: true
-          list: []
+          list:
+            - name: enable total processes
+              description: Number of active processes.
+              default_value: yes
+              required: false
+            - name: processes running
+              description: Show number of processes running or blocked.
+              default_value: yes
+              required: false
+            - name: real memory
+              description: Memeory used on host.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -161,7 +181,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show an overall vision about processes running."
           labels: []
           metrics:
             - name: system.active_processes
@@ -188,10 +208,10 @@ modules:
       module_name: kern.cp_time
       monitored_instance:
         name: freebsd kern.cp_time
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -201,8 +221,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Total CPU utilization"
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -221,14 +241,18 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          description: "[plugin:freebsd]"
         options:
-          description: ""
+          description: "The netdata main configuration file."
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: kern.cp_time
+              description: Enable or disable Total CPU usage.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -266,7 +290,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show CPU usage statistics."
           labels: []
           metrics:
             - name: system.cpu
@@ -298,10 +322,10 @@ modules:
       module_name: dev.cpu.temperature
       monitored_instance:
         name: freebsd dev.cpu.temperature
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.org"
       related_resources:
         integrations:
           list: []
@@ -311,8 +335,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Get current CPU temperature"
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -331,14 +355,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: dev.cpu.temperature
+              description: Enable or disable CPU temperature metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -356,7 +385,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "This metric show latest CPU temperature."
           labels: []
           metrics:
             - name: cpu.temperature
@@ -370,10 +399,10 @@ modules:
       module_name: dev.cpu.0.freq
       monitored_instance:
         name: freebsd dev.cpu.0.freq
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -383,8 +412,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Read current CPU Scaling frequency."
+        method_description: "Current CPU Scaling Frequency"
       supported_platforms:
         include: []
         exclude: []
@@ -403,14 +432,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "Config options"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file"
         options:
           description: ""
           folding:
             title: ""
             enabled: true
-          list: []
+          list:
+            - name: dev.cpu.0.freq
+              description: Enable or disable CPU Scaling frequency metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -428,7 +462,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "The metric shows status of CPU frequency, it is direct affected by system load."
           labels: []
           metrics:
             - name: cpu.scaling_cur_freq
@@ -442,10 +476,10 @@ modules:
       module_name: hw.intrcnt
       monitored_instance:
         name: freebsd hw.intrcnt
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -455,8 +489,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Get total number of interrupts"
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -475,14 +509,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config option"
             enabled: true
-          list: []
+          list:
+            - name: hw.intrcnt
+              description: Enable or disable Interrupts metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -500,7 +539,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show system interrupts frequency."
           labels: []
           metrics:
             - name: system.intr
@@ -520,10 +559,10 @@ modules:
       module_name: vm.stats.sys.v_intr
       monitored_instance:
         name: freebsd vm.stats.sys.v_intr
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -533,8 +572,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Device interrupts"
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -553,14 +592,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config option"
             enabled: true
-          list: []
+          list:
+            - name: vm.stats.sys.v_intr
+              description: Enable or disable device interrupts metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -578,7 +622,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "The metric show device interrupt frequency."
           labels: []
           metrics:
             - name: system.dev_intr
@@ -592,10 +636,10 @@ modules:
       module_name: vm.stats.sys.v_soft
       monitored_instance:
         name: freebsd vm.stats.sys.v_soft
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -605,8 +649,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Software Interrupt"
+        method_description: "vm.stats.sys.v_soft"
       supported_platforms:
         include: []
         exclude: []
@@ -625,14 +669,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config option"
             enabled: true
-          list: []
+          list:
+            - name: vm.stats.sys.v_soft
+              description: Enable or disable software inerrupts metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -650,7 +699,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "This metric shows software interrupt frequency."
           labels: []
           metrics:
             - name: system.soft_intr
@@ -664,10 +713,10 @@ modules:
       module_name: vm.stats.sys.v_swtch
       monitored_instance:
         name: freebsd vm.stats.sys.v_swtch
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -677,8 +726,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "CPU context switch"
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -697,14 +746,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: vm.stats.sys.v_swtch
+              description: Enable or disable CPU context switch metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -722,7 +776,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "The metric count the number of context switches happening on host."
           labels: []
           metrics:
             - name: system.ctxt
@@ -745,7 +799,7 @@ modules:
         link: ""
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -755,8 +809,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect information about SWAP memory."
+        method_description: "The plugin calls `sysctlnametomib` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -775,14 +829,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: vm.swap_info
+              description: Enable or disable SWAP metrics.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -805,7 +864,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "This metric shows the SWAP usage."
           labels: []
           metrics:
             - name: system.swap
@@ -820,10 +879,10 @@ modules:
       module_name: system.ram
       monitored_instance:
         name: freebsd system.ram
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "memory.svg"
       related_resources:
         integrations:
           list: []
@@ -833,8 +892,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Show information about system memory usage."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -853,14 +912,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: system.ram
+              description: Enable or disable system RAM metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -898,7 +962,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "This metric shows RAM usage statistics."
           labels: []
           metrics:
             - name: system.ram
@@ -924,10 +988,10 @@ modules:
       module_name: vm.stats.vm.v_swappgs
       monitored_instance:
         name: freebsd vm.stats.vm.v_swappgs
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "memory.svg"
       related_resources:
         integrations:
           list: []
@@ -937,7 +1001,7 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
+        metrics_description: "The metric swap amount of data read from and written to SWAP."
         method_description: ""
       supported_platforms:
         include: []
@@ -957,14 +1021,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: vm.stats.vm.v_swappgs
+              description: Enable or disable infoormation about SWAP I/O metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -987,7 +1056,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "This metric shows events happening on SWAP."
           labels: []
           metrics:
             - name: system.swapio
@@ -1002,10 +1071,10 @@ modules:
       module_name: vm.stats.vm.v_pgfaults
       monitored_instance:
         name: freebsd vm.stats.vm.v_pgfaults
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "memory.svg"
       related_resources:
         integrations:
           list: []
@@ -1015,8 +1084,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect memory page faults events."
+        method_description: "The plugin calls `sysctl` function to collect necessary data"
       supported_platforms:
         include: []
         exclude: []
@@ -1035,14 +1104,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: vm.stats.vm.v_pgfaults
+              description: Enable or disable Memory page fault metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -1060,7 +1134,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "The number of page faults happened on host."
           labels: []
           metrics:
             - name: mem.pgfaults
@@ -1078,10 +1152,10 @@ modules:
       module_name: kern.ipc.sem
       monitored_instance:
         name: freebsd kern.ipc.sem
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -1091,7 +1165,7 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
+        metrics_description: "Collect information about semaphore."
         method_description: ""
       supported_platforms:
         include: []
@@ -1111,14 +1185,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: kern.ipc.sem
+              description: Enable or disable semaphore metrics.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -1146,7 +1225,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics shows counters for semaphores on host."
           labels: []
           metrics:
             - name: system.ipc_semaphores
@@ -1166,10 +1245,10 @@ modules:
       module_name: kern.ipc.shm
       monitored_instance:
         name: freebsd kern.ipc.shm
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "memory.svg"
       related_resources:
         integrations:
           list: []
@@ -1179,8 +1258,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect shared memory information."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -1199,14 +1278,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: kern.ipc.shm
+              description: Enable or disable shared memory metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -1224,7 +1308,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics give status about current shared memory segments."
           labels: []
           metrics:
             - name: system.ipc_shared_mem_segs
@@ -1244,10 +1328,10 @@ modules:
       module_name: kern.ipc.msq
       monitored_instance:
         name: freebsd kern.ipc.msq
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -1257,7 +1341,7 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
+        metrics_description: "Collect number of IPC message Queues"
         method_description: ""
       supported_platforms:
         include: []
@@ -1277,14 +1361,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: kern.ipc.msq
+              description: Enable or disable IPC message queue metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -1302,7 +1391,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show statistics IPC messages statistics."
           labels: []
           metrics:
             - name: system.ipc_msq_queues
@@ -1329,10 +1418,10 @@ modules:
       module_name: uptime
       monitored_instance:
         name: freebsd uptime
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -1342,8 +1431,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Show period of time server is up."
+        method_description: "The plugin calls `clock_gettime` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -1362,14 +1451,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: vm.loadavg
+              description: Enable or disable load average metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -1387,7 +1481,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "How long the system is running."
           labels: []
           metrics:
             - name: system.uptime
@@ -1401,10 +1495,10 @@ modules:
       module_name: net.isr
       monitored_instance:
         name: freebsd net.isr
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -1414,8 +1508,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect information about system softnet stat."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -1434,14 +1528,23 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:net.isr]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: netisr
+              description: Enable or disable general vision about softnet stat metrics.
+              default_value: yes
+              required: false
+            - name: netisr per core
+              description: Enable or disable softnet stat metric per core.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -1476,7 +1579,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show statistics about softnet stats."
           labels: []
           metrics:
             - name: system.softnet_stat
@@ -1506,10 +1609,10 @@ modules:
       module_name: devstat
       monitored_instance:
         name: freebsd devstat
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "hard-drive.svg"
       related_resources:
         integrations:
           list: []
@@ -1519,8 +1622,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect information per hard disk available on host."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -1539,14 +1642,63 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:kern.devstat]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: enable new disks detected at runtime
+              description: Enable or disable possibility to detect new disks.
+              default_value: auto
+              required: false
+            - name: performance metrics for pass devices
+              description: Enable or disable metrics for disks with type `PASS`.
+              default_value: auto
+              required: false
+            - name: total bandwidth for all disks
+              description: Enable or disable total bandwidth metric for all disks.
+              default_value: yes
+              required: false
+            - name: bandwidth for all disks
+              description: Enable or disable bandwidth for all disks metric.
+              default_value: auto
+              required: false
+            - name: operations for all disks
+              description: Enable or disable operations for all disks metric.
+              default_value: auto
+              required: false
+            - name: queued operations for all disks
+              description: Enable or disable queued operations for all disks  metric.
+              default_value: auto
+              required: false
+            - name: utilization percentage for all disks
+              description: Enable or disable utilization percentage for all disks metric.
+              default_value: auto
+              required: false
+            - name: i/o time for all disks
+              description: Enable or disable I/O time for all disks metric.
+              default_value: auto
+              required: false
+            - name: average completed i/o time for all disks
+              description: Enable or disable average completed I/O time for all disks metric.
+              default_value: auto
+              required: false
+            - name: average completed i/o bandwidth for all disks
+              description: Enable or disable average completed I/O bandwidth for all disks metric.
+              default_value: auto
+              required: false
+            - name: average service time for all disks
+              description: Enable or disable average service time for all disks metric.
+              default_value: auto
+              required: false
+            - name: disable by default disks matching
+              description: Do not create charts for disks listed.
+              default_value: ""
+              required: false
         examples:
           folding:
             enabled: true
@@ -1569,7 +1721,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics give a general vision about I/O events on disks."
           labels: []
           metrics:
             - name: system.io
@@ -1649,10 +1801,10 @@ modules:
       module_name: net.inet.tcp.states
       monitored_instance:
         name: freebsd net.inet.tcp.states
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "network.svg"
       related_resources:
         integrations:
           list: []
@@ -1682,14 +1834,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: net.inet.tcp.states
+              description: Enable or disable TCP state metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -1712,7 +1869,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "A counter for TCP connections."
           labels: []
           metrics:
             - name: ipv4.tcpsock
@@ -1726,10 +1883,10 @@ modules:
       module_name: net.inet.tcp.stats
       monitored_instance:
         name: freebsd net.inet.tcp.stats
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "network.svg"
       related_resources:
         integrations:
           list: []
@@ -1739,8 +1896,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect overall information about TCP connections."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -1759,14 +1916,47 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:net.inet.tcp.stats]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: ipv4 TCP packets
+              description: Enable or disable ipv4 TCP packets metric.
+              default_value: yes
+              required: false
+            - name: ipv4 TCP errors
+              description: Enable or disable pv4 TCP errors metric.
+              default_value: yes
+              required: false
+            - name: ipv4 TCP handshake issues
+              description: Enable or disable ipv4 TCP handshake issue metric.
+              default_value: yes
+              required: false
+            - name: TCP connection aborts
+              description: Enable or disable TCP connection aborts metric.
+              default_value: auto
+              required: false
+            - name: TCP out-of-order queue
+              description: Enable or disable TCP out-of-order queue metric.
+              default_value: auto
+              required: false
+            - name: TCP SYN cookies
+              description: Enable or disable TCP SYN cookies metric.
+              default_value: auto
+              required: false
+            - name: TCP listen issues
+              description: Enable or disable TCP listen issues metric.
+              default_value: auto
+              required: false
+            - name: ECN packets
+              description: Enable or disable ECN packets metric.
+              default_value: auto
+              required: false
         examples:
           folding:
             enabled: true
@@ -1808,7 +1998,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show TCP connections statistics."
           labels: []
           metrics:
             - name: ipv4.tcppackets
@@ -1880,10 +2070,10 @@ modules:
       module_name: net.inet.udp.stats
       monitored_instance:
         name: freebsd net.inet.udp.stats
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "network.svg"
       related_resources:
         integrations:
           list: []
@@ -1893,8 +2083,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect information about UDP connections."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -1913,14 +2103,23 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:net.inet.udp.stats]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: ipv4 UDP packets
+              description: Enable or disable ipv4 UDP packets metric.
+              default_value: yes
+              required: false
+            - name: ipv4 UDP errors
+              description: Enable or disable ipv4 UDP errors metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -1948,7 +2147,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show UDP connections statistics."
           labels: []
           metrics:
             - name: ipv4.udppackets
@@ -1973,10 +2172,10 @@ modules:
       module_name: net.inet.icmp.stats
       monitored_instance:
         name: freebsd net.inet.icmp.stats
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "network.svg"
       related_resources:
         integrations:
           list: []
@@ -1986,8 +2185,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect information about ICMP traffic."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -2006,14 +2205,27 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:net.inet.icmp.stats]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: IPv4 ICMP packets
+              description: Enable or disable IPv4 ICMP packets metric.
+              default_value: yes
+              required: false
+            - name: IPv4 ICMP error
+              description: Enable or disable IPv4 ICMP error metric.
+              default_value: yes
+              required: false
+            - name: IPv4 ICMP messages
+              description: Enable or disable IPv4 ICMP messages metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -2031,7 +2243,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show ICMP connections statistics."
           labels: []
           metrics:
             - name: ipv4.icmp
@@ -2063,10 +2275,10 @@ modules:
       module_name: net.inet.ip.stats
       monitored_instance:
         name: freebsd net.inet.ip.stats
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "network.svg"
       related_resources:
         integrations:
           list: []
@@ -2076,8 +2288,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect IP stats"
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -2096,14 +2308,31 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:net.inet.ip.stats]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: ipv4 packets
+              description: Enable or disable IPv4 packets metric.
+              default_value: yes
+              required: false
+            - name: ipv4 fragments sent
+              description: Enable or disable IPv4 fragments sent metric.
+              default_value: yes
+              required: false
+            - name: ipv4 fragments assembly
+              description: Enable or disable IPv4 fragments assembly metric.
+              default_value: yes
+              required: false
+            - name: ipv4 errors
+              description: Enable or disable IPv4 errors metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -2121,7 +2350,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show IPv4 connections statistics."
           labels: []
           metrics:
             - name: ipv4.packets
@@ -2165,10 +2394,10 @@ modules:
       module_name: net.inet6.ip6.stats
       monitored_instance:
         name: freebsd net.inet6.ip6.stats
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "network.svg"
       related_resources:
         integrations:
           list: []
@@ -2178,8 +2407,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect information abou IPv6 stats."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -2198,14 +2427,31 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:net.inet6.ip6.stats]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: ipv6 packets
+              description: Enable or disable ipv6 packet metric.
+              default_value: auto
+              required: false
+            - name: ipv6 fragments sent
+              description: Enable or disable ipv6 fragments sent metric.
+              default_value: auto
+              required: false
+            - name: ipv6 fragments assembly
+              description: Enable or disable ipv6 fragments assembly metric.
+              default_value: auto
+              required: false
+            - name: ipv6 errors
+              description: Enable or disable ipv6 errors metric.
+              default_value: auto
+              required: false
         examples:
           folding:
             enabled: true
@@ -2223,7 +2469,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show general information about IPv6 connections."
           labels: []
           metrics:
             - name: ipv6.packets
@@ -2269,10 +2515,10 @@ modules:
       module_name: net.inet6.icmp6.stats
       monitored_instance:
         name: freebsd net.inet6.icmp6.stats
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "network.svg"
       related_resources:
         integrations:
           list: []
@@ -2282,8 +2528,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect information abou IPv6 ICMP"
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -2302,14 +2548,43 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:net.inet6.icmp6.stats]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: icmp
+              description: Enable or disable ICMP metric.
+              default_value: auto
+              required: false
+            - name: icmp redirects
+              description: Enable or disable ICMP redirects metric.
+              default_value: auto
+              required: false
+            - name: icmp errors
+              description: Enable or disable ICMP errors metric.
+              default_value: auto
+              required: false
+            - name: icmp echos
+              description: Enable or disable ICMP echos metric.
+              default_value: auto
+              required: false
+            - name: icmp router
+              description: Enable or disable ICMP router metric.
+              default_value: auto
+              required: false
+            - name: icmp neighbor
+              description: Enable or disable ICMP neighbor metric.
+              default_value: auto
+              required: false
+            - name: icmp types
+              description: Enable or disable ICMP types metric.
+              default_value: auto
+              required: false
         examples:
           folding:
             enabled: true
@@ -2327,7 +2602,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "Collect IPv6 ICMP traffic statistics."
           labels: []
           metrics:
             - name: ipv6.icmp
@@ -2406,10 +2681,10 @@ modules:
       module_name: ipfw
       monitored_instance:
         name: freebsd ipfw
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "firewall.svg"
       related_resources:
         integrations:
           list: []
@@ -2419,8 +2694,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect information about FreeBSD firewall."
+        method_description: "The plugin uses RAW socket to communicate with kernel and collect data."
       supported_platforms:
         include: []
         exclude: []
@@ -2439,14 +2714,27 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:ipfw]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: counters for static rules
+              description: Enable or disable counters for static rules  metric.
+              default_value: yes
+              required: false
+            - name: number of dynamic rules
+              description: Enable or disable number of dynamic rules metric.
+              default_value: yes
+              required: false
+            - name: allocated memory
+              description: Enable or disable allocated memory metric.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -2464,7 +2752,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "Theese metrics show FreeBSD firewall statistics."
           labels: []
           metrics:
             - name: ipfw.mem
@@ -2503,10 +2791,10 @@ modules:
       module_name: getifaddrs
       monitored_instance:
         name: freebsd getifaddrs
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "network.svg"
       related_resources:
         integrations:
           list: []
@@ -2516,8 +2804,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect traffic per network interface."
+        method_description: "The plugin calls `getifaddrs` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -2536,14 +2824,63 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:getifaddrs]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: enable new interfaces detected at runtime
+              description: Enable or disable possibility to discover new interface after plugin starts.
+              default_value: auto
+              required: false
+            - name: total bandwidth for physical interfaces
+              description: Enable or disable total bandwidth for physical interfaces  metric.
+              default_value: auto
+              required: false
+            - name: total packets for physical interfaces
+              description: Enable or disable total packets for physical interfaces metric.
+              default_value: auto
+              required: false
+            - name: total bandwidth for ipv4 interface
+              description: Enable or disable total bandwidth for IPv4 interface metric.
+              default_value: auto
+              required: false
+            - name: total bandwidth for ipv6 interfaces
+              description: Enable or disable total bandwidth for ipv6 interfaces metric.
+              default_value: auto
+              required: false
+            - name: bandwidth for all interfaces
+              description: Enable or disable bandwidth for all interfaces metric.
+              default_value: auto
+              required: false
+            - name: packets for all interfaces
+              description: Enable or disable packets for all interfaces metric.
+              default_value: auto
+              required: false
+            - name: errors for all interfaces
+              description: Enable or disable errors for all interfaces metric.
+              default_value: auto
+              required: false
+            - name: drops for all interfaces
+              description: Enable or disable drops for all interfaces metric.
+              default_value: auto
+              required: false
+            - name: collisions for all interface
+              description: Enable or disable collisions for all interface metric.
+              default_value: auto
+              required: false
+            - name: disable by default interfaces matching
+              description: Do not display data for intterfaces listed.
+              default_value: lo*
+              required: false
+            - name: set physical interfaces for system.net
+              description: Do not show network traffic for listed interfaces.
+              default_value: igb* ix* cxl* em* ixl* ixlv* bge* ixgbe* vtnet* vmx* re* igc* dwc*
+              required: false
         examples:
           folding:
             enabled: true
@@ -2628,7 +2965,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "General overview about network traffic."
           labels: []
           metrics:
             - name: system.net
@@ -2706,10 +3043,10 @@ modules:
       module_name: getmntinfo
       monitored_instance:
         name: freebsd getmntinfo
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "hard-drive.svg"
       related_resources:
         integrations:
           list: []
@@ -2719,8 +3056,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect information per mount point."
+        method_description: "The plugin calls `getmntinfo` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -2739,14 +3076,35 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:getmntinfo]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: enable new mount points detected at runtime
+              description: Cheeck new mount points during runtime.
+              default_value: auto
+              required: false
+            - name: space usage for all disks
+              description: Enable or disable space usage for all disks metric.
+              default_value: auto
+              required: false
+            - name: inodes usage for all disks
+              description: Enable or disable inodes usage for all disks metric.
+              default_value: auto
+              required: false
+            - name: exclude space metrics on paths
+              description: Do not show metrics for listed paths.
+              default_value: /proc/*
+              required: false
+            - name: exclude space metrics on filesystems
+              description: Do not monitor listed filesystems.
+              default_value: autofs procfs subfs devfs none
+              required: false
         examples:
           folding:
             enabled: true
@@ -2774,7 +3132,7 @@ modules:
       availability: []
       scopes:
         - name: mount point
-          description: ""
+          description: "These metrics show detailss about mount point usages."
           labels: []
           metrics:
             - name: disk.space
@@ -2798,10 +3156,10 @@ modules:
       module_name: zfs
       monitored_instance:
         name: freebsd zfs
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "filesystem.svg"
       related_resources:
         integrations:
           list: []
@@ -2811,8 +3169,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect metrics for ZFS filesystem"
+        method_description: "The plugin uses `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -2831,14 +3189,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:zfs_arcstats]"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: show zero charts
+              description: Do not show charts with zero metrics.
+              default_value: no
+              required: false
         examples:
           folding:
             enabled: true
@@ -2860,7 +3223,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: ""
+          description: "These metrics show detailed information about ZFS filesystem."
           labels: []
           metrics:
             - name: zfs.arc_size
