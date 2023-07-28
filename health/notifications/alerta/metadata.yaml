@@ -33,35 +33,29 @@
         list:
           - name: 'SEND_ALERTA'
             default_value: ''
-            description: |
-              Set `SEND_ALERTA` to YES
+            description: "Set `SEND_ALERTA` to YES"
             required: true
           - name: 'ALERTA_WEBHOOK_URL'
             default_value: ''
-            description: |
-              set `ALERTA_WEBHOOK_URL` to the API url you defined when you installed the Alerta server.
+            description: "set `ALERTA_WEBHOOK_URL` to the API url you defined when you installed the Alerta server."
             required: true
           - name: 'ALERTA_API_KEY'
             default_value: ''
-            description: |
-              Set `ALERTA_API_KEY` to your API key.
+            description: "Set `ALERTA_API_KEY` to your API key."
             required: true
-            detailed_description: |
+            detailed_description: >
               You will need an API key to send messages from any source, if Alerta is configured to use authentication (recommended). To create a new API key:
               1. Go to Configuration > API Keys.
               2. Create a new API key called "netdata" with `write:alerts` permission.
           - name: 'DEFAULT_RECIPIENT_ALERTA'
             default_value: ''
-            description: |
-              Set `DEFAULT_RECIPIENT_ALERTA` to the default recipient environment you want the alert notifications to be sent to.
-              All roles will default to this variable if left unconfigured.
+            description: "Set `DEFAULT_RECIPIENT_ALERTA` to the default recipient environment you want the alert notifications to be sent to. All roles will default to this variable if left unconfigured."
             required: true
           - name: 'DEFAULT_RECIPIENT_CUSTOM'
             default_value: ''
-            description: |
-              Set different recipient environments per role, by editing `DEFAULT_RECIPIENT_CUSTOM` with the environment name of your choice
+            description: "Set different recipient environments per role, by editing `DEFAULT_RECIPIENT_CUSTOM` with the environment name of your choice"
             required: false
-            detailed_description: |
+            detailed_description: >
               The `DEFAULT_RECIPIENT_CUSTOM` can be edited in the following entries at the bottom of the same file:
 
               ```
