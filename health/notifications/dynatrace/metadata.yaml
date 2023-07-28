@@ -79,7 +79,7 @@
             config: |
               #------------------------------------------------------------------------------
               # Dynatrace global notification options
-              
+
               SEND_DYNATRACE="YES"
               DYNATRACE_SERVER="https://monitor.example.com"
               DYNATRACE_TOKEN="XXXXXXX"
