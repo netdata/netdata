@@ -34,7 +34,7 @@
             description: "You can change `EMAIL_SENDER` to the email address sending the notifications."
             required: false
           - name: 'SEND_EMAIL'
-            default_value: ''
+            default_value: 'YES'
             description: "Set `SEND_EMAIL` to YES"
             required: true
           - name: 'DEFAULT_RECIPIENT_EMAIL'
