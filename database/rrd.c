@@ -100,12 +100,12 @@ static void *dbengine_tier_init(void *ptr) {
 }
 #endif
 
-typedef struct {} dbengine_config_t;
+typedef struct {
+    bool use_direct_io;
+} dbengine_config_t;
 
 static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
     UNUSED(cfg);
-
-    rrdb.use_direct_io = config_get_boolean(CONFIG_SECTION_DB, "dbengine use direct io", rrdb.use_direct_io);
 
     unsigned read_num = (unsigned)config_get_number(CONFIG_SECTION_DB, "dbengine pages per extent", MAX_PAGES_PER_EXTENT);
     if (read_num > 0 && read_num <= MAX_PAGES_PER_EXTENT)
@@ -282,6 +282,11 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
 
 #ifdef ENABLE_DBENGINE
             dbengine_config_t cfg;
+
+            cfg.use_direct_io = config_get_boolean(CONFIG_SECTION_DB, "dbengine use direct io", rrdb.use_direct_io);
+
+            rrdb.use_direct_io = cfg.use_direct_io;
+
             dbengine_init(hostname, &cfg);
 #else
             rrdb.storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", 1);
