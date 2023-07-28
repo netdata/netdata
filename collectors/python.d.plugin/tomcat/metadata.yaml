@@ -6,7 +6,7 @@ meta:
     link: "https://tomcat.apache.org/"
     categories:
       - data-collection.web-servers-and-web-proxies
-    icon_filename: "tomcat.png"
+    icon_filename: "tomcat.svg"
   related_resources:
     integrations:
       list: []
