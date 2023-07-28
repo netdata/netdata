@@ -54,7 +54,7 @@ modules:
         options:
           description: |
             There are three sections in the file which you can configure:
-            
+
             - `[plugin:macos:sysctl"]` - Enable or disable monitoring for network, swap, loadavg, and boot time.
             - `[plugin:macos:mach_smi]` - Enable or disable monitoring for CPU and Virtual memory.
             - `[plugin:macos:iokit]` - Enable or disable monitoring for storage device.
