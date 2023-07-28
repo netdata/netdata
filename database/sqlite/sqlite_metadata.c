@@ -49,7 +49,7 @@
 
 #define METADATA_CMD_Q_MAX_SIZE (1024)              // Max queue size; callers will block until there is room
 #define METADATA_MAINTENANCE_FIRST_CHECK (1800)     // Maintenance first run after agent startup in seconds
-#define METADATA_MAINTENANCE_RETRY (60)             // Retry run if already running or last run did actual work
+#define METADATA_MAINTENANCE_REPEAT (60)            // Repeat if last run for dimensions, charts, labels needs more work
 #define METADATA_HEALTH_LOG_INTERVAL (3600)         // Repeat maintenance for health
 #define METADATA_DIM_CHECK_INTERVAL (3600)          // Repeat maintenance for dimensions
 #define METADATA_CHART_CHECK_INTERVAL (3600)        // Repeat maintenance for charts
@@ -751,7 +751,7 @@ static bool run_cleanup_loop(
 #define SQL_CHECK_CHART_EXISTENCE_IN_DIMENSION "SELECT count(1) FROM dimension WHERE chart_id = @chart_id"
 #define SQL_CHECK_CHART_EXISTENCE_IN_CHART "SELECT count(1) FROM chart WHERE chart_id = @chart_id"
 
-static bool chart_can_be_deleted(uuid_t(*chart_uuid), bool check_in_dimension)
+static bool chart_can_be_deleted(uuid_t *chart_uuid, bool check_in_dimension)
 {
     int rc, result = 1;
     sqlite3_stmt *res = NULL;
@@ -834,9 +834,9 @@ static void check_dimension_metadata(struct metadata_wc *wc)
 
     now = now_realtime_sec();
     if (total_deleted > 0 || runtime_exceeded)
-        next_execution_t = now + METADATA_MAINTENANCE_RETRY;
+        next_execution_t = now + METADATA_MAINTENANCE_REPEAT;
     else {
-        last_row_id= 0;
+        last_row_id = 0;
         next_execution_t = now + METADATA_DIM_CHECK_INTERVAL;
     }
 
@@ -893,7 +893,7 @@ static void check_chart_metadata(struct metadata_wc *wc)
 
     now = now_realtime_sec();
     if (total_deleted > 0 || runtime_exceeded)
-        next_execution_t = now + METADATA_MAINTENANCE_RETRY;
+        next_execution_t = now + METADATA_MAINTENANCE_REPEAT;
     else {
         last_row_id = 0;
         next_execution_t = now + METADATA_CHART_CHECK_INTERVAL;
@@ -953,7 +953,7 @@ static void check_label_metadata(struct metadata_wc *wc)
 
     now = now_realtime_sec();
     if (total_deleted > 0 || runtime_exceeded)
-        next_execution_t = now + METADATA_MAINTENANCE_RETRY;
+        next_execution_t = now + METADATA_MAINTENANCE_REPEAT;
     else {
         last_row_id = 0;
         next_execution_t = now + METADATA_LABEL_CHECK_INTERVAL;
