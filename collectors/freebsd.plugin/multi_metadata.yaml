@@ -21,7 +21,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "System Load Average"
-        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -120,7 +120,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Collect Virtual Memory information from host."
-        method_description: "The plugin uses function `sysctl` to collect data."
+        method_description: "The plugin calls function `sysctl` to collect data."
       supported_platforms:
         include: []
         exclude: []
@@ -222,7 +222,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Total CPU utilization"
-        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -336,7 +336,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Get current CPU temperature"
-        method_description: "The plugin uses `sysctl`` functiion to collect necessary data."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -490,7 +490,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Get total number of interrupts"
-        method_description: "The plugin uses `sysctl`` functiion to collect necessary data."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -573,7 +573,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Device interrupts"
-        method_description: "The plugin uses `sysctl`` functiion to collect necessary data."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -727,7 +727,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "CPU context switch"
-        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -810,7 +810,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Collect information about SWAP memory."
-        method_description: "The plugin uses `sysctlnametomib` functiion to collect necessary data."
+        method_description: "The plugin calls `sysctlnametomib` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -893,7 +893,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Show information about system memory usage."
-        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -1085,7 +1085,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Collect memory page faults events."
-        method_description: "The plugin uses `sysctl` functiion to collect necessary data"
+        method_description: "The plugin calls `sysctl` function to collect necessary data"
       supported_platforms:
         include: []
         exclude: []
@@ -1259,7 +1259,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Collect shared memory information."
-        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -1432,7 +1432,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Show period of time server is up."
-        method_description: "The plugin uses `clock_gettime` function to collect necessary data."
+        method_description: "The plugin calls `clock_gettime` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -1509,7 +1509,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Collect information about system softnet stat."
-        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -1623,7 +1623,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Collect information per hard disk available on host."
-        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -1679,7 +1679,7 @@ modules:
               description: Enable or disable utilization percentage for all disks metric.
               default_value: auto
               required: false
-            - name: i/o time for all disks 
+            - name: i/o time for all disks
               description: Enable or disable I/O time for all disks metric.
               default_value: auto
               required: false
@@ -1897,7 +1897,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Collect overall information about TCP connections."
-        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -2084,7 +2084,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Collect information about UDP connections."
-        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -2186,7 +2186,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Collect information about ICMP traffic."
-        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -2289,7 +2289,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Collect IP stats"
-        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -2408,7 +2408,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Collect information abou IPv6 stats."
-        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -2529,7 +2529,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Collect information abou IPv6 ICMP"
-        method_description: "The plugin uses `sysctl` functiion to collect necessary data."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -2805,7 +2805,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "Collect traffic per network interface."
-        method_description: "The plugin uses `getifaddrs` functiion to collect necessary data."
+        method_description: "The plugin calls `getifaddrs` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -3043,10 +3043,10 @@ modules:
       module_name: getmntinfo
       monitored_instance:
         name: freebsd getmntinfo
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "hard-drive.svg"
       related_resources:
         integrations:
           list: []
@@ -3056,8 +3056,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect information per mount point."
+        method_description: "The plugin calls `getmntinfo` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -3076,14 +3076,35 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd:getmntinfo"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: enable new mount points detected at runtime 
+              description: Cheeck new mount points during runtime.
+              default_value: auto
+              required: false
+            - name: space usage for all disks
+              description: Enable or disable space usage for all disks metric.
+              default_value: auto
+              required: false
+            - name: inodes usage for all disks
+              description: Enable or disable inodes usage for all disks metric.
+              default_value: auto
+              required: false
+            - name: exclude space metrics on paths
+              description: Do not show metrics for listed paths.
+              default_value: /proc/*
+              required: false
+            - name: exclude space metrics on filesystems
+              description: Do not monitor listed filesystems.
+              default_value: autofs procfs subfs devfs none
+              required: false
         examples:
           folding:
             enabled: true
@@ -3135,10 +3156,10 @@ modules:
       module_name: zfs
       monitored_instance:
         name: freebsd zfs
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "filesystem.svg"
       related_resources:
         integrations:
           list: []
@@ -3148,8 +3169,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect metrics for ZFS filesystem"
+        method_description: "The plugin uses `sysctl` function to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -3168,14 +3189,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd:zfs_arcstats"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: show zero charts
+              description: Do not show charts with zero metrics.
+              default_value: no
+              required: false
         examples:
           folding:
             enabled: true
