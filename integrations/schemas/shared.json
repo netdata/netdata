@@ -30,6 +30,29 @@
         "icon_filename": {
           "type": "string",
           "description": "The filename of the integration's icon, as sourced from https://github.com/netdata/website/tree/master/themes/tailwind/static/img."
+        },
+        "variables": {
+          "type": "object",
+          "description": "A mapping of variables to be used when templating other keys.",
+          "patternProperties": {
+            "^[a-zA-Z_][a-zA-Z0-9_]*$": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
         }
       },
       "required": [
