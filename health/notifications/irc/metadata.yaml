@@ -42,7 +42,7 @@
               # If not found, irc notifications will be silently disabled.
               nc="/usr/bin/nc"
           - name: 'SEND_IRC'
-            default_value: ''
+            default_value: 'YES'
             description: "Set `SEND_IRC` YES."
             required: true
           - name: 'DEFAULT_RECIPIENT_IRC'
@@ -68,7 +68,7 @@
           - name: 'DEFAULT_RECIPIENT_IRC'
             default_value: ''
             description: "You can have different channels per role, by editing `DEFAULT_RECIPIENT_IRC` with the channel you want"
-            required: false
+            required: true
             detailed_description: >
               The `DEFAULT_RECIPIENT_IRC` can be edited in the following entries at the bottom of the same file:
               ```
