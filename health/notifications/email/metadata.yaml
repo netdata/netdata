@@ -38,7 +38,7 @@
             description: "Set `SEND_EMAIL` to YES"
             required: true
           - name: 'DEFAULT_RECIPIENT_EMAIL'
-            default_value: ''
+            default_value: 'root'
             description: "Set `DEFAULT_RECIPIENT_EMAIL` to the email address you want the email to be sent by default. You can define multiple email addresses like this: `alarms@example.com` `systems@example.com`."
             required: false
             detailed_description: >
