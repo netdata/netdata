@@ -34,7 +34,7 @@
           enabled: true
         list:
           - name: 'SEND_PUSHOVER'
-            default_value: ''
+            default_value: 'YES'
             description: "Set `SEND_PUSHOVER` to YES"
             required: true
           - name: 'PUSHOVER_WEBHOOK_URL'
@@ -44,7 +44,7 @@
           - name: 'DEFAULT_RECIPIENT_PUSHOVER'
             default_value: ''
             description: "Set `DEFAULT_RECIPIENT_PUSHOVER` the Pushover User token you want the alert notifications to be sent to. You can define multiple User tokens like this: `USERTOKEN1` `USERTOKEN2`."
-            required: false
+            required: true
             detailed_description: >
               All roles will default to this variable if left unconfigured.
 
