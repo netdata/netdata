@@ -1,0 +1,80 @@
+# yamllint disable rule:line-length
+---
+- id: 'notify-twilio'
+  meta:
+    name: 'Twilio'
+    link: 'https://www.twilio.com/'
+    categories:
+      - notify.agent
+    icon_filename: 'twilio.png'
+  keywords:
+    - Twilio
+  overview:
+    notification_description: |
+      Send notifications to Twilio using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+    notification_limitations: ''
+  setup:
+    prerequisites:
+      list:
+        - title: ''
+          description: |
+            - Get your SID, and Token from https://www.twilio.com/console
+            - Terminal access to the Agent you wish to configure
+    configuration:
+      file:
+        name: 'health_alarm_notify.conf'
+      options:
+        description: 'The following options can be defined for this notification'
+        folding:
+          title: 'Config Options'
+          enabled: true
+        list:
+          - name: 'SEND_TWILIO'
+            default_value: 'YES'
+            description: "Set `SEND_TWILIO` to YES"
+            required: true
+          - name: 'TWILIO_ACCOUNT_SID'
+            default_value: ''
+            description: "set `TWILIO_ACCOUNT_SID`  to your account SID."
+            required: true
+          - name: 'TWILIO_ACCOUNT_TOKEN '
+            default_value: ''
+            description: "Set `TWILIO_ACCOUNT_TOKEN` to your account token."
+            required: true
+          - name: 'TWILIO_NUMBER'
+            default_value: ''
+            description: "Set `TWILIO_NUMBER` to your account's number."
+            required: true
+          - name: 'DEFAULT_RECIPIENT_TWILIO'
+            default_value: ''
+            description: "Set DEFAULT_RECIPIENT_TWILIO to the number you want the alert notifications to be sent to. You can define multiple numbers like this: +15555555555 +17777777777."
+            required: true
+            detailed_description: >
+              You can then have different recipients per role, by editing DEFAULT_RECIPIENT_TWILIO with the recipient's number you want, in the following entries at the bottom of the same file:
+
+              ```
+              role_recipients_twilio[sysadmin]="+15555555555"
+              role_recipients_twilio[domainadmin]="+15555555556"
+              role_recipients_twilio[dba]="+15555555557"
+              role_recipients_twilio[webmaster]="+15555555558"
+              role_recipients_twilio[proxyadmin]="+15555555559"
+              role_recipients_twilio[sitemgr]="+15555555550"
+              ```
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: 'Basic Configuration'
+            folding:
+              enabled: false
+            description: ''
+            config: |
+              #------------------------------------------------------------------------------
+              # Twilio (twilio.com) SMS options
+
+              SEND_TWILIO="YES"
+              TWILIO_ACCOUNT_SID="xxxxxxxxx"
+              TWILIO_ACCOUNT_TOKEN="xxxxxxxxxx"
+              TWILIO_NUMBER="xxxxxxxxxxx"
+              DEFAULT_RECIPIENT_TWILIO="+15555555555"

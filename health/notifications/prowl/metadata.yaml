@@ -1,0 +1,68 @@
+# yamllint disable rule:line-length
+---
+- id: 'notify-prowl'
+  meta:
+    name: 'Prowl'
+    link: 'https://www.prowlapp.com/'
+    categories:
+      - notify.agent
+    icon_filename: 'prowl.png'
+  keywords:
+    - Prowl
+  overview:
+    notification_description: |
+      Send notifications to Prowl using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+    notification_limitations: |
+      - Because of how Netdata integrates with Prowl, there is a hard limit of at most 1000 notifications per hour (starting from the first notification sent). Any alerts beyond the first thousand in an hour will be dropped.
+      - Warning messages will be sent with the 'High' priority, critical messages will be sent with the 'Emergency' priority, and all other messages will be sent with the normal priority. Opening the notification's associated URL will take you to the Netdata dashboard of the system that issued the alert, directly to the chart that it triggered on.
+  setup:
+    prerequisites:
+      list:
+        - title: ''
+          description: |
+            - A Prowl API key, which can be requested through the Prowl website after registering
+            - Access to the terminal where Netdata Agent is running
+    configuration:
+      file:
+        name: 'health_alarm_notify.conf'
+      options:
+        description: 'The following options can be defined for this notification'
+        folding:
+          title: 'Config Options'
+          enabled: true
+        list:
+          - name: 'SEND_PROWL'
+            default_value: 'YES'
+            description: "Set `SEND_PROWL` to YES"
+            required: true
+          - name: 'DEFAULT_RECIPIENT_PROWL'
+            default_value: ''
+            description: "Set `DEFAULT_RECIPIENT_PROWL` to  the Prowl API key you want the alert notifications to be sent to. You can define multiple API keys like this: `APIKEY1`, `APIKEY2`."
+            required: true
+            detailed_description: >
+              All roles will default to this variable if left unconfigured.
+
+              The `DEFAULT_RECIPIENT_PROWL` can be edited in the following entries at the bottom of the same file:
+              ```
+              role_recipients_prowl[sysadmin]="AAAAAAAA"
+              role_recipients_prowl[domainadmin]="BBBBBBBBB"
+              role_recipients_prowl[dba]="CCCCCCCCC"
+              role_recipients_prowl[webmaster]="DDDDDDDDDD"
+              role_recipients_prowl[proxyadmin]="EEEEEEEEEE"
+              role_recipients_prowl[sitemgr]="FFFFFFFFFF"
+              ```
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: 'Basic Configuration'
+            folding:
+              enabled: false
+            description: ''
+            config: |
+              #------------------------------------------------------------------------------
+              # iOS Push Notifications
+
+              SEND_PROWL="YES"
+              DEFAULT_RECIPIENT_PROWL="XXXXXXXXXX"

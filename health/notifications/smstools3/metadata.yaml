@@ -1,0 +1,81 @@
+# yamllint disable rule:line-length
+---
+- id: 'notify-sms'
+  meta:
+    name: 'SMS'
+    link: 'http://smstools3.kekekasvi.com/'
+    categories:
+      - notify.agent
+    icon_filename: 'sms.png'
+  keywords:
+    - SMS tools 3
+    - SMS
+    - Messaging
+  overview:
+    notification_description: |
+      Send notifications to `smstools3` using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+      The SMS Server Tools 3 is a SMS Gateway software which can send and receive short messages through GSM modems and mobile phones.
+    notification_limitations: ''
+  setup:
+    prerequisites:
+      list:
+        - title: ''
+          description: |
+            - [Install](http://smstools3.kekekasvi.com/index.php?p=compiling) and [configure](http://smstools3.kekekasvi.com/index.php?p=configure) `smsd`
+            - To ensure that the user `netdata` can execute `sendsms`. Any user executing `sendsms` needs to:
+              - Have write permissions to /tmp and /var/spool/sms/outgoing
+              - Be a member of group smsd
+              - To ensure that the steps above are successful, just su netdata and execute sendsms phone message.
+            - Access to the terminal where Netdata Agent is running
+    configuration:
+      file:
+        name: 'health_alarm_notify.conf'
+      options:
+        description: 'The following options can be defined for this notification'
+        folding:
+          title: 'Config Options'
+          enabled: true
+        list:
+          - name: 'sendsms'
+            default_value: 'YES'
+            description: "Set the path for `sendsms`, otherwise Netdata will search for it in your system `$PATH:`"
+            required: true
+            detailed_description: >
+              # The full path of the sendsms command (smstools3).
+              # If empty, the system $PATH will be searched for it.
+              # If not found, SMS notifications will be silently disabled.
+              sendsms="/usr/bin/sendsms"
+          - name: 'SEND_SMS'
+            default_value: ''
+            description: "Set `SEND_SMS` to `YES`."
+            required: true
+          - name: 'DEFAULT_RECIPIENT_SMS'
+            default_value: ''
+            description: "Set DEFAULT_RECIPIENT_SMS to the phone number you want the alert notifications to be sent to. You can define multiple phone numbers like this: PHONE1 PHONE2."
+            required: true
+            detailed_description: >
+              All roles will default to this variable if left unconfigured.
+
+              You can then have different phone numbers per role, by editing `DEFAULT_RECIPIENT_SMS` with the phone number you want, in the following entries at the bottom of the same file:
+              ```
+              role_recipients_sms[sysadmin]="PHONE1"
+              role_recipients_sms[domainadmin]="PHONE2"
+              role_recipients_sms[dba]="PHONE3"
+              role_recipients_sms[webmaster]="PHONE4"
+              role_recipients_sms[proxyadmin]="PHONE5"
+              role_recipients_sms[sitemgr]="PHONE6"
+              ```
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: 'Basic Configuration'
+            folding:
+              enabled: false
+            description: ''
+            config: |
+              #------------------------------------------------------------------------------
+              # SMS Server Tools 3 (smstools3) global notification options
+              SEND_SMS="YES"
+              DEFAULT_RECIPIENT_SMS="1234567890"

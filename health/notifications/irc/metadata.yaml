@@ -1,0 +1,99 @@
+# yamllint disable rule:line-length
+---
+- id: 'notify-irc'
+  meta:
+    name: 'IRC'
+    link: ''
+    categories:
+      - notify.agent
+    icon_filename: 'irc.png'
+  keywords:
+    - IRC
+  overview:
+    notification_description: |
+      Send notifications to IRC using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+    notification_limitations: ''
+  setup:
+    prerequisites:
+      list:
+        - title: ''
+          description: |
+            - The `nc` utility. You can set the path to it, or Netdata will search for it in your system `$PATH`.
+            - Access to the terminal where Netdata Agent is running
+    configuration:
+      file:
+        name: 'health_alarm_notify.conf'
+      options:
+        description: 'The following options can be defined for this notification'
+        folding:
+          title: 'Config Options'
+          enabled: true
+        list:
+          - name: 'nc path'
+            default_value: ''
+            description: "Set the path for nc, otherwise Netdata will search for it in your system $PATH"
+            required: true
+            detailed_description: >
+              #------------------------------------------------------------------------------
+              # external commands
+              #
+              # The full path of the nc command.
+              # If empty, the system $PATH will be searched for it.
+              # If not found, irc notifications will be silently disabled.
+              nc="/usr/bin/nc"
+          - name: 'SEND_IRC'
+            default_value: 'YES'
+            description: "Set `SEND_IRC` YES."
+            required: true
+          - name: 'DEFAULT_RECIPIENT_IRC'
+            default_value: ''
+            description: "Set `DEFAULT_RECIPIENT_IRC` to one or more channels to post the messages to. You can define multiple channels like this: `#alarms` `#systems`."
+            required: true
+          - name: 'IRC_NETWORK'
+            default_value: ''
+            description: "Set `IRC_NETWORK` to the IRC network which your preferred channels belong to."
+            required: true
+          - name: 'IRC_PORT '
+            default_value: ''
+            description: "Set `IRC_PORT` to the IRC port to which a connection will occur."
+            required: false
+          - name: 'IRC_NICKNAME'
+            default_value: ''
+            description: "Set `IRC_NICKNAME` to the IRC nickname which is required to send the notification. It must not be an already registered name as the connection's MODE is defined as a guest."
+            required: true
+          - name: 'IRC_REALNAME'
+            default_value: ''
+            description: "Set `IRC_REALNAME` to the IRC realname which is required in order to make the connection."
+            required: true
+          - name: 'DEFAULT_RECIPIENT_IRC'
+            default_value: ''
+            description: "You can have different channels per role, by editing `DEFAULT_RECIPIENT_IRC` with the channel you want"
+            required: true
+            detailed_description: >
+              The `DEFAULT_RECIPIENT_IRC` can be edited in the following entries at the bottom of the same file:
+              ```
+              role_recipients_irc[sysadmin]="#systems"
+              role_recipients_irc[domainadmin]="#domains"
+              role_recipients_irc[dba]="#databases #systems"
+              role_recipients_irc[webmaster]="#marketing #development"
+              role_recipients_irc[proxyadmin]="#proxy-admin"
+              role_recipients_irc[sitemgr]="#sites"
+              ```
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: 'Basic Configuration'
+            folding:
+              enabled: false
+            description: ''
+            config: |
+              #------------------------------------------------------------------------------
+              # irc notification options
+              #
+              SEND_IRC="YES"
+              DEFAULT_RECIPIENT_IRC="#system-alarms"
+              IRC_NETWORK="irc.freenode.net"
+              IRC_NICKNAME="netdata-alarm-user"
+              IRC_REALNAME="netdata-user"

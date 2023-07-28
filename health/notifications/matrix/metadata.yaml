@@ -1,0 +1,88 @@
+# yamllint disable rule:line-length
+---
+- id: 'notify-matrix'
+  meta:
+    name: 'Matrix'
+    link: 'https://spec.matrix.org/unstable/push-gateway-api/'
+    categories:
+      - notify.agent
+    icon_filename: 'matrix.png'
+  keywords:
+    - Matrix
+  overview:
+    notification_description: |
+      Send notifications to Matrix network rooms using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+    notification_limitations: ''
+  setup:
+    prerequisites:
+      list:
+        - title: ''
+          description: |
+            - The url of the homeserver (`https://homeserver:port`).
+            - Credentials for connecting to the homeserver, in the form of a valid access token for your account (or for a dedicated notification account). These tokens usually don't expire.
+            - The room ids that you want to sent the notification to.
+            - Access to the terminal where Netdata Agent is running
+    configuration:
+      file:
+        name: 'health_alarm_notify.conf'
+      options:
+        description: 'The following options can be defined for this notification'
+        folding:
+          title: 'Config Options'
+          enabled: true
+        list:
+          - name: 'SEND_MATRIX'
+            default_value: 'YES'
+            description: "Set `SEND_MATRIX` to YES"
+            required: true
+          - name: 'MATRIX_HOMESERVER'
+            default_value: ''
+            description: "set `MATRIX_HOMESERVER` to the URL of the Matrix homeserver."
+            required: true
+          - name: 'MATRIX_ACCESSTOKEN'
+            default_value: ''
+            description: "Set `MATRIX_ACCESSTOKEN` to the access token from your Matrix account."
+            required: true
+            detailed_description: >
+              To obtain the access token, you can use the following curl command:
+              ```
+              curl -XPOST -d '{"type":"m.login.password", "user":"example", "password":"wordpass"}' "https://homeserver:8448/_matrix/client/r0/login"
+              ```
+          - name: 'DEFAULT_RECIPIENT_MATRIX'
+            default_value: ''
+            description: "Set `DEFAULT_RECIPIENT_MATRIX`  to the rooms you want the alert notifications to be sent to. The format is `!roomid:homeservername`."
+            required: true
+            detailed_description: >
+              The room ids are unique identifiers and can be obtained from the room settings in a Matrix client (e.g. Riot).
+              You can define multiple rooms like this: !roomid1:homeservername `!roomid2:homeservername`.
+              All roles will default to this variable if left unconfigured.
+
+              Detailed information about the Matrix client API is available at the official site.
+
+              You can then have different rooms per role, by editing DEFAULT_RECIPIENT_MATRIX with the !roomid:homeservername you want, in the following entries at the bottom of the same file:
+
+              ```
+              role_recipients_matrix[sysadmin]="!roomid1:homeservername"
+              role_recipients_matrix[domainadmin]="!roomid2:homeservername"
+              role_recipients_matrix[dba]="!roomid3:homeservername"
+              role_recipients_matrix[webmaster]="!roomid4:homeservername"
+              role_recipients_matrix[proxyadmin]="!roomid5:homeservername"
+              role_recipients_matrix[sitemgr]="!roomid6:homeservername"
+              ```
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: 'Basic Configuration'
+            folding:
+              enabled: false
+            description: ''
+            config: |
+              #------------------------------------------------------------------------------
+              # Matrix notifications
+
+              SEND_MATRIX="YES"
+              MATRIX_HOMESERVER="https://matrix.org:8448"
+              MATRIX_ACCESSTOKEN="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+              DEFAULT_RECIPIENT_MATRIX="!XXXXXXXXXXXX:matrix.org"

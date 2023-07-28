@@ -1,0 +1,73 @@
+# yamllint disable rule:line-length
+---
+- id: 'notify-discord'
+  meta:
+    name: 'Discord'
+    link: 'https://discord.com/'
+    categories:
+      - notify.agent
+    icon_filename: 'discord.png'
+  keywords:
+    - Discord
+  overview:
+    notification_description: |
+      Send notifications to Discord using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+    notification_limitations: ''
+  setup:
+    prerequisites:
+      list:
+        - title: ''
+          description: |
+            - The incoming webhook URL as given by Discord. Create a webhook by following the official [Discord documentation](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks). You can use the same on all your Netdata servers (or you can have multiple if you like - your decision).
+            - One or more Discord channels to post the messages to
+            - Access to the terminal where Netdata Agent is running
+    configuration:
+      file:
+        name: 'health_alarm_notify.conf'
+      options:
+        description: 'The following options can be defined for this notification'
+        folding:
+          title: 'Config Options'
+          enabled: true
+        list:
+          - name: 'SEND_DISCORD'
+            default_value: 'YES'
+            description: "Set `SEND_DISCORD` to YES"
+            required: true
+          - name: 'DISCORD_WEBHOOK_URL'
+            default_value: ''
+            description: "set `DISCORD_WEBHOOK_URL` to your webhook URL."
+            required: true
+          - name: 'DEFAULT_RECIPIENT_DISCORD'
+            default_value: ''
+            description: "Set `DEFAULT_RECIPIENT_DISCORD` to the channel you want the alert notifications to be sent to. You can define multiple channels like this: `alerts` `systems`. "
+            required: true
+            detailed_description: >
+              All roles will default to this variable if left unconfigured.
+              You can then have different channels per role, by editing `DEFAULT_RECIPIENT_DISCORD` with the channel you want, in the following entries at the bottom of the same file:
+              ```
+              role_recipients_discord[sysadmin]="systems"
+              role_recipients_discord[domainadmin]="domains"
+              role_recipients_discord[dba]="databases systems"
+              role_recipients_discord[webmaster]="marketing development"
+              role_recipients_discord[proxyadmin]="proxy-admin"
+              role_recipients_discord[sitemgr]="sites"
+              ```
+
+              The values you provide should already exist as Discord channels in your server.
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: 'Basic Configuration'
+            folding:
+              enabled: false
+            description: ''
+            config: |
+              #------------------------------------------------------------------------------
+              # discord (discordapp.com) global notification options
+
+              SEND_DISCORD="YES"
+              DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/XXXXXXXXXXXXX/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+              DEFAULT_RECIPIENT_DISCORD="alerts"

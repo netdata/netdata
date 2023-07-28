@@ -1,0 +1,67 @@
+# yamllint disable rule:line-length
+---
+- id: 'notify-ntfy'
+  meta:
+    name: 'ntfy'
+    link: 'https://ntfy.sh/'
+    categories:
+      - notify.agent
+    icon_filename: 'ntfy.png'
+  keywords:
+    - ntfy
+  overview:
+    notification_description: |
+      [ntfy](https://ntfy.sh/) (pronounce: notify) is a simple HTTP-based [pub-sub](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern) notification service. It allows you to send notifications to your phone or desktop via scripts from any computer, entirely without signup, cost or setup. It's also [open source](https://github.com/binwiederhier/ntfy) if you want to run your own server.
+      You can send alerts to an ntfy server using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+    notification_limitations: ''
+  setup:
+    prerequisites:
+      list:
+        - title: ''
+          description: |
+            - (Optional) A [self-hosted ntfy server](https://docs.ntfy.sh/faq/#can-i-self-host-it), in case you don't want to use https://ntfy.sh
+            - A new [topic](https://ntfy.sh/#subscribe) for the notifications to be published to
+            - Access to the terminal where Netdata Agent is running
+    configuration:
+      file:
+        name: 'health_alarm_notify.conf'
+      options:
+        description: 'The following options can be defined for this notification'
+        folding:
+          title: 'Config Options'
+          enabled: true
+        list:
+          - name: 'SEND_NTFY'
+            default_value: 'YES'
+            description: "Set `SEND_NTFY` to YES"
+            required: true
+          - name: 'DEFAULT_RECIPIENT_NTFY'
+            default_value: ''
+            description: "Set `DEFAULT_RECIPIENT_NTFY` to the URL formed by the server-topic combination you want the alert notifications to be sent to. Unless you are hosting your own server, the server should always be set to https://ntfy.sh."
+            required: true
+            detailed_description: >
+              You can define multiple recipient URLs like this: https://SERVER1/TOPIC1 https://SERVER2/TOPIC2
+
+              All roles will default to this variable if left unconfigured.
+
+              You can then have different servers and/or topics per role, by editing DEFAULT_RECIPIENT_NTFY with the server-topic combination you want, in the following entries at the bottom of the same file:
+              ```
+              role_recipients_ntfy[sysadmin]="https://SERVER1/TOPIC1"
+              role_recipients_ntfy[domainadmin]="https://SERVER2/TOPIC2"
+              role_recipients_ntfy[dba]="https://SERVER3/TOPIC3"
+              role_recipients_ntfy[webmaster]="https://SERVER4/TOPIC4"
+              role_recipients_ntfy[proxyadmin]="https://SERVER5/TOPIC5"
+              role_recipients_ntfy[sitemgr]="https://SERVER6/TOPIC6"
+              ```
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: 'Basic Configuration'
+            folding:
+              enabled: false
+            description: ''
+            config: |
+              SEND_NTFY="YES"
+              DEFAULT_RECIPIENT_NTFY="https://ntfy.sh/netdata-X7seHg7d3Tw9zGOk https://ntfy.sh/netdata-oIPm4IK1IlUtlA30"

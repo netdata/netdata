@@ -1,0 +1,75 @@
+# yamllint disable rule:line-length
+---
+- id: 'notify-pushover'
+  meta:
+    name: 'PushOver'
+    link: 'https://pushover.net/'
+    categories:
+      - notify.agent
+    icon_filename: 'pushover.png'
+  keywords:
+    - PushOver
+  overview:
+    notification_description: |
+      Send notification to Pushover using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+      - Netdata will send warning messages with priority 0 and critical messages with priority 1. 
+      - Pushover allows you to select do-not-disturb hours. The way this is configured, critical notifications will ring and vibrate your phone, even during the do-not-disturb-hours. 
+      - All other notifications will be delivered silently.
+    notification_limitations: ''
+  setup:
+    prerequisites:
+      list:
+        - title: ''
+          description: |
+            - An Application token. You can use the same on all your Netdata servers.
+            - A User token for each user you are going to send notifications to. This is the actual recipient of the notification.
+            - Access to the terminal where Netdata Agent is running
+    configuration:
+      file:
+        name: 'health_alarm_notify.conf'
+      options:
+        description: 'The following options can be defined for this notification'
+        folding:
+          title: 'Config Options'
+          enabled: true
+        list:
+          - name: 'SEND_PUSHOVER'
+            default_value: 'YES'
+            description: "Set `SEND_PUSHOVER` to YES"
+            required: true
+          - name: 'PUSHOVER_WEBHOOK_URL'
+            default_value: ''
+            description: "set `PUSHOVER_WEBHOOK_URL` to your Pushover Application token."
+            required: true
+          - name: 'DEFAULT_RECIPIENT_PUSHOVER'
+            default_value: ''
+            description: "Set `DEFAULT_RECIPIENT_PUSHOVER` the Pushover User token you want the alert notifications to be sent to. You can define multiple User tokens like this: `USERTOKEN1` `USERTOKEN2`."
+            required: true
+            detailed_description: >
+              All roles will default to this variable if left unconfigured.
+
+              The `DEFAULT_RECIPIENT_PUSHOVER` can be edited in the following entries at the bottom of the same file:
+              ```
+              role_recipients_pushover[sysadmin]="USERTOKEN1"
+              role_recipients_pushover[domainadmin]="USERTOKEN2"
+              role_recipients_pushover[dba]="USERTOKEN3 USERTOKEN4"
+              role_recipients_pushover[webmaster]="USERTOKEN5"
+              role_recipients_pushover[proxyadmin]="USERTOKEN6"
+              role_recipients_pushover[sitemgr]="USERTOKEN7"
+              ```
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: 'Basic Configuration'
+            folding:
+              enabled: false
+            description: ''
+            config: |
+              #------------------------------------------------------------------------------
+              # pushover (pushover.net) global notification options
+
+              SEND_PUSHOVER="YES"
+              PUSHOVER_APP_TOKEN="XXXXXXXXX"
+              DEFAULT_RECIPIENT_PUSHOVER="USERTOKEN"

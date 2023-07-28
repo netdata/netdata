@@ -1,0 +1,75 @@
+# yamllint disable rule:line-length
+---
+- id: 'notify-teams'
+  meta:
+    name: 'Microsoft Teams'
+    link: 'https://www.microsoft.com/en-us/microsoft-teams/log-in'
+    categories:
+      - notify.agent
+    icon_filename: 'teams.png'
+  keywords:
+    - Microsoft
+    - Teams
+    - MS teams
+  overview:
+    notification_description: |
+      You can send Netdata alerts to Microsoft Teams using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+    notification_limitations: ''
+  setup:
+    prerequisites:
+      list:
+        - title: ''
+          description: |
+            - The incoming webhook URL as given by Microsoft Teams. You can use the same on all your Netdata servers (or you can have multiple if you like).
+            - One or more channels to post the messages to
+            - Access to the terminal where Netdata Agent is running
+    configuration:
+      file:
+        name: 'health_alarm_notify.conf'
+      options:
+        description: 'The following options can be defined for this notification'
+        folding:
+          title: 'Config Options'
+          enabled: true
+        list:
+          - name: 'SEND_MSTEAMS'
+            default_value: 'YES'
+            description: "Set `SEND_MSTEAMS` to YES"
+            required: true
+          - name: 'MSTEAMS_WEBHOOK_URL'
+            default_value: ''
+            description: "set `MSTEAMS_WEBHOOK_URL` to the incoming webhook URL as given by Microsoft Teams."
+            required: true
+          - name: 'DEFAULT_RECIPIENT_MSTEAMS'
+            default_value: ''
+            description: "Set `DEFAULT_RECIPIENT_MSTEAMS` to the encoded Microsoft Teams channel name you want the alert notifications to be sent to."
+            required: true
+            detailed_description: >
+              In Microsoft Teams the channel name is encoded in the URI after /IncomingWebhook/. You can define multiple channels like this: CHANNEL1 CHANNEL2.
+              All roles will default to this variable if left unconfigured.
+
+              You can then have different channels per role, by editing `DEFAULT_RECIPIENT_MSTEAMS` with the channel you want, in the following entries at the bottom of the same file:
+              ```
+              role_recipients_msteams[sysadmin]="CHANNEL1"
+              role_recipients_msteams[domainadmin]="CHANNEL2"
+              role_recipients_msteams[dba]="databases CHANNEL3"
+              role_recipients_msteams[webmaster]="CHANNEL4"
+              role_recipients_msteams[proxyadmin]="CHANNEL5"
+              role_recipients_msteams[sitemgr]="CHANNEL6"
+              ```
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: 'Basic Configuration'
+            folding:
+              enabled: false
+            description: ''
+            config: |
+              #------------------------------------------------------------------------------
+              # Microsoft Teams (office.com) global notification options
+
+              SEND_MSTEAMS="YES"
+              MSTEAMS_WEBHOOK_URL="https://outlook.office.com/webhook/XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX@XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX/IncomingWebhook/CHANNEL/XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+              DEFAULT_RECIPIENT_MSTEAMS="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"

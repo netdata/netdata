@@ -1,0 +1,73 @@
+# yamllint disable rule:line-length
+---
+- id: 'notify-pushbullet'
+  meta:
+    name: 'Pushbullet'
+    link: 'https://www.pushbullet.com/'
+    categories:
+      - notify.agent
+    icon_filename: 'pushbullet.png'
+  keywords:
+    - Pushbullet
+  overview:
+    notification_description: |
+      Send notifications to Pushbullet using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+    notification_limitations: ''
+  setup:
+    prerequisites:
+      list:
+        - title: ''
+          description: |
+            - A Pushbullet access token that can be created in your [account settings](https://www.pushbullet.com/#settings/account).
+            - Access to the terminal where Netdata Agent is running
+    configuration:
+      file:
+        name: 'health_alarm_notify.conf'
+      options:
+        description: 'The following options can be defined for this notification'
+        folding:
+          title: 'Config Options'
+          enabled: true
+        list:
+          - name: 'Send_PUSHBULLET'
+            default_value: 'YES'
+            description: "Set `Send_PUSHBULLET` to YES"
+            required: true
+          - name: 'PUSHBULLET_ACCESS_TOKEN'
+            default_value: ''
+            description: "set `PUSHBULLET_ACCESS_TOKEN` to the access token you generated."
+            required: true
+          - name: 'DEFAULT_RECIPIENT_PUSHBULLET'
+            default_value: ''
+            description: "Set `DEFAULT_RECIPIENT_PUSHBULLET` to the email (e.g. `example@domain.com`) or the channel tag (e.g. `#channel`) you want the alert notifications to be sent to."
+            required: true
+            detailed_description: >
+              You can define multiple entries like this: user1@email.com user2@email.com.
+
+              All roles will default to this variable if left unconfigured.
+
+              The `DEFAULT_RECIPIENT_PUSHBULLET` can be edited in the following entries at the bottom of the same file:
+              ```
+              role_recipients_pushbullet[sysadmin]="user1@email.com"
+              role_recipients_pushbullet[domainadmin]="user2@mail.com"
+              role_recipients_pushbullet[dba]="#channel1"
+              role_recipients_pushbullet[webmaster]="#channel2"
+              role_recipients_pushbullet[proxyadmin]="user3@mail.com"
+              role_recipients_pushbullet[sitemgr]="user4@mail.com"
+              ```
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: 'Basic Configuration'
+            folding:
+              enabled: false
+            description: ''
+            config: |
+              #------------------------------------------------------------------------------
+              # pushbullet (pushbullet.com) push notification options
+
+              SEND_PUSHBULLET="YES"
+              PUSHBULLET_ACCESS_TOKEN="XXXXXXXXX"
+              DEFAULT_RECIPIENT_PUSHBULLET="admin1@example.com admin3@somemail.com #examplechanneltag #anotherchanneltag"

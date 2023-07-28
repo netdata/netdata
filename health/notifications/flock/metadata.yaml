@@ -1,0 +1,69 @@
+# yamllint disable rule:line-length
+---
+- id: 'notify-flock'
+  meta:
+    name: 'Flock'
+    link: 'https://support.flock.com/'
+    categories:
+      - notify.agent
+    icon_filename: 'flock.png'
+  keywords:
+    - Flock
+  overview:
+    notification_description: |
+      Send notifications to Flock using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+    notification_limitations: ''
+  setup:
+    prerequisites:
+      list:
+        - title: ''
+          description: |
+            - The incoming webhook URL as given by flock.com. You can use the same on all your Netdata servers (or you can have multiple if you like). Read more about flock webhooks and how to get one [here](https://admin.flock.com/webhooks).
+            - Access to the terminal where Netdata Agent is running
+    configuration:
+      file:
+        name: 'health_alarm_notify.conf'
+      options:
+        description: 'The following options can be defined for this notification'
+        folding:
+          title: 'Config Options'
+          enabled: true
+        list:
+          - name: 'SEND_FLOCK'
+            default_value: 'YES'
+            description: "Set `SEND_FLOCK` to YES"
+            required: true
+          - name: 'FLOCK_WEBHOOK_URL'
+            default_value: ''
+            description: "set `FLOCK_WEBHOOK_URL` to your webhook URL."
+            required: true
+          - name: 'DEFAULT_RECIPIENT_FLOCK'
+            default_value: ''
+            description: "Set `DEFAULT_RECIPIENT_FLOCK` to  the Flock channel you want the alert notifications to be sent to. All roles will default to this variable if left unconfigured."
+            required: true
+            detailed_description: >
+              You can have different channels per role, by editing DEFAULT_RECIPIENT_FLOCK with the channel you want, in the following entries at the bottom of the same file:
+              ```
+              role_recipients_flock[sysadmin]="systems"
+              role_recipients_flock[domainadmin]="domains"
+              role_recipients_flock[dba]="databases systems"
+              role_recipients_flock[webmaster]="marketing development"
+              role_recipients_flock[proxyadmin]="proxy-admin"
+              role_recipients_flock[sitemgr]="sites"
+              ```
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: 'Basic Configuration'
+            folding:
+              enabled: false
+            description: ''
+            config: |
+              #------------------------------------------------------------------------------
+              # flock (flock.com) global notification options
+
+              SEND_FLOCK="YES"
+              FLOCK_WEBHOOK_URL="https://api.flock.com/hooks/sendMessage/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+              DEFAULT_RECIPIENT_FLOCK="alarms"

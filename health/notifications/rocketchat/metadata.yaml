@@ -1,0 +1,72 @@
+# yamllint disable rule:line-length
+---
+- id: 'notify-rocketchat'
+  meta:
+    name: 'RocketChat'
+    link: 'https://rocket.chat/'
+    categories:
+      - notify.agent
+    icon_filename: 'rocketchat.png'
+  keywords:
+    - RocketChat
+  overview:
+    notification_description: |
+      Send notifications to Rocket.Chat using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+    notification_limitations: ''
+  setup:
+    prerequisites:
+      list:
+        - title: ''
+          description: |
+            - The incoming webhook URL as given by RocketChat. You can use the same on all your Netdata servers (or you can have multiple if you like - your decision).
+            - One or more channels to post the messages to
+            - Access to the terminal where Netdata Agent is running
+    configuration:
+      file:
+        name: 'health_alarm_notify.conf'
+      options:
+        description: 'The following options can be defined for this notification'
+        folding:
+          title: 'Config Options'
+          enabled: true
+        list:
+          - name: 'SEND_ROCKETCHAT'
+            default_value: 'YES'
+            description: "Set `SEND_ROCKETCHAT` to `YES`"
+            required: true
+          - name: 'ROCKETCHAT_WEBHOOK_URL'
+            default_value: ''
+            description: "set `ROCKETCHAT_WEBHOOK_URL` to your webhook URL."
+            required: true
+          - name: 'DEFAULT_RECIPIENT_ROCKETCHAT'
+            default_value: ''
+            description: "Set `DEFAULT_RECIPIENT_ROCKETCHAT` to the channel you want the alert notifications to be sent to. You can define multiple channels like this: `alerts` `systems`."
+            required: true
+            detailed_description: >
+              All roles will default to this variable if left unconfigured.
+
+              The `DEFAULT_RECIPIENT_ROCKETCHAT` can be edited in the following entries at the bottom of the same file:
+              ```
+              role_recipients_rocketchat[sysadmin]="systems"
+              role_recipients_rocketchat[domainadmin]="domains"
+              role_recipients_rocketchat[dba]="databases systems"
+              role_recipients_rocketchat[webmaster]="marketing development"
+              role_recipients_rocketchat[proxyadmin]="proxy_admin"
+              role_recipients_rocketchat[sitemgr]="sites"
+              ```
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: 'Basic Configuration'
+            folding:
+              enabled: false
+            description: ''
+            config: |
+              #------------------------------------------------------------------------------
+              # rocketchat (rocket.chat) global notification options
+
+              SEND_ROCKETCHAT="YES"
+              ROCKETCHAT_WEBHOOK_URL="<your_incoming_webhook_url>"
+              DEFAULT_RECIPIENT_ROCKETCHAT="monitoring_alarms"
