@@ -1,0 +1,93 @@
+meta:
+  plugin_name: profile.plugin
+  module_name: profile.plugin
+  monitored_instance:
+    name: Netata
+    link: 'https://github.com/netdata/netdata/'
+    categories:
+    - data-collection.other
+    icon_filename: 'netfilter.png'
+  related_resources:
+    integrations:
+      list: []
+  info_provided_to_referring_integrations:
+    description: ''
+  keywords: []
+  most_popular: false
+overview:
+  data_collection:
+    metrics_description: 'An example plugin that generate random charts according information given.'
+    method_description: 'Uses internal functions of c++ library.'
+  supported_platforms:
+    include: []
+    exclude: []
+  multi_instance: true
+  additional_permissions:
+    description: ''
+  default_behavior:
+    auto_detection:
+      description: ''
+    limits:
+      description: ''
+    performance_impact:
+      description: ''
+setup:
+  prerequisites:
+    list: []
+  configuration:
+    file:
+      name: 'netdata.conf'
+      section_name: '[plugin:profile]'
+      description: 'This is netdata main configuration file'
+    options:
+      description: ''
+      folding:
+        title: 'Config options'
+        enabled: true
+      list:
+        - name: update every
+          description: Data collection frequency.
+          default_value: 5
+          required: false
+        - name: number of charts
+          description: Number of new charts that plugin will make.
+          default_value: 200
+          required: false
+        - name: number of dimensions per chart
+          description: Number of dimension that each chart will have.
+          default_value: 5
+          required: false
+        - name: seconds to backfill
+          description: period of time in seconds that plugin will backfill data.
+          default_value: 86400
+          required: false
+        - name: number of threads
+          description: number of threads plugin will work.
+          default_value: 16
+          required: false
+    examples:
+      folding:
+        enabled: true
+        title: ''
+      list: []
+troubleshooting:
+  problems:
+    list: []
+alerts: []
+metrics:
+  folding:
+    title: Metrics
+    enabled: false
+  description: ""
+  availability: []
+  scopes:
+  - name: global
+    description: ""
+    labels: []
+    metrics:
+    - name: profile.ChartID
+      description: A chart genrated with information from configuration file.
+      unit: "profile_units"
+      chart_type: line
+      dimensions:
+      - name: dim_NUMBER
