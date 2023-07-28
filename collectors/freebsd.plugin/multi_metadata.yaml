@@ -5,10 +5,10 @@ modules:
       module_name: vm.loadavg
       monitored_instance:
         name: freebsd vm.loadavg
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -18,8 +18,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "System Load Average"
+        method_description: "The plugin uses `sysctl`` functiion to collect necessary data."
       supported_platforms:
         include: []
         exclude: []
@@ -38,14 +38,19 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd"
+          description: "The netdata main configuration file."
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: vm.loadavg
+              description: Enable or disable load average charts.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
@@ -99,10 +104,10 @@ modules:
       module_name: vm.vmtotal
       monitored_instance:
         name: freebsd vm.vmtotal
-        link: ""
+        link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: ""
+        icon_filename: "freebsd.jpg"
       related_resources:
         integrations:
           list: []
@@ -112,8 +117,8 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: ""
-        method_description: ""
+        metrics_description: "Collect Virtual Memory information from host."
+        method_description: "The plugin uses function `sysctl` to collect data." 
       supported_platforms:
         include: []
         exclude: []
@@ -132,14 +137,27 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
+          name: "netdata.conf"
+          section_name: "plugin:freebsd:vm.vmtotal"
           description: ""
         options:
           description: ""
           folding:
-            title: ""
+            title: "Config Options"
             enabled: true
-          list: []
+          list:
+            - name: enable total processes
+              description: Number of active processes.
+              default_value: yes
+              required: false
+            - name: processes running
+              description: Show number of processes running or blocked.
+              default_value: yes
+              required: false
+            - name: real memory
+              description: Memeory used on host.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
