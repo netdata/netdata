@@ -252,7 +252,7 @@
             --cap-add SYS_PTRACE \
             --cap-add SYS_ADMIN \
             --security-opt apparmor=unconfined \
-            -e NETDATA_CLAIM_TOKEN= {% claim_token %} \
+            -e NETDATA_CLAIM_TOKEN={% claim_token %} \
             -e NETDATA_CLAIM_URL={% claim_url %} \
             -e NETDATA_CLAIM_ROOMS={% $claim_rooms %} \
             netdata/netdata:edge
@@ -275,7 +275,7 @@
             --cap-add SYS_PTRACE \
             --cap-add SYS_ADMIN \
             --security-opt apparmor=unconfined \
-            -e NETDATA_CLAIM_TOKEN= {% claim_token %} \
+            -e NETDATA_CLAIM_TOKEN={% claim_token %} \
             -e NETDATA_CLAIM_URL={% claim_url %} \
             -e NETDATA_CLAIM_ROOMS={% $claim_rooms %} \
             netdata/netdata:stable
