@@ -105,6 +105,7 @@ typedef struct {
     size_t storage_tiers;
     bool parallel_initialization;
     unsigned rrdeng_pages_per_extent;
+    const char *dbengine_base_path;
 } dbengine_config_t;
 
 static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
@@ -118,9 +119,9 @@ static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
     int divisor = 1;
     for(size_t tier = 0; tier < rrdb.storage_tiers ;tier++) {
         if(tier == 0)
-            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", netdata_configured_cache_dir);
+            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", rrdb.dbengine_base_path);
         else
-            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%zu", netdata_configured_cache_dir, tier);
+            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%zu", rrdb.dbengine_base_path, tier);
 
         int ret = mkdir(dbenginepath, 0775);
         if (ret != 0 && errno != EEXIST) {
@@ -288,10 +289,13 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
             cfg.parallel_initialization = (cfg.storage_tiers <= (size_t) get_netdata_cpus()) ? true : false;
             cfg.parallel_initialization = config_get_boolean(CONFIG_SECTION_DB, "dbengine parallel initialization", cfg.parallel_initialization);
 
+            cfg.dbengine_base_path = rrdb.dbengine_base_path;
+
             rrdb.use_direct_io = cfg.use_direct_io;
             rrdb.storage_tiers = cfg.storage_tiers;
             rrdb.parallel_initialization = cfg.parallel_initialization;
             rrdb.rrdeng_pages_per_extent = cfg.rrdeng_pages_per_extent;
+            rrdb.dbengine_base_path = cfg.dbengine_base_path;
 
             dbengine_init(hostname, &cfg);
 #else
@@ -384,6 +388,7 @@ struct rrdb rrdb = {
     .use_direct_io = true,
     .parallel_initialization = false,
     .rrdeng_pages_per_extent = MAX_PAGES_PER_EXTENT,
+    .dbengine_base_path = CACHE_DIR,
     .storage_tiers_grouping_iterations = {
         1,
         60,

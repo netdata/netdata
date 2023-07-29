@@ -879,6 +879,8 @@ struct rrdb {
 
     unsigned rrdeng_pages_per_extent;
 
+    const char *dbengine_base_path;
+
     size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
     RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS];
 
