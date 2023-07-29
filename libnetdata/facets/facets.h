@@ -33,6 +33,7 @@ FACET_KEY *facets_register_dynamic_key(FACETS *facets, const char *key, FACET_KE
 
 typedef enum __attribute__((packed)) {
     FACETS_OPTION_ALL_FACETS_VISIBLE    = (1 << 0), // all facets, should be visible by default in the table
+    FACETS_OPTION_ALL_KEYS_FTS          = (1 << 1), // all keys are searchable by full text search
 } FACETS_OPTIONS;
 
 FACETS *facets_create(uint32_t items_to_return, usec_t anchor, FACETS_OPTIONS options, const char *visible_keys, const char *facet_keys, const char *non_facet_keys);

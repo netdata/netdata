@@ -186,7 +186,7 @@ static void function_systemd_journal(const char *transaction, char *function __m
     buffer_flush(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT | BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAYS);
 
-    FACETS *facets = facets_create(50, 0, 0,
+    FACETS *facets = facets_create(50, 0, FACETS_OPTION_ALL_KEYS_FTS,
                                    SYSTEMD_ALWAYS_VISIBLE_KEYS,
                                    SYSTEMD_KEYS_INCLUDED_IN_FACETS,
                                    SYSTEMD_KEYS_EXCLUDED_FROM_FACETS);
@@ -199,7 +199,7 @@ static void function_systemd_journal(const char *transaction, char *function __m
 
     // register the fields in the order you want them on the dashboard
 
-    facets_register_dynamic_key(facets, "ND_JOURNAL_PROCESS", FACET_KEY_OPTION_VISIBLE,
+    facets_register_dynamic_key(facets, "ND_JOURNAL_PROCESS", FACET_KEY_OPTION_VISIBLE|FACET_KEY_OPTION_FTS,
                                 systemd_journal_dynamic_row_id, NULL);
 
     facets_register_key(facets, "MESSAGE",
