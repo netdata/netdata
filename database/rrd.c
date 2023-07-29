@@ -106,6 +106,8 @@ typedef struct {
     bool parallel_initialization;
     unsigned rrdeng_pages_per_extent;
     const char *dbengine_base_path;
+    int default_rrdeng_disk_quota_mb;
+    size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
 } dbengine_config_t;
 
 static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
@@ -290,12 +292,16 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
             cfg.parallel_initialization = config_get_boolean(CONFIG_SECTION_DB, "dbengine parallel initialization", cfg.parallel_initialization);
 
             cfg.dbengine_base_path = rrdb.dbengine_base_path;
+            cfg.default_rrdeng_disk_quota_mb = rrdb.default_rrdeng_disk_quota_mb;
+            memcpy(cfg.storage_tiers_grouping_iterations, rrdb.storage_tiers_grouping_iterations, RRD_STORAGE_TIERS);
 
             rrdb.use_direct_io = cfg.use_direct_io;
             rrdb.storage_tiers = cfg.storage_tiers;
             rrdb.parallel_initialization = cfg.parallel_initialization;
             rrdb.rrdeng_pages_per_extent = cfg.rrdeng_pages_per_extent;
             rrdb.dbengine_base_path = cfg.dbengine_base_path;
+            rrdb.default_rrdeng_disk_quota_mb = cfg.default_rrdeng_disk_quota_mb;
+            memcpy(rrdb.storage_tiers_grouping_iterations, cfg.storage_tiers_grouping_iterations, RRD_STORAGE_TIERS);
 
             dbengine_init(hostname, &cfg);
 #else
