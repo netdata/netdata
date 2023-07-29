@@ -117,10 +117,11 @@ static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
     struct dbengine_initialization tiers_init[RRD_STORAGE_TIERS] = {};
 
     size_t created_tiers = 0;
-    char dbenginepath[FILENAME_MAX + 1];
-    char dbengineconfig[200 + 1];
     int divisor = 1;
+
     for(size_t tier = 0; tier < rrdb.storage_tiers ;tier++) {
+        char dbenginepath[FILENAME_MAX + 1];
+
         if(tier == 0)
             snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", rrdb.dbengine_base_path);
         else
@@ -140,6 +141,7 @@ static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
         RRD_BACKFILL backfill = rrdb.storage_tiers_backfill[tier];
 
         if(tier > 0) {
+            char dbengineconfig[200 + 1];
             snprintfz(dbengineconfig, 200, "dbengine tier %zu multihost disk space MB", tier);
             disk_space_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig, disk_space_mb);
 
