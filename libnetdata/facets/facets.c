@@ -75,6 +75,7 @@ struct facet_key {
     FACET_KEY_OPTIONS options;
 
     bool default_selected_for_values; // the default "selected" for all values in the dictionary
+    bool not_match_by_query;
 
     // members about the current row
     uint32_t key_found_in_row;
@@ -92,6 +93,7 @@ struct facets {
 
     FACETS_OPTIONS options;
     usec_t anchor;
+    SIMPLE_PATTERN *query;
 
     DICTIONARY *accepted_params;
 
@@ -313,6 +315,13 @@ inline FACET_KEY *facets_register_dynamic_key(FACETS *facets, const char *key, F
     return k;
 }
 
+void facets_set_query(FACETS *facets, const char *query) {
+    if(!query)
+        return;
+
+    facets->query = simple_pattern_create(query, " \t", SIMPLE_PATTERN_EXACT, false);
+}
+
 void facets_set_items(FACETS *facets, uint32_t items) {
     facets->max_items_to_return = items;
 }
@@ -343,6 +352,9 @@ void facets_register_facet_filter(FACETS *facets, const char *key_id, char *valu
 static inline void facets_check_value(FACETS *facets __maybe_unused, FACET_KEY *k) {
     if(buffer_strlen(k->current_value) == 0)
         buffer_strcat(k->current_value, FACET_VALUE_UNSET);
+
+    if(facets->query && (k->options & FACET_KEY_OPTION_FTS) && !simple_pattern_matches(facets->query, buffer_tostring(k->current_value)))
+        k->not_match_by_query = true;
 
     if(k->values) {
         FACET_VALUE tk = {
@@ -517,6 +529,7 @@ void facets_rows_begin(FACETS *facets) {
     dfe_start_read(facets->keys, k) {
                 k->key_found_in_row = 0;
                 k->key_values_selected_in_row = 0;
+                k->not_match_by_query = false;
                 buffer_flush(k->current_value);
             }
     dfe_done(k);
@@ -527,6 +540,7 @@ void facets_row_finished(FACETS *facets, usec_t usec) {
 
     uint32_t total_keys = 0;
     uint32_t selected_by = 0;
+    bool not_matched_by_query = 0;
 
     FACET_KEY *k;
     dfe_start_read(facets->keys, k) {
@@ -545,8 +559,13 @@ void facets_row_finished(FACETS *facets, usec_t usec) {
 
         total_keys += k->key_found_in_row;
         selected_by += k->key_values_selected_in_row;
+
+        not_matched_by_query += k->not_match_by_query ? 1 : 0;
     }
     dfe_done(k);
+
+    if(not_matched_by_query)
+        goto cleanup;
 
     if(selected_by >= total_keys - 1) {
         uint32_t found = 0;
@@ -585,6 +604,7 @@ void facets_row_finished(FACETS *facets, usec_t usec) {
     if(selected_by == total_keys)
         facets_row_keep(facets, usec);
 
+cleanup:
     facets_rows_begin(facets);
 }
 

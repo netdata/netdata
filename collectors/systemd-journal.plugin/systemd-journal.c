@@ -5,7 +5,7 @@
  *  GPL v3+
  */
 
-// TODO - 1) MARKDOC 2) QUERY
+// TODO - 1) MARKDOC
 
 #include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
@@ -203,11 +203,12 @@ static void function_systemd_journal(const char *transaction, char *function __m
                                 systemd_journal_dynamic_row_id, NULL);
 
     facets_register_key(facets, "MESSAGE",
-                        FACET_KEY_OPTION_NO_FACET|FACET_KEY_OPTION_VISIBLE);
+                        FACET_KEY_OPTION_NO_FACET|FACET_KEY_OPTION_VISIBLE|FACET_KEY_OPTION_FTS);
 
     time_t after_s = 0, before_s = 0;
     usec_t anchor = 0;
     size_t last = 0;
+    const char *query = NULL;
 
     buffer_json_member_add_object(wb, "request");
     buffer_json_member_add_object(wb, "filters");
@@ -231,6 +232,9 @@ static void function_systemd_journal(const char *transaction, char *function __m
         }
         else if(strncmp(keyword, JOURNAL_PARAMETER_LAST ":", strlen(JOURNAL_PARAMETER_LAST ":")) == 0) {
             last = str2ul(&keyword[strlen(JOURNAL_PARAMETER_LAST ":")]);
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_QUERY ":", strlen(JOURNAL_PARAMETER_QUERY ":")) == 0) {
+            query= &keyword[strlen(JOURNAL_PARAMETER_QUERY ":")];
         }
         else {
             char *value = strchr(keyword, ':');
@@ -284,11 +288,13 @@ static void function_systemd_journal(const char *transaction, char *function __m
     buffer_json_member_add_time_t(wb, "before", before_s);
     buffer_json_member_add_uint64(wb, "anchor", anchor);
     buffer_json_member_add_uint64(wb, "last", last);
+    buffer_json_member_add_string(wb, "query", query);
     buffer_json_member_add_time_t(wb, "timeout", timeout);
     buffer_json_object_close(wb); // request
 
     facets_set_items(facets, last);
     facets_set_anchor(facets, anchor);
+    facets_set_query(facets, query);
     int response = systemd_journal_query(wb, facets, after_s * USEC_PER_SEC, before_s * USEC_PER_SEC,
                                        now_monotonic_usec() + (timeout - 1) * USEC_PER_SEC);
 

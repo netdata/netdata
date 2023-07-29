@@ -8,6 +8,7 @@ typedef enum __attribute__((packed)) {
     FACET_KEY_OPTION_NO_FACET = (1 << 1), // non-filterable value
     FACET_KEY_OPTION_STICKY   = (1 << 2), // should be sticky in the table
     FACET_KEY_OPTION_VISIBLE  = (1 << 3), // should be in the default table
+    FACET_KEY_OPTION_FTS      = (1 << 4), // the key is filterable by full text search (FTS)
 } FACET_KEY_OPTIONS;
 
 typedef struct facet_row_key_value {
@@ -43,6 +44,7 @@ void facets_rows_begin(FACETS *facets);
 void facets_row_finished(FACETS *facets, usec_t usec);
 
 FACET_KEY *facets_register_key(FACETS *facets, const char *param, FACET_KEY_OPTIONS options);
+void facets_set_query(FACETS *facets, const char *query);
 void facets_set_items(FACETS *facets, uint32_t items);
 void facets_set_anchor(FACETS *facets, usec_t anchor);
 void facets_register_facet_filter(FACETS *facets, const char *key_id, char *value_ids, FACET_KEY_OPTIONS options);

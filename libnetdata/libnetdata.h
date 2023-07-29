@@ -986,6 +986,8 @@ extern bool unittest_running;
 
 bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t *now_ptr, bool unittest_running);
 
+int netdata_base64_decode(const char *encoded, char *decoded, size_t decoded_size);
+
 # ifdef __cplusplus
 }
 # endif
