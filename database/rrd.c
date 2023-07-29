@@ -157,9 +157,12 @@ static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
 
             snprintfz(dbengineconfig, 200, "dbengine tier %zu backfill", tier);
             const char *bf = config_get(CONFIG_SECTION_DB, dbengineconfig, backfill == RRD_BACKFILL_NEW ? "new" : backfill == RRD_BACKFILL_FULL ? "full" : "none");
-            if(strcmp(bf, "new") == 0) backfill = RRD_BACKFILL_NEW;
-            else if(strcmp(bf, "full") == 0) backfill = RRD_BACKFILL_FULL;
-            else if(strcmp(bf, "none") == 0) backfill = RRD_BACKFILL_NONE;
+            if(strcmp(bf, "new") == 0)
+                backfill = RRD_BACKFILL_NEW;
+            else if(strcmp(bf, "full") == 0)
+                backfill = RRD_BACKFILL_FULL;
+            else if(strcmp(bf, "none") == 0)
+                backfill = RRD_BACKFILL_NONE;
             else {
                 netdata_log_error("DBENGINE: unknown backfill value '%s', assuming 'new'", bf);
                 config_set(CONFIG_SECTION_DB, dbengineconfig, "new");
