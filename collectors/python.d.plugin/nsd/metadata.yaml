@@ -58,7 +58,7 @@ setup:
               Defaults:netdata   !requiretty
               netdata ALL=(ALL)  NOPASSWD: /usr/sbin/nsd-control stats_noreset
               ```
-            
+          
             > Note that you will need to set the `command` option to `sudo /usr/sbin/nsd-control stats_noreset` if you use this method.
 
   configuration:

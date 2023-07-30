@@ -5,7 +5,7 @@ meta:
     name: Icecast
     link: 'https://icecast.org/'
     categories:
-    - data-collection.media-streaming-servers
+      - data-collection.media-streaming-servers
     icon_filename: 'icecast.svg'
   related_resources:
     integrations:
@@ -113,13 +113,13 @@ metrics:
   description: ""
   availability: []
   scopes:
-  - name: global
-    description: "These metrics refer to the entire monitored application."
-    labels: []
-    metrics:
-    - name: icecast.listeners
-      description: Number Of Listeners
-      unit: "listeners"
-      chart_type: line
-      dimensions:
-      - name: a dimension for each active source
+    - name: global
+      description: "These metrics refer to the entire monitored application."
+      labels: []
+      metrics:
+        - name: icecast.listeners
+          description: Number Of Listeners
+          unit: "listeners"
+          chart_type: line
+          dimensions:
+            - name: a dimension for each active source

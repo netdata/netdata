@@ -5,7 +5,7 @@ meta:
     name: Tor
     link: 'https://www.torproject.org/'
     categories:
-    - data-collection.vpns
+      - data-collection.vpns
     icon_filename: 'tor.svg'
   related_resources:
     integrations:
@@ -110,10 +110,10 @@ setup:
         - name: Local socket
           description: A basic local socket configuration
           config: |
-             local_socket:
-              name: 'local'
-              control_port: '/var/run/tor/control'
-              password: <password> # if required
+            local_socket:
+             name: 'local'
+             control_port: '/var/run/tor/control'
+             password: <password> # if required
 troubleshooting:
   problems:
     list: []
@@ -125,14 +125,14 @@ metrics:
   description: ""
   availability: []
   scopes:
-  - name: global
-    description: "These metrics refer to the entire monitored application."
-    labels: []
-    metrics:
-    - name: tor.traffic
-      description: Tor Traffic
-      unit: "KiB/s"
-      chart_type: area
-      dimensions:
-      - name: read
-      - name: write
+    - name: global
+      description: "These metrics refer to the entire monitored application."
+      labels: []
+      metrics:
+        - name: tor.traffic
+          description: Tor Traffic
+          unit: "KiB/s"
+          chart_type: area
+          dimensions:
+            - name: read
+            - name: write

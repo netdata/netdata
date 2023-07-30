@@ -7,7 +7,7 @@ meta:
     name: IOPing
     link: "https://github.com/koct9i/ioping"
     categories:
-    - data-collection.synthetic-checks
+      - data-collection.synthetic-checks
     icon_filename: "syslog.png"
   related_resources:
     integrations:
@@ -78,10 +78,10 @@ troubleshooting:
   problems:
     list: []
 alerts:
-- name: ioping_disk_latency
-  link: https://github.com/netdata/netdata/blob/master/health/health.d/ioping.conf
-  metric: ioping.latency
-  info: average I/O latency over the last 10 seconds
+  - name: ioping_disk_latency
+    link: https://github.com/netdata/netdata/blob/master/health/health.d/ioping.conf
+    metric: ioping.latency
+    info: average I/O latency over the last 10 seconds
 metrics:
   folding:
     title: Metrics
@@ -89,13 +89,13 @@ metrics:
   description: ""
   availability: []
   scopes:
-  - name: disk
-    description: ""
-    labels: []
-    metrics:
-    - name: ioping.latency
-      description: Read Latency
-      unit: "microseconds"
-      chart_type: line
-      dimensions:
-      - name: latency
+    - name: disk
+      description: ""
+      labels: []
+      metrics:
+        - name: ioping.latency
+          description: Read Latency
+          unit: "microseconds"
+          chart_type: line
+          dimensions:
+            - name: latency
