@@ -14,13 +14,6 @@ if [ ! -w / ] && [ "${EUID}" -eq 0 ]; then
   echo >&2 "WARNING: For more information, see https://learn.netdata.cloud/docs/agent/claim#known-issues-on-older-hosts-with-seccomp-enabled"
 fi
 
-if [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
-  [ -n "$DISABLE_TELEMETRY" ] ||
-  [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] ||
-  [ -n "$DO_NOT_TRACK" ]; then
-  touch /etc/netdata/.opt-out-from-anonymous-statistics
-fi
-
 chmod o+rX / # Needed to fix permissions issues in some cases.
 
 BALENA_PGID=$(stat -c %g /var/run/balena.sock 2>/dev/null || true)
@@ -46,9 +39,16 @@ if [ -n "${PGID}" ]; then
   usermod -a -G "${PGID}" "${DOCKER_USR}" || echo >&2 "Could not add netdata user to group docker with ID ${PGID}"
 fi
 
-if mountpoint -q /etc/netdata && [ -z "$(ls -A /etc/netdata)" ]; then
+if mountpoint -q /etc/netdata && [ -z "$(ls -A /etc/netdata | grep -v netdata.conf)" ]; then
   echo "Copying stock configuration to /etc/netdata"
-  cp -a /etc/netdata.stock/. /etc/netdata
+  cp -an /etc/netdata.stock/. /etc/netdata
+fi
+
+if [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
+  [ -n "$DISABLE_TELEMETRY" ] ||
+  [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] ||
+  [ -n "$DO_NOT_TRACK" ]; then
+  touch /etc/netdata/.opt-out-from-anonymous-statistics
 fi
 
 if [ -w "/etc/netdata" ]; then
