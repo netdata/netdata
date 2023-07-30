@@ -442,6 +442,12 @@ __attribute__((constructor)) void initialize_labels_keys_char_map(void) {
 
 }
 
+__attribute__((constructor)) void initialize_label_stats(void) {
+    dictionary_stats_category_rrdlabels.memory.dict = 0;
+    dictionary_stats_category_rrdlabels.memory.index = 0;
+    dictionary_stats_category_rrdlabels.memory.values = 0;
+}
+
 size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_size, unsigned char *char_map, bool utf, const char *empty, size_t *multibyte_length) {
     if(unlikely(!dst_size)) return 0;
 
