@@ -19,7 +19,7 @@ modules:
         - ipmi
         - freeipmi
       most_popular: true
-    overview: &overview
+    overview:
       data_collection:
         metrics_description: |
           "Monitor enterprise server sensor readings, event log entries, and hardware statuses to ensure reliable server operations."

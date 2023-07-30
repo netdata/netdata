@@ -81,7 +81,7 @@ modules:
           list:
             - name: chart_configs
               description: an array of chart configuration dictionaries
-              default_value: []
+              default_value: "[]"
               required: true
             - name: chart_configs.name
               description: name of the chart to be displayed in the dashboard.
