@@ -3,6 +3,79 @@
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 
+// Key OF HS ARRRAY
+typedef struct label_registry_idx {
+    STRING *key;
+    STRING *value;
+} LABEL_REGISTRY_IDX;
+
+typedef struct labels_registry_entry {
+    LABEL_REGISTRY_IDX index;
+} RRDLABEL;
+
+// Value of HS array
+typedef struct labels_registry_idx_entry {
+    RRDLABEL label;
+    size_t refcount;
+} RRDLABEL_IDX;
+
+typedef struct rrdlabels {
+    SPINLOCK spinlock;
+    size_t version;
+    Pvoid_t JudyL;
+} RRDLABELS;
+
+#define lfe_start_nolock(label_list, label, ls)                                                                        \
+    do {                                                                                                               \
+        bool _first_then_next = true;                                                                                  \
+        Pvoid_t *_PValue;                                                                                              \
+        Word_t _Index = 0;                                                                                             \
+        while ((_PValue = JudyLFirstThenNext((label_list)->JudyL, &_Index, &_first_then_next))) {                      \
+            (ls) = *(RRDLABEL_SRC *)_PValue;                                                                           \
+            (label) = (void *)_Index;
+
+#define lfe_done_nolock()                                                                                              \
+        }                                                                                                              \
+    }                                                                                                                  \
+    while (0)
+
+#define lfe_start_read(label_list, label, ls)                                                                          \
+    do {                                                                                                               \
+        spinlock_lock(&(label_list)->spinlock);                                                                        \
+        bool _first_then_next = true;                                                                                  \
+        Pvoid_t *_PValue;                                                                                              \
+        Word_t _Index = 0;                                                                                             \
+        while ((_PValue = JudyLFirstThenNext((label_list)->JudyL, &_Index, &_first_then_next))) {                      \
+            (ls) = *(RRDLABEL_SRC *)_PValue;                                                                           \
+            (label) = (void *)_Index;
+
+#define lfe_done(label_list)                                                                                           \
+        }                                                                                                              \
+        spinlock_unlock(&(label_list)->spinlock);                                                                      \
+    }                                                                                                                  \
+    while (0)
+
+static inline void STATS_PLUS_MEMORY(struct dictionary_stats *stats, size_t key_size, size_t item_size, size_t value_size) {
+    if(key_size)
+        __atomic_fetch_add(&stats->memory.index, (long)JUDYHS_INDEX_SIZE_ESTIMATE(key_size), __ATOMIC_RELAXED);
+
+    if(item_size)
+        __atomic_fetch_add(&stats->memory.dict, (long)item_size, __ATOMIC_RELAXED);
+
+    if(value_size)
+        __atomic_fetch_add(&stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
+}
+static inline void STATS_MINUS_MEMORY(struct dictionary_stats *stats, size_t key_size, size_t item_size, size_t value_size) {
+    if(key_size)
+        __atomic_fetch_sub(&stats->memory.index, (long)JUDYHS_INDEX_SIZE_ESTIMATE(key_size), __ATOMIC_RELAXED);
+
+    if(item_size)
+        __atomic_fetch_sub(&stats->memory.dict, (long)item_size, __ATOMIC_RELAXED);
+
+    if(value_size)
+        __atomic_fetch_sub(&stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
+}
+
 // ----------------------------------------------------------------------------
 // labels sanitization
 
@@ -487,6 +560,7 @@ static inline size_t rrdlabels_sanitize_value(char *dst, const char *src, size_t
 RRDLABELS *rrdlabels_create(void)
 {
     RRDLABELS *labels = callocz(1, sizeof(*labels));
+    STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, sizeof(RRDLABELS), 0, 0);
     return labels;
 }
 
@@ -529,6 +603,7 @@ static RRDLABEL *add_label_name_value(const char *name, const char *value)
         rrdlabel = callocz(1, sizeof(*rrdlabel));
         rrdlabel->label.index = label_index;
         *PValue = rrdlabel;
+        STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, sizeof(LABEL_REGISTRY_IDX), sizeof(RRDLABEL_IDX), 0);
     }
     __atomic_add_fetch(&rrdlabel->refcount, 1, __ATOMIC_RELAXED);
 
@@ -556,6 +631,7 @@ static void delete_label(RRDLABEL *label)
                     JU_ERRNO(&J_Error),
                     JU_ERRID(&J_Error));
             }
+            STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, sizeof(LABEL_REGISTRY_IDX), sizeof(*rrdlabel), 0);
             string_freez(label->index.key);
             string_freez(label->index.value);
             freez(rrdlabel);
@@ -580,8 +656,8 @@ void rrdlabels_destroy(RRDLABELS *labels)
     while ((PValue = JudyLFirstThenNext(labels->JudyL, &Index, &first_then_next))) {
         delete_label((RRDLABEL *)Index);
     }
-    JudyLFreeArray(&labels->JudyL, PJE0);
-
+    size_t memory_freed = JudyLFreeArray(&labels->JudyL, PJE0);
+    STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, memory_freed + sizeof(RRDLABELS), 0, 0);
     spinlock_unlock(&labels->spinlock);
     freez(labels);
 }
@@ -595,10 +671,14 @@ static void labels_add_already_sanitized(RRDLABELS *labels, const char *key, con
 
     spinlock_lock(&labels->spinlock);
 
+    size_t mem_before_judyl = JudyLMemUsed(labels->JudyL);
+
     Pvoid_t *PValue = JudyLIns(&labels->JudyL, (Word_t) label, PJE0);
     if (PValue && !*PValue) {
         *((RRDLABEL_SRC *)PValue) = (ls & ~(RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_OLD));
         labels->version++;
+        size_t mem_after_judyl = JudyLMemUsed(labels->JudyL);
+        STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, mem_after_judyl - mem_before_judyl, 0, 0);
     }
     else
         delete_label(label);
@@ -828,10 +908,14 @@ void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
     RRDLABEL_SRC ls;
     lfe_start_nolock(src, label, ls)
     {
+        size_t mem_before_judyl = JudyLMemUsed(dst->JudyL);
         PValue = JudyLIns(&dst->JudyL, (Word_t)label, PJE0);
         RRDLABEL_SRC flag = RRDLABEL_FLAG_NEW;
-        if (PValue && *PValue)
+        if (PValue && !*PValue) {
             dup_label(label);
+            size_t mem_after_judyl = JudyLMemUsed(dst->JudyL);
+            STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, mem_after_judyl - mem_before_judyl, 0, 0);
+        }
         else
             flag = RRDLABEL_FLAG_OLD;
         *((RRDLABEL_SRC *)PValue) |= flag;
@@ -842,7 +926,13 @@ void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
     first_then_next = true;
     while ((PValue = JudyLFirstThenNext(dst->JudyL, &Index, &first_then_next))) {
         if (!((*((RRDLABEL_SRC *)PValue)) & (RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_PERMANENT))) {
+
+            size_t mem_before_judyl = JudyLMemUsed(dst->JudyL);
             (void)JudyLDel(&dst->JudyL, Index, PJE0);
+            size_t mem_after_judyl = JudyLMemUsed(dst->JudyL);
+
+            STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, mem_before_judyl - mem_after_judyl, 0, 0);
+
             delete_label((RRDLABEL *)Index);
             if (dst->JudyL != (Pvoid_t) NULL) {
                 Index = 0;
@@ -871,21 +961,20 @@ void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src)
     spinlock_lock(&dst->spinlock);
     spinlock_lock(&src->spinlock);
 
-//    spinlock_lock(&rrdb.labels.spinlock);
-
     lfe_start_nolock(src, label, ls)
     {
+        size_t mem_before_judyl = JudyLMemUsed(dst->JudyL);
         PValue = JudyLIns(&dst->JudyL, (Word_t)label, PJE0);
         if (PValue && !*PValue) {
             dup_label(label);
+            size_t mem_after_judyl = JudyLMemUsed(dst->JudyL);
+            STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, mem_after_judyl - mem_before_judyl, 0, 0);
             *((RRDLABEL_SRC *)PValue) = ls;
         }
     }
     lfe_done_nolock();
 
     dst->version = src->version;
-
-//    spinlock_unlock(&rrdb.labels.spinlock);
 
     spinlock_unlock(&src->spinlock);
     spinlock_unlock(&dst->spinlock);
