@@ -648,6 +648,7 @@ static int web_client_api_request_v2_webrtc(RRDHOST *host __maybe_unused, struct
 static int web_client_api_request_v2_config(RRDHOST *host __maybe_unused, struct web_client *w, char *query) {
 
     char *url = strdupz(buffer_tostring(w->url_as_received));
+    char *url_full = url;
 
     if (strncmp(url, CONFIG_API_V2_URL, strlen(CONFIG_API_V2_URL)) != 0) {
         buffer_sprintf(w->response.data, "Invalid URL");
@@ -660,11 +661,11 @@ static int web_client_api_request_v2_config(RRDHOST *host __maybe_unused, struct
     char *module = strtok_r(NULL, "/", &save_ptr);
     char *job_id = strtok_r(NULL, "/", &save_ptr);
     char *extra = strtok_r(NULL, "/", &save_ptr);
-    error_report("plugin: %s, module: %s, job_id: %s, extra: %s", plugin, module, job_id, extra);
 
     buffer_flush(w->response.data);
     if (extra != NULL) {
         buffer_sprintf(w->response.data, "Invalid URL");
+        freez(url_full);
         return HTTP_RESP_BAD_REQUEST;
     }
 
@@ -685,6 +686,7 @@ static int web_client_api_request_v2_config(RRDHOST *host __maybe_unused, struct
             break;
         default:
             buffer_sprintf(w->response.data, "Invalid HTTP method");
+            freez(url_full);
             return HTTP_RESP_BAD_REQUEST;
     }
 
@@ -702,6 +704,7 @@ static int web_client_api_request_v2_config(RRDHOST *host __maybe_unused, struct
     if (resp.content_free)
         resp.content_free(resp.content);
     w->response.data->content_type = resp.content_type;
+    freez(url_full);
     return resp.status;
 }
 
