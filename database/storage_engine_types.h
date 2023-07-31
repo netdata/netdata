@@ -5,14 +5,6 @@
 
 #include "libnetdata/libnetdata.h"
 
-#define STORAGE_ENGINE_TIERS 5
-
-typedef enum __attribute__ ((__packed__)) {
-    STORAGE_TIER_BACKFILL_NONE = 0,
-    STORAGE_TIER_BACKFILL_FULL,
-    STORAGE_TIER_BACKFILL_NEW
-} STORAGE_TIER_BACKFILL;
-
 typedef struct rrddim RRDDIM;
 typedef struct storage_instance STORAGE_INSTANCE;
 typedef struct storage_metric_handle STORAGE_METRIC_HANDLE;
@@ -60,5 +52,13 @@ struct storage_engine_query_handle {
     STORAGE_ENGINE_ID id;
     STORAGE_QUERY_HANDLE *handle;
 };
+
+typedef enum __attribute__ ((__packed__)) {
+    STORAGE_TIER_BACKFILL_NONE = 0,
+    STORAGE_TIER_BACKFILL_FULL,
+    STORAGE_TIER_BACKFILL_NEW
+} STORAGE_TIER_BACKFILL;
+
+#define STORAGE_ENGINE_TIERS 5
 
 #endif /* NETDATA_STORAGE_ENGINE_TYPES_H */
