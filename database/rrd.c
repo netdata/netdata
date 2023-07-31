@@ -161,7 +161,7 @@ static bool dbengine_init(const char *hostname, dbengine_config_t *cfg) {
         fatal("DBENGINE on '%s', failed to initialize databases at '%s'.", hostname, netdata_configured_cache_dir);
 
     for (size_t tier = 0; tier < cfg->storage_tiers ;tier++)
-        rrdeng_readiness_wait(rrdb.dbengine_cfg.multidb_ctx[tier]);
+        rrdeng_readiness_wait(cfg->multidb_ctx[tier]);
 
     return true;
 }
@@ -205,7 +205,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
             netdata_log_info("DBENGINE: Initializing ...");
 
 #ifdef ENABLE_DBENGINE
-            dbengine_config_t cfg = rrdb.dbengine_cfg;
+            dbengine_config_t cfg = dbengine_cfg;
 
             // check journal
             cfg.check_journal = config_get_boolean(CONFIG_SECTION_DB, "dbengine enable journal integrity check", cfg.check_journal);
@@ -435,81 +435,6 @@ struct rrdb rrdb = {
     .dbengine_enabled = false,
 
 #ifdef ENABLE_DBENGINE
-    .dbengine_cfg = {
-        .base_path = CACHE_DIR,
-
-        .check_journal  = CONFIG_BOOLEAN_NO,
-        .use_direct_io = true,
-        .parallel_initialization = false,
-
-        .disk_quota_mb = 256,
-
-        #if defined(ENV32BIT)
-            .page_cache_mb = 16,
-            .extent_cache_mb = 0,
-        #else
-            .page_cache_mb = 32,
-            .extent_cache_mb = 0,
-        #endif
-
-        .pages_per_extent = MAX_PAGES_PER_EXTENT,
-
-        .page_type_size = {
-            sizeof(storage_number),
-            sizeof(storage_number_tier1_t)
-        },
-
-        .storage_tiers = 3,
-
-        .multidb_ctx = {
-            NULL,
-            NULL,
-            NULL,
-            NULL,
-            NULL,
-        },
-
-        .multidb_disk_quota_mb = {
-            256,
-            128,
-            64,
-            32,
-            16,
-        },
-
-        .storage_tiers_grouping_iterations = {
-            1,
-            60,
-            60,
-            60,
-            60
-        },
-
-        .storage_tiers_backfill = {
-            STORAGE_TIER_BACKFILL_NEW,
-            STORAGE_TIER_BACKFILL_NEW,
-            STORAGE_TIER_BACKFILL_NEW,
-            STORAGE_TIER_BACKFILL_NEW,
-            STORAGE_TIER_BACKFILL_NEW,
-        },
-
-    #if defined(ENV32BIT)
-        .tier_page_size = {
-            2048,
-            1024,
-            192,
-            192,
-            192
-        },
-    #else
-        .tier_page_size = {
-            4096,
-            2048,
-            384,
-            384,
-            384
-        },
-    #endif
-    },
+    .dbengine_cfg = {},
 #endif // ENABLE_DBENGINE
 };

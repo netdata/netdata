@@ -549,6 +549,7 @@ libjudy_a-JudyLTables.$(OBJEXT) : CFLAGS += -I$(abs_top_srcdir)/libnetdata/libju
 
 if ENABLE_DBENGINE
     RRD_PLUGIN_FILES += \
+        database/engine/rrddim_eng.c \
         database/engine/rrddim_eng.h \
         database/engine/rrdengine.c \
         database/engine/rrdengine.h \

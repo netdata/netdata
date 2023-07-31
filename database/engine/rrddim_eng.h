@@ -93,4 +93,6 @@ typedef struct {
     size_t tier_page_size[STORAGE_ENGINE_TIERS];
 } dbengine_config_t;
 
+extern dbengine_config_t dbengine_cfg;
+
 #endif /* NETDATA_RRDDIM_ENG_H */
