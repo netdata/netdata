@@ -101,7 +101,7 @@ static void *dbengine_tier_init(void *ptr) {
 #endif
 
 static void dbengine_init(const char *hostname, dbengine_config_t *cfg) {
-    struct dbengine_initialization tiers_init[RRD_STORAGE_TIERS] = {};
+    struct dbengine_initialization tiers_init[STORAGE_ENGINE_TIERS] = {};
 
     for (size_t tier = 0; tier < cfg->storage_tiers ;tier++) {
         char dbenginepath[FILENAME_MAX + 1];
@@ -255,9 +255,9 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
                 cfg.storage_tiers = 1;
                 config_set_number(CONFIG_SECTION_DB, "storage tiers", cfg.storage_tiers);
             }
-            if (cfg.storage_tiers > RRD_STORAGE_TIERS) {
-                netdata_log_error("Up to %d storage tier are supported. Assuming %d.", RRD_STORAGE_TIERS, RRD_STORAGE_TIERS);
-                cfg.storage_tiers = RRD_STORAGE_TIERS;
+            if (cfg.storage_tiers > STORAGE_ENGINE_TIERS) {
+                netdata_log_error("Up to %d storage tier are supported. Assuming %d.", STORAGE_ENGINE_TIERS, RRD_STORAGE_TIERS);
+                cfg.storage_tiers = STORAGE_ENGINE_TIERS;
                 config_set_number(CONFIG_SECTION_DB, "storage tiers", cfg.storage_tiers);
             }
 

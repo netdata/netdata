@@ -1187,7 +1187,7 @@ typedef struct query_engine_ops {
 
     // statistics
     size_t db_total_points_read;
-    size_t db_points_read_per_tier[RRD_STORAGE_TIERS];
+    size_t db_points_read_per_tier[STORAGE_ENGINE_TIERS];
 
     struct {
         time_t expanded_after;

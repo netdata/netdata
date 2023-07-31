@@ -13,7 +13,7 @@ typedef struct weights_stats {
     size_t db_points;
     size_t result_points;
     size_t db_queries;
-    size_t db_points_per_tier[RRD_STORAGE_TIERS];
+    size_t db_points_per_tier[STORAGE_ENGINE_TIERS];
     size_t binary_searches;
 } WEIGHTS_STATS;
 

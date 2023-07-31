@@ -579,7 +579,7 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(bool from_worker) {
 // ----------------------------------------------------------------------------
 
 struct {
-    ARAL *aral[RRD_STORAGE_TIERS];
+    ARAL *aral[STORAGE_ENGINE_TIERS];
 } dbengine_page_alloc_globals = {};
 
 static inline ARAL *page_size_lookup(size_t size) {

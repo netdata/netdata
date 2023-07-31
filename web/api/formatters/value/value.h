@@ -11,7 +11,7 @@ typedef struct storage_value {
     time_t after;
     time_t before;
     size_t points_read;
-    size_t storage_points_per_tier[RRD_STORAGE_TIERS];
+    size_t storage_points_per_tier[STORAGE_ENGINE_TIERS];
     size_t result_points;
     STORAGE_POINT sp;
     usec_t duration_ut;

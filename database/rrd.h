@@ -377,7 +377,7 @@ struct rrdset {
 
     rrd_ml_chart_t *ml_chart;
 
-    STORAGE_METRICS_GROUP *storage_metrics_groups[RRD_STORAGE_TIERS];
+    STORAGE_METRICS_GROUP *storage_metrics_groups[STORAGE_ENGINE_TIERS];
 
     // ------------------------------------------------------------------------
     // linking to siblings and parents
@@ -744,7 +744,7 @@ struct rrdhost {
         STORAGE_ENGINE_ID id;                       // the storage engine id for this tier
         STORAGE_INSTANCE *instance;                 // the db instance for this tier
         uint32_t tier_grouping;                     // tier 0 iterations aggregated on this tier
-    } db[RRD_STORAGE_TIERS];
+    } db[STORAGE_ENGINE_TIERS];
 
     struct rrdhost_system_info *system_info;        // information collected from the host environment
 

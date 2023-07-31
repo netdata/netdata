@@ -4,8 +4,8 @@
 
 static void rrdhost_streaming_sender_structures_init(RRDHOST *host);
 
-#if RRD_STORAGE_TIERS != 5
-#error RRD_STORAGE_TIERS is not 5 - you need to update the grouping iterations per tier
+#if STORAGE_ENGINE_TIERS != 5
+#error STORAGE_ENGINE_TIERS is not 5 - you need to update the grouping iterations per tier
 #endif
 
 size_t get_tier_grouping(size_t tier) {

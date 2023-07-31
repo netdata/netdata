@@ -65,7 +65,7 @@ static struct global_statistics {
     uint64_t backfill_queries_made;
     uint64_t backfill_db_points_read;
 
-    uint64_t db_points_stored_per_tier[RRD_STORAGE_TIERS];
+    uint64_t db_points_stored_per_tier[STORAGE_ENGINE_TIERS];
 
 } global_statistics = {
         .connected_clients = 0,
@@ -796,7 +796,7 @@ static void global_statistics_charts(void) {
 
     {
         static RRDSET *st_points_stored = NULL;
-        static RRDDIM *rds[RRD_STORAGE_TIERS] = {};
+        static RRDDIM *rds[STORAGE_ENGINE_TIERS] = {};
 
         if (unlikely(!st_points_stored)) {
             st_points_stored = rrdset_create_localhost(
@@ -2466,7 +2466,7 @@ static void dbengine2_statistics_charts(void) {
         RRDHOST *host;
         unsigned long long stats_array[RRDENG_NR_STATS] = {0};
         unsigned long long local_stats_array[RRDENG_NR_STATS];
-        unsigned dbengine_contexts = 0, counted_multihost_db[RRD_STORAGE_TIERS] = { 0 }, i;
+        unsigned dbengine_contexts = 0, counted_multihost_db[STORAGE_ENGINE_TIERS] = { 0 }, i;
 
         rrdhost_foreach_read(host) {
             if (!rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {

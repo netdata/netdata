@@ -87,11 +87,11 @@ typedef struct {
 
     size_t storage_tiers;
 
-    STORAGE_INSTANCE *multidb_ctx[RRD_STORAGE_TIERS];
-    int multidb_disk_quota_mb[RRD_STORAGE_TIERS];
-    size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
-    STORAGE_TIER_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS];
-    size_t tier_page_size[RRD_STORAGE_TIERS];
+    STORAGE_INSTANCE *multidb_ctx[STORAGE_ENGINE_TIERS];
+    int multidb_disk_quota_mb[STORAGE_ENGINE_TIERS];
+    size_t storage_tiers_grouping_iterations[STORAGE_ENGINE_TIERS];
+    STORAGE_TIER_BACKFILL storage_tiers_backfill[STORAGE_ENGINE_TIERS];
+    size_t tier_page_size[STORAGE_ENGINE_TIERS];
 } dbengine_config_t;
 
 #endif /* NETDATA_RRDDIM_ENG_H */

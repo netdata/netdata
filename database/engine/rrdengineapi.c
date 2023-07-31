@@ -10,10 +10,10 @@ struct rrdengine_instance multidb_ctx_storage_tier4;
 
 #define mrg_metric_ctx(metric) (struct rrdengine_instance *)mrg_metric_section(main_mrg, metric)
 
-#if RRD_STORAGE_TIERS != 5
-#error RRD_STORAGE_TIERS is not 5 - you need to add allocations here
+#if STORAGE_ENGINE_TIERS != 5
+#error STORAGE_ENGINE_TIERS is not 5 - you need to add allocations here
 #endif
-uint8_t tier_page_type[RRD_STORAGE_TIERS] = {PAGE_METRICS, PAGE_TIER, PAGE_TIER, PAGE_TIER, PAGE_TIER};
+uint8_t tier_page_type[STORAGE_ENGINE_TIERS] = {PAGE_METRICS, PAGE_TIER, PAGE_TIER, PAGE_TIER, PAGE_TIER};
 
 #if PAGE_TYPE_MAX != 1
 #error PAGE_TYPE_MAX is not 1 - you need to add allocations here

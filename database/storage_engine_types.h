@@ -5,7 +5,7 @@
 
 #include "libnetdata/libnetdata.h"
 
-#define RRD_STORAGE_TIERS 5
+#define STORAGE_ENGINE_TIERS 5
 
 typedef enum __attribute__ ((__packed__)) {
     STORAGE_TIER_BACKFILL_NONE = 0,

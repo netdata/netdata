@@ -514,7 +514,7 @@ static struct {
                 .analytics = NULL,
                 .print = "Tiering (multiple dbs with different metrics resolution)",
                 .json = "tiering",
-                .value = TOSTRING(RRD_STORAGE_TIERS),
+                .value = TOSTRING(STORAGE_ENGINE_TIERS),
         },
         [BIB_FEATURE_ML] = {
                 .category = BIC_FEATURE,

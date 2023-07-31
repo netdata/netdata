@@ -142,7 +142,7 @@ typedef struct query_plan_entry {
     time_t before;
 } QUERY_PLAN_ENTRY;
 
-#define QUERY_PLANS_MAX (RRD_STORAGE_TIERS)
+#define QUERY_PLANS_MAX (STORAGE_ENGINE_TIERS)
 
 typedef struct query_metrics_counts {   // counts the number of metrics related to an object
     size_t selected;                    // selected to be queried
@@ -215,7 +215,7 @@ typedef struct query_metric {
         time_t db_last_time_s;          // the latest timestamp available for this tier
         time_t db_update_every_s;       // latest update every for this tier
         long weight;
-    } tiers[RRD_STORAGE_TIERS];
+    } tiers[STORAGE_ENGINE_TIERS];
 
     struct {
         size_t used;
@@ -351,11 +351,11 @@ typedef struct query_target {
     } window;
 
     struct {
-        size_t queries[RRD_STORAGE_TIERS];
+        size_t queries[STORAGE_ENGINE_TIERS];
         time_t first_time_s;                  // the combined first_time_t of all metrics in the query, across all tiers
         time_t last_time_s;                   // the combined last_time_T of all metrics in the query, across all tiers
         time_t minimum_latest_update_every_s; // the min update every of the metrics in the query
-        struct query_tier_statistics tiers[RRD_STORAGE_TIERS];
+        struct query_tier_statistics tiers[STORAGE_ENGINE_TIERS];
     } db;
 
     struct {

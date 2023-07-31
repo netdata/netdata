@@ -1341,7 +1341,7 @@ static inline void rrdset_init_last_updated_time(RRDSET *st) {
     last_updated_time_align(st);
 }
 
-static __thread size_t rrdset_done_statistics_points_stored_per_tier[RRD_STORAGE_TIERS];
+static __thread size_t rrdset_done_statistics_points_stored_per_tier[STORAGE_ENGINE_TIERS];
 
 static inline time_t tier_next_point_time_s(RRDDIM *rd, size_t tier, time_t now_s) {
     uint32_t tier_grouping = rd->rrdset->rrdhost->db[tier].tier_grouping;
