@@ -4,8 +4,8 @@ modules:
       plugin_name: python.d.plugin
       module_name: alarms
       monitored_instance:
-        name: python.d alarms
-        link: https://learn.netdata.cloud/docs/data-collection/netdata-specific/alarms
+        name: Netdata Agent alarms
+        link: https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/alarms/README.md
         categories:
           - data-collection.other
         icon_filename: ""
