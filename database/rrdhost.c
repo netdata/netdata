@@ -8,6 +8,7 @@ static void rrdhost_streaming_sender_structures_init(RRDHOST *host);
 #error STORAGE_ENGINE_TIERS is not 5 - you need to update the grouping iterations per tier
 #endif
 
+#ifdef ENABLE_DBENGINE
 size_t get_tier_grouping(size_t tier) {
     if (unlikely(tier >= rrd_storage_tiers()))
         tier = rrd_storage_tiers() - 1;
@@ -19,6 +20,12 @@ size_t get_tier_grouping(size_t tier) {
 
     return grouping;
 }
+#else
+size_t get_tier_grouping(size_t tier) {
+    UNUSED(tier);
+    return 1;
+}
+#endif
 
 bool is_storage_engine_shared(STORAGE_INSTANCE *engine __maybe_unused) {
 #ifdef ENABLE_DBENGINE
@@ -275,7 +282,7 @@ RRDHOST *rrdhost_create(
 ) {
     netdata_log_debug(D_RRDHOST, "Host '%s': adding with guid '%s'", hostname, guid);
 
-    if(storage_engine_id == STORAGE_ENGINE_DBENGINE && !rrdb.dbengine_cfg.enabled) {
+    if(storage_engine_id == STORAGE_ENGINE_DBENGINE && !rrdb.dbengine_enabled) {
         netdata_log_error("memory mode 'dbengine' is not enabled, but host '%s' is configured for it. Falling back to 'alloc'", hostname);
         storage_engine_id = STORAGE_ENGINE_ALLOC;
     }

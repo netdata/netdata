@@ -881,6 +881,8 @@ struct rrdb {
 
     RRDHOST *localhost;
 
+    bool dbengine_enabled;
+
 #ifdef ENABLE_DBENGINE
     dbengine_config_t dbengine_cfg;
 #endif

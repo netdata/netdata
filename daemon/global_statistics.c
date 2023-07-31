@@ -4159,7 +4159,7 @@ void *global_statistics_main(void *ptr)
         registry_statistics();
 
 #ifdef ENABLE_DBENGINE
-        if(rrdb.dbengine_cfg.enabled) {
+        if(rrdb.dbengine_enabled) {
             worker_is_busy(WORKER_JOB_DBENGINE);
             dbengine2_statistics_charts();
         }

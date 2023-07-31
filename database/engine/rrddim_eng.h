@@ -71,7 +71,6 @@ size_t rrdeng_collectors_running(STORAGE_INSTANCE *db_instance);
 void rrdeng_size_statistics(STORAGE_INSTANCE *db_instance, BUFFER *wb);
 
 typedef struct {
-    bool enabled;
     const char *base_path;
 
     int check_journal;

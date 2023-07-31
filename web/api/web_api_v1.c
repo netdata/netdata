@@ -1443,7 +1443,7 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
 
-    if(!rrdb.dbengine_cfg.enabled) {
+    if(!rrdb.dbengine_enabled) {
         buffer_strcat(wb, "dbengine is not enabled");
         return HTTP_RESP_NOT_FOUND;
     }

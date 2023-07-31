@@ -594,7 +594,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
         }
     }
 
-    if (unlikely(rpt->config.storage_engine_id == STORAGE_ENGINE_DBENGINE && !rrdb.dbengine_cfg.enabled))
+    if (unlikely(rpt->config.storage_engine_id == STORAGE_ENGINE_DBENGINE && !rrdb.dbengine_enabled))
     {
         netdata_log_error("STREAM '%s' [receive from %s:%s]: dbengine is not enabled, falling back to default.",
                           rpt->hostname, rpt->client_ip, rpt->client_port);

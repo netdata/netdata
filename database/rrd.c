@@ -98,9 +98,8 @@ static void *dbengine_tier_init(void *ptr) {
     dbi->ret = rrdeng_init(NULL, dbi->path, dbi->disk_space_mb, dbi->tier);
     return ptr;
 }
-#endif
 
-static void dbengine_init(const char *hostname, dbengine_config_t *cfg) {
+static bool dbengine_init(const char *hostname, dbengine_config_t *cfg) {
     struct dbengine_initialization tiers_init[STORAGE_ENGINE_TIERS] = {};
 
     for (size_t tier = 0; tier < cfg->storage_tiers ;tier++) {
@@ -164,8 +163,9 @@ static void dbengine_init(const char *hostname, dbengine_config_t *cfg) {
     for (size_t tier = 0; tier < cfg->storage_tiers ;tier++)
         rrdeng_readiness_wait(rrdb.dbengine_cfg.multidb_ctx[tier]);
 
-    cfg->enabled = true;
+    return true;
 }
+#endif // ENABLE_DBENGINE
 
 static void init_host_indexes() {
     internal_fatal(rrdb.rrdhost_root_index || rrdb.rrdhost_root_index_hostname,
@@ -195,7 +195,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
     }
 
     if (unlikely(unittest)) {
-        rrdb.dbengine_cfg.enabled = true;
+        rrdb.dbengine_enabled = true;
     }
     else {
         health_init();
@@ -343,28 +343,21 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
 
             rrdb.dbengine_cfg = cfg;
 
-            dbengine_init(hostname, &rrdb.dbengine_cfg);
-#else
-            rrdb.storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", 1);
-            if(rrdb.storage_tiers != 1) {
-                netdata_log_error("DBENGINE is not available on '%s', so only 1 database tier can be supported.", hostname);
-                rrdb.storage_tiers = 1;
-                config_set_number(CONFIG_SECTION_DB, "storage tiers", rrdb.storage_tiers);
-            }
-            rrdb.dbengine_enabled = false;
+            rrdb.dbengine_enabled = dbengine_init(hostname, &rrdb.dbengine_cfg);
 #endif // ENABLE_DBENGINE
         }
         else {
             netdata_log_info("DBENGINE: Not initializing ...");
-            rrdb.dbengine_cfg.storage_tiers = 1;
         }
 
-        if (!rrdb.dbengine_cfg.enabled) {
+        if (!rrdb.dbengine_enabled) {
+#ifdef ENABLE_DBENGINE
             if (rrdb.dbengine_cfg.storage_tiers > 1) {
                 netdata_log_error("dbengine is not enabled, but %zu tiers have been requested. Resetting tiers to 1",
                                   rrdb.dbengine_cfg.storage_tiers);
                 rrdb.dbengine_cfg.storage_tiers = 1;
             }
+#endif
 
             if (default_storage_engine_id == STORAGE_ENGINE_DBENGINE) {
                 netdata_log_error("dbengine is not enabled, but it has been given as the default db mode. Resetting db mode to alloc");
@@ -439,8 +432,10 @@ struct rrdb rrdb = {
     .rrd_rwlock = NETDATA_RWLOCK_INITIALIZER,
     .localhost = NULL,
 
+    .dbengine_enabled = false,
+
+#ifdef ENABLE_DBENGINE
     .dbengine_cfg = {
-        .enabled = false,
         .base_path = CACHE_DIR,
 
         .check_journal  = CONFIG_BOOLEAN_NO,
@@ -516,4 +511,5 @@ struct rrdb rrdb = {
         },
     #endif
     },
+#endif // ENABLE_DBENGINE
 };
