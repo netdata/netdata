@@ -415,6 +415,7 @@ void job_del_cb(const DICTIONARY_ITEM *item, void *value, void *data)
     UNUSED(item);
     UNUSED(data);
     struct job *job = (struct job *)value;
+    freez(job->reason);
     freez(job->name);
     freez(job);
 }
