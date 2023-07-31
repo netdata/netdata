@@ -355,7 +355,7 @@ static void wal_cleanup1(void) {
     if(!spinlock_trylock(&wal_globals.protected.spinlock))
         return;
 
-    if (wal_globals.protected.available_items && wal_globals.protected.available > rrdb.dbengine_cfg.storage_tiers) {
+    if (wal_globals.protected.available_items && wal_globals.protected.available > dbengine_cfg.storage_tiers) {
         wal = wal_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
         wal_globals.protected.available--;
@@ -583,25 +583,25 @@ struct {
 } dbengine_page_alloc_globals = {};
 
 static inline ARAL *page_size_lookup(size_t size) {
-    for (size_t tier = 0; tier < rrdb.dbengine_cfg.storage_tiers ;tier++)
-        if(size == rrdb.dbengine_cfg.tier_page_size[tier])
+    for (size_t tier = 0; tier < dbengine_cfg.storage_tiers ;tier++)
+        if(size == dbengine_cfg.tier_page_size[tier])
             return dbengine_page_alloc_globals.aral[tier];
 
     return NULL;
 }
 
 static void dbengine_page_alloc_init(void) {
-    for (size_t i = rrdb.dbengine_cfg.storage_tiers; i > 0 ;i--) {
-        size_t tier = rrdb.dbengine_cfg.storage_tiers - i;
+    for (size_t i = dbengine_cfg.storage_tiers; i > 0 ;i--) {
+        size_t tier = dbengine_cfg.storage_tiers - i;
 
         char buf[20 + 1];
         snprintfz(buf, 20, "tier%zu-pages", tier);
 
         dbengine_page_alloc_globals.aral[tier] = aral_create(
                 buf,
-                rrdb.dbengine_cfg.tier_page_size[tier],
+                dbengine_cfg.tier_page_size[tier],
                 64,
-                512 * rrdb.dbengine_cfg.tier_page_size[tier],
+                512 * dbengine_cfg.tier_page_size[tier],
                 pgc_aral_statistics(),
                 NULL, NULL, false, false);
     }
@@ -837,7 +837,7 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
     uLong crc;
 
     for(descr = base, Index = 0, count = 0, uncompressed_payload_length = 0;
-        descr && count != rrdb.dbengine_cfg.pages_per_extent;
+        descr && count != dbengine_cfg.pages_per_extent;
         descr = descr->link.next, Index++) {
 
         uncompressed_payload_length += descr->page_length;

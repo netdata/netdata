@@ -1084,7 +1084,7 @@ void pgc_and_mrg_initialize(void)
 {
     main_mrg = mrg_create(0);
 
-    size_t target_cache_size = (size_t) rrdb.dbengine_cfg.page_cache_mb * 1024ULL * 1024ULL;
+    size_t target_cache_size = (size_t) dbengine_cfg.page_cache_mb * 1024ULL * 1024ULL;
     size_t main_cache_size = (target_cache_size / 100) * 95;
     size_t open_cache_size = 0;
     size_t extent_cache_size = (target_cache_size / 100) * 5;
@@ -1094,13 +1094,13 @@ void pgc_and_mrg_initialize(void)
         main_cache_size = target_cache_size - extent_cache_size;
     }
 
-    extent_cache_size += (size_t) (rrdb.dbengine_cfg.extent_cache_mb * 1024ULL * 1024ULL);
+    extent_cache_size += (size_t) (dbengine_cfg.extent_cache_mb * 1024ULL * 1024ULL);
 
     main_cache = pgc_create(
             "main_cache",
             main_cache_size,
             main_cache_free_clean_page_callback,
-            (size_t) rrdb.dbengine_cfg.pages_per_extent,
+            (size_t) dbengine_cfg.pages_per_extent,
             main_cache_flush_dirty_page_init_callback,
             main_cache_flush_dirty_page_callback,
             10,
