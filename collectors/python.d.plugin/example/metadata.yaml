@@ -5,7 +5,7 @@ modules:
       module_name: example
       monitored_instance:
         name: Example collector
-        link: https://learn.netdata.cloud/docs/data-collection/examples/example-module-in-python
+        link: https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/example/README.md
         categories:
           - data-collection.other
         icon_filename: ""
