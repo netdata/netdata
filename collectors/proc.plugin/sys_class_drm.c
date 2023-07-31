@@ -984,11 +984,11 @@ int do_sys_class_drm(int update_every, usec_t dt) {
     }
 
 
-    #define read_file_error(var_name) do {\
-        collector_error("Cannot read %s for %s: [%s]", #var_name, c->pathname, c->id.marketing_name);\
-        card_free(c);\
-        break;\
-    } while (0);
+    #define read_file_error(var_name) {                                                                 \
+        collector_error("Cannot read %s for %s: [%s]", #var_name, c->pathname, c->id.marketing_name);   \
+        card_free(c);                                                                                   \
+        break;                                                                                          \
+    }
 
     for(struct card *c = card_root; c; c = c->next) {
         
