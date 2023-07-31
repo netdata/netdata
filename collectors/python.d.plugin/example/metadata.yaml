@@ -4,7 +4,7 @@ modules:
       plugin_name: python.d.plugin
       module_name: example
       monitored_instance:
-        name: python.d alarms
+        name: Example collector
         link: https://learn.netdata.cloud/docs/data-collection/examples/example-module-in-python
         categories:
           - data-collection.other
