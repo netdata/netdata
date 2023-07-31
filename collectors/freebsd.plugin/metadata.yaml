@@ -8,7 +8,7 @@ modules:
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: "freebsd.jpg"
+        icon_filename: "freebsd.svg"
       related_resources:
         integrations:
           list: []
@@ -209,7 +209,7 @@ modules:
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: "freebsd.jpg"
+        icon_filename: "freebsd.svg"
       related_resources:
         integrations:
           list: []
@@ -400,7 +400,7 @@ modules:
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: "freebsd.jpg"
+        icon_filename: "freebsd.svg"
       related_resources:
         integrations:
           list: []
@@ -477,7 +477,7 @@ modules:
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: "freebsd.jpg"
+        icon_filename: "freebsd.svg"
       related_resources:
         integrations:
           list: []
@@ -560,7 +560,7 @@ modules:
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: "freebsd.jpg"
+        icon_filename: "freebsd.svg"
       related_resources:
         integrations:
           list: []
@@ -637,7 +637,7 @@ modules:
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: "freebsd.jpg"
+        icon_filename: "freebsd.svg"
       related_resources:
         integrations:
           list: []
@@ -714,7 +714,7 @@ modules:
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: "freebsd.jpg"
+        icon_filename: "freebsd.svg"
       related_resources:
         integrations:
           list: []
@@ -797,7 +797,7 @@ modules:
         link: ""
         categories:
           - data-collection.freebsd
-        icon_filename: "freebsd.jpg"
+        icon_filename: "freebsd.svg"
       related_resources:
         integrations:
           list: []
@@ -1153,7 +1153,7 @@ modules:
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: "freebsd.jpg"
+        icon_filename: "freebsd.svg"
       related_resources:
         integrations:
           list: []
@@ -1329,7 +1329,7 @@ modules:
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: "freebsd.jpg"
+        icon_filename: "freebsd.svg"
       related_resources:
         integrations:
           list: []
@@ -1419,7 +1419,7 @@ modules:
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: "freebsd.jpg"
+        icon_filename: "freebsd.svg"
       related_resources:
         integrations:
           list: []
@@ -1496,7 +1496,7 @@ modules:
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
-        icon_filename: "freebsd.jpg"
+        icon_filename: "freebsd.svg"
       related_resources:
         integrations:
           list: []

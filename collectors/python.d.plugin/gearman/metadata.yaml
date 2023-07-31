@@ -8,7 +8,7 @@ modules:
         link: "http://gearman.org/"
         categories:
           - data-collection.distributed-computing-systems
-        icon_filename: "gearman.svg"
+        icon_filename: "gearman.png"
       related_resources:
         integrations:
           list: []
