@@ -6,7 +6,7 @@ meta:
   link: 'https://learn.netdata.cloud/docs/exporting/json-document-databases'
   categories:
     - export
-  icon_filename: 'json.png'
+  icon_filename: 'json.svg'
 keywords:
   - exporter
   - json
