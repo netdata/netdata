@@ -714,14 +714,15 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                     continue;
                 }
 
-                int i;
-                for(i = 0; amdgpu_ids[i].asic_id; i++){
+                for(int i = 0; amdgpu_ids[i].asic_id; i++){
                     if(c->id.asic_id == amdgpu_ids[i].asic_id && c->id.pci_rev_id == amdgpu_ids[i].pci_rev_id){
                         c->id.marketing_name = strdupz(amdgpu_ids[i].marketing_name);
                         break;
                     }
+                } 
+                if(!c->id.marketing_name){
+                    c->id.marketing_name = strdupz(amdgpu_ids[sizeof(amdgpu_ids)/sizeof(amdgpu_ids[0]) - 1].marketing_name);
                 }
-                if(!amdgpu_ids[i].asic_id) c->id = amdgpu_ids[i];
 
 
                 collected_number tmp_val; 
