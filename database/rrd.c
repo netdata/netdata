@@ -133,29 +133,6 @@ static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
             break;
         }
 
-        RRD_BACKFILL backfill = rrdb.storage_tiers_backfill[tier];
-
-        if(tier > 0) {
-            char dbengineconfig[200 + 1];
-            snprintfz(dbengineconfig, 200, "dbengine tier %zu update every iterations", tier);
-
-            snprintfz(dbengineconfig, 200, "dbengine tier %zu backfill", tier);
-            const char *bf = config_get(CONFIG_SECTION_DB, dbengineconfig, backfill == RRD_BACKFILL_NEW ? "new" : backfill == RRD_BACKFILL_FULL ? "full" : "none");
-            if(strcmp(bf, "new") == 0)
-                backfill = RRD_BACKFILL_NEW;
-            else if(strcmp(bf, "full") == 0)
-                backfill = RRD_BACKFILL_FULL;
-            else if(strcmp(bf, "none") == 0)
-                backfill = RRD_BACKFILL_NONE;
-            else {
-                netdata_log_error("DBENGINE: unknown backfill value '%s', assuming 'new'", bf);
-                config_set(CONFIG_SECTION_DB, dbengineconfig, "new");
-                backfill = RRD_BACKFILL_NEW;
-            }
-        }
-
-        rrdb.storage_tiers_backfill[tier] = backfill;
-
         tiers_init[tier].disk_space_mb = rrdb.multidb_disk_quota_mb[tier];
         tiers_init[tier].tier = tier;
         strncpyz(tiers_init[tier].path, dbenginepath, FILENAME_MAX);
@@ -257,6 +234,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
                 cfg.storage_tiers = RRD_STORAGE_TIERS;
                 config_set_number(CONFIG_SECTION_DB, "storage tiers", cfg.storage_tiers);
             }
+            rrdb.storage_tiers = cfg.storage_tiers;
 
             {
                 rrdb.multidb_disk_quota_mb[0] = (int) config_get_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", compute_multidb_diskspace());
@@ -305,6 +283,33 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
                     }
 
                     internal_error(true, "DBENGINE tier %zu grouping iterations is set to %zu", tier, rrdb.storage_tiers_grouping_iterations[tier]);
+                }
+            }
+
+            {
+                for (size_t tier = 0; tier != cfg.storage_tiers; tier++) {
+                    RRD_BACKFILL backfill = rrdb.storage_tiers_backfill[tier];
+
+                    if(tier > 0) {
+                        char buf[200 + 1];
+                        snprintfz(buf, 200, "dbengine tier %zu backfill", tier);
+
+                        const char *bf = config_get(CONFIG_SECTION_DB, buf, backfill == RRD_BACKFILL_NEW ? "new" : backfill == RRD_BACKFILL_FULL ? "full" : "none");
+
+                        if(strcmp(bf, "new") == 0)
+                            backfill = RRD_BACKFILL_NEW;
+                        else if(strcmp(bf, "full") == 0)
+                            backfill = RRD_BACKFILL_FULL;
+                        else if(strcmp(bf, "none") == 0)
+                            backfill = RRD_BACKFILL_NONE;
+                        else {
+                            netdata_log_error("DBENGINE: unknown backfill value '%s', assuming 'new'", bf);
+                            config_set(CONFIG_SECTION_DB, buf, "new");
+                            backfill = RRD_BACKFILL_NEW;
+                        }
+                    }
+
+                    rrdb.storage_tiers_backfill[tier] = backfill;
                 }
             }
 
