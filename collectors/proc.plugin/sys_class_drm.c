@@ -509,7 +509,7 @@ static struct amdgpu_id_struct amdgpu_ids[] = {
     {0x98E4, 0xEA, "AMD Radeon R4 Graphics"},
     {0x98E4, 0xEB, "AMD Radeon R3 Graphics"},
     {0x98E4, 0xEC, "AMD Radeon R4 Graphics"},
-    {0x0000, 0x00, "unknown gpu"}
+    {0x0000, 0x00, "unknown AMD GPU"}
 };
 
 struct card {
@@ -693,7 +693,7 @@ int do_sys_class_drm(int update_every, usec_t dt) {
             if( de->d_type == DT_DIR && ((de->d_name[0] == '.' && de->d_name[1] == '\0') || 
                  (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0'))) continue;
             
-            if(likely(de->d_type == DT_LNK && !strncmp(de->d_name, "card", 4) && !strchr(de->d_name, '-'))) {
+            if(de->d_type == DT_LNK && !strncmp(de->d_name, "card", 4) && !strchr(de->d_name, '-')) {
                 struct card *const c = callocz(1, sizeof(struct card));  
 
                 /* Get static info */              
@@ -703,10 +703,16 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                 c->pathname = strdupz(filename);
 
                 snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, "device/device");
-                read_single_base64_or_hex_number_file(filename, (unsigned long long *) &c->id.asic_id);
+                if(read_single_base64_or_hex_number_file(filename, (unsigned long long *) &c->id.asic_id)){
+                    card_free(c);
+                    continue;
+                }
 
                 snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, "device/revision");
-                read_single_base64_or_hex_number_file(filename, (unsigned long long *) &c->id.pci_rev_id);
+                if(read_single_base64_or_hex_number_file(filename, (unsigned long long *) &c->id.pci_rev_id)){
+                    card_free(c);
+                    continue;
+                }
 
                 int i;
                 for(i = 0; amdgpu_ids[i].asic_id; i++){
@@ -978,11 +984,11 @@ int do_sys_class_drm(int update_every, usec_t dt) {
     }
 
 
-    #define read_file_error(var_name) {\
+    #define read_file_error(var_name) do {\
         collector_error("Cannot read %s for %s: [%s]", #var_name, c->pathname, c->id.marketing_name);\
         card_free(c);\
         break;\
-    }
+    } while (0);
 
     for(struct card *c = card_root; c; c = c->next) {
         

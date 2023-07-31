@@ -510,7 +510,6 @@ static inline int read_single_signed_number_file(const char *filename, long long
     return 0;
 }
 
-#include "log/log.h"
 static inline int read_single_base64_or_hex_number_file(const char *filename, unsigned long long *result) {
     char buffer[30 + 1];
 
