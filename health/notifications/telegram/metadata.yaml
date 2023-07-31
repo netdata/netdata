@@ -6,7 +6,7 @@
     link: 'https://telegram.org/'
     categories:
       - notify.agent
-    icon_filename: 'telegram.png'
+    icon_filename: 'telegram.svg'
   keywords:
     - Telegram
   overview:

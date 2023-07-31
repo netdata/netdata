@@ -6,7 +6,7 @@
     link: 'http://smstools3.kekekasvi.com/'
     categories:
       - notify.agent
-    icon_filename: 'sms.png'
+    icon_filename: 'sms.svg'
   keywords:
     - SMS tools 3
     - SMS

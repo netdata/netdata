@@ -6,7 +6,7 @@
     link: 'https://dynatrace.com'
     categories:
       - notify.agent
-    icon_filename: 'dynatrace.png'
+    icon_filename: 'dynatrace.svg'
   keywords:
     - Dynatrace
   overview:

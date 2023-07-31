@@ -6,7 +6,7 @@
     link: 'https://www.microsoft.com/en-us/microsoft-teams/log-in'
     categories:
       - notify.agent
-    icon_filename: 'teams.png'
+    icon_filename: 'msteams.svg'
   keywords:
     - Microsoft
     - Teams
