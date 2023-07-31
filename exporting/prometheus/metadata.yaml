@@ -165,7 +165,7 @@
     <<: *meta
     name: AppOptics
     link: https://www.solarwinds.com/appoptics
-    icon_filename: 'appoptics.png'
+    icon_filename: 'solarwinds.svg'
     keywords:
       - app optics
       - AppOptics
