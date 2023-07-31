@@ -41,8 +41,6 @@ typedef enum __attribute__ ((__packed__)) {
     QUERY_SOURCE_UNITTEST,
 } QUERY_SOURCE;
 
-#define RRD_STORAGE_TIERS 5
-
 // forward declarations
 struct rrddim_tier;
 
@@ -85,12 +83,6 @@ RRDSET_TYPE rrdset_type_id(const char *name);
 const char *rrdset_type_name(RRDSET_TYPE chart_type);
 
 #include "contexts/rrdcontext.h"
-
-typedef enum __attribute__ ((__packed__)) {
-    RRD_BACKFILL_NONE = 0,
-    RRD_BACKFILL_FULL,
-    RRD_BACKFILL_NEW
-} RRD_BACKFILL;
 
 #define UPDATE_EVERY_MIN 1
 #define UPDATE_EVERY_MAX 600
@@ -866,31 +858,6 @@ struct rrdhost {
 // ----------------------------------------------------------------------------
 // RRDB 
 
-typedef struct {
-    bool enabled;
-    const char *base_path;
-
-    int check_journal;
-    bool use_direct_io;
-    bool parallel_initialization;
-
-    int disk_quota_mb;
-    int page_cache_mb;
-    int extent_cache_mb;
-
-    unsigned pages_per_extent;
-    size_t page_type_size[256];
-
-    size_t storage_tiers;
-
-    STORAGE_INSTANCE *multidb_ctx[RRD_STORAGE_TIERS];
-    int multidb_disk_quota_mb[RRD_STORAGE_TIERS];
-    size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
-    RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS];
-    size_t tier_page_size[RRD_STORAGE_TIERS];
-} dbengine_config_t;
-
-
 struct rrdb {
     DICTIONARY *rrdhost_root_index;
     DICTIONARY *rrdhost_root_index_hostname;
@@ -914,7 +881,9 @@ struct rrdb {
 
     RRDHOST *localhost;
 
+#ifdef ENABLE_DBENGINE
     dbengine_config_t dbengine_cfg;
+#endif
 };
 
 extern struct rrdb rrdb;

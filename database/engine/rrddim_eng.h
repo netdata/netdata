@@ -70,4 +70,28 @@ size_t rrdeng_collectors_running(STORAGE_INSTANCE *db_instance);
 
 void rrdeng_size_statistics(STORAGE_INSTANCE *db_instance, BUFFER *wb);
 
+typedef struct {
+    bool enabled;
+    const char *base_path;
+
+    int check_journal;
+    bool use_direct_io;
+    bool parallel_initialization;
+
+    int disk_quota_mb;
+    int page_cache_mb;
+    int extent_cache_mb;
+
+    unsigned pages_per_extent;
+    size_t page_type_size[256];
+
+    size_t storage_tiers;
+
+    STORAGE_INSTANCE *multidb_ctx[RRD_STORAGE_TIERS];
+    int multidb_disk_quota_mb[RRD_STORAGE_TIERS];
+    size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
+    RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS];
+    size_t tier_page_size[RRD_STORAGE_TIERS];
+} dbengine_config_t;
+
 #endif /* NETDATA_RRDDIM_ENG_H */
