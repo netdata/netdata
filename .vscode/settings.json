@@ -1,7 +1,6 @@
 {
-    "yaml.schemas": {
-        "./integrations/schemas/collection-single-module.json": "/metadata.yaml",
-        "./integrations/schemas/collection-multi-module.json": "/multi_metadata.yaml",
-        "./integrations/schemas/categories.json": "/categories.yaml",
-    }
+  "yaml.schemas": {
+    "./integrations/schemas/collector.json": "/metadata.yaml",
+    "./integrations/schemas/categories.json": "/categories.yaml"
+  }
 }

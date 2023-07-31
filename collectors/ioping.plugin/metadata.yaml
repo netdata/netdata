@@ -1,101 +1,101 @@
-# yamllint disable rule:line-length
----
-meta:
-  plugin_name: ioping.plugin
-  module_name: ioping.plugin
-  monitored_instance:
-    name: IOPing
-    link: "https://github.com/koct9i/ioping"
-    categories:
-    - data-collection.synthetic-checks
-    icon_filename: "syslog.png"
-  related_resources:
-    integrations:
-      list: []
-  info_provided_to_referring_integrations:
-    description: ""
-  keywords: []
-  most_popular: false
-overview:
-  data_collection:
-    metrics_description: "Monitor IOPing metrics for efficient disk I/O latency tracking. Keep track of read/write speeds, latency, and error rates for optimized disk operations."
-    method_description: "Plugin uses `ioping` command."
-  supported_platforms:
-    include: []
-    exclude: []
-  multi_instance: true
-  additional_permissions:
-    description: ""
-  default_behavior:
-    auto_detection:
-      description: ""
-    limits:
-      description: ""
-    performance_impact:
-      description: ""
-setup:
-  prerequisites:
-    list:
-      - title: Install ioping
-        description: |
-          You can install the command by passing the argument `install` to the plugin (`/usr/libexec/netdata/plugins.d/ioping.plugin install`).
-  configuration:
-    file:
-      name: "ioping.conf"
-      description: "File with options to specify hardware to monitor and arguments for ioping command."
-    options:
-      description: ""
-      folding:
-        title: "Config options"
-        enabled: true
-      list:
-        - name: update_every
-          description: Data collection frequency.
-          default_value: 1s
-          required: false
-        - name: destination
-          description: The directory/file/device to ioping.
-          default_value: ""
-          required: true
-        - name: request_size
-          description: The request size in bytes to ioping the destination (symbolic modifiers are supported)
-          default_value: 4k
-          required: false
-        - name: ioping_opts
-          description: Options passed to `ioping` commands.
-          default_value: -T 1000000
-          required: false
-    examples:
-      folding:
-        enabled: true
-        title: "Config"
-      list:
-        - name: Basic Configuration
-          description: This example has the minimum configuration necessary to have the plugin running.
-          config: |
-            destination="/dev/sda"
-troubleshooting:
-  problems:
-    list: []
-alerts:
-- name: ioping_disk_latency
-  link: https://github.com/netdata/netdata/blob/master/health/health.d/ioping.conf
-  metric: ioping.latency
-  info: average I/O latency over the last 10 seconds
-metrics:
-  folding:
-    title: Metrics
-    enabled: false
-  description: ""
-  availability: []
-  scopes:
-  - name: disk
-    description: ""
-    labels: []
+plugin_name: ioping.plugin
+modules:
+  - meta:
+      plugin_name: ioping.plugin
+      module_name: ioping.plugin
+      monitored_instance:
+        name: IOPing
+        link: "https://github.com/koct9i/ioping"
+        categories:
+          - data-collection.synthetic-checks
+        icon_filename: "syslog.png"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Monitor IOPing metrics for efficient disk I/O latency tracking. Keep track of read/write speeds, latency, and error rates for optimized disk operations."
+        method_description: "Plugin uses `ioping` command."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Install ioping
+            description: |
+              You can install the command by passing the argument `install` to the plugin (`/usr/libexec/netdata/plugins.d/ioping.plugin install`).
+      configuration:
+        file:
+          name: "ioping.conf"
+          description: "File with options to specify hardware to monitor and arguments for ioping command."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1s
+              required: false
+            - name: destination
+              description: The directory/file/device to ioping.
+              default_value: ""
+              required: true
+            - name: request_size
+              description: The request size in bytes to ioping the destination (symbolic modifiers are supported)
+              default_value: 4k
+              required: false
+            - name: ioping_opts
+              description: Options passed to `ioping` commands.
+              default_value: -T 1000000
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: "Config"
+          list:
+            - name: Basic Configuration
+              description: This example has the minimum configuration necessary to have the plugin running.
+              config: |
+                destination="/dev/sda"
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: ioping_disk_latency
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/ioping.conf
+        metric: ioping.latency
+        info: average I/O latency over the last 10 seconds
     metrics:
-    - name: ioping.latency
-      description: Read Latency
-      unit: "microseconds"
-      chart_type: line
-      dimensions:
-      - name: latency
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: disk
+          description: ""
+          labels: []
+          metrics:
+            - name: ioping.latency
+              description: Read Latency
+              unit: "microseconds"
+              chart_type: line
+              dimensions:
+                - name: latency

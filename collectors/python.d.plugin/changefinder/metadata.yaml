@@ -1,77 +1,79 @@
-meta:
-  plugin_name: python.d.plugin
-  module_name: changefinder
-  monitored_instance:
-    name: python.d changefinder
-    link: ''
-    categories: []
-    icon_filename: ''
-  related_resources:
-    integrations:
-      list: []
-  info_provided_to_referring_integrations:
-    description: ''
-  keywords: []
-  most_popular: false
-overview:
-  data_collection:
-    metrics_description: ''
-    method_description: ''
-  supported_platforms:
-    include: []
-    exclude: []
-  multi_instance: true
-  additional_permissions:
-    description: ''
-  default_behavior:
-    auto_detection:
-      description: ''
-    limits:
-      description: ''
-    performance_impact:
-      description: ''
-setup:
-  prerequisites:
-    list: []
-  configuration:
-    file:
-      name: ''
-      description: ''
-    options:
-      description: ''
-      folding:
-        title: ''
-        enabled: true
-      list: []
-    examples:
-      folding:
-        enabled: true
-        title: ''
-      list: []
-troubleshooting:
-  problems:
-    list: []
-alerts: []
-metrics:
-  folding:
-    title: Metrics
-    enabled: false
-  description: ""
-  availability: []
-  scopes:
-  - name: global
-    description: ""
-    labels: []
+plugin_name: python.d.plugin
+modules:
+  - meta:
+      plugin_name: python.d.plugin
+      module_name: changefinder
+      monitored_instance:
+        name: python.d changefinder
+        link: ''
+        categories: []
+        icon_filename: ''
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ''
+        method_description: ''
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+          description: ''
+        options:
+          description: ''
+          folding:
+            title: ''
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
     metrics:
-    - name: changefinder.scores
-      description: ChangeFinder
-      unit: "score"
-      chart_type: line
-      dimensions:
-      - name: a dimension per chart
-    - name: changefinder.flags
-      description: ChangeFinder
-      unit: "flag"
-      chart_type: stacked
-      dimensions:
-      - name: a dimension per chart
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: changefinder.scores
+              description: ChangeFinder
+              unit: "score"
+              chart_type: line
+              dimensions:
+                - name: a dimension per chart
+            - name: changefinder.flags
+              description: ChangeFinder
+              unit: "flag"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per chart

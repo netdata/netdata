@@ -58,4 +58,3 @@
               SEND_SLACK="YES"
               SLACK_WEBHOOK_URL="https://hooks.slack.com/services/XXXXXXXX/XXXXXXXX/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" 
               DEFAULT_RECIPIENT_SLACK="#alarms"
-

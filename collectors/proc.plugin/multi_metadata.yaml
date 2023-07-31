@@ -43,7 +43,7 @@ modules:
           - `/sys/devices/system/cpu/[X]/cpuidle/state[X]/time` to get the total time each specific CPU core has spent in each idle state since the system was started.
         method_description: ""
       supported_platforms:
-        include: [ "linux" ]
+        include: ["linux"]
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -244,7 +244,7 @@ modules:
           can help to mitigate the risk of entropy depletion, but they may not be as reliable as hardware-based solutions.
         method_description: ""
       supported_platforms:
-        include: [ "linux" ]
+        include: ["linux"]
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -332,7 +332,7 @@ modules:
           - **Compliance requirements**: Server uptime data can be used to demonstrate compliance with regulatory requirements or SLAs that mandate a minimum level of server availability.
         method_description: ""
       supported_platforms:
-        include: [ "linux" ]
+        include: ["linux"]
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -429,7 +429,7 @@ modules:
           of memory resources.
         method_description: ""
       supported_platforms:
-        include: [ "linux" ]
+        include: ["linux"]
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -1151,7 +1151,7 @@ modules:
           `/proc/net/softnet_stat` provides statistics that relate to the handling of network packets by softirq.
           
           It provides information about:
-  
+          
           - Total number of processed packets (`processed`).
           - Times ksoftirq ran out of quota (`dropped`).
           - Times net_rx_action was rescheduled.
