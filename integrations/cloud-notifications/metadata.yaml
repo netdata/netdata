@@ -1,6 +1,6 @@
 # yamllint disable rule:line-length
 ---
-- id: 'notify-discord'
+- id: 'notify-cloud-discord'
   meta:
     name: 'Discord'
     link: 'https://discord.com/'
@@ -40,9 +40,9 @@
         * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Discord:
           - Define the type channel you want to send notifications to: **Text channel** or **Forum channel**
           - Webhook URL - URL provided on Discord for the channel you want to receive your notifications.
-          - Thread name - if the Discord channel is a **Forum channel** you will need to provide the thread name as well      
+          - Thread name - if the Discord channel is a **Forum channel** you will need to provide the thread name as well
 
-- id: 'notify-pagerduty'
+- id: 'notify-cloud-pagerduty'
   meta:
     name: 'PagerDuty'
     link: 'https://www.pagerduty.com/'
@@ -62,7 +62,7 @@
       - The Netdata Space needs to be on **Business** plan or higher
       - You need to have a PagerDuty service to receive events using webhooks.
 
-      
+
       ### PagerDuty Server Configuration
       Steps to configure your PagerDuty to receive notifications from Netdata:
 
@@ -84,7 +84,7 @@
         * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For PagerDuty:
           - Integration Key - is a 32 character key provided by PagerDuty to receive events on your service.
 
-- id: 'notify-slack'
+- id: 'notify-cloud-slack'
   meta:
     name: 'Slack'
     link: 'https://slack.com/'
@@ -99,14 +99,14 @@
   setup:
     description: |
       ### Prerequisites
-      
+
       - A Netdata Cloud account
       - Access to the Netdata Space as an **administrator**
       - The Netdata Space needs to be on **Business** plan or higher
       - You need to have a Slack app on your workspace to receive the Webhooks.
-      
+
       ### Slack Server Configuration
-      
+
       Steps to configure your Slack to receive notifications from Netdata:
 
       1. Create an app to receive webhook integrations. Check [Create an app](https://api.slack.com/apps?new_app=1) from Slack documentation for further details
@@ -116,7 +116,7 @@
         - At the bottom of **Webhook URLs for Your Workspace** section you have **Add New Webhook to Workspace**
         - After pressing that specify the channel where you want your notifications to be delivered
         - Once completed copy the Webhook URL that you will need to add to your notification configuration on Netdata UI
-      
+
       For more details please check Slacks's article [Incoming webhooks for Slack](https://slack.com/help/articles/115005265063-Incoming-webhooks-for-Slack).
 
       ### Netdata Configuration Steps
@@ -132,8 +132,8 @@
           - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
         * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Slack:
           - Webhook URL - URL provided on Slack for the channel you want to receive your notifications.
-          
-- id: 'notify-opsgenie'
+
+- id: 'notify-cloud-opsgenie'
   meta:
     name: 'Opsgenie'
     link: 'https://www.atlassian.com/software/opsgenie'
@@ -149,14 +149,14 @@
   setup:
     description: |
       ### Prerequisites
-      
+
       - A Netdata Cloud account
       - Access to the Netdata Space as an **administrator**
       - The Netdata Space needs to be on **Business** plan or higher
       - You need to have permissions on Opsgenie to add new integrations.
-      
+
       ### Opsgenie Server Configuration
-      
+
       Steps to configure your Opsgenie to receive notifications from Netdata:
 
       1. Go to integrations tab of your team, click **Add integration**
@@ -177,7 +177,7 @@
         * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Opsgenie:
           - API Key - a key provided on Opsgenie for the channel you want to receive your notifications.
 
-- id: 'notify-mattermost'
+- id: 'notify-cloud-mattermost'
   meta:
     name: 'Mattermost'
     link: 'https://mattermost.com/'
@@ -192,15 +192,15 @@
   setup:
     description: |
       ### Prerequisites
-      
+
       - A Netdata Cloud account
       - Access to the Netdata Space as an **administrator**
       - The Netdata Space needs to be on **Business** plan or higher
       - You need to have permissions on Mattermost to add new integrations.
       - You need to have a Mattermost app on your workspace to receive the webhooks.
-      
+
       ### Mattermost Server Configuration
-      
+
       Steps to configure your Mattermost to receive notifications from Netdata:
 
       1. In Mattermost, go to Product menu > Integrations > Incoming Webhook
@@ -211,7 +211,7 @@
         `https://your-mattermost-server.com/hooks/xxx-generatedkey-xxx`
 
         - Treat this endpoint as a secret. Anyone who has it will be able to post messages to your Mattermost instance.
-            
+
       For more details please check Mattermost's article [Incoming webhooks for Mattermost](https://developers.mattermost.com/integrate/webhooks/incoming/).
 
       ### Netdata Configuration Steps
@@ -227,8 +227,8 @@
           - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
         * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Mattermost:
           - Webhook URL - URL provided on Mattermost for the channel you want to receive your notifications
-          
-- id: 'notify-rocketchat'
+
+- id: 'notify-cloud-rocketchat'
   meta:
     name: 'RocketChat'
     link: 'https://www.rocket.chat/'
@@ -243,15 +243,15 @@
   setup:
     description: |
       ### Prerequisites
-      
+
       - A Netdata Cloud account
       - Access to the Netdata Space as an **administrator**
       - The Netdata Space needs to be on **Business** plan or higher
       - You need to have permissions on Mattermost to add new integrations.
       - You need to have a RocketChat app on your workspace to receive the webhooks.
-      
+
       ### Mattermost Server Configuration
-      
+
       Steps to configure your RocketChat to receive notifications from Netdata:
 
       1. In RocketChat, Navigate to Administration > Workspace > Integrations.
@@ -262,7 +262,7 @@
         `https://your-server.rocket.chat/hooks/YYYYYYYYYYYYYYYYYYYYYYYY/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`
         - Treat this endpoint as a secret. Anyone who has it will be able to post messages to your RocketChat instance.
 
-            
+
       For more details please check RocketChat's article Incoming webhooks for [RocketChat](https://docs.rocket.chat/use-rocket.chat/workspace-administration/integrations/).
 
       ### Netdata Configuration Steps
@@ -278,8 +278,8 @@
           - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
         * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For RocketChat:
           - Webhook URL - URL provided on RocketChat for the channel you want to receive your notifications.
-          
-- id: 'notify-webhook'
+
+- id: 'notify-cloud-webhook'
   meta:
     name: 'Webhook'
     link: 'https://en.wikipedia.org/wiki/Webhook'
@@ -295,7 +295,7 @@
   setup:
     description: |
       ### Prerequisites
-      
+
       - A Netdata Cloud account
       - Access to the Netdata Space as an **administrator**
       - The Netdata Space needs to be on **Pro** plan or higher
@@ -319,7 +319,7 @@
             * Mutual TLS (recommended) - default authentication mechanism used if no other method is selected.
             * Basic - the client sends a request with an Authorization header that includes a base64-encoded string in the format **username:password**. These will settings will be required inputs.
             * Bearer - the client sends a request with an Authorization header that includes a **bearer token**. This setting will be a required input.
-          
+
 
         ### Webhook service
 
@@ -356,7 +356,7 @@
         When setting up a webhook integration, the user can specify a set of headers to be included in the HTTP requests sent to the webhook URL.
 
         By default, the following headers will be sent in the HTTP request
-        
+
         |            **Header**            | **Value**                 |
         |:-------------------------------:|-----------------------------|
         |     Content-Type             | application/json        |
@@ -372,11 +372,11 @@
         This is the default authentication mechanism used if no other method is selected.
 
         To take advantage of mutual TLS, you can configure your server to verify Netdata's client certificate. In order to achieve this, the Netdata client sending the notification supports mutual TLS (mTLS) to identify itself with a client certificate that your server can validate.
-        
+
         The steps to perform this validation are as follows:
-        
+
         - Store Netdata CA certificate on a file in your disk. The content of this file should be:
-        
+
         <details>
           <summary>Netdata CA certificate</summary>
 
@@ -513,8 +513,7 @@
           response = {
             'response_token': 'sha256=' + base64.b64encode(sha256_hash_digest).decode('ascii')
           }
-          
+
           # returns properly formatted json response
           return json.dumps(response)
         ```
-
