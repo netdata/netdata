@@ -83,7 +83,7 @@ static struct global_statistics {
 };
 
 void global_statistics_rrdset_done_chart_collection_completed(size_t *points_read_per_tier_array) {
-    for(size_t tier = 0; tier < rrdb.dbengine_cfg.storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < rrd_storage_tiers(); tier++) {
         __atomic_fetch_add(&global_statistics.db_points_stored_per_tier[tier], points_read_per_tier_array[tier], __ATOMIC_RELAXED);
         points_read_per_tier_array[tier] = 0;
     }
@@ -210,7 +210,7 @@ static inline void global_statistics_copy(struct global_statistics *gs, uint8_t 
     gs->backfill_queries_made       = __atomic_load_n(&global_statistics.backfill_queries_made, __ATOMIC_RELAXED);
     gs->backfill_db_points_read     = __atomic_load_n(&global_statistics.backfill_db_points_read, __ATOMIC_RELAXED);
 
-    for(size_t tier = 0; tier < rrdb.dbengine_cfg.storage_tiers ;tier++)
+    for (size_t tier = 0; tier < rrd_storage_tiers(); tier++)
         gs->db_points_stored_per_tier[tier] = __atomic_load_n(&global_statistics.db_points_stored_per_tier[tier], __ATOMIC_RELAXED);
 
     if(options & GLOBAL_STATS_RESET_WEB_USEC_MAX) {
@@ -814,14 +814,14 @@ static void global_statistics_charts(void) {
                     , RRDSET_TYPE_STACKED
             );
 
-            for(size_t tier = 0; tier < rrdb.dbengine_cfg.storage_tiers ;tier++) {
+            for (size_t tier = 0; tier < rrd_storage_tiers(); tier++) {
                 char buf[30 + 1];
                 snprintfz(buf, 30, "tier%zu", tier);
                 rds[tier] = rrddim_add(st_points_stored, buf, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
         }
 
-        for(size_t tier = 0; tier < rrdb.dbengine_cfg.storage_tiers ;tier++)
+        for (size_t tier = 0; tier < rrd_storage_tiers(); tier++)
             rrddim_set_by_pointer(st_points_stored, rds[tier], (collected_number)gs.db_points_stored_per_tier[tier]);
 
         rrdset_done(st_points_stored);
@@ -2472,7 +2472,7 @@ static void dbengine2_statistics_charts(void) {
             if (!rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
 
                 /* get localhost's DB engine's statistics for each tier */
-                for(size_t tier = 0; tier < rrdb.dbengine_cfg.storage_tiers ;tier++) {
+                for (size_t tier = 0; tier < rrd_storage_tiers(); tier++) {
                     if(host->db[tier].id != STORAGE_ENGINE_DBENGINE) continue;
                     if(!host->db[tier].instance) continue;
 

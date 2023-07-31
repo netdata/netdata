@@ -326,7 +326,7 @@ void netdata_cleanup_and_exit(int ret) {
 #ifdef ENABLE_DBENGINE
     if (rrdb.dbengine_cfg.enabled) {
         delta_shutdown_time("dbengine exit mode");
-        for (size_t tier = 0; tier < rrdb.dbengine_cfg.storage_tiers; tier++)
+        for (size_t tier = 0; tier < rrd_storage_tiers(); tier++)
             rrdeng_exit_mode(rrdb.dbengine_cfg.multidb_ctx[tier]);
     }
 #endif
@@ -417,7 +417,7 @@ void netdata_cleanup_and_exit(int ret) {
 #ifdef ENABLE_DBENGINE
         if (rrdb.dbengine_cfg.enabled) {
             delta_shutdown_time("flush dbengine tiers");
-            for (size_t tier = 0; tier < rrdb.dbengine_cfg.storage_tiers; tier++)
+            for (size_t tier = 0; tier < rrd_storage_tiers(); tier++)
                 rrdeng_prepare_exit(rrdb.dbengine_cfg.multidb_ctx[tier]);
         }
 #endif
@@ -439,7 +439,7 @@ void netdata_cleanup_and_exit(int ret) {
             size_t running = 1;
             while(running) {
                 running = 0;
-                for (size_t tier = 0; tier < rrdb.dbengine_cfg.storage_tiers; tier++)
+                for (size_t tier = 0; tier < rrd_storage_tiers(); tier++)
                     running += rrdeng_collectors_running(rrdb.dbengine_cfg.multidb_ctx[tier]);
 
                 if(running) {
@@ -457,7 +457,7 @@ void netdata_cleanup_and_exit(int ret) {
             }
 
             delta_shutdown_time("stop dbengine tiers");
-            for (size_t tier = 0; tier < rrdb.dbengine_cfg.storage_tiers; tier++)
+            for (size_t tier = 0; tier < rrd_storage_tiers(); tier++)
                 rrdeng_exit(rrdb.dbengine_cfg.multidb_ctx[tier]);
         }
 #endif

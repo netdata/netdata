@@ -1042,7 +1042,7 @@ static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t afte
     }
 
     size_t best_tier = 0;
-    for(size_t tier = 1; tier < rrdb.dbengine_cfg.storage_tiers ; tier++) {
+    for (size_t tier = 1; tier < rrd_storage_tiers(); tier++) {
         if(qm->tiers[tier].weight >= qm->tiers[best_tier].weight)
             best_tier = tier;
     }
@@ -1051,7 +1051,7 @@ static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t afte
 }
 
 static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
-    if(unlikely(rrdb.dbengine_cfg.storage_tiers < 2))
+    if(unlikely(rrd_storage_tiers() < 2))
         return 0;
 
     if(unlikely(after_wanted == before_wanted || points_wanted <= 0)) {
@@ -1059,10 +1059,10 @@ static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after
         return 0;
     }
 
-    long weight[rrdb.dbengine_cfg.storage_tiers];
+    long weight[rrd_storage_tiers()];
 
-    for(size_t tier = 0; tier < rrdb.dbengine_cfg.storage_tiers ; tier++) {
-
+    for (size_t tier = 0; tier < rrd_storage_tiers(); tier++)
+    {
         time_t common_first_time_s = 0;
         time_t common_last_time_s = 0;
         time_t common_update_every_s = 0;
@@ -1098,7 +1098,7 @@ static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after
     }
 
     size_t best_tier = 0;
-    for(size_t tier = 1; tier < rrdb.dbengine_cfg.storage_tiers ; tier++) {
+    for (size_t tier = 1; tier < rrd_storage_tiers(); tier++) {
         if(weight[tier] >= weight[best_tier])
             best_tier = tier;
     }
@@ -1111,7 +1111,7 @@ static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after
 
 static time_t rrdset_find_natural_update_every_for_timeframe(QUERY_TARGET *qt, time_t after_wanted, time_t before_wanted, size_t points_wanted, RRDR_OPTIONS options, size_t tier) {
     size_t best_tier;
-    if((options & RRDR_OPTION_SELECTED_TIER) && tier < rrdb.dbengine_cfg.storage_tiers)
+    if ((options & RRDR_OPTION_SELECTED_TIER) && tier < rrd_storage_tiers())
         best_tier = tier;
     else
         best_tier = rrddim_find_best_tier_for_timeframe(qt, after_wanted, before_wanted, points_wanted);
