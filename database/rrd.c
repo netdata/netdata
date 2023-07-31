@@ -133,20 +133,11 @@ static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
             break;
         }
 
-        size_t grouping_iterations = rrdb.storage_tiers_grouping_iterations[tier];
         RRD_BACKFILL backfill = rrdb.storage_tiers_backfill[tier];
 
         if(tier > 0) {
             char dbengineconfig[200 + 1];
             snprintfz(dbengineconfig, 200, "dbengine tier %zu update every iterations", tier);
-            grouping_iterations = config_get_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
-            if(grouping_iterations < 2) {
-                grouping_iterations = 2;
-                config_set_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
-                netdata_log_error("DBENGINE on '%s': 'dbegnine tier %zu update every iterations' cannot be less than 2. Assuming 2.",
-                                  hostname,
-                                  tier);
-            }
 
             snprintfz(dbengineconfig, 200, "dbengine tier %zu backfill", tier);
             const char *bf = config_get(CONFIG_SECTION_DB, dbengineconfig, backfill == RRD_BACKFILL_NEW ? "new" : backfill == RRD_BACKFILL_FULL ? "full" : "none");
@@ -163,19 +154,7 @@ static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
             }
         }
 
-        rrdb.storage_tiers_grouping_iterations[tier] = grouping_iterations;
         rrdb.storage_tiers_backfill[tier] = backfill;
-
-        if(tier > 0 && get_tier_grouping(tier) > 65535) {
-            rrdb.storage_tiers_grouping_iterations[tier] = 1;
-            netdata_log_error("DBENGINE on '%s': dbengine tier %zu gives aggregation of more than 65535 points of tier 0. Disabling tiers above %zu",
-                              hostname,
-                              tier,
-                              tier);
-            break;
-        }
-
-        internal_error(true, "DBENGINE tier %zu grouping iterations is set to %zu", tier, rrdb.storage_tiers_grouping_iterations[tier]);
 
         tiers_init[tier].disk_space_mb = rrdb.multidb_disk_quota_mb[tier];
         tiers_init[tier].tier = tier;
@@ -295,6 +274,37 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
                     char buf[200 + 1];
                     snprintfz(buf, 200, "dbengine tier %zu multihost disk space MB", tier);
                     rrdb.multidb_disk_quota_mb[tier] = config_get_number(CONFIG_SECTION_DB, buf, curr_tier_size);
+                }
+            }
+
+            {
+                for (size_t tier = 1; tier < cfg.storage_tiers; tier++) {
+                    char buf[200 + 1];
+                    snprintfz(buf, 200, "dbengine tier %zu update every iterations", tier);
+
+                    size_t grouping_iterations = rrdb.storage_tiers_grouping_iterations[tier];
+                    grouping_iterations = config_get_number(CONFIG_SECTION_DB, buf, grouping_iterations);
+
+                    if (grouping_iterations < 2) {
+                        grouping_iterations = 2;
+                        config_set_number(CONFIG_SECTION_DB, buf, grouping_iterations);
+                        netdata_log_error("DBENGINE on '%s': 'dbegnine tier %zu update every iterations' cannot be less than 2. Assuming 2.",
+                                          hostname, tier);
+                    }
+
+                    rrdb.storage_tiers_grouping_iterations[tier] = grouping_iterations;
+
+                    if(tier > 0 && get_tier_grouping(tier) > 65535) {
+                        rrdb.storage_tiers_grouping_iterations[tier] = 1;
+                        netdata_log_error("DBENGINE on '%s': dbengine tier %zu gives aggregation of more than 65535 points of tier 0. Disabling tiers above %zu",
+                                          hostname,
+                                          tier,
+                                          tier);
+                        cfg.storage_tiers = tier;
+                        break;
+                    }
+
+                    internal_error(true, "DBENGINE tier %zu grouping iterations is set to %zu", tier, rrdb.storage_tiers_grouping_iterations[tier]);
                 }
             }
 
