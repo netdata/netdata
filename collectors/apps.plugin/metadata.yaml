@@ -9,7 +9,7 @@ modules:
         link: ""
         categories:
           - data-collection.processes-and-system-services
-        icon_filename: "netdata.png"
+        icon_filename: "applications.svg"
       related_resources:
         integrations:
           list: []
@@ -229,7 +229,7 @@ modules:
         link: ""
         categories:
           - data-collection.processes-and-system-services
-        icon_filename: ""
+        icon_filename: "user.svg"
       related_resources:
         integrations:
           list: []
@@ -451,7 +451,7 @@ modules:
         link: ""
         categories:
           - data-collection.processes-and-system-services
-        icon_filename: ""
+        icon_filename: "users.svg"
       related_resources:
         integrations:
           list: []
