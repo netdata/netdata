@@ -667,7 +667,7 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
     };
 
     // always calculate entries by size
-    vd.point_size = rrdb.page_type_size[vd.type];
+    vd.point_size = rrdb.dbengine_cfg.page_type_size[vd.type];
     vd.entries = page_entries_by_size(vd.page_length, vd.point_size);
 
     // allow to be called without entries (when loading pages from disk)

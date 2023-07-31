@@ -663,10 +663,10 @@ void set_late_global_environment(struct rrdhost_system_info *system_info)
 #ifdef ENABLE_DBENGINE
     {
         char b[16];
-        snprintfz(b, 15, "%d", rrdb.default_rrdeng_page_cache_mb);
+        snprintfz(b, 15, "%d", rrdb.dbengine_cfg.page_cache_mb);
         analytics_set_data(&analytics_data.netdata_config_page_cache_size, b);
 
-        snprintfz(b, 15, "%d", rrdb.multidb_disk_quota_mb[0]);
+        snprintfz(b, 15, "%d", rrdb.dbengine_cfg.multidb_disk_quota_mb[0]);
         analytics_set_data(&analytics_data.netdata_config_multidb_disk_quota, b);
     }
 #endif

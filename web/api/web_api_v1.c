@@ -762,7 +762,7 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
         }
         else if(!strcmp(name, "tier")) {
             tier = str2ul(value);
-            if(tier < rrdb.storage_tiers)
+            if(tier < rrd_storage_tiers())
                 options |= RRDR_OPTION_SELECTED_TIER;
             else
                 tier = 0;
@@ -1264,8 +1264,8 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
     buffer_json_member_add_string(wb, "memory-mode", storage_engine_name(host->storage_engine_id));
 #ifdef ENABLE_DBENGINE
-    buffer_json_member_add_uint64(wb, "multidb-disk-quota", rrdb.multidb_disk_quota_mb[0]);
-    buffer_json_member_add_uint64(wb, "page-cache-size", rrdb.default_rrdeng_page_cache_mb);
+    buffer_json_member_add_uint64(wb, "multidb-disk-quota", rrdb.dbengine_cfg.multidb_disk_quota_mb[0]);
+    buffer_json_member_add_uint64(wb, "page-cache-size", rrdb.dbengine_cfg.page_cache_mb);
 #endif // ENABLE_DBENGINE
     buffer_json_member_add_boolean(wb, "web-enabled", web_server_mode != WEB_SERVER_MODE_NONE);
     buffer_json_member_add_boolean(wb, "stream-enabled", default_rrdpush_enabled);
@@ -1443,7 +1443,7 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
 
-    if(!rrdb.dbengine_enabled) {
+    if(!rrdb.dbengine_cfg.enabled) {
         buffer_strcat(wb, "dbengine is not enabled");
         return HTTP_RESP_NOT_FOUND;
     }
@@ -1451,9 +1451,9 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
     wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
     buffer_strcat(wb, "{");
-    for(size_t tier = 0; tier < rrdb.storage_tiers ;tier++) {
+    for (size_t tier = 0; tier < rrd_storage_tiers(); tier++) {
         buffer_sprintf(wb, "%s\n\t\"tier%zu\": {", tier?",":"", tier);
-        rrdeng_size_statistics(rrdb.multidb_ctx[tier], wb);
+        rrdeng_size_statistics(rrdb.dbengine_cfg.multidb_ctx[tier], wb);
         buffer_strcat(wb, "\n\t}");
     }
     buffer_strcat(wb, "\n}");

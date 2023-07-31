@@ -653,13 +653,13 @@ bind_fail:
 static bool dimension_can_be_deleted(uuid_t *dim_uuid __maybe_unused)
 {
 #ifdef ENABLE_DBENGINE
-    if (rrdb.dbengine_enabled) {
+    if (rrdb.dbengine_cfg.enabled) {
         bool no_retention = true;
-        for (size_t tier = 0; tier < rrdb.storage_tiers; tier++) {
-            if (!rrdb.multidb_ctx[tier])
+        for (size_t tier = 0; tier < rrd_storage_tiers(); tier++) {
+            if (!rrdb.dbengine_cfg.multidb_ctx[tier])
                 continue;
             time_t first_time_t = 0, last_time_t = 0;
-            if (rrdeng_metric_retention_by_uuid((void *) rrdb.multidb_ctx[tier], dim_uuid, &first_time_t, &last_time_t)) {
+            if (rrdeng_metric_retention_by_uuid((void *) rrdb.dbengine_cfg.multidb_ctx[tier], dim_uuid, &first_time_t, &last_time_t)) {
                 if (first_time_t > 0) {
                     no_retention = false;
                     break;

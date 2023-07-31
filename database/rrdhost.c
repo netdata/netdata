@@ -9,12 +9,13 @@ static void rrdhost_streaming_sender_structures_init(RRDHOST *host);
 #endif
 
 size_t get_tier_grouping(size_t tier) {
-    if(unlikely(tier >= rrdb.storage_tiers)) tier = rrdb.storage_tiers - 1;
+    if (unlikely(tier >= rrd_storage_tiers()))
+        tier = rrd_storage_tiers() - 1;
 
     size_t grouping = 1;
     // first tier is always 1 iteration of whatever update every the chart has
     for(size_t i = 1; i <= tier ;i++)
-        grouping *= rrdb.storage_tiers_grouping_iterations[i];
+        grouping *= rrdb.dbengine_cfg.storage_tiers_grouping_iterations[i];
 
     return grouping;
 }
@@ -274,7 +275,7 @@ RRDHOST *rrdhost_create(
 ) {
     netdata_log_debug(D_RRDHOST, "Host '%s': adding with guid '%s'", hostname, guid);
 
-    if(storage_engine_id == STORAGE_ENGINE_DBENGINE && !rrdb.dbengine_enabled) {
+    if(storage_engine_id == STORAGE_ENGINE_DBENGINE && !rrdb.dbengine_cfg.enabled) {
         netdata_log_error("memory mode 'dbengine' is not enabled, but host '%s' is configured for it. Falling back to 'alloc'", hostname);
         storage_engine_id = STORAGE_ENGINE_ALLOC;
     }
@@ -395,7 +396,7 @@ int is_legacy = 1;
             host->db[0].tier_grouping = get_tier_grouping(0);
 
              // may fail here for legacy dbengine initialization
-            ret = rrdeng_init(&host->db[0].instance, dbenginepath, rrdb.default_rrdeng_disk_quota_mb, 0);
+            ret = rrdeng_init(&host->db[0].instance, dbenginepath, rrdb.dbengine_cfg.disk_quota_mb, 0);
 
             if(ret == 0) {
                 rrdeng_readiness_wait(host->db[0].instance);
@@ -403,17 +404,17 @@ int is_legacy = 1;
                 // assign the rest of the shared storage instances to it
                 // to allow them collect its metrics too
 
-                for(size_t tier = 1; tier < rrdb.storage_tiers ; tier++) {
+                for (size_t tier = 1; tier < rrd_storage_tiers(); tier++) {
                     host->db[tier].id= STORAGE_ENGINE_DBENGINE;
-                    host->db[tier].instance = rrdb.multidb_ctx[tier];
+                    host->db[tier].instance = rrdb.dbengine_cfg.multidb_ctx[tier];
                     host->db[tier].tier_grouping = get_tier_grouping(tier);
                 }
             }
         }
         else {
-            for(size_t tier = 0; tier < rrdb.storage_tiers ; tier++) {
+            for(size_t tier = 0; tier < rrd_storage_tiers(); tier++) {
                 host->db[tier].id = STORAGE_ENGINE_DBENGINE;
-                host->db[tier].instance = rrdb.multidb_ctx[tier];
+                host->db[tier].instance = rrdb.dbengine_cfg.multidb_ctx[tier];
                 host->db[tier].tier_grouping = get_tier_grouping(tier);
             }
         }
@@ -440,9 +441,9 @@ int is_legacy = 1;
 
 #ifdef ENABLE_DBENGINE
         // the first tier is reserved for the non-dbengine modes
-        for(size_t tier = 1; tier < rrdb.storage_tiers ; tier++) {
+        for (size_t tier = 1; tier < rrd_storage_tiers(); tier++) {
             host->db[tier].id = STORAGE_ENGINE_DBENGINE;
-            host->db[tier].instance = rrdb.multidb_ctx[tier];
+            host->db[tier].instance = rrdb.dbengine_cfg.multidb_ctx[tier];
             host->db[tier].tier_grouping = get_tier_grouping(tier);
         }
 #endif
@@ -895,7 +896,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     // release its children resources
 
 #ifdef ENABLE_DBENGINE
-    for(size_t tier = 0; tier < rrdb.storage_tiers ;tier++) {
+    for (size_t tier = 0; tier < rrd_storage_tiers(); tier++) {
         if(host->db[tier].id == STORAGE_ENGINE_DBENGINE
             && host->db[tier].instance
             && !is_storage_engine_shared(host->db[tier].instance))
@@ -916,7 +917,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     health_alarm_log_free(host);
 
 #ifdef ENABLE_DBENGINE
-    for(size_t tier = 0; tier < rrdb.storage_tiers ;tier++) {
+    for (size_t tier = 0; tier < rrd_storage_tiers(); tier++) {
         if(host->db[tier].id == STORAGE_ENGINE_DBENGINE
             && host->db[tier].instance
             && !is_storage_engine_shared(host->db[tier].instance))

@@ -20,11 +20,11 @@ uint8_t tier_page_type[RRD_STORAGE_TIERS] = {PAGE_METRICS, PAGE_TIER, PAGE_TIER,
 #endif
 
 __attribute__((constructor)) void initialize_multidb_ctx(void) {
-    rrdb.multidb_ctx[0] = (STORAGE_INSTANCE *) &multidb_ctx_storage_tier0;
-    rrdb.multidb_ctx[1] = (STORAGE_INSTANCE *) &multidb_ctx_storage_tier1;
-    rrdb.multidb_ctx[2] = (STORAGE_INSTANCE *) &multidb_ctx_storage_tier2;
-    rrdb.multidb_ctx[3] = (STORAGE_INSTANCE *) &multidb_ctx_storage_tier3;
-    rrdb.multidb_ctx[4] = (STORAGE_INSTANCE *) &multidb_ctx_storage_tier4;
+    rrdb.dbengine_cfg.multidb_ctx[0] = (STORAGE_INSTANCE *) &multidb_ctx_storage_tier0;
+    rrdb.dbengine_cfg.multidb_ctx[1] = (STORAGE_INSTANCE *) &multidb_ctx_storage_tier1;
+    rrdb.dbengine_cfg.multidb_ctx[2] = (STORAGE_INSTANCE *) &multidb_ctx_storage_tier2;
+    rrdb.dbengine_cfg.multidb_ctx[3] = (STORAGE_INSTANCE *) &multidb_ctx_storage_tier3;
+    rrdb.dbengine_cfg.multidb_ctx[4] = (STORAGE_INSTANCE *) &multidb_ctx_storage_tier4;
 }
 
 // ----------------------------------------------------------------------------
@@ -423,7 +423,7 @@ static size_t aligned_allocation_entries(size_t max_slots, size_t target_slot, t
 static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, size_t *data_size, usec_t point_in_time_ut) {
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
-    size_t max_size = rrdb.tier_page_size[ctx->config.tier];
+    size_t max_size = rrdb.dbengine_cfg.tier_page_size[ctx->config.tier];
     size_t max_slots = max_size / CTX_POINT_SIZE_BYTES(ctx);
 
     size_t slots = aligned_allocation_entries(
@@ -443,7 +443,7 @@ static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, 
     // internal_error(true, "PAGE ALLOC %zu bytes (%zu max)", size, max_size);
 
     internal_fatal(slots < 3 || slots > max_slots, "ooops! wrong distribution of metrics across time");
-    internal_fatal(size > rrdb.tier_page_size[ctx->config.tier] || size < CTX_POINT_SIZE_BYTES(ctx) * 2, "ooops! wrong page size");
+    internal_fatal(size > rrdb.dbengine_cfg.tier_page_size[ctx->config.tier] || size < CTX_POINT_SIZE_BYTES(ctx) * 2, "ooops! wrong page size");
 
     *data_size = size;
     void *d = dbengine_page_alloc(size);
@@ -1061,7 +1061,7 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
         datafiles++;
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
-    ssize_t cpus = (ssize_t) get_netdata_cpus() / rrdb.storage_tiers;
+    ssize_t cpus = (ssize_t) get_netdata_cpus() / rrdb.dbengine_cfg.storage_tiers;
     if(cpus > (ssize_t)datafiles)
         cpus = (ssize_t)datafiles;
 
@@ -1155,7 +1155,7 @@ int rrdeng_init(STORAGE_INSTANCE **db_instance_ptr, const char *dbfiles_path,
     }
 
     if(NULL == ctxp) {
-        ctx = (struct rrdengine_instance *) rrdb.multidb_ctx[tier];
+        ctx = (struct rrdengine_instance *) rrdb.dbengine_cfg.multidb_ctx[tier];
         memset(ctx, 0, sizeof(*ctx));
         ctx->config.legacy = false;
     }
@@ -1370,9 +1370,9 @@ static RRDENG_SIZE_STATS rrdeng_size_statistics_internal(struct rrdengine_instan
 //    stats.sizeof_metric = 0;
     stats.sizeof_datafile = struct_natural_alignment(sizeof(struct rrdengine_datafile)) + struct_natural_alignment(sizeof(struct rrdengine_journalfile));
     stats.sizeof_page_in_cache = 0; // struct_natural_alignment(sizeof(struct page_cache_descr));
-    stats.sizeof_point_data = rrdb.page_type_size[ctx->config.page_type];
-    stats.sizeof_page_data = rrdb.tier_page_size[ctx->config.tier];
-    stats.pages_per_extent = rrdb.rrdeng_pages_per_extent;
+    stats.sizeof_point_data = rrdb.dbengine_cfg.page_type_size[ctx->config.page_type];
+    stats.sizeof_page_data = rrdb.dbengine_cfg.tier_page_size[ctx->config.tier];
+    stats.pages_per_extent = rrdb.dbengine_cfg.pages_per_extent;
 
 //    stats.sizeof_metric_in_index = 40;
 //    stats.sizeof_page_in_index = 24;

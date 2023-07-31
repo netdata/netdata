@@ -51,7 +51,7 @@ static void svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
         /* only a collector can mark a chart as obsolete, so we must remove the reference */
 
         size_t tiers_available = 0, tiers_said_no_retention = 0;
-        for(size_t tier = 0; tier < rrdb.storage_tiers ;tier++) {
+        for(size_t tier = 0; tier < rrdb.dbengine_cfg.storage_tiers ;tier++) {
             if(rd->tiers[tier].db_collection_handle) {
                 tiers_available++;
 

@@ -2337,11 +2337,11 @@ void generate_dbengine_dataset(unsigned history_seconds)
     time_t time_present;
 
     default_storage_engine_id = STORAGE_ENGINE_DBENGINE;
-    rrdb.default_rrdeng_page_cache_mb = 128;
+    rrdb.dbengine_cfg.page_cache_mb = 128;
     // Worst case for uncompressible data
-    rrdb.default_rrdeng_disk_quota_mb = (((uint64_t)DSET_DIMS * DSET_CHARTS) * sizeof(storage_number) * history_seconds) /
+    rrdb.dbengine_cfg.disk_quota_mb = (((uint64_t)DSET_DIMS * DSET_CHARTS) * sizeof(storage_number) * history_seconds) /
                                    (1024 * 1024);
-    rrdb.default_rrdeng_disk_quota_mb -= rrdb.default_rrdeng_disk_quota_mb * EXPECTED_COMPRESSION_RATIO / 100;
+    rrdb.dbengine_cfg.disk_quota_mb -= rrdb.dbengine_cfg.disk_quota_mb * EXPECTED_COMPRESSION_RATIO / 100;
 
     error_log_limit_unlimited();
     fprintf(stderr, "Initializing localhost with hostname 'dbengine-dataset'");
@@ -2429,7 +2429,7 @@ static void query_dbengine_chart(void *arg)
 
         if (thread_info->delete_old_data) {
             /* A time window of twice the disk space is sufficient for compression space savings of up to 50% */
-            time_approx_min = time_max - (rrdb.default_rrdeng_disk_quota_mb * 2 * 1024 * 1024) /
+            time_approx_min = time_max - (rrdb.dbengine_cfg.disk_quota_mb * 2 * 1024 * 1024) /
                                          (((uint64_t) DSET_DIMS * DSET_CHARTS) * sizeof(storage_number));
             time_min = MAX(time_min, time_approx_min);
         }
@@ -2530,16 +2530,16 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
         PAGE_CACHE_MB = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
 
     default_storage_engine_id = STORAGE_ENGINE_DBENGINE;
-    rrdb.default_rrdeng_page_cache_mb = PAGE_CACHE_MB;
+    rrdb.dbengine_cfg.page_cache_mb = PAGE_CACHE_MB;
     if (DISK_SPACE_MB) {
         fprintf(stderr, "By setting disk space limit data are allowed to be deleted. "
                         "Data validation is turned off for this run.\n");
-        rrdb.default_rrdeng_disk_quota_mb = DISK_SPACE_MB;
+        rrdb.dbengine_cfg.disk_quota_mb = DISK_SPACE_MB;
     } else {
         // Worst case for uncompressible data
-        rrdb.default_rrdeng_disk_quota_mb =
+        rrdb.dbengine_cfg.disk_quota_mb =
                 (((uint64_t) DSET_DIMS * DSET_CHARTS) * sizeof(storage_number) * HISTORY_SECONDS) / (1024 * 1024);
-        rrdb.default_rrdeng_disk_quota_mb -= rrdb.default_rrdeng_disk_quota_mb * EXPECTED_COMPRESSION_RATIO / 100;
+        rrdb.dbengine_cfg.disk_quota_mb -= rrdb.dbengine_cfg.disk_quota_mb * EXPECTED_COMPRESSION_RATIO / 100;
     }
 
     fprintf(stderr, "Initializing localhost with hostname 'dbengine-stress-test'\n");

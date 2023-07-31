@@ -946,7 +946,7 @@ static bool query_metric_is_valid_tier(QUERY_METRIC *qm, size_t tier) {
 }
 
 static size_t query_metric_first_working_tier(QUERY_METRIC *qm) {
-    for(size_t tier = 0; tier < rrdb.storage_tiers ; tier++) {
+    for (size_t tier = 0; tier < rrd_storage_tiers(); tier++) {
 
         // find the db time-range for this tier for all metrics
         STORAGE_METRIC_HANDLE *db_metric_handle = qm->tiers[tier].db_metric_handle;
@@ -991,7 +991,7 @@ static long query_plan_points_coverage_weight(time_t db_first_time_s, time_t db_
 }
 
 static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
-    if(unlikely(rrdb.storage_tiers < 2))
+    if(unlikely(rrd_storage_tiers() < 2))
         return 0;
 
     if(unlikely(after_wanted == before_wanted || points_wanted <= 0))
@@ -1004,7 +1004,7 @@ static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t afte
     time_t min_first_time_s = 0;
     time_t max_last_time_s = 0;
 
-    for(size_t tier = 0; tier < rrdb.storage_tiers ; tier++) {
+    for (size_t tier = 0; tier < rrd_storage_tiers(); tier++) {
         time_t first_time_s = qm->tiers[tier].db_first_time_s;
         time_t last_time_s  = qm->tiers[tier].db_last_time_s;
 
@@ -1015,7 +1015,7 @@ static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t afte
             max_last_time_s = last_time_s;
     }
 
-    for(size_t tier = 0; tier < rrdb.storage_tiers ; tier++) {
+    for (size_t tier = 0; tier < rrd_storage_tiers(); tier++) {
 
         // find the db time-range for this tier for all metrics
         STORAGE_METRIC_HANDLE *db_metric_handle = qm->tiers[tier].db_metric_handle;
@@ -1042,7 +1042,7 @@ static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t afte
     }
 
     size_t best_tier = 0;
-    for(size_t tier = 1; tier < rrdb.storage_tiers ; tier++) {
+    for(size_t tier = 1; tier < rrdb.dbengine_cfg.storage_tiers ; tier++) {
         if(qm->tiers[tier].weight >= qm->tiers[best_tier].weight)
             best_tier = tier;
     }
@@ -1051,7 +1051,7 @@ static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t afte
 }
 
 static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
-    if(unlikely(rrdb.storage_tiers < 2))
+    if(unlikely(rrdb.dbengine_cfg.storage_tiers < 2))
         return 0;
 
     if(unlikely(after_wanted == before_wanted || points_wanted <= 0)) {
@@ -1059,9 +1059,9 @@ static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after
         return 0;
     }
 
-    long weight[rrdb.storage_tiers];
+    long weight[rrdb.dbengine_cfg.storage_tiers];
 
-    for(size_t tier = 0; tier < rrdb.storage_tiers ; tier++) {
+    for(size_t tier = 0; tier < rrdb.dbengine_cfg.storage_tiers ; tier++) {
 
         time_t common_first_time_s = 0;
         time_t common_last_time_s = 0;
@@ -1098,7 +1098,7 @@ static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after
     }
 
     size_t best_tier = 0;
-    for(size_t tier = 1; tier < rrdb.storage_tiers ; tier++) {
+    for(size_t tier = 1; tier < rrdb.dbengine_cfg.storage_tiers ; tier++) {
         if(weight[tier] >= weight[best_tier])
             best_tier = tier;
     }
@@ -1111,7 +1111,7 @@ static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after
 
 static time_t rrdset_find_natural_update_every_for_timeframe(QUERY_TARGET *qt, time_t after_wanted, time_t before_wanted, size_t points_wanted, RRDR_OPTIONS options, size_t tier) {
     size_t best_tier;
-    if((options & RRDR_OPTION_SELECTED_TIER) && tier < rrdb.storage_tiers)
+    if((options & RRDR_OPTION_SELECTED_TIER) && tier < rrdb.dbengine_cfg.storage_tiers)
         best_tier = tier;
     else
         best_tier = rrddim_find_best_tier_for_timeframe(qt, after_wanted, before_wanted, points_wanted);
@@ -1353,9 +1353,10 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
     size_t selected_tier;
     bool switch_tiers = true;
 
-    if((ops->r->internal.qt->window.options & RRDR_OPTION_SELECTED_TIER)
-       && ops->r->internal.qt->window.tier < rrdb.storage_tiers
-       && query_metric_is_valid_tier(qm, ops->r->internal.qt->window.tier)) {
+    if ((ops->r->internal.qt->window.options & RRDR_OPTION_SELECTED_TIER) &&
+        (ops->r->internal.qt->window.tier < rrd_storage_tiers()) &&
+        (query_metric_is_valid_tier(qm, ops->r->internal.qt->window.tier)))
+    {
         selected_tier = ops->r->internal.qt->window.tier;
         switch_tiers = false;
     }
@@ -1383,7 +1384,7 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
         // check if our selected tier can start the query
         if (selected_tier_first_time_s > after_wanted) {
             // we need some help from other tiers
-            for (size_t tr = (int)selected_tier + 1; tr < rrdb.storage_tiers && qm->plan.used < QUERY_PLANS_MAX ; tr++) {
+            for (size_t tr = (int)selected_tier + 1; tr < rrd_storage_tiers() && qm->plan.used < QUERY_PLANS_MAX ; tr++) {
                 if(!query_metric_is_valid_tier(qm, tr))
                     continue;
 
@@ -1940,7 +1941,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
 
     r->stats.result_points_generated += points_added;
     r->stats.db_points_read += ops->db_total_points_read;
-    for(size_t tr = 0; tr < rrdb.storage_tiers ; tr++)
+    for (size_t tr = 0; tr < rrd_storage_tiers(); tr++)
         qt->db.tiers[tr].points += ops->db_points_read_per_tier[tr];
 }
 
@@ -1950,9 +1951,9 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
 void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut);
 
 void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s) {
-    if (unlikely(tier >= rrdb.storage_tiers))
+    if (unlikely(tier >= rrd_storage_tiers()))
         return;
-    if (rrdb.storage_tiers_backfill[tier] == RRD_BACKFILL_NONE)
+    if (rrdb.dbengine_cfg.storage_tiers_backfill[tier] == RRD_BACKFILL_NONE)
         return;
 
     struct rrddim_tier *t = &rd->tiers[tier];
@@ -1965,7 +1966,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
     time_t time_diff   = now_s - latest_time_s;
 
     // if the user wants only NEW backfilling, and we don't have any data
-    if (rrdb.storage_tiers_backfill[tier] == RRD_BACKFILL_NEW && latest_time_s <= 0)
+    if (rrdb.dbengine_cfg.storage_tiers_backfill[tier] == RRD_BACKFILL_NEW && latest_time_s <= 0)
         return;
 
     // there is really nothing we can do
@@ -2291,7 +2292,7 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     rrdr_relative_window_to_absolute(&after_wanted, &before_wanted, NULL);
     query_debug_log(":relative2absolute after %ld, before %ld", after_wanted, before_wanted);
 
-    if (natural_points && (options & RRDR_OPTION_SELECTED_TIER) && tier > 0 && rrdb.storage_tiers > 1) {
+    if (natural_points && (options & RRDR_OPTION_SELECTED_TIER) && tier > 0 && rrd_storage_tiers() > 1) {
         update_every = rrdset_find_natural_update_every_for_timeframe(
                 qt, after_wanted, before_wanted, points_wanted, options, tier);
 

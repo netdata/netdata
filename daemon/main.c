@@ -324,10 +324,10 @@ void netdata_cleanup_and_exit(int ret) {
     (void) rename(agent_crash_file, agent_incomplete_shutdown_file);
 
 #ifdef ENABLE_DBENGINE
-    if (rrdb.dbengine_enabled) {
+    if (rrdb.dbengine_cfg.enabled) {
         delta_shutdown_time("dbengine exit mode");
-        for (size_t tier = 0; tier < rrdb.storage_tiers; tier++)
-            rrdeng_exit_mode(rrdb.multidb_ctx[tier]);
+        for (size_t tier = 0; tier < rrdb.dbengine_cfg.storage_tiers; tier++)
+            rrdeng_exit_mode(rrdb.dbengine_cfg.multidb_ctx[tier]);
     }
 #endif
 
@@ -415,10 +415,10 @@ void netdata_cleanup_and_exit(int ret) {
         // exit cleanly
 
 #ifdef ENABLE_DBENGINE
-        if (rrdb.dbengine_enabled) {
+        if (rrdb.dbengine_cfg.enabled) {
             delta_shutdown_time("flush dbengine tiers");
-            for (size_t tier = 0; tier < rrdb.storage_tiers; tier++)
-                rrdeng_prepare_exit(rrdb.multidb_ctx[tier]);
+            for (size_t tier = 0; tier < rrdb.dbengine_cfg.storage_tiers; tier++)
+                rrdeng_prepare_exit(rrdb.dbengine_cfg.multidb_ctx[tier]);
         }
 #endif
 
@@ -433,14 +433,14 @@ void netdata_cleanup_and_exit(int ret) {
         metadata_sync_shutdown();
 
 #ifdef ENABLE_DBENGINE
-        if (rrdb.dbengine_enabled) {
+        if (rrdb.dbengine_cfg.enabled) {
             delta_shutdown_time("wait for dbengine collectors to finish");
 
             size_t running = 1;
             while(running) {
                 running = 0;
-                for (size_t tier = 0; tier < rrdb.storage_tiers; tier++)
-                    running += rrdeng_collectors_running(rrdb.multidb_ctx[tier]);
+                for (size_t tier = 0; tier < rrdb.dbengine_cfg.storage_tiers; tier++)
+                    running += rrdeng_collectors_running(rrdb.dbengine_cfg.multidb_ctx[tier]);
 
                 if(running) {
                     error_limit_static_thread_var(erl, 1, 100 * USEC_PER_MS);
@@ -457,8 +457,8 @@ void netdata_cleanup_and_exit(int ret) {
             }
 
             delta_shutdown_time("stop dbengine tiers");
-            for (size_t tier = 0; tier < rrdb.storage_tiers; tier++)
-                rrdeng_exit(rrdb.multidb_ctx[tier]);
+            for (size_t tier = 0; tier < rrdb.dbengine_cfg.storage_tiers; tier++)
+                rrdeng_exit(rrdb.dbengine_cfg.multidb_ctx[tier]);
         }
 #endif
     }
@@ -1589,7 +1589,7 @@ int main(int argc, char **argv) {
                             rrdb.default_update_every = 1;
                             default_storage_engine_id = STORAGE_ENGINE_RAM;
                             default_health_enabled = 0;
-                            rrdb.storage_tiers = 1;
+                            rrdb.dbengine_cfg.storage_tiers = 1;
                             registry_init();
                             if(rrd_init("unittest", NULL, true)) {
                                 fprintf(stderr, "rrd_init failed for unittest\n");

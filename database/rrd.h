@@ -866,23 +866,36 @@ struct rrdhost {
 // ----------------------------------------------------------------------------
 // RRDB 
 
+typedef struct {
+    bool enabled;
+    const char *base_path;
+
+    int check_journal;
+    bool use_direct_io;
+    bool parallel_initialization;
+
+    int disk_quota_mb;
+    int page_cache_mb;
+    int extent_cache_mb;
+
+    unsigned pages_per_extent;
+    size_t page_type_size[256];
+
+    size_t storage_tiers;
+
+    STORAGE_INSTANCE *multidb_ctx[RRD_STORAGE_TIERS];
+    int multidb_disk_quota_mb[RRD_STORAGE_TIERS];
+    size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
+    RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS];
+    size_t tier_page_size[RRD_STORAGE_TIERS];
+} dbengine_config_t;
+
+
 struct rrdb {
     DICTIONARY *rrdhost_root_index;
     DICTIONARY *rrdhost_root_index_hostname;
 
     bool unittest_running;
-    bool dbengine_enabled;
-    size_t storage_tiers;
-    bool use_direct_io;
-
-    bool parallel_initialization;
-
-    unsigned rrdeng_pages_per_extent;
-
-    const char *dbengine_base_path;
-
-    size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
-    RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS];
 
     int default_update_every;
     int default_rrd_history_entries;
@@ -901,24 +914,16 @@ struct rrdb {
 
     RRDHOST *localhost;
 
-    int default_rrdeng_page_cache_mb;
-
-    int default_rrdeng_extent_cache_mb;
-
-    int db_engine_journal_check;
-
-    int default_rrdeng_disk_quota_mb;
-
-    int multidb_disk_quota_mb[RRD_STORAGE_TIERS];
-
-    STORAGE_INSTANCE *multidb_ctx[RRD_STORAGE_TIERS];
-
-    size_t page_type_size[256];
-
-    size_t tier_page_size[RRD_STORAGE_TIERS];
+    dbengine_config_t dbengine_cfg;
 };
 
 extern struct rrdb rrdb;
+
+#ifdef DBENGINE
+#define rrd_storage_tiers() (rrdb.dbengine_cfg.storage_tiers)
+#else
+#define rrd_storage_tiers() 1
+#endif
 
 #define rrdhost_hostname(host) string2str((host)->hostname)
 #define rrdhost_registry_hostname(host) string2str((host)->registry_hostname)

@@ -12,7 +12,7 @@
 
 #define RRDENG_FD_BUDGET_PER_INSTANCE (50)
 
-#define CTX_POINT_SIZE_BYTES(ctx) rrdb.page_type_size[(ctx)->config.page_type]
+#define CTX_POINT_SIZE_BYTES(ctx) rrdb.dbengine_cfg.page_type_size[(ctx)->config.page_type]
 
 typedef struct rrdengine_size_statistics {
     size_t default_granularity_secs;
