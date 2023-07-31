@@ -621,13 +621,13 @@ int db_init() {
             uv_mutex_lock(p_file_info->db_mut);
 
             // This error check will be used a lot, so define it here. 
-            #define do_sqlite_error_check(p_file_info, rc, rc_expctd){\
-                if(unlikely(rc_expctd != rc)) {\
+            #define do_sqlite_error_check(p_file_info, rc, rc_expctd) do {                                      \
+                if(unlikely(rc_expctd != rc)) {                                                                 \
                     throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);\
-                    uv_mutex_unlock(p_file_info->db_mut);\
-                    goto return_error;\
-                }\
-            }
+                    uv_mutex_unlock(p_file_info->db_mut);                                                       \
+                    goto return_error;                                                                          \
+                }                                                                                               \
+            } while(0)
 
             if(unlikely(
                     SQLITE_OK != (rc = sqlite3_bind_text(stmt_search_if_log_source_exists, 1, p_file_info->stream_guid, -1, NULL)) ||
@@ -1274,7 +1274,7 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
         int db_off = p_file_infos[1] ? sqlite3_column_int(stmt_retrieve_log_msg_metadata, 6) : 0;
 
         /* If exceeding quota and new timestamp is different than previous, terminate query */
-        if(res_buff->len >= p_query_params->quota && (tmp_itm.timestamp != p_query_params->end_timestamp))
+        if(res_buff->len >= p_query_params->quota && tmp_itm.timestamp != p_query_params->end_timestamp)
             break;
 
         /* Retrieve compressed log messages from BLOB file */

@@ -67,6 +67,11 @@ void circ_buff_search(Circ_buff_t *const buffs[], logs_query_params_t *const p_q
         qsort(items, items_off, sizeof(items[0]), circ_buff_items_qsort_timestamp_fnc);
  
     for (int i = 0; items[i]; i++) {
+
+        /* If exceeding quota and new timestamp is different than previous, terminate query */
+        if(results->len >= p_query_params->quota && items[i]->timestamp != p_query_params->end_timestamp)
+            break;
+
         res_hdr.timestamp = items[i]->timestamp;
         res_hdr.text_size = items[i]->text_size;
 
@@ -106,10 +111,7 @@ void circ_buff_search(Circ_buff_t *const buffs[], logs_query_params_t *const p_q
 
             m_assert(TEST_MS_TIMESTAMP_VALID(res_hdr.timestamp), "res_hdr.timestamp is invalid");
 
-            if(results->len >= p_query_params->quota){
-                p_query_params->end_timestamp = res_hdr.timestamp;
-                break;
-            }
+            p_query_params->end_timestamp = res_hdr.timestamp;
         }
     }
 }
