@@ -7,7 +7,7 @@ modules:
         name: Pandas
         link: https://learn.netdata.cloud/docs/data-collection/generic-data-collection/structured-data-pandas
         categories:
-          - data-collection.other
+          - data-collection.generic-data-collection
         icon_filename: pandas.png
       related_resources:
         integrations:
