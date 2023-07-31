@@ -941,7 +941,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
 
     rpt->capabilities = STREAM_CAP_INVALID;
 
-#ifdef ENABLE_HTTPD
+#ifdef ENABLE_H2O
     rpt->h2o_ctx = h2o_ctx;
 #endif
 

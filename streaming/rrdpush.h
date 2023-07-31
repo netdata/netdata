@@ -382,12 +382,12 @@ struct receiver_state {
     } instances;
 */
 
-#ifdef ENABLE_HTTPD
+#ifdef ENABLE_H2O
     void *h2o_ctx;
 #endif
 };
 
-#ifdef ENABLE_HTTPD
+#ifdef ENABLE_H2O
 #define is_h2o_rrdpush(x) ((x)->h2o_ctx != NULL)
 #define unless_h2o_rrdpush(x) if(!is_h2o_rrdpush(x))
 #endif
