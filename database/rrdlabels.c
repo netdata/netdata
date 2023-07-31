@@ -566,7 +566,7 @@ static inline size_t rrdlabels_sanitize_value(char *dst, const char *src, size_t
 RRDLABELS *rrdlabels_create(void)
 {
     RRDLABELS *labels = callocz(1, sizeof(*labels));
-    STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, sizeof(RRDLABELS), 0, 0);
+    STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, sizeof(RRDLABELS), 0);
     return labels;
 }
 
@@ -663,7 +663,7 @@ void rrdlabels_destroy(RRDLABELS *labels)
         delete_label((RRDLABEL *)Index);
     }
     size_t memory_freed = JudyLFreeArray(&labels->JudyL, PJE0);
-    STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, memory_freed + sizeof(RRDLABELS), 0, 0);
+    STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, memory_freed + sizeof(RRDLABELS), 0);
     spinlock_unlock(&labels->spinlock);
     freez(labels);
 }
@@ -684,7 +684,7 @@ static void labels_add_already_sanitized(RRDLABELS *labels, const char *key, con
         *((RRDLABEL_SRC *)PValue) = (ls & ~(RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_OLD));
         labels->version++;
         size_t mem_after_judyl = JudyLMemUsed(labels->JudyL);
-        STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, mem_after_judyl - mem_before_judyl, 0, 0);
+        STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, mem_after_judyl - mem_before_judyl, 0);
     }
     else
         delete_label(label);
@@ -920,7 +920,7 @@ void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
         if (PValue && !*PValue) {
             dup_label(label);
             size_t mem_after_judyl = JudyLMemUsed(dst->JudyL);
-            STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, mem_after_judyl - mem_before_judyl, 0, 0);
+            STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, mem_after_judyl - mem_before_judyl, 0);
         }
         else
             flag = RRDLABEL_FLAG_OLD;
@@ -937,7 +937,7 @@ void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
             (void)JudyLDel(&dst->JudyL, Index, PJE0);
             size_t mem_after_judyl = JudyLMemUsed(dst->JudyL);
 
-            STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, mem_before_judyl - mem_after_judyl, 0, 0);
+            STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, mem_before_judyl - mem_after_judyl, 0);
 
             delete_label((RRDLABEL *)Index);
             if (dst->JudyL != (Pvoid_t) NULL) {
@@ -974,7 +974,7 @@ void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src)
         if (PValue && !*PValue) {
             dup_label(label);
             size_t mem_after_judyl = JudyLMemUsed(dst->JudyL);
-            STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, mem_after_judyl - mem_before_judyl, 0, 0);
+            STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, mem_after_judyl - mem_before_judyl, 0);
             *((RRDLABEL_SRC *)PValue) = ls;
         }
     }
