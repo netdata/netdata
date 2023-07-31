@@ -256,7 +256,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
                 config_set_number(CONFIG_SECTION_DB, "storage tiers", cfg.storage_tiers);
             }
             if (cfg.storage_tiers > STORAGE_ENGINE_TIERS) {
-                netdata_log_error("Up to %d storage tier are supported. Assuming %d.", STORAGE_ENGINE_TIERS, RRD_STORAGE_TIERS);
+                netdata_log_error("Up to %d storage tier are supported. Assuming %d.", STORAGE_ENGINE_TIERS, STORAGE_ENGINE_TIERS);
                 cfg.storage_tiers = STORAGE_ENGINE_TIERS;
                 config_set_number(CONFIG_SECTION_DB, "storage tiers", cfg.storage_tiers);
             }
