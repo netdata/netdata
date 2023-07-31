@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdpush.h"
-#include "httpd/http_server.h"
+#include "web/server/h2o/http_server.h"
 
 extern struct config stream_config;
 

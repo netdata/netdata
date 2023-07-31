@@ -676,7 +676,7 @@ static int rrdpush_http_upgrade_prelude(RRDHOST *host, struct sender_state *s) {
         goto err_cleanup;
     }
 
-    debug(D_STREAM, "Stream sender upgrade to \"" NETDATA_STREAM_PROTO_NAME "\" successful");
+    netdata_log_debug(D_STREAM, "Stream sender upgrade to \"" NETDATA_STREAM_PROTO_NAME "\" successful");
     rbuf_free(buf);
     http_parse_ctx_destroy(&ctx);
     return 0;
