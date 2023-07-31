@@ -2443,7 +2443,7 @@ void parser_destroy(PARSER *parser) {
     if (unlikely(!parser))
         return;
 
-    if (parser->user.cd->configuration != NULL) {
+    if (parser->user.cd != NULL && parser->user.cd->configuration != NULL) {
         unregister_plugin(parser->user.cd->cfg_dict_item);
         parser->user.cd->configuration = NULL;
     }
