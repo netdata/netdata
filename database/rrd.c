@@ -84,6 +84,7 @@ STRING *rrd_string_strdupz(const char *s) {
 // ----------------------------------------------------------------------------
 // rrd global / startup initialization
 
+#ifdef ENABLE_DBENGINE
 static dbengine_config_t get_dbengine_config(const char *hostname) {
     // use the global `dbengine_cfg` instance to retrieve default values;
     dbengine_config_t cfg = dbengine_cfg;
@@ -224,6 +225,7 @@ static dbengine_config_t get_dbengine_config(const char *hostname) {
 
     return cfg;
 }
+#endif // ENABLE_DBENGINE
 
 static void init_host_indexes() {
     internal_fatal(rrdb.rrdhost_root_index || rrdb.rrdhost_root_index_hostname,
