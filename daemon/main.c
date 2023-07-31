@@ -1101,6 +1101,13 @@ static void get_netdata_configured_variables() {
         }
     }
 
+#if !defined(ENABLE_DBENGINE)
+    if (default_storage_engine_id  == STORAGE_ENGINE_DBENGINE) {
+       error_report("RRD_MEMORY_MODE_DBENGINE is not supported in this platform. The agent will use db mode 'save' instead.");
+       default_storage_engine_id = STORAGE_ENGINE_SAVE;
+    }
+#endif
+
     // ------------------------------------------------------------------------
     // get default database size
 
@@ -1135,38 +1142,6 @@ static void get_netdata_configured_variables() {
         netdata_configured_primary_plugins_dir = plugin_directories[PLUGINSD_STOCK_PLUGINS_DIRECTORY_PATH];
     }
 
-#ifdef ENABLE_DBENGINE
-    // ------------------------------------------------------------------------
-    // get default Database Engine page cache size in MiB
-
-    rrdb.default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page cache size MB", rrdb.default_rrdeng_page_cache_mb);
-    rrdb.default_rrdeng_extent_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine extent cache size MB", rrdb.default_rrdeng_extent_cache_mb);
-    rrdb.db_engine_journal_check = config_get_boolean(CONFIG_SECTION_DB, "dbengine enable journal integrity check", CONFIG_BOOLEAN_NO);
-
-    if(rrdb.default_rrdeng_extent_cache_mb < 0)
-        rrdb.default_rrdeng_extent_cache_mb = 0;
-
-    if(rrdb.default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
-        netdata_log_error("Invalid page cache size %d given. Defaulting to %d.", rrdb.default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
-        rrdb.default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
-        config_set_number(CONFIG_SECTION_DB, "dbengine page cache size MB", rrdb.default_rrdeng_page_cache_mb);
-    }
-
-    // ------------------------------------------------------------------------
-    // get default Database Engine disk space quota in MiB
-
-    rrdb.default_rrdeng_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine disk space MB", rrdb.default_rrdeng_disk_quota_mb);
-    if (rrdb.default_rrdeng_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
-        netdata_log_error("Invalid dbengine disk space %d given. Defaulting to %d.", rrdb.default_rrdeng_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
-        rrdb.default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
-        config_set_number(CONFIG_SECTION_DB, "dbengine disk space MB", rrdb.default_rrdeng_disk_quota_mb);
-    }
-#else
-    if (default_storage_engine_id  == STORAGE_ENGINE_DBENGINE) {
-       error_report("RRD_MEMORY_MODE_DBENGINE is not supported in this platform. The agent will use db mode 'save' instead.");
-       default_storage_engine_id = STORAGE_ENGINE_SAVE;
-    }
-#endif
     // ------------------------------------------------------------------------
 
     netdata_configured_host_prefix = config_get(CONFIG_SECTION_GLOBAL, "host access prefix", "");

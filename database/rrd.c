@@ -219,6 +219,29 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
             netdata_log_info("DBENGINE: Initializing ...");
 
 #ifdef ENABLE_DBENGINE
+            rrdb.default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page cache size MB", rrdb.default_rrdeng_page_cache_mb);
+            rrdb.default_rrdeng_extent_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine extent cache size MB", rrdb.default_rrdeng_extent_cache_mb);
+            rrdb.db_engine_journal_check = config_get_boolean(CONFIG_SECTION_DB, "dbengine enable journal integrity check", CONFIG_BOOLEAN_NO);
+
+            if(rrdb.default_rrdeng_extent_cache_mb < 0)
+                rrdb.default_rrdeng_extent_cache_mb = 0;
+
+            if(rrdb.default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
+                netdata_log_error("Invalid page cache size %d given. Defaulting to %d.", rrdb.default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
+                rrdb.default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
+                config_set_number(CONFIG_SECTION_DB, "dbengine page cache size MB", rrdb.default_rrdeng_page_cache_mb);
+            }
+
+            // ------------------------------------------------------------------------
+            // get default Database Engine disk space quota in MiB
+
+            rrdb.default_rrdeng_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine disk space MB", rrdb.default_rrdeng_disk_quota_mb);
+            if (rrdb.default_rrdeng_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
+                netdata_log_error("Invalid dbengine disk space %d given. Defaulting to %d.", rrdb.default_rrdeng_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
+                rrdb.default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
+                config_set_number(CONFIG_SECTION_DB, "dbengine disk space MB", rrdb.default_rrdeng_disk_quota_mb);
+            }
+
             dbengine_config_t cfg;
 
             cfg.use_direct_io = config_get_boolean(CONFIG_SECTION_DB, "dbengine use direct io", rrdb.use_direct_io);
