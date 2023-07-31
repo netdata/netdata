@@ -6,7 +6,7 @@
     link: 'https://ntfy.sh/'
     categories:
       - notify.agent
-    icon_filename: 'ntfy.png'
+    icon_filename: 'ntfy.svg'
   keywords:
     - ntfy
   overview:

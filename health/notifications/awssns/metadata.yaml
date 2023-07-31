@@ -6,7 +6,7 @@
     link: 'https://aws.amazon.com/sns/'
     categories:
       - notify.agent
-    icon_filename: 'awssns.png'
+    icon_filename: 'aws.svg'
   keywords:
     - AWS SNS
   overview:
