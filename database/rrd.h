@@ -909,7 +909,7 @@ struct rrdb {
 
     int default_rrdeng_disk_quota_mb;
 
-    int default_multidb_disk_quota_mb;
+    int multidb_disk_quota_mb[RRD_STORAGE_TIERS];
 
     STORAGE_INSTANCE *multidb_ctx[RRD_STORAGE_TIERS];
 

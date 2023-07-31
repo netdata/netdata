@@ -1264,7 +1264,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
     buffer_json_member_add_string(wb, "memory-mode", storage_engine_name(host->storage_engine_id));
 #ifdef ENABLE_DBENGINE
-    buffer_json_member_add_uint64(wb, "multidb-disk-quota", rrdb.default_multidb_disk_quota_mb);
+    buffer_json_member_add_uint64(wb, "multidb-disk-quota", rrdb.multidb_disk_quota_mb[0]);
     buffer_json_member_add_uint64(wb, "page-cache-size", rrdb.default_rrdeng_page_cache_mb);
 #endif // ENABLE_DBENGINE
     buffer_json_member_add_boolean(wb, "web-enabled", web_server_mode != WEB_SERVER_MODE_NONE);

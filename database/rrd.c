@@ -109,6 +109,7 @@ typedef struct {
     int default_rrdeng_disk_quota_mb;
     size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
     RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS];
+    int multidb_disk_quota_mb[RRD_STORAGE_TIERS];
 } dbengine_config_t;
 
 static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
@@ -117,7 +118,6 @@ static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
     struct dbengine_initialization tiers_init[RRD_STORAGE_TIERS] = {};
 
     size_t created_tiers = 0;
-    int divisor = 1;
 
     for(size_t tier = 0; tier < rrdb.storage_tiers ;tier++) {
         char dbenginepath[FILENAME_MAX + 1];
@@ -133,18 +133,11 @@ static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
             break;
         }
 
-        if(tier > 0)
-            divisor *= 2;
-
-        int disk_space_mb = rrdb.default_multidb_disk_quota_mb / divisor;
         size_t grouping_iterations = rrdb.storage_tiers_grouping_iterations[tier];
         RRD_BACKFILL backfill = rrdb.storage_tiers_backfill[tier];
 
         if(tier > 0) {
             char dbengineconfig[200 + 1];
-            snprintfz(dbengineconfig, 200, "dbengine tier %zu multihost disk space MB", tier);
-            disk_space_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig, disk_space_mb);
-
             snprintfz(dbengineconfig, 200, "dbengine tier %zu update every iterations", tier);
             grouping_iterations = config_get_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
             if(grouping_iterations < 2) {
@@ -184,7 +177,7 @@ static void dbengine_init(const char *hostname, const dbengine_config_t *cfg) {
 
         internal_error(true, "DBENGINE tier %zu grouping iterations is set to %zu", tier, rrdb.storage_tiers_grouping_iterations[tier]);
 
-        tiers_init[tier].disk_space_mb = disk_space_mb;
+        tiers_init[tier].disk_space_mb = rrdb.multidb_disk_quota_mb[tier];
         tiers_init[tier].tier = tier;
         strncpyz(tiers_init[tier].path, dbenginepath, FILENAME_MAX);
         tiers_init[tier].ret = 0;
@@ -286,6 +279,25 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
                 config_set_number(CONFIG_SECTION_DB, "storage tiers", cfg.storage_tiers);
             }
 
+            {
+                rrdb.multidb_disk_quota_mb[0] = (int) config_get_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", compute_multidb_diskspace());
+                if(rrdb.multidb_disk_quota_mb[0] < RRDENG_MIN_DISK_SPACE_MB) {
+                    netdata_log_error("Invalid multidb disk space %d given. Defaulting to %d.", rrdb.multidb_disk_quota_mb[0], rrdb.default_rrdeng_disk_quota_mb);
+                    rrdb.multidb_disk_quota_mb[0] = rrdb.default_rrdeng_disk_quota_mb;
+                    config_set_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", rrdb.multidb_disk_quota_mb[0]);
+                }
+
+                // figure out the default non-zero tier disk size
+                for (size_t tier = 1; tier != cfg.storage_tiers; tier++) {
+                    int prev_tier_size = rrdb.multidb_disk_quota_mb[tier - 1];
+                    int curr_tier_size = prev_tier_size >> 1;
+
+                    char buf[200 + 1];
+                    snprintfz(buf, 200, "dbengine tier %zu multihost disk space MB", tier);
+                    rrdb.multidb_disk_quota_mb[tier] = config_get_number(CONFIG_SECTION_DB, buf, curr_tier_size);
+                }
+            }
+
             unsigned read_num = (unsigned)config_get_number(CONFIG_SECTION_DB, "dbengine pages per extent", rrdb.rrdeng_pages_per_extent);
             if (read_num > 0 && read_num <= rrdb.rrdeng_pages_per_extent)
                 cfg.rrdeng_pages_per_extent = read_num;
@@ -304,6 +316,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
             memcpy(cfg.storage_tiers_grouping_iterations, rrdb.storage_tiers_grouping_iterations, RRD_STORAGE_TIERS);
 
             memcpy(cfg.storage_tiers_backfill, rrdb.storage_tiers_backfill, RRD_STORAGE_TIERS);
+            memcpy(cfg.multidb_disk_quota_mb, rrdb.multidb_disk_quota_mb, RRD_STORAGE_TIERS);
 
             rrdb.use_direct_io = cfg.use_direct_io;
             rrdb.storage_tiers = cfg.storage_tiers;
@@ -313,6 +326,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
             rrdb.default_rrdeng_disk_quota_mb = cfg.default_rrdeng_disk_quota_mb;
             memcpy(rrdb.storage_tiers_grouping_iterations, cfg.storage_tiers_grouping_iterations, RRD_STORAGE_TIERS);
             memcpy(rrdb.storage_tiers_backfill, cfg.storage_tiers_backfill, RRD_STORAGE_TIERS);
+            memcpy(rrdb.multidb_disk_quota_mb, cfg.multidb_disk_quota_mb, RRD_STORAGE_TIERS);
 
             dbengine_init(hostname, &cfg);
 #else
@@ -441,7 +455,13 @@ struct rrdb rrdb = {
     .db_engine_journal_check = CONFIG_BOOLEAN_NO,
 
     .default_rrdeng_disk_quota_mb = 256,
-    .default_multidb_disk_quota_mb = 256,
+    .multidb_disk_quota_mb = {
+        256,
+        128,
+        64,
+        32,
+        16,
+    },
 
     .multidb_ctx = {
         NULL,
