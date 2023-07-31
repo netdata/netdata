@@ -194,9 +194,9 @@
   id: 'export-newrelic'
   meta:
     <<: *meta
-    name: NewRelic
+    name: New Relic
     link: https://newrelic.com/
-    icon_filename: 'newrelic.png'
+    icon_filename: 'newrelic.svg'
     keywords:
       - export
       - NewRelic
@@ -208,7 +208,7 @@
     <<: *meta
     name: QuasarDB
     link: https://doc.quasar.ai/master/
-    icon_filename: 'quasardb.png'
+    icon_filename: 'quasar.jpeg'
     keywords:
       - export
       - quasar
@@ -221,7 +221,7 @@
     <<: *meta
     name: Splunk SignalFx
     link: https://www.splunk.com/en_us/products/observability.html
-    icon_filename: 'splunk.png'
+    icon_filename: 'splunk.svg'
     keywords:
       - export
       - splunk
@@ -270,7 +270,7 @@
     <<: *meta
     name: VMware Aria
     link: https://www.vmware.com/products/aria-operations-for-applications.html
-    icon_filename: 'vmware-aria.png'
+    icon_filename: 'aria.png'
     keywords:
       - export
       - VMware
@@ -368,7 +368,7 @@
     <<: *meta
     name: Kafka
     link: https://kafka.apache.org/
-    icon_filename: 'kafka.png'
+    icon_filename: 'kafka.svg'
     keywords:
       - export
       - Kafka
@@ -404,7 +404,7 @@
     <<: *meta
     name: PostgreSQL
     link: https://www.postgresql.org/
-    icon_filename: 'postgres.png'
+    icon_filename: 'postgres.svg'
     keywords:
       - export
       - PostgreSQL

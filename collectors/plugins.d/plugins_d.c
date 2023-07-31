@@ -217,6 +217,11 @@ void *pluginsd_main(void *ptr)
 
     // disable some plugins by default
     config_get_boolean(CONFIG_SECTION_PLUGINS, "slabinfo", CONFIG_BOOLEAN_NO);
+    // it crashes (both threads) on Alpine after we made it multi-threaded
+    // works with "--device /dev/ipmi0", but this is not default
+    // see https://github.com/netdata/netdata/pull/15564 for details
+    if (getenv("NETDATA_LISTENER_PORT"))
+        config_get_boolean(CONFIG_SECTION_PLUGINS, "freeipmi", CONFIG_BOOLEAN_NO);
 
     // store the errno for each plugins directory
     // so that we don't log broken directories on each loop
