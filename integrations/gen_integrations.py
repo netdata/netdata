@@ -290,12 +290,24 @@ def _load_exporter_file(file, repo):
         warn(f'Failed to validate { file } against the schema.', file)
         return []
 
-    data['integration_type'] = 'exporter'
-    data['_src_path'] = file
-    data['_repo'] = repo
-    data['_index'] = 0
+    if 'id' in data:
+        data['integration_type'] = 'exporter'
+        data['_src_path'] = file
+        data['_repo'] = repo
+        data['_index'] = 0
 
-    return [data]
+        return [data]
+    else:
+        ret = []
+
+        for idx, item in enumerate(data):
+            item['integration_type'] = 'exporter'
+            item['_src_path'] = file
+            item['_repo'] = repo
+            item['_index'] = idx
+            ret.append(item)
+
+        return ret
 
 
 def load_exporters():

@@ -15,6 +15,7 @@
   ],
   "$defs": {
     "entry": {
+      "type": "object",
       "properties": {
         "id": {
           "$ref": "./shared.json#/$defs/id"
