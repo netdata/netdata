@@ -666,6 +666,12 @@ static int read_multiline_file(procfile *ff, char *pathname, collected_number *n
     return 2; // error
 }
 
+static char *set_id(const char *suf_1, const char *suf_2, const char *suf_3){
+    static char id[RRD_ID_LENGTH_MAX + 1];
+    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s_%s", suf_1, suf_2, suf_3);
+    return id;
+}
+
 int do_sys_class_drm(int update_every, usec_t dt) {
     (void)dt;
     
@@ -688,7 +694,7 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                  (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0'))) continue;
             
             if(likely(de->d_type == DT_LNK && !strncmp(de->d_name, "card", 4) && !strchr(de->d_name, '-'))) {
-                struct card *const c = callocz(sizeof(struct card), 1);  
+                struct card *const c = callocz(1, sizeof(struct card));  
 
                 /* Get static info */              
 
@@ -721,18 +727,14 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                         prop_pathname = strdupz(filename);                                       \
                 }
 
-                char id[RRD_ID_LENGTH_MAX + 1];
-
                 /* Initialize GPU and VRAM utilization metrics */
 
                 set_prop_pathname("device/gpu_busy_percent", c->pathname_util_gpu, NULL);
                 
                 if(c->pathname_util_gpu){
-                    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", "gpu_utilization", c->id.marketing_name);
-
                     c->st_util_gpu = rrdset_create_localhost(
                             AMDGPU_CHART_TYPE
-                            , id
+                            , set_id("gpu_utilization", c->id.marketing_name, de->d_name)
                             , NULL
                             , "utilization"
                             , AMDGPU_CHART_TYPE ".gpu_utilization"
@@ -754,11 +756,9 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                 set_prop_pathname("device/mem_busy_percent", c->pathname_util_mem, NULL);
 
                 if(c->pathname_util_mem){
-                    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", "gpu_mem_utilization", c->id.marketing_name);
-
                     c->st_util_mem = rrdset_create_localhost(
                             AMDGPU_CHART_TYPE
-                            , id
+                            , set_id("gpu_mem_utilization", c->id.marketing_name, de->d_name)
                             , NULL
                             , "utilization"
                             , AMDGPU_CHART_TYPE ".gpu_mem_utilization"
@@ -783,11 +783,9 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                 set_prop_pathname("device/pp_dpm_sclk", c->pathname_clk_gpu, c->ff_clk_gpu);
                 
                 if(c->pathname_clk_gpu){
-                    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", "gpu_clk_frequency", c->id.marketing_name);
-
                     c->st_clk_gpu = rrdset_create_localhost(
                             AMDGPU_CHART_TYPE
-                            , id
+                            , set_id("gpu_clk_frequency", c->id.marketing_name, de->d_name)
                             , NULL
                             , "frequency"
                             , AMDGPU_CHART_TYPE ".gpu_clk_frequency"
@@ -809,11 +807,9 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                 set_prop_pathname("device/pp_dpm_mclk", c->pathname_clk_mem, c->ff_clk_mem);
 
                 if(c->pathname_clk_mem){
-                    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", "gpu_mem_clk_frequency", c->id.marketing_name);
-
                     c->st_clk_mem = rrdset_create_localhost(
                             AMDGPU_CHART_TYPE
-                            , id
+                            , set_id("gpu_mem_clk_frequency", c->id.marketing_name, de->d_name)
                             , NULL
                             , "frequency"
                             , AMDGPU_CHART_TYPE ".gpu_mem_clk_frequency"
@@ -840,11 +836,9 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                 if(c->pathname_mem_total_vram) c->total_vram = tmp_val;
                 
                 if(c->pathname_mem_used_vram && c->pathname_mem_total_vram){
-                    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", "gpu_mem_vram_usage_perc", c->id.marketing_name);
-
                     c->st_mem_usage_perc_vram = rrdset_create_localhost(
                             AMDGPU_CHART_TYPE
-                            , id
+                            , set_id("gpu_mem_vram_usage_perc", c->id.marketing_name, de->d_name)
                             , NULL
                             , "memory_usage"
                             , AMDGPU_CHART_TYPE ".gpu_mem_vram_usage_perc"
@@ -862,11 +856,9 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                     c->rd_mem_used_perc_vram = rrddim_add(c->st_mem_usage_perc_vram, "used", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
 
 
-                    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", "gpu_mem_vram_usage", c->id.marketing_name);
-
                     c->st_mem_usage_vram = rrdset_create_localhost(
                             AMDGPU_CHART_TYPE
-                            , id
+                            , set_id("gpu_mem_vram_usage", c->id.marketing_name, de->d_name)
                             , NULL
                             , "memory_usage"
                             , AMDGPU_CHART_TYPE ".gpu_mem_vram_usage"
@@ -891,11 +883,9 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                 if(c->pathname_mem_total_vis_vram) c->total_vis_vram = tmp_val;
 
                 if(c->pathname_mem_used_vis_vram && c->pathname_mem_total_vis_vram){
-                    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", "gpu_mem_vis_vram_usage_perc", c->id.marketing_name);
-
                     c->st_mem_usage_perc_vis_vram = rrdset_create_localhost(
                             AMDGPU_CHART_TYPE
-                            , id
+                            , set_id("gpu_mem_vis_vram_usage_perc", c->id.marketing_name, de->d_name)
                             , NULL
                             , "memory_usage"
                             , AMDGPU_CHART_TYPE ".gpu_mem_vis_vram_usage_perc"
@@ -913,11 +903,9 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                     c->rd_mem_used_perc_vis_vram = rrddim_add(c->st_mem_usage_perc_vis_vram, "used", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
 
 
-                    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", "gpu_mem_vis_vram_usage", c->id.marketing_name);
-
                     c->st_mem_usage_vis_vram = rrdset_create_localhost(
                             AMDGPU_CHART_TYPE
-                            , id
+                            , set_id("gpu_mem_vis_vram_usage", c->id.marketing_name, de->d_name)
                             , NULL
                             , "memory_usage"
                             , AMDGPU_CHART_TYPE ".gpu_mem_vis_vram_usage"
@@ -942,11 +930,9 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                 if(c->pathname_mem_total_gtt) c->total_gtt = tmp_val;
 
                 if(c->pathname_mem_used_gtt && c->pathname_mem_total_gtt){
-                    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", "gpu_mem_gtt_usage_perc", c->id.marketing_name);
-
                     c->st_mem_usage_perc_gtt = rrdset_create_localhost(
                             AMDGPU_CHART_TYPE
-                            , id
+                            , set_id("gpu_mem_gtt_usage_perc", c->id.marketing_name, de->d_name)
                             , NULL
                             , "memory_usage"
                             , AMDGPU_CHART_TYPE ".gpu_mem_gtt_usage_perc"
@@ -963,11 +949,9 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                     c->rd_mem_used_perc_gtt = rrddim_add(c->st_mem_usage_perc_gtt, "used", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
 
-                    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", "gpu_mem_gtt_usage", c->id.marketing_name);
-
                     c->st_mem_usage_gtt = rrdset_create_localhost(
                             AMDGPU_CHART_TYPE
-                            , id
+                            , set_id("gpu_mem_gtt_usage", c->id.marketing_name, de->d_name)
                             , NULL
                             , "memory_usage"
                             , AMDGPU_CHART_TYPE ".gpu_mem_gtt_usage"
