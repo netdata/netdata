@@ -95,4 +95,6 @@ typedef struct {
 
 extern dbengine_config_t dbengine_cfg;
 
+bool dbengine_init(const char *hostname, dbengine_config_t *cfg);
+
 #endif /* NETDATA_RRDDIM_ENG_H */

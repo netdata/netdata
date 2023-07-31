@@ -84,88 +84,146 @@ STRING *rrd_string_strdupz(const char *s) {
 // ----------------------------------------------------------------------------
 // rrd global / startup initialization
 
-#ifdef ENABLE_DBENGINE
-struct dbengine_initialization {
-    netdata_thread_t thread;
-    char path[FILENAME_MAX + 1];
-    int disk_space_mb;
-    size_t tier;
-    int ret;
-};
+static dbengine_config_t get_dbengine_config(const char *hostname) {
+    // use the global `dbengine_cfg` instance to retrieve default values;
+    dbengine_config_t cfg = dbengine_cfg;
 
-static void *dbengine_tier_init(void *ptr) {
-    struct dbengine_initialization *dbi = ptr;
-    dbi->ret = rrdeng_tier_init(NULL, dbi->path, dbi->disk_space_mb, dbi->tier);
-    return ptr;
+    // check journal
+    cfg.check_journal = config_get_boolean(CONFIG_SECTION_DB, "dbengine enable journal integrity check", cfg.check_journal);
+
+    // use direct io
+    cfg.use_direct_io = config_get_boolean(CONFIG_SECTION_DB, "dbengine use direct io", cfg.use_direct_io);
+
+    // parallel initialization
+    cfg.parallel_initialization = (cfg.storage_tiers <= (size_t) get_netdata_cpus()) ? true : false;
+    cfg.parallel_initialization = config_get_boolean(CONFIG_SECTION_DB, "dbengine parallel initialization", cfg.parallel_initialization);
+
+    // disk quota size
+    cfg.disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine disk space MB", cfg.disk_quota_mb);
+    if (cfg.disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
+        netdata_log_error("Invalid dbengine disk space %d given. Defaulting to %d.", cfg.disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
+        cfg.disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
+        config_set_number(CONFIG_SECTION_DB, "dbengine disk space MB", cfg.disk_quota_mb);
+    }
+
+    // page cache size
+    cfg.page_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page cache size MB", cfg.page_cache_mb);
+    if (cfg.page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
+        netdata_log_error("Invalid page cache size %d given. Defaulting to %d.",
+                          cfg.page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
+        cfg.page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
+        config_set_number(CONFIG_SECTION_DB, "dbengine page cache size MB", cfg.page_cache_mb);
+    }
+
+    // extent cache size
+    cfg.extent_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine extent cache size MB", cfg.extent_cache_mb);
+    if (cfg.extent_cache_mb < 0)
+        cfg.extent_cache_mb = 0;
+
+    // pages per extent
+    unsigned pages_per_extent = (unsigned) config_get_number(CONFIG_SECTION_DB, "dbengine pages per extent", cfg.pages_per_extent);
+    if (pages_per_extent > 0 && pages_per_extent <= cfg.pages_per_extent)
+        cfg.pages_per_extent = pages_per_extent;
+    else {
+        netdata_log_error("Invalid dbengine pages per extent %u given. Using %u.", pages_per_extent, cfg.pages_per_extent);
+        config_set_number(CONFIG_SECTION_DB, "dbengine pages per extent", cfg.pages_per_extent);
+    }
+
+    // number of storage tiers
+    cfg.storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", cfg.storage_tiers);
+    if (cfg.storage_tiers < 1) {
+        netdata_log_error("At least 1 storage tier is required. Assuming 1.");
+        cfg.storage_tiers = 1;
+        config_set_number(CONFIG_SECTION_DB, "storage tiers", cfg.storage_tiers);
+    }
+    if (cfg.storage_tiers > STORAGE_ENGINE_TIERS) {
+        netdata_log_error("Up to %d storage tier are supported. Assuming %d.", STORAGE_ENGINE_TIERS, STORAGE_ENGINE_TIERS);
+        cfg.storage_tiers = STORAGE_ENGINE_TIERS;
+        config_set_number(CONFIG_SECTION_DB, "storage tiers", cfg.storage_tiers);
+    }
+
+    // multi-db disk quota size
+    {
+        cfg.multidb_disk_quota_mb[0] = (int) config_get_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", compute_multidb_diskspace());
+        if (cfg.multidb_disk_quota_mb[0] < RRDENG_MIN_DISK_SPACE_MB) {
+            netdata_log_error("Invalid multidb disk space %d given. Defaulting to %d.", cfg.multidb_disk_quota_mb[0], cfg.disk_quota_mb);
+            cfg.multidb_disk_quota_mb[0] = cfg.disk_quota_mb;
+            config_set_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", cfg.multidb_disk_quota_mb[0]);
+        }
+
+        // figure out the default non-zero tier disk size
+        for (size_t tier = 1; tier != cfg.storage_tiers; tier++) {
+            int prev_tier_size = cfg.multidb_disk_quota_mb[tier - 1];
+            int curr_tier_size = prev_tier_size >> 1;
+
+            char buf[200 + 1];
+            snprintfz(buf, 200, "dbengine tier %zu multihost disk space MB", tier);
+            cfg.multidb_disk_quota_mb[tier] = config_get_number(CONFIG_SECTION_DB, buf, curr_tier_size);
+        }
+    }
+
+    // tier grouping
+    {
+        for (size_t tier = 1; tier < cfg.storage_tiers; tier++) {
+            char buf[200 + 1];
+            snprintfz(buf, 200, "dbengine tier %zu update every iterations", tier);
+
+            size_t grouping_iterations = cfg.storage_tiers_grouping_iterations[tier];
+            grouping_iterations = config_get_number(CONFIG_SECTION_DB, buf, grouping_iterations);
+
+            if (grouping_iterations < 2) {
+                grouping_iterations = 2;
+                config_set_number(CONFIG_SECTION_DB, buf, grouping_iterations);
+                netdata_log_error("DBENGINE on '%s': 'dbegnine tier %zu update every iterations' cannot be less than 2. Assuming 2.",
+                                  hostname, tier);
+            }
+
+            cfg.storage_tiers_grouping_iterations[tier] = grouping_iterations;
+
+            if(tier > 0 && get_tier_grouping(tier) > 65535) {
+                cfg.storage_tiers_grouping_iterations[tier] = 1;
+                netdata_log_error("DBENGINE on '%s': dbengine tier %zu gives aggregation of more than 65535 points of tier 0. Disabling tiers above %zu",
+                                  hostname,
+                                  tier,
+                                  tier);
+                cfg.storage_tiers = tier;
+                break;
+            }
+
+            internal_error(true, "DBENGINE tier %zu grouping iterations is set to %zu", tier, cfg.storage_tiers_grouping_iterations[tier]);
+        }
+    }
+
+    // tier backfilling
+    {
+        for (size_t tier = 0; tier != cfg.storage_tiers; tier++) {
+            STORAGE_TIER_BACKFILL backfill = cfg.storage_tiers_backfill[tier];
+
+            if (tier > 0) {
+                char buf[200 + 1];
+                snprintfz(buf, 200, "dbengine tier %zu backfill", tier);
+
+                const char *bf = config_get(CONFIG_SECTION_DB, buf, backfill == STORAGE_TIER_BACKFILL_NEW ? "new" : backfill == STORAGE_TIER_BACKFILL_FULL ? "full" : "none");
+
+                if(strcmp(bf, "new") == 0)
+                    backfill = STORAGE_TIER_BACKFILL_NEW;
+                else if(strcmp(bf, "full") == 0)
+                    backfill = STORAGE_TIER_BACKFILL_FULL;
+                else if(strcmp(bf, "none") == 0)
+                    backfill = STORAGE_TIER_BACKFILL_NONE;
+                else {
+                    netdata_log_error("DBENGINE: unknown backfill value '%s', assuming 'new'", bf);
+                    config_set(CONFIG_SECTION_DB, buf, "new");
+                    backfill = STORAGE_TIER_BACKFILL_NEW;
+                }
+            }
+
+            cfg.storage_tiers_backfill[tier] = backfill;
+        }
+    }
+
+    return cfg;
 }
-
-static bool dbengine_init(const char *hostname, dbengine_config_t *cfg) {
-    struct dbengine_initialization tiers_init[STORAGE_ENGINE_TIERS] = {};
-
-    for (size_t tier = 0; tier < cfg->storage_tiers ;tier++) {
-        char dbenginepath[FILENAME_MAX + 1];
-
-        if (tier == 0)
-            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", cfg->base_path);
-        else
-            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%zu", cfg->base_path, tier);
-
-        int ret = mkdir(dbenginepath, 0775);
-        if (ret != 0 && errno != EEXIST) {
-            netdata_log_error("DBENGINE on '%s': cannot create directory '%s'", hostname, dbenginepath);
-            break;
-        }
-
-        tiers_init[tier].disk_space_mb = cfg->multidb_disk_quota_mb[tier];
-        tiers_init[tier].tier = tier;
-        strncpyz(tiers_init[tier].path, dbenginepath, FILENAME_MAX);
-        tiers_init[tier].ret = 0;
-
-        if (cfg->parallel_initialization) {
-            char tag[NETDATA_THREAD_TAG_MAX + 1];
-            snprintfz(tag, NETDATA_THREAD_TAG_MAX, "DBENGINIT[%zu]", tier);
-            netdata_thread_create(&tiers_init[tier].thread, tag, NETDATA_THREAD_OPTION_JOINABLE,
-                                  dbengine_tier_init, &tiers_init[tier]);
-        }
-        else
-            dbengine_tier_init(&tiers_init[tier]);
-    }
-
-    size_t created_tiers = 0;
-
-    for (size_t tier = 0; tier < cfg->storage_tiers ;tier++) {
-        void *ptr;
-
-        if (cfg->parallel_initialization)
-            netdata_thread_join(tiers_init[tier].thread, &ptr);
-
-        if (tiers_init[tier].ret != 0) {
-            netdata_log_error("DBENGINE on '%s': Failed to initialize multi-host database tier %zu on path '%s'",
-                              hostname,
-                              tiers_init[tier].tier,
-                              tiers_init[tier].path);
-        }
-        else if (created_tiers == tier)
-            created_tiers++;
-    }
-
-    if (created_tiers && created_tiers < cfg->storage_tiers) {
-        netdata_log_error("DBENGINE on '%s': Managed to create %zu tiers instead of %zu. Continuing with %zu available.",
-                          hostname,
-                          created_tiers,
-                          cfg->storage_tiers,
-                          created_tiers);
-        cfg->storage_tiers = created_tiers;
-    }
-    else if (!created_tiers)
-        fatal("DBENGINE on '%s', failed to initialize databases at '%s'.", hostname, netdata_configured_cache_dir);
-
-    for (size_t tier = 0; tier < cfg->storage_tiers ;tier++)
-        rrdeng_readiness_wait(cfg->multidb_ctx[tier]);
-
-    return true;
-}
-#endif // ENABLE_DBENGINE
 
 static void init_host_indexes() {
     internal_fatal(rrdb.rrdhost_root_index || rrdb.rrdhost_root_index_hostname,
@@ -201,152 +259,15 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
         health_init();
         rrdpush_init();
 
-        if (default_storage_engine_id == STORAGE_ENGINE_DBENGINE || rrdpush_receiver_needs_dbengine()) {
+        if (default_storage_engine_id == STORAGE_ENGINE_DBENGINE || rrdpush_receiver_needs_dbengine())
+        {
             netdata_log_info("DBENGINE: Initializing ...");
 
 #ifdef ENABLE_DBENGINE
-            dbengine_config_t cfg = dbengine_cfg;
-
-            // check journal
-            cfg.check_journal = config_get_boolean(CONFIG_SECTION_DB, "dbengine enable journal integrity check", cfg.check_journal);
-
-            // use direct io
-            cfg.use_direct_io = config_get_boolean(CONFIG_SECTION_DB, "dbengine use direct io", cfg.use_direct_io);
-
-            // parallel initialization
-            cfg.parallel_initialization = (cfg.storage_tiers <= (size_t) get_netdata_cpus()) ? true : false;
-            cfg.parallel_initialization = config_get_boolean(CONFIG_SECTION_DB, "dbengine parallel initialization", cfg.parallel_initialization);
-
-            // disk quota size
-            cfg.disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine disk space MB", cfg.disk_quota_mb);
-            if (cfg.disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
-                netdata_log_error("Invalid dbengine disk space %d given. Defaulting to %d.", cfg.disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
-                cfg.disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
-                config_set_number(CONFIG_SECTION_DB, "dbengine disk space MB", cfg.disk_quota_mb);
-            }
-
-            // page cache size
-            cfg.page_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page cache size MB", cfg.page_cache_mb);
-            if (cfg.page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
-                netdata_log_error("Invalid page cache size %d given. Defaulting to %d.",
-                                  cfg.page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
-                cfg.page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
-                config_set_number(CONFIG_SECTION_DB, "dbengine page cache size MB", cfg.page_cache_mb);
-            }
-
-            // extent cache size
-            cfg.extent_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine extent cache size MB", cfg.extent_cache_mb);
-            if (cfg.extent_cache_mb < 0)
-                cfg.extent_cache_mb = 0;
-
-            // pages per extent
-            unsigned pages_per_extent = (unsigned) config_get_number(CONFIG_SECTION_DB, "dbengine pages per extent", cfg.pages_per_extent);
-            if (pages_per_extent > 0 && pages_per_extent <= cfg.pages_per_extent)
-                cfg.pages_per_extent = pages_per_extent;
-            else {
-                netdata_log_error("Invalid dbengine pages per extent %u given. Using %u.", pages_per_extent, cfg.pages_per_extent);
-                config_set_number(CONFIG_SECTION_DB, "dbengine pages per extent", cfg.pages_per_extent);
-            }
-
-            // number of storage tiers
-            cfg.storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", cfg.storage_tiers);
-            if (cfg.storage_tiers < 1) {
-                netdata_log_error("At least 1 storage tier is required. Assuming 1.");
-                cfg.storage_tiers = 1;
-                config_set_number(CONFIG_SECTION_DB, "storage tiers", cfg.storage_tiers);
-            }
-            if (cfg.storage_tiers > STORAGE_ENGINE_TIERS) {
-                netdata_log_error("Up to %d storage tier are supported. Assuming %d.", STORAGE_ENGINE_TIERS, STORAGE_ENGINE_TIERS);
-                cfg.storage_tiers = STORAGE_ENGINE_TIERS;
-                config_set_number(CONFIG_SECTION_DB, "storage tiers", cfg.storage_tiers);
-            }
-
-            // multi-db disk quota size
-            {
-                cfg.multidb_disk_quota_mb[0] = (int) config_get_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", compute_multidb_diskspace());
-                if (cfg.multidb_disk_quota_mb[0] < RRDENG_MIN_DISK_SPACE_MB) {
-                    netdata_log_error("Invalid multidb disk space %d given. Defaulting to %d.", cfg.multidb_disk_quota_mb[0], cfg.disk_quota_mb);
-                    cfg.multidb_disk_quota_mb[0] = cfg.disk_quota_mb;
-                    config_set_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", cfg.multidb_disk_quota_mb[0]);
-                }
-
-                // figure out the default non-zero tier disk size
-                for (size_t tier = 1; tier != cfg.storage_tiers; tier++) {
-                    int prev_tier_size = cfg.multidb_disk_quota_mb[tier - 1];
-                    int curr_tier_size = prev_tier_size >> 1;
-
-                    char buf[200 + 1];
-                    snprintfz(buf, 200, "dbengine tier %zu multihost disk space MB", tier);
-                    cfg.multidb_disk_quota_mb[tier] = config_get_number(CONFIG_SECTION_DB, buf, curr_tier_size);
-                }
-            }
-
-            // tier grouping
-            {
-                for (size_t tier = 1; tier < cfg.storage_tiers; tier++) {
-                    char buf[200 + 1];
-                    snprintfz(buf, 200, "dbengine tier %zu update every iterations", tier);
-
-                    size_t grouping_iterations = cfg.storage_tiers_grouping_iterations[tier];
-                    grouping_iterations = config_get_number(CONFIG_SECTION_DB, buf, grouping_iterations);
-
-                    if (grouping_iterations < 2) {
-                        grouping_iterations = 2;
-                        config_set_number(CONFIG_SECTION_DB, buf, grouping_iterations);
-                        netdata_log_error("DBENGINE on '%s': 'dbegnine tier %zu update every iterations' cannot be less than 2. Assuming 2.",
-                                          hostname, tier);
-                    }
-
-                    cfg.storage_tiers_grouping_iterations[tier] = grouping_iterations;
-
-                    if(tier > 0 && get_tier_grouping(tier) > 65535) {
-                        cfg.storage_tiers_grouping_iterations[tier] = 1;
-                        netdata_log_error("DBENGINE on '%s': dbengine tier %zu gives aggregation of more than 65535 points of tier 0. Disabling tiers above %zu",
-                                          hostname,
-                                          tier,
-                                          tier);
-                        cfg.storage_tiers = tier;
-                        break;
-                    }
-
-                    internal_error(true, "DBENGINE tier %zu grouping iterations is set to %zu", tier, cfg.storage_tiers_grouping_iterations[tier]);
-                }
-            }
-
-            // tier backfilling
-            {
-                for (size_t tier = 0; tier != cfg.storage_tiers; tier++) {
-                    STORAGE_TIER_BACKFILL backfill = cfg.storage_tiers_backfill[tier];
-
-                    if (tier > 0) {
-                        char buf[200 + 1];
-                        snprintfz(buf, 200, "dbengine tier %zu backfill", tier);
-
-                        const char *bf = config_get(CONFIG_SECTION_DB, buf, backfill == STORAGE_TIER_BACKFILL_NEW ? "new" : backfill == STORAGE_TIER_BACKFILL_FULL ? "full" : "none");
-
-                        if(strcmp(bf, "new") == 0)
-                            backfill = STORAGE_TIER_BACKFILL_NEW;
-                        else if(strcmp(bf, "full") == 0)
-                            backfill = STORAGE_TIER_BACKFILL_FULL;
-                        else if(strcmp(bf, "none") == 0)
-                            backfill = STORAGE_TIER_BACKFILL_NONE;
-                        else {
-                            netdata_log_error("DBENGINE: unknown backfill value '%s', assuming 'new'", bf);
-                            config_set(CONFIG_SECTION_DB, buf, "new");
-                            backfill = STORAGE_TIER_BACKFILL_NEW;
-                        }
-                    }
-
-                    cfg.storage_tiers_backfill[tier] = backfill;
-                }
-            }
-
-            rrdb.dbengine_cfg = cfg;
-
-            rrdb.dbengine_enabled = dbengine_init(hostname, &rrdb.dbengine_cfg);
-#endif // ENABLE_DBENGINE
-        }
-        else {
+        rrdb.dbengine_cfg = get_dbengine_config(hostname);
+        rrdb.dbengine_enabled = dbengine_init(hostname, &rrdb.dbengine_cfg);
+#endif
+        } else {
             netdata_log_info("DBENGINE: Not initializing ...");
         }
 
@@ -433,7 +354,6 @@ struct rrdb rrdb = {
     .localhost = NULL,
 
     .dbengine_enabled = false,
-
 #ifdef ENABLE_DBENGINE
     .dbengine_cfg = {},
 #endif // ENABLE_DBENGINE
