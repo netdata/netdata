@@ -1,131 +1,131 @@
-# yamllint disable rule:line-length
----
-meta:
-  plugin_name: cups.plugin
-  module_name: cups.plugin
-  monitored_instance:
-    name: CUPS
-    link: "https://www.cups.org/"
-    categories:
-    - data-collection.hardware-devices-and-sensors
-    icon_filename: "cups.png"
-  related_resources:
-    integrations:
-      list: []
-  info_provided_to_referring_integrations:
-    description: ""
-  keywords: []
-  most_popular: false
-overview:
-  data_collection:
-    metrics_description: "Monitor CUPS performance for achieving optimal printing system operations. Monitor job statuses, queue lengths, and error rates to ensure smooth printing tasks."
-    method_description: "The plugin uses CUPS shared library to connect and monitor the server."
-  supported_platforms:
-    include: []
-    exclude: []
-  multi_instance: true
-  additional_permissions:
-    description: "The plugin needs to access the server. Netdata sets permissions during installation time to reach the server through its library."
-  default_behavior:
-    auto_detection:
-      description: "The plugin detects when CUPS server is running and tries to connect to it."
-    limits:
-      description: ""
-    performance_impact:
-      description: ""
-setup:
-  prerequisites:
-    list:
-      - title: Minimum setup
-        description: "The CUPS server must be installed and running."
-  configuration:
-    file:
-      name: "netdata.conf"
-      section_name: "[plugin:cups]"
-      description: "The netdata main configuration file."
-    options:
-      description: ""
-      folding:
-        title: "Config options"
-        enabled: true
-      list:
-        - name: update every
-          description: Data collection frequency.
-          default_value: 1
-          required: false
-        - name: command options
-          description: Additional parameters for the collector
-          default_value: ""
-          required: false
-    examples:
-      folding:
-        enabled: true
-        title: ""
-      list: []
-troubleshooting:
-  problems:
-    list: []
-alerts: []
-metrics:
-  folding:
-    title: Metrics
-    enabled: false
-  description: ""
-  availability: []
-  scopes:
-  - name: global
-    description: ""
-    labels: []
+plugin_name: cups.plugin
+modules:
+  - meta:
+      plugin_name: cups.plugin
+      module_name: cups.plugin
+      monitored_instance:
+        name: CUPS
+        link: "https://www.cups.org/"
+        categories:
+          - data-collection.hardware-devices-and-sensors
+        icon_filename: "cups.png"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Monitor CUPS performance for achieving optimal printing system operations. Monitor job statuses, queue lengths, and error rates to ensure smooth printing tasks."
+        method_description: "The plugin uses CUPS shared library to connect and monitor the server."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: "The plugin needs to access the server. Netdata sets permissions during installation time to reach the server through its library."
+      default_behavior:
+        auto_detection:
+          description: "The plugin detects when CUPS server is running and tries to connect to it."
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Minimum setup
+            description: "The CUPS server must be installed and running."
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:cups]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: command options
+              description: Additional parameters for the collector
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
     metrics:
-    - name: cups.dests_state
-      description: Destinations by state
-      unit: "dests"
-      chart_type: stacked
-      dimensions:
-      - name: idle
-      - name: printing
-      - name: stopped
-    - name: cups.dests_option
-      description: Destinations by option
-      unit: "dests"
-      chart_type: line
-      dimensions:
-      - name: total
-      - name: acceptingjobs
-      - name: shared
-    - name: cups.job_num
-      description: Active jobs
-      unit: "jobs"
-      chart_type: stacked
-      dimensions:
-      - name: pending
-      - name: held
-      - name: processing
-    - name: cups.job_size
-      description: Active jobs size
-      unit: "KB"
-      chart_type: stacked
-      dimensions:
-      - name: pending
-      - name: held
-      - name: processing
-  - name: destination
-    description: ""
-    labels: []
-    metrics:
-    - name: cups.destination_job_num
-      description: Active jobs of {destination}
-      unit: "jobs"
-      chart_type: stacked
-      dimensions:
-      - name: pending
-      - name: held
-      - name: processing
-    - name: cups.destination_job_size
-      description: Active jobs size of {destination}
-      unit: "KB"
-      chart_type: stacked
-      dimensions:
-      - name: pending
-      - name: held
-      - name: processing
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: cups.dests_state
+              description: Destinations by state
+              unit: "dests"
+              chart_type: stacked
+              dimensions:
+                - name: idle
+                - name: printing
+                - name: stopped
+            - name: cups.dests_option
+              description: Destinations by option
+              unit: "dests"
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: acceptingjobs
+                - name: shared
+            - name: cups.job_num
+              description: Active jobs
+              unit: "jobs"
+              chart_type: stacked
+              dimensions:
+                - name: pending
+                - name: held
+                - name: processing
+            - name: cups.job_size
+              description: Active jobs size
+              unit: "KB"
+              chart_type: stacked
+              dimensions:
+                - name: pending
+                - name: held
+                - name: processing
+        - name: destination
+          description: ""
+          labels: []
+          metrics:
+            - name: cups.destination_job_num
+              description: Active jobs of {destination}
+              unit: "jobs"
+              chart_type: stacked
+              dimensions:
+                - name: pending
+                - name: held
+                - name: processing
+            - name: cups.destination_job_size
+              description: Active jobs size of {destination}
+              unit: "KB"
+              chart_type: stacked
+              dimensions:
+                - name: pending
+                - name: held
+                - name: processing

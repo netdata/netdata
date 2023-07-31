@@ -6,7 +6,7 @@
     link: 'https://spec.matrix.org/unstable/push-gateway-api/'
     categories:
       - notify.agent
-    icon_filename: 'matrix.png'
+    icon_filename: 'matrix.svg'
   keywords:
     - Matrix
   overview:

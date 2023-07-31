@@ -1,217 +1,219 @@
-meta:
-  plugin_name: charts.d.plugin
-  module_name: nut
-  monitored_instance:
-    name: UPS/PDU
-    link: ''
-    categories:
-    - data-collection.ups
-    icon_filename: 'plug-circle-bolt.svg'
-  related_resources:
-    integrations:
-      list: []
-  info_provided_to_referring_integrations:
-    description: ''
-  keywords:
-    - nut
-    - network ups tools
-    - ups
-    - pdu
-  most_popular: false
-overview:
-  data_collection:
-    metrics_description: 'Examine UPS/PDU metrics with Netdata for insights into power device performance. Improve your power device performance with comprehensive dashboards and anomaly detection.'
-    method_description: 'This collector uses the `nut` (Network UPS Tools) to query statistics for multiple UPS devices.'
-  supported_platforms:
-    include: []
-    exclude: []
-  multi_instance: true
-  additional_permissions:
-    description: ''
-  default_behavior:
-    auto_detection:
-      description: ''
-    limits:
-      description: ''
-    performance_impact:
-      description: ''
-setup:
-  prerequisites:
-    list:
-      - title: "Required software"
-        description: "Make sure the Network UPS Tools (`nut`) is installed and can detect your UPS devices."
-  configuration:
-    file:
-      name: charts.d/nut.conf
-    options:
-      description: |
-        The config file is sourced by the charts.d plugin. It's a standard bash file.
-
-        The following collapsed table contains all the options that can be configured for the nut collector.
-      folding:
-        title: "Config options"
-        enabled: true
-      list:
-        - name: nut_ups
-          description: A space separated list of UPS names. If empty, the list returned by `upsc -l` will be used.
-          default_value: ""
-          required: false
-        - name: nut_names
-          description: Each line represents an alias for one UPS. If empty, the FQDN will be used.
-          default_value: ""
-          required: false
-        - name: nut_timeout
-          description: How long to wait for nut to respond.
-          default_value: 2
-          required: false
-        - name: nut_clients_chart
-          description: Set this to 1 to enable another chart showing the number of UPS clients connected to `upsd`.
-          default_value: 1
-          required: false
-        - name: nut_update_every
-          description: The data collection frequency. If unset, will inherit the netdata update frequency.
-          default_value: 2
-          required: false
-        - name: nut_priority
-          description: The charts priority on the dashboard
-          default_value: 90000
-          required: false
-        - name: nut_retries
-          description: The number of retries to do in case of failure before disabling the collector.
-          default_value: 10
-          required: false
-    examples:
-      folding:
-        enabled: true
-        title: "Config"
-      list:
-        - name: Provide names to UPS devices
-          description: Map aliases to UPS devices
-          config: |
-            # a space separated list of UPS names
-            # if empty, the list returned by 'upsc -l' will be used
-            #nut_ups=
-
-            # each line represents an alias for one UPS
-            # if empty, the FQDN will be used
-            nut_names["XXXXXX"]="UPS-office"
-            nut_names["YYYYYY"]="UPS-rack"
-
-            # how much time in seconds, to wait for nut to respond
-            #nut_timeout=2
-
-            # set this to 1, to enable another chart showing the number
-            # of UPS clients connected to upsd
-            #nut_clients_chart=1
-
-            # the data collection frequency
-            # if unset, will inherit the netdata update frequency
-            #nut_update_every=2
-
-            # the charts priority on the dashboard
-            #nut_priority=90000
-
-            # the number of retries to do in case of failure
-            # before disabling the module
-            #nut_retries=10
-troubleshooting:
-  problems:
-    list: []
-alerts:
-- name: nut_ups_charge
-  link: https://github.com/netdata/netdata/blob/master/health/health.d/nut.conf
-  metric: nut.charge
-  info: average UPS charge over the last minute
-  os: "*"
-- name: nut_10min_ups_load
-  link: https://github.com/netdata/netdata/blob/master/health/health.d/nut.conf
-  metric: nut.load
-  info: average UPS load over the last 10 minutes
-  os: "*"
-- name: nut_last_collected_secs
-  link: https://github.com/netdata/netdata/blob/master/health/health.d/nut.conf
-  metric: nut.load
-  info: number of seconds since the last successful data collection
-metrics:
-  folding:
-    title: Metrics
-    enabled: false
-  description: ""
-  availability: []
-  scopes:
-  - name: ups
-    description: "Metrics related to UPS. Each UPS provides its own set of the following metrics."
-    labels: []
+plugin_name: charts.d.plugin
+modules:
+  - meta:
+      plugin_name: charts.d.plugin
+      module_name: nut
+      monitored_instance:
+        name: UPS/PDU
+        link: ''
+        categories:
+          - data-collection.ups
+        icon_filename: 'plug-circle-bolt.svg'
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords:
+        - nut
+        - network ups tools
+        - ups
+        - pdu
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: 'Examine UPS/PDU metrics with Netdata for insights into power device performance. Improve your power device performance with comprehensive dashboards and anomaly detection.'
+        method_description: 'This collector uses the `nut` (Network UPS Tools) to query statistics for multiple UPS devices.'
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list:
+          - title: "Required software"
+            description: "Make sure the Network UPS Tools (`nut`) is installed and can detect your UPS devices."
+      configuration:
+        file:
+          name: charts.d/nut.conf
+        options:
+          description: |
+            The config file is sourced by the charts.d plugin. It's a standard bash file.
+            
+            The following collapsed table contains all the options that can be configured for the nut collector.
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: nut_ups
+              description: A space separated list of UPS names. If empty, the list returned by `upsc -l` will be used.
+              default_value: ""
+              required: false
+            - name: nut_names
+              description: Each line represents an alias for one UPS. If empty, the FQDN will be used.
+              default_value: ""
+              required: false
+            - name: nut_timeout
+              description: How long to wait for nut to respond.
+              default_value: 2
+              required: false
+            - name: nut_clients_chart
+              description: Set this to 1 to enable another chart showing the number of UPS clients connected to `upsd`.
+              default_value: 1
+              required: false
+            - name: nut_update_every
+              description: The data collection frequency. If unset, will inherit the netdata update frequency.
+              default_value: 2
+              required: false
+            - name: nut_priority
+              description: The charts priority on the dashboard
+              default_value: 90000
+              required: false
+            - name: nut_retries
+              description: The number of retries to do in case of failure before disabling the collector.
+              default_value: 10
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: "Config"
+          list:
+            - name: Provide names to UPS devices
+              description: Map aliases to UPS devices
+              config: |
+                # a space separated list of UPS names
+                # if empty, the list returned by 'upsc -l' will be used
+                #nut_ups=
+                
+                # each line represents an alias for one UPS
+                # if empty, the FQDN will be used
+                nut_names["XXXXXX"]="UPS-office"
+                nut_names["YYYYYY"]="UPS-rack"
+                
+                # how much time in seconds, to wait for nut to respond
+                #nut_timeout=2
+                
+                # set this to 1, to enable another chart showing the number
+                # of UPS clients connected to upsd
+                #nut_clients_chart=1
+                
+                # the data collection frequency
+                # if unset, will inherit the netdata update frequency
+                #nut_update_every=2
+                
+                # the charts priority on the dashboard
+                #nut_priority=90000
+                
+                # the number of retries to do in case of failure
+                # before disabling the module
+                #nut_retries=10
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: nut_ups_charge
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/nut.conf
+        metric: nut.charge
+        info: average UPS charge over the last minute
+        os: "*"
+      - name: nut_10min_ups_load
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/nut.conf
+        metric: nut.load
+        info: average UPS load over the last 10 minutes
+        os: "*"
+      - name: nut_last_collected_secs
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/nut.conf
+        metric: nut.load
+        info: number of seconds since the last successful data collection
     metrics:
-    - name: nut.charge
-      description: UPS Charge
-      unit: "percentage"
-      chart_type: area
-      dimensions:
-      - name: charge
-    - name: nut.runtime
-      description: UPS Runtime
-      unit: "seconds"
-      chart_type: line
-      dimensions:
-      - name: runtime
-    - name: nut.battery.voltage
-      description: UPS Battery Voltage
-      unit: "Volts"
-      chart_type: line
-      dimensions:
-      - name: voltage
-      - name: high
-      - name: low
-      - name: nominal
-    - name: nut.input.voltage
-      description: UPS Input Voltage
-      unit: "Volts"
-      chart_type: line
-      dimensions:
-      - name: voltage
-      - name: fault
-      - name: nominal
-    - name: nut.input.current
-      description: UPS Input Current
-      unit: "Ampere"
-      chart_type: line
-      dimensions:
-      - name: nominal
-    - name: nut.input.frequency
-      description: UPS Input Frequency
-      unit: "Hz"
-      chart_type: line
-      dimensions:
-      - name: frequency
-      - name: nominal
-    - name: nut.output.voltage
-      description: UPS Output Voltage
-      unit: "Volts"
-      chart_type: line
-      dimensions:
-      - name: voltage
-    - name: nut.load
-      description: UPS Load
-      unit: "percentage"
-      chart_type: area
-      dimensions:
-      - name: load
-    - name: nut.load_usage
-      description: UPS Load Usage
-      unit: "Watts"
-      chart_type: area
-      dimensions:
-      - name: load_usage
-    - name: nut.temperature
-      description: UPS Temperature
-      unit: "temperature"
-      chart_type: line
-      dimensions:
-      - name: temp
-    - name: nut.clients
-      description: UPS Connected Clients
-      unit: "clients"
-      chart_type: area
-      dimensions:
-      - name: clients
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: ups
+          description: "Metrics related to UPS. Each UPS provides its own set of the following metrics."
+          labels: []
+          metrics:
+            - name: nut.charge
+              description: UPS Charge
+              unit: "percentage"
+              chart_type: area
+              dimensions:
+                - name: charge
+            - name: nut.runtime
+              description: UPS Runtime
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: runtime
+            - name: nut.battery.voltage
+              description: UPS Battery Voltage
+              unit: "Volts"
+              chart_type: line
+              dimensions:
+                - name: voltage
+                - name: high
+                - name: low
+                - name: nominal
+            - name: nut.input.voltage
+              description: UPS Input Voltage
+              unit: "Volts"
+              chart_type: line
+              dimensions:
+                - name: voltage
+                - name: fault
+                - name: nominal
+            - name: nut.input.current
+              description: UPS Input Current
+              unit: "Ampere"
+              chart_type: line
+              dimensions:
+                - name: nominal
+            - name: nut.input.frequency
+              description: UPS Input Frequency
+              unit: "Hz"
+              chart_type: line
+              dimensions:
+                - name: frequency
+                - name: nominal
+            - name: nut.output.voltage
+              description: UPS Output Voltage
+              unit: "Volts"
+              chart_type: line
+              dimensions:
+                - name: voltage
+            - name: nut.load
+              description: UPS Load
+              unit: "percentage"
+              chart_type: area
+              dimensions:
+                - name: load
+            - name: nut.load_usage
+              description: UPS Load Usage
+              unit: "Watts"
+              chart_type: area
+              dimensions:
+                - name: load_usage
+            - name: nut.temperature
+              description: UPS Temperature
+              unit: "temperature"
+              chart_type: line
+              dimensions:
+                - name: temp
+            - name: nut.clients
+              description: UPS Connected Clients
+              unit: "clients"
+              chart_type: area
+              dimensions:
+                - name: clients

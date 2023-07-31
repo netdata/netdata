@@ -6,7 +6,7 @@
     link: 'https://messagebird.com/'
     categories:
       - notify.agent
-    icon_filename: 'messagebird.png'
+    icon_filename: 'messagebird.svg'
   keywords:
     - MessageBird
   overview:
