@@ -2111,6 +2111,7 @@ static inline PARSER_RC pluginsd_job_status(char **words, size_t num_words, PARS
         message = strdupz(words[5]);
 
     report_job_status(parser->user.cd->configuration, words[1], words[2], job_status, state, message);
+    return PARSER_RC_OK;
 }
 
 static inline PARSER_RC streaming_claimed_id(char **words, size_t num_words, PARSER *parser)
