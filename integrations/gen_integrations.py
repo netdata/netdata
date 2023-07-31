@@ -22,8 +22,7 @@ REPO_PATH = INTEGRATIONS_PATH.parent
 SCHEMA_PATH = INTEGRATIONS_PATH / 'schemas'
 GO_REPO_PATH = REPO_PATH / 'go.d.plugin'
 DISTROS_FILE = REPO_PATH / '.github' / 'data' / 'distros.yml'
-SINGLE_PATTERN = '*/metadata.yaml'
-MULTI_PATTERN = '*/multi_metadata.yaml'
+METADATA_PATTERN = '*/metadata.yaml'
 
 COLLECTOR_SOURCES = [
     (AGENT_REPO, REPO_PATH / 'collectors', True),
@@ -112,13 +111,8 @@ NOTIFICATION_VALIDATOR = Draft7Validator(
     registry=registry,
 )
 
-SINGLE_VALIDATOR = Draft7Validator(
-    {'$ref': './collection-single-module.json#'},
-    registry=registry,
-)
-
-MULTI_VALIDATOR = Draft7Validator(
-    {'$ref': './collection-multi-module.json#'},
+COLLECTOR_VALIDATOR = Draft7Validator(
+    {'$ref': './collector.json#'},
     registry=registry,
 )
 
@@ -167,23 +161,17 @@ def get_category_sets(categories):
 
 
 def get_collector_metadata_entries():
-    single = []
-    multi = []
+    ret = []
 
     for r, d, m in COLLECTOR_SOURCES:
         if d.exists() and d.is_dir() and m:
-            for item in d.glob(SINGLE_PATTERN):
-                single.append((r, item))
-
-            for item in d.glob(MULTI_PATTERN):
-                multi.append((r, item))
+            for item in d.glob(METADATA_PATTERN):
+                ret.append((r, item))
         elif d.exists() and d.is_file() and not m:
-            if d.match(SINGLE_PATTERN):
-                single.append(d)
-            elif d.match(MULTI_PATTERN):
-                multi.append(d)
+            if d.match(METADATA_PATTERN):
+                ret.append(d)
 
-    return (single, multi)
+    return ret
 
 
 def load_yaml(src):
@@ -226,9 +214,9 @@ def load_categories():
 def load_collectors():
     ret = []
 
-    single, multi = get_collector_metadata_entries()
+    entries = get_collector_metadata_entries()
 
-    for repo, path in single:
+    for repo, path in entries:
         debug(f'Loading { path }.')
         data = load_yaml(path)
 
@@ -236,26 +224,7 @@ def load_collectors():
             continue
 
         try:
-            SINGLE_VALIDATOR.validate(data)
-        except ValidationError:
-            warn(f'Failed to validate { path } against the schema.', path)
-            continue
-
-        data['integration_type'] = 'collector'
-        data['_src_path'] = path
-        data['_repo'] = repo
-        data['_index'] = 0
-        ret.append(data)
-
-    for repo, path in multi:
-        debug(f'Loading { path }.')
-        data = load_yaml(path)
-
-        if not data:
-            continue
-
-        try:
-            MULTI_VALIDATOR.validate(data)
+            COLLECTOR_VALIDATOR.validate(data)
         except ValidationError:
             warn(f'Failed to validate { path } against the schema.', path)
             continue
@@ -300,7 +269,7 @@ def load_deploy():
 
     for repo, path, match in DEPLOY_SOURCES:
         if match and path.exists() and path.is_dir():
-            for file in path.glob(SINGLE_PATTERN):
+            for file in path.glob(METADATA_PATTERN):
                 ret.extend(_load_deploy_file(file, repo))
         elif not match and path.exists() and path.is_file():
             ret.extend(_load_deploy_file(path, repo))
@@ -334,7 +303,7 @@ def load_exporters():
 
     for repo, path, match in EXPORTER_SOURCES:
         if match and path.exists() and path.is_dir():
-            for file in path.glob(SINGLE_PATTERN):
+            for file in path.glob(METADATA_PATTERN):
                 ret.extend(_load_exporter_file(file, repo))
         elif not match and path.exists() and path.is_file():
             ret.extend(_load_exporter_file(path, repo))
@@ -380,7 +349,7 @@ def load_notifications():
 
     for repo, path, match in NOTIFICATION_SOURCES:
         if match and path.exists() and path.is_dir():
-            for file in path.glob(SINGLE_PATTERN):
+            for file in path.glob(METADATA_PATTERN):
                 ret.extend(_load_notification_file(file, repo))
         elif not match and path.exists() and path.is_file():
             ret.extend(_load_notification_file(path, repo))
@@ -400,7 +369,7 @@ def make_id(meta):
 
 
 def make_edit_link(item):
-    if item['_repo'] == 'netdata/go.d.repo':
+    if item['_repo'] == 'netdata/go.d.plugin':
         item_path = item['_src_path'].relative_to(GO_REPO_PATH)
     else:
         item_path = item['_src_path'].relative_to(REPO_PATH)
