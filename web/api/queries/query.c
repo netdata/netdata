@@ -1954,7 +1954,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
     if (unlikely(tier >= rrd_storage_tiers()))
         return;
 
-    if (rrd_storage_tier_backfill(tier) == RRD_BACKFILL_NONE)
+    if (rrd_storage_tier_backfill(tier) == STORAGE_TIER_BACKFILL_NONE)
         return;
 
     struct rrddim_tier *t = &rd->tiers[tier];
@@ -1967,7 +1967,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
     time_t time_diff   = now_s - latest_time_s;
 
     // if the user wants only NEW backfilling, and we don't have any data
-    if (rrd_storage_tier_backfill(tier) == RRD_BACKFILL_NEW && latest_time_s <= 0)
+    if (rrd_storage_tier_backfill(tier) == STORAGE_TIER_BACKFILL_NEW && latest_time_s <= 0)
         return;
 
     // there is really nothing we can do

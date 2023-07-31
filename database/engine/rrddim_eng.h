@@ -90,7 +90,7 @@ typedef struct {
     STORAGE_INSTANCE *multidb_ctx[RRD_STORAGE_TIERS];
     int multidb_disk_quota_mb[RRD_STORAGE_TIERS];
     size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
-    RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS];
+    STORAGE_TIER_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS];
     size_t tier_page_size[RRD_STORAGE_TIERS];
 } dbengine_config_t;
 

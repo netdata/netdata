@@ -8,10 +8,10 @@
 #define RRD_STORAGE_TIERS 5
 
 typedef enum __attribute__ ((__packed__)) {
-    RRD_BACKFILL_NONE = 0,
-    RRD_BACKFILL_FULL,
-    RRD_BACKFILL_NEW
-} RRD_BACKFILL;
+    STORAGE_TIER_BACKFILL_NONE = 0,
+    STORAGE_TIER_BACKFILL_FULL,
+    STORAGE_TIER_BACKFILL_NEW
+} STORAGE_TIER_BACKFILL;
 
 typedef struct rrddim RRDDIM;
 typedef struct storage_instance STORAGE_INSTANCE;

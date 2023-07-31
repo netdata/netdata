@@ -893,7 +893,7 @@ extern struct rrdb rrdb;
 #define rrd_storage_tier_backfill(tier) (rrdb.dbengine_cfg.storage_tiers[(tier)])
 #else
 #define rrd_storage_tiers() 1
-#define rrd_storage_tier_backfill(tier) RRD_BACKFILL_NEW
+#define rrd_storage_tier_backfill(tier) STORAGE_TIER_BACKFILL_NEW
 #endif
 
 #define rrdhost_hostname(host) string2str((host)->hostname)

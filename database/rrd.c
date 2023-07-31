@@ -316,24 +316,24 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
             // tier backfilling
             {
                 for (size_t tier = 0; tier != cfg.storage_tiers; tier++) {
-                    RRD_BACKFILL backfill = cfg.storage_tiers_backfill[tier];
+                    STORAGE_TIER_BACKFILL backfill = cfg.storage_tiers_backfill[tier];
 
                     if (tier > 0) {
                         char buf[200 + 1];
                         snprintfz(buf, 200, "dbengine tier %zu backfill", tier);
 
-                        const char *bf = config_get(CONFIG_SECTION_DB, buf, backfill == RRD_BACKFILL_NEW ? "new" : backfill == RRD_BACKFILL_FULL ? "full" : "none");
+                        const char *bf = config_get(CONFIG_SECTION_DB, buf, backfill == STORAGE_TIER_BACKFILL_NEW ? "new" : backfill == STORAGE_TIER_BACKFILL_FULL ? "full" : "none");
 
                         if(strcmp(bf, "new") == 0)
-                            backfill = RRD_BACKFILL_NEW;
+                            backfill = STORAGE_TIER_BACKFILL_NEW;
                         else if(strcmp(bf, "full") == 0)
-                            backfill = RRD_BACKFILL_FULL;
+                            backfill = STORAGE_TIER_BACKFILL_FULL;
                         else if(strcmp(bf, "none") == 0)
-                            backfill = RRD_BACKFILL_NONE;
+                            backfill = STORAGE_TIER_BACKFILL_NONE;
                         else {
                             netdata_log_error("DBENGINE: unknown backfill value '%s', assuming 'new'", bf);
                             config_set(CONFIG_SECTION_DB, buf, "new");
-                            backfill = RRD_BACKFILL_NEW;
+                            backfill = STORAGE_TIER_BACKFILL_NEW;
                         }
                     }
 
@@ -491,11 +491,11 @@ struct rrdb rrdb = {
         },
 
         .storage_tiers_backfill = {
-            RRD_BACKFILL_NEW,
-            RRD_BACKFILL_NEW,
-            RRD_BACKFILL_NEW,
-            RRD_BACKFILL_NEW,
-            RRD_BACKFILL_NEW,
+            STORAGE_TIER_BACKFILL_NEW,
+            STORAGE_TIER_BACKFILL_NEW,
+            STORAGE_TIER_BACKFILL_NEW,
+            STORAGE_TIER_BACKFILL_NEW,
+            STORAGE_TIER_BACKFILL_NEW,
         },
 
     #if defined(ENV32BIT)
