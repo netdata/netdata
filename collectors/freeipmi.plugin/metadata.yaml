@@ -1,10 +1,9 @@
 plugin_name: freeipmi.plugin
 modules:
-  - &module
-    meta: &meta
+  - meta:
       plugin_name: freeipmi.plugin
       module_name: sensors
-      monitored_instance: &monitored_instance
+      monitored_instance:
         name: IPMI
         link: "https://www.ibm.com/docs/en/power9/0009-ESS?topic=ipmi-overview"
         categories:
@@ -20,7 +19,7 @@ modules:
         - ipmi
         - freeipmi
       most_popular: true
-    overview: &overview
+    overview:
       data_collection:
         metrics_description: |
           "Monitor enterprise server sensor readings, event log entries, and hardware statuses to ensure reliable server operations."

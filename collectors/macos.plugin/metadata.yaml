@@ -1,5 +1,3 @@
-# yamllint disable rule:line-length
----
 plugin_name: macos.plugin
 modules:
   - meta:

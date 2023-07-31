@@ -1,5 +1,3 @@
-# yamllint disable rule:line-length
----
 plugin_name: ebpf.plugin
 modules:
   - meta:
@@ -271,22 +269,22 @@ modules:
         list:
           - title: Compile kernel
             description: |
-                Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
-                When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
-                with different names.
-
-                Now follow steps:
-                1. Copy the configuration file to /usr/src/linux/.config.
-                2. Select the necessary options: make oldconfig
-                3. Compile your kernel image: make bzImage
-                4. Compile your modules: make modules
-                5. Copy your new kernel image for boot loader directory
-                6. Install the new modules: make modules_install
-                7. Generate an initial ramdisk image (`initrd`) if it is necessary.
-                8. Update your boot loader
+              Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+              When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+              with different names.
+              
+              Now follow steps:
+              1. Copy the configuration file to /usr/src/linux/.config.
+              2. Select the necessary options: make oldconfig
+              3. Compile your kernel image: make bzImage
+              4. Compile your modules: make modules
+              5. Copy your new kernel image for boot loader directory
+              6. Install the new modules: make modules_install
+              7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+              8. Update your boot loader
           - title: Debug Filesystem
             description: |
-                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).
+              This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).
       configuration:
         file:
           name: "ebpf.d/process.conf"
@@ -520,22 +518,22 @@ modules:
         list:
           - title: Compile kernel
             description: |
-                Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
-                When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
-                with different names.
-
-                Now follow steps:
-                1. Copy the configuration file to /usr/src/linux/.config.
-                2. Select the necessary options: make oldconfig
-                3. Compile your kernel image: make bzImage
-                4. Compile your modules: make modules
-                5. Copy your new kernel image for boot loader directory
-                6. Install the new modules: make modules_install
-                7. Generate an initial ramdisk image (`initrd`) if it is necessary.
-                8. Update your boot loader
+              Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+              When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+              with different names.
+              
+              Now follow steps:
+              1. Copy the configuration file to /usr/src/linux/.config.
+              2. Select the necessary options: make oldconfig
+              3. Compile your kernel image: make bzImage
+              4. Compile your modules: make modules
+              5. Copy your new kernel image for boot loader directory
+              6. Install the new modules: make modules_install
+              7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+              8. Update your boot loader
           - title: Debug Filesystem
             description: |
-                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
+              This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
       configuration:
         file:
           name: "ebpf.d/disk.conf"
@@ -626,22 +624,22 @@ modules:
         list:
           - title: Compile kernel
             description: |
-                Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
-                When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
-                with different names.
-
-                Now follow steps:
-                1. Copy the configuration file to /usr/src/linux/.config.
-                2. Select the necessary options: make oldconfig
-                3. Compile your kernel image: make bzImage
-                4. Compile your modules: make modules
-                5. Copy your new kernel image for boot loader directory
-                6. Install the new modules: make modules_install
-                7. Generate an initial ramdisk image (`initrd`) if it is necessary.
-                8. Update your boot loader
+              Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+              When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+              with different names.
+              
+              Now follow steps:
+              1. Copy the configuration file to /usr/src/linux/.config.
+              2. Select the necessary options: make oldconfig
+              3. Compile your kernel image: make bzImage
+              4. Compile your modules: make modules
+              5. Copy your new kernel image for boot loader directory
+              6. Install the new modules: make modules_install
+              7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+              8. Update your boot loader
           - title: Debug Filesystem
             description: |
-                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).
+              This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).
       configuration:
         file:
           name: "ebpf.d/hardirq.conf"
@@ -964,22 +962,22 @@ modules:
         list:
           - title: Compile kernel
             description: |
-                Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
-                When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
-                with different names.
-
-                Now follow steps:
-                1. Copy the configuration file to /usr/src/linux/.config.
-                2. Select the necessary options: make oldconfig
-                3. Compile your kernel image: make bzImage
-                4. Compile your modules: make modules
-                5. Copy your new kernel image for boot loader directory
-                6. Install the new modules: make modules_install
-                7. Generate an initial ramdisk image (`initrd`) if it is necessary.
-                8. Update your boot loader
+              Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+              When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+              with different names.
+              
+              Now follow steps:
+              1. Copy the configuration file to /usr/src/linux/.config.
+              2. Select the necessary options: make oldconfig
+              3. Compile your kernel image: make bzImage
+              4. Compile your modules: make modules
+              5. Copy your new kernel image for boot loader directory
+              6. Install the new modules: make modules_install
+              7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+              8. Update your boot loader
           - title: Debug Filesystem
             description: |
-                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug`).
+              This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug`).
       configuration:
         file:
           name: "ebpf.d/sync.conf"
@@ -1430,22 +1428,22 @@ modules:
         list:
           - title: Compile kernel
             description: |
-                Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
-                When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
-                with different names.
-
-                Now follow steps:
-                1. Copy the configuration file to /usr/src/linux/.config.
-                2. Select the necessary options: make oldconfig
-                3. Compile your kernel image: make bzImage
-                4. Compile your modules: make modules
-                5. Copy your new kernel image for boot loader directory
-                6. Install the new modules: make modules_install
-                7. Generate an initial ramdisk image (`initrd`) if it is necessary.
-                8. Update your boot loader
+              Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+              When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+              with different names.
+              
+              Now follow steps:
+              1. Copy the configuration file to /usr/src/linux/.config.
+              2. Select the necessary options: make oldconfig
+              3. Compile your kernel image: make bzImage
+              4. Compile your modules: make modules
+              5. Copy your new kernel image for boot loader directory
+              6. Install the new modules: make modules_install
+              7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+              8. Update your boot loader
           - title: Debug Filesystem
             description: |
-                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).
+              This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).
       configuration:
         file:
           name: "ebpf.d/oomkill.conf"
@@ -2311,22 +2309,22 @@ modules:
         list:
           - title: Compile kernel
             description: |
-                Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
-                When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
-                with different names.
-
-                Now follow steps:
-                1. Copy the configuration file to /usr/src/linux/.config.
-                2. Select the necessary options: make oldconfig
-                3. Compile your kernel image: make bzImage
-                4. Compile your modules: make modules
-                5. Copy your new kernel image for boot loader directory
-                6. Install the new modules: make modules_install
-                7. Generate an initial ramdisk image (`initrd`) if it is necessary.
-                8. Update your boot loader
+              Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+              When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+              with different names.
+              
+              Now follow steps:
+              1. Copy the configuration file to /usr/src/linux/.config.
+              2. Select the necessary options: make oldconfig
+              3. Compile your kernel image: make bzImage
+              4. Compile your modules: make modules
+              5. Copy your new kernel image for boot loader directory
+              6. Install the new modules: make modules_install
+              7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+              8. Update your boot loader
           - title: Debug Filesystem
             description: |
-                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
+              This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
       configuration:
         file:
           name: "ebpf.d/shm.conf"
@@ -2540,22 +2538,22 @@ modules:
         list:
           - title: Compile kernel
             description: |
-                Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
-                When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
-                with different names.
-
-                Now follow steps:
-                1. Copy the configuration file to /usr/src/linux/.config.
-                2. Select the necessary options: make oldconfig
-                3. Compile your kernel image: make bzImage
-                4. Compile your modules: make modules
-                5. Copy your new kernel image for boot loader directory
-                6. Install the new modules: make modules_install
-                7. Generate an initial ramdisk image (`initrd`) if it is necessary.
-                8. Update your boot loader
+              Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+              When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+              with different names.
+              
+              Now follow steps:
+              1. Copy the configuration file to /usr/src/linux/.config.
+              2. Select the necessary options: make oldconfig
+              3. Compile your kernel image: make bzImage
+              4. Compile your modules: make modules
+              5. Copy your new kernel image for boot loader directory
+              6. Install the new modules: make modules_install
+              7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+              8. Update your boot loader
           - title: Debug Filesystem
             description: |
-                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
+              This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
       configuration:
         file:
           name: "ebpf.d/softirq.conf"
@@ -2648,22 +2646,22 @@ modules:
         list:
           - title: Compile kernel
             description: |
-                Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
-                When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
-                with different names.
-
-                Now follow steps:
-                1. Copy the configuration file to /usr/src/linux/.config.
-                2. Select the necessary options: make oldconfig
-                3. Compile your kernel image: make bzImage
-                4. Compile your modules: make modules
-                5. Copy your new kernel image for boot loader directory
-                6. Install the new modules: make modules_install
-                7. Generate an initial ramdisk image (`initrd`) if it is necessary.
-                8. Update your boot loader
+              Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+              When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+              with different names.
+              
+              Now follow steps:
+              1. Copy the configuration file to /usr/src/linux/.config.
+              2. Select the necessary options: make oldconfig
+              3. Compile your kernel image: make bzImage
+              4. Compile your modules: make modules
+              5. Copy your new kernel image for boot loader directory
+              6. Install the new modules: make modules_install
+              7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+              8. Update your boot loader
           - title: Debug Filesystem
             description: |
-                This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
+              This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
       configuration:
         file:
           name: "ebpf.d/mount.conf"
