@@ -403,7 +403,7 @@ int is_legacy = 1;
             host->db[0].tier_grouping = get_tier_grouping(0);
 
              // may fail here for legacy dbengine initialization
-            ret = rrdeng_init(&host->db[0].instance, dbenginepath, rrdb.dbengine_cfg.disk_quota_mb, 0);
+            ret = rrdeng_tier_init(&host->db[0].instance, dbenginepath, rrdb.dbengine_cfg.disk_quota_mb, 0);
 
             if(ret == 0) {
                 rrdeng_readiness_wait(host->db[0].instance);

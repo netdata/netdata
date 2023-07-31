@@ -57,8 +57,8 @@ bool rrdeng_is_legacy(STORAGE_INSTANCE *db_instance);
 
 void rrdeng_get_37_statistics(STORAGE_INSTANCE *db_instance, unsigned long long *array);
 
-int rrdeng_init(STORAGE_INSTANCE **db_instance, const char *dbfiles_path,
-                       unsigned disk_space_mb, size_t tier);
+int rrdeng_tier_init(STORAGE_INSTANCE **db_instance, const char *dbfiles_path,
+                     unsigned disk_space_mb, size_t tier);
 
 void rrdeng_readiness_wait(STORAGE_INSTANCE *db_instance);
 void rrdeng_exit_mode(STORAGE_INSTANCE *db_instance);

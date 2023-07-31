@@ -95,7 +95,7 @@ struct dbengine_initialization {
 
 static void *dbengine_tier_init(void *ptr) {
     struct dbengine_initialization *dbi = ptr;
-    dbi->ret = rrdeng_init(NULL, dbi->path, dbi->disk_space_mb, dbi->tier);
+    dbi->ret = rrdeng_tier_init(NULL, dbi->path, dbi->disk_space_mb, dbi->tier);
     return ptr;
 }
 

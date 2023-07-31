@@ -1132,7 +1132,7 @@ void rrdeng_exit_mode(STORAGE_INSTANCE *db_instance) {
 /*
  * Returns 0 on success, negative on error
  */
-int rrdeng_init(STORAGE_INSTANCE **db_instance_ptr, const char *dbfiles_path,
+int rrdeng_tier_init(STORAGE_INSTANCE **db_instance_ptr, const char *dbfiles_path,
                 unsigned disk_space_mb, size_t tier) {
     struct rrdengine_instance **ctxp = (struct rrdengine_instance **) db_instance_ptr;
 
