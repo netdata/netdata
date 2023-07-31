@@ -404,7 +404,7 @@ modules:
       monitored_instance:
         name: Kubernetes Containers
         link: https://kubernetes.io/
-        icon_filename: k8s.png
+        icon_filename: kubernetes.svg
         categories:
           - data-collection.containers-vms
           - data-collection.kubernetes
