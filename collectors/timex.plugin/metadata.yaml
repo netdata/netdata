@@ -1,112 +1,112 @@
-# yamllint disable rule:line-length
----
-meta:
-  plugin_name: timex.plugin
-  module_name: timex.plugin
-  monitored_instance:
-    name: Timex
-    link: ""
-    categories:
-      - data-collection.system-clock-and-ntp
-    icon_filename: "syslog.png"
-  related_resources:
-    integrations:
-      list: []
-  info_provided_to_referring_integrations:
-    description: ""
-  keywords: []
-  most_popular: false
-overview:
-  data_collection:
-    metrics_description: "Examine Timex metrics to gain insights into system clock operations. Study time sync status, clock drift, and adjustments to ensure accurate system timekeeping."
-    method_description: "It uses system call adjtimex on Linux and ntp_adjtime on FreeBSD or Mac to monitor the system kernel clock synchronization state."
-  supported_platforms:
-    include: []
-    exclude: []
-  multi_instance: true
-  additional_permissions:
-    description: ""
-  default_behavior:
-    auto_detection:
-      description: ""
-    limits:
-      description: ""
-    performance_impact:
-      description: ""
-setup:
-  prerequisites:
-    list: []
-  configuration:
-    file:
-      name: "netdata.conf"
-      section_name: "[plugin:timex]"
-      description: "The netdata main configuration file."
-    options:
-      description: "At least one option ('clock synchronization state', 'time offset') needs to be enabled for this collector to run."
+plugin_name: timex.plugin
+modules:
+  - meta:
+      plugin_name: timex.plugin
+      module_name: timex.plugin
+      monitored_instance:
+        name: Timex
+        link: ""
+        categories:
+          - data-collection.system-clock-and-ntp
+        icon_filename: "syslog.png"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Examine Timex metrics to gain insights into system clock operations. Study time sync status, clock drift, and adjustments to ensure accurate system timekeeping."
+        method_description: "It uses system call adjtimex on Linux and ntp_adjtime on FreeBSD or Mac to monitor the system kernel clock synchronization state."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:timex]"
+          description: "The netdata main configuration file."
+        options:
+          description: "At least one option ('clock synchronization state', 'time offset') needs to be enabled for this collector to run."
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: clock synchronization state
+              description: Make chart showing system clock synchronization state.
+              default_value: yes
+              required: true
+            - name: time offset
+              description: Make chart showing computed time offset between local system and reference clock
+              default_value: yes
+              required: true
+        examples:
+          folding:
+            enabled: true
+            title: "Config"
+          list:
+            - name: Basic
+              description: A basic configuration example.
+              config: |
+                [plugin:timex]
+                  update every = 1
+                  clock synchronization state = yes
+                  time offset = yes
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: system_clock_sync_state
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/timex.conf
+        metric: system.clock_sync_state
+        info: when set to 0, the system kernel believes the system clock is not properly synchronized to a reliable server
+        os: "linux"
+    metrics:
       folding:
-        title: "Config options"
-        enabled: true
-      list:
-        - name: update every
-          description: Data collection frequency.
-          default_value: 1
-          required: false
-        - name: clock synchronization state
-          description: Make chart showing system clock synchronization state.
-          default_value: yes
-          required: true
-        - name: time offset
-          description: Make chart showing computed time offset between local system and reference clock
-          default_value: yes
-          required: true
-    examples:
-      folding:
-        enabled: true
-        title: "Config"
-      list:
-        - name: Basic
-          description: A basic configuration example.
-          config: |
-            [plugin:timex]
-              update every = 1
-              clock synchronization state = yes
-              time offset = yes
-troubleshooting:
-  problems:
-    list: []
-alerts:
-  - name: system_clock_sync_state
-    link: https://github.com/netdata/netdata/blob/master/health/health.d/timex.conf
-    metric: system.clock_sync_state
-    info: when set to 0, the system kernel believes the system clock is not properly synchronized to a reliable server
-    os: "linux"
-metrics:
-  folding:
-    title: Metrics
-    enabled: false
-  description: ""
-  availability: []
-  scopes:
-    - name: global
-      description: "These metrics refer to the entire monitored application."
-      labels: []
-      metrics:
-        - name: system.clock_sync_state
-          description: System Clock Synchronization State
-          unit: "state"
-          chart_type: line
-          dimensions:
-            - name: state
-        - name: system.clock_status
-          description: System Clock Status
-          unit: "status"
-          chart_type: line
-          dimensions:
-            - name: unsync
-            - name: clockerr
-        - name: system.clock_sync_offset
-          description: Computed Time Offset Between Local System and Reference Clock
-          unit: "milliseconds"
-          chart_type: line
-          dimensions:
-            - name: offset
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the entire monitored application."
+          labels: []
+          metrics:
+            - name: system.clock_sync_state
+              description: System Clock Synchronization State
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: state
+            - name: system.clock_status
+              description: System Clock Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: unsync
+                - name: clockerr
+            - name: system.clock_sync_offset
+              description: Computed Time Offset Between Local System and Reference Clock
+              unit: "milliseconds"
+              chart_type: line
+              dimensions:
+                - name: offset

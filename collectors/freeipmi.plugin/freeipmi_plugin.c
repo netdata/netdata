@@ -1892,7 +1892,7 @@ int main (int argc, char **argv) {
 
         // restart check (14400 seconds)
         if (now_monotonic_sec() - started_t > IPMI_RESTART_EVERY_SECONDS) {
-            collector_error("%s(): reached my lifetime expectancy. Exiting to restart.", __FUNCTION__);
+            collector_info("%s(): reached my lifetime expectancy. Exiting to restart.", __FUNCTION__);
             fprintf(stdout, "EXIT\n");
             fflush(stdout);
             exit(0);
