@@ -4,7 +4,7 @@ modules:
       plugin_name: macos.plugin
       module_name: mach_smi
       monitored_instance:
-        name: MacOS
+        name: macOS
         link: "https://www.apple.com/macos"
         categories:
           - data-collection.macos-systems
@@ -21,7 +21,7 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: "Monitor MacOS metrics for efficient operating system performance."
+        metrics_description: "Monitor macOS metrics for efficient operating system performance."
         method_description: |
           The plugin uses three different methods to collect data:
             - The function `sysctlbyname` is called to collect network, swap, loadavg, and boot time.
