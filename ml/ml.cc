@@ -1137,7 +1137,7 @@ ml_detect_main(void *arg)
 
         loop_counter += 1;
         if (loop_counter == Cfg.crash_detection_thread_after) {
-            error("GVD: aborting detection thread");
+            netdata_log_error("GVD: aborting detection thread");
             abort();
         }
 
