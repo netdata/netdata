@@ -448,7 +448,7 @@ int register_module(struct configurable_plugin *plugin, struct module *module)
                     continue;
                 if (ent->d_type != DT_REG)
                     continue;
-                size_t len = strlen(ent->d_name);
+                size_t len = strnlen(ent->d_name, NAME_MAX);
                 if (len <= strlen(DYN_CONF_CFG_EXT))
                     continue;
                 if (strcmp(ent->d_name + len - strlen(DYN_CONF_CFG_EXT), DYN_CONF_CFG_EXT) != 0)
