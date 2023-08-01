@@ -234,7 +234,7 @@
       priority: -1
       children: []
     - id: data-collection.ci-cd-systems
-      name: CI/CD and Provisioning
+      name: CI/CD Platforms
       description: ""
       most_popular: false
       priority: -1
