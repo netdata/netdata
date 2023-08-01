@@ -123,7 +123,6 @@
               | `${calc_param_values}`      | The value of the variables in the evaluated expression                           |
               | `${total_warnings}`         | The total number of alarms in WARNING state on the host                          |
               | `${total_critical}`         | The total number of alarms in CRITICAL state on the host                         |
-              ```
       examples:
         folding:
           enabled: true
