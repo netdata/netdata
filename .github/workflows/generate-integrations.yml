@@ -44,7 +44,9 @@ jobs:
           ref: ${{ env.go_ref }}
       - name: Prepare Dependencies
         id: prep-deps
-        run: sudo apt-get install python3-jsonschema python3-referencing python3-jinja2 python3-ruamel.yaml
+        run: |
+          sudo apt-get install python3-jsonschema python3-pip python3-jinja2 python3-ruamel.yaml
+          sudo pip install referencing
       - name: Generate Integrations
         id: generate
         run: integrations/gen_integrations.py
