@@ -4,7 +4,6 @@
 
 [[ entry.overview.data_collection.metrics_description ]]
 
-[% if entry.overview.data_collection.method_description %]
 [[ entry.overview.data_collection.method_description ]]
 
 [% if entry.overview.supported_platforms.include %]
@@ -23,7 +22,6 @@ This collector is supported on all platforms except for the following platforms:
 This collector is supported on all platforms.
 [% endif %]
 
-[# TODO: This attribute name needs to be changed in the schema #]
 [% if entry.overview.multi_instance %]
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 [% else %]
@@ -66,5 +64,4 @@ The default configuration for this integration does not impose any limits on dat
 [[ entry.overview.default_behavior.performance_impact.description ]]
 [% else %]
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
-[% endif %]
 [% endif %]
