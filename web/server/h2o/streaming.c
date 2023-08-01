@@ -365,8 +365,8 @@ void check_tx_buf(h2o_stream_conn_t *conn)
     if (rbuf_bytes_available(conn->tx)) {
         pthread_mutex_unlock(&conn->tx_buf_lock);
         stream_process(conn, 0);
-    }
-    pthread_mutex_unlock(&conn->tx_buf_lock);
+    } else
+        pthread_mutex_unlock(&conn->tx_buf_lock);
 }
 
 void h2o_stream_check_pending_write_reqs(void)
