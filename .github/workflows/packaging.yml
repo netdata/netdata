@@ -224,12 +224,6 @@ jobs:
         with:
           name: ${{ matrix.distro }}-${{ matrix.version }}-${{ matrix.arch }}-packages
           path: ${{ github.workspace }}/artifacts/*
-      - name: Upload telemetry metadata (Sentry)
-        id: upload-sentry-metadata
-        run: |
-          if [[ "${{ env.ENABLE_SENTRY }}" == '1' ]]; then
-            echo "WIP"
-          fi
       - name: Test Packages
         id: test
         shell: bash
@@ -269,6 +263,22 @@ jobs:
           ${{ matrix.arch }} \
           ${{ matrix.format }} \
           ${{ needs.version-check.outputs.repo }}
+      - name: Upload telemetry metadata (Sentry)
+        id: upload-sentry-metadata
+        if: github.repository == 'netdata/netdata'
+        uses: mathieu-bour/setup-sentry-cli@main
+        with:
+          token: ${{ SECRETS.SENTRY_CLI_TOKEN }}
+          organization: netdata-inc
+          project: netdata-agent
+        run: |
+          if [[ "${{ env.ENABLE_SENTRY }}" == '1' ]]; then
+            for pkgfile in artifacts/*.rpm ; do
+              mkdir temp
+              rpm2cpio $pkgfile | cpio -idmv -D temp
+            done
+            sentry-cli debug-files upload --include-sources temp/
+          fi
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
