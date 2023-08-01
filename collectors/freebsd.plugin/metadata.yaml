@@ -4,7 +4,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: vm.loadavg
       monitored_instance:
-        name: freebsd vm.loadavg
+        name: vm.loadavg
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -103,7 +103,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: vm.vmtotal
       monitored_instance:
-        name: freebsd vm.vmtotal
+        name: vm.vmtotal
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -205,7 +205,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: kern.cp_time
       monitored_instance:
-        name: freebsd kern.cp_time
+        name: kern.cp_time
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -319,7 +319,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: dev.cpu.temperature
       monitored_instance:
-        name: freebsd dev.cpu.temperature
+        name: dev.cpu.temperature
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -396,7 +396,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: dev.cpu.0.freq
       monitored_instance:
-        name: freebsd dev.cpu.0.freq
+        name: dev.cpu.0.freq
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -473,7 +473,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: hw.intrcnt
       monitored_instance:
-        name: freebsd hw.intrcnt
+        name: hw.intrcnt
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -556,7 +556,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: vm.stats.sys.v_intr
       monitored_instance:
-        name: freebsd vm.stats.sys.v_intr
+        name: vm.stats.sys.v_intr
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -633,7 +633,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: vm.stats.sys.v_soft
       monitored_instance:
-        name: freebsd vm.stats.sys.v_soft
+        name: vm.stats.sys.v_soft
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -710,7 +710,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: vm.stats.sys.v_swtch
       monitored_instance:
-        name: freebsd vm.stats.sys.v_swtch
+        name: vm.stats.sys.v_swtch
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -793,7 +793,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: vm.swap_info
       monitored_instance:
-        name: freebsd vm.swap_info
+        name: vm.swap_info
         link: ""
         categories:
           - data-collection.freebsd
@@ -876,7 +876,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: system.ram
       monitored_instance:
-        name: freebsd system.ram
+        name: system.ram
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -985,7 +985,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: vm.stats.vm.v_swappgs
       monitored_instance:
-        name: freebsd vm.stats.vm.v_swappgs
+        name: vm.stats.vm.v_swappgs
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -1068,7 +1068,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: vm.stats.vm.v_pgfaults
       monitored_instance:
-        name: freebsd vm.stats.vm.v_pgfaults
+        name: vm.stats.vm.v_pgfaults
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -1149,7 +1149,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: kern.ipc.sem
       monitored_instance:
-        name: freebsd kern.ipc.sem
+        name: kern.ipc.sem
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -1242,7 +1242,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: kern.ipc.shm
       monitored_instance:
-        name: freebsd kern.ipc.shm
+        name: kern.ipc.shm
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -1325,7 +1325,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: kern.ipc.msq
       monitored_instance:
-        name: freebsd kern.ipc.msq
+        name: kern.ipc.msq
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -1415,7 +1415,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: uptime
       monitored_instance:
-        name: freebsd uptime
+        name: uptime
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -1492,7 +1492,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: net.isr
       monitored_instance:
-        name: freebsd net.isr
+        name: net.isr
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -1606,7 +1606,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: devstat
       monitored_instance:
-        name: freebsd devstat
+        name: devstat
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -1798,7 +1798,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: net.inet.tcp.states
       monitored_instance:
-        name: freebsd net.inet.tcp.states
+        name: net.inet.tcp.states
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -1880,7 +1880,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: net.inet.tcp.stats
       monitored_instance:
-        name: freebsd net.inet.tcp.stats
+        name: net.inet.tcp.stats
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -2067,7 +2067,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: net.inet.udp.stats
       monitored_instance:
-        name: freebsd net.inet.udp.stats
+        name: net.inet.udp.stats
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -2169,7 +2169,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: net.inet.icmp.stats
       monitored_instance:
-        name: freebsd net.inet.icmp.stats
+        name: net.inet.icmp.stats
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -2272,7 +2272,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: net.inet.ip.stats
       monitored_instance:
-        name: freebsd net.inet.ip.stats
+        name: net.inet.ip.stats
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -2391,7 +2391,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: net.inet6.ip6.stats
       monitored_instance:
-        name: freebsd net.inet6.ip6.stats
+        name: net.inet6.ip6.stats
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -2512,7 +2512,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: net.inet6.icmp6.stats
       monitored_instance:
-        name: freebsd net.inet6.icmp6.stats
+        name: net.inet6.icmp6.stats
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -2678,7 +2678,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: ipfw
       monitored_instance:
-        name: freebsd ipfw
+        name: ipfw
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -2788,7 +2788,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: getifaddrs
       monitored_instance:
-        name: freebsd getifaddrs
+        name: getifaddrs
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -3040,7 +3040,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: getmntinfo
       monitored_instance:
-        name: freebsd getmntinfo
+        name: getmntinfo
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
@@ -3153,7 +3153,7 @@ modules:
       plugin_name: freebsd.plugin
       module_name: zfs
       monitored_instance:
-        name: freebsd zfs
+        name: zfs
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.freebsd
