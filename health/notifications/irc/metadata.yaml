@@ -33,7 +33,8 @@
             default_value: ''
             description: "Set the path for nc, otherwise Netdata will search for it in your system $PATH"
             required: true
-            detailed_description: >
+            detailed_description: |
+              ```sh
               #------------------------------------------------------------------------------
               # external commands
               #
@@ -41,13 +42,10 @@
               # If empty, the system $PATH will be searched for it.
               # If not found, irc notifications will be silently disabled.
               nc="/usr/bin/nc"
+              ```
           - name: 'SEND_IRC'
             default_value: 'YES'
             description: "Set `SEND_IRC` YES."
-            required: true
-          - name: 'DEFAULT_RECIPIENT_IRC'
-            default_value: ''
-            description: "Set `DEFAULT_RECIPIENT_IRC` to one or more channels to post the messages to. You can define multiple channels like this: `#alarms` `#systems`."
             required: true
           - name: 'IRC_NETWORK'
             default_value: ''
@@ -69,9 +67,9 @@
             default_value: ''
             description: "You can have different channels per role, by editing `DEFAULT_RECIPIENT_IRC` with the channel you want"
             required: true
-            detailed_description: >
+            detailed_description: |
               The `DEFAULT_RECIPIENT_IRC` can be edited in the following entries at the bottom of the same file:
-              ```
+              ```conf
               role_recipients_irc[sysadmin]="#systems"
               role_recipients_irc[domainadmin]="#domains"
               role_recipients_irc[dba]="#databases #systems"

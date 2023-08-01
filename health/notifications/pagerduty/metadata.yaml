@@ -40,11 +40,11 @@
             default_value: ''
             description: "Set `DEFAULT_RECIPIENT_PD` to the PagerDuty service key you want the alert notifications to be sent to. You can define multiple service keys like this: `pd_service_key_1` `pd_service_key_2`."
             required: true
-            detailed_description: >
+            detailed_description: |
               All roles will default to this variable if left unconfigured.
 
               The `DEFAULT_RECIPIENT_PD` can be edited in the following entries at the bottom of the same file:
-              ```
+              ```conf
               role_recipients_pd[sysadmin]="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa"
               role_recipients_pd[domainadmin]="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxb"
               role_recipients_pd[dba]="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxc"

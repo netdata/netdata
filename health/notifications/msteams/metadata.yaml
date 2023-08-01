@@ -44,12 +44,13 @@
             default_value: ''
             description: "Set `DEFAULT_RECIPIENT_MSTEAMS` to the encoded Microsoft Teams channel name you want the alert notifications to be sent to."
             required: true
-            detailed_description: >
-              In Microsoft Teams the channel name is encoded in the URI after /IncomingWebhook/. You can define multiple channels like this: CHANNEL1 CHANNEL2.
+            detailed_description: |
+              In Microsoft Teams the channel name is encoded in the URI after `/IncomingWebhook/`. You can define multiple channels like this: `CHANNEL1` `CHANNEL2`.
+
               All roles will default to this variable if left unconfigured.
 
-              You can then have different channels per role, by editing `DEFAULT_RECIPIENT_MSTEAMS` with the channel you want, in the following entries at the bottom of the same file:
-              ```
+              You can have different channels per role, by editing `DEFAULT_RECIPIENT_MSTEAMS` with the channel you want, in the following entries at the bottom of the same file:
+              ```conf
               role_recipients_msteams[sysadmin]="CHANNEL1"
               role_recipients_msteams[domainadmin]="CHANNEL2"
               role_recipients_msteams[dba]="databases CHANNEL3"

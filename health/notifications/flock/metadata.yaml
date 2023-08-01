@@ -41,9 +41,9 @@
             default_value: ''
             description: "Set `DEFAULT_RECIPIENT_FLOCK` to  the Flock channel you want the alert notifications to be sent to. All roles will default to this variable if left unconfigured."
             required: true
-            detailed_description: >
+            detailed_description: |
               You can have different channels per role, by editing DEFAULT_RECIPIENT_FLOCK with the channel you want, in the following entries at the bottom of the same file:
-              ```
+              ```conf
               role_recipients_flock[sysadmin]="systems"
               role_recipients_flock[domainadmin]="domains"
               role_recipients_flock[dba]="databases systems"

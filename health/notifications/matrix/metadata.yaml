@@ -43,7 +43,7 @@
             default_value: ''
             description: "Set `MATRIX_ACCESSTOKEN` to the access token from your Matrix account."
             required: true
-            detailed_description: >
+            detailed_description: |
               To obtain the access token, you can use the following curl command:
               ```
               curl -XPOST -d '{"type":"m.login.password", "user":"example", "password":"wordpass"}' "https://homeserver:8448/_matrix/client/r0/login"
@@ -52,16 +52,16 @@
             default_value: ''
             description: "Set `DEFAULT_RECIPIENT_MATRIX`  to the rooms you want the alert notifications to be sent to. The format is `!roomid:homeservername`."
             required: true
-            detailed_description: >
+            detailed_description: |
               The room ids are unique identifiers and can be obtained from the room settings in a Matrix client (e.g. Riot).
-              You can define multiple rooms like this: !roomid1:homeservername `!roomid2:homeservername`.
+              
+              You can define multiple rooms like this: `!roomid1:homeservername` `!roomid2:homeservername`.
+              
               All roles will default to this variable if left unconfigured.
 
-              Detailed information about the Matrix client API is available at the official site.
+              You can have different rooms per role, by editing `DEFAULT_RECIPIENT_MATRIX` with the `!roomid:homeservername` you want, in the following entries at the bottom of the same file:
 
-              You can then have different rooms per role, by editing DEFAULT_RECIPIENT_MATRIX with the !roomid:homeservername you want, in the following entries at the bottom of the same file:
-
-              ```
+              ```conf
               role_recipients_matrix[sysadmin]="!roomid1:homeservername"
               role_recipients_matrix[domainadmin]="!roomid2:homeservername"
               role_recipients_matrix[dba]="!roomid3:homeservername"

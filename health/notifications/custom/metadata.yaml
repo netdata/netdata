@@ -36,10 +36,9 @@
             default_value: ''
             description: "This value is dependent on how you handle the `${to}` variable inside the `custom_sender()` function."
             required: true
-            detailed_description: >
-              You can have different `${to}` variables per **role**, by editing `DEFAULT_RECIPIENT_CUSTOM` with the variable you want, in the following entries at the bottom of the file:
-
-              ```conf
+            detailed_description: |
+              All roles will default to this variable if left unconfigured. You can edit `DEFAULT_RECIPIENT_CUSTOM` with the variable you want, in the following entries at the bottom of the same file:
+              ```
               role_recipients_custom[sysadmin]="systems"
               role_recipients_custom[domainadmin]="domains"
               role_recipients_custom[dba]="databases systems"
@@ -51,10 +50,9 @@
             default_value: ''
             description: "You can look at the other senders in `/usr/libexec/netdata/plugins.d/alarm-notify.sh` for examples of how to modify the function in this configuration file."
             required: false
-            detailed_description: >
-              The following is a sample `custom_sender()` function in `health_alarm_notify.conf`, to send an SMS via an imaginary HTTPS endpoint to the SMS gateway:
-
-              ```sh
+            detailed_description: |
+              The following is a sample custom_sender() function in health_alarm_notify.conf, to send an SMS via an imaginary HTTPS endpoint to the SMS gateway:
+              ```
               custom_sender() {
                   # example human readable SMS
                   local msg="${host} ${status_message}: ${alarm} ${raised_for}"

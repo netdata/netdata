@@ -45,11 +45,11 @@
             default_value: ''
             description: "Set `DEFAULT_RECIPIENT_MESSAGEBIRD` to the number you want the alert notification to be sent as an SMS. You can define multiple recipients like this: +15555555555 +17777777777."
             required: true
-            detailed_description: >
+            detailed_description: |
               All roles will default to this variable if left unconfigured.
 
               You can then have different recipients per role, by editing `DEFAULT_RECIPIENT_MESSAGEBIRD` with the number you want, in the following entries at the bottom of the same file:
-              ```
+              ```conf
               role_recipients_messagebird[sysadmin]="+15555555555"
               role_recipients_messagebird[domainadmin]="+15555555556"
               role_recipients_messagebird[dba]="+15555555557"
