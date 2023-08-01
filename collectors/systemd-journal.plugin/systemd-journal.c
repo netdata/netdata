@@ -12,6 +12,7 @@
 #include "libnetdata/required_dummies.h"
 
 #include <systemd/sd-journal.h>
+#include <syslog.h>
 
 #define FACET_MAX_VALUE_LENGTH                  8192
 
@@ -54,6 +55,10 @@
 
 static netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
 static bool plugin_should_exit = false;
+
+DICTIONARY *uids = NULL;
+DICTIONARY *gids = NULL;
+
 
 // ----------------------------------------------------------------------------
 
@@ -165,6 +170,134 @@ static void systemd_journal_function_help(const char *transaction) {
     pluginsd_function_result_end_to_stdout();
 }
 
+static const char *syslog_facility_to_name(int facility) {
+    switch (facility) {
+        case LOG_FAC(LOG_KERN): return "kern";
+        case LOG_FAC(LOG_USER): return "user";
+        case LOG_FAC(LOG_MAIL): return "mail";
+        case LOG_FAC(LOG_DAEMON): return "daemon";
+        case LOG_FAC(LOG_AUTH): return "auth";
+        case LOG_FAC(LOG_SYSLOG): return "syslog";
+        case LOG_FAC(LOG_LPR): return "lpr";
+        case LOG_FAC(LOG_NEWS): return "news";
+        case LOG_FAC(LOG_UUCP): return "uucp";
+        case LOG_FAC(LOG_CRON): return "cron";
+        case LOG_FAC(LOG_AUTHPRIV): return "authpriv";
+        case LOG_FAC(LOG_FTP): return "ftp";
+        case LOG_FAC(LOG_LOCAL0): return "local0";
+        case LOG_FAC(LOG_LOCAL1): return "local1";
+        case LOG_FAC(LOG_LOCAL2): return "local2";
+        case LOG_FAC(LOG_LOCAL3): return "local3";
+        case LOG_FAC(LOG_LOCAL4): return "local4";
+        case LOG_FAC(LOG_LOCAL5): return "local5";
+        case LOG_FAC(LOG_LOCAL6): return "local6";
+        case LOG_FAC(LOG_LOCAL7): return "local7";
+        default: return NULL;
+    }
+}
+
+static const char *syslog_priority_to_name(int priority) {
+    switch (priority) {
+        case LOG_ALERT: return "alert";
+        case LOG_CRIT: return "critical";
+        case LOG_DEBUG: return "debug";
+        case LOG_EMERG: return "panic";
+        case LOG_ERR: return "error";
+        case LOG_INFO: return "info";
+        case LOG_NOTICE: return "notice";
+        case LOG_WARNING: return "warning";
+        default: return NULL;
+    }
+}
+
+static char *uid_to_username(uid_t uid, char *buffer, size_t buffer_size) {
+    struct passwd pw, *result;
+    char tmp[1024 + 1];
+
+    if (getpwuid_r(uid, &pw, tmp, 1024, &result) != 0 || result == NULL)
+        return NULL;
+
+    strncpy(buffer, pw.pw_name, buffer_size - 1);
+    buffer[buffer_size - 1] = '\0'; // Null-terminate just in case
+    return buffer;
+}
+
+static char *gid_to_groupname(gid_t gid, char* buffer, size_t buffer_size) {
+    struct group grp, *result;
+    char tmp[1024 + 1];
+
+    if (getgrgid_r(gid, &grp, tmp, 1024, &result) != 0 || result == NULL)
+        return NULL;
+
+    strncpy(buffer, grp.gr_name, buffer_size - 1);
+    buffer[buffer_size - 1] = '\0'; // Null-terminate just in case
+    return buffer;
+}
+
+static void systemd_journal_transform_syslog_facility(FACETS *facets __maybe_unused, BUFFER *wb, void *data __maybe_unused) {
+    const char *v = buffer_tostring(wb);
+    if(*v && isdigit(*v)) {
+        int facility = str2i(buffer_tostring(wb));
+        const char *name = syslog_facility_to_name(facility);
+        if (name) {
+            buffer_flush(wb);
+            buffer_json_add_array_item_string(wb, name);
+        }
+    }
+}
+
+static void systemd_journal_transform_priority(FACETS *facets __maybe_unused, BUFFER *wb, void *data __maybe_unused) {
+    const char *v = buffer_tostring(wb);
+    if(*v && isdigit(*v)) {
+        int priority = str2i(buffer_tostring(wb));
+        const char *name = syslog_priority_to_name(priority);
+        if (name) {
+            buffer_flush(wb);
+            buffer_json_add_array_item_string(wb, name);
+        }
+    }
+}
+
+static void systemd_journal_transform_uid(FACETS *facets __maybe_unused, BUFFER *wb, void *data) {
+    DICTIONARY *cache = data;
+    const char *v = buffer_tostring(wb);
+    if(*v && isdigit(*v)) {
+        const char *sv = dictionary_get(cache, v);
+        if(!sv) {
+            char buf[1024 + 1];
+            int uid = str2i(buffer_tostring(wb));
+            const char *name = uid_to_username(uid, buf, 1024);
+            if (!name)
+                name = v;
+
+            sv = dictionary_set(cache, v, (void *)name, strlen(name) + 1);
+        }
+
+        buffer_flush(wb);
+        buffer_strcat(wb, sv);
+    }
+}
+
+static void systemd_journal_transform_gid(FACETS *facets __maybe_unused, BUFFER *wb, void *data) {
+    DICTIONARY *cache = data;
+    const char *v = buffer_tostring(wb);
+    if(*v && isdigit(*v)) {
+        const char *sv = dictionary_get(cache, v);
+        if(!sv) {
+            char buf[1024 + 1];
+            int gid = str2i(buffer_tostring(wb));
+            const char *name = gid_to_groupname(gid, buf, 1024);
+            if (!name)
+                name = v;
+
+            sv = dictionary_set(cache, v, (void *)name, strlen(name) + 1);
+        }
+
+        buffer_flush(wb);
+        buffer_strcat(wb, sv);
+    }
+}
+
 static void systemd_journal_dynamic_row_id(FACETS *facets __maybe_unused, BUFFER *wb, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row, void *data __maybe_unused) {
     FACET_ROW_KEY_VALUE *syslog_identifier_rkv = dictionary_get(row->dict, "SYSLOG_IDENTIFIER");
     FACET_ROW_KEY_VALUE *pid_rkv = dictionary_get(row->dict, "_PID");
@@ -178,7 +311,7 @@ static void systemd_journal_dynamic_row_id(FACETS *facets __maybe_unused, BUFFER
     buffer_json_add_array_item_string(wb, buffer_tostring(rkv->wb));
 }
 
-static void function_systemd_journal(const char *transaction, char *function __maybe_unused, char *line_buffer __maybe_unused, int line_max __maybe_unused, int timeout __maybe_unused) {
+static void function_systemd_journal(const char *transaction, char *function, char *line_buffer __maybe_unused, int line_max __maybe_unused, int timeout __maybe_unused) {
     char *words[SYSTEMD_JOURNAL_MAX_PARAMS] = { NULL };
     size_t num_words = quoted_strings_splitter_pluginsd(function, words, SYSTEMD_JOURNAL_MAX_PARAMS);
 
@@ -201,6 +334,18 @@ static void function_systemd_journal(const char *transaction, char *function __m
 
     facets_register_dynamic_key(facets, "ND_JOURNAL_PROCESS", FACET_KEY_OPTION_VISIBLE|FACET_KEY_OPTION_FTS,
                                 systemd_journal_dynamic_row_id, NULL);
+
+    facets_register_key_transformation(facets, "SYSLOG_FACILITY", FACET_KEY_OPTION_FTS,
+                                       systemd_journal_transform_syslog_facility, NULL);
+
+    facets_register_key_transformation(facets, "PRIORITY", FACET_KEY_OPTION_FTS,
+                                       systemd_journal_transform_priority, NULL);
+
+    facets_register_key_transformation(facets, "_UID", FACET_KEY_OPTION_FTS,
+                                       systemd_journal_transform_uid, uids);
+
+    facets_register_key_transformation(facets, "_GID", FACET_KEY_OPTION_FTS,
+                                       systemd_journal_transform_gid, gids);
 
     facets_register_key(facets, "MESSAGE",
                         FACET_KEY_OPTION_NO_FACET|FACET_KEY_OPTION_VISIBLE|FACET_KEY_OPTION_FTS);
@@ -376,11 +521,15 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
 
+    uids = dictionary_create(0);
+    gids = dictionary_create(0);
+
     // ------------------------------------------------------------------------
     // debug
 
     if(argc == 2 && strcmp(argv[1], "debug") == 0) {
-        function_systemd_journal("123", "", "", 0, 30);
+        char buf[] = "systemd-journal after:-86400 before:0 last:50 query:fprintd";
+        function_systemd_journal("123", buf, "", 0, 30);
         exit(1);
     }
 
@@ -417,6 +566,9 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         if(now - started_t > 86400)
             break;
     }
+
+    dictionary_destroy(uids);
+    dictionary_destroy(gids);
 
     exit(0);
 }

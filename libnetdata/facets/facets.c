@@ -81,8 +81,16 @@ struct facet_key {
     uint32_t key_values_selected_in_row;
     BUFFER *current_value;
 
-    facet_dynamic_row_t cb;
-    void *cb_data;
+    struct {
+        facet_dynamic_row_t cb;
+        void *data;
+    } dynamic;
+
+    struct {
+        facets_key_transformer_t cb;
+        void *data;
+
+    } transform;
 };
 
 struct facets {
@@ -228,7 +236,7 @@ static void facet_key_insert_callback(const DICTIONARY_ITEM *item __maybe_unused
     FACET_KEY *k = value;
     FACETS *facets = data;
 
-    if(k->options & FACET_KEY_OPTION_FTS)
+    if((k->options & FACET_KEY_OPTION_FTS) || (facets->options & FACETS_OPTION_ALL_KEYS_FTS))
         facets->keys_filtered_by_query++;
 
     if(k->name) {
@@ -305,7 +313,7 @@ void facets_accepted_param(FACETS *facets, const char *param) {
 inline FACET_KEY *facets_register_key(FACETS *facets, const char *key, FACET_KEY_OPTIONS options) {
     FACET_KEY tk = {
             .name = key,
-            .options = options | ((facets->options & FACETS_OPTION_ALL_KEYS_FTS) ? FACET_KEY_OPTION_FTS : 0),
+            .options = options,
             .default_selected_for_values = true,
     };
     char hash[FACET_STRING_HASH_SIZE];
@@ -313,10 +321,17 @@ inline FACET_KEY *facets_register_key(FACETS *facets, const char *key, FACET_KEY
     return dictionary_set(facets->keys, hash, &tk, sizeof(tk));
 }
 
+inline FACET_KEY *facets_register_key_transformation(FACETS *facets, const char *key, FACET_KEY_OPTIONS options, facets_key_transformer_t cb, void *data) {
+    FACET_KEY *k = facets_register_key(facets, key, options);
+    k->transform.cb = cb;
+    k->transform.data = data;
+    return k;
+}
+
 inline FACET_KEY *facets_register_dynamic_key(FACETS *facets, const char *key, FACET_KEY_OPTIONS options, facet_dynamic_row_t cb, void *data) {
     FACET_KEY *k = facets_register_key(facets, key, options);
-    k->cb = cb;
-    k->cb_data = data;
+    k->dynamic.cb = cb;
+    k->dynamic.data = data;
     return k;
 }
 
@@ -324,7 +339,7 @@ void facets_set_query(FACETS *facets, const char *query) {
     if(!query)
         return;
 
-    facets->query = simple_pattern_create(query, " \t", SIMPLE_PATTERN_EXACT, false);
+    facets->query = simple_pattern_create(query, " \t", SIMPLE_PATTERN_SUBSTRING, false);
 }
 
 void facets_set_items(FACETS *facets, uint32_t items) {
@@ -355,10 +370,17 @@ void facets_register_facet_filter(FACETS *facets, const char *key_id, char *valu
 // ----------------------------------------------------------------------------
 
 static inline void facets_check_value(FACETS *facets __maybe_unused, FACET_KEY *k) {
+    if(k->transform.cb)
+        k->transform.cb(facets, k->current_value, k->transform.data);
+
     if(buffer_strlen(k->current_value) == 0)
         buffer_strcat(k->current_value, FACET_VALUE_UNSET);
 
-    if(facets->query && (k->options & FACET_KEY_OPTION_FTS)) {
+//    bool found = false;
+//    if(strstr(buffer_tostring(k->current_value), "fprintd") != NULL)
+//        found = true;
+
+    if(facets->query && ((k->options & FACET_KEY_OPTION_FTS) || facets->options & FACETS_OPTION_ALL_KEYS_FTS)) {
         if(simple_pattern_matches(facets->query, buffer_tostring(k->current_value)))
             facets->keys_matched_by_query++;
     }
@@ -735,11 +757,11 @@ void facets_report(FACETS *facets, BUFFER *wb) {
             {
                 FACET_ROW_KEY_VALUE *rkv = dictionary_get(row->dict, k->name);
 
-                if(unlikely(k->cb)) {
+                if(unlikely(k->dynamic.cb)) {
                     if(unlikely(!rkv))
                         rkv = dictionary_set(row->dict, k->name, NULL, sizeof(*rkv));
 
-                    k->cb(facets, wb, rkv, row, k->cb_data);
+                    k->dynamic.cb(facets, wb, rkv, row, k->dynamic.data);
                 }
                 else
                 	buffer_json_add_array_item_string(wb, rkv ? buffer_tostring(rkv->wb) : FACET_VALUE_UNSET);

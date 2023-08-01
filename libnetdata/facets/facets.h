@@ -28,8 +28,10 @@ typedef struct facet_key FACET_KEY;
 #define FACET_STRING_HASH_SIZE 19
 void facets_string_hash(const char *src, char *out);
 
+typedef void (*facets_key_transformer_t)(FACETS *facets __maybe_unused, BUFFER *wb, void *data);
 typedef void (*facet_dynamic_row_t)(FACETS *facets, BUFFER *wb, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row, void *data);
 FACET_KEY *facets_register_dynamic_key(FACETS *facets, const char *key, FACET_KEY_OPTIONS options, facet_dynamic_row_t cb, void *data);
+FACET_KEY *facets_register_key_transformation(FACETS *facets, const char *key, FACET_KEY_OPTIONS options, facets_key_transformer_t cb, void *data);
 
 typedef enum __attribute__((packed)) {
     FACETS_OPTION_ALL_FACETS_VISIBLE    = (1 << 0), // all facets, should be visible by default in the table
