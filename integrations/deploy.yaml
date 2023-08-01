@@ -11,28 +11,30 @@
   most_popular: true
   install_description: 'Run the following command on your node to install and claim Netdata:'
   methods:
-    - method: wget
+    - &ks_wget
+      method: wget
       commands:
         - channel: nightly
           command: >
             wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --nightly-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
+            --nightly-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
         - channel: stable
           command: >
             wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --stable-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
-    - method: curl
+            --stable-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
+    - &ks_curl
+      method: curl
       commands:
         - channel: nightly
           command: >
             curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --nightly-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
+            --nightly-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
         - channel: stable
           command: >
             curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --stable-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
+            --stable-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
   additional_info: &ref_containers >
-    Did you know you can also deploy Netdata on your OS using {% goToCategory categoryId="deploy.docker-kubernetes" %}Kubernetes{% /goToCategory %} or {% goToCategory categoryId="deploy.docker-kubernetes" %}Docker{% /goToCategory %}?
+    Did you know you can also deploy Netdata on your OS using {% goToCategory navigateToSettings=$navigateToSettings categoryId="deploy.docker-kubernetes" %}Kubernetes{% /goToCategory %} or {% goToCategory categoryId="deploy.docker-kubernetes" %}Docker{% /goToCategory %}?
   related_resources: {}
   platform_info:
     group: ''
@@ -196,16 +198,7 @@
     - apple
   install_description: 'Run the following command on your Intel based OSX, macOS servers to install and claim Netdata:'
   methods:
-    - method: curl
-      commands:
-        - channel: nightly
-          command: >
-            curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --nightly-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
-        - channel: stable
-          command: >
-            curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --stable-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
+    - *ks_curl
   additional_info: *ref_containers
   related_resources: {}
   platform_info:
@@ -230,7 +223,6 @@
 
     > Netdata container requires different privileges and mounts to provide functionality similar to that provided by Netdata installed on the host. More info [here](https://learn.netdata.cloud/docs/installing/docker?_gl=1*f2xcnf*_ga*MTI1MTUwMzU0OS4xNjg2NjM1MDA1*_ga_J69Z2JCTFB*MTY5MDMxMDIyMS40MS4xLjE2OTAzMTAzNjkuNTguMC4w#create-a-new-netdata-agent-container)
     > Netdata will use the hostname from the container in which it is run instead of that of the host system. To change the default hostname check [here](https://learn.netdata.cloud/docs/agent/packaging/docker?_gl=1*i5weve*_ga*MTI1MTUwMzU0OS4xNjg2NjM1MDA1*_ga_J69Z2JCTFB*MTY5MDMxMjM4Ny40Mi4xLjE2OTAzMTIzOTAuNTcuMC4w#change-the-default-hostname)
-   
   methods:
     - method: Docker CLI
       commands:
@@ -252,11 +244,12 @@
             --cap-add SYS_PTRACE \
             --cap-add SYS_ADMIN \
             --security-opt apparmor=unconfined \
-            -e NETDATA_CLAIM_TOKEN= {% claim_token %} \
+            {% if $showClaimingOptions %}
+            -e NETDATA_CLAIM_TOKEN={% claim_token %} \
             -e NETDATA_CLAIM_URL={% claim_url %} \
             -e NETDATA_CLAIM_ROOMS={% $claim_rooms %} \
+            {% /if %}
             netdata/netdata:edge
-
         - channel: stable
           command: |
             docker run -d --name=netdata \
@@ -275,9 +268,11 @@
             --cap-add SYS_PTRACE \
             --cap-add SYS_ADMIN \
             --security-opt apparmor=unconfined \
-            -e NETDATA_CLAIM_TOKEN= {% claim_token %} \
+            {% if $showClaimingOptions %}
+            -e NETDATA_CLAIM_TOKEN={% claim_token %} \
             -e NETDATA_CLAIM_URL={% claim_url %} \
             -e NETDATA_CLAIM_ROOMS={% $claim_rooms %} \
+            {% /if %}
             netdata/netdata:stable
     - method: Docker Compose
       commands:
@@ -306,10 +301,12 @@
                   - /sys:/host/sys:ro
                   - /etc/os-release:/host/etc/os-release:ro
                   - /var/run/docker.sock:/var/run/docker.sock:ro
+                {% if $showClaimingOptions %}
                 environment:
                   - NETDATA_CLAIM_TOKEN={% claim_token %}
                   - NETDATA_CLAIM_URL={% claim_url %}
                   - NETDATA_CLAIM_ROOMS={% $claim_rooms %}
+                {% /if %}
             volumes:
               netdataconfig:
               netdatalib:
@@ -339,10 +336,12 @@
                   - /sys:/host/sys:ro
                   - /etc/os-release:/host/etc/os-release:ro
                   - /var/run/docker.sock:/var/run/docker.sock:ro
+                {% if $showClaimingOptions %}
                 environment:
                   - NETDATA_CLAIM_TOKEN={% claim_token %}
                   - NETDATA_CLAIM_URL={% claim_url %}
                   - NETDATA_CLAIM_ROOMS={% $claim_rooms %}
+                {% /if %}
             volumes:
               netdataconfig:
               netdatalib:
@@ -444,23 +443,23 @@
         - channel: nightly
           command: |
             helm install netdata netdata/netdata \
-            --set image.tag=latest \
+            --set image.tag=latest{% if $showClaimingOptions %} \
             --set parent.claiming.enabled="true" \
             --set parent.claiming.token={% claim_token %} \
             --set parent.claiming.rooms={% $claim_rooms %} \
             --set child.claiming.enabled="true" \
             --set child.claiming.token={% claim_token %} \
-            --set child.claiming.rooms={% $claim_rooms %}
+            --set child.claiming.rooms={% $claim_rooms %}{% /if %}
         - channel: stable
           command: |
             helm install netdata netdata/netdata \
-            --set image.tag=stable \
+            --set image.tag=stable{% if $showClaimingOptions %} \
             --set parent.claiming.enabled="true" \
             --set parent.claiming.token={% claim_token %} \
             --set parent.claiming.rooms={% $claim_rooms %} \
             --set child.claiming.enabled="true" \
             --set child.claiming.token={% claim_token %} \
-            --set child.claiming.rooms={% $claim_rooms %}
+            --set child.claiming.rooms={% $claim_rooms %}{% /if %}
     - method: Existing Cluster
       commands:
         - channel: nightly
@@ -470,6 +469,7 @@
 
             restarter:
               enabled: true
+            {% if $showClaimingOptions %}
 
             parent:
               claiming:
@@ -482,11 +482,16 @@
                 enabled: true
                 token: {% claim_token %}
                 rooms: {% $claim_rooms %}
+            {% /if %}
         - channel: stable
           command: |
             image:
               tag: stable
 
+            restarter:
+              enabled: true
+            {% if $showClaimingOptions %}
+
             parent:
               claiming:
                 enabled: true
@@ -498,6 +503,7 @@
                 enabled: true
                 token: {% claim_token %}
                 rooms: {% $claim_rooms %}
+            {% /if %}
   additional_info: ''
   related_resources: {}
   most_popular: true
@@ -520,26 +526,8 @@
     3. Configure Netdata to collect data remotely from your Windows hosts by adding one job per host to windows.conf file. See the [configuration section](https://learn.netdata.cloud/docs/data-collection/monitor-anything/System%20Metrics/Windows-machines#configuration) for details.
     4. Enable [virtual nodes](https://learn.netdata.cloud/docs/data-collection/windows-systems#virtual-nodes) configuration so the windows nodes are displayed as separate nodes.
   methods:
-    - method: wget
-      commands:
-        - channel: nightly
-          command: >
-            wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --nightly-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
-        - channel: stable
-          command: >
-            wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --stable-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
-    - method: curl
-      commands:
-        - channel: nightly
-          command: >
-            curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --nightly-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
-        - channel: stable
-          command: >
-            curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --stable-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
+    - *ks_wget
+    - *ks_curl
   additional_info: ''
   related_resources: {}
   most_popular: true
@@ -563,19 +551,20 @@
 
     ```pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof liblz4 libuv json-c cmake gmake```
     This step needs root privileges. Please respond in the affirmative for any relevant prompts during the installation process.
-    
+
     Run the following command on your node to install and claim Netdata:
   methods:
-    - method: wget
+    - *ks_curl
+    - method: fetch
       commands:
         - channel: nightly
           command: >
-            wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --nightly-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
+            fetch -o /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
+            --nightly-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
         - channel: stable
           command: >
-            wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
-            --stable-channel --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}
+            fetch -o /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
+            --stable-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
   additional_info: |
     Netdata can also be installed via [FreeBSD ports](https://www.freshports.org/net-mgmt/netdata).
   related_resources: {}

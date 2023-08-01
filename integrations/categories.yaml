@@ -1,5 +1,5 @@
 - id: deploy
-  name: deploy
+  name: Deploy
   description: ""
   most_popular: true
   priority: 1
@@ -24,7 +24,7 @@
       priority: -1
       children: []
 - id: data-collection
-  name: data-collection
+  name: Data Collection
   description: ""
   most_popular: true
   priority: 2
@@ -34,6 +34,7 @@
       description: ""
       most_popular: false
       priority: -1
+      collector_default: true
       children: []
     - id: data-collection.ebpf
       name: eBPF
