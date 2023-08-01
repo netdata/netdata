@@ -7,7 +7,7 @@
     link: 'https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage'
     categories:
       - export
-    icon_filename: 'prometheus.png'
+    icon_filename: 'prometheus.svg'
   keywords:
     - exporter
     - Prometheus
