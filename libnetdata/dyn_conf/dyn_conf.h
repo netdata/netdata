@@ -104,8 +104,8 @@ struct configurable_plugin {
 };
 
 // API to be used by plugins
-DICTIONARY_ITEM *register_plugin(struct configurable_plugin *plugin);
-void unregister_plugin(DICTIONARY_ITEM *plugin);
+const DICTIONARY_ITEM *register_plugin(struct configurable_plugin *plugin);
+void unregister_plugin(const DICTIONARY_ITEM *plugin);
 int register_module(struct configurable_plugin *plugin, struct module *module);
 
 void report_job_status(struct configurable_plugin *plugin, const char *module_name, const char *job_name, enum job_status status, int status_code, char *reason);

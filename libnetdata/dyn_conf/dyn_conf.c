@@ -290,7 +290,7 @@ dyncfg_config_t load_config(const char *plugin_name, const char *module_name, co
     return config;
 }
 
-const char *set_plugin_config(struct configurable_plugin *plugin, dyncfg_config_t cfg)
+char *set_plugin_config(struct configurable_plugin *plugin, dyncfg_config_t cfg)
 {
     enum set_config_result rc = plugin->set_config_cb(plugin->cb_usr_ctx, &cfg);
     if (rc != SET_CONFIG_ACCEPTED) {
@@ -305,7 +305,7 @@ const char *set_plugin_config(struct configurable_plugin *plugin, dyncfg_config_
     return NULL;
 }
 
-static const char *set_module_config(struct module *mod, dyncfg_config_t cfg)
+static char *set_module_config(struct module *mod, dyncfg_config_t cfg)
 {
     struct configurable_plugin *plugin = mod->plugin;
 
@@ -378,7 +378,7 @@ void module_del_cb(const DICTIONARY_ITEM *item, void *value, void *data)
 }
 
 
-DICTIONARY_ITEM *register_plugin(struct configurable_plugin *plugin)
+const DICTIONARY_ITEM *register_plugin(struct configurable_plugin *plugin)
 {
     if (get_plugin_by_name(plugin->name) != NULL) {
         error_report("DYNCFG plugin \"%s\" already registered", plugin->name);
@@ -403,7 +403,7 @@ DICTIONARY_ITEM *register_plugin(struct configurable_plugin *plugin)
     return dictionary_get_and_acquire_item(plugins_dict, plugin->name);
 }
 
-void unregister_plugin(DICTIONARY_ITEM *plugin)
+void unregister_plugin(const DICTIONARY_ITEM *plugin)
 {
     struct configurable_plugin *plug = dictionary_acquired_item_value(plugin);
     dictionary_acquired_item_release(plugins_dict, plugin);
@@ -507,7 +507,7 @@ void handle_plugin_root(struct uni_http_response *resp, int method, struct confi
         }
         case HTTP_METHOD_PUT:
         {
-            const char *response;
+            char *response;
             if (post_payload == NULL) {
                 resp->content = "no payload";
                 resp->content_length = strlen(resp->content);
@@ -583,7 +583,7 @@ void handle_module_root(struct uni_http_response *resp, int method, struct confi
         resp->content_length = cfg.data_size;
         return;
     } else if (method == HTTP_METHOD_PUT) {
-        const char *response;
+        char *response;
         if (post_payload == NULL) {
             resp->content = "no payload";
             resp->content_length = strlen(resp->content);
@@ -747,7 +747,7 @@ void handle_job_root(struct uni_http_response *resp, int method, struct module *
         resp->content_length = strlen(resp->content);
         return;
     }
-    DICTIONARY_ITEM *job_item = dictionary_get_and_acquire_item(mod->jobs, job_id);
+    const DICTIONARY_ITEM *job_item = dictionary_get_and_acquire_item(mod->jobs, job_id);
     struct job *job = dictionary_acquired_item_value(job_item);
 
     _handle_job_root(resp, method, mod, job_id, post_payload, post_payload_size, job);
@@ -768,7 +768,7 @@ struct uni_http_response dyn_conf_process_http_request(int method, const char *p
         handle_dyncfg_root(&resp, method);
         return resp;
     }
-    DICTIONARY_ITEM *plugin_item = dictionary_get_and_acquire_item(plugins_dict, plugin);
+    const DICTIONARY_ITEM *plugin_item = dictionary_get_and_acquire_item(plugins_dict, plugin);
     if (plugin_item == NULL) {
         resp.content = "plugin not found";
         resp.content_length = strlen(resp.content);
@@ -817,7 +817,7 @@ void plugin_del_cb(const DICTIONARY_ITEM *item, void *value, void *data)
 
 void report_job_status(struct configurable_plugin *plugin, const char *module_name, const char *job_name, enum job_status status, int status_code, char *reason)
 {
-    DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(plugins_dict, plugin->name);
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(plugins_dict, plugin->name);
     if (item == NULL) {
         netdata_log_error("plugin %s not found", plugin->name);
         return;
@@ -832,7 +832,7 @@ void report_job_status(struct configurable_plugin *plugin, const char *module_na
         netdata_log_error("module %s is not array", module_name);
         goto EXIT_PLUGIN;
     }
-    DICTIONARY_ITEM *job_item = dictionary_get_and_acquire_item(mod->jobs, job_name);
+    const DICTIONARY_ITEM *job_item = dictionary_get_and_acquire_item(mod->jobs, job_name);
     if (job_item == NULL) {
         netdata_log_error("job %s not found", job_name);
         goto EXIT_PLUGIN;
@@ -871,8 +871,7 @@ void *dyncfg_main(void *in)
 {
     while (!netdata_exit) {
         struct deferred_cfg_send *dcs = deferred_config_pop();
-//        error_report("DYNCFG, deferred cfg send for %s %s %s", dcs->plugin_name, dcs->module_name, dcs->job_name);
-        DICTIONARY_ITEM *plugin_item = dictionary_get_and_acquire_item(plugins_dict, dcs->plugin_name);
+        const DICTIONARY_ITEM *plugin_item = dictionary_get_and_acquire_item(plugins_dict, dcs->plugin_name);
         if (plugin_item == NULL) {
             error_report("DYNCFG, plugin %s not found", dcs->plugin_name);
             deferred_config_free(dcs);
