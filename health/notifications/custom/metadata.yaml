@@ -53,15 +53,15 @@
             required: false
             detailed_description: >
               The following is a sample `custom_sender()` function in `health_alarm_notify.conf`, to send an SMS via an imaginary HTTPS endpoint to the SMS gateway:
-          
+
               ```sh
               custom_sender() {
                   # example human readable SMS
                   local msg="${host} ${status_message}: ${alarm} ${raised_for}"
-          
+
                   # limit it to 160 characters and encode it for use in a URL
                   urlencode "${msg:0:160}" >/dev/null; msg="${REPLY}"
-          
+
                   # a space separated list of the recipients to send alarms to
                   to="${1}"
           
@@ -72,7 +72,7 @@
                           --data-urlencode "Body=${msg}" \
                           -u "${accountsid}:${accounttoken}" \
                       https://domain.website.com/)
-          
+
                     if [ "${httpcode}" = "200" ]; then
                       info "sent custom notification ${msg} to ${phone}"
                       sent=$((sent + 1))
@@ -82,9 +82,9 @@
                   done
               }
               ```
-          
+
               The supported variables that you can use for the function's `msg` variable are:
-          
+
               | Variable name               | Description                                                                      |
               |:---------------------------:|:---------------------------------------------------------------------------------|
               | `${alarm}`                  | Like "name = value units"                                                        |
