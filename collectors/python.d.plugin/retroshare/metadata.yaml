@@ -7,7 +7,7 @@ modules:
         name: RetroShare
         link: "https://retroshare.cc/"
         categories:
-          - data-collection.p2p
+          - data-collection.media-streaming-servers
         icon_filename: "retroshare.png"
       related_resources:
         integrations:
