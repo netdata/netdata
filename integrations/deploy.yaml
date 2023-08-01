@@ -236,6 +236,7 @@
       commands:
         - channel: nightly
           command: |
+            ```bash
             docker run -d --name=netdata \
             --pid=host \
             --network=host \
@@ -256,9 +257,11 @@
             -e NETDATA_CLAIM_URL={% claim_url %} \
             -e NETDATA_CLAIM_ROOMS={% $claim_rooms %} \
             netdata/netdata:edge
+            ```
 
         - channel: stable
           command: |
+            ```bash
             docker run -d --name=netdata \
             --pid=host \
             --network=host \
@@ -279,6 +282,7 @@
             -e NETDATA_CLAIM_URL={% claim_url %} \
             -e NETDATA_CLAIM_ROOMS={% $claim_rooms %} \
             netdata/netdata:stable
+            ```
     - method: Docker Compose
       commands:
         - channel: nightly
@@ -451,6 +455,7 @@
       commands:
         - channel: nightly
           command: |
+            ```bash
             helm install netdata netdata/netdata \
             --set image.tag=latest \
             --set parent.claiming.enabled="true" \
@@ -459,8 +464,10 @@
             --set child.claiming.enabled="true" \
             --set child.claiming.token={% claim_token %} \
             --set child.claiming.rooms={% $claim_rooms %}
+            ```
         - channel: stable
           command: |
+            ```bash
             helm install netdata netdata/netdata \
             --set image.tag=stable \
             --set parent.claiming.enabled="true" \
@@ -469,6 +476,7 @@
             --set child.claiming.enabled="true" \
             --set child.claiming.token={% claim_token %} \
             --set child.claiming.rooms={% $claim_rooms %}
+            ```
     - method: Existing Cluster
       commands:
         - channel: nightly
