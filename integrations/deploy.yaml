@@ -236,6 +236,7 @@
       commands:
         - channel: nightly
           command: |
+            ```bash
             docker run -d --name=netdata \
             --pid=host \
             --network=host \
@@ -256,9 +257,11 @@
             -e NETDATA_CLAIM_URL={% claim_url %} \
             -e NETDATA_CLAIM_ROOMS={% $claim_rooms %} \
             netdata/netdata:edge
+            ```
 
         - channel: stable
           command: |
+            ```bash
             docker run -d --name=netdata \
             --pid=host \
             --network=host \
@@ -279,10 +282,12 @@
             -e NETDATA_CLAIM_URL={% claim_url %} \
             -e NETDATA_CLAIM_ROOMS={% $claim_rooms %} \
             netdata/netdata:stable
+            ```
     - method: Docker Compose
       commands:
         - channel: nightly
           command: |
+            ```yaml
             version: '3'
             services:
               netdata:
@@ -314,8 +319,10 @@
               netdataconfig:
               netdatalib:
               netdatacache:
+            ```
         - channel: stable
           command: |
+            ```yaml
             version: '3'
             services:
               netdata:
@@ -347,10 +354,12 @@
               netdataconfig:
               netdatalib:
               netdatacache:
+            ```
     - method: Docker Swarm
       commands:
         - channel: nightly
           command: |
+            ```yaml
             version: '3'
             services:
               netdata:
@@ -383,8 +392,10 @@
               netdataconfig:
               netdatalib:
               netdatacache:
+            ```
         - channel: stable
           command: |
+            ```yaml
             version: '3'
             services:
               netdata:
@@ -417,6 +428,7 @@
               netdataconfig:
               netdatalib:
               netdatacache:
+            ```
   additional_info: ''
   related_resources: {}
   platform_info:
@@ -443,6 +455,7 @@
       commands:
         - channel: nightly
           command: |
+            ```bash
             helm install netdata netdata/netdata \
             --set image.tag=latest \
             --set parent.claiming.enabled="true" \
@@ -451,8 +464,10 @@
             --set child.claiming.enabled="true" \
             --set child.claiming.token={% claim_token %} \
             --set child.claiming.rooms={% $claim_rooms %}
+            ```
         - channel: stable
           command: |
+            ```bash
             helm install netdata netdata/netdata \
             --set image.tag=stable \
             --set parent.claiming.enabled="true" \
@@ -461,10 +476,12 @@
             --set child.claiming.enabled="true" \
             --set child.claiming.token={% claim_token %} \
             --set child.claiming.rooms={% $claim_rooms %}
+            ```
     - method: Existing Cluster
       commands:
         - channel: nightly
           command: |
+            ```yaml
             image:
               tag: latest
 
@@ -482,8 +499,10 @@
                 enabled: true
                 token: {% claim_token %}
                 rooms: {% $claim_rooms %}
+             ```
         - channel: stable
           command: |
+            ```yaml
             image:
               tag: stable
 
@@ -498,6 +517,7 @@
                 enabled: true
                 token: {% claim_token %}
                 rooms: {% $claim_rooms %}
+            ```
   additional_info: ''
   related_resources: {}
   most_popular: true
