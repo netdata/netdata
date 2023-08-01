@@ -20,10 +20,10 @@
     "      returns a list of available log sources to be queried\n\n" \
     "   "LOGS_QRY_KW_START_TIME":NUMBER\n" \
     "      start timestamp in ms to search from (inclusive), default: " \
-            LOGS_MANAG_STR(LOGS_MANAG_QUERY_START_DEFAULT) "\n\n" \
+            "N/A\n\n" \
     "   "LOGS_QRY_KW_END_TIME":NUMBER\n" \
     "      end timestamp in ms to search until (inclusive), default: " \
-            LOGS_MANAG_STR(LOGS_MANAG_QUERY_END_DEFAULT) "\n\n" \
+            "N/A\n\n" \
     "   "LOGS_QRY_KW_QUOTA":NUMBER\n" \
     "      max size of logs to return (in MiB), default: " \
             LOGS_MANAG_STR(LOGS_MANAG_QUERY_QUOTA_DEFAULT) "\n\n" \
@@ -81,19 +81,8 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
     UNUSED(callback);
     UNUSED(callback_data);
 
-    logs_query_params_t query_params = {  
-        .start_timestamp = LOGS_MANAG_QUERY_START_DEFAULT,
-        .end_timestamp = LOGS_MANAG_QUERY_END_DEFAULT, /* default from / until to return all timestamps */
-        .quota = LOGS_MANAG_QUERY_QUOTA_DEFAULT,
-        .chart_name = {0},
-        .filename = {0},
-        .keyword = NULL,
-        .ignore_case = 0,
-        .sanitize_keyword = 0,
-        .data_format = LOGS_QUERY_DATA_FORMAT_JSON_ARRAY,
-        .results_buff = buffer_create(query_params.quota, &netdata_buffers_statistics.buffers_functions),
-        .num_lines = 0
-    };
+    logs_query_params_t query_params = {0};
+    unsigned long req_quota = 0;
 
     unsigned int fn_off = 0, cn_off = 0;
 
@@ -138,13 +127,13 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
         }
 
         if(!strcmp(key, LOGS_QRY_KW_START_TIME)){
-            query_params.start_timestamp = strtoll(value, NULL, 10);
+            query_params.req_from_ts = strtoll(value, NULL, 10);
         }
         else if(!strcmp(key, LOGS_QRY_KW_END_TIME)){
-            query_params.end_timestamp = strtoll(value, NULL, 10);
+            query_params.req_to_ts = strtoll(value, NULL, 10);
         }
         else if(!strcmp(key, LOGS_QRY_KW_QUOTA)){
-            query_params.quota = strtoll(value, NULL, 10);
+            req_quota = strtoll(value, NULL, 10);
         }
         else if(!strcmp(key, LOGS_QRY_KW_FILENAME) && 
                 fn_off < LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES){
@@ -172,12 +161,13 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
         }
     }
 
-    const msec_t req_start_timestamp = query_params.start_timestamp,
-                 req_end_timestamp = query_params.end_timestamp;
-    const unsigned long req_quota = query_params.quota;
+    if(!req_quota) query_params.quota = LOGS_MANAG_QUERY_QUOTA_DEFAULT;
+    else if(req_quota > LOGS_MANAG_QUERY_QUOTA_MAX) query_params.quota = LOGS_MANAG_QUERY_QUOTA_MAX;
+    else query_params.quota = req_quota;
+
     struct rusage start, end;
     getrusage(RUSAGE_THREAD, &start);
-    const logs_qry_res_err_t *const res_err = execute_logs_manag_query(&query_params); // WARNING! query may change start_timestamp, end_timestamp and quota
+    const logs_qry_res_err_t *const res_err = execute_logs_manag_query(&query_params);
     getrusage(RUSAGE_THREAD, &end);
 
     fn_off = cn_off = 0;
@@ -192,27 +182,25 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
                     "   \"logs_management_meta\": {\n"
                     "      \"api_version\": %s,\n"
                     "      \"requested_from\": %llu,\n"
-                    "      \"requested_until\": %llu,\n"
+                    "      \"requested_to\": %llu,\n"
                     "      \"requested_quota\": %llu,\n"
-                    "      \"requested_keyword\": \"%s\",\n",
+                    "      \"requested_keyword\": \"%s\",\n"
+                    "      \"actual_from\": %llu,\n"
+                    "      \"actual_to\": %llu,\n"
+                    "      \"actual_quota\": %llu,\n"
+                    "      \"requested_filename\": [\n",
                     res_err->http_code,
                     update_every,
                     LOGS_QRY_VERSION,
-                    req_start_timestamp,
-                    req_end_timestamp,
+                    query_params.req_from_ts,
+                    query_params.req_to_ts,
                     req_quota / (1 KiB),
-                    query_params.keyword ? query_params.keyword : ""
-    );
-     
-    buffer_sprintf( dest_wb,
-                    "      \"actual_from\": %llu,\n"
-                    "      \"actual_until\": %llu,\n"
-                    "      \"actual_quota\": %llu,\n"
-                    "      \"requested_filename\": [\n",
-                    query_params.start_timestamp,
-                    query_params.end_timestamp,
+                    query_params.keyword ? query_params.keyword : "",
+                    query_params.act_from_ts,
+                    query_params.act_to_ts,
                     query_params.quota / (1 KiB)
     );
+
     while(query_params.filename[fn_off]) buffer_sprintf(dest_wb, "         \"%s\",\n", query_params.filename[fn_off++]);
     if(query_params.filename[0])  dest_wb->len -= 2;
 

@@ -1175,8 +1175,8 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
     if(!p_file_infos[1]){ /* Single DB to be searched */
         stmt_retrieve_log_msg_metadata = p_file_infos[0]->stmt_retrieve_log_msg_metadata;
         if(unlikely(
-            SQLITE_OK != (rc = sqlite3_bind_int64(stmt_retrieve_log_msg_metadata, 1, p_query_params->start_timestamp)) ||
-            SQLITE_OK != (rc = sqlite3_bind_int64(stmt_retrieve_log_msg_metadata, 2, p_query_params->end_timestamp)) ||
+            SQLITE_OK != (rc = sqlite3_bind_int64(stmt_retrieve_log_msg_metadata, 1, p_query_params->req_from_ts)) ||
+            SQLITE_OK != (rc = sqlite3_bind_int64(stmt_retrieve_log_msg_metadata, 2, p_query_params->req_to_ts)) ||
             (SQLITE_ROW != (rc = sqlite3_step(stmt_retrieve_log_msg_metadata)) && (SQLITE_DONE != rc))
         )){
             throw_error(p_file_infos[0]->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
@@ -1245,9 +1245,9 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
                                     "WHERE Timestamp BETWEEN ? AND ? ;",
                                     -1, &stmt_retrieve_log_msg_metadata, NULL)) ||
             SQLITE_OK !=    (rc = sqlite3_bind_int64(stmt_retrieve_log_msg_metadata, 1, 
-                                                        (sqlite3_int64)p_query_params->start_timestamp)) ||
+                                                        (sqlite3_int64)p_query_params->req_from_ts)) ||
             SQLITE_OK !=    (rc = sqlite3_bind_int64(stmt_retrieve_log_msg_metadata, 2, 
-                                                        (sqlite3_int64)p_query_params->end_timestamp)) ||
+                                                        (sqlite3_int64)p_query_params->req_to_ts)) ||
             (SQLITE_ROW !=  (rc = sqlite3_step(stmt_retrieve_log_msg_metadata)) && (SQLITE_DONE != rc))
         )){
             throw_error(p_file_infos[0]->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
@@ -1260,6 +1260,11 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
     
     BUFFER *const res_buff = p_query_params->results_buff;
     m_assert(res_buff->len == 0, "res_buff->len should equal 0");
+    logs_query_res_hdr_t res_hdr = { // results header
+        .matches = 0,
+        .text_size = 0,
+        .timestamp = p_query_params->act_to_ts
+    }; 
     size_t text_compressed_size_max = 0;
     
     while (rc == SQLITE_ROW) {
@@ -1274,8 +1279,12 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
         int db_off = p_file_infos[1] ? sqlite3_column_int(stmt_retrieve_log_msg_metadata, 6) : 0;
 
         /* If exceeding quota and new timestamp is different than previous, terminate query */
-        if(res_buff->len >= p_query_params->quota && tmp_itm.timestamp != p_query_params->end_timestamp)
+        if(res_buff->len >= p_query_params->quota && tmp_itm.timestamp != res_hdr.timestamp){
+            p_query_params->act_to_ts = res_hdr.timestamp;
             break;
+        }
+
+        res_hdr.timestamp = tmp_itm.timestamp;
 
         /* Retrieve compressed log messages from BLOB file */
         if(tmp_itm.text_compressed_size > text_compressed_size_max){
@@ -1292,9 +1301,7 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
         }
         
         /* Append retrieved results to BUFFER */
-        logs_query_res_hdr_t res_hdr = {0}; // results header
         buffer_increase(res_buff, sizeof(res_hdr) + tmp_itm.text_size);
-        res_hdr.timestamp = tmp_itm.timestamp;
                                                         
         if(!p_query_params->keyword || !*p_query_params->keyword || !strcmp(p_query_params->keyword, " ")){
             // TODO: decompress_text does not handle or return any errors currently. How should any errors be handled?
@@ -1331,15 +1338,13 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
 
         m_assert(TEST_MS_TIMESTAMP_VALID(res_hdr.timestamp), "res_hdr.timestamp is invalid");
 
-        p_query_params->end_timestamp = res_hdr.timestamp;
-
         rc = sqlite3_step(stmt_retrieve_log_msg_metadata);
         if (unlikely(rc != SQLITE_ROW && rc != SQLITE_DONE)){
             throw_error(p_file_infos[db_off]->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
             // TODO: If there are errors here, should db_writer_db_mode_full() be terminated?
             break;
         }
-    }
+    }  
 
     if(tmp_itm.text_compressed) freez(tmp_itm.text_compressed);
 

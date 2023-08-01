@@ -11,9 +11,13 @@
 #include "helper.h"
 #include "parser.h"
 
-static int circ_buff_items_qsort_timestamp_fnc (const void * item_a, const void * item_b) {
+static int qsort_timestamp (const void *item_a, const void *item_b) {
    return ( (int64_t)(*(Circ_buff_item_t**)item_a)->timestamp - 
             (int64_t)(*(Circ_buff_item_t**)item_b)->timestamp);
+}
+
+static int reverse_qsort_timestamp (const void * item_a, const void * item_b) {
+   return -qsort_timestamp(item_a, item_b);
 }
 
 /**
@@ -30,8 +34,7 @@ static int circ_buff_items_qsort_timestamp_fnc (const void * item_a, const void 
  */
 void circ_buff_search(Circ_buff_t *const buffs[], logs_query_params_t *const p_query_params) {
 
-    BUFFER *const results = p_query_params->results_buff;
-    logs_query_res_hdr_t res_hdr = {0}; // result header
+    BUFFER *const res_buff = p_query_params->results_buff;
 
     int buffs_size = 0, buff_max_num_of_items = 0;
 
@@ -61,26 +64,34 @@ void circ_buff_search(Circ_buff_t *const buffs[], logs_query_params_t *const p_q
 
     items[items_off] = NULL;
 
-    if(unlikely(items[0] == NULL)) // No items to be searched
-        return;
-    else if(buffs[1] != NULL) // More than 1 buffers to search, so sorting is needed.
-        qsort(items, items_off, sizeof(items[0]), circ_buff_items_qsort_timestamp_fnc);
+    if(unlikely(items[0] == NULL)) return; // No items to be searched
+    else qsort(items, items_off, sizeof(items[0]), 
+        p_query_params->req_to_ts >= p_query_params->req_from_ts ? qsort_timestamp : reverse_qsort_timestamp);
  
+    logs_query_res_hdr_t res_hdr = { // result header
+        .matches = 0, 
+        .text_size = 0, 
+        .timestamp = p_query_params->act_to_ts
+    }; 
+
     for (int i = 0; items[i]; i++) {
 
-        /* If exceeding quota and new timestamp is different than previous, terminate query */
-        if(results->len >= p_query_params->quota && items[i]->timestamp != p_query_params->end_timestamp)
+        /* If exceeding quota and new timestamp is different than previous, terminate query but
+        *  inform caller about act_to_ts to continue from (its next value) in next call. */
+        if(res_buff->len >= p_query_params->quota && items[i]->timestamp != res_hdr.timestamp){
+            p_query_params->act_to_ts = res_hdr.timestamp;
             break;
+        }
 
         res_hdr.timestamp = items[i]->timestamp;
         res_hdr.text_size = items[i]->text_size;
 
-        if (res_hdr.timestamp >= p_query_params->start_timestamp && 
-            res_hdr.timestamp <= p_query_params->end_timestamp) {
+        if (res_hdr.timestamp >= p_query_params->req_from_ts && 
+            res_hdr.timestamp <= p_query_params->req_to_ts) {
 
             /* In case of search_keyword, less than sizeof(res_hdr) + temp_msg.text_size 
              * space is required, but go for worst case scenario for now */
-            buffer_increase(results, sizeof(res_hdr) + res_hdr.text_size); 
+            buffer_increase(res_buff, sizeof(res_hdr) + res_hdr.text_size); 
 
             if(!p_query_params->keyword || !*p_query_params->keyword || !strcmp(p_query_params->keyword, " ")){
                 /* NOTE: relying on items[i]->num_lines to get number of log lines
@@ -88,11 +99,11 @@ void circ_buff_search(Circ_buff_t *const buffs[], logs_query_params_t *const p_q
                  * already to return correct count. Maybe an issue under heavy load. */
                 res_hdr.matches = items[i]->num_lines;
                 res_hdr.text_size--; // res_hdr.text_size-- to get rid of last '\0' or '\n' 
-                memcpy(&results->buffer[results->len + sizeof(res_hdr)], items[i]->data, res_hdr.text_size);
+                memcpy(&res_buff->buffer[res_buff->len + sizeof(res_hdr)], items[i]->data, res_hdr.text_size);
             }
             else {
                 res_hdr.matches = search_keyword(   items[i]->data, res_hdr.text_size, 
-                                                    &results->buffer[results->len + sizeof(res_hdr)], 
+                                                    &res_buff->buffer[res_buff->len + sizeof(res_hdr)], 
                                                     &res_hdr.text_size, p_query_params->keyword, NULL, 
                                                     p_query_params->ignore_case);
                 if(likely(res_hdr.matches > 0)) {
@@ -104,14 +115,12 @@ void circ_buff_search(Circ_buff_t *const buffs[], logs_query_params_t *const p_q
             }
 
             if(res_hdr.text_size){
-                memcpy(&results->buffer[results->len], &res_hdr, sizeof(res_hdr));
-                results->len += sizeof(res_hdr) + res_hdr.text_size; 
+                memcpy(&res_buff->buffer[res_buff->len], &res_hdr, sizeof(res_hdr));
+                res_buff->len += sizeof(res_hdr) + res_hdr.text_size; 
                 p_query_params->num_lines += res_hdr.matches;
             }
 
             m_assert(TEST_MS_TIMESTAMP_VALID(res_hdr.timestamp), "res_hdr.timestamp is invalid");
-
-            p_query_params->end_timestamp = res_hdr.timestamp;
         }
     }
 }

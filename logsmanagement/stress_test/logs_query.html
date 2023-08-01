@@ -51,8 +51,8 @@
   <h4>Set query parameters:</h4>
   <label for="req_from">Requested from (epoch in ms):</label>
   <input type="text" id="req_from" name="req_from"><br><br>
-  <label for="req_until">Requested until (epoch in ms):</label>
-  <input type="text" id="req_until" name="req_until" ><br><br>
+  <label for="req_to">Requested to (epoch in ms):</label>
+  <input type="text" id="req_to" name="req_to" ><br><br>
   <label for="req_quota">Quota in bytes:</label>
   <input type="text" id="req_quota" name="req_quota" ><br><br>
   <label for="keyword">Keyword / regex:</label>
@@ -70,8 +70,8 @@
 
 <script>
 document.getElementById('req_from').value = '1682000000000';
-document.getElementById('req_until').value = '1782000000000';
-document.getElementById('req_quota').value = '1048576';
+document.getElementById('req_to').value = '1782000000000';
+document.getElementById('req_quota').value = '10485760';
 document.getElementById('keyword_is_regex').checked = true;
 document.getElementById('keyword_case_sensitive').checked = false;
 
@@ -104,12 +104,12 @@ function submit_query() {
             "<b>API version:</b> " + logs_management_meta.api_version + "<br>" +
             "<b>Requested from (epoch in ms):</b> " + logs_management_meta.requested_from + "<br>" +
             "<b>Requested from:</b> " + new Date(logs_management_meta.requested_from) + "<br>" +
-            "<b>Requested until (epoch in ms):</b> " + logs_management_meta.requested_until + "<br>" +
-            "<b>Requested until:</b> " + new Date(logs_management_meta.requested_until) + "<br>" +
+            "<b>Requested to (epoch in ms):</b> " + logs_management_meta.requested_to + "<br>" +
+            "<b>Requested to:</b> " + new Date(logs_management_meta.requested_to) + "<br>" +
             "<b>Actual from (epoch in ms):</b> " + logs_management_meta.actual_from + "<br>" +
             "<b>Actual from:</b> " + new Date(logs_management_meta.actual_from) + "<br>" +
-            "<b>Actual until (epoch in ms):</b> " + logs_management_meta.actual_until + "<br>" +
-            "<b>Actual until:</b> " + new Date(logs_management_meta.actual_until) + "<br>" +
+            "<b>Actual to (epoch in ms):</b> " + logs_management_meta.actual_to + "<br>" +
+            "<b>Actual to:</b> " + new Date(logs_management_meta.actual_to) + "<br>" +
             "<b>Requested quota:</b> " + logs_management_meta.requested_quota + " KiB<br>" +
             "<b>Actual quota:</b> " + logs_management_meta.actual_quota + " KiB<br>" +
             "<b>Number of distrinct log records on this page:</b> " + logs_management_meta.num_lines + "<br>" +
@@ -132,8 +132,8 @@ function submit_query() {
   sources_value = encodeURIComponent(sources.value);
   req_from = document.getElementById("req_from");
   req_from_value = encodeURIComponent(req_from.value);
-  req_until = document.getElementById("req_until");
-  req_until_value = encodeURIComponent(req_until.value);
+  req_to = document.getElementById("req_to");
+  req_to_value = encodeURIComponent(req_to.value);
   req_quota = document.getElementById("req_quota");
   req_quota_value = encodeURIComponent(req_quota.value);
   keyword = document.getElementById("keyword");
@@ -145,7 +145,7 @@ function submit_query() {
   if(document.getElementById('use_functions').checked){
     xmlhttp_req = "http://" + location.host + "/api/v1/function?function=logsmanagement" + 
                       " from:" + req_from_value + 
-                      " until:" + req_until_value + 
+                      " to:" + req_to_value + 
                       " quota:" + req_quota_value +
                       " keyword:" + keyword_value +
                       " sanitize_keyword: " + sanitize_keyword +
@@ -161,7 +161,7 @@ function submit_query() {
   } else {
       xmlhttp_req = "http://" +  location.host + "/api/v1/logsmanagement?" + 
                         "from=" + req_from_value + 
-                        "&until=" + req_until_value + 
+                        "&to=" + req_to_value + 
                         "&quota=" + req_quota_value +
                         "&keyword=" + keyword_value +
                         "&sanitize_keyword=" + sanitize_keyword +

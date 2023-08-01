@@ -82,15 +82,17 @@ const logs_qry_res_err_t *fetch_log_sources(BUFFER *wb){
 const logs_qry_res_err_t *execute_logs_manag_query(logs_query_params_t *p_query_params) {
     struct File_info *p_file_infos[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES] = {NULL};
 
-    if(unlikely(p_query_params->quota > MAX_LOG_MSG_SIZE)) p_query_params->quota = MAX_LOG_MSG_SIZE;
-
     /* Check all required query parameters are present */
     if(unlikely(!*p_query_params->filename && !*p_query_params->chart_name))
         return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_INV_REQ_ERR];
 
-    if(unlikely(!p_query_params->start_timestamp || !p_query_params->end_timestamp ||
-                (p_query_params->start_timestamp > p_query_params->end_timestamp)))
+    if(unlikely(!p_query_params->req_from_ts || !p_query_params->req_to_ts))
         return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_INV_TS_ERROR];
+
+    /* Start with maximum possible actual timestamp range and reduce it 
+     * accordingly when searching DB and circular buffer. */
+    p_query_params->act_from_ts = p_query_params->req_from_ts;
+    p_query_params->act_to_ts = p_query_params->req_to_ts;
 
     /* Find p_file_infos for this query according to chart_names or filenames 
      * if the former is not valid. Only one of the two will be used, 

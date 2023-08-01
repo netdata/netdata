@@ -1559,8 +1559,8 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
     w->response.data->content_type = CT_APPLICATION_JSON;
 
     logs_query_params_t query_params = {0};
-    query_params.quota = LOGS_MANAG_QUERY_QUOTA_DEFAULT;
-    
+    unsigned long req_quota = 0;
+
     unsigned int fn_off = 0, cn_off = 0;
 
     while(url) {
@@ -1572,13 +1572,13 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
         if(!value || !*value) continue;
 
         if(!strcmp(name, LOGS_QRY_KW_START_TIME)) {
-            query_params.start_timestamp = strtoll(value, NULL, 10);
+            query_params.req_from_ts = strtoll(value, NULL, 10);
         }
         else if(!strcmp(name, LOGS_QRY_KW_END_TIME)) {
-            query_params.end_timestamp = strtoll(value, NULL, 10);
+            query_params.req_to_ts = strtoll(value, NULL, 10);
         }
         else if(!strcmp(name, LOGS_QRY_KW_QUOTA)) {
-            query_params.quota = strtoll(value, NULL, 10);
+            req_quota = strtoll(value, NULL, 10);
         }
         else if(!strcmp(name, LOGS_QRY_KW_FILENAME) && fn_off < LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES) {
             query_params.filename[fn_off++] = value;
@@ -1602,19 +1602,34 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
 
     fn_off = cn_off = 0;
 
+    if(!req_quota) query_params.quota = LOGS_MANAG_QUERY_QUOTA_DEFAULT;
+    else if(req_quota > LOGS_MANAG_QUERY_QUOTA_MAX) query_params.quota = LOGS_MANAG_QUERY_QUOTA_MAX;
+    else query_params.quota = req_quota;
+
     query_params.results_buff = buffer_create(query_params.quota, &netdata_buffers_statistics.buffers_api);
+
+    const logs_qry_res_err_t *const res_err = execute_logs_manag_query(&query_params);
     
-    buffer_strcat(w->response.data, "{\n");
-    buffer_sprintf(w->response.data, "\t\"api_version\": %s,\n", LOGS_QRY_VERSION);
-    buffer_sprintf(w->response.data, "\t\"requested_from\": %llu,\n", query_params.start_timestamp);
-    buffer_sprintf(w->response.data, "\t\"requested_until\": %llu,\n", query_params.end_timestamp);
-    buffer_sprintf(w->response.data, "\t\"requested_quota\": %llu,\n", query_params.quota / (1 KiB));
-    buffer_sprintf(w->response.data, "\t\"requested_keyword\": \"%s\",\n", query_params.keyword ? query_params.keyword : "");
-    const logs_qry_res_err_t *const res_err = execute_logs_manag_query(&query_params); // WARNING! query may change start_timestamp, end_timestamp and quota  
-    buffer_sprintf(w->response.data, "\t\"actual_from\": %llu,\n", query_params.start_timestamp);
-    buffer_sprintf(w->response.data, "\t\"actual_until\": %llu,\n", query_params.end_timestamp);
-    buffer_sprintf(w->response.data, "\t\"actual_quota\": %llu,\n", query_params.quota / (1 KiB));
-    buffer_sprintf(w->response.data, "\t\"requested_filename\":[\n");
+    buffer_sprintf(w->response.data,   
+                    "{\n" 
+                    "\t\"api_version\": " LOGS_QRY_VERSION ",\n"
+                    "\t\"requested_from\": %llu,\n"
+                    "\t\"requested_to\": %llu,\n"
+                    "\t\"requested_quota\": %llu,\n"
+                    "\t\"requested_keyword\": \"%s\",\n"
+                    "\t\"actual_from\": %llu,\n"
+                    "\t\"actual_to\": %llu,\n"
+                    "\t\"actual_quota\": %llu,\n"
+                    "\t\"requested_filename\":[\n",
+                    query_params.req_from_ts,
+                    query_params.req_to_ts,
+                    req_quota / (1 KiB),
+                    query_params.keyword ? query_params.keyword : "",
+                    query_params.act_from_ts,
+                    query_params.act_to_ts,
+                    query_params.quota / (1 KiB)
+    );
+
     while(query_params.filename[fn_off]) buffer_sprintf(w->response.data, "\t\t\"%s\",\n", query_params.filename[fn_off++]);
     if(query_params.filename[0])  w->response.data->len -= 2;
     buffer_strcat(w->response.data, "\n\t],\n");

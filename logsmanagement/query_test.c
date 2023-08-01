@@ -28,8 +28,8 @@ static void pipe_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf
     logs_query_params_t *query_params = calloc(1, log_files_no * sizeof(logs_query_params_t));
     uv_thread_t *test_execute_query_thread_id = malloc(log_files_no * sizeof(uv_thread_t));
     for (int i = 0; i < log_files_no; i++) {
-        query_params[i].start_timestamp = strtoll(strtok(NULL, ","), &pEnd, 10);
-        query_params[i].end_timestamp = strtoll(strtok(NULL, ","), &pEnd, 10);
+        query_params[i].req_from_ts = strtoll(strtok(NULL, ","), &pEnd, 10);
+        query_params[i].req_to_ts = strtoll(strtok(NULL, ","), &pEnd, 10);
         query_params[i].filename[0] = malloc(100 * sizeof(char));
         query_params[i].filename[0] = strtok(NULL, ",");
         query_params[i].keyword = strtok(NULL, ",");
@@ -90,7 +90,7 @@ void test_execute_query_thread(void *args) {
     uv_buf_t uv_buf;
     int64_t file_offset = 0;
     size_t results_size_max = query_params.results_buff->size;
-    msec_t final_timestamp = query_params.end_timestamp;
+    msec_t final_timestamp = query_params.req_to_ts;
 
     uv_loop_t thread_loop;
     uv_loop_init(&thread_loop);
@@ -142,8 +142,8 @@ void test_execute_query_thread(void *args) {
         // Simulate real query which would do buffer_create() and buffer_free() everytime 
         buffer_free(query_params.results_buff); 
         query_params.results_buff = buffer_create(results_size_max, NULL);
-        query_params.start_timestamp = query_params.end_timestamp + 1;
-        query_params.end_timestamp = final_timestamp;
+        query_params.req_from_ts = query_params.req_to_ts + 1;
+        query_params.req_to_ts = final_timestamp;
     }
 
 #if 1
