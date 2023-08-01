@@ -138,61 +138,61 @@
       priority: 5
       children:
         - id: data-collection.linux-systems.system-metrics
-          name: System Metrics
+          name: System
           description: ""
           most_popular: true
           priority: 1
           children: []
         - id: data-collection.linux-systems.memory-metrics
-          name: Memory Metrics
+          name: Memory
           description: ""
           most_popular: true
           priority: 3
           children: []
         - id: data-collection.linux-systems.cpu-metrics
-          name: CPU Metrics
+          name: CPU
           description: ""
           most_popular: true
           priority: 2
           children: []
         - id: data-collection.linux-systems.pressure-metrics
-          name: Pressure Metrics
+          name: Pressure
           description: ""
           most_popular: false
           priority: -1
           children: []
         - id: data-collection.linux-systems.network-metrics
-          name: Network Metrics
+          name: Network
           description: ""
           most_popular: true
           priority: 5
           children: []
         - id: data-collection.linux-systems.ipc-metrics
-          name: IPC Metrics
+          name: IPC
           description: ""
           most_popular: false
           priority: -1
           children: []
         - id: data-collection.linux-systems.disk-metrics
-          name: Disk Metrics
+          name: Disk
           description: ""
           most_popular: true
           priority: 4
           children: []
         - id: data-collection.linux-systems.firewall-metrics
-          name: Firewall Metrics
+          name: Firewall
           description: ""
           most_popular: false
           priority: -1
           children: []
         - id: data-collection.linux-systems.power-supply-metrics
-          name: Power Supply Metrics
+          name: Power Supply
           description: ""
           most_popular: false
           priority: -1
           children: []
         - id: data-collection.linux-systems.filesystem-metrics
-          name: Filesystem Metrics
+          name: Filesystem
           description: ""
           most_popular: false
           priority: -1
@@ -216,7 +216,7 @@
               priority: -1
               children: []
         - id: data-collection.linux-systems.kernel-metrics
-          name: Kernel Metrics
+          name: Kernel
           description: ""
           most_popular: false
           priority: -1
