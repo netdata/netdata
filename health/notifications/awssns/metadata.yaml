@@ -103,7 +103,8 @@
             required: true
             detailed_description: |
               All roles will default to this variable if left unconfigured.
-			  You can have different recipient Topics per **role**, by editing `DEFAULT_RECIPIENT_AWSSNS` with the Topic ARN you want, in the following entries at the bottom of the same file:
+
+              You can have different recipient Topics per **role**, by editing `DEFAULT_RECIPIENT_AWSSNS` with the Topic ARN you want, in the following entries at the bottom of the same file:
 
               ```conf
               role_recipients_awssns[sysadmin]="arn:aws:sns:us-east-2:123456789012:Systems"
@@ -122,7 +123,6 @@
             folding:
               enabled: false
             description: 'An example working configuration would be:'
-            config: |
             config: |
               ```conf
               #------------------------------------------------------------------------------
