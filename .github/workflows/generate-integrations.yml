@@ -45,8 +45,8 @@ jobs:
       - name: Prepare Dependencies
         id: prep-deps
         run: |
-          sudo apt-get install python3-jsonschema python3-pip python3-jinja2 python3-ruamel.yaml
-          sudo pip install referencing
+          sudo apt-get install python3-pip
+          sudo pip install referencing jsonschema jinja2 ruamel.yaml
       - name: Generate Integrations
         id: generate
         run: integrations/gen_integrations.py
