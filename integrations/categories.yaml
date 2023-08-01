@@ -282,7 +282,7 @@
       priority: -1
       children: []
     - id: data-collection.media-streaming-servers
-      name: Media Streaming Servers
+      name: Media Services
       description: ""
       most_popular: false
       priority: -1
