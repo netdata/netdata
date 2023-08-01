@@ -285,7 +285,7 @@
     link: 'https://en.wikipedia.org/wiki/Webhook'
     categories:
       - notify.cloud
-    icon_filename: 'webhooks.png'
+    icon_filename: 'webhook.svg'
   keywords:
     - generic webhooks
     - webhooks
