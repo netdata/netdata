@@ -55,7 +55,7 @@
             default_value: ''
             description: "Set different recipient environments per role, by editing `DEFAULT_RECIPIENT_CUSTOM` with the environment name of your choice"
             required: false
-            detailed_description: >
+            detailed_description: |
               The `DEFAULT_RECIPIENT_CUSTOM` can be edited in the following entries at the bottom of the same file:
 
               ```conf
