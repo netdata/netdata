@@ -7,7 +7,7 @@ modules:
         name: Puppet
         link: "https://www.puppet.com/"
         categories:
-          - data-collection.provisioning-systems
+          - data-collection.ci-cd-systems
         icon_filename: "puppet.svg"
       related_resources:
         integrations:
