@@ -8,7 +8,7 @@ modules:
         link: 'https://www.kernel.org/doc/html/next/admin-guide/sysctl/vm.html'
         categories:
           - data-collection.linux-systems.memory-metrics
-        icon_filename: 'microchip.png'
+        icon_filename: 'microchip.svg'
       related_resources:
         integrations:
           list: []
@@ -150,7 +150,7 @@ modules:
         link: 'https://www.kernel.org/doc/html/latest/admin-guide/mm/zswap.html'
         categories:
           - data-collection.linux-systems.memory-metrics
-        icon_filename: 'microchip.png'
+        icon_filename: 'microchip.svg'
       related_resources:
         integrations:
           list: []
