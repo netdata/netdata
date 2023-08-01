@@ -1927,7 +1927,7 @@ dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name,
 
     dyncfg_config_t cfg;
     cfg.data = strdupz(buffer_tostring(wb));
-    cfg.data_size = strlen(cfg.data);
+    cfg.data_size = buffer_strlen(wb);
 
     if (rc != NULL)
         *rc = cond.rc;
