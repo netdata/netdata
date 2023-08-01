@@ -301,8 +301,11 @@ static int hdl_stream(h2o_handler_t *self, h2o_req_t *req)
     h2o_stream_conn_t *conn = mallocz(sizeof(*conn));
     h2o_stream_conn_t_init(conn);
 
-    if (is_streaming_handshake(req))
+    if (is_streaming_handshake(req)) {
+        h2o_stream_conn_t_destroy(conn);
+        freez(conn);
         return 1;
+    }
 
     /* build response */
     req->res.status = HTTP_RESP_SWITCH_PROTO;
