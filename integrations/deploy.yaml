@@ -283,6 +283,7 @@
       commands:
         - channel: nightly
           command: |
+            ```yaml
             version: '3'
             services:
               netdata:
@@ -314,8 +315,10 @@
               netdataconfig:
               netdatalib:
               netdatacache:
+            ```
         - channel: stable
           command: |
+            ```yaml
             version: '3'
             services:
               netdata:
@@ -347,10 +350,12 @@
               netdataconfig:
               netdatalib:
               netdatacache:
+            ```
     - method: Docker Swarm
       commands:
         - channel: nightly
           command: |
+            ```yaml
             version: '3'
             services:
               netdata:
@@ -383,8 +388,10 @@
               netdataconfig:
               netdatalib:
               netdatacache:
+            ```
         - channel: stable
           command: |
+            ```yaml
             version: '3'
             services:
               netdata:
@@ -417,6 +424,7 @@
               netdataconfig:
               netdatalib:
               netdatacache:
+            ```
   additional_info: ''
   related_resources: {}
   platform_info:
@@ -465,6 +473,7 @@
       commands:
         - channel: nightly
           command: |
+            ```yaml
             image:
               tag: latest
 
@@ -482,8 +491,10 @@
                 enabled: true
                 token: {% claim_token %}
                 rooms: {% $claim_rooms %}
+             ```
         - channel: stable
           command: |
+            ```yaml
             image:
               tag: stable
 
@@ -498,6 +509,7 @@
                 enabled: true
                 token: {% claim_token %}
                 rooms: {% $claim_rooms %}
+            ```
   additional_info: ''
   related_resources: {}
   most_popular: true
