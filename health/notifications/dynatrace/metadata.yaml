@@ -49,7 +49,7 @@
             default_value: ''
             description: "Set `DYNATRACE_SPACE` to the API Space, it is the URL part of the page you have access in order to generate the API Token."
             required: true
-            detailed_description: >
+            detailed_description: |
               For example, the URL for a generated API token might look like: https://monitor.illumineit.com/e/2a93fe0e-4cd5-469a-9d0d-1a064235cfce/#settings/integration/apikeys;gf=all In that case, the Space is 2a93fe0e-4cd5-469a-9d0d-1a064235cfce.
           - name: 'DYNATRACE_TAG_VALUE'
             default_value: ''
@@ -63,7 +63,7 @@
             default_value: 'Netdata Alarm'
             description: "Set `DYNATRACE_EVENT` to the Dynatrace eventType you want."
             required: false
-            detailed_description: >
+            detailed_description: |
               `AVAILABILITY_EVENT`, `CUSTOM_ALERT`, `CUSTOM_ANNOTATION`, `CUSTOM_CONFIGURATION`, `CUSTOM_DEPLOYMENT`, `CUSTOM_INFO`, `ERROR_EVENT`,
               `MARKED_FOR_TERMINATION`, `PERFORMANCE_EVENT`, `RESOURCE_CONTENTION_EVENT`.
               You can read more [here](https://www.dynatrace.com/support/help/dynatrace-api/environment-api/events-v2/post-event#request-body-objects).

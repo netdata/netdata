@@ -56,7 +56,7 @@
             default_value: ''
             description: "Set SEND_SYSLOG to YES, make sure you have everything else configured before turning this on."
             required: true
-            detailed_description: >
+            detailed_description: |
               You can then have different recipients per role, by editing DEFAULT_RECIPIENT_SYSLOG with the recipient you want, in the following entries at the bottom of the same file:
 
               ```conf
