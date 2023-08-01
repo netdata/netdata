@@ -184,14 +184,14 @@
   quick_start: -1
 - id: deploy-macos
   meta:
-    name: MacOS
+    name: macOS
     link: ''
     categories:
       - deploy.operating-systems
     icon_filename: 'apple.svg'
   most_popular: true
   keywords:
-    - MacOS
+    - macOS
     - mac
     - apple
   install_description: 'Run the following command on your Intel based OSX, macOS servers to install and claim Netdata:'
