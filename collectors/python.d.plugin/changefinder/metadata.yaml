@@ -6,7 +6,8 @@ modules:
       monitored_instance:
         name: python.d changefinder
         link: ''
-        categories: []
+        categories:
+          - data-collection.other
         icon_filename: ''
       related_resources:
         integrations:
