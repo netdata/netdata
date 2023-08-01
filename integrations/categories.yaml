@@ -65,6 +65,12 @@
       most_popular: false
       priority: -1
       children: []
+    - id: data-collection.notifications
+      name: Notifications
+      description: ""
+      most_popular: false
+      priority: -1
+      children: []
     - id: data-collection.service-discovery-registry
       name: Service Discovery / Registry
       description: ""
@@ -406,7 +412,7 @@
   description: "Exporter Integrations"
   most_popular: true
   priority: 4
-  children:
+  children: []
 - id: notify
   name: notifications
   description: "Notification Integrations"
