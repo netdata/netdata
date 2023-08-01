@@ -1794,17 +1794,17 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, netdata_socket_t *ns)
         socket_bandwidth_curr[current_pid] = curr;
     }
 
-    curr->bytes_sent = ns->tcp.tcp_bytes_sent;
-    curr->bytes_received = ns->tcp.tcp_bytes_received;
-    curr->call_tcp_sent = ns->tcp.call_tcp_sent;
-    curr->call_tcp_received = ns->tcp.call_tcp_received;
-    curr->retransmit = ns->tcp.retransmit;
-    curr->call_close = ns->tcp.close;
-    curr->call_tcp_v4_connection = ns->tcp.ipv4_connect;
-    curr->call_tcp_v6_connection = ns->tcp.ipv6_connect;
+    curr->bytes_sent += ns->tcp.tcp_bytes_sent;
+    curr->bytes_received += ns->tcp.tcp_bytes_received;
+    curr->call_tcp_sent += ns->tcp.call_tcp_sent;
+    curr->call_tcp_received += ns->tcp.call_tcp_received;
+    curr->retransmit += ns->tcp.retransmit;
+    curr->call_close += ns->tcp.close;
+    curr->call_tcp_v4_connection += ns->tcp.ipv4_connect;
+    curr->call_tcp_v6_connection += ns->tcp.ipv6_connect;
 
-    curr->call_udp_sent = ns->udp.call_udp_sent;
-    curr->call_udp_received = ns->udp.call_udp_received;
+    curr->call_udp_sent += ns->udp.call_udp_sent;
+    curr->call_udp_received += ns->udp.call_udp_received;
 }
 
 /**
