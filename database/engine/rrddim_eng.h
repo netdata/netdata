@@ -93,8 +93,14 @@ typedef struct {
     size_t tier_page_size[STORAGE_ENGINE_TIERS];
 } dbengine_config_t;
 
+// returns a copy of sane default options for dbengine
+dbengine_config_t dbengine_default_config();
+
+// global to keep runtime configuration options as modified the user by
+// calling `dbengine_init()``
 extern dbengine_config_t dbengine_cfg;
 
-bool dbengine_init(const char *hostname, dbengine_config_t *cfg);
+// initialize dbengine with the provided configuration settings
+bool dbengine_init(const char *hostname, dbengine_config_t cfg);
 
 #endif /* NETDATA_RRDDIM_ENG_H */

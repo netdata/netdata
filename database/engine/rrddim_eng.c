@@ -16,16 +16,18 @@ static void *dbengine_tier_init(void *ptr) {
     return ptr;
 }
 
-bool dbengine_init(const char *hostname, dbengine_config_t *cfg) {
+bool dbengine_init(const char *hostname, dbengine_config_t cfg) {
+    dbengine_cfg = cfg;
+
     struct dbengine_initialization tiers_init[STORAGE_ENGINE_TIERS] = {};
 
-    for (size_t tier = 0; tier < cfg->storage_tiers ;tier++) {
+    for (size_t tier = 0; tier < dbengine_cfg.storage_tiers ;tier++) {
         char dbenginepath[FILENAME_MAX + 1];
 
         if (tier == 0)
-            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", cfg->base_path);
+            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", dbengine_cfg.base_path);
         else
-            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%zu", cfg->base_path, tier);
+            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%zu", dbengine_cfg.base_path, tier);
 
         int ret = mkdir(dbenginepath, 0775);
         if (ret != 0 && errno != EEXIST) {
@@ -33,12 +35,12 @@ bool dbengine_init(const char *hostname, dbengine_config_t *cfg) {
             break;
         }
 
-        tiers_init[tier].disk_space_mb = cfg->multidb_disk_quota_mb[tier];
+        tiers_init[tier].disk_space_mb = dbengine_cfg.multidb_disk_quota_mb[tier];
         tiers_init[tier].tier = tier;
         strncpyz(tiers_init[tier].path, dbenginepath, FILENAME_MAX);
         tiers_init[tier].ret = 0;
 
-        if (cfg->parallel_initialization) {
+        if (dbengine_cfg.parallel_initialization) {
             char tag[NETDATA_THREAD_TAG_MAX + 1];
             snprintfz(tag, NETDATA_THREAD_TAG_MAX, "DBENGINIT[%zu]", tier);
             netdata_thread_create(&tiers_init[tier].thread, tag, NETDATA_THREAD_OPTION_JOINABLE,
@@ -50,10 +52,10 @@ bool dbengine_init(const char *hostname, dbengine_config_t *cfg) {
 
     size_t created_tiers = 0;
 
-    for (size_t tier = 0; tier < cfg->storage_tiers ;tier++) {
+    for (size_t tier = 0; tier < dbengine_cfg.storage_tiers ;tier++) {
         void *ptr;
 
-        if (cfg->parallel_initialization)
+        if (dbengine_cfg.parallel_initialization)
             netdata_thread_join(tiers_init[tier].thread, &ptr);
 
         if (tiers_init[tier].ret != 0) {
@@ -66,24 +68,24 @@ bool dbengine_init(const char *hostname, dbengine_config_t *cfg) {
             created_tiers++;
     }
 
-    if (created_tiers && created_tiers < cfg->storage_tiers) {
+    if (created_tiers && created_tiers < dbengine_cfg.storage_tiers) {
         netdata_log_error("DBENGINE on '%s': Managed to create %zu tiers instead of %zu. Continuing with %zu available.",
                           hostname,
                           created_tiers,
-                          cfg->storage_tiers,
+                          dbengine_cfg.storage_tiers,
                           created_tiers);
-        cfg->storage_tiers = created_tiers;
+        dbengine_cfg.storage_tiers = created_tiers;
     }
     else if (!created_tiers)
-        fatal("DBENGINE on '%s', failed to initialize databases at '%s'.", hostname, cfg->base_path);
+        fatal("DBENGINE on '%s', failed to initialize databases at '%s'.", hostname, dbengine_cfg.base_path);
 
-    for (size_t tier = 0; tier < cfg->storage_tiers ;tier++)
-        rrdeng_readiness_wait(cfg->multidb_ctx[tier]);
+    for (size_t tier = 0; tier < dbengine_cfg.storage_tiers ;tier++)
+        rrdeng_readiness_wait(dbengine_cfg.multidb_ctx[tier]);
 
     return true;
 }
 
-dbengine_config_t dbengine_cfg = {
+static const dbengine_config_t default_dbengine_cfg = {
     .base_path = CACHE_DIR,
 
     .check_journal  = CONFIG_BOOLEAN_NO,
@@ -159,3 +161,10 @@ dbengine_config_t dbengine_cfg = {
     },
 #endif
 };
+
+dbengine_config_t dbengine_default_config() {
+    return default_dbengine_cfg;
+}
+
+// runtime dbengine config, set by calling `dbengine_init()`
+dbengine_config_t dbengine_cfg = {};

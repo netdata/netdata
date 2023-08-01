@@ -86,8 +86,7 @@ STRING *rrd_string_strdupz(const char *s) {
 
 #ifdef ENABLE_DBENGINE
 static dbengine_config_t get_dbengine_config(const char *hostname) {
-    // use the global `dbengine_cfg` instance to retrieve default values;
-    dbengine_config_t cfg = dbengine_cfg;
+    dbengine_config_t cfg = dbengine_default_config();
 
     // check journal
     cfg.check_journal = config_get_boolean(CONFIG_SECTION_DB, "dbengine enable journal integrity check", cfg.check_journal);
@@ -267,7 +266,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
 
 #ifdef ENABLE_DBENGINE
         rrdb.dbengine_cfg = get_dbengine_config(hostname);
-        rrdb.dbengine_enabled = dbengine_init(hostname, &rrdb.dbengine_cfg);
+        rrdb.dbengine_enabled = dbengine_init(hostname, rrdb.dbengine_cfg);
 #endif
         } else {
             netdata_log_info("DBENGINE: Not initializing ...");
