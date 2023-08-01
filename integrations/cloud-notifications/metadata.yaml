@@ -14,7 +14,7 @@
     notification_description: "From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on Discord."
     notification_limitations: ''
   setup:
-    description:
+    description: |
       ### Prerequisites
       - A Netdata Cloud account
       - Access to the Netdata Space as an **administrator**
@@ -55,7 +55,7 @@
     notification_description: "From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on PagerDuty."
     notification_limitations: ''
   setup:
-    description:
+    description: |
       ### Prerequisites
       - A Netdata Cloud account
       - Access to the Netdata Space as an **administrator**
@@ -97,7 +97,7 @@
     notification_description: "From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on Slack."
     notification_limitations: ''
   setup:
-    description:
+    description: |
       ### Prerequisites
       
       - A Netdata Cloud account
@@ -147,7 +147,7 @@
     notification_description: "From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on Opsgenie."
     notification_limitations: ''
   setup:
-    description:
+    description: |
       ### Prerequisites
       
       - A Netdata Cloud account
@@ -190,7 +190,7 @@
     notification_description: "From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on Mattermost."
     notification_limitations: ''
   setup:
-    description:
+    description: |
       ### Prerequisites
       
       - A Netdata Cloud account
@@ -241,7 +241,7 @@
     notification_description: "From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on RocketChat."
     notification_limitations: ''
   setup:
-    description:
+    description: |
       ### Prerequisites
       
       - A Netdata Cloud account
@@ -293,7 +293,7 @@
     notification_description: "From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on a webhook using a predefined schema."
     notification_limitations: ''
   setup:
-    description:
+    description: |
       ### Prerequisites
       
       - A Netdata Cloud account
