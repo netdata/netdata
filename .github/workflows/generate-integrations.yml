@@ -45,14 +45,18 @@ jobs:
       - name: Prepare Dependencies
         id: prep-deps
         run: |
-          sudo apt-get install python3-pip
-          sudo pip install referencing jsonschema jinja2 ruamel.yaml
+          sudo apt-get install python3-venv
+          python3 -m venv ./virtualenv
+          source ./virtualenv/bin/activate
+          pip install jsonschema referencing jinja2 ruamel.yaml
       - name: Generate Integrations
         id: generate
-        run: integrations/gen_integrations.py
-      - name: Clean Up Go Repo
-        id: clean-go
-        run: rm -rf go.d.plugin
+        run: |
+          source ./virtualenv/bin/activate
+          python3 integrations/gen_integrations.py
+      - name: Clean Up Temporary Data
+        id: clean
+        run: rm -rf go.d.plugin virtualenv
       - name: Create PR
         id: create-pr
         uses: peter-evans/create-pull-request@v5
@@ -82,7 +86,7 @@ jobs:
               Checkout Go: ${{ steps.checkout-go.outcome }}
               Prepare Dependencies: ${{ steps.prep-deps.outcome }}
               Generate Integrations: ${{ steps.generate.outcome }}
-              Clean Up Go Repository: ${{ steps.clean-go.outcome }}
+              Clean Up Temporary Data: ${{ steps.clean.outcome }}
               Create PR: ${{ steps.create-pr.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
