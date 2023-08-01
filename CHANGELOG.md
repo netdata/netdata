@@ -6,6 +6,19 @@
 
 **Merged pull requests:**
 
+- fix proc.plugin meta filename [\#15659](https://github.com/netdata/netdata/pull/15659) ([ilyam8](https://github.com/ilyam8))
+- Fix icon for solarwinds [\#15657](https://github.com/netdata/netdata/pull/15657) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- Fix Apps plugin icons [\#15655](https://github.com/netdata/netdata/pull/15655) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- fix pandas category [\#15654](https://github.com/netdata/netdata/pull/15654) ([andrewm4894](https://github.com/andrewm4894))
+- Fix exporter icons [\#15652](https://github.com/netdata/netdata/pull/15652) ([shyamvalsan](https://github.com/shyamvalsan))
+- disable freeipmi in docker by default [\#15651](https://github.com/netdata/netdata/pull/15651) ([ilyam8](https://github.com/ilyam8))
+- Fixing FreeBSD icons [\#15650](https://github.com/netdata/netdata/pull/15650) ([shyamvalsan](https://github.com/shyamvalsan))
+- Fix exporter schema to support multiple entries per file. [\#15649](https://github.com/netdata/netdata/pull/15649) ([Ferroin](https://github.com/Ferroin))
+- Fixing icons in netdata/netdata repo [\#15647](https://github.com/netdata/netdata/pull/15647) ([shyamvalsan](https://github.com/shyamvalsan))
+- Fix name in the yaml of example python collector [\#15646](https://github.com/netdata/netdata/pull/15646) ([Ancairon](https://github.com/Ancairon))
+- Fix icons [\#15645](https://github.com/netdata/netdata/pull/15645) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- Fix icons for notifications [\#15644](https://github.com/netdata/netdata/pull/15644) ([shyamvalsan](https://github.com/shyamvalsan))
+- convert collectors meta files from single to multi [\#15642](https://github.com/netdata/netdata/pull/15642) ([ilyam8](https://github.com/ilyam8))
 - The icon\_filename value was not in quotes - Fixed [\#15635](https://github.com/netdata/netdata/pull/15635) ([sashwathn](https://github.com/sashwathn))
 - Update graphite metadata.yaml [\#15634](https://github.com/netdata/netdata/pull/15634) ([shyamvalsan](https://github.com/shyamvalsan))
 - Debugfs yaml update [\#15633](https://github.com/netdata/netdata/pull/15633) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -332,7 +345,6 @@
 - fix\(alerting\): removing some of criticals [\#15124](https://github.com/netdata/netdata/pull/15124) ([M4itee](https://github.com/M4itee))
 - Add hardening options to CFLAGS by default if they are available. [\#15087](https://github.com/netdata/netdata/pull/15087) ([Ferroin](https://github.com/Ferroin))
 - Additional CO-RE code \(eBPF.plugin\) [\#15078](https://github.com/netdata/netdata/pull/15078) ([thiagoftsm](https://github.com/thiagoftsm))
-- Update README.md [\#15044](https://github.com/netdata/netdata/pull/15044) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
@@ -409,17 +421,6 @@
 - bump go.d.plugin to v0.53.0 [\#15059](https://github.com/netdata/netdata/pull/15059) ([ilyam8](https://github.com/ilyam8))
 - Fix ACLK memleak [\#15055](https://github.com/netdata/netdata/pull/15055) ([underhood](https://github.com/underhood))
 - fix\(debugfs/zswap\): don't collect metrics if Zswap is disabled [\#15054](https://github.com/netdata/netdata/pull/15054) ([ilyam8](https://github.com/ilyam8))
-- Comment out default `role_recipients_*` values [\#15047](https://github.com/netdata/netdata/pull/15047) ([jamgregory](https://github.com/jamgregory))
-- Small update ml defaults [\#15046](https://github.com/netdata/netdata/pull/15046) ([andrewm4894](https://github.com/andrewm4894))
-- Better cleanup of health log table [\#15045](https://github.com/netdata/netdata/pull/15045) ([MrZammler](https://github.com/MrZammler))
-- Fix handling of permissions in static installs. [\#15042](https://github.com/netdata/netdata/pull/15042) ([Ferroin](https://github.com/Ferroin))
-- Update tor.chart.py [\#15041](https://github.com/netdata/netdata/pull/15041) ([jmphilippe](https://github.com/jmphilippe))
-- Wording fix in interact with charts doc [\#15040](https://github.com/netdata/netdata/pull/15040) ([Ancairon](https://github.com/Ancairon))
-- fatal in claim\(\) only if --claim-only is used [\#15039](https://github.com/netdata/netdata/pull/15039) ([ilyam8](https://github.com/ilyam8))
-- Update libbpf [\#15038](https://github.com/netdata/netdata/pull/15038) ([thiagoftsm](https://github.com/thiagoftsm))
-- Slight wording fix on the database readme [\#15034](https://github.com/netdata/netdata/pull/15034) ([Ancairon](https://github.com/Ancairon))
-- Update SQLITE to version 3.41.2 [\#15031](https://github.com/netdata/netdata/pull/15031) ([stelfrag](https://github.com/stelfrag))
-- Update troubleshooting-agent-with-cloud-connection.md [\#15029](https://github.com/netdata/netdata/pull/15029) ([cakrit](https://github.com/cakrit))
 
 ## [v1.39.1](https://github.com/netdata/netdata/tree/v1.39.1) (2023-05-18)
 
