@@ -340,8 +340,8 @@ typedef struct ebpf_module {
 } ebpf_module_t;
 
 #define EBPF_DEFAULT_LIFETIME 300
-// This will be present until all functions are merged
-#define EBPF_NON_FUNCTION_LIFE_TIME 86400
+// This will be present until all functions are merged. The deadline is planned for 68 years since plugin start
+#define EBPF_NON_FUNCTION_LIFE_TIME UINT_MAX
 
 int ebpf_get_kernel_version();
 int get_redhat_release();
