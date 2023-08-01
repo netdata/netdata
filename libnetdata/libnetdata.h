@@ -579,7 +579,7 @@ void recursive_config_double_dir_load(
         , void *data
         , size_t depth
 );
-char *read_by_filename(const char *filename, long *file_size);
+char *read_by_filename(char *filename, long *file_size);
 char *find_and_replace(const char *src, const char *find, const char *replace, const char *where);
 
 /* fix for alpine linux */
