@@ -54,7 +54,7 @@
       priority: 6
       children: []
     - id: data-collection.database-servers
-      name: Database Servers
+      name: Databases
       description: ""
       most_popular: true
       priority: 1
