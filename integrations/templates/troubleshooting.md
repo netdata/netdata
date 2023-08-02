@@ -49,7 +49,7 @@ should give you clues as to why the collector isn't working.
 [% endif %]
 [% endif %]
 [% elif entry.integration_type == 'notification' %]
-[% if 'cloud-notifications' in entry._src_path %]
+[% if 'cloud-notifications' in entry._src_path|string %]
 [% if entry.troubleshooting.problems.list %]
 ## Troubleshooting
 
