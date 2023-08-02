@@ -1590,7 +1590,10 @@ int main(int argc, char **argv) {
                             default_storage_engine_id = STORAGE_ENGINE_RAM;
                             default_health_enabled = 0;
 #ifdef ENABLE_DBENGINE
-                            rrdb.dbengine_cfg.storage_tiers = 1;
+                            dbengine_config_t cfg = dbengine_default_config();
+                            cfg.storage_tiers = 1;
+                            rrdb.dbengine_cfg = cfg;
+                            dbengine_init("foo", rrdb.dbengine_cfg);
 #endif
                             registry_init();
                             if(rrd_init("unittest", NULL, true)) {

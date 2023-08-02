@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrddim_eng.h"
+#include "rrdengineapi.h"
+
+/* Default global database instance */
+struct rrdengine_instance multidb_ctx_storage_tier0;
+struct rrdengine_instance multidb_ctx_storage_tier1;
+struct rrdengine_instance multidb_ctx_storage_tier2;
+struct rrdengine_instance multidb_ctx_storage_tier3;
+struct rrdengine_instance multidb_ctx_storage_tier4;
 
 struct dbengine_initialization {
     netdata_thread_t thread;
@@ -112,11 +120,11 @@ static const dbengine_config_t default_dbengine_cfg = {
     .storage_tiers = 3,
 
     .multidb_ctx = {
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
+        (STORAGE_INSTANCE *) &multidb_ctx_storage_tier0,
+        (STORAGE_INSTANCE *) &multidb_ctx_storage_tier1,
+        (STORAGE_INSTANCE *) &multidb_ctx_storage_tier2,
+        (STORAGE_INSTANCE *) &multidb_ctx_storage_tier3,
+        (STORAGE_INSTANCE *) &multidb_ctx_storage_tier4,
     },
 
     .multidb_disk_quota_mb = {

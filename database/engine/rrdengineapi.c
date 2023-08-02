@@ -1,13 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
 
-/* Default global database instance */
-struct rrdengine_instance multidb_ctx_storage_tier0;
-struct rrdengine_instance multidb_ctx_storage_tier1;
-struct rrdengine_instance multidb_ctx_storage_tier2;
-struct rrdengine_instance multidb_ctx_storage_tier3;
-struct rrdengine_instance multidb_ctx_storage_tier4;
-
 #define mrg_metric_ctx(metric) (struct rrdengine_instance *)mrg_metric_section(main_mrg, metric)
 
 #if STORAGE_ENGINE_TIERS != 5
@@ -18,14 +11,6 @@ uint8_t tier_page_type[STORAGE_ENGINE_TIERS] = {PAGE_METRICS, PAGE_TIER, PAGE_TI
 #if PAGE_TYPE_MAX != 1
 #error PAGE_TYPE_MAX is not 1 - you need to add allocations here
 #endif
-
-__attribute__((constructor)) void initialize_multidb_ctx(void) {
-    dbengine_cfg.multidb_ctx[0] = (STORAGE_INSTANCE *) &multidb_ctx_storage_tier0;
-    dbengine_cfg.multidb_ctx[1] = (STORAGE_INSTANCE *) &multidb_ctx_storage_tier1;
-    dbengine_cfg.multidb_ctx[2] = (STORAGE_INSTANCE *) &multidb_ctx_storage_tier2;
-    dbengine_cfg.multidb_ctx[3] = (STORAGE_INSTANCE *) &multidb_ctx_storage_tier3;
-    dbengine_cfg.multidb_ctx[4] = (STORAGE_INSTANCE *) &multidb_ctx_storage_tier4;
-}
 
 // ----------------------------------------------------------------------------
 // metrics groups
