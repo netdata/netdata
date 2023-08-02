@@ -20,6 +20,7 @@ struct web_api_command {
     uint32_t hash;
     WEB_CLIENT_ACL acl;
     int (*callback)(RRDHOST *host, struct web_client *w, char *url);
+    unsigned int allow_subpaths;
 };
 
 struct web_client;

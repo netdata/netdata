@@ -43,6 +43,11 @@
 #define PLUGINSD_KEYWORD_HOST_LABEL             "HOST_LABEL"
 #define PLUGINSD_KEYWORD_HOST                   "HOST"
 
+#define PLUGINSD_KEYWORD_DYNCFG_ENABLE          "DYNCFG_ENABLE"
+#define PLUGINSD_KEYWORD_DYNCFG_REGISTER_MODULE "DYNCFG_REGISTER_MODULE"
+
+#define PLUGINSD_KEYWORD_REPORT_JOB_STATUS      "REPORT_JOB_STATUS"
+
 #define PLUGINSD_KEYWORD_EXIT                   "EXIT"
 
 #define PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT 10 // seconds
@@ -79,6 +84,9 @@ struct plugind {
     } unsafe;
 
     time_t started_t;
+
+    const DICTIONARY_ITEM *cfg_dict_item;
+    struct configurable_plugin *configuration;
 
     struct plugind *prev;
     struct plugind *next;

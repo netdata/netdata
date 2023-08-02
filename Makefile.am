@@ -200,6 +200,8 @@ LIBNETDATA_FILES = \
     libnetdata/worker_utilization/worker_utilization.c \
     libnetdata/worker_utilization/worker_utilization.h \
     libnetdata/http/http_defs.h \
+    libnetdata/dyn_conf/dyn_conf.c \
+    libnetdata/dyn_conf/dyn_conf.h \
     $(NULL)
 
 if ENABLE_PLUGIN_EBPF
