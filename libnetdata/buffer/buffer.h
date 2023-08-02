@@ -932,6 +932,8 @@ typedef enum __attribute__((packed)) {
     RRDF_FIELD_OPTS_UNIQUE_KEY   = (1 << 0), // the field is the unique key of the row
     RRDF_FIELD_OPTS_VISIBLE      = (1 << 1), // the field should be visible by default
     RRDF_FIELD_OPTS_STICKY       = (1 << 2), // the field should be sticky
+    RRDF_FIELD_OPTS_FULL_WIDTH   = (1 << 3), // the field should get full width
+    RRDF_FIELD_OPTS_WRAP         = (1 << 4), // the field should get full width
 } RRDF_FIELD_OPTIONS;
 
 typedef enum __attribute__((packed)) {
@@ -996,8 +998,8 @@ static inline const char *rrdf_field_visual_to_string(RRDF_FIELD_VISUAL visual) 
 
 typedef enum __attribute__((packed)) {
     RRDF_FIELD_TRANSFORM_NONE,      // show the value as-is
-    RRDF_FIELD_TRANSFORM_NUMBER,    // show the value repsecting the decimal_points
-    RRDF_FIELD_TRANSFORM_DURATION_S,  // transform as duration in second to a human readable duration
+    RRDF_FIELD_TRANSFORM_NUMBER,    // show the value respecting the decimal_points
+    RRDF_FIELD_TRANSFORM_DURATION_S,  // transform as duration in second to a human-readable duration
     RRDF_FIELD_TRANSFORM_DATETIME_MS,  // UNIX epoch timestamp in ms
     RRDF_FIELD_TRANSFORM_DATETIME_USEC,  // UNIX epoch timestamp in usec
 } RRDF_FIELD_TRANSFORM;
@@ -1134,6 +1136,9 @@ buffer_rrdf_table_add_field(BUFFER *wb, size_t field_id, const char *key, const 
         buffer_json_member_add_boolean(wb, "sticky", options & RRDF_FIELD_OPTS_STICKY);
         buffer_json_member_add_string(wb, "summary", rrdf_field_summary_to_string(summary));
         buffer_json_member_add_string(wb, "filter", rrdf_field_filter_to_string(filter));
+
+        buffer_json_member_add_boolean(wb, "full_width", options & RRDF_FIELD_OPTS_FULL_WIDTH);
+        buffer_json_member_add_boolean(wb, "wrap", options & RRDF_FIELD_OPTS_WRAP);
     }
     buffer_json_object_close(wb);
 }

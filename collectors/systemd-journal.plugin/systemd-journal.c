@@ -348,7 +348,7 @@ static void function_systemd_journal(const char *transaction, char *function, ch
                                        systemd_journal_transform_gid, gids);
 
     facets_register_key(facets, "MESSAGE",
-                        FACET_KEY_OPTION_NO_FACET|FACET_KEY_OPTION_VISIBLE|FACET_KEY_OPTION_FTS);
+                        FACET_KEY_OPTION_NO_FACET|FACET_KEY_OPTION_MAIN_TEXT|FACET_KEY_OPTION_VISIBLE|FACET_KEY_OPTION_FTS);
 
     time_t after_s = 0, before_s = 0;
     usec_t anchor = 0;

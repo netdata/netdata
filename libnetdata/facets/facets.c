@@ -707,11 +707,12 @@ void facets_report(FACETS *facets, BUFFER *wb) {
                 NULL,
                 RRDF_FIELD_SUMMARY_COUNT,
                 RRDF_FIELD_FILTER_RANGE,
-                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY | RRDF_FIELD_OPTS_UNIQUE_KEY,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY,
                 NULL);
 
         FACET_KEY *k;
         dfe_start_read(facets->keys, k) {
+            RRDF_FIELD_OPTIONS options = RRDF_FIELD_OPTS_NONE;
             bool visible = k->options & (FACET_KEY_OPTION_VISIBLE|FACET_KEY_OPTION_STICKY);
 
             if((facets->options & FACETS_OPTION_ALL_FACETS_VISIBLE && k->values))
@@ -719,6 +720,12 @@ void facets_report(FACETS *facets, BUFFER *wb) {
 
             if(!visible)
                 visible = simple_pattern_matches(facets->visible_keys, k->name);
+
+            if(visible)
+                options |= RRDF_FIELD_OPTS_VISIBLE;
+
+            if(k->options & FACET_KEY_OPTION_MAIN_TEXT)
+                options |= RRDF_FIELD_OPTS_FULL_WIDTH | RRDF_FIELD_OPTS_WRAP;
 
             buffer_rrdf_table_add_field(
                     wb, field_id++,
@@ -730,7 +737,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
                     NULL,
                     RRDF_FIELD_SUMMARY_COUNT,
                     k->values ? RRDF_FIELD_FILTER_FACET : RRDF_FIELD_FILTER_NONE,
-                    visible ? RRDF_FIELD_OPTS_VISIBLE : RRDF_FIELD_OPTS_NONE,
+                    options,
                     FACET_VALUE_UNSET);
         }
         dfe_done(k);

@@ -9,6 +9,7 @@ typedef enum __attribute__((packed)) {
     FACET_KEY_OPTION_STICKY   = (1 << 2), // should be sticky in the table
     FACET_KEY_OPTION_VISIBLE  = (1 << 3), // should be in the default table
     FACET_KEY_OPTION_FTS      = (1 << 4), // the key is filterable by full text search (FTS)
+    FACET_KEY_OPTION_MAIN_TEXT = (1 << 5), // full width and wrap
 } FACET_KEY_OPTIONS;
 
 typedef struct facet_row_key_value {
