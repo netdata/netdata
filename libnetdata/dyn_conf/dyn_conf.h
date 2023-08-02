@@ -130,7 +130,7 @@ struct uni_http_response dyn_conf_process_http_request(int method, const char *p
 
 // API to be used by main netdata process, initialization and destruction etc.
 int dyn_conf_init(void);
-
+void freez_dyncfg(void *ptr);
 void *dyncfg_main(void *in);
 
 #endif //DYN_CONF_H

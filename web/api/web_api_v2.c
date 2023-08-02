@@ -698,7 +698,7 @@ static int web_client_api_request_v2_config(RRDHOST *host __maybe_unused, struct
         if (resp.content_free)
             resp.content_free(resp.content);
         resp.content = con;
-        resp.content_free = freez;
+        resp.content_free = freez_dyncfg;
     }
     buffer_strcat(w->response.data, resp.content);
     if (resp.content_free)
