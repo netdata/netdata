@@ -115,15 +115,15 @@ struct configurable_plugin {
 };
 
 // API to be used by plugins
-const DICTIONARY_ITEM *register_plugin(struct configurable_plugin *plugin);
-void unregister_plugin(const DICTIONARY_ITEM *plugin);
-int register_module(struct configurable_plugin *plugin, struct module *module);
+const DICTIONARY_ITEM *register_plugin(DICTIONARY *plugins_dict, struct configurable_plugin *plugin);
+void unregister_plugin(DICTIONARY *plugins_dict, const DICTIONARY_ITEM *plugin);
+int register_module(DICTIONARY *plugins_dict, struct configurable_plugin *plugin, struct module *module);
 
-void report_job_status(struct configurable_plugin *plugin, const char *module_name, const char *job_name, enum job_status status, int status_code, char *reason);
+void report_job_status(DICTIONARY *plugins_dict, struct configurable_plugin *plugin, const char *module_name, const char *job_name, enum job_status status, int status_code, char *reason);
 
 // API to be used by the web server(s)
-json_object *get_list_of_plugins_json();
-struct configurable_plugin *get_plugin_by_name(const char *name);
+json_object *get_list_of_plugins_json(DICTIONARY *plugins_dict);
+struct configurable_plugin *get_plugin_by_name(DICTIONARY *plugins_dict, const char *name);
 
 json_object *get_list_of_modules_json(struct configurable_plugin *plugin);
 struct module *get_module_by_name(struct configurable_plugin *plugin, const char *module_name);
@@ -137,11 +137,14 @@ struct uni_http_response {
     void (*content_free)(void *);
 };
 
-struct uni_http_response dyn_conf_process_http_request(int method, const char *plugin, const char *module, const char *job_id, void *payload, size_t payload_size);
+struct uni_http_response dyn_conf_process_http_request(DICTIONARY *plugins_dict, int method, const char *plugin, const char *module, const char *job_id, void *payload, size_t payload_size);
 
 // API to be used by main netdata process, initialization and destruction etc.
 int dyn_conf_init(void);
 void freez_dyncfg(void *ptr);
+
+void plugin_del_cb(const DICTIONARY_ITEM *item, void *value, void *data);
+
 void *dyncfg_main(void *in);
 
 #endif //DYN_CONF_H

@@ -2125,7 +2125,7 @@ static inline PARSER_RC pluginsd_register_plugin(char **words __maybe_unused, si
     cfg->get_config_schema_cb = get_plugin_config_schema_cb;
     cfg->cb_usr_ctx = parser;
 
-    parser->user.cd->cfg_dict_item = register_plugin(cfg);
+    parser->user.cd->cfg_dict_item = register_plugin(parser->user.host->configurable_plugins, cfg);
 
     if (unlikely(parser->user.cd->cfg_dict_item == NULL)) {
         freez(cfg->name);
@@ -2168,7 +2168,7 @@ static inline PARSER_RC pluginsd_register_module(char **words __maybe_unused, si
     mod->delete_job_cb = delete_job_cb;
     mod->job_config_cb_usr_ctx = parser;
 
-    register_module(plug_cfg, mod);
+    register_module(parser->user.host->configurable_plugins, plug_cfg, mod);
     return PARSER_RC_OK;
 }
 
@@ -2188,7 +2188,7 @@ static inline PARSER_RC pluginsd_job_status(char **words, size_t num_words, PARS
     if (num_words == 6)
         message = strdupz(words[5]);
 
-    report_job_status(parser->user.cd->configuration, words[1], words[2], job_status, state, message);
+    report_job_status(parser->user.host->configurable_plugins, parser->user.cd->configuration, words[1], words[2], job_status, state, message);
     return PARSER_RC_OK;
 }
 
@@ -2533,7 +2533,7 @@ void parser_destroy(PARSER *parser) {
         return;
 
     if (parser->user.cd != NULL && parser->user.cd->configuration != NULL) {
-        unregister_plugin(parser->user.cd->cfg_dict_item);
+        unregister_plugin(parser->user.host->configurable_plugins, parser->user.cd->cfg_dict_item);
         parser->user.cd->configuration = NULL;
     }
 

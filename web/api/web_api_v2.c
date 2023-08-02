@@ -709,7 +709,7 @@ static int web_client_api_request_v2_config(RRDHOST *host __maybe_unused, struct
             return HTTP_RESP_BAD_REQUEST;
     }
 
-    struct uni_http_response resp = dyn_conf_process_http_request(http_method, plugin, module, job_id, w->post_payload, w->post_payload_size);
+    struct uni_http_response resp = dyn_conf_process_http_request(host->configurable_plugins, http_method, plugin, module, job_id, w->post_payload, w->post_payload_size);
     if (resp.content[resp.content_length - 1] != '\0') {
         char *con = mallocz(resp.content_length + 1);
         memcpy(con, resp.content, resp.content_length);

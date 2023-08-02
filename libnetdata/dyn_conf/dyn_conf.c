@@ -11,9 +11,8 @@
 #define DYN_CONF_JOB_LIST "jobs"
 #define DYN_CONF_CFG_EXT ".cfg"
 
-DICTIONARY *plugins_dict = NULL;
-
 struct deferred_cfg_send {
+    DICTIONARY *plugins_dict;
     char *plugin_name;
     char *module_name;
     char *job_name;
@@ -33,7 +32,7 @@ static void deferred_config_free(struct deferred_cfg_send *dcs)
     freez(dcs);
 }
 
-static void deferred_config_push_back(const char *plugin_name, const char *module_name, const char *job_name)
+static void deferred_config_push_back(DICTIONARY *plugins_dict, const char *plugin_name, const char *module_name, const char *job_name)
 {
     struct deferred_cfg_send *deferred = callocz(1, sizeof(struct deferred_cfg_send));
     deferred->plugin_name = strdupz(plugin_name);
@@ -42,6 +41,7 @@ static void deferred_config_push_back(const char *plugin_name, const char *modul
         if (job_name != NULL)
             deferred->job_name = strdupz(job_name);
     }
+    deferred->plugins_dict = plugins_dict;
     pthread_mutex_lock(&deferred_configs_lock);
     if (dyncfg_shutdown) {
         pthread_mutex_unlock(&deferred_configs_lock);
@@ -95,7 +95,7 @@ static int _get_list_of_plugins_json_cb(const DICTIONARY_ITEM *item, void *entry
     return 0;
 }
 
-json_object *get_list_of_plugins_json()
+json_object *get_list_of_plugins_json(DICTIONARY *plugins_dict)
 {
     json_object *obj = json_object_new_array();
 
@@ -231,7 +231,7 @@ struct module *get_module_by_name(struct configurable_plugin *plugin, const char
     return dictionary_get(plugin->modules, module_name);
 }
 
-inline struct configurable_plugin *get_plugin_by_name(const char *name)
+inline struct configurable_plugin *get_plugin_by_name(DICTIONARY *plugins_dict, const char *name)
 {
     return dictionary_get(plugins_dict, name);
 }
@@ -396,9 +396,9 @@ void module_del_cb(const DICTIONARY_ITEM *item, void *value, void *data)
 }
 
 
-const DICTIONARY_ITEM *register_plugin(struct configurable_plugin *plugin)
+const DICTIONARY_ITEM *register_plugin(DICTIONARY *plugins_dict, struct configurable_plugin *plugin)
 {
-    if (get_plugin_by_name(plugin->name) != NULL) {
+    if (get_plugin_by_name(plugins_dict, plugin->name) != NULL) {
         error_report("DYNCFG plugin \"%s\" already registered", plugin->name);
         return NULL;
     }
@@ -413,7 +413,7 @@ const DICTIONARY_ITEM *register_plugin(struct configurable_plugin *plugin)
     plugin->modules = dictionary_create(DICT_OPTION_VALUE_LINK_DONT_CLONE);
     dictionary_register_delete_callback(plugin->modules, module_del_cb, NULL);
 
-    deferred_config_push_back(plugin->name, NULL, NULL);
+    deferred_config_push_back(plugins_dict, plugin->name, NULL, NULL);
 
     dictionary_set(plugins_dict, plugin->name, plugin, sizeof(plugin));
 
@@ -421,7 +421,7 @@ const DICTIONARY_ITEM *register_plugin(struct configurable_plugin *plugin)
     return dictionary_get_and_acquire_item(plugins_dict, plugin->name);
 }
 
-void unregister_plugin(const DICTIONARY_ITEM *plugin)
+void unregister_plugin(DICTIONARY *plugins_dict, const DICTIONARY_ITEM *plugin)
 {
     struct configurable_plugin *plug = dictionary_acquired_item_value(plugin);
     dictionary_acquired_item_release(plugins_dict, plugin);
@@ -438,7 +438,7 @@ void job_del_cb(const DICTIONARY_ITEM *item, void *value, void *data)
     freez(job);
 }
 
-int register_module(struct configurable_plugin *plugin, struct module *module)
+int register_module(DICTIONARY *plugins_dict, struct configurable_plugin *plugin, struct module *module)
 {
     if (get_module_by_name(plugin, module->name) != NULL) {
         error_report("DYNCFG module \"%s\" already registered", module->name);
@@ -447,7 +447,7 @@ int register_module(struct configurable_plugin *plugin, struct module *module)
 
     pthread_mutex_init(&module->lock, NULL);
 
-    deferred_config_push_back(plugin->name, module->name, NULL);
+    deferred_config_push_back(plugins_dict, plugin->name, module->name, NULL);
 
     module->plugin = plugin;
 
@@ -478,7 +478,7 @@ int register_module(struct configurable_plugin *plugin, struct module *module)
                 job->module = module;
                 dictionary_set(module->jobs, job->name, job, sizeof(job));
 
-                deferred_config_push_back(plugin->name, module->name, job->name);
+                deferred_config_push_back(plugins_dict, plugin->name, module->name, job->name);
             }
             closedir(dir);
         }
@@ -494,7 +494,7 @@ void freez_dyncfg(void *ptr) {
     freez(ptr);
 }
 
-static void handle_dyncfg_root(struct uni_http_response *resp, int method)
+static void handle_dyncfg_root(DICTIONARY *plugins_dict, struct uni_http_response *resp, int method)
 {
     if (method != HTTP_METHOD_GET) {
         resp->content = "method not allowed";
@@ -502,7 +502,7 @@ static void handle_dyncfg_root(struct uni_http_response *resp, int method)
         resp->status = HTTP_RESP_METHOD_NOT_ALLOWED;
         return;
     }
-    json_object *obj = get_list_of_plugins_json();
+    json_object *obj = get_list_of_plugins_json(plugins_dict);
     json_object *wrapper = json_object_new_object();
     json_object_object_add(wrapper, "configurable_plugins", obj);
     resp->content = strdupz(json_object_to_json_string_ext(wrapper, JSON_C_TO_STRING_PRETTY));
@@ -776,7 +776,7 @@ void handle_job_root(struct uni_http_response *resp, int method, struct module *
     dictionary_acquired_item_release(mod->jobs, job_item);
 }
 
-struct uni_http_response dyn_conf_process_http_request(int method, const char *plugin, const char *module, const char *job_id, void *post_payload, size_t post_payload_size)
+struct uni_http_response dyn_conf_process_http_request(DICTIONARY *plugins_dict, int method, const char *plugin, const char *module, const char *job_id, void *post_payload, size_t post_payload_size)
 {
     struct uni_http_response resp = {
         .status = HTTP_RESP_INTERNAL_SERVER_ERROR,
@@ -786,7 +786,7 @@ struct uni_http_response dyn_conf_process_http_request(int method, const char *p
         .content_length = 0
     };
     if (plugin == NULL) {
-        handle_dyncfg_root(&resp, method);
+        handle_dyncfg_root(plugins_dict, &resp, method);
         return resp;
     }
     const DICTIONARY_ITEM *plugin_item = dictionary_get_and_acquire_item(plugins_dict, plugin);
@@ -836,7 +836,7 @@ void plugin_del_cb(const DICTIONARY_ITEM *item, void *value, void *data)
     freez(plugin);
 }
 
-void report_job_status(struct configurable_plugin *plugin, const char *module_name, const char *job_name, enum job_status status, int status_code, char *reason)
+void report_job_status(DICTIONARY *plugins_dict, struct configurable_plugin *plugin, const char *module_name, const char *job_name, enum job_status status, int status_code, char *reason)
 {
     struct job *job = NULL;
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(plugins_dict, plugin->name);
@@ -886,9 +886,6 @@ int dyn_conf_init(void)
         }
     }
 
-    plugins_dict = dictionary_create(DICT_OPTION_VALUE_LINK_DONT_CLONE);
-    dictionary_register_delete_callback(plugins_dict, plugin_del_cb, NULL);
-
     return 0;
 }
 
@@ -916,6 +913,15 @@ void *dyncfg_main(void *ptr)
 
     while (!netdata_exit) {
         struct deferred_cfg_send *dcs = deferred_config_pop(ptr);
+        DICTIONARY *plugins_dict = dcs->plugins_dict;
+#ifdef NETDATA_INTERNAL_CHECKS
+        if (plugins_dict == NULL) {
+            fatal("DYNCFG, plugins_dict is NULL");
+            deferred_config_free(dcs);
+            continue;
+        }
+#endif
+
         const DICTIONARY_ITEM *plugin_item = dictionary_get_and_acquire_item(plugins_dict, dcs->plugin_name);
         if (plugin_item == NULL) {
             error_report("DYNCFG, plugin %s not found", dcs->plugin_name);
