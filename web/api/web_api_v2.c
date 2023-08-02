@@ -669,6 +669,18 @@ static int web_client_api_request_v2_config(RRDHOST *host __maybe_unused, struct
     char *url_full = url;
 
     buffer_flush(w->response.data);
+
+    if (strncmp(url, "/host/", strlen("/host/")) == 0) {
+        url += strlen("/host/");
+        char *host_id_end = strchr(url, '/');
+        if (host_id_end == NULL) {
+            buffer_sprintf(w->response.data, "Invalid URL");
+            freez(url_full);
+            return HTTP_RESP_BAD_REQUEST;
+        }
+        url += host_id_end - url;
+    }
+
     if (strncmp(url, CONFIG_API_V2_URL, strlen(CONFIG_API_V2_URL)) != 0) {
         buffer_sprintf(w->response.data, "Invalid URL");
         freez(url_full);
