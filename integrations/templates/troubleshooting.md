@@ -1,5 +1,5 @@
 [% if entry.integration_type == 'collector' %]
-[% if entry.plugin_name == 'go.d.plugin' %]
+[% if entry.meta.plugin_name == 'go.d.plugin' %]
 ## Troubleshooting
 
 ### Debug Mode
@@ -26,7 +26,7 @@ should give you clues as to why the collector isn't working.
   ./go.d.plugin -d -m [[ entry.module_name ]]
   ```
 
-[% elif entry.plugin_name == 'python.d.plugin' %]
+[% elif entry.meta.plugin_name == 'python.d.plugin' %]
 ## Troubleshooting
 
 ### Debug Mode
@@ -53,7 +53,7 @@ should give you clues as to why the collector isn't working.
   ./python.d.plugin [[ entry.module_name ]] debug trace
   ```
 
-[% elif entry.plugin_name == 'charts.d.plugin' %]
+[% elif entry.meta.plugin_name == 'charts.d.plugin' %]
 ## Troubleshooting
 
 ### Debug Mode
