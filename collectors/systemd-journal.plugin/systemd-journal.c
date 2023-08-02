@@ -528,7 +528,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // debug
 
     if(argc == 2 && strcmp(argv[1], "debug") == 0) {
-        char buf[] = "systemd-journal after:-86400 before:0 last:50 query:fprintd";
+        char buf[] = "systemd-journal after:1690887452 before:1690973852 CZoAVzB6joqGAF2sog:A9CjdwALhHZcAAEDAv";
         function_systemd_journal("123", buf, "", 0, 30);
         exit(1);
     }

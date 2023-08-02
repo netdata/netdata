@@ -587,10 +587,9 @@ void facets_row_finished(FACETS *facets, usec_t usec) {
         internal_fatal(k->key_values_selected_in_row > 1, "key values are selected in row more than once");
 
         k->key_found_in_row = 1;
-        k->key_values_selected_in_row = k->key_values_selected_in_row == 0 ? 0 : 1;
 
         total_keys += k->key_found_in_row;
-        selected_by += k->key_values_selected_in_row;
+        selected_by += (k->key_values_selected_in_row) ? 1 : 0;
     }
     dfe_done(k);
 
@@ -600,16 +599,8 @@ void facets_row_finished(FACETS *facets, usec_t usec) {
         dfe_start_read(facets->keys, k){
             uint32_t counted_by = selected_by;
 
-            if (counted_by != total_keys) {
-                counted_by = 0;
-
-                FACET_KEY *m;
-                dfe_start_read(facets->keys, m) {
-                    if(k == m || m->key_values_selected_in_row)
-                        counted_by++;
-                }
-                dfe_done(m);
-            }
+            if (counted_by != total_keys && !k->key_values_selected_in_row)
+                counted_by++;
 
             if(counted_by == total_keys) {
                 if(k->values) {
