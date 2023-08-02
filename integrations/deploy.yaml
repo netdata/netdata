@@ -301,12 +301,12 @@
                   - /sys:/host/sys:ro
                   - /etc/os-release:/host/etc/os-release:ro
                   - /var/run/docker.sock:/var/run/docker.sock:ro
-                {% if $showClaimingOptions %}
+            {% if $showClaimingOptions %}
                 environment:
                   - NETDATA_CLAIM_TOKEN={% claim_token %}
                   - NETDATA_CLAIM_URL={% claim_url %}
                   - NETDATA_CLAIM_ROOMS={% $claim_rooms %}
-                {% /if %}
+            {% /if %}
             volumes:
               netdataconfig:
               netdatalib:
@@ -336,12 +336,12 @@
                   - /sys:/host/sys:ro
                   - /etc/os-release:/host/etc/os-release:ro
                   - /var/run/docker.sock:/var/run/docker.sock:ro
-                {% if $showClaimingOptions %}
+            {% if $showClaimingOptions %}
                 environment:
                   - NETDATA_CLAIM_TOKEN={% claim_token %}
                   - NETDATA_CLAIM_URL={% claim_url %}
                   - NETDATA_CLAIM_ROOMS={% $claim_rooms %}
-                {% /if %}
+            {% /if %}
             volumes:
               netdataconfig:
               netdatalib:
