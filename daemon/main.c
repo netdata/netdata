@@ -1672,6 +1672,13 @@ int main(int argc, char **argv) {
                             return pluginsd_parser_unittest();
                         }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
+#ifdef ENABLE_DBENGINE
+                            dbengine_config_t cfg = dbengine_default_config();
+                            cfg.storage_tiers = 1;
+                            rrdb.dbengine_cfg = cfg;
+                            dbengine_init("foo", rrdb.dbengine_cfg);
+#endif
+
                             optarg += strlen(createdataset_string);
                             unsigned history_seconds = strtoul(optarg, NULL, 0);
                             post_conf_load(&user);
