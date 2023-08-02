@@ -5,6 +5,6 @@
     "./integrations/schemas/notification.json": "/health/notifications/*/metadata.yaml",
     "./integrations/schemas/categories.json": "/integrations/categories.yaml",
     "./integrations/schemas/deploy.json": "/integrations/deploy.yaml",
-    "./integrations/schemas/distros.json": "/.github/data/distros.yml",
+    "./integrations/schemas/distros.json": "/.github/data/distros.yml"
   }
 }
