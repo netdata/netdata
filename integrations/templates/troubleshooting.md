@@ -4,7 +4,7 @@
 
 ### Debug Mode
 
-To troubleshoot issues with the `[[ entry.module_name ]]` collector, run the `go.d.plugin` with the debug option enabled. The output
+To troubleshoot issues with the `[[ entry.meta.module_name ]]` collector, run the `go.d.plugin` with the debug option enabled. The output
 should give you clues as to why the collector isn't working.
 
 - Navigate to the `plugins.d` directory, usually at `/usr/libexec/netdata/plugins.d/`. If that's not the case on
@@ -23,7 +23,7 @@ should give you clues as to why the collector isn't working.
 - Run the `go.d.plugin` to debug the collector:
 
   ```bash
-  ./go.d.plugin -d -m [[ entry.module_name ]]
+  ./go.d.plugin -d -m [[ entry.meta.module_name ]]
   ```
 
 [% elif entry.meta.plugin_name == 'python.d.plugin' %]
@@ -31,7 +31,7 @@ should give you clues as to why the collector isn't working.
 
 ### Debug Mode
 
-To troubleshoot issues with the `[[ entry.module_name ]]` collector, run the `python.d.plugin` with the debug option enabled. The output
+To troubleshoot issues with the `[[ entry.meta.module_name ]]` collector, run the `python.d.plugin` with the debug option enabled. The output
 should give you clues as to why the collector isn't working.
 
 - Navigate to the `plugins.d` directory, usually at `/usr/libexec/netdata/plugins.d/`. If that's not the case on
@@ -50,7 +50,7 @@ should give you clues as to why the collector isn't working.
 - Run the `python.d.plugin` to debug the collector:
 
   ```bash
-  ./python.d.plugin [[ entry.module_name ]] debug trace
+  ./python.d.plugin [[ entry.meta.module_name ]] debug trace
   ```
 
 [% elif entry.meta.plugin_name == 'charts.d.plugin' %]
@@ -58,7 +58,7 @@ should give you clues as to why the collector isn't working.
 
 ### Debug Mode
 
-To troubleshoot issues with the `[[ entry.module_name ]]` collector, run the `charts.d.plugin` with the debug option enabled. The output
+To troubleshoot issues with the `[[ entry.meta.module_name ]]` collector, run the `charts.d.plugin` with the debug option enabled. The output
 should give you clues as to why the collector isn't working.
 
 - Navigate to the `plugins.d` directory, usually at `/usr/libexec/netdata/plugins.d/`. If that's not the case on
@@ -77,7 +77,7 @@ should give you clues as to why the collector isn't working.
 - Run the `charts.d.plugin` to debug the collector:
 
   ```bash
-  ./charts.d.plugin debug 1 [[ entry.module_name ]]
+  ./charts.d.plugin debug 1 [[ entry.meta.module_name ]]
   ```
 
 [% else %]
@@ -114,12 +114,11 @@ export NETDATA_ALARM_NOTIFY_DEBUG=1
 ```
 
 Note that this will test _all_ alert mechanisms for the selected role.
-
+[% endif %]
 [% elif entry.integration_type == 'exporter' %]
 [% if entry.troubleshooting.problems.list %]
 ## Troubleshooting
 
-[% endif %]
 [% endif %]
 [% for item in entry.troubleshooting.problems.list %]
 ### [[ item.name ]]
