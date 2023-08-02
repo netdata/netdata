@@ -439,90 +439,6 @@ static inline void clean_internal_socket_plot(netdata_socket_plot_t *ptr)
 }
 
 /**
- * Clean socket plot
- *
- * Clean the allocated data for inbound and outbound vectors.
-static void clean_allocated_socket_plot()
-{
-    if (!network_viewer_opt.enabled)
-        return;
-
-    uint32_t i;
-    uint32_t end = inbound_vectors.last;
-    netdata_socket_plot_t *plot = inbound_vectors.plot;
-    for (i = 0; i < end; i++) {
-        clean_internal_socket_plot(&plot[i]);
-    }
-
-    clean_internal_socket_plot(&plot[inbound_vectors.last]);
-
-    end = outbound_vectors.last;
-    plot = outbound_vectors.plot;
-    for (i = 0; i < end; i++) {
-        clean_internal_socket_plot(&plot[i]);
-    }
-    clean_internal_socket_plot(&plot[outbound_vectors.last]);
-}
- */
-
-/**
- * Clean network ports allocated during initialization.
- *
- * @param ptr a pointer to the link list.
-static void clean_network_ports(ebpf_network_viewer_port_list_t *ptr)
-{
-    if (unlikely(!ptr))
-        return;
-
-    while (ptr) {
-        ebpf_network_viewer_port_list_t *next = ptr->next;
-        freez(ptr->value);
-        freez(ptr);
-        ptr = next;
-    }
-}
- */
-
-/**
- * Clean service names
- *
- * Clean the allocated link list that stores names.
- *
- * @param names the link list.
-static void clean_service_names(ebpf_network_viewer_dim_name_t *names)
-{
-    if (unlikely(!names))
-        return;
-
-    while (names) {
-        ebpf_network_viewer_dim_name_t *next = names->next;
-        freez(names->name);
-        freez(names);
-        names = next;
-    }
-}
- */
-
-/**
- * Clean hostnames
- *
- * @param hostnames the hostnames to clean
-static void clean_hostnames(ebpf_network_viewer_hostname_list_t *hostnames)
-{
-    if (unlikely(!hostnames))
-        return;
-
-    while (hostnames) {
-        ebpf_network_viewer_hostname_list_t *next = hostnames->next;
-        freez(hostnames->value);
-        simple_pattern_free(hostnames->value_pattern);
-        freez(hostnames);
-        hostnames = next;
-    }
-}
- */
-
-/**
  * Clean port Structure
  *
  * Clean the allocated list.
@@ -571,26 +487,6 @@ static void clean_ip_structure(ebpf_network_viewer_ip_list_t **clean)
  */
 static void ebpf_socket_free(ebpf_module_t *em )
 {
-    /* We can have thousands of sockets to clean, so we are transferring
-     * for OS the responsibility while we do not use ARAL here
-    freez(socket_hash_values);
-
-    freez(bandwidth_vector);
-
-    freez(socket_values);
-    clean_allocated_socket_plot();
-    freez(inbound_vectors.plot);
-    freez(outbound_vectors.plot);
-
-    clean_port_structure(&listen_ports);
-
-    clean_network_ports(network_viewer_opt.included_port);
-    clean_network_ports(network_viewer_opt.excluded_port);
-    clean_service_names(network_viewer_opt.names);
-    clean_hostnames(network_viewer_opt.included_hostnames);
-    clean_hostnames(network_viewer_opt.excluded_hostnames);
-     */
-
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     ebpf_update_stats(&plugin_statistics, em);
