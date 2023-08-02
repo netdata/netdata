@@ -372,10 +372,12 @@
                   - /sys:/host/sys:ro
                   - /etc/os-release:/host/etc/os-release:ro
                   - /etc/hostname:/etc/hostname:ro
+            {% if $showClaimingOptions %}
                 environment:
                   - NETDATA_CLAIM_TOKEN={% claim_token %}
                   - NETDATA_CLAIM_URL={% claim_url %}
                   - NETDATA_CLAIM_ROOMS={% $claim_rooms %}
+            {% /if %}
                 deploy:
                   mode: global
             volumes:
@@ -406,10 +408,12 @@
                   - /sys:/host/sys:ro
                   - /etc/os-release:/host/etc/os-release:ro
                   - /etc/hostname:/etc/hostname:ro
+            {% if $showClaimingOptions %}
                 environment:
                   - NETDATA_CLAIM_TOKEN={% claim_token %}
                   - NETDATA_CLAIM_URL={% claim_url %}
                   - NETDATA_CLAIM_ROOMS={% $claim_rooms %}
+            {% /if %}
                 deploy:
                   mode: global
             volumes:
