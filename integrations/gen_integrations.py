@@ -253,6 +253,13 @@ def load_collectors():
             item['_src_path'] = path
             item['_repo'] = repo
             item['_index'] = idx
+
+            if 'id' not in item['meta'].keys():
+                item['id'] = make_id(item['meta'])
+                warn(f'Needed to generate id for item found at { item["_src_path"] } index { item["_index"] }.', item['_src_path'])
+            else:
+                item['id'] = item['meta']['id']
+
             ret.append(item)
 
     return ret
@@ -431,11 +438,6 @@ def render_collectors(categories, collectors, ids):
     debug('Computing default categories.')
 
     default_cats, valid_cats = get_category_sets(categories)
-
-    debug('Generating collector IDs.')
-
-    for item in collectors:
-        item['id'] = make_id(item['meta'])
 
     debug('Sorting collectors.')
 

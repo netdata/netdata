@@ -1,6 +1,7 @@
 plugin_name: timex.plugin
 modules:
   - meta:
+      id: collector-timex.plugin
       plugin_name: timex.plugin
       module_name: timex.plugin
       monitored_instance:

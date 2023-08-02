@@ -1,6 +1,7 @@
 plugin_name: ebpf.plugin
 modules:
   - meta:
+      id: collector-ebpf.plugin-filedescriptor
       plugin_name: ebpf.plugin
       module_name: filedescriptor
       monitored_instance:
@@ -225,6 +226,7 @@ modules:
               dimensions:
                 - name: calls
   - meta:
+      id: collector-ebpf.plugin-processes
       plugin_name: ebpf.plugin
       module_name: processes
       monitored_instance:
@@ -480,6 +482,7 @@ modules:
               dimensions:
                 - name: a dimension per systemd service
   - meta:
+      id: collector-ebpf.plugin-disk
       plugin_name: ebpf.plugin
       module_name: disk
       monitored_instance:
@@ -588,6 +591,7 @@ modules:
               dimensions:
                 - name: latency
   - meta:
+      id: collector-ebpf.plugin-hardirq
       plugin_name: ebpf.plugin
       module_name: hardirq
       monitored_instance:
@@ -694,6 +698,7 @@ modules:
               dimensions:
                 - name: hardirq names
   - meta:
+      id: collector-ebpf.plugin-cachestat
       plugin_name: ebpf.plugin
       module_name: cachestat
       monitored_instance:
@@ -926,6 +931,7 @@ modules:
               dimensions:
                 - name: a dimension per systemd service
   - meta:
+      id: collector-ebpf.plugin-sync
       plugin_name: ebpf.plugin
       module_name: sync
       monitored_instance:
@@ -1108,6 +1114,7 @@ modules:
               dimensions:
                 - name: sync_file_range
   - meta:
+      id: collector-ebpf.plugin-mdflush
       plugin_name: ebpf.plugin
       module_name: mdflush
       monitored_instance:
@@ -1212,6 +1219,7 @@ modules:
               dimensions:
                 - name: disk
   - meta:
+      id: collector-ebpf.plugin-swap
       plugin_name: ebpf.plugin
       module_name: swap
       monitored_instance:
@@ -1392,6 +1400,7 @@ modules:
                 - name: write
                 - name: read
   - meta:
+      id: collector-ebpf.plugin-oomkill
       plugin_name: ebpf.plugin
       module_name: oomkill
       monitored_instance:
@@ -1520,6 +1529,7 @@ modules:
               dimensions:
                 - name: kills
   - meta:
+      id: collector-ebpf.plugin-socket
       plugin_name: ebpf.plugin
       module_name: socket
       monitored_instance:
@@ -1888,6 +1898,7 @@ modules:
               dimensions:
                 - name: a dimension per systemd service
   - meta:
+      id: collector-ebpf.plugin-dcstat
       plugin_name: ebpf.plugin
       module_name: dcstat
       monitored_instance:
@@ -2110,6 +2121,7 @@ modules:
               dimensions:
                 - name: a dimension per systemd service
   - meta:
+      id: collector-ebpf.plugin-filesystem
       plugin_name: ebpf.plugin
       module_name: filesystem
       monitored_instance:
@@ -2272,6 +2284,7 @@ modules:
               dimensions:
                 - name: latency period
   - meta:
+      id: collector-ebpf.plugin-shm
       plugin_name: ebpf.plugin
       module_name: shm
       monitored_instance:
@@ -2508,6 +2521,7 @@ modules:
                 - name: dt
                 - name: ctl
   - meta:
+      id: collector-ebpf.plugin-softirq
       plugin_name: ebpf.plugin
       module_name: softirq
       monitored_instance:
@@ -2614,6 +2628,7 @@ modules:
               dimensions:
                 - name: soft IRQs
   - meta:
+      id: collector-ebpf.plugin-mount
       plugin_name: ebpf.plugin
       module_name: mount
       monitored_instance:
@@ -2738,6 +2753,7 @@ modules:
                 - name: mount
                 - name: umount
   - meta:
+      id: collector-ebpf.plugin-vfs
       plugin_name: ebpf.plugin
       module_name: vfs
       monitored_instance:
@@ -3173,6 +3189,7 @@ modules:
               dimensions:
                 - name: calls
   - meta:
+      id: collector-ebpf.plugin-process
       plugin_name: ebpf.plugin
       module_name: process
       monitored_instance:

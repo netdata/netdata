@@ -1,6 +1,7 @@
 plugin_name: ioping.plugin
 modules:
   - meta:
+      id: collector-ioping.plugin
       plugin_name: ioping.plugin
       module_name: ioping.plugin
       monitored_instance:

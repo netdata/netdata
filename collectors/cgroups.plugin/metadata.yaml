@@ -2,6 +2,7 @@ plugin_name: cgroups.plugin
 modules:
   - &module
     meta: &meta
+      id: collector-cgroups.plugin-cgroup
       plugin_name: cgroups.plugin
       module_name: /sys/fs/cgroup
       monitored_instance:
@@ -409,6 +410,7 @@ modules:
   - <<: *module
     meta:
       <<: *meta
+      id: collector-cgroups.plugin-k8s
       monitored_instance:
         name: Kubernetes Containers
         link: https://kubernetes.io/
@@ -807,6 +809,7 @@ modules:
   - <<: *module
     meta:
       <<: *meta
+      id: collector-cgroups.plugin-systemd
       monitored_instance:
         name: Systemd Services
         link: ""
@@ -936,6 +939,7 @@ modules:
   - <<: *module
     meta:
       <<: *meta
+      id: collector-cgroups.plugin-vms
       monitored_instance:
         name: Virtual Machines
         link: ""
@@ -954,6 +958,7 @@ modules:
   - <<: *module
     meta:
       <<: *meta
+      id: collector-cgroups.plugin-lxc
       monitored_instance:
         name: LXC Containers
         link: ""
@@ -972,6 +977,7 @@ modules:
   - <<: *module
     meta:
       <<: *meta
+      id: collector-cgroups.plugin-libvirt
       monitored_instance:
         name: Libvirt Containers
         link: ""
@@ -989,6 +995,7 @@ modules:
   - <<: *module
     meta:
       <<: *meta
+      id: collector-cgroups.plugin-ovirt
       monitored_instance:
         name: oVirt Containers
         link: ""
@@ -1006,6 +1013,7 @@ modules:
   - <<: *module
     meta:
       <<: *meta
+      id: collector-cgroups.plugin-proxmox
       monitored_instance:
         name: Proxmox Containers
         link: ""

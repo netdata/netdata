@@ -1,6 +1,7 @@
 plugin_name: idlejitter.plugin
 modules:
   - meta:
+      id: collector-idlejitter.plugin
       plugin_name: idlejitter.plugin
       module_name: idlejitter.plugin
       monitored_instance:

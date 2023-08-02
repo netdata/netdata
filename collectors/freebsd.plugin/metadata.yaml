@@ -1,6 +1,7 @@
 plugin_name: freebsd.plugin
 modules:
   - meta:
+      id: collector-freebsd.plugin-vm.loadavg
       plugin_name: freebsd.plugin
       module_name: vm.loadavg
       monitored_instance:
@@ -100,6 +101,7 @@ modules:
                 - name: load5
                 - name: load15
   - meta:
+      id: collector-freebsd.plugin-vm.vmtotal
       plugin_name: freebsd.plugin
       module_name: vm.vmtotal
       monitored_instance:
@@ -202,6 +204,7 @@ modules:
               dimensions:
                 - name: used
   - meta:
+      id: collector-freebsd.plugin-kern.cp_time
       plugin_name: freebsd.plugin
       module_name: kern.cp_time
       monitored_instance:
@@ -316,6 +319,7 @@ modules:
                 - name: interrupt
                 - name: idle
   - meta:
+      id: collector-freebsd.plugin-dev.cpu.temperature
       plugin_name: freebsd.plugin
       module_name: dev.cpu.temperature
       monitored_instance:
@@ -393,6 +397,7 @@ modules:
               dimensions:
                 - name: a dimension per core
   - meta:
+      id: collector-freebsd.plugin-dev.cpu.freq
       plugin_name: freebsd.plugin
       module_name: dev.cpu.0.freq
       monitored_instance:
@@ -470,6 +475,7 @@ modules:
               dimensions:
                 - name: frequency
   - meta:
+      id: collector-freebsd.plugin-hw.intrcnt
       plugin_name: freebsd.plugin
       module_name: hw.intrcnt
       monitored_instance:
@@ -553,6 +559,7 @@ modules:
               dimensions:
                 - name: a dimension per interrupt
   - meta:
+      id: collector-freebsd.plugin-vm.stats.sys.v_intr
       plugin_name: freebsd.plugin
       module_name: vm.stats.sys.v_intr
       monitored_instance:
@@ -630,6 +637,7 @@ modules:
               dimensions:
                 - name: interrupts
   - meta:
+      id: collector-freebsd.plugin-vm.stats.sys.v_soft
       plugin_name: freebsd.plugin
       module_name: vm.stats.sys.v_soft
       monitored_instance:
@@ -707,6 +715,7 @@ modules:
               dimensions:
                 - name: interrupts
   - meta:
+      id: collector-freebsd.plugin-vm.stats.sys.v_swtch
       plugin_name: freebsd.plugin
       module_name: vm.stats.sys.v_swtch
       monitored_instance:
@@ -790,6 +799,7 @@ modules:
               dimensions:
                 - name: started
   - meta:
+      id: collector-freebsd.plugin-vm.swap_info
       plugin_name: freebsd.plugin
       module_name: vm.swap_info
       monitored_instance:
@@ -873,6 +883,7 @@ modules:
                 - name: free
                 - name: used
   - meta:
+      id: collector-freebsd.plugin-system.ram
       plugin_name: freebsd.plugin
       module_name: system.ram
       monitored_instance:
@@ -982,6 +993,7 @@ modules:
               dimensions:
                 - name: avail
   - meta:
+      id: collector-freebsd.plugin-vm.stats.vm.v_swappgs
       plugin_name: freebsd.plugin
       module_name: vm.stats.vm.v_swappgs
       monitored_instance:
@@ -1065,6 +1077,7 @@ modules:
                 - name: io
                 - name: out
   - meta:
+      id: collector-freebsd.plugin-vm.stats.vm.v_pgfaults
       plugin_name: freebsd.plugin
       module_name: vm.stats.vm.v_pgfaults
       monitored_instance:
@@ -1146,6 +1159,7 @@ modules:
                 - name: cow_optimized
                 - name: in_transit
   - meta:
+      id: collector-freebsd.plugin-kern.ipc.sem
       plugin_name: freebsd.plugin
       module_name: kern.ipc.sem
       monitored_instance:
@@ -1239,6 +1253,7 @@ modules:
               dimensions:
                 - name: arrays
   - meta:
+      id: collector-freebsd.plugin-kern.ipc.shm
       plugin_name: freebsd.plugin
       module_name: kern.ipc.shm
       monitored_instance:
@@ -1322,6 +1337,7 @@ modules:
               dimensions:
                 - name: allocated
   - meta:
+      id: collector-freebsd.plugin-kern.ipc.msq
       plugin_name: freebsd.plugin
       module_name: kern.ipc.msq
       monitored_instance:
@@ -1412,6 +1428,7 @@ modules:
                 - name: allocated
                 - name: used
   - meta:
+      id: collector-freebsd.plugin-uptime
       plugin_name: freebsd.plugin
       module_name: uptime
       monitored_instance:
@@ -1489,6 +1506,7 @@ modules:
               dimensions:
                 - name: uptime
   - meta:
+      id: collector-freebsd.plugin-net.isr
       plugin_name: freebsd.plugin
       module_name: net.isr
       monitored_instance:
@@ -1603,6 +1621,7 @@ modules:
                 - name: qdrops
                 - name: queued
   - meta:
+      id: collector-freebsd.plugin-devstat
       plugin_name: freebsd.plugin
       module_name: devstat
       monitored_instance:
@@ -1795,6 +1814,7 @@ modules:
               dimensions:
                 - name: svctm
   - meta:
+      id: collector-freebsd.plugin-net.inet.tcp.states
       plugin_name: freebsd.plugin
       module_name: net.inet.tcp.states
       monitored_instance:
@@ -1877,6 +1897,7 @@ modules:
               dimensions:
                 - name: connections
   - meta:
+      id: collector-freebsd.plugin-net.inet.tcp.stats
       plugin_name: freebsd.plugin
       module_name: net.inet.tcp.stats
       monitored_instance:
@@ -2064,6 +2085,7 @@ modules:
                 - name: OutECT0Pkts
                 - name: OutECT1Pkts
   - meta:
+      id: collector-freebsd.plugin-net.inet.udp.stats
       plugin_name: freebsd.plugin
       module_name: net.inet.udp.stats
       monitored_instance:
@@ -2166,6 +2188,7 @@ modules:
                 - name: InCsumErrors
                 - name: IgnoredMulti
   - meta:
+      id: collector-freebsd.plugin-net.inet.icmp.stats
       plugin_name: freebsd.plugin
       module_name: net.inet.icmp.stats
       monitored_instance:
@@ -2269,6 +2292,7 @@ modules:
                 - name: InEchos
                 - name: OutEchos
   - meta:
+      id: collector-freebsd.plugin-net.inet.ip.stats
       plugin_name: freebsd.plugin
       module_name: net.inet.ip.stats
       monitored_instance:
@@ -2388,6 +2412,7 @@ modules:
                 - name: InAddrErrors
                 - name: InUnknownProtos
   - meta:
+      id: collector-freebsd.plugin-net.inet.ip6.stats
       plugin_name: freebsd.plugin
       module_name: net.inet6.ip6.stats
       monitored_instance:
@@ -2509,6 +2534,7 @@ modules:
                 - name: InNoRoutes
                 - name: OutNoRoutes
   - meta:
+      id: collector-freebsd.plugin-net.inet.icmp6.stats
       plugin_name: freebsd.plugin
       module_name: net.inet6.icmp6.stats
       monitored_instance:
@@ -2675,6 +2701,7 @@ modules:
                 - name: OutType135
                 - name: OutType143
   - meta:
+      id: collector-freebsd.plugin-ipfw
       plugin_name: freebsd.plugin
       module_name: ipfw
       monitored_instance:
@@ -2785,6 +2812,7 @@ modules:
               dimensions:
                 - name: a dimension per dynamic rule
   - meta:
+      id: collector-freebsd.plugin-getifaddrs
       plugin_name: freebsd.plugin
       module_name: getifaddrs
       monitored_instance:
@@ -3005,6 +3033,7 @@ modules:
               dimensions:
                 - name: collisions
   - meta:
+      id: collector-freebsd.plugin-getmntinfo
       plugin_name: freebsd.plugin
       module_name: getmntinfo
       monitored_instance:
@@ -3118,6 +3147,7 @@ modules:
                 - name: used
                 - name: reserved_for_root
   - meta:
+      id: collector-freebsd.plugin-zfs
       plugin_name: freebsd.plugin
       module_name: zfs
       monitored_instance:

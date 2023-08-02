@@ -1,6 +1,7 @@
 plugin_name: slabinfo.plugin
 modules:
   - meta:
+      id: collector-slabinfo.plugin
       plugin_name: slabinfo.plugin
       module_name: slabinfo.plugin
       monitored_instance:

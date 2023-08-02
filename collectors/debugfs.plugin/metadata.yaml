@@ -1,6 +1,7 @@
 plugin_name: debugfs.plugin
 modules:
   - meta:
+      id: collector-debugfs.plugin-extfrag
       plugin_name: debugfs.plugin
       module_name: /sys/kernel/debug/extfrag
       monitored_instance:
@@ -143,6 +144,7 @@ modules:
                 - name: order9
                 - name: order10
   - meta:
+      id: collector-debugfs.plugin-zswap
       plugin_name: debugfs.plugin
       module_name: /sys/kernel/debug/zswap
       monitored_instance:
@@ -288,6 +290,7 @@ modules:
               dimensions:
                 - name: duplicate
   - meta:
+      id: collector-debugfs.plugin-powercap
       plugin_name: debugfs.plugin
       module_name: intel_rapl
       monitored_instance:

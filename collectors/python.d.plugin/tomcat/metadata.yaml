@@ -1,6 +1,7 @@
 plugin_name: python.d.plugin
 modules:
   - meta:
+      id: collector-python.d.plugin-tomcat
       plugin_name: python.d.plugin
       module_name: tomcat
       monitored_instance:

@@ -1,6 +1,7 @@
 plugin_name: python.d.plugin
 modules:
   - meta:
+      id: collector-python.d.plugin-riakkv
       plugin_name: python.d.plugin
       module_name: riakkv
       monitored_instance:

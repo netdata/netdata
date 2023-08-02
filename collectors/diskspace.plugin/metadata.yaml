@@ -1,6 +1,7 @@
 plugin_name: diskspace.plugin
 modules:
   - meta:
+      id: collector-diskspace.plugin
       plugin_name: diskspace.plugin
       module_name: diskspace.plugin
       monitored_instance:

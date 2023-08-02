@@ -2,6 +2,7 @@ plugin_name: apps.plugin
 modules:
   # removed system.processes_state
   - meta:
+      id: collector-apps.plugin-apps
       plugin_name: apps.plugin
       module_name: apps
       monitored_instance:
@@ -185,6 +186,7 @@ modules:
                 - name: avg
                 - name: max
   - meta:
+      id: collector-apps.plugin-groups
       plugin_name: apps.plugin
       module_name: groups
       monitored_instance:
@@ -370,6 +372,7 @@ modules:
                 - name: avg
                 - name: max
   - meta:
+      id: collector-apps.plugin-users
       plugin_name: apps.plugin
       module_name: users
       monitored_instance:

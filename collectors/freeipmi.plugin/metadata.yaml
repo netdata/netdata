@@ -1,6 +1,7 @@
 plugin_name: freeipmi.plugin
 modules:
   - meta:
+      id: collector-freeimpi.plugin-sensors
       plugin_name: freeipmi.plugin
       module_name: freeipmi
       monitored_instance:

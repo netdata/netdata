@@ -14,6 +14,9 @@
           "meta": {
             "type": "object",
             "properties": {
+              "id": {
+                "$ref": "./shared.json#/$defs/id"
+              },
               "plugin_name": {
                 "type": "string",
                 "description": "Plugin name (e.g. apps.plugin, proc.plugin, go.d.plugin). It must match the name of the executable file in the plugins.d directory."
@@ -90,6 +93,7 @@
               }
             },
             "required": [
+              "id",
               "plugin_name",
               "module_name",
               "monitored_instance",
