@@ -657,8 +657,10 @@ static int web_client_api_request_v2_config(RRDHOST *host __maybe_unused, struct
     char *url = strdupz(buffer_tostring(w->url_as_received));
     char *url_full = url;
 
+    buffer_flush(w->response.data);
     if (strncmp(url, CONFIG_API_V2_URL, strlen(CONFIG_API_V2_URL)) != 0) {
         buffer_sprintf(w->response.data, "Invalid URL");
+        freez(url_full);
         return HTTP_RESP_BAD_REQUEST;
     }
     url += strlen(CONFIG_API_V2_URL);
@@ -669,7 +671,6 @@ static int web_client_api_request_v2_config(RRDHOST *host __maybe_unused, struct
     char *job_id = strtok_r(NULL, "/", &save_ptr);
     char *extra = strtok_r(NULL, "/", &save_ptr);
 
-    buffer_flush(w->response.data);
     if (extra != NULL) {
         buffer_sprintf(w->response.data, "Invalid URL");
         freez(url_full);
