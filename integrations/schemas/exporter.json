@@ -46,6 +46,9 @@
         },
         "setup": {
           "$ref": "./shared.json#/$defs/full_setup"
+        },
+        "troubleshooting": {
+          "$ref": "./shared.json#/$defs/troubleshooting"
         }
       },
       "required": [
