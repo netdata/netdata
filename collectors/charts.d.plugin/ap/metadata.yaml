@@ -7,7 +7,7 @@ modules:
         name: Access Points
         link: "https://learn.netdata.cloud/docs/data-collection/networking-stack-and-network-interfaces/linux-access-points"
         categories:
-          - data-collection.networking-stack-and-network-interfaces
+          - data-collection.linux-systems.network-metrics
         icon_filename: "network-wired.svg"
       related_resources:
         integrations:
