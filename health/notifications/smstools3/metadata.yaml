@@ -79,3 +79,6 @@
               # SMS Server Tools 3 (smstools3) global notification options
               SEND_SMS="YES"
               DEFAULT_RECIPIENT_SMS="1234567890"
+  troubleshooting:
+    problems:
+      list: []

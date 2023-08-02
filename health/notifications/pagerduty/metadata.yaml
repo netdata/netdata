@@ -68,3 +68,6 @@
               SEND_PD="YES"
               DEFAULT_RECIPIENT_PD="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
               USE_PD_VERSION="2"
+  troubleshooting:
+    problems:
+      list: []

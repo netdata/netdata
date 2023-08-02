@@ -67,3 +67,6 @@
               SEND_FLOCK="YES"
               FLOCK_WEBHOOK_URL="https://api.flock.com/hooks/sendMessage/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
               DEFAULT_RECIPIENT_FLOCK="alarms"
+  troubleshooting:
+    problems:
+      list: []

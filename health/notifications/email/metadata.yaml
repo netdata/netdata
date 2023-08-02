@@ -68,3 +68,6 @@
               EMAIL_SENDER="example@domain.com"
               SEND_EMAIL="YES"
               DEFAULT_RECIPIENT_EMAIL="recipient@example.com"
+  troubleshooting:
+    problems:
+      list: []

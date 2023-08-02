@@ -72,3 +72,6 @@
               SEND_TELEGRAM="YES"
               TELEGRAM_BOT_TOKEN="111122223:7OpFlFFRzRBbrUUmIjj5HF9Ox2pYJZy5"
               DEFAULT_RECIPIENT_TELEGRAM="-100233335555"
+  troubleshooting:
+    problems:
+      list: []

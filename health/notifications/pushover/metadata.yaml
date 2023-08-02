@@ -73,3 +73,6 @@
               SEND_PUSHOVER="YES"
               PUSHOVER_APP_TOKEN="XXXXXXXXX"
               DEFAULT_RECIPIENT_PUSHOVER="USERTOKEN"
+  troubleshooting:
+    problems:
+      list: []

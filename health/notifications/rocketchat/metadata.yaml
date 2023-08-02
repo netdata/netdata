@@ -70,3 +70,6 @@
               SEND_ROCKETCHAT="YES"
               ROCKETCHAT_WEBHOOK_URL="<your_incoming_webhook_url>"
               DEFAULT_RECIPIENT_ROCKETCHAT="monitoring_alarms"
+  troubleshooting:
+    problems:
+      list: []

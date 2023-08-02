@@ -55,3 +55,6 @@
               SEND_OPSGENIE="YES"
               OPSGENIE_API_KEY="11111111-2222-3333-4444-555555555555"
               OPSGENIE_API_URL=""
+  troubleshooting:
+    problems:
+      list: []

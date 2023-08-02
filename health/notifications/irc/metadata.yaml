@@ -95,3 +95,6 @@
               IRC_NETWORK="irc.freenode.net"
               IRC_NICKNAME="netdata-alarm-user"
               IRC_REALNAME="netdata-user"
+  troubleshooting:
+    problems:
+      list: []
