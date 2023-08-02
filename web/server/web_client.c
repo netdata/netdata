@@ -204,7 +204,9 @@ void web_client_request_done(struct web_client *w) {
                 break;
 
             case WEB_CLIENT_MODE_POST:
+            case WEB_CLIENT_MODE_PUT:
             case WEB_CLIENT_MODE_GET:
+            case WEB_CLIENT_MODE_DELETE:
                 mode = "DATA";
                 break;
 
@@ -1075,6 +1077,14 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
         s = &s[5];
         w->mode = WEB_CLIENT_MODE_POST;
     }
+    else if(!strncmp(s, "PUT ", 4)) {
+        s = &s[4];
+        w->mode = WEB_CLIENT_MODE_PUT;
+    }
+    else if(!strncmp(s, "DELETE ", 7)) {
+        s = &s[7];
+        w->mode = WEB_CLIENT_MODE_DELETE;
+    }
     else if(!strncmp(s, "STREAM ", 7)) {
         s = &s[7];
 
@@ -1747,6 +1757,8 @@ void web_client_process_request(struct web_client *w) {
                 case WEB_CLIENT_MODE_FILECOPY:
                 case WEB_CLIENT_MODE_POST:
                 case WEB_CLIENT_MODE_GET:
+                case WEB_CLIENT_MODE_PUT:
+                case WEB_CLIENT_MODE_DELETE:
                     if(unlikely(
                             !web_client_can_access_dashboard(w) &&
                             !web_client_can_access_registry(w) &&
@@ -1879,6 +1891,8 @@ void web_client_process_request(struct web_client *w) {
 
         case WEB_CLIENT_MODE_POST:
         case WEB_CLIENT_MODE_GET:
+        case WEB_CLIENT_MODE_PUT:
+        case WEB_CLIENT_MODE_DELETE:
             netdata_log_debug(D_WEB_CLIENT, "%llu: Done preparing the response. Sending data (%zu bytes) to client.", w->id, w->response.data->len);
             break;
 
@@ -2042,7 +2056,7 @@ ssize_t web_client_send_deflate(struct web_client *w)
 
         // ask for FINISH if we have all the input
         int flush = Z_SYNC_FLUSH;
-        if((w->mode == WEB_CLIENT_MODE_GET || w->mode == WEB_CLIENT_MODE_POST)
+        if((w->mode == WEB_CLIENT_MODE_GET || w->mode == WEB_CLIENT_MODE_POST || w->mode == WEB_CLIENT_MODE_PUT || w->mode == WEB_CLIENT_MODE_DELETE)
             || (w->mode == WEB_CLIENT_MODE_FILECOPY && !web_client_has_wait_receive(w) && w->response.data->len == w->response.rlen)) {
             flush = Z_FINISH;
             netdata_log_debug(D_DEFLATE, "%llu: Requesting Z_FINISH, if possible.", w->id);

@@ -579,7 +579,7 @@ void recursive_config_double_dir_load(
         , void *data
         , size_t depth
 );
-char *read_by_filename(char *filename, long *file_size);
+char *read_by_filename(const char *filename, long *file_size);
 char *find_and_replace(const char *src, const char *find, const char *replace, const char *where);
 
 /* fix for alpine linux */
@@ -837,6 +837,7 @@ extern char *netdata_configured_host_prefix;
 #include "yaml.h"
 #include "http/http_defs.h"
 #include "gorilla/gorilla.h"
+#include "dyn_conf/dyn_conf.h"
 
 // BEWARE: this exists in alarm-notify.sh
 #define DEFAULT_CLOUD_BASE_URL "https://app.netdata.cloud"

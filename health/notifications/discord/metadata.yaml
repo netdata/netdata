@@ -71,3 +71,6 @@
               SEND_DISCORD="YES"
               DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/XXXXXXXXXXXXX/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
               DEFAULT_RECIPIENT_DISCORD="alerts"
+  troubleshooting:
+    problems:
+      list: []

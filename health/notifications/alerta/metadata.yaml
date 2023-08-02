@@ -85,3 +85,6 @@
               ALERTA_WEBHOOK_URL="http://yourserver/alerta/api"
               ALERTA_API_KEY="INSERT_YOUR_API_KEY_HERE"
               DEFAULT_RECIPIENT_ALERTA="Production"
+  troubleshooting:
+    problems:
+      list: []

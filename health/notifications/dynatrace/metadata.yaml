@@ -87,3 +87,6 @@
               DYNATRACE_TAG_VALUE="SERVERTAG"
               DYNATRACE_ANNOTATION_TYPE="Netdata Alert"
               DYNATRACE_EVENT="AVAILABILITY_EVENT"
+  troubleshooting:
+    problems:
+      list: []

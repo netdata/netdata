@@ -86,3 +86,6 @@
               MATRIX_HOMESERVER="https://matrix.org:8448"
               MATRIX_ACCESSTOKEN="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
               DEFAULT_RECIPIENT_MATRIX="!XXXXXXXXXXXX:matrix.org"
+  troubleshooting:
+    problems:
+      list: []

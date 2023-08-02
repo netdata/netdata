@@ -164,3 +164,6 @@
                     fi
                   done
               }
+  troubleshooting:
+    problems:
+      list: []

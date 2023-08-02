@@ -54,7 +54,7 @@ jobs:
         run: |
           if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/eslint') }}" = "true" ]; then
             echo "run=true" >> "${GITHUB_OUTPUT}"
-          elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -v "web/gui/v1" | grep -v "web/gui/v2" | grep -Eq '.*\.js|node\.d\.plugin\.in' ; then
+          elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -v "web/gui/v1" | grep -v "web/gui/v2" | grep -v "integrations/" | grep -Eq '.*\.js' ; then
             echo "run=true" >> "${GITHUB_OUTPUT}"
             echo 'JS files have changed, need to run ESLint.'
           else

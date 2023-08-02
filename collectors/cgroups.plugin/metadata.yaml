@@ -406,7 +406,7 @@ modules:
         link: https://kubernetes.io/
         icon_filename: kubernetes.svg
         categories:
-          - data-collection.containers-vms
+          - data-collection.containers-and-vms
           - data-collection.kubernetes
       keywords:
         - k8s
@@ -977,7 +977,7 @@ modules:
         link: ""
         icon_filename: container.svg
         categories:
-          - data-collection.containers-vms
+          - data-collection.containers-and-vms
       keywords:
         - vms
         - virtualization
@@ -995,7 +995,7 @@ modules:
         link: ""
         icon_filename: lxc.png
         categories:
-          - data-collection.containers-vms
+          - data-collection.containers-and-vms
       keywords:
         - lxc
         - lxd
@@ -1013,7 +1013,7 @@ modules:
         link: ""
         icon_filename: libvirt.png
         categories:
-          - data-collection.containers-vms
+          - data-collection.containers-and-vms
       keywords:
         - libvirt
         - container
@@ -1030,7 +1030,7 @@ modules:
         link: ""
         icon_filename: ovirt.svg
         categories:
-          - data-collection.containers-vms
+          - data-collection.containers-and-vms
       keywords:
         - ovirt
         - container
@@ -1047,7 +1047,7 @@ modules:
         link: ""
         icon_filename: proxmox.png
         categories:
-          - data-collection.containers-vms
+          - data-collection.containers-and-vms
       keywords:
         - proxmox
         - container

@@ -30,6 +30,10 @@
           "type": "integer",
           "description": "Indicates sort order for categories that are marked as most popular."
         },
+        "collector_default": {
+          "type": "boolean",
+          "description": "Indicates that the category should be added to collector integrations that list no categories."
+        },
         "children": {
           "type": "array",
           "description": "A list of categories that are children of this category.",

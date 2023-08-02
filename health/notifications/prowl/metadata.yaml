@@ -66,3 +66,6 @@
 
               SEND_PROWL="YES"
               DEFAULT_RECIPIENT_PROWL="XXXXXXXXXX"
+  troubleshooting:
+    problems:
+      list: []

@@ -7,7 +7,7 @@ modules:
         name: tc QoS classes
         link: "https://wiki.linuxfoundation.org/networking/iproute2"
         categories:
-          - data-collection.networking-stack-and-network-interfaces
+          - data-collection.linux-systems.network-metrics
         icon_filename: "netdata.png"
       related_resources:
         integrations:

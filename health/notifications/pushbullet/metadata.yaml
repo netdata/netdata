@@ -71,3 +71,6 @@
               SEND_PUSHBULLET="YES"
               PUSHBULLET_ACCESS_TOKEN="XXXXXXXXX"
               DEFAULT_RECIPIENT_PUSHBULLET="admin1@example.com admin3@somemail.com #examplechanneltag #anotherchanneltag"
+  troubleshooting:
+    problems:
+      list: []

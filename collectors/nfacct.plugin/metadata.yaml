@@ -7,7 +7,7 @@ modules:
         name: Netfilter
         link: 'https://www.netfilter.org/'
         categories:
-          - data-collection.networking-stack-and-network-interfaces
+          - data-collection.linux-systems.firewall-metrics
         icon_filename: 'netfilter.png'
       related_resources:
         integrations:
