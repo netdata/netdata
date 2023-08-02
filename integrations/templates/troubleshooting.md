@@ -115,6 +115,7 @@ export NETDATA_ALARM_NOTIFY_DEBUG=1
 
 Note that this will test _all_ alert mechanisms for the selected role.
 
+[% endif %]
 [% elif entry.integration_type == 'exporter' %]
 [% if entry.troubleshooting.problems.list %]
 ## Troubleshooting
