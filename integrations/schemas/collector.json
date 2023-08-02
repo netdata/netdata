@@ -222,43 +222,7 @@
             "$ref": "./shared.json#/$defs/full_setup"
           },
           "troubleshooting": {
-            "type": "object",
-            "description": "Information needed to troubleshoot issues with this collector.",
-            "properties": {
-              "problems": {
-                "type": "object",
-                "description": "Common problems that users face again and again... and their solutions.",
-                "properties": {
-                  "list": {
-                    "type": "array",
-                    "description": "List of common problems.",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "name": {
-                          "type": "string",
-                          "description": "Problem name."
-                        },
-                        "description": {
-                          "type": "string",
-                          "description": "Explanation of the problem and its solution."
-                        }
-                      }
-                    },
-                    "required": [
-                      "name",
-                      "description"
-                    ]
-                  }
-                },
-                "required": [
-                  "list"
-                ]
-              }
-            },
-            "required": [
-              "problems"
-            ]
+            "$ref": "./shared.json#/$defs/troubleshooting"
           },
           "alerts": {
             "type": "array",

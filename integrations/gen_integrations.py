@@ -56,11 +56,13 @@ COLLECTOR_RENDER_KEYS = [
 EXPORTER_RENDER_KEYS = [
     'overview',
     'setup',
+    'troubleshooting',
 ]
 
 NOTIFICATION_RENDER_KEYS = [
     'overview',
     'setup',
+    'troubleshooting',
 ]
 
 GITHUB_ACTIONS = os.environ.get('GITHUB_ACTIONS', False)
@@ -473,12 +475,15 @@ def render_collectors(categories, collectors, ids):
                 }
 
         for key in COLLECTOR_RENDER_KEYS:
-            template = get_jinja_env().get_template(f'{ key }.md')
-            data = template.render(entry=item, related=related)
+            if key in item.keys():
+                template = get_jinja_env().get_template(f'{ key }.md')
+                data = template.render(entry=item, related=related)
 
-            if 'variables' in item['meta']['monitored_instance']:
-                template = get_jinja_env().from_string(data)
-                data = template.render(variables=item['meta']['monitored_instance']['variables'])
+                if 'variables' in item['meta']['monitored_instance']:
+                    template = get_jinja_env().from_string(data)
+                    data = template.render(variables=item['meta']['monitored_instance']['variables'])
+            else:
+                data = ''
 
             item[key] = data
 
@@ -540,12 +545,15 @@ def render_exporters(categories, exporters, ids):
 
     for item in exporters:
         for key in EXPORTER_RENDER_KEYS:
-            template = get_jinja_env().get_template(f'{ key }.md')
-            data = template.render(entry=item)
+            if key in item.keys():
+                template = get_jinja_env().get_template(f'{ key }.md')
+                data = template.render(entry=item)
 
-            if 'variables' in item['meta']:
-                template = get_jinja_env().from_string(data)
-                data = template.render(variables=item['meta']['variables'])
+                if 'variables' in item['meta']:
+                    template = get_jinja_env().from_string(data)
+                    data = template.render(variables=item['meta']['variables'])
+            else:
+                data = ''
 
             item[key] = data
 
@@ -569,12 +577,15 @@ def render_notifications(categories, notifications, ids):
 
     for item in notifications:
         for key in NOTIFICATION_RENDER_KEYS:
-            template = get_jinja_env().get_template(f'{ key }.md')
-            data = template.render(entry=item)
+            if key in item.keys():
+                template = get_jinja_env().get_template(f'{ key }.md')
+                data = template.render(entry=item)
 
-            if 'variables' in item['meta']:
-                template = get_jinja_env().from_string(data)
-                data = template.render(variables=item['meta']['variables'])
+                if 'variables' in item['meta']:
+                    template = get_jinja_env().from_string(data)
+                    data = template.render(variables=item['meta']['variables'])
+            else:
+                data = ''
 
             item[key] = data
 

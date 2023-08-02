@@ -1,8 +1,7 @@
-[% if entry.troubleshooting.list or entry.integration_type == 'collector' or entry.integration_type == 'notification' %]
+[% if entry.integration_type == 'collector' %]
+[% if entry.meta.plugin_name == 'go.d.plugin' %]
 ## Troubleshooting
 
-[% if entry.integration_type == 'collector' %]
-[% if entry.plugin_name == 'go.d.plugin' %]
 ### Debug Mode
 
 To troubleshoot issues with the `[[ entry.module_name ]]` collector, run the `go.d.plugin` with the debug option enabled. The output
@@ -26,7 +25,10 @@ should give you clues as to why the collector isn't working.
   ```bash
   ./go.d.plugin -d -m [[ entry.module_name ]]
   ```
-[% elif entry.plugin_name == 'python.d.plugin' %]
+
+[% elif entry.meta.plugin_name == 'python.d.plugin' %]
+## Troubleshooting
+
 ### Debug Mode
 
 To troubleshoot issues with the `[[ entry.module_name ]]` collector, run the `python.d.plugin` with the debug option enabled. The output
@@ -50,7 +52,10 @@ should give you clues as to why the collector isn't working.
   ```bash
   ./python.d.plugin [[ entry.module_name ]] debug trace
   ```
-[% elif entry.plugin_name == 'charts.d.plugin' %]
+
+[% elif entry.meta.plugin_name == 'charts.d.plugin' %]
+## Troubleshooting
+
 ### Debug Mode
 
 To troubleshoot issues with the `[[ entry.module_name ]]` collector, run the `charts.d.plugin` with the debug option enabled. The output
@@ -74,9 +79,22 @@ should give you clues as to why the collector isn't working.
   ```bash
   ./charts.d.plugin debug 1 [[ entry.module_name ]]
   ```
+
+[% else %]
+[% if entry.troubleshooting.problems.list %]
+## Troubleshooting
+
+[% endif %]
 [% endif %]
 [% elif entry.integration_type == 'notification' %]
-[% if not 'cloud-notifications' in entry._src_path %]
+[% if 'cloud-notifications' in entry._src_path %]
+[% if entry.troubleshooting.problems.list %]
+## Troubleshooting
+
+[% endif %]
+[% else %]
+## Troubleshooting
+
 ### Test Notification
 
 You can run the following command by hand, to test alerts configuration:
@@ -96,9 +114,14 @@ export NETDATA_ALARM_NOTIFY_DEBUG=1
 ```
 
 Note that this will test _all_ alert mechanisms for the selected role.
+
+[% elif entry.integration_type == 'exporter' %]
+[% if entry.troubleshooting.problems.list %]
+## Troubleshooting
+
 [% endif %]
 [% endif %]
-[% for item in entry.troubleshooting.list %]
+[% for item in entry.troubleshooting.problems.list %]
 ### [[ item.name ]]
 
 [[ description ]]
