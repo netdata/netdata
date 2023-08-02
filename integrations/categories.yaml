@@ -63,8 +63,8 @@
     - id: data-collection.kubernetes
       name: Kubernetes
       description: ""
-      most_popular: false
-      priority: -1
+      most_popular: true
+      priority: 7
       children: []
     - id: data-collection.notifications
       name: Incident Management
