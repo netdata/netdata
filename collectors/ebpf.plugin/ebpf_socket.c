@@ -96,6 +96,17 @@ netdata_ebpf_targets_t socket_targets[] = { {.name = "inet_csk_accept", .mode = 
                                             {.name = "tcp_v6_connect", .mode = EBPF_LOAD_TRAMPOLINE},
                                             {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
+struct netdata_static_thread ebpf_read_socket = {
+        .name = "EBPF_READ_SOCKET",
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+};
+
 #ifdef NETDATA_DEV_MODE
 int socket_disable_priority;
 #endif
@@ -504,6 +515,10 @@ static void ebpf_socket_free(ebpf_module_t *em )
 static void ebpf_socket_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    if (ebpf_read_socket.thread)
+        netdata_thread_cancel(*ebpf_read_socket.thread);
+
     ebpf_socket_free(em);
 }
 
@@ -1475,8 +1490,27 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_idx_t *key, net
  */
 static void ebpf_read_socket_hash_table(BUFFER *buf, int fd, int maps_per_core)
 {
+    /*
+    if (buf)
+        ebpf_fill_function_buffer(buf, &key, values);
+        */
+}
+
+/**
+ * Update array vectors
+ *
+ * Read data from hash table and update vectors.
+ *
+ * @param em the structure with configuration
+ */
+static void ebpf_update_array_vectors(ebpf_module_t *em)
+{
+    netdata_thread_disable_cancelability();
     netdata_socket_idx_t key = {};
     netdata_socket_idx_t next_key = {};
+
+    int maps_per_core = em->maps_per_core;
+    int fd = em->maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd;
 
     netdata_socket_t *values = socket_values;
     size_t length = sizeof(netdata_socket_t);
@@ -1499,15 +1533,49 @@ static void ebpf_read_socket_hash_table(BUFFER *buf, int fd, int maps_per_core)
         }
 
         ebpf_hash_socket_accumulator(values, &key, end);
-        if (buf)
-            ebpf_fill_function_buffer(buf, &key, values);
-
         ebpf_socket_fill_publish_apps(key.pid, values);
 
         memset(values, 0, length);
 
         key = next_key;
     }
+    netdata_thread_enable_cancelability();
+}
+
+/**
+ * Socket thread
+ *
+ * Thread used to generate socket charts.
+ *
+ * @param ptr a pointer to `struct ebpf_module`
+ *
+ * @return It always return NULL
+ */
+void *ebpf_read_socket_thread(void *ptr)
+{
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    ebpf_update_array_vectors(em);
+
+    int update_every = em->update_every;
+    int counter = update_every - 1;
+
+    uint32_t running_time = 0;
+    uint32_t lifetime = em->lifetime;
+    while (!ebpf_exit_plugin && running_time < lifetime) {
+        (void)heartbeat_next(&hb, USEC_PER_SEC);
+        if (ebpf_exit_plugin || ++counter != update_every)
+            continue;
+
+        ebpf_update_array_vectors(em);
+
+        counter = 0;
+    }
+
+    return NULL;
 }
 
 /**
@@ -1701,18 +1769,6 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, netdata_socket_t *ns)
 
     curr->call_udp_sent += ns->udp.call_udp_sent;
     curr->call_udp_received += ns->udp.call_udp_received;
-}
-
-/**
- *  Update the apps data reading information from the hash table
- *
- * @param maps_per_core      do I need to read all cores?
- */
-static inline void ebpf_socket_update_apps_data(int maps_per_core)
-{
-    int fd = socket_maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd;
-
-    ebpf_read_socket_hash_table(NULL, fd, maps_per_core);
 }
 
 /**
@@ -2287,9 +2343,6 @@ static void socket_collector(ebpf_module_t *em)
         }
 
         pthread_mutex_lock(&collect_data_mutex);
-        if (socket_apps_enabled)
-            ebpf_socket_update_apps_data(maps_per_core);
-
         if (cgroups)
             ebpf_update_socket_cgroup(maps_per_core);
 
@@ -3324,6 +3377,13 @@ void *ebpf_socket_thread(void *ptr)
     ebpf_global_labels(
         socket_aggregated_data, socket_publish_aggregated, socket_dimension_names, socket_id_names,
         algorithms, NETDATA_MAX_SOCKET_VECTOR);
+
+    ebpf_read_socket.thread = mallocz(sizeof(netdata_thread_t));
+    netdata_thread_create(ebpf_read_socket.thread,
+                          ebpf_read_socket.name,
+                          NETDATA_THREAD_OPTION_DEFAULT,
+                          ebpf_read_socket_thread,
+                          em);
 
     pthread_mutex_lock(&lock);
     ebpf_create_global_charts(em);
