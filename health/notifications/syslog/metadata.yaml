@@ -83,3 +83,6 @@
               SEND_SYSLOG="YES"
               SYSLOG_FACILITY='local6'
               DEFAULT_RECIPIENT_SYSLOG="daemon.notice@loghost6:514/netdata"
+  troubleshooting:
+    problems:
+      list: []

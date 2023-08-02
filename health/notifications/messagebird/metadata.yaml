@@ -74,3 +74,6 @@
               MESSAGEBIRD_ACCESS_KEY="XXXXXXXX"
               MESSAGEBIRD_NUMBER="XXXXXXX"
               DEFAULT_RECIPIENT_MESSAGEBIRD="+15555555555"
+  troubleshooting:
+    problems:
+      list: []

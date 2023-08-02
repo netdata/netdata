@@ -1,3 +1,5 @@
+## Setup
+
 [% if entry.setup.description %]
 [[ entry.setup.description ]]
 [% else %]

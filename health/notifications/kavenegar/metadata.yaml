@@ -77,3 +77,6 @@
               KAVENEGAR_API_KEY="XXXXXXXXXXXX"
               KAVENEGAR_SENDER="YYYYYYYY"
               DEFAULT_RECIPIENT_KAVENEGAR="0912345678"
+  troubleshooting:
+    problems:
+      list: []

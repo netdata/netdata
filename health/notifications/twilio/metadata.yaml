@@ -78,3 +78,6 @@
               TWILIO_ACCOUNT_TOKEN="xxxxxxxxxx"
               TWILIO_NUMBER="xxxxxxxxxxx"
               DEFAULT_RECIPIENT_TWILIO="+15555555555"
+  troubleshooting:
+    problems:
+      list: []

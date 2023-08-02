@@ -1,10 +1,10 @@
 [% if entry.integration_type == 'collector' %]
-[% if entry.meta.plugin_name == 'go.d.plugin' %]
+[% if entry.meta.plugin_name is in(['go.d.plugin', 'python.d.plugin', 'charts.d.plugin']) %]
 ## Troubleshooting
 
 ### Debug Mode
 
-To troubleshoot issues with the `[[ entry.module_name ]]` collector, run the `go.d.plugin` with the debug option enabled. The output
+To troubleshoot issues with the `[[ entry.meta.module_name ]]` collector, run the `[[ entry.meta.plugin_name ]]` with the debug option enabled. The output
 should give you clues as to why the collector isn't working.
 
 - Navigate to the `plugins.d` directory, usually at `/usr/libexec/netdata/plugins.d/`. If that's not the case on
@@ -20,66 +20,28 @@ should give you clues as to why the collector isn't working.
   sudo -u netdata -s
   ```
 
+[% if entry.meta.plugin_name == 'go.d.plugin' %]
 - Run the `go.d.plugin` to debug the collector:
 
   ```bash
-  ./go.d.plugin -d -m [[ entry.module_name ]]
+  ./go.d.plugin -d -m [[ entry.meta.module_name ]]
   ```
 
 [% elif entry.meta.plugin_name == 'python.d.plugin' %]
-## Troubleshooting
-
-### Debug Mode
-
-To troubleshoot issues with the `[[ entry.module_name ]]` collector, run the `python.d.plugin` with the debug option enabled. The output
-should give you clues as to why the collector isn't working.
-
-- Navigate to the `plugins.d` directory, usually at `/usr/libexec/netdata/plugins.d/`. If that's not the case on
-  your system, open `netdata.conf` and look for the `plugins` setting under `[directories]`.
-
-  ```bash
-  cd /usr/libexec/netdata/plugins.d/
-  ```
-
-- Switch to the `netdata` user.
-
-  ```bash
-  sudo -u netdata -s
-  ```
-
 - Run the `python.d.plugin` to debug the collector:
 
   ```bash
-  ./python.d.plugin [[ entry.module_name ]] debug trace
+  ./python.d.plugin [[ entry.meta.module_name ]] debug trace
   ```
 
 [% elif entry.meta.plugin_name == 'charts.d.plugin' %]
-## Troubleshooting
-
-### Debug Mode
-
-To troubleshoot issues with the `[[ entry.module_name ]]` collector, run the `charts.d.plugin` with the debug option enabled. The output
-should give you clues as to why the collector isn't working.
-
-- Navigate to the `plugins.d` directory, usually at `/usr/libexec/netdata/plugins.d/`. If that's not the case on
-  your system, open `netdata.conf` and look for the `plugins` setting under `[directories]`.
-
-  ```bash
-  cd /usr/libexec/netdata/plugins.d/
-  ```
-
-- Switch to the `netdata` user.
-
-  ```bash
-  sudo -u netdata -s
-  ```
-
 - Run the `charts.d.plugin` to debug the collector:
 
   ```bash
-  ./charts.d.plugin debug 1 [[ entry.module_name ]]
+  ./charts.d.plugin debug 1 [[ entry.meta.module_name ]]
   ```
 
+[% endif %]
 [% else %]
 [% if entry.troubleshooting.problems.list %]
 ## Troubleshooting
@@ -87,7 +49,7 @@ should give you clues as to why the collector isn't working.
 [% endif %]
 [% endif %]
 [% elif entry.integration_type == 'notification' %]
-[% if 'cloud-notifications' in entry._src_path %]
+[% if 'cloud-notifications' in entry._src_path|string %]
 [% if entry.troubleshooting.problems.list %]
 ## Troubleshooting
 
@@ -115,6 +77,7 @@ export NETDATA_ALARM_NOTIFY_DEBUG=1
 
 Note that this will test _all_ alert mechanisms for the selected role.
 
+[% endif %]
 [% elif entry.integration_type == 'exporter' %]
 [% if entry.troubleshooting.problems.list %]
 ## Troubleshooting
@@ -127,4 +90,3 @@ Note that this will test _all_ alert mechanisms for the selected role.
 [[ description ]]
 
 [% endfor %]
-[% endif %]
