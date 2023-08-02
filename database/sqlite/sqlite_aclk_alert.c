@@ -7,7 +7,7 @@
 #include "../../aclk/aclk_alarm_api.h"
 #endif
 
-#define SQL_UPDATE_FILTERED_ALERT "UPDATE aclk_alert_%s SET filtered_alert_unique_id = %u where filtered_alert_unique_id = %u"
+#define SQL_UPDATE_FILTERED_ALERT "UPDATE aclk_alert_%s SET filtered_alert_unique_id = %u, date_created = unixepoch() where filtered_alert_unique_id = %u"
 void update_filtered(ALARM_ENTRY *ae, uint32_t unique_id, char *uuid_str) {
     char sql[ACLK_SYNC_QUERY_SIZE];
     snprintfz(sql, ACLK_SYNC_QUERY_SIZE-1, SQL_UPDATE_FILTERED_ALERT, uuid_str, ae->unique_id, unique_id);
@@ -979,7 +979,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
 #endif
 }
 
-#define SQL_DELETE_ALERT_ENTRIES "DELETE FROM aclk_alert_%s WHERE filtered_alert_unique_id + %d < UNIXEPOCH();"
+#define SQL_DELETE_ALERT_ENTRIES "DELETE FROM aclk_alert_%s WHERE date_created + %d < UNIXEPOCH();"
 void sql_aclk_alert_clean_dead_entries(RRDHOST *host)
 {
     char uuid_str[UUID_STR_LEN];
