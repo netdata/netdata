@@ -13,10 +13,8 @@ modules:
       related_resources:
         integrations:
           list:
-            - plugin_name: apps.plugin
-              module_name: apps
-            - plugin_name: cgroups.plugin
-              module_name: cgroups
+            - id: collector-apps.plugin-apps
+            - id: collector-cgroups.plugin-cgroup
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -238,10 +236,8 @@ modules:
       related_resources:
         integrations:
           list:
-            - plugin_name: apps.plugin
-              module_name: apps
-            - plugin_name: cgroups.plugin
-              module_name: cgroups
+            - id: collector-apps.plugin-apps
+            - id: collector-cgroups.plugin-cgroup
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -710,10 +706,8 @@ modules:
       related_resources:
         integrations:
           list:
-            - plugin_name: apps.plugin
-              module_name: apps
-            - plugin_name: cgroups.plugin
-              module_name: cgroups
+            - id: collector-apps.plugin-apps
+            - id: collector-cgroups.plugin-cgroup
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -1231,10 +1225,8 @@ modules:
       related_resources:
         integrations:
           list:
-            - plugin_name: apps.plugin
-              module_name: apps
-            - plugin_name: cgroups.plugin
-              module_name: cgroups
+            - id: collector-apps.plugin-apps
+            - id: collector-cgroups.plugin-cgroup
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -1412,10 +1404,8 @@ modules:
       related_resources:
         integrations:
           list:
-            - plugin_name: apps.plugin
-              module_name: apps
-            - plugin_name: cgroups.plugin
-              module_name: cgroups
+            - id: collector-apps.plugin-apps
+            - id: collector-cgroups.plugin-cgroup
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -1541,10 +1531,8 @@ modules:
       related_resources:
         integrations:
           list:
-            - plugin_name: apps.plugin
-              module_name: apps
-            - plugin_name: cgroups.plugin
-              module_name: cgroups
+            - id: collector-apps.plugin-apps
+            - id: collector-cgroups.plugin-cgroup
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -1910,10 +1898,8 @@ modules:
       related_resources:
         integrations:
           list:
-            - plugin_name: apps.plugin
-              module_name: apps
-            - plugin_name: cgroups.plugin
-              module_name: cgroups
+            - id: collector-apps.plugin-apps
+            - id: collector-cgroups.plugin-cgroup
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -2296,10 +2282,8 @@ modules:
       related_resources:
         integrations:
           list:
-            - plugin_name: apps.plugin
-              module_name: apps
-            - plugin_name: cgroups.plugin
-              module_name: cgroups
+            - id: collector-apps.plugin-apps
+            - id: collector-cgroups.plugin-cgroup
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -2765,10 +2749,8 @@ modules:
       related_resources:
         integrations:
           list:
-            - plugin_name: apps.plugin
-              module_name: apps
-            - plugin_name: cgroups.plugin
-              module_name: cgroups
+            - id: collector-apps.plugin-apps
+            - id: collector-cgroups.plugin-cgroup
       info_provided_to_referring_integrations:
         description: ""
       keywords:

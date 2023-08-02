@@ -45,19 +45,11 @@
                         "items": {
                           "type": "object",
                           "properties": {
-                            "plugin_name": {
-                              "type": "string",
-                              "description": "Related integration plugin name."
-                            },
-                            "module_name": {
-                              "type": "string",
-                              "description": "Related integration module name."
+                            "id": {
+                              "$ref": "./shared.json#/$defs/id"
                             }
                           },
-                          "required": [
-                            "plugin_name",
-                            "module_name"
-                          ]
+                          "required": []
                         }
                       }
                     },

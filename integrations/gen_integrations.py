@@ -459,16 +459,20 @@ def render_collectors(categories, collectors, ids):
 
         related = []
 
-        for res in item['meta']['related_resources']['integrations']['list']:
-            res_id = make_id(res)
+        for idx, res in enumerate(item['meta']['related_resources']['integrations']['list']):
+            res_id = res.get('id', False)
+
+            if not res_id:
+                warn(f'Missing ID for related resource { idx } in { item["id" ] }, ignoring it.', item['_src_path'])
+                continue
 
             if res_id not in idmap.keys():
                 warn(f'Could not find related integration { res_id }, ignoring it.', item['_src_path'])
                 continue
 
             related.append({
-                'plugin_name': res['plugin_name'],
-                'module_name': res['module_name'],
+                'plugin_name': idmap[res_id]['meta']['plugin_name'],
+                'module_name': idmap[res_id]['meta']['module_name'],
                 'id': res_id,
                 'name': idmap[res_id]['meta']['monitored_instance']['name'],
                 'info': idmap[res_id]['meta']['info_provided_to_referring_integrations'],
