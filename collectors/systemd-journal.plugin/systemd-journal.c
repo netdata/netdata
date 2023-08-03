@@ -393,7 +393,7 @@ static void function_systemd_journal(const char *transaction, char *function, ch
                     if(sep)
                         *sep++ = '\0';
 
-                    facets_register_facet_filter(facets, keyword, value, 0);
+                    facets_register_facet_filter(facets, keyword, value, FACET_KEY_OPTION_REORDER);
                     buffer_json_add_array_item_string(wb, value);
 
                     value = sep;

@@ -81,6 +81,8 @@ struct facet_key {
     uint32_t key_values_selected_in_row;
     BUFFER *current_value;
 
+    uint32_t order;
+
     struct {
         facet_dynamic_row_t cb;
         void *data;
@@ -112,6 +114,7 @@ struct facets {
 
     uint32_t items_to_return;
     uint32_t max_items_to_return;
+    uint32_t order;
 
     struct {
         FACET_ROW *last_added;
@@ -236,6 +239,9 @@ static void facet_key_insert_callback(const DICTIONARY_ITEM *item __maybe_unused
     FACET_KEY *k = value;
     FACETS *facets = data;
 
+    if(!(k->options & FACET_KEY_OPTION_REORDER))
+        k->order = facets->order++;
+
     if((k->options & FACET_KEY_OPTION_FTS) || (facets->options & FACETS_OPTION_ALL_KEYS_FTS))
         facets->keys_filtered_by_query++;
 
@@ -257,6 +263,11 @@ static bool facet_key_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
         // an actual value, not a filter
         k->name = strdupz(nk->name);
         facet_key_late_init(facets, k);
+    }
+
+    if(k->options & FACET_KEY_OPTION_REORDER) {
+        k->order = facets->order++;
+        k->options &= ~FACET_KEY_OPTION_REORDER;
     }
 
     return false;
@@ -290,6 +301,7 @@ FACETS *facets_create(uint32_t items_to_return, usec_t anchor, FACETS_OPTIONS op
 
     facets->max_items_to_return = items_to_return;
     facets->anchor = anchor;
+    facets->order = 1;
 
     return facets;
 }
@@ -671,7 +683,11 @@ void facets_report(FACETS *facets, BUFFER *wb) {
             {
                 buffer_json_member_add_string(wb, "id", k_dfe.name);
                 buffer_json_member_add_string(wb, "name", k->name);
-                buffer_json_member_add_uint64(wb, "order", k_dfe.counter);
+
+                if(!k->order)
+                    k->order = facets->order++;
+
+                buffer_json_member_add_uint64(wb, "order", k->order);
                 buffer_json_member_add_array(wb, "options");
                 {
                     FACET_VALUE *v;
