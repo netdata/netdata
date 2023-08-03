@@ -624,7 +624,7 @@ In a nutshell, Netdata proves invaluable for:
 &nbsp;<br/>&nbsp;<br/>
 </details>
 
-### Is Netdata open-source?
+### :globe_with_meridians: Is Netdata open-source?
 
 The Netdata Agent back-end is entirely open-source. We ship 3 different versions of the UI: 2 open-source versions and 1 closed-source version.
 
