@@ -203,9 +203,11 @@ int do_proc_pressure(int update_every, usec_t dt) {
             if(!do_full && !do_some)
                 continue;
 
-            ff = procfile_open(filename, " =", PROCFILE_FLAG_DEFAULT);
+            ff = procfile_open(filename, " =", PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
             if (unlikely(!ff)) {
-                collector_error("Cannot read pressure information from %s.", filename);
+                // PSI IRQ was added recently (https://github.com/torvalds/linux/commit/52b1364ba0b105122d6de0e719b36db705011ac1) 
+                if (strcmp(resource_info[i].name, "irq") != 0)
+                    collector_error("Cannot read pressure information from %s.", filename);
                 continue;
             }
         }
