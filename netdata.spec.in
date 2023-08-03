@@ -54,6 +54,13 @@ AutoReqProv: yes
 %global _have_nfacct 1
 %endif
 
+# Only build systemd-journal plugin on supported platforms
+%if 0%{?centos_ver} != 7 && 0%{?centos_ver} != 8 && 0%{?amazon_linux} != 2
+%global _have_systemd_journal 1
+%else
+%global _have_systemd_journal 0
+%endif
+
 Summary:	Real-time performance monitoring, done right!
 Name:		netdata
 Version:	%{version}
@@ -78,7 +85,6 @@ BuildRequires: gcc-c++
 BuildRequires: make
 BuildRequires: git-core
 BuildRequires: autoconf
-BuildRequires: systemd-devel
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
 BuildRequires: autoconf-archive
 %if 0%{?rhel} <= 8 && 0%{?amzn} < 2023
@@ -161,12 +167,14 @@ Requires: netdata-plugin-perf
 %if 0%{?_have_nfacct}
 Requires: netdata-plugin-nfacct
 %endif
+%if 0%{?_have_systemd_journal}
+Suggests: netdata-plugin-systemd-journal
+%endif
 %if 0%{?_have_freeipmi} && 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
 Suggests: netdata-plugin-freeipmi
 %endif
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
 Suggests: netdata-plugin-cups
-Suggests: netdata-plugin-systemd-journal
 %endif
 
 
@@ -204,6 +212,12 @@ BuildRequires:  freeipmi-devel
 BuildRequires: cups-devel >= 1.7
 %endif
 # end - cups plugin dependencies
+
+# systemd-journal dependencies
+%if 0%{?_have_systemd_journal}
+BuildRequires: systemd-devel >= 245
+%endif
+# end - systemd-journal dependencies
 
 # Prometheus remote write dependencies
 BuildRequires: snappy-devel
@@ -250,13 +264,16 @@ export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging
 autoreconf -ivf
 %configure \
 	%if 0%{!?_have_ebpf}
-	--disable-ebpf
+	--disable-ebpf \
 	%endif
 	%if 0%{!?_have_freeipmi}
-	--disable-plugin-freeipmi
+	--disable-plugin-freeipmi \
 	%endif
 	%if 0%{!?_have_nfacct}
-	--disable-plugin-nfacct
+	--disable-plugin-nfacct \
+	%endif
+	%if 0%{!?_have_systemd_journal}
+	--disable-plugin-systemd-journal \
 	%endif
 	%if 0%{?centos_ver:1}
 	%if %{centos_ver} < 8
@@ -310,7 +327,9 @@ install -m 0750 -p debugfs.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugi
 
 # ###########################################################
 # Install systemd-journal.plugin
+%if 0%{?_have_systemd_journal}
 install -m 4750 -p systemd-journal.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/systemd-journal.plugin"
+%endif
 
 # ###########################################################
 # Install perf.plugin
@@ -607,7 +626,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 %exclude %{_libexecdir}/%{name}/plugins.d/perf.plugin
 
 # systemd-journal belongs to a different sub-package
+%if 0%{?_have_systemd_journal}
 %exclude %{_libexecdir}/%{name}/plugins.d/systemd-journal.plugin
+%endif
 
 # CUPS belongs to a different sub package
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
@@ -910,6 +931,7 @@ fi
 # CAP_DAC_READ_SEARCH required for data collection.
 %caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/debugfs.plugin
 
+%if 0%{?_have_systemd_journal}
 %package plugin-systemd-journal
 Summary: The systemd-journal plugin for the Netdata Agent
 Group: Applications/System
@@ -930,6 +952,7 @@ fi
 %defattr(0750,root,netdata,0750)
 # CAP_DAC_READ_SEARCH required for data collection.
 %caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/systemd-journal.plugin
+%endif
 
 %changelog
 * Thu Aug 03 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-21
