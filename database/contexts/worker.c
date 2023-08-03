@@ -609,6 +609,13 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
                         continue;
                     }
 
+                    bool ri_collected = rrd_flag_is_collected(ri);
+
+                    if(ri_collected && !rrd_flag_check(ri, RRD_FLAG_MERGED_COLLECTED_RI_TO_RC)) {
+                        rrdcontext_update_from_collected_rrdinstance(ri);
+                        rrd_flag_set(ri, RRD_FLAG_MERGED_COLLECTED_RI_TO_RC);
+                    }
+
                     if(unlikely(!currently_collected && rrd_flag_is_collected(ri) && ri->first_time_s))
                         currently_collected = true;
 

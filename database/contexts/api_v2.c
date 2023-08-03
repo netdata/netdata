@@ -1103,9 +1103,19 @@ static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
     o->count++;
 
     if(o->family != n->family) {
-        STRING *m = string_2way_merge(o->family, n->family);
-        string_freez(o->family);
-        o->family = m;
+        if((o->flags & RRD_FLAG_COLLECTED) && !(n->flags & RRD_FLAG_COLLECTED))
+            // keep old
+            ;
+        else if(!(o->flags & RRD_FLAG_COLLECTED) && (n->flags & RRD_FLAG_COLLECTED)) {
+            // keep new
+            string_freez(o->family);
+            o->family = string_dup(n->family);
+        }
+        else {
+            // merge
+            string_freez(o->family);
+            o->family = string_2way_merge(o->family, n->family);
+        }
     }
 
     if(o->priority != n->priority) {
