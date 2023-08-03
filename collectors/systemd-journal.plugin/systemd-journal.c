@@ -317,7 +317,7 @@ static void function_systemd_journal(const char *transaction, char *function, ch
 
     BUFFER *wb = buffer_create(0, NULL);
     buffer_flush(wb);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT | BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAYS);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAYS);
 
     FACETS *facets = facets_create(50, 0, FACETS_OPTION_ALL_KEYS_FTS,
                                    SYSTEMD_ALWAYS_VISIBLE_KEYS,
