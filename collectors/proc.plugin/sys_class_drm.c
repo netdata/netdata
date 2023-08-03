@@ -587,6 +587,7 @@ struct card {
     collected_number used_gtt;
     collected_number total_gtt;
     
+    struct do_rrd_x *do_rrd_x_root;
     
     struct card *next;
 };
@@ -595,41 +596,6 @@ static struct card *card_root = NULL;
 static void card_free(struct card *c){
     if(c->pathname) freez((void *) c->pathname);
     if(c->id.marketing_name) freez((void *) c->id.marketing_name);
-
-    /* GPU and VRAM utilizations */
-    if(c->pathname_util_gpu) freez((void *) c->pathname_util_gpu);
-    if(c->st_util_gpu) rrdset_is_obsolete(c->st_util_gpu);
-
-    if(c->pathname_util_mem) freez((void *) c->pathname_util_mem);
-    if(c->st_util_mem) rrdset_is_obsolete(c->st_util_mem);
-    
-
-    /* GPU and VRAM clock frequencies */
-    if(c->pathname_clk_gpu) freez((void *) c->pathname_clk_gpu);
-    if(c->st_clk_gpu) rrdset_is_obsolete(c->st_clk_gpu);
-    if(c->ff_clk_gpu) procfile_close(c->ff_clk_gpu);
-
-    if(c->pathname_clk_mem) freez((void *) c->pathname_clk_mem);
-    if(c->st_clk_mem) rrdset_is_obsolete(c->st_clk_mem);
-    if(c->ff_clk_mem) procfile_close(c->ff_clk_mem);
-
-
-    /* GPU memory usage */
-    if(c->pathname_mem_used_vram) freez((void *) c->pathname_mem_used_vram);
-    if(c->pathname_mem_total_vram) freez((void *) c->pathname_mem_total_vram);
-    if(c->st_mem_usage_perc_vram) rrdset_is_obsolete(c->st_mem_usage_perc_vram);
-    if(c->st_mem_usage_vram) rrdset_is_obsolete(c->st_mem_usage_vram);
-
-    if(c->pathname_mem_used_vis_vram) freez((void *) c->pathname_mem_used_vis_vram);
-    if(c->pathname_mem_total_vis_vram) freez((void *) c->pathname_mem_total_vis_vram);
-    if(c->st_mem_usage_perc_vis_vram) rrdset_is_obsolete(c->st_mem_usage_perc_vis_vram);
-    if(c->st_mem_usage_vis_vram) rrdset_is_obsolete(c->st_mem_usage_vis_vram);
-
-    if(c->pathname_mem_used_gtt) freez((void *) c->pathname_mem_used_gtt);
-    if(c->pathname_mem_total_gtt) freez((void *) c->pathname_mem_total_gtt);
-    if(c->st_mem_usage_perc_gtt) rrdset_is_obsolete(c->st_mem_usage_perc_gtt);
-    if(c->st_mem_usage_gtt) rrdset_is_obsolete(c->st_mem_usage_gtt);
-
 
     /* remove card from linked list */
     if(c == card_root) card_root = c->next;
@@ -640,7 +606,6 @@ static void card_free(struct card *c){
     }
 
     freez(c);
-
 }
 
 static int read_multiline_file(procfile *ff, char *pathname, collected_number *num){
@@ -664,6 +629,158 @@ static int read_multiline_file(procfile *ff, char *pathname, collected_number *n
 
     procfile_close(ff);
     return 2; // error
+}
+
+typedef int (*do_rrd_x_func)(struct card *const c);
+
+struct do_rrd_x {
+    do_rrd_x_func func;
+    struct do_rrd_x *next;
+};
+
+static void add_do_rrd_x(struct card *const c, const do_rrd_x_func func){
+    struct do_rrd_x *const drrd = callocz(1, sizeof(struct do_rrd_x));
+    drrd->func = func;
+    drrd->next = c->do_rrd_x_root;
+    c->do_rrd_x_root = drrd;
+}
+
+static void rm_do_rrd_x(struct card *const c, struct do_rrd_x *const drrd){
+    if(drrd == c->do_rrd_x_root) c->do_rrd_x_root = drrd->next;
+    else {
+        struct do_rrd_x *last;
+        for(last = c->do_rrd_x_root; last && last->next != drrd; last = last->next);
+        if(last) last->next = drrd->next;
+    }
+
+    freez(drrd);
+}
+
+static int do_rrd_util_gpu(struct card *const c){
+    if(likely(!read_single_number_file(c->pathname_util_gpu, (unsigned long long *) &c->util_gpu))){
+        rrddim_set_by_pointer(c->st_util_gpu, c->rd_util_gpu, c->util_gpu);
+        rrdset_done(c->st_util_gpu);
+        return 0;
+    }
+    else {
+        collector_error("Cannot read util_gpu for %s: [%s]", c->pathname, c->id.marketing_name);
+        freez((void *) c->pathname_util_gpu);
+        rrdset_is_obsolete(c->st_util_gpu);
+        return 1;
+    }
+}
+
+static int do_rrd_util_mem(struct card *const c){
+    if(likely(!read_single_number_file(c->pathname_util_mem, (unsigned long long *) &c->util_mem))){
+        rrddim_set_by_pointer(c->st_util_mem, c->rd_util_mem, c->util_mem);
+        rrdset_done(c->st_util_mem);
+        return 0;
+    }
+    else {
+        collector_error("Cannot read util_mem for %s: [%s]", c->pathname, c->id.marketing_name);
+        freez((void *) c->pathname_util_mem);
+        rrdset_is_obsolete(c->st_util_mem);
+        return 1;
+    }
+}
+
+static int do_rrd_clk_gpu(struct card *const c){
+    if(likely(!read_multiline_file(c->ff_clk_gpu, (char *) c->pathname_clk_gpu, &c->clk_gpu))){
+        rrddim_set_by_pointer(c->st_clk_gpu, c->rd_clk_gpu, c->clk_gpu);
+        rrdset_done(c->st_clk_gpu);
+        return 0;
+    }
+    else {
+        collector_error("Cannot read clk_gpu for %s: [%s]", c->pathname, c->id.marketing_name);
+        freez((void *) c->pathname_clk_gpu);
+        rrdset_is_obsolete(c->st_clk_gpu);
+        procfile_close(c->ff_clk_gpu);
+        return 1;
+    }
+}
+
+static int do_rrd_clk_mem(struct card *const c){
+    if(likely(!read_multiline_file(c->ff_clk_mem, (char *) c->pathname_clk_mem, &c->clk_mem))){
+        rrddim_set_by_pointer(c->st_clk_mem, c->rd_clk_mem, c->clk_mem);
+        rrdset_done(c->st_clk_mem);
+        return 0;
+    }
+    else {
+        collector_error("Cannot read clk_mem for %s: [%s]", c->pathname, c->id.marketing_name);
+        freez((void *) c->pathname_clk_mem);
+        rrdset_is_obsolete(c->st_clk_mem);
+        procfile_close(c->ff_clk_mem);
+        return 1;
+    }
+}
+
+static int do_rrd_vram(struct card *const c){
+    if(likely(!read_single_number_file(c->pathname_mem_used_vram, (unsigned long long *) &c->used_vram) && 
+            c->total_vram)){
+        rrddim_set_by_pointer(  c->st_mem_usage_perc_vram, 
+                                c->rd_mem_used_perc_vram, 
+                                c->used_vram * 10000 / c->total_vram);
+        rrdset_done(c->st_mem_usage_perc_vram);
+
+        rrddim_set_by_pointer(c->st_mem_usage_vram, c->rd_mem_used_vram, c->used_vram);
+        rrddim_set_by_pointer(c->st_mem_usage_vram, c->rd_mem_free_vram, c->total_vram - c->used_vram);
+        rrdset_done(c->st_mem_usage_vram);
+        return 0;
+    }
+    else {
+        collector_error("Cannot read used_vram for %s: [%s]", c->pathname, c->id.marketing_name);
+        freez((void *) c->pathname_mem_used_vram);
+        freez((void *) c->pathname_mem_total_vram);
+        rrdset_is_obsolete(c->st_mem_usage_perc_vram);
+        rrdset_is_obsolete(c->st_mem_usage_vram);
+        return 1;
+    }
+}
+
+static int do_rrd_vis_vram(struct card *const c){
+    if(likely(!read_single_number_file(c->pathname_mem_used_vis_vram, (unsigned long long *) &c->used_vis_vram) && 
+            c->total_vis_vram)){
+        rrddim_set_by_pointer(  c->st_mem_usage_perc_vis_vram, 
+                                c->rd_mem_used_perc_vis_vram, 
+                                c->used_vis_vram * 10000 / c->total_vis_vram);
+        rrdset_done(c->st_mem_usage_perc_vis_vram);
+    
+        rrddim_set_by_pointer(c->st_mem_usage_vis_vram, c->rd_mem_used_vis_vram, c->used_vis_vram);
+        rrddim_set_by_pointer(c->st_mem_usage_vis_vram, c->rd_mem_free_vis_vram, c->total_vis_vram - c->used_vis_vram);
+        rrdset_done(c->st_mem_usage_vis_vram);
+        return 0;
+    }
+    else {
+        collector_error("Cannot read used_vis_vram for %s: [%s]", c->pathname, c->id.marketing_name);
+        freez((void *) c->pathname_mem_used_vis_vram);
+        freez((void *) c->pathname_mem_total_vis_vram);
+        rrdset_is_obsolete(c->st_mem_usage_perc_vis_vram);
+        rrdset_is_obsolete(c->st_mem_usage_vis_vram);
+        return 1;
+    }
+}
+
+static int do_rrd_gtt(struct card *const c){
+    if(likely(!read_single_number_file(c->pathname_mem_used_gtt, (unsigned long long *) &c->used_gtt) && 
+            c->total_gtt)){
+        rrddim_set_by_pointer(  c->st_mem_usage_perc_gtt, 
+                                c->rd_mem_used_perc_gtt, 
+                                c->used_gtt * 10000 / c->total_gtt);
+        rrdset_done(c->st_mem_usage_perc_gtt);
+    
+        rrddim_set_by_pointer(c->st_mem_usage_gtt, c->rd_mem_used_gtt, c->used_gtt);
+        rrddim_set_by_pointer(c->st_mem_usage_gtt, c->rd_mem_free_gtt, c->total_gtt - c->used_gtt);
+        rrdset_done(c->st_mem_usage_gtt);
+        return 0;
+    }
+    else {
+        collector_error("Cannot read used_gtt for %s: [%s]", c->pathname, c->id.marketing_name);
+        freez((void *) c->pathname_mem_used_gtt);
+        freez((void *) c->pathname_mem_total_gtt);
+        rrdset_is_obsolete(c->st_mem_usage_perc_gtt);
+        rrdset_is_obsolete(c->st_mem_usage_gtt);
+        return 1;
+    }
 }
 
 static char *set_id(const char *suf_1, const char *suf_2, const char *suf_3){
@@ -758,6 +875,7 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                     c->rd_util_gpu = rrddim_add(c->st_util_gpu, "utilization", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
+                    add_do_rrd_x(c, do_rrd_util_gpu);
                 }
 
                 set_prop_pathname("device/mem_busy_percent", c->pathname_util_mem, NULL);
@@ -782,6 +900,7 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                     c->rd_util_mem = rrddim_add(c->st_util_mem, "utilization", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
+                    add_do_rrd_x(c, do_rrd_util_mem);
                 }
 
 
@@ -809,6 +928,8 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                     c->rd_clk_gpu = rrddim_add(c->st_clk_gpu, "frequency", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
+                    add_do_rrd_x(c, do_rrd_clk_gpu);
+
                 }
 
                 set_prop_pathname("device/pp_dpm_mclk", c->pathname_clk_mem, c->ff_clk_mem);
@@ -833,6 +954,7 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                     c->rd_clk_mem = rrddim_add(c->st_clk_mem, "frequency", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
+                    add_do_rrd_x(c, do_rrd_clk_mem);
                 }
 
 
@@ -883,6 +1005,8 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                     c->rd_mem_used_vram = rrddim_add(c->st_mem_usage_vram, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                     c->rd_mem_free_vram = rrddim_add(c->st_mem_usage_vram, "free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
+
+                    add_do_rrd_x(c, do_rrd_vram);
                 }
 
                 set_prop_pathname("device/mem_info_vis_vram_used",  c->pathname_mem_used_vis_vram,  NULL);
@@ -930,6 +1054,8 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                     c->rd_mem_used_vis_vram = rrddim_add(c->st_mem_usage_vis_vram, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                     c->rd_mem_free_vis_vram = rrddim_add(c->st_mem_usage_vis_vram, "free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
+
+                    add_do_rrd_x(c, do_rrd_vis_vram);
                 }
 
                 set_prop_pathname("device/mem_info_gtt_used",       c->pathname_mem_used_gtt,       NULL);
@@ -976,6 +1102,8 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                     c->rd_mem_used_gtt = rrddim_add(c->st_mem_usage_gtt, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                     c->rd_mem_free_gtt = rrddim_add(c->st_mem_usage_gtt, "free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
+
+                    add_do_rrd_x(c, do_rrd_gtt);
                 }
 
                 c->next = card_root;
@@ -985,92 +1113,28 @@ int do_sys_class_drm(int update_every, usec_t dt) {
     }
 
 
-    #define read_file_error(var_name) {                                                                 \
-        collector_error("Cannot read %s for %s: [%s]", #var_name, c->pathname, c->id.marketing_name);   \
-        card_free(c);                                                                                   \
-        break;                                                                                          \
+    struct card *card_cur = card_root,
+                *card_next;
+    while(card_cur){
+
+        struct do_rrd_x *do_rrd_x_cur = card_cur->do_rrd_x_root,
+                        *do_rrd_x_next;
+        while(do_rrd_x_cur){
+            if(unlikely(do_rrd_x_cur->func(card_cur))) {
+                do_rrd_x_next = do_rrd_x_cur->next;
+                rm_do_rrd_x(card_cur, do_rrd_x_cur);
+                do_rrd_x_cur = do_rrd_x_next;
+            }
+            else do_rrd_x_cur = do_rrd_x_cur->next;
+        }
+        
+        if(unlikely(!card_cur->do_rrd_x_root)){
+            card_next = card_cur->next;
+            card_free(card_cur);
+            card_cur = card_next;
+        }
+        else card_cur = card_cur->next;
     }
 
-    for(struct card *c = card_root; c; c = c->next) {
-        
-        /* Do GPU and VRAM utilization update */
-
-        if(likely(!read_single_number_file(c->pathname_util_gpu, (unsigned long long *) &c->util_gpu))){
-            rrddim_set_by_pointer(c->st_util_gpu, c->rd_util_gpu, c->util_gpu);
-            rrdset_done(c->st_util_gpu);
-        }
-        else read_file_error(util_gpu);
-
-        if(likely(!read_single_number_file(c->pathname_util_mem, (unsigned long long *) &c->util_mem))){
-            rrddim_set_by_pointer(c->st_util_mem, c->rd_util_mem, c->util_mem);
-            rrdset_done(c->st_util_mem);
-        }
-        else read_file_error(util_mem);
-
-
-        /* Do GPU and VRAM clock frequency update */
-
-        if(likely(!read_multiline_file(c->ff_clk_gpu, (char *) c->pathname_clk_gpu, &c->clk_gpu))){
-            rrddim_set_by_pointer(c->st_clk_gpu, c->rd_clk_gpu, c->clk_gpu);
-            rrdset_done(c->st_clk_gpu);
-        }
-        else read_file_error(clk_gpu);
-
-        if(likely(!read_multiline_file(c->ff_clk_mem, (char *) c->pathname_clk_mem, &c->clk_mem))){
-            rrddim_set_by_pointer(c->st_clk_mem, c->rd_clk_mem, c->clk_mem);
-            rrdset_done(c->st_clk_mem);
-        }
-        else read_file_error(clk_mem);
-
-
-        /* Do GPU memory usage update */
-
-        if(likely(!read_single_number_file(c->pathname_mem_used_vram, (unsigned long long *) &c->used_vram) && 
-                c->total_vram)){
-
-            rrddim_set_by_pointer(  c->st_mem_usage_perc_vram, 
-                                    c->rd_mem_used_perc_vram, 
-                                    c->used_vram * 10000 / c->total_vram);
-            rrdset_done(c->st_mem_usage_perc_vram);
-
-            rrddim_set_by_pointer(c->st_mem_usage_vram, c->rd_mem_used_vram, c->used_vram);
-            rrddim_set_by_pointer(c->st_mem_usage_vram, c->rd_mem_free_vram, c->total_vram - c->used_vram);
-            rrdset_done(c->st_mem_usage_vram);
-
-        }
-        else read_file_error(used_vram);
-
-        if(likely(!read_single_number_file(c->pathname_mem_used_vis_vram, (unsigned long long *) &c->used_vis_vram) &&
-                c->total_vis_vram)){
-
-            rrddim_set_by_pointer(  c->st_mem_usage_perc_vis_vram, 
-                                    c->rd_mem_used_perc_vis_vram, 
-                                    c->used_vis_vram * 10000 / c->total_vis_vram);
-            rrdset_done(c->st_mem_usage_perc_vis_vram);
-        
-            rrddim_set_by_pointer(c->st_mem_usage_vis_vram, c->rd_mem_used_vis_vram, c->used_vis_vram);
-            rrddim_set_by_pointer(c->st_mem_usage_vis_vram, c->rd_mem_free_vis_vram, c->total_vis_vram - c->used_vis_vram);
-            rrdset_done(c->st_mem_usage_vis_vram);
-            
-        }
-        else read_file_error(used_vis_vram);
-
-        if(likely(!read_single_number_file(c->pathname_mem_used_gtt, (unsigned long long *) &c->used_gtt) &&
-                c->total_gtt)){
-                    
-            rrddim_set_by_pointer(  c->st_mem_usage_perc_gtt, 
-                                    c->rd_mem_used_perc_gtt, 
-                                    c->used_gtt * 10000 / c->total_gtt);
-            rrdset_done(c->st_mem_usage_perc_gtt);
-        
-            rrddim_set_by_pointer(c->st_mem_usage_gtt, c->rd_mem_used_gtt, c->used_gtt);
-            rrddim_set_by_pointer(c->st_mem_usage_gtt, c->rd_mem_free_gtt, c->total_gtt - c->used_gtt);
-            rrdset_done(c->st_mem_usage_gtt);
-            
-        }
-        else read_file_error(used_gtt);
-
-    }
-
-    return 0;
+    return card_root ? 0 : 1;
 }
