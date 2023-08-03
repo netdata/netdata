@@ -118,7 +118,7 @@ static inline size_t storage_engine_disk_space_used(STORAGE_ENGINE_ID id, STORAG
             return rrddim_disk_space_used(db_instance);
 #ifdef ENABLE_DBENGINE
         case STORAGE_ENGINE_DBENGINE:
-            return rrdeng_disk_space_max(db_instance);
+            return rrdeng_disk_space_used(db_instance);
 #endif
         default:
             __builtin_unreachable();
