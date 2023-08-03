@@ -301,6 +301,7 @@ typedef struct {
     unsigned train_every;
 
     unsigned num_models_to_use;
+    unsigned delete_models_older_than;
 
     unsigned db_engine_anomaly_rate_every;
 

@@ -436,6 +436,10 @@ const char *db_models_delete =
     "DELETE FROM models "
     "WHERE dim_id = @dim_id AND before < @before;";
 
+const char *db_models_prune =
+    "DELETE FROM models "
+    "WHERE before < %ld";
+
 static int
 ml_dimension_add_model(const uuid_t *metric_uuid, const ml_kmeans_t *km)
 {
@@ -1677,6 +1681,7 @@ void ml_init()
         db = NULL;
     }
 
+    // create table
     if (db) {
         char *err = NULL;
         int rc = sqlite3_exec(db, db_models_create_table, NULL, NULL, &err);
@@ -1684,6 +1689,18 @@ void ml_init()
             error_report("Failed to create models table (%s, %s)", sqlite3_errstr(rc), err ? err : "");
             sqlite3_close(db);
             sqlite3_free(err);
+            db = NULL;
+        }
+    }
+
+    // delete very old models
+    if (db) {
+        char cmd[1024 + 1];
+        snprintfz(cmd, 1024, db_models_prune, now_realtime_sec() - Cfg.delete_models_older_than);
+
+        int rc = db_execute(db, cmd);
+        if (rc == 1) {
+            sqlite3_close(db);
             db = NULL;
         }
     }
