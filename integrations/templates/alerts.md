@@ -1,5 +1,8 @@
-[% if entry.alerts %]
 ## Alerts
+
+[% if entry.alerts %]
+
+The following alerts are available:
 
 |  Alert name  | On metric | Description |
 |:------------:|:---------:|:-----------:|
