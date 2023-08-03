@@ -114,18 +114,7 @@ static int _get_list_of_modules_json_cb(const DICTIONARY_ITEM *item, void *entry
 
     json_object *json_item = json_object_new_string(module->name);
     json_object_object_add(json_module, "name", json_item);
-    const char *module_type;
-    switch (module->type) {
-        case MOD_TYPE_SINGLE:
-            module_type = "single";
-            break;
-        case MOD_TYPE_ARRAY:
-            module_type = "job_array";
-            break;
-        default:
-            module_type = "unknown";
-            break;
-    }
+    const char *module_type = module_type2str(module->type);
     json_item = json_object_new_string(module_type);
     json_object_object_add(json_module, "type", json_item);
 

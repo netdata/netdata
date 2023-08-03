@@ -31,6 +31,18 @@ static inline enum module_type str2_module_type(const char *type_name)
     return MOD_TYPE_UNKNOWN;
 }
 
+static inline const char *module_type2str(enum module_type type)
+{
+    switch (type) {
+        case MOD_TYPE_ARRAY:
+            return "job_array";
+        case MOD_TYPE_SINGLE:
+            return "single";
+        default:
+            return "unknown";
+    }
+}
+
 struct dyncfg_config {
     void *data;
     size_t data_size;
