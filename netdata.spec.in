@@ -160,7 +160,6 @@ Requires: netdata-plugin-perf
 %if 0%{?_have_nfacct}
 Requires: netdata-plugin-nfacct
 %endif
-%endif
 %if 0%{?_have_freeipmi} && 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
 Suggests: netdata-plugin-freeipmi
 %endif
