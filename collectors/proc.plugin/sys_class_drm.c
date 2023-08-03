@@ -849,12 +849,13 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
 
                 collected_number tmp_val; 
-                #define set_prop_pathname(prop_filename, prop_pathname, ff){                     \
-                    snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, prop_filename);      \
-                    if(ff && !read_multiline_file(ff, filename, &tmp_val))                       \
-                        prop_pathname = strdupz(filename);                                       \
-                    else if(!read_single_number_file(filename, (unsigned long long *) &tmp_val)) \
-                        prop_pathname = strdupz(filename);                                       \
+                #define set_prop_pathname(prop_filename, prop_pathname, ff){                    \
+                    snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, prop_filename);     \
+                    if((ff && !read_multiline_file(ff, filename, &tmp_val)) ||                  \
+                          !read_single_number_file(filename, (unsigned long long *) &tmp_val))  \
+                        prop_pathname = strdupz(filename);                                      \
+                    else                                                                        \
+                        collector_error("Cannot read file '%s'", filename);                     \
                 }
 
                 /* Initialize GPU and VRAM utilization metrics */
