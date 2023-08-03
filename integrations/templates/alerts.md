@@ -1,4 +1,6 @@
 [% if entry.alerts %]
+## Alerts
+
 |  Alert name  | On metric | Description |
 |:------------:|:---------:|:-----------:|
 [% for alert in entry.alerts %]
