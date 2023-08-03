@@ -624,6 +624,28 @@ In a nutshell, Netdata proves invaluable for:
 &nbsp;<br/>&nbsp;<br/>
 </details>
 
+### Is Netdata open-source?
+
+The Netdata Agent back-end is entirely open-source. We ship 3 different versions of the UI: 2 open-source versions and 1 closed-source version.
+
+<details><summary>Click to see detailed answer ...</summary>
+&nbsp;<br/>&nbsp;<br/>
+
+The entire back-end of the Netdata Agent is open-source, licensed under GPLv3+. We don't develop a separate enterprise version. All users, including commercial ones, use the same Netdata Agent.
+
+The Netdata Agent is shipped with multiple UI versions:
+
+- `http://agent.ip:19999/v0/`, the original open-source single-node UI, GPLv3+.
+- `http://agent.ip:19999/v1/`, the latest open-source single-node UI, GPLv3+.
+- `http://agent.ip:19999/v2/`, a snapshot of the latest Netdata Cloud UI as it was at the time the agent was released, licensed to be distributed with Netdata Agents under [NCUL1](https://github.com/netdata/netdata/blob/master/web/gui/v2/LICENSE.md).
+
+When you access a Netdata Agent via `http://agent.ip:19999/` a splash screen attempts to use the latest live version of Netdata Cloud UI (downloaded from Cloudflare). This only happens when the web browser has internet connectivity and Netdata Cloud is not disabled at the agent configuration. Otherwise, it falls back to `http://agent.ip:19999/v2/`.
+
+The Netdata Cloud UI is not open-source. But we thought that it is to the benefit of the community to allow everyone to use it directly with Netdata Agents, for free, even if Netdata Cloud is not used.
+
+&nbsp;<br/>&nbsp;<br/>
+</details>
+
 ## :book: Documentation
 
 Netdata's documentation is available at [**Netdata Learn**](https://learn.netdata.cloud).
@@ -687,5 +709,7 @@ instructions on building each Netdata component from the source and preparing a 
 
 ## License
 
-The Netdata Agent is [GPLv3+](https://github.com/netdata/netdata/blob/master/LICENSE). Netdata re-distributes other open-source tools and libraries. Please check the
+Netdata is [GPLv3+](https://github.com/netdata/netdata/blob/master/LICENSE). Netdata re-distributes other open-source tools and libraries. Please check the
 [third party licenses](https://github.com/netdata/netdata/blob/master/REDISTRIBUTED.md).
+
+The Latest Netdata UI, is [NCUL1](https://github.com/netdata/netdata/blob/master/web/gui/v2/LICENSE.md) and is not open-source. It also uses third party open source components. Check the [UI third party licenses](https://github.com/netdata/netdata/blob/master/web/gui/v2/3D_PARTY_LICENSES.txt)
