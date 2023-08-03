@@ -11,6 +11,12 @@
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
+#ifndef SD_JOURNAL_ALL_NAMESPACES
+#define JOURNAL_NAMESPACE SD_JOURNAL_LOCAL_ONLY
+#else
+#define JOURNAL_NAMESPACE SD_JOURNAL_ALL_NAMESPACES
+#endif
+
 #include <systemd/sd-journal.h>
 #include <syslog.h>
 
@@ -67,7 +73,7 @@ int systemd_journal_query(BUFFER *wb, FACETS *facets, usec_t after_ut, usec_t be
     int r;
 
     // Open the system journal for reading
-    r = sd_journal_open(&j, SD_JOURNAL_ALL_NAMESPACES);
+    r = sd_journal_open(&j, JOURNAL_NAMESPACE);
     if (r < 0)
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
 
