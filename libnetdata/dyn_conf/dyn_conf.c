@@ -472,8 +472,11 @@ int register_module(struct configurable_plugin *plugin, struct module *module)
     return 0;
 }
 
+void freez_dyncfg(void *ptr) {
+    freez(ptr);
+}
 
-void handle_dyncfg_root(struct uni_http_response *resp, int method)
+static void handle_dyncfg_root(struct uni_http_response *resp, int method)
 {
     if (method != HTTP_METHOD_GET) {
         resp->content = "method not allowed";
@@ -488,11 +491,11 @@ void handle_dyncfg_root(struct uni_http_response *resp, int method)
     json_object_put(wrapper);
     resp->status = HTTP_RESP_OK;
     resp->content_type = CT_APPLICATION_JSON;
-    resp->content_free = freez;
+    resp->content_free = freez_dyncfg;
     resp->content_length = strlen(resp->content);
 }
 
-void handle_plugin_root(struct uni_http_response *resp, int method, struct configurable_plugin *plugin, void *post_payload, size_t post_payload_size)
+static void handle_plugin_root(struct uni_http_response *resp, int method, struct configurable_plugin *plugin, void *post_payload, size_t post_payload_size)
 {
     switch(method) {
         case HTTP_METHOD_GET:
@@ -501,7 +504,7 @@ void handle_plugin_root(struct uni_http_response *resp, int method, struct confi
             resp->content = mallocz(cfg.data_size);
             memcpy(resp->content, cfg.data, cfg.data_size);
             resp->status = HTTP_RESP_OK;
-            resp->content_free = free;
+            resp->content_free = freez_dyncfg;
             resp->content_length = cfg.data_size;
             return;
         }
@@ -545,7 +548,7 @@ void handle_module_root(struct uni_http_response *resp, int method, struct confi
         resp->content = mallocz(cfg.data_size);
         memcpy(resp->content, cfg.data, cfg.data_size);
         resp->status = HTTP_RESP_OK;
-        resp->content_free = freez;
+        resp->content_free = freez_dyncfg;
         resp->content_length = cfg.data_size;
         return;
     }
@@ -563,7 +566,7 @@ void handle_module_root(struct uni_http_response *resp, int method, struct confi
         json_object_put(wrapper);
         resp->status = HTTP_RESP_OK;
         resp->content_type = CT_APPLICATION_JSON;
-        resp->content_free = freez;
+        resp->content_free = freez_dyncfg;
         resp->content_length = strlen(resp->content);
         return;
     }
@@ -579,7 +582,7 @@ void handle_module_root(struct uni_http_response *resp, int method, struct confi
         resp->content = mallocz(cfg.data_size);
         memcpy(resp->content, cfg.data, cfg.data_size);
         resp->status = HTTP_RESP_OK;
-        resp->content_free = free;
+        resp->content_free = freez_dyncfg;
         resp->content_length = cfg.data_size;
         return;
     } else if (method == HTTP_METHOD_PUT) {
@@ -655,7 +658,7 @@ static inline void _handle_job_root(struct uni_http_response *resp, int method, 
             resp->content = mallocz(cfg.data_size);
             memcpy(resp->content, cfg.data, cfg.data_size);
             resp->status = HTTP_RESP_OK;
-            resp->content_free = freez;
+            resp->content_free = freez_dyncfg;
             resp->content_length = cfg.data_size;
             return;
         }
@@ -710,7 +713,7 @@ void handle_job_root(struct uni_http_response *resp, int method, struct module *
         resp->content = mallocz(cfg.data_size);
         memcpy(resp->content, cfg.data, cfg.data_size);
         resp->status = HTTP_RESP_OK;
-        resp->content_free = freez;
+        resp->content_free = freez_dyncfg;
         resp->content_length = cfg.data_size;
         return;
     }
@@ -719,7 +722,7 @@ void handle_job_root(struct uni_http_response *resp, int method, struct module *
         resp->content = mallocz(cfg.data_size);
         memcpy(resp->content, cfg.data, cfg.data_size);
         resp->status = HTTP_RESP_OK;
-        resp->content_free = freez;
+        resp->content_free = freez_dyncfg;
         resp->content_length = cfg.data_size;
         return;
     }
@@ -743,7 +746,7 @@ void handle_job_root(struct uni_http_response *resp, int method, struct module *
         json_object_put(wrapper);
         resp->status = HTTP_RESP_OK;
         resp->content_type = CT_APPLICATION_JSON;
-        resp->content_free = freez;
+        resp->content_free = freez_dyncfg;
         resp->content_length = strlen(resp->content);
         return;
     }
