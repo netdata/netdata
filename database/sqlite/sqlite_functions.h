@@ -29,7 +29,7 @@ typedef enum db_check_action_type {
 
 #define CHECK_SQLITE_CONNECTION(db_meta)                                                                               \
     if (unlikely(!db_meta)) {                                                                                          \
-        if (default_storage_engine_id != STORAGE_ENGINE_DBENGINE) {                                                     \
+        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {                                                     \
             return 1;                                                                                                  \
         }                                                                                                              \
         error_report("Database has not been initialized");                                                             \

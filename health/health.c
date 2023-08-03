@@ -254,7 +254,7 @@ static inline void unlink_alarm_notify_in_progress(ALARM_ENTRY *ae)
  *
  * @return a pointer to the user config directory
  */
-static const char *health_user_config_dir(void) {
+inline char *health_user_config_dir(void) {
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_user_config_dir);
     return config_get(CONFIG_SECTION_DIRECTORIES, "health config", buffer);
@@ -267,7 +267,7 @@ static const char *health_user_config_dir(void) {
  *
  * @return a pointer to the stock config directory.
  */
-static const char *health_stock_config_dir(void) {
+inline char *health_stock_config_dir(void) {
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_stock_config_dir);
     return config_get(CONFIG_SECTION_DIRECTORIES, "stock health config", buffer);
@@ -344,8 +344,8 @@ static void health_reload_host(RRDHOST *host) {
 
     netdata_log_health("[%s]: Reloading health.", rrdhost_hostname(host));
 
-    const char *user_path = health_user_config_dir();
-    const char *stock_path = health_stock_config_dir();
+    char *user_path = health_user_config_dir();
+    char *stock_path = health_stock_config_dir();
 
     // free all running alarms
     rrdcalc_delete_all(host);
@@ -403,7 +403,7 @@ void health_reload(void) {
     sql_refresh_hashes();
 
     RRDHOST *host;
-    dfe_start_reentrant(rrdb.rrdhost_root_index, host){
+    dfe_start_reentrant(rrdhost_root_index, host){
         health_reload_host(host);
     }
     dfe_done(host);
@@ -1080,7 +1080,7 @@ void *health_main(void *ptr) {
         }
 
         worker_is_busy(WORKER_HEALTH_JOB_RRD_LOCK);
-        dfe_start_reentrant(rrdb.rrdhost_root_index, host) {
+        dfe_start_reentrant(rrdhost_root_index, host) {
 
             if(unlikely(!service_running(SERVICE_HEALTH)))
                 break;
@@ -1114,7 +1114,7 @@ void *health_main(void *ptr) {
             }
 
             // wait until cleanup of obsolete charts on children is complete
-            if (host != rrdb.localhost) {
+            if (host != localhost) {
                 if (unlikely(host->trigger_chart_obsoletion_check == 1)) {
                     netdata_log_health("[%s]: Waiting for chart obsoletion check.", rrdhost_hostname(host));
                     continue;
@@ -1611,7 +1611,7 @@ void *health_main(void *ptr) {
 }
 
 void health_add_host_labels(void) {
-    DICTIONARY *labels = rrdb.localhost->rrdlabels;
+    DICTIONARY *labels = localhost->rrdlabels;
 
     // The source should be CONF, but when it is set, these labels are exported by default ('send configured labels' in exporting.conf).
     // Their export seems to break exporting to Graphite, see https://github.com/netdata/netdata/issues/14084.

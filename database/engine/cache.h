@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 #ifndef DBENGINE_CACHE_H
 #define DBENGINE_CACHE_H
 

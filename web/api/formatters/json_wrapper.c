@@ -16,7 +16,7 @@ static void jsonwrap_query_metric_plan(BUFFER *wb, QUERY_METRIC *qm) {
     buffer_json_array_close(wb);
 
     buffer_json_member_add_array(wb, "tiers");
-    for (size_t tier = 0; tier < rrdb.storage_tiers; tier++) {
+    for (size_t tier = 0; tier < storage_tiers; tier++) {
         buffer_json_add_array_item_object(wb);
         buffer_json_member_add_uint64(wb, "tr", tier);
         buffer_json_member_add_time_t(wb, "fe", qm->tiers[tier].db_first_time_s);
@@ -920,7 +920,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb) {
     buffer_json_member_add_string(wb, "format", rrdr_format_to_string(format));
 
     buffer_json_member_add_array(wb, "db_points_per_tier");
-    for(size_t tier = 0; tier < rrdb.storage_tiers ; tier++)
+    for(size_t tier = 0; tier < storage_tiers ; tier++)
         buffer_json_add_array_item_uint64(wb, qt->db.tiers[tier].points);
     buffer_json_array_close(wb);
 
@@ -1269,7 +1269,7 @@ static void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS
 void version_hashes_api_v2(BUFFER *wb, struct query_versions *versions) {
     buffer_json_member_add_object(wb, "versions");
     buffer_json_member_add_uint64(wb, "routing_hard_hash", 1);
-    buffer_json_member_add_uint64(wb, "nodes_hard_hash", dictionary_version(rrdb.rrdhost_root_index));
+    buffer_json_member_add_uint64(wb, "nodes_hard_hash", dictionary_version(rrdhost_root_index));
     buffer_json_member_add_uint64(wb, "contexts_hard_hash", versions->contexts_hard_hash);
     buffer_json_member_add_uint64(wb, "contexts_soft_hash", versions->contexts_soft_hash);
     buffer_json_member_add_uint64(wb, "alerts_hard_hash", versions->alerts_hard_hash);
@@ -1498,7 +1498,7 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
 
     buffer_json_member_add_object(wb, "db");
     {
-        buffer_json_member_add_uint64(wb, "tiers", rrdb.storage_tiers);
+        buffer_json_member_add_uint64(wb, "tiers", storage_tiers);
         buffer_json_member_add_time_t(wb, "update_every", qt->db.minimum_latest_update_every_s);
         buffer_json_member_add_time_t(wb, "first_entry", qt->db.first_time_s);
         buffer_json_member_add_time_t(wb, "last_entry", qt->db.last_time_s);
@@ -1513,7 +1513,7 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
         buffer_json_object_close(wb); // dimensions
 
         buffer_json_member_add_array(wb, "per_tier");
-        for(size_t tier = 0; tier < rrdb.storage_tiers ; tier++) {
+        for(size_t tier = 0; tier < storage_tiers ; tier++) {
             buffer_json_add_array_item_object(wb);
             buffer_json_member_add_uint64(wb, "tier", tier);
             buffer_json_member_add_uint64(wb, "queries", qt->db.tiers[tier].queries);

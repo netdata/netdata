@@ -802,7 +802,7 @@ void rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(RRDHOST *host
 
 void rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts() {
     RRDHOST *host;
-    dfe_start_reentrant(rrdb.rrdhost_root_index, host) {
+    dfe_start_reentrant(rrdhost_root_index, host) {
         if (unlikely(!host->health.health_enabled))
             continue;
 

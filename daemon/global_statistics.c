@@ -83,7 +83,7 @@ static struct global_statistics {
 };
 
 void global_statistics_rrdset_done_chart_collection_completed(size_t *points_read_per_tier_array) {
-    for(size_t tier = 0; tier < rrdb.storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < storage_tiers ;tier++) {
         __atomic_fetch_add(&global_statistics.db_points_stored_per_tier[tier], points_read_per_tier_array[tier], __ATOMIC_RELAXED);
         points_read_per_tier_array[tier] = 0;
     }
@@ -210,7 +210,7 @@ static inline void global_statistics_copy(struct global_statistics *gs, uint8_t 
     gs->backfill_queries_made       = __atomic_load_n(&global_statistics.backfill_queries_made, __ATOMIC_RELAXED);
     gs->backfill_db_points_read     = __atomic_load_n(&global_statistics.backfill_db_points_read, __ATOMIC_RELAXED);
 
-    for(size_t tier = 0; tier < rrdb.storage_tiers ;tier++)
+    for(size_t tier = 0; tier < storage_tiers ;tier++)
         gs->db_points_stored_per_tier[tier] = __atomic_load_n(&global_statistics.db_points_stored_per_tier[tier], __ATOMIC_RELAXED);
 
     if(options & GLOBAL_STATS_RESET_WEB_USEC_MAX) {
@@ -262,7 +262,7 @@ static void global_statistics_charts(void) {
                     , "netdata"
                     , "stats"
                     , 130000
-                    , rrdb.localhost->update_every
+                    , localhost->rrd_update_every
                     , RRDSET_TYPE_STACKED
             );
 
@@ -308,7 +308,7 @@ static void global_statistics_charts(void) {
                     "netdata",
                     "stats",
                     130100,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_STACKED);
 
             rd_database = rrddim_add(st_memory, "db", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -397,7 +397,7 @@ static void global_statistics_charts(void) {
                 "netdata",
                 "stats",
                 130101,
-                rrdb.localhost->update_every,
+                localhost->rrd_update_every,
                 RRDSET_TYPE_STACKED);
 
             rd_queries = rrddim_add(st_memory_buffers, "queries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -452,7 +452,7 @@ static void global_statistics_charts(void) {
                     "netdata",
                     "stats",
                     130150,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_LINE);
 
             rd_uptime = rrddim_add(st_uptime, "uptime", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -480,7 +480,7 @@ static void global_statistics_charts(void) {
                     , "netdata"
                     , "stats"
                     , 130200
-                    , rrdb.localhost->update_every
+                    , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
             );
 
@@ -509,7 +509,7 @@ static void global_statistics_charts(void) {
                     , "netdata"
                     , "stats"
                     , 130300
-                    , rrdb.localhost->update_every
+                    , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
             );
 
@@ -539,7 +539,7 @@ static void global_statistics_charts(void) {
                     , "netdata"
                     , "stats"
                     , 130400
-                    , rrdb.localhost->update_every
+                    , localhost->rrd_update_every
                     , RRDSET_TYPE_AREA
             );
 
@@ -571,7 +571,7 @@ static void global_statistics_charts(void) {
                     , "netdata"
                     , "stats"
                     , 130500
-                    , rrdb.localhost->update_every
+                    , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
             );
 
@@ -618,7 +618,7 @@ static void global_statistics_charts(void) {
                     , "netdata"
                     , "stats"
                     , 130600
-                    , rrdb.localhost->update_every
+                    , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
             );
 
@@ -670,7 +670,7 @@ static void global_statistics_charts(void) {
                     , "netdata"
                     , "stats"
                     , 131000
-                    , rrdb.localhost->update_every
+                    , localhost->rrd_update_every
                     , RRDSET_TYPE_STACKED
             );
 
@@ -721,7 +721,7 @@ static void global_statistics_charts(void) {
                     , "netdata"
                     , "stats"
                     , 131001
-                    , rrdb.localhost->update_every
+                    , localhost->rrd_update_every
                     , RRDSET_TYPE_STACKED
             );
 
@@ -770,7 +770,7 @@ static void global_statistics_charts(void) {
                     , "netdata"
                     , "stats"
                     , 131002
-                    , rrdb.localhost->update_every
+                    , localhost->rrd_update_every
                     , RRDSET_TYPE_STACKED
             );
 
@@ -810,18 +810,18 @@ static void global_statistics_charts(void) {
                     , "netdata"
                     , "stats"
                     , 131003
-                    , rrdb.localhost->update_every
+                    , localhost->rrd_update_every
                     , RRDSET_TYPE_STACKED
             );
 
-            for(size_t tier = 0; tier < rrdb.storage_tiers ;tier++) {
+            for(size_t tier = 0; tier < storage_tiers ;tier++) {
                 char buf[30 + 1];
                 snprintfz(buf, 30, "tier%zu", tier);
                 rds[tier] = rrddim_add(st_points_stored, buf, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
         }
 
-        for(size_t tier = 0; tier < rrdb.storage_tiers ;tier++)
+        for(size_t tier = 0; tier < storage_tiers ;tier++)
             rrddim_set_by_pointer(st_points_stored, rds[tier], (collected_number)gs.db_points_stored_per_tier[tier]);
 
         rrdset_done(st_points_stored);
@@ -882,7 +882,7 @@ static inline void sqlite3_statistics_copy(struct sqlite3_statistics *gs) {
     gs->sqlite3_queries_failed_locked = __atomic_load_n(&sqlite3_statistics.sqlite3_queries_failed_locked, __ATOMIC_RELAXED);
     gs->sqlite3_rows                  = __atomic_load_n(&sqlite3_statistics.sqlite3_rows, __ATOMIC_RELAXED);
 
-    usec_t timeout = rrdb.default_update_every * USEC_PER_SEC + rrdb.default_update_every * USEC_PER_SEC / 3;
+    usec_t timeout = default_rrd_update_every * USEC_PER_SEC + default_rrd_update_every * USEC_PER_SEC / 3;
     usec_t now = now_monotonic_usec();
     if(!last_run)
         last_run = now;
@@ -968,7 +968,7 @@ static void sqlite3_statistics_charts(void) {
                 , "netdata"
                 , "stats"
                 , 131100
-                , rrdb.localhost->update_every
+                , localhost->rrd_update_every
                 , RRDSET_TYPE_LINE
             );
 
@@ -998,7 +998,7 @@ static void sqlite3_statistics_charts(void) {
                 , "netdata"
                 , "stats"
                 , 131101
-                , rrdb.localhost->update_every
+                , localhost->rrd_update_every
                 , RRDSET_TYPE_LINE
             );
 
@@ -1034,7 +1034,7 @@ static void sqlite3_statistics_charts(void) {
                 , "netdata"
                 , "stats"
                 , 131102
-                , rrdb.localhost->update_every
+                , localhost->rrd_update_every
                 , RRDSET_TYPE_LINE
             );
 
@@ -1065,7 +1065,7 @@ static void sqlite3_statistics_charts(void) {
                 , "netdata"
                 , "stats"
                 , 131103
-                , rrdb.localhost->update_every
+                , localhost->rrd_update_every
                 , RRDSET_TYPE_LINE
             );
 
@@ -1109,7 +1109,7 @@ static void sqlite3_statistics_charts(void) {
                 , "netdata"
                 , "stats"
                 , 131104
-                , rrdb.localhost->update_every
+                , localhost->rrd_update_every
                 , RRDSET_TYPE_LINE
             );
 
@@ -1237,7 +1237,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_LINE);
 
             ptrs->rd_hit_ratio_closest = rrddim_add(ptrs->st_cache_hit_ratio, "closest", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
@@ -1285,7 +1285,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_LINE);
 
             ptrs->rd_searches_closest   = rrddim_add(ptrs->st_operations, "search closest", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1339,7 +1339,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_STACKED);
 
             ptrs->rd_pgc_memory_free     = rrddim_add(ptrs->st_pgc_memory, "free",     NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -1393,7 +1393,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_LINE);
 
             ptrs->rd_pgc_tm_current    = rrddim_add(ptrs->st_pgc_tm, "current",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -1443,7 +1443,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_LINE);
 
             ptrs->rd_pgc_pages_clean   = rrddim_add(ptrs->st_pgc_pages, "clean", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -1487,7 +1487,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_AREA);
 
             ptrs->rd_pgc_memory_new_clean         = rrddim_add(ptrs->st_pgc_memory_changes, "new clean", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1529,7 +1529,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_AREA);
 
             ptrs->rd_pgc_memory_dirty_to_clean    = rrddim_add(ptrs->st_pgc_memory_migrations, "dirty to clean", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1569,7 +1569,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_AREA);
 
             ptrs->rd_pgc_memory_evictions_aggressive = rrddim_add(ptrs->st_pgc_memory_events, "evictions aggressive", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1611,7 +1611,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_LINE);
 
             ptrs->rd_pgc_waste_evictions_skipped = rrddim_add(ptrs->st_pgc_waste, "evictions skipped", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1663,7 +1663,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_LINE);
 
             ptrs->rd_pgc_workers_searchers = rrddim_add(ptrs->st_pgc_workers, "searchers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -1752,7 +1752,7 @@ static void dbengine2_statistics_charts(void) {
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_STACKED);
 
             rd_pgc_memory_main    = rrddim_add(st_pgc_memory, "main cache", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -1804,7 +1804,7 @@ static void dbengine2_statistics_charts(void) {
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_STACKED);
 
             rd_pgc_buffers_pgc         = rrddim_add(st_pgc_buffers, "pgc", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -1863,7 +1863,7 @@ static void dbengine2_statistics_charts(void) {
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_AREA);
 
             rd_julyl_moved     = rrddim_add(st_julyl_moved, "moved", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1897,7 +1897,7 @@ static void dbengine2_statistics_charts(void) {
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_LINE);
 
             rd_mrg_metrics = rrddim_add(st_mrg_metrics, "all", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -1937,7 +1937,7 @@ static void dbengine2_statistics_charts(void) {
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_LINE);
 
             rd_mrg_add = rrddim_add(st_mrg_ops, "add", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1969,7 +1969,7 @@ static void dbengine2_statistics_charts(void) {
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_LINE);
 
             rd_mrg_references = rrddim_add(st_mrg_references, "references", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -2000,7 +2000,7 @@ static void dbengine2_statistics_charts(void) {
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_LINE);
 
             rd_hit_ratio = rrddim_add(st_cache_hit_ratio, "overall", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
@@ -2077,7 +2077,7 @@ static void dbengine2_statistics_charts(void) {
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_LINE);
 
             rd_total = rrddim_add(st_queries, "total", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2113,7 +2113,7 @@ static void dbengine2_statistics_charts(void) {
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_LINE);
 
             rd_queries = rrddim_add(st_queries_running, "queries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -2143,7 +2143,7 @@ static void dbengine2_statistics_charts(void) {
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_STACKED);
 
             rd_cache = rrddim_add(st_query_pages_metadata_source, "cache hit", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2177,7 +2177,7 @@ static void dbengine2_statistics_charts(void) {
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_STACKED);
 
             rd_pages_main_cache = rrddim_add(st_query_pages_data_source, "main cache", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2213,7 +2213,7 @@ static void dbengine2_statistics_charts(void) {
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_STACKED);
 
             rd_pass4 = rrddim_add(st_query_next_page, "pass4", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2254,7 +2254,7 @@ static void dbengine2_statistics_charts(void) {
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_STACKED);
 
             rd_pages_zero_time = rrddim_add(st_query_page_issues, "zero timestamp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2301,7 +2301,7 @@ static void dbengine2_statistics_charts(void) {
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_LINE);
 
             rd_compressed = rrddim_add(st_query_pages_from_disk, "ok compressed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2353,7 +2353,7 @@ static void dbengine2_statistics_charts(void) {
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_LINE);
 
             rd_journal_v2_mapped = rrddim_add(st_events, "journal v2 mapped", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2397,7 +2397,7 @@ static void dbengine2_statistics_charts(void) {
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_STACKED);
 
             rd_routing = rrddim_add(st_prep_timings, "routing", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2438,7 +2438,7 @@ static void dbengine2_statistics_charts(void) {
                     "netdata",
                     "stats",
                     priority,
-                    rrdb.localhost->update_every,
+                    localhost->rrd_update_every,
                     RRDSET_TYPE_STACKED);
 
             rd_init = rrddim_add(st_query_timings, "init", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2460,7 +2460,7 @@ static void dbengine2_statistics_charts(void) {
         rrdset_done(st_query_timings);
     }
 
-    if(rrd_tryrdlock() == 0) {
+    if(netdata_rwlock_tryrdlock(&rrd_rwlock) == 0) {
         priority = 135400;
 
         RRDHOST *host;
@@ -2472,8 +2472,8 @@ static void dbengine2_statistics_charts(void) {
             if (!rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
 
                 /* get localhost's DB engine's statistics for each tier */
-                for(size_t tier = 0; tier < rrdb.storage_tiers ;tier++) {
-                    if(host->db[tier].id != STORAGE_ENGINE_DBENGINE) continue;
+                for(size_t tier = 0; tier < storage_tiers ;tier++) {
+                    if(host->db[tier].mode != RRD_MEMORY_MODE_DBENGINE) continue;
                     if(!host->db[tier].instance) continue;
 
                     if(is_storage_engine_shared(host->db[tier].instance)) {
@@ -2484,7 +2484,7 @@ static void dbengine2_statistics_charts(void) {
                     }
 
                     ++dbengine_contexts;
-                    rrdeng_get_37_statistics(host->db[tier].instance, local_stats_array);
+                    rrdeng_get_37_statistics((struct rrdengine_instance *)host->db[tier].instance, local_stats_array);
                     for (i = 0; i < RRDENG_NR_STATS; ++i) {
                         /* aggregate statistics across hosts */
                         stats_array[i] += local_stats_array[i];
@@ -2520,7 +2520,7 @@ static void dbengine2_statistics_charts(void) {
                             "netdata",
                             "stats",
                             priority,
-                            rrdb.localhost->update_every,
+                            localhost->rrd_update_every,
                             RRDSET_TYPE_LINE);
 
                     rd_savings = rrddim_add(st_compression, "savings", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
@@ -2561,7 +2561,7 @@ static void dbengine2_statistics_charts(void) {
                             "netdata",
                             "stats",
                             priority,
-                            rrdb.localhost->update_every,
+                            localhost->rrd_update_every,
                             RRDSET_TYPE_LINE);
 
                     rd_reads = rrddim_add(st_io_stats, "reads", NULL, 1, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -2593,7 +2593,7 @@ static void dbengine2_statistics_charts(void) {
                             "netdata",
                             "stats",
                             priority,
-                            rrdb.localhost->update_every,
+                            localhost->rrd_update_every,
                             RRDSET_TYPE_LINE);
 
                     rd_reads = rrddim_add(st_io_stats, "reads", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2626,7 +2626,7 @@ static void dbengine2_statistics_charts(void) {
                             "netdata",
                             "stats",
                             priority,
-                            rrdb.localhost->update_every,
+                            localhost->rrd_update_every,
                             RRDSET_TYPE_LINE);
 
                     rd_io_errors = rrddim_add(st_errors, "io_errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2661,7 +2661,7 @@ static void dbengine2_statistics_charts(void) {
                             "netdata",
                             "stats",
                             priority,
-                            rrdb.localhost->update_every,
+                            localhost->rrd_update_every,
                             RRDSET_TYPE_LINE);
 
                     rd_fd_current = rrddim_add(st_fd, "current", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -2701,7 +2701,7 @@ static void update_strings_charts() {
             , "netdata"
             , "stats"
             , 910000
-            , rrdb.localhost->update_every
+            , localhost->rrd_update_every
             , RRDSET_TYPE_LINE);
 
         rd_ops_inserts      = rrddim_add(st_ops, "inserts",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2730,7 +2730,7 @@ static void update_strings_charts() {
             , "netdata"
             , "stats"
             , 910001
-            , rrdb.localhost->update_every
+            , localhost->rrd_update_every
             , RRDSET_TYPE_AREA);
 
         rd_entries_entries  = rrddim_add(st_entries, "entries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -2753,7 +2753,7 @@ static void update_strings_charts() {
             , "netdata"
             , "stats"
             , 910001
-            , rrdb.localhost->update_every
+            , localhost->rrd_update_every
             , RRDSET_TYPE_AREA);
 
         rd_mem  = rrddim_add(st_mem, "memory", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -2781,7 +2781,7 @@ static void update_heartbeat_charts() {
             , "netdata"
             , "stats"
             , 900000
-            , rrdb.localhost->update_every
+            , localhost->rrd_update_every
             , RRDSET_TYPE_AREA);
 
         rd_heartbeat_min = rrddim_add(st_heartbeat, "min", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -2903,7 +2903,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
                 , "netdata"
                 , "stats"
                 , c->priority + 0
-                , rrdb.localhost->update_every
+                , localhost->rrd_update_every
                 , RRDSET_TYPE_LINE
             );
 
@@ -2944,7 +2944,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
                 , "netdata"
                 , "stats"
                 , c->priority + 1
-                , rrdb.localhost->update_every
+                , localhost->rrd_update_every
                 , RRDSET_TYPE_LINE
             );
 
@@ -2994,7 +2994,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
                 , "netdata"
                 , "stats"
                 , c->priority + 2
-                , rrdb.localhost->update_every
+                , localhost->rrd_update_every
                 , RRDSET_TYPE_LINE
             );
 
@@ -3053,7 +3053,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
                 , "netdata"
                 , "stats"
                 , c->priority + 3
-                , rrdb.localhost->update_every
+                , localhost->rrd_update_every
                 , RRDSET_TYPE_LINE
             );
 
@@ -3099,7 +3099,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
                 , "netdata"
                 , "stats"
                 , c->priority + 4
-                , rrdb.localhost->update_every
+                , localhost->rrd_update_every
                 , RRDSET_TYPE_STACKED
             );
 
@@ -3144,7 +3144,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
                 , "netdata"
                 , "stats"
                 , c->priority + 5
-                , rrdb.localhost->update_every
+                , localhost->rrd_update_every
                 , RRDSET_TYPE_LINE
             );
 
@@ -3239,7 +3239,7 @@ static void malloc_trace_statistics(void) {
             , "netdata"
             , "stats"
             , 900000
-            , rrdb.localhost->update_every
+            , localhost->rrd_update_every
             , RRDSET_TYPE_STACKED
         );
     }
@@ -3256,7 +3256,7 @@ static void malloc_trace_statistics(void) {
             , "netdata"
             , "stats"
             , 900001
-            , rrdb.localhost->update_every
+            , localhost->rrd_update_every
             , RRDSET_TYPE_LINE
         );
     }
@@ -3273,7 +3273,7 @@ static void malloc_trace_statistics(void) {
             , "netdata"
             , "stats"
             , 900002
-            , rrdb.localhost->update_every
+            , localhost->rrd_update_every
             , RRDSET_TYPE_STACKED
         );
     }
@@ -3290,7 +3290,7 @@ static void malloc_trace_statistics(void) {
             , "netdata"
             , "stats"
             , 900003
-            , rrdb.localhost->update_every
+            , localhost->rrd_update_every
             , RRDSET_TYPE_LINE
         );
     }
@@ -3462,7 +3462,7 @@ static void workers_total_cpu_utilization_chart(void) {
             "netdata",
             "stats",
             999000,
-            rrdb.localhost->update_every,
+            localhost->rrd_update_every,
             RRDSET_TYPE_STACKED);
     }
 
@@ -3510,7 +3510,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
             , "netdata"
             , "stats"
             , wu->priority
-            , rrdb.localhost->update_every
+            , localhost->rrd_update_every
             , RRDSET_TYPE_AREA
         );
     }
@@ -3563,7 +3563,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                 , "netdata"
                 , "stats"
                 , wu->priority + 1
-                , rrdb.localhost->update_every
+                , localhost->rrd_update_every
                 , RRDSET_TYPE_AREA
             );
         }
@@ -3614,7 +3614,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
             , "netdata"
             , "stats"
             , wu->priority + 2
-            , rrdb.localhost->update_every
+            , localhost->rrd_update_every
             , RRDSET_TYPE_STACKED
         );
     }
@@ -3657,7 +3657,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
             , "netdata"
             , "stats"
             , wu->priority + 3
-            , rrdb.localhost->update_every
+            , localhost->rrd_update_every
             , RRDSET_TYPE_STACKED
         );
     }
@@ -3701,7 +3701,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                 , "netdata"
                 , "stats"
                 , wu->priority + 4
-                , rrdb.localhost->update_every
+                , localhost->rrd_update_every
                 , RRDSET_TYPE_STACKED
             );
 
@@ -3753,7 +3753,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                     , "netdata"
                     , "stats"
                     , wu->priority + 5 + i
-                    , rrdb.localhost->update_every
+                    , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
                     );
 
@@ -3809,7 +3809,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                     , "netdata"
                     , "stats"
                     , wu->priority + 5 + i
-                    , rrdb.localhost->update_every
+                    , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
                 );
 
@@ -4136,9 +4136,9 @@ void *global_statistics_main(void *ptr)
     netdata_thread_cleanup_push(global_statistics_cleanup, ptr);
 
     int update_every =
-        (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", rrdb.localhost->update_every);
-    if (update_every < rrdb.localhost->update_every)
-        update_every = rrdb.localhost->update_every;
+        (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
+    if (update_every < localhost->rrd_update_every)
+        update_every = localhost->rrd_update_every;
 
     usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;
@@ -4159,7 +4159,7 @@ void *global_statistics_main(void *ptr)
         registry_statistics();
 
 #ifdef ENABLE_DBENGINE
-        if(rrdb.dbengine_enabled) {
+        if(dbengine_enabled) {
             worker_is_busy(WORKER_JOB_DBENGINE);
             dbengine2_statistics_charts();
         }
@@ -4209,9 +4209,9 @@ void *global_statistics_workers_main(void *ptr)
     netdata_thread_cleanup_push(global_statistics_workers_cleanup, ptr);
 
             int update_every =
-                    (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", rrdb.localhost->update_every);
-            if (update_every < rrdb.localhost->update_every)
-                update_every = rrdb.localhost->update_every;
+                    (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
+            if (update_every < localhost->rrd_update_every)
+                update_every = localhost->rrd_update_every;
 
             usec_t step = update_every * USEC_PER_SEC;
             heartbeat_t hb;
@@ -4251,9 +4251,9 @@ void *global_statistics_sqlite3_main(void *ptr)
     netdata_thread_cleanup_push(global_statistics_sqlite3_cleanup, ptr);
 
             int update_every =
-                    (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", rrdb.localhost->update_every);
-            if (update_every < rrdb.localhost->update_every)
-                update_every = rrdb.localhost->update_every;
+                    (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
+            if (update_every < localhost->rrd_update_every)
+                update_every = localhost->rrd_update_every;
 
             usec_t step = update_every * USEC_PER_SEC;
             heartbeat_t hb;

@@ -1252,8 +1252,8 @@ static void populate_system_info(void) {
     struct rrdhost_system_info *system_info;
     bool free_system_info = false;
 
-    if(rrdb.localhost && rrdb.localhost->system_info) {
-        system_info = rrdb.localhost->system_info;
+    if(localhost && localhost->system_info) {
+        system_info = localhost->system_info;
     }
     else {
         system_info = callocz(1, sizeof(struct rrdhost_system_info));

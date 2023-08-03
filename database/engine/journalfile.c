@@ -296,8 +296,8 @@ static bool journalfile_v2_mounted_data_unmount(struct rrdengine_journalfile *jo
 void journalfile_v2_data_unmount_cleanup(time_t now_s) {
     // DO NOT WAIT ON ANY LOCK!!!
 
-    for (size_t tier = 0; tier < rrdb.storage_tiers; tier++) {
-        struct rrdengine_instance *ctx = (struct rrdengine_instance *) rrdb.multidb_ctx[tier];
+    for(size_t tier = 0; tier < (size_t)storage_tiers ;tier++) {
+        struct rrdengine_instance *ctx = multidb_ctx[tier];
         if(!ctx) continue;
 
         struct rrdengine_datafile *datafile;
@@ -577,7 +577,7 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
     char path[RRDENG_PATH_MAX];
 
     journalfile_v1_generate_path(datafile, path, sizeof(path));
-    fd = open_file_for_io(path, O_CREAT | O_RDWR | O_TRUNC, &file, rrdb.use_direct_io);
+    fd = open_file_for_io(path, O_CREAT | O_RDWR | O_TRUNC, &file, use_direct_io);
     if (fd < 0) {
         ctx_fs_error(ctx);
         return fd;
@@ -917,7 +917,7 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
     rc = journalfile_check_v2_extent_list(data_start, journal_v2_file_size);
     if (rc) return 1;
 
-    if (!rrdb.db_engine_journal_check)
+    if (!db_engine_journal_check)
         return 0;
 
     rc = journalfile_check_v2_metric_list(data_start, journal_v2_file_size);
@@ -1115,7 +1115,7 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
 
     // Initialize the journal file to be able to access the data
 
-    if (!rrdb.db_engine_journal_check)
+    if (!db_engine_journal_check)
         journalfile->v2.flags |= JOURNALFILE_FLAG_METRIC_CRC_CHECK;
     journalfile_v2_data_set(journalfile, fd, data_start, journal_v2_file_size);
 
@@ -1501,7 +1501,7 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
 
     journalfile_v1_generate_path(datafile, path, sizeof(path));
 
-    fd = open_file_for_io(path, O_RDWR, &file, rrdb.use_direct_io);
+    fd = open_file_for_io(path, O_RDWR, &file, use_direct_io);
     if (fd < 0) {
         ctx_fs_error(ctx);
 

@@ -196,7 +196,7 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
 
         else if(!strcmp(name, "tier")) {
             tier = str2ul(value);
-            if(tier < rrdb.storage_tiers)
+            if(tier < storage_tiers)
                 options |= RRDR_OPTION_SELECTED_TIER;
             else
                 tier = 0;

@@ -64,7 +64,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     st->name = string_strdupz("chart_name");
 
     st->update_every = 1;
-    st->storage_engine_id = STORAGE_ENGINE_SAVE;
+    st->rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
 
     st->rrdhost = host;
 
@@ -77,7 +77,7 @@ int setup_rrdhost()
 {
     localhost = calloc(1, sizeof(RRDHOST));
 
-    localhost->update_every = 1;
+    localhost->rrd_update_every = 1;
 
     localhost->tags = string_strdupz("TAG1=VALUE1 TAG2=VALUE2");
 

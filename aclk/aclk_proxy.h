@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 #ifndef ACLK_PROXY_H
 #define ACLK_PROXY_H
 

@@ -51,12 +51,15 @@ void health_reload(void);
 
 void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* context, RRDCALC_STATUS status);
 void health_alarms2json(RRDHOST *host, BUFFER *wb, int all);
+void health_alert2json_conf(RRDHOST *host, BUFFER *wb, CONTEXTS_V2_OPTIONS all);
 void health_alarms_values2json(RRDHOST *host, BUFFER *wb, int all);
 
 void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf);
 void health_api_v1_chart_custom_variables2json(RRDSET *st, BUFFER *buf);
 
+int health_alarm_log_open(RRDHOST *host);
 void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae);
+void health_alarm_log_load(RRDHOST *host);
 
 ALARM_ENTRY* health_create_alarm_entry(
     RRDHOST *host,
@@ -88,9 +91,13 @@ ALARM_ENTRY* health_create_alarm_entry(
 void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae);
 
 void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath);
+char *health_user_config_dir(void);
+char *health_stock_config_dir(void);
 void health_alarm_log_free(RRDHOST *host);
 
 void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae);
+
+void *health_cmdapi_thread(void *ptr);
 
 char *health_edit_command_from_source(const char *source);
 void sql_refresh_hashes(void);

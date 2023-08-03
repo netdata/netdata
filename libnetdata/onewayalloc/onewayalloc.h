@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 #ifndef ONEWAYALLOC_H
 #define ONEWAYALLOC_H 1
 

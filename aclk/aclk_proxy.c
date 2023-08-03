@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 #include "aclk_proxy.h"
 
 #include "daemon/common.h"

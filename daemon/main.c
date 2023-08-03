@@ -8,9 +8,12 @@
 #warning COMPILING 32BIT NETDATA
 #endif
 
+bool unittest_running = false;
 int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
 
+int libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
+bool ieee754_doubles = false;
 time_t netdata_start_time = 0;
 struct netdata_static_thread *static_threads;
 
@@ -324,10 +327,10 @@ void netdata_cleanup_and_exit(int ret) {
     (void) rename(agent_crash_file, agent_incomplete_shutdown_file);
 
 #ifdef ENABLE_DBENGINE
-    if (rrdb.dbengine_enabled) {
+    if(dbengine_enabled) {
         delta_shutdown_time("dbengine exit mode");
-        for (size_t tier = 0; tier < rrdb.storage_tiers; tier++)
-            rrdeng_exit_mode(rrdb.multidb_ctx[tier]);
+        for (size_t tier = 0; tier < storage_tiers; tier++)
+            rrdeng_exit_mode(multidb_ctx[tier]);
     }
 #endif
 
@@ -415,10 +418,10 @@ void netdata_cleanup_and_exit(int ret) {
         // exit cleanly
 
 #ifdef ENABLE_DBENGINE
-        if (rrdb.dbengine_enabled) {
+        if(dbengine_enabled) {
             delta_shutdown_time("flush dbengine tiers");
-            for (size_t tier = 0; tier < rrdb.storage_tiers; tier++)
-                rrdeng_prepare_exit(rrdb.multidb_ctx[tier]);
+            for (size_t tier = 0; tier < storage_tiers; tier++)
+                rrdeng_prepare_exit(multidb_ctx[tier]);
         }
 #endif
 
@@ -433,14 +436,14 @@ void netdata_cleanup_and_exit(int ret) {
         metadata_sync_shutdown();
 
 #ifdef ENABLE_DBENGINE
-        if (rrdb.dbengine_enabled) {
+        if(dbengine_enabled) {
             delta_shutdown_time("wait for dbengine collectors to finish");
 
             size_t running = 1;
             while(running) {
                 running = 0;
-                for (size_t tier = 0; tier < rrdb.storage_tiers; tier++)
-                    running += rrdeng_collectors_running(rrdb.multidb_ctx[tier]);
+                for (size_t tier = 0; tier < storage_tiers; tier++)
+                    running += rrdeng_collectors_running(multidb_ctx[tier]);
 
                 if(running) {
                     error_limit_static_thread_var(erl, 1, 100 * USEC_PER_MS);
@@ -457,8 +460,8 @@ void netdata_cleanup_and_exit(int ret) {
             }
 
             delta_shutdown_time("stop dbengine tiers");
-            for (size_t tier = 0; tier < rrdb.storage_tiers; tier++)
-                rrdeng_exit(rrdb.multidb_ctx[tier]);
+            for (size_t tier = 0; tier < storage_tiers; tier++)
+                rrdeng_exit(multidb_ctx[tier]);
         }
 #endif
     }
@@ -655,26 +658,6 @@ static void set_nofile_limit(struct rlimit *rl) {
 
     if (rl->rlim_cur < 1024)
         netdata_log_error("Number of open file descriptors allowed for this process is too low (RLIMIT_NOFILE=%zu)", (size_t)rl->rlim_cur);
-}
-
-static void set_libuv_worker_threads()
-{
-#if defined(ENV32BIT)
-    const int min_libuv_worker_threads = 8;
-    const int max_libuv_worker_threads = 128;
-#else
-    const int min_libuv_worker_threads = 16;
-    const int max_libuv_worker_threads = 1024;
-#endif
-
-    int n = (int) get_netdata_cpus() * 6;
-    n = CLAMP(n, min_libuv_worker_threads, max_libuv_worker_threads);
-
-    n = config_get_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", n);
-    n = MAX(n, min_libuv_worker_threads);
-    config_set_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", n);
-
-    rrdb.libuv_worker_threads = n;
 }
 
 void cancel_main_threads() {
@@ -1082,37 +1065,37 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get default database update frequency
 
-    rrdb.default_update_every = (int) config_get_number(CONFIG_SECTION_DB, "update every", rrdb.default_update_every);
-    if(rrdb.default_update_every < UPDATE_EVERY_MIN || rrdb.default_update_every > UPDATE_EVERY_MAX) {
-        netdata_log_error("Invalid data collection frequency (update every) %d given. Defaulting to %d.", rrdb.default_update_every, UPDATE_EVERY_MIN);
-        rrdb.default_update_every = UPDATE_EVERY_MIN;
-        config_set_number(CONFIG_SECTION_DB, "update every", rrdb.default_update_every);
+    default_rrd_update_every = (int) config_get_number(CONFIG_SECTION_DB, "update every", UPDATE_EVERY);
+    if(default_rrd_update_every < 1 || default_rrd_update_every > 600) {
+        netdata_log_error("Invalid data collection frequency (update every) %d given. Defaulting to %d.", default_rrd_update_every, UPDATE_EVERY);
+        default_rrd_update_every = UPDATE_EVERY;
+        config_set_number(CONFIG_SECTION_DB, "update every", default_rrd_update_every);
     }
 
     // ------------------------------------------------------------------------
-    // get default storage engine for the database
+    // get default memory mode for the database
 
     {
-        const char *se_name = config_get(CONFIG_SECTION_DB, "mode", storage_engine_name(default_storage_engine_id));
-        if (!storage_engine_id(se_name, &default_storage_engine_id)) {
-            netdata_log_error("Invalid memory mode '%s' given. Using '%s'",
-                              se_name, storage_engine_name(default_storage_engine_id));
-            config_set(CONFIG_SECTION_DB, "mode", storage_engine_name(default_storage_engine_id));
+        const char *mode = config_get(CONFIG_SECTION_DB, "mode", rrd_memory_mode_name(default_rrd_memory_mode));
+        default_rrd_memory_mode = rrd_memory_mode_id(mode);
+        if(strcmp(mode, rrd_memory_mode_name(default_rrd_memory_mode)) != 0) {
+            netdata_log_error("Invalid memory mode '%s' given. Using '%s'", mode, rrd_memory_mode_name(default_rrd_memory_mode));
+            config_set(CONFIG_SECTION_DB, "mode", rrd_memory_mode_name(default_rrd_memory_mode));
         }
     }
 
     // ------------------------------------------------------------------------
     // get default database size
 
-    if(default_storage_engine_id != STORAGE_ENGINE_DBENGINE && default_storage_engine_id != STORAGE_ENGINE_NONE) {
-        rrdb.default_rrd_history_entries = (int)config_get_number(
+    if(default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && default_rrd_memory_mode != RRD_MEMORY_MODE_NONE) {
+        default_rrd_history_entries = (int)config_get_number(
             CONFIG_SECTION_DB, "retention",
-            align_entries_to_pagesize(default_storage_engine_id, RRD_DEFAULT_HISTORY_ENTRIES));
+            align_entries_to_pagesize(default_rrd_memory_mode, RRD_DEFAULT_HISTORY_ENTRIES));
 
-        long h = align_entries_to_pagesize(default_storage_engine_id, rrdb.default_rrd_history_entries);
-        if (h != rrdb.default_rrd_history_entries) {
+        long h = align_entries_to_pagesize(default_rrd_memory_mode, default_rrd_history_entries);
+        if (h != default_rrd_history_entries) {
             config_set_number(CONFIG_SECTION_DB, "retention", h);
-            rrdb.default_rrd_history_entries = (int)h;
+            default_rrd_history_entries = (int)h;
         }
     }
 
@@ -1139,39 +1122,39 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get default Database Engine page cache size in MiB
 
-    rrdb.default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page cache size MB", rrdb.default_rrdeng_page_cache_mb);
-    rrdb.default_rrdeng_extent_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine extent cache size MB", rrdb.default_rrdeng_extent_cache_mb);
-    rrdb.db_engine_journal_check = config_get_boolean(CONFIG_SECTION_DB, "dbengine enable journal integrity check", CONFIG_BOOLEAN_NO);
+    default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page cache size MB", default_rrdeng_page_cache_mb);
+    default_rrdeng_extent_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine extent cache size MB", default_rrdeng_extent_cache_mb);
+    db_engine_journal_check = config_get_boolean(CONFIG_SECTION_DB, "dbengine enable journal integrity check", CONFIG_BOOLEAN_NO);
 
-    if(rrdb.default_rrdeng_extent_cache_mb < 0)
-        rrdb.default_rrdeng_extent_cache_mb = 0;
+    if(default_rrdeng_extent_cache_mb < 0)
+        default_rrdeng_extent_cache_mb = 0;
 
-    if(rrdb.default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
-        netdata_log_error("Invalid page cache size %d given. Defaulting to %d.", rrdb.default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
-        rrdb.default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
-        config_set_number(CONFIG_SECTION_DB, "dbengine page cache size MB", rrdb.default_rrdeng_page_cache_mb);
+    if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
+        netdata_log_error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
+        default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
+        config_set_number(CONFIG_SECTION_DB, "dbengine page cache size MB", default_rrdeng_page_cache_mb);
     }
 
     // ------------------------------------------------------------------------
     // get default Database Engine disk space quota in MiB
 
-    rrdb.default_rrdeng_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine disk space MB", rrdb.default_rrdeng_disk_quota_mb);
-    if (rrdb.default_rrdeng_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
-        netdata_log_error("Invalid dbengine disk space %d given. Defaulting to %d.", rrdb.default_rrdeng_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
-        rrdb.default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
-        config_set_number(CONFIG_SECTION_DB, "dbengine disk space MB", rrdb.default_rrdeng_disk_quota_mb);
+    default_rrdeng_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
+    if(default_rrdeng_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
+        netdata_log_error("Invalid dbengine disk space %d given. Defaulting to %d.", default_rrdeng_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
+        default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
+        config_set_number(CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
     }
 
-    rrdb.default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", compute_multidb_diskspace());
-    if(rrdb.default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
-        netdata_log_error("Invalid multidb disk space %d given. Defaulting to %d.", rrdb.default_multidb_disk_quota_mb, rrdb.default_rrdeng_disk_quota_mb);
-        rrdb.default_multidb_disk_quota_mb = rrdb.default_rrdeng_disk_quota_mb;
-        config_set_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", rrdb.default_multidb_disk_quota_mb);
+    default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", compute_multidb_diskspace());
+    if(default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
+        netdata_log_error("Invalid multidb disk space %d given. Defaulting to %d.", default_multidb_disk_quota_mb, default_rrdeng_disk_quota_mb);
+        default_multidb_disk_quota_mb = default_rrdeng_disk_quota_mb;
+        config_set_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", default_multidb_disk_quota_mb);
     }
 #else
-    if (default_storage_engine_id  == STORAGE_ENGINE_DBENGINE) {
+    if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
        error_report("RRD_MEMORY_MODE_DBENGINE is not supported in this platform. The agent will use db mode 'save' instead.");
-       default_storage_engine_id = STORAGE_ENGINE_SAVE;
+       default_rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
     }
 #endif
     // ------------------------------------------------------------------------
@@ -1196,22 +1179,22 @@ static void get_netdata_configured_variables() {
 
     // --------------------------------------------------------------------
 
-    rrdb.rrdset_free_obsolete_time_s = config_get_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdb.rrdset_free_obsolete_time_s);
+    rrdset_free_obsolete_time_s = config_get_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time_s);
     // Current chart locking and invalidation scheme doesn't prevent Netdata from segmentation faults if a short
     // cleanup delay is set. Extensive stress tests showed that 10 seconds is quite a safe delay. Look at
     // https://github.com/netdata/netdata/pull/11222#issuecomment-868367920 for more information.
-    if (rrdb.rrdset_free_obsolete_time_s < 10) {
-        rrdb.rrdset_free_obsolete_time_s = 10;
+    if (rrdset_free_obsolete_time_s < 10) {
+        rrdset_free_obsolete_time_s = 10;
         netdata_log_info("The \"cleanup obsolete charts after seconds\" option was set to 10 seconds.");
-        config_set_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdb.rrdset_free_obsolete_time_s);
+        config_set_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time_s);
     }
 
-    rrdb.gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_DB, "gap when lost iterations above", rrdb.gap_when_lost_iterations_above);
-    if (rrdb.gap_when_lost_iterations_above < 1) {
-        rrdb.gap_when_lost_iterations_above = 1;
-        config_set_number(CONFIG_SECTION_DB, "gap when lost iterations above", rrdb.gap_when_lost_iterations_above);
+    gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
+    if (gap_when_lost_iterations_above < 1) {
+        gap_when_lost_iterations_above = 1;
+        config_set_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
     }
-    rrdb.gap_when_lost_iterations_above += 2;
+    gap_when_lost_iterations_above += 2;
 
     // --------------------------------------------------------------------
     // get various system parameters
@@ -1320,138 +1303,6 @@ int get_system_info(struct rrdhost_system_info *system_info, bool log) {
     }
     freez(script);
     return 0;
-}
-
-static void localhost_load_config_labels(void) {
-    int status = config_load(NULL, 1, CONFIG_SECTION_HOST_LABEL);
-    if(!status) {
-        char *filename = CONFIG_DIR "/" CONFIG_FILENAME;
-        netdata_log_error("RRDLABEL: Cannot reload the configuration file '%s', using labels in memory", filename);
-    }
-
-    struct section *co = appconfig_get_section(&netdata_config, CONFIG_SECTION_HOST_LABEL);
-    if(co) {
-        config_section_wrlock(co);
-        struct config_option *cv;
-        for(cv = co->values; cv ; cv = cv->next) {
-            rrdlabels_add(rrdb.localhost->rrdlabels, cv->name, cv->value, RRDLABEL_SRC_CONFIG);
-            cv->flags |= CONFIG_VALUE_USED;
-        }
-        config_section_unlock(co);
-    }
-}
-
-static void localhost_load_kubernetes_labels(void) {
-    char label_script[sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("get-kubernetes-labels.sh") + 2)];
-    sprintf(label_script, "%s/%s", netdata_configured_primary_plugins_dir, "get-kubernetes-labels.sh");
-
-    if (unlikely(access(label_script, R_OK) != 0)) {
-        netdata_log_error("Kubernetes pod label fetching script %s not found.",label_script);
-        return;
-    }
-
-    netdata_log_debug(D_RRDHOST, "Attempting to fetch external labels via %s", label_script);
-
-    pid_t pid;
-    FILE *fp_child_input;
-    FILE *fp_child_output = netdata_popen(label_script, &pid, &fp_child_input);
-    if(!fp_child_output) return;
-
-    char buffer[1000 + 1];
-    while (fgets(buffer, 1000, fp_child_output) != NULL)
-        rrdlabels_add_pair(rrdb.localhost->rrdlabels, buffer, RRDLABEL_SRC_AUTO|RRDLABEL_SRC_K8S);
-
-    // Non-zero exit code means that all the script output is error messages. We've shown already any message that didn't include a ':'
-    // Here we'll inform with an ERROR that the script failed, show whatever (if anything) was added to the list of labels, free the memory and set the return to null
-    int rc = netdata_pclose(fp_child_input, fp_child_output, pid);
-    if(rc)
-        netdata_log_error("%s exited abnormally. Failed to get kubernetes labels.", label_script);
-}
-
-static void localhost_load_auto_labels(void) {
-    DICTIONARY *labels = rrdb.localhost->rrdlabels;
-
-    if (rrdb.localhost->system_info->cloud_provider_type)
-        rrdlabels_add(labels, "_cloud_provider_type", rrdb.localhost->system_info->cloud_provider_type, RRDLABEL_SRC_AUTO);
-
-    if (rrdb.localhost->system_info->cloud_instance_type)
-        rrdlabels_add(labels, "_cloud_instance_type", rrdb.localhost->system_info->cloud_instance_type, RRDLABEL_SRC_AUTO);
-
-    if (rrdb.localhost->system_info->cloud_instance_region)
-        rrdlabels_add(labels, "_cloud_instance_region", rrdb.localhost->system_info->cloud_instance_region, RRDLABEL_SRC_AUTO);
-
-    if (rrdb.localhost->system_info->host_os_name)
-        rrdlabels_add(labels, "_os_name", rrdb.localhost->system_info->host_os_name, RRDLABEL_SRC_AUTO);
-
-    if (rrdb.localhost->system_info->host_os_version)
-        rrdlabels_add(labels, "_os_version", rrdb.localhost->system_info->host_os_version, RRDLABEL_SRC_AUTO);
-
-    if (rrdb.localhost->system_info->kernel_version)
-        rrdlabels_add(labels, "_kernel_version", rrdb.localhost->system_info->kernel_version, RRDLABEL_SRC_AUTO);
-
-    if (rrdb.localhost->system_info->host_cores)
-        rrdlabels_add(labels, "_system_cores", rrdb.localhost->system_info->host_cores, RRDLABEL_SRC_AUTO);
-
-    if (rrdb.localhost->system_info->host_cpu_freq)
-        rrdlabels_add(labels, "_system_cpu_freq", rrdb.localhost->system_info->host_cpu_freq, RRDLABEL_SRC_AUTO);
-
-    if (rrdb.localhost->system_info->host_ram_total)
-        rrdlabels_add(labels, "_system_ram_total", rrdb.localhost->system_info->host_ram_total, RRDLABEL_SRC_AUTO);
-
-    if (rrdb.localhost->system_info->host_disk_space)
-        rrdlabels_add(labels, "_system_disk_space", rrdb.localhost->system_info->host_disk_space, RRDLABEL_SRC_AUTO);
-
-    if (rrdb.localhost->system_info->architecture)
-        rrdlabels_add(labels, "_architecture", rrdb.localhost->system_info->architecture, RRDLABEL_SRC_AUTO);
-
-    if (rrdb.localhost->system_info->virtualization)
-        rrdlabels_add(labels, "_virtualization", rrdb.localhost->system_info->virtualization, RRDLABEL_SRC_AUTO);
-
-    if (rrdb.localhost->system_info->container)
-        rrdlabels_add(labels, "_container", rrdb.localhost->system_info->container, RRDLABEL_SRC_AUTO);
-
-    if (rrdb.localhost->system_info->container_detection)
-        rrdlabels_add(labels, "_container_detection", rrdb.localhost->system_info->container_detection, RRDLABEL_SRC_AUTO);
-
-    if (rrdb.localhost->system_info->virt_detection)
-        rrdlabels_add(labels, "_virt_detection", rrdb.localhost->system_info->virt_detection, RRDLABEL_SRC_AUTO);
-
-    if (rrdb.localhost->system_info->is_k8s_node)
-        rrdlabels_add(labels, "_is_k8s_node", rrdb.localhost->system_info->is_k8s_node, RRDLABEL_SRC_AUTO);
-
-    if (rrdb.localhost->system_info->install_type)
-        rrdlabels_add(labels, "_install_type", rrdb.localhost->system_info->install_type, RRDLABEL_SRC_AUTO);
-
-    if (rrdb.localhost->system_info->prebuilt_arch)
-        rrdlabels_add(labels, "_prebuilt_arch", rrdb.localhost->system_info->prebuilt_arch, RRDLABEL_SRC_AUTO);
-
-    if (rrdb.localhost->system_info->prebuilt_dist)
-        rrdlabels_add(labels, "_prebuilt_dist", rrdb.localhost->system_info->prebuilt_dist, RRDLABEL_SRC_AUTO);
-
-    add_aclk_host_labels();
-
-    health_add_host_labels();
-
-    rrdlabels_add(labels, "_is_parent", (rrdb.localhost->connected_children_count > 0) ? "true" : "false", RRDLABEL_SRC_AUTO);
-
-    if (rrdb.localhost->rrdpush_send_destination)
-        rrdlabels_add(labels, "_streams_to", rrdb.localhost->rrdpush_send_destination, RRDLABEL_SRC_AUTO);
-}
-
-void localhost_load_labels(void) {
-    if(!rrdb.localhost->rrdlabels)
-        rrdb.localhost->rrdlabels = rrdlabels_create();
-
-    rrdlabels_unmark_all(rrdb.localhost->rrdlabels);
-
-    // priority is important here
-    localhost_load_config_labels();
-    localhost_load_kubernetes_labels();
-    localhost_load_auto_labels();
-
-    rrdhost_flag_set(rrdb.localhost, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
-
-    rrdpush_send_host_labels(rrdb.localhost);
 }
 
 void set_silencers_filename() {
@@ -1600,7 +1451,7 @@ int main(int argc, char **argv) {
                         }
 
                         if(strcmp(optarg, "unittest") == 0) {
-                            rrdb.unittest_running = true;
+                            unittest_running = true;
 
                             if (pluginsd_parser_unittest())
                                 return 1;
@@ -1618,10 +1469,10 @@ int main(int argc, char **argv) {
                             // No call to load the config file on this code-path
                             post_conf_load(&user);
                             get_netdata_configured_variables();
-                            rrdb.default_update_every = 1;
-                            default_storage_engine_id = STORAGE_ENGINE_RAM;
+                            default_rrd_update_every = 1;
+                            default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
                             default_health_enabled = 0;
-                            rrdb.storage_tiers = 1;
+                            storage_tiers = 1;
                             registry_init();
                             if(rrd_init("unittest", NULL, true)) {
                                 fprintf(stderr, "rrd_init failed for unittest\n");
@@ -1650,52 +1501,52 @@ int main(int argc, char **argv) {
                             return command_argument_sanitization_tests();
                         }
                         else if(strcmp(optarg, "dicttest") == 0) {
-                            rrdb.unittest_running = true;
+                            unittest_running = true;
                             return dictionary_unittest(10000);
                         }
                         else if(strcmp(optarg, "araltest") == 0) {
-                            rrdb.unittest_running = true;
+                            unittest_running = true;
                             return aral_unittest(10000);
                         }
                         else if(strcmp(optarg, "stringtest") == 0) {
-                            rrdb.unittest_running = true;
+                            unittest_running = true;
                             return string_unittest(10000);
                         }
                         else if(strcmp(optarg, "rrdlabelstest") == 0) {
-                            rrdb.unittest_running = true;
+                            unittest_running = true;
                             return rrdlabels_unittest();
                         }
                         else if(strcmp(optarg, "buffertest") == 0) {
-                            rrdb.unittest_running = true;
+                            unittest_running = true;
                             return buffer_unittest();
                         }
 #ifdef ENABLE_DBENGINE
                         else if(strcmp(optarg, "mctest") == 0) {
-                            rrdb.unittest_running = true;
+                            unittest_running = true;
                             return mc_unittest();
                         }
                         else if(strcmp(optarg, "ctxtest") == 0) {
-                            rrdb.unittest_running = true;
+                            unittest_running = true;
                             return ctx_unittest();
                         }
                         else if(strcmp(optarg, "metatest") == 0) {
-                            rrdb.unittest_running = true;
+                            unittest_running = true;
                             return metadata_unittest();
                         }
                         else if(strcmp(optarg, "pgctest") == 0) {
-                            rrdb.unittest_running = true;
+                            unittest_running = true;
                             return pgc_unittest();
                         }
                         else if(strcmp(optarg, "mrgtest") == 0) {
-                            rrdb.unittest_running = true;
+                            unittest_running = true;
                             return mrg_unittest();
                         }
                         else if(strcmp(optarg, "julytest") == 0) {
-                            rrdb.unittest_running = true;
+                            unittest_running = true;
                             return julytest();
                         }
                         else if(strcmp(optarg, "parsertest") == 0) {
-                            rrdb.unittest_running = true;
+                            unittest_running = true;
                             return pluginsd_parser_unittest();
                         }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
@@ -1703,7 +1554,7 @@ int main(int argc, char **argv) {
                             unsigned history_seconds = strtoul(optarg, NULL, 0);
                             post_conf_load(&user);
                             get_netdata_configured_variables();
-                            rrdb.default_update_every = 1;
+                            default_rrd_update_every = 1;
                             registry_init();
                             if(rrd_init("dbengine-dataset", NULL, true)) {
                                 fprintf(stderr, "rrd_init failed for unittest\n");
@@ -1981,12 +1832,25 @@ int main(int argc, char **argv) {
 #endif
 #endif
 
-        // decide how many libuv workers to have on 32 vs 64 bit platforms
-        set_libuv_worker_threads();
+        // set libuv worker threads
+        libuv_worker_threads = (int)get_netdata_cpus() * 6;
+
+        if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS)
+            libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
+
+        if(libuv_worker_threads > MAX_LIBUV_WORKER_THREADS)
+            libuv_worker_threads = MAX_LIBUV_WORKER_THREADS;
+
+
+        libuv_worker_threads = config_get_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", libuv_worker_threads);
+        if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS) {
+            libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
+            config_set_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", libuv_worker_threads);
+        }
 
         {
             char buf[20 + 1];
-            snprintfz(buf, 20, "%d", rrdb.libuv_worker_threads);
+            snprintfz(buf, 20, "%d", libuv_worker_threads);
             setenv("UV_THREADPOOL_SIZE", buf, 1);
         }
 
@@ -2034,7 +1898,7 @@ int main(int argc, char **argv) {
         // initialize the log files
         open_all_log_files();
 
-        rrdb.ieee754_doubles = is_system_ieee754_double();
+        ieee754_doubles = is_system_ieee754_double();
 
         aral_judy_init();
 
@@ -2210,9 +2074,9 @@ int main(int argc, char **argv) {
 
     error_log_limit_reset();
 
-    // Load localhost labels
+    // Load host labels
     delta_startup_time("collect host labels");
-    localhost_load_labels();
+    reload_host_labels();
 
     // ------------------------------------------------------------------------
     // spawn the threads

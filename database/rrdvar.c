@@ -217,6 +217,11 @@ NETDATA_DOUBLE rrdvar2number(const RRDVAR_ACQUIRED *rva) {
             return (NETDATA_DOUBLE)*n;
         }
 
+        case RRDVAR_TYPE_TOTAL: {
+            total_number *n = (total_number *)rv->value;
+            return (NETDATA_DOUBLE)*n;
+        }
+
         case RRDVAR_TYPE_INT: {
             int *n = (int *)rv->value;
             return *n;

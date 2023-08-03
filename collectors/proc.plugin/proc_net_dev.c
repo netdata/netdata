@@ -1518,7 +1518,7 @@ void *netdev_main(void *ptr)
 
     netdata_thread_cleanup_push(netdev_main_cleanup, ptr);
 
-    usec_t step = rrdb.localhost->update_every * USEC_PER_SEC;
+    usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
 
@@ -1530,7 +1530,7 @@ void *netdev_main(void *ptr)
             break;
 
         worker_is_busy(0);
-        if(do_proc_net_dev(rrdb.localhost->update_every, hb_dt))
+        if(do_proc_net_dev(localhost->rrd_update_every, hb_dt))
             break;
     }
 

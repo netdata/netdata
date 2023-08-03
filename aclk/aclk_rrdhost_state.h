@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 #ifndef ACLK_RRDHOST_STATE_H
 #define ACLK_RRDHOST_STATE_H
 

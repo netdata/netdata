@@ -356,7 +356,7 @@ ml_dimension_calculated_numbers(ml_training_thread_t *training_thread, ml_dimens
     */
     struct storage_engine_query_handle handle;
 
-    storage_engine_query_init(dim->rd->rrdset->storage_engine_id, dim->rd->tiers[0].db_metric_handle, &handle,
+    storage_engine_query_init(dim->rd->tiers[0].backend, dim->rd->tiers[0].db_metric_handle, &handle,
               training_response.query_after_t, training_response.query_before_t,
               STORAGE_PRIORITY_BEST_EFFORT);
 

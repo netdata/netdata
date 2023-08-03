@@ -45,17 +45,17 @@ static void svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
             netdata_log_error("Cannot delete dimension file '%s'", cache_filename);
     }
 
-    if (st->storage_engine_id == STORAGE_ENGINE_DBENGINE) {
+    if (rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         rrddimvar_delete_all(rd);
 
         /* only a collector can mark a chart as obsolete, so we must remove the reference */
 
         size_t tiers_available = 0, tiers_said_no_retention = 0;
-        for(size_t tier = 0; tier < rrdb.storage_tiers ;tier++) {
+        for(size_t tier = 0; tier < storage_tiers ;tier++) {
             if(rd->tiers[tier].db_collection_handle) {
                 tiers_available++;
 
-                if(storage_engine_store_finalize(st->storage_engine_id, rd->tiers[tier].db_collection_handle))
+                if(storage_engine_store_finalize(rd->tiers[tier].db_collection_handle))
                     tiers_said_no_retention++;
 
                 rd->tiers[tier].db_collection_handle = NULL;
@@ -87,7 +87,7 @@ static bool svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_dimensio
     dfe_start_write(st->rrddim_root_index, rd) {
         if(unlikely(
                 all_dimensions ||
-                (rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && (rd->collector.last_collected_time.tv_sec + rrdb.rrdset_free_obsolete_time_s < now))
+                (rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && (rd->collector.last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now))
                     )) {
 
             if(dictionary_acquired_item_references(rd_dfe.item) == 1) {
@@ -121,7 +121,7 @@ static void svc_rrdset_obsolete_to_archive(RRDSET *st) {
     // has to be run after all dimensions are archived - or use-after-free will occur
     rrdvar_delete_all(st->rrdvars);
 
-    if(st->storage_engine_id != STORAGE_ENGINE_DBENGINE) {
+    if(st->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
         if(rrdhost_option_check(st->rrdhost, RRDHOST_OPTION_DELETE_OBSOLETE_CHARTS)) {
             worker_is_busy(WORKER_JOB_DELETE_CHART);
             rrdset_delete_files(st);
@@ -146,9 +146,9 @@ static void svc_rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
             continue;
 
         if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)
-                     && st->last_accessed_time_s + rrdb.rrdset_free_obsolete_time_s < now
-                     && st->last_updated.tv_sec + rrdb.rrdset_free_obsolete_time_s < now
-                     && st->last_collected_time.tv_sec + rrdb.rrdset_free_obsolete_time_s < now
+                     && st->last_accessed_time_s + rrdset_free_obsolete_time_s < now
+                     && st->last_updated.tv_sec + rrdset_free_obsolete_time_s < now
+                     && st->last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now
                      )) {
             svc_rrdset_obsolete_to_archive(st);
         }
@@ -196,7 +196,7 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
             svc_rrdhost_cleanup_obsolete_charts(host);
         }
 
-        if(host != rrdb.localhost
+        if(host != localhost
             && host->trigger_chart_obsoletion_check
             && (
                    (
@@ -231,7 +231,7 @@ restart_after_removal:
 
         if (rrdhost_option_check(host, RRDHOST_OPTION_DELETE_ORPHAN_HOST)
             /* don't delete multi-host DB host files */
-            && !(host->storage_engine_id == STORAGE_ENGINE_DBENGINE && is_storage_engine_shared(host->db[0].instance))
+            && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_storage_engine_shared(host->db[0].instance))
         ) {
             worker_is_busy(WORKER_JOB_DELETE_HOST_CHARTS);
             rrdhost_delete_charts(host);
@@ -297,7 +297,7 @@ void *service_main(void *ptr)
         heartbeat_next(&hb, step);
 
         svc_rrd_cleanup_obsolete_charts_from_all_hosts();
-        svc_rrdhost_cleanup_orphan_hosts(rrdb.localhost);
+        svc_rrdhost_cleanup_orphan_hosts(localhost);
     }
 
     netdata_thread_cleanup_pop(1);

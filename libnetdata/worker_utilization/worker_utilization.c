@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 #include "worker_utilization.h"
 
 #define WORKER_IDLE 'I'
