@@ -3,6 +3,8 @@
 #define FACET_VALUE_UNSET "-"
 #define HISTOGRAM_COLUMNS 60
 
+static void facets_row_free(FACETS *facets __maybe_unused, FACET_ROW *row);
+
 // ----------------------------------------------------------------------------
 
 time_t calculate_bar_width(time_t before, time_t after) {
@@ -312,6 +314,14 @@ void facets_destroy(FACETS *facets) {
     simple_pattern_free(facets->visible_keys);
     simple_pattern_free(facets->included_keys);
     simple_pattern_free(facets->excluded_keys);
+
+    while(facets->base) {
+        FACET_ROW *r = facets->base;
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(facets->base, r, prev, next);
+
+        facets_row_free(facets, r);
+    }
+
     freez(facets);
 }
 
