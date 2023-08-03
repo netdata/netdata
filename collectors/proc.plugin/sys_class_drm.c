@@ -827,12 +827,14 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                 snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, "device/device");
                 if(read_single_base64_or_hex_number_file(filename, (unsigned long long *) &c->id.asic_id)){
+                    collector_error("Cannot read asic_id from '%s'", filename);
                     card_free(c);
                     continue;
                 }
 
                 snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, "device/revision");
                 if(read_single_base64_or_hex_number_file(filename, (unsigned long long *) &c->id.pci_rev_id)){
+                    collector_error("Cannot read pci_rev_id from '%s'", filename);
                     card_free(c);
                     continue;
                 }
@@ -843,9 +845,8 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                         break;
                     }
                 } 
-                if(!c->id.marketing_name){
+                if(!c->id.marketing_name)
                     c->id.marketing_name = strdupz(amdgpu_ids[sizeof(amdgpu_ids)/sizeof(amdgpu_ids[0]) - 1].marketing_name);
-                }
 
 
                 collected_number tmp_val; 
