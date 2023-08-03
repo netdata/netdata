@@ -31,7 +31,7 @@ typedef struct facet_key FACET_KEY;
 void facets_string_hash(const char *src, char *out);
 
 typedef void (*facets_key_transformer_t)(FACETS *facets __maybe_unused, BUFFER *wb, void *data);
-typedef void (*facet_dynamic_row_t)(FACETS *facets, BUFFER *wb, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row, void *data);
+typedef void (*facet_dynamic_row_t)(FACETS *facets, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row, void *data);
 FACET_KEY *facets_register_dynamic_key(FACETS *facets, const char *key, FACET_KEY_OPTIONS options, facet_dynamic_row_t cb, void *data);
 FACET_KEY *facets_register_key_transformation(FACETS *facets, const char *key, FACET_KEY_OPTIONS options, facets_key_transformer_t cb, void *data);
 

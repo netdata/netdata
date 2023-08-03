@@ -247,7 +247,7 @@ static void systemd_journal_transform_syslog_facility(FACETS *facets __maybe_unu
         const char *name = syslog_facility_to_name(facility);
         if (name) {
             buffer_flush(wb);
-            buffer_json_add_array_item_string(wb, name);
+            buffer_strcat(wb, name);
         }
     }
 }
@@ -259,7 +259,7 @@ static void systemd_journal_transform_priority(FACETS *facets __maybe_unused, BU
         const char *name = syslog_priority_to_name(priority);
         if (name) {
             buffer_flush(wb);
-            buffer_json_add_array_item_string(wb, name);
+            buffer_strcat(wb, name);
         }
     }
 }
@@ -304,7 +304,7 @@ static void systemd_journal_transform_gid(FACETS *facets __maybe_unused, BUFFER 
     }
 }
 
-static void systemd_journal_dynamic_row_id(FACETS *facets __maybe_unused, BUFFER *wb, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row, void *data __maybe_unused) {
+static void systemd_journal_dynamic_row_id(FACETS *facets __maybe_unused, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row, void *data __maybe_unused) {
     FACET_ROW_KEY_VALUE *syslog_identifier_rkv = dictionary_get(row->dict, "SYSLOG_IDENTIFIER");
     FACET_ROW_KEY_VALUE *pid_rkv = dictionary_get(row->dict, "_PID");
 
@@ -314,7 +314,7 @@ static void systemd_journal_dynamic_row_id(FACETS *facets __maybe_unused, BUFFER
     buffer_flush(rkv->wb);
     buffer_sprintf(rkv->wb, "%s[%s]", identifier, pid);
 
-    buffer_json_add_array_item_string(wb, buffer_tostring(rkv->wb));
+    buffer_json_add_array_item_string(json_array, buffer_tostring(rkv->wb));
 }
 
 static void function_systemd_journal(const char *transaction, char *function, char *line_buffer __maybe_unused, int line_max __maybe_unused, int timeout __maybe_unused) {

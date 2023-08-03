@@ -81,7 +81,12 @@ struct facet_key {
     // members about the current row
     uint32_t key_found_in_row;
     uint32_t key_values_selected_in_row;
-    BUFFER *current_value;
+
+    struct {
+        char hash[FACET_STRING_HASH_SIZE];
+        bool updated;
+        BUFFER *b;
+    } current_value;
 
     uint32_t order;
 
@@ -93,8 +98,9 @@ struct facet_key {
     struct {
         facets_key_transformer_t cb;
         void *data;
-
     } transform;
+
+    struct facet_key *prev, *next;
 };
 
 struct facets {
@@ -111,6 +117,7 @@ struct facets {
 
     DICTIONARY *accepted_params;
 
+    FACET_KEY *keys_ll;
     DICTIONARY *keys;
     FACET_ROW *base;    // double linked list of the selected facets rows
 
@@ -253,7 +260,9 @@ static void facet_key_insert_callback(const DICTIONARY_ITEM *item __maybe_unused
         facet_key_late_init(facets, k);
     }
 
-    k->current_value = buffer_create(0, NULL);
+    k->current_value.b = buffer_create(0, NULL);
+
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(facets->keys_ll, k, prev, next);
 }
 
 static bool facet_key_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data) {
@@ -277,8 +286,12 @@ static bool facet_key_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
 
 static void facet_key_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     FACET_KEY *k = value;
+    FACETS *facets = data;
+
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(facets->keys_ll, k, prev, next);
+
     dictionary_destroy(k->values);
-    buffer_free(k->current_value);
+    buffer_free(k->current_value.b);
     freez((char *)k->name);
 }
 
@@ -392,28 +405,32 @@ void facets_register_facet_filter(FACETS *facets, const char *key_id, char *valu
 // ----------------------------------------------------------------------------
 
 static inline void facets_check_value(FACETS *facets __maybe_unused, FACET_KEY *k) {
-    if(k->transform.cb)
-        k->transform.cb(facets, k->current_value, k->transform.data);
+    if(!k->current_value.updated)
+        buffer_flush(k->current_value.b);
 
-    if(buffer_strlen(k->current_value) == 0)
-        buffer_strcat(k->current_value, FACET_VALUE_UNSET);
+    if(k->transform.cb)
+        k->transform.cb(facets, k->current_value.b, k->transform.data);
+
+    if(!k->current_value.updated) {
+        buffer_strcat(k->current_value.b, FACET_VALUE_UNSET);
+        k->current_value.updated = true;
+    }
 
 //    bool found = false;
 //    if(strstr(buffer_tostring(k->current_value), "fprintd") != NULL)
 //        found = true;
 
     if(facets->query && ((k->options & FACET_KEY_OPTION_FTS) || facets->options & FACETS_OPTION_ALL_KEYS_FTS)) {
-        if(simple_pattern_matches(facets->query, buffer_tostring(k->current_value)))
+        if(simple_pattern_matches(facets->query, buffer_tostring(k->current_value.b)))
             facets->keys_matched_by_query++;
     }
 
     if(k->values) {
         FACET_VALUE tk = {
-            .name = buffer_tostring(k->current_value),
+            .name = buffer_tostring(k->current_value.b),
         };
-        char hash[FACET_STRING_HASH_SIZE];
-        facets_string_hash(tk.name, hash);
-        dictionary_set(k->values, hash, &tk, sizeof(tk));
+        facets_string_hash(tk.name, k->current_value.hash);
+        dictionary_set(k->values, k->current_value.hash, &tk, sizeof(tk));
     }
     else {
         k->key_found_in_row++;
@@ -423,16 +440,18 @@ static inline void facets_check_value(FACETS *facets __maybe_unused, FACET_KEY *
 
 void facets_add_key_value(FACETS *facets, const char *key, const char *value) {
     FACET_KEY *k = facets_register_key(facets, key, 0);
-    buffer_flush(k->current_value);
-    buffer_strcat(k->current_value, value);
+    buffer_flush(k->current_value.b);
+    buffer_strcat(k->current_value.b, value);
+    k->current_value.updated = true;
 
     facets_check_value(facets, k);
 }
 
 void facets_add_key_value_length(FACETS *facets, const char *key, const char *value, size_t value_len) {
     FACET_KEY *k = facets_register_key(facets, key, 0);
-    buffer_flush(k->current_value);
-    buffer_strncat(k->current_value, value, value_len);
+    buffer_flush(k->current_value.b);
+    buffer_strncat(k->current_value.b, value, value_len);
+    k->current_value.updated = true;
 
     facets_check_value(facets, k);
 }
@@ -492,7 +511,8 @@ static FACET_ROW *facets_row_create(FACETS *facets, usec_t usec, FACET_ROW *into
     FACET_KEY *k;
     dfe_start_read(facets->keys, k) {
         FACET_ROW_KEY_VALUE t = {
-                .tmp = buffer_strlen(k->current_value) ? buffer_tostring(k->current_value) : FACET_VALUE_UNSET,
+                .tmp = (k->current_value.updated && buffer_strlen(k->current_value.b)) ?
+                        buffer_tostring(k->current_value.b) : FACET_VALUE_UNSET,
                 .wb = NULL,
         };
         dictionary_set(row->dict, k->name, &t, sizeof(t));
@@ -577,12 +597,14 @@ static void facets_row_keep(FACETS *facets, usec_t usec) {
 
 void facets_rows_begin(FACETS *facets) {
     FACET_KEY *k;
-    dfe_start_read(facets->keys, k) {
-                k->key_found_in_row = 0;
-                k->key_values_selected_in_row = 0;
-                buffer_flush(k->current_value);
-            }
-    dfe_done(k);
+    // dfe_start_read(facets->keys, k) {
+    for(k = facets->keys_ll ; k ; k = k->next) {
+        k->key_found_in_row = 0;
+        k->key_values_selected_in_row = 0;
+        k->current_value.updated = false;
+        k->current_value.hash[0] = '\0';
+    }
+    // dfe_done(k);
 
     facets->keys_matched_by_query = 0;
 }
@@ -597,9 +619,10 @@ void facets_row_finished(FACETS *facets, usec_t usec) {
     uint32_t selected_by = 0;
 
     FACET_KEY *k;
-    dfe_start_read(facets->keys, k) {
+    // dfe_start_read(facets->keys, k) {
+    for(k = facets->keys_ll ; k ; k = k->next) {
         if(!k->key_found_in_row) {
-            internal_fatal(buffer_strlen(k->current_value), "key is not found in row but it has a current value");
+            internal_fatal(buffer_strlen(k->current_value.b), "key is not found in row but it has a current value");
             // put the FACET_VALUE_UNSET value into it
             facets_check_value(facets, k);
         }
@@ -613,12 +636,13 @@ void facets_row_finished(FACETS *facets, usec_t usec) {
         total_keys += k->key_found_in_row;
         selected_by += (k->key_values_selected_in_row) ? 1 : 0;
     }
-    dfe_done(k);
+    // dfe_done(k);
 
     if(selected_by >= total_keys - 1) {
         uint32_t found = 0;
 
-        dfe_start_read(facets->keys, k){
+        // dfe_start_read(facets->keys, k){
+        for(k = facets->keys_ll ; k ; k = k->next) {
             uint32_t counted_by = selected_by;
 
             if (counted_by != total_keys && !k->key_values_selected_in_row)
@@ -626,16 +650,17 @@ void facets_row_finished(FACETS *facets, usec_t usec) {
 
             if(counted_by == total_keys) {
                 if(k->values) {
-                    char hash[FACET_STRING_HASH_SIZE];
-                    facets_string_hash(buffer_tostring(k->current_value), hash);
-                    FACET_VALUE *v = dictionary_get(k->values, hash);
+                    if(!k->current_value.hash[0])
+                        facets_string_hash(buffer_tostring(k->current_value.b), k->current_value.hash);
+
+                    FACET_VALUE *v = dictionary_get(k->values, k->current_value.hash);
                     v->final_facet_value_counter++;
                 }
 
                 found++;
             }
         }
-        dfe_done(k);
+        // dfe_done(k);
 
         internal_fatal(!found, "We should find at least one facet to count this row");
         (void)found;
