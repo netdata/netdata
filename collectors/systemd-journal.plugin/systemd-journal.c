@@ -332,23 +332,27 @@ static void function_systemd_journal(const char *transaction, char *function, ch
 
     // register the fields in the order you want them on the dashboard
 
-    facets_register_dynamic_key(facets, "ND_JOURNAL_PROCESS", FACET_KEY_OPTION_VISIBLE|FACET_KEY_OPTION_FTS,
+    facets_register_dynamic_key(facets, "ND_JOURNAL_PROCESS", FACET_KEY_OPTION_NO_FACET|FACET_KEY_OPTION_VISIBLE|FACET_KEY_OPTION_FTS,
                                 systemd_journal_dynamic_row_id, NULL);
-
-    facets_register_key_transformation(facets, "SYSLOG_FACILITY", FACET_KEY_OPTION_FTS,
-                                       systemd_journal_transform_syslog_facility, NULL);
-
-    facets_register_key_transformation(facets, "PRIORITY", FACET_KEY_OPTION_FTS,
-                                       systemd_journal_transform_priority, NULL);
-
-    facets_register_key_transformation(facets, "_UID", FACET_KEY_OPTION_FTS,
-                                       systemd_journal_transform_uid, uids);
-
-    facets_register_key_transformation(facets, "_GID", FACET_KEY_OPTION_FTS,
-                                       systemd_journal_transform_gid, gids);
 
     facets_register_key(facets, "MESSAGE",
                         FACET_KEY_OPTION_NO_FACET|FACET_KEY_OPTION_MAIN_TEXT|FACET_KEY_OPTION_VISIBLE|FACET_KEY_OPTION_FTS);
+
+    facets_register_key_transformation(facets, "PRIORITY", FACET_KEY_OPTION_FACET|FACET_KEY_OPTION_FTS,
+                                       systemd_journal_transform_priority, NULL);
+
+    facets_register_key_transformation(facets, "SYSLOG_FACILITY", FACET_KEY_OPTION_FACET|FACET_KEY_OPTION_FTS,
+                                       systemd_journal_transform_syslog_facility, NULL);
+
+    facets_register_key(facets, "SYSLOG_IDENTIFIER", FACET_KEY_OPTION_FACET|FACET_KEY_OPTION_FTS);
+    facets_register_key(facets, "UNIT", FACET_KEY_OPTION_FACET|FACET_KEY_OPTION_FTS);
+    facets_register_key(facets, "USER_UNIT", FACET_KEY_OPTION_FACET|FACET_KEY_OPTION_FTS);
+
+    facets_register_key_transformation(facets, "_UID", FACET_KEY_OPTION_FACET|FACET_KEY_OPTION_FTS,
+                                       systemd_journal_transform_uid, uids);
+
+    facets_register_key_transformation(facets, "_GID", FACET_KEY_OPTION_FACET|FACET_KEY_OPTION_FTS,
+                                       systemd_journal_transform_gid, gids);
 
     time_t after_s = 0, before_s = 0;
     usec_t anchor = 0;
