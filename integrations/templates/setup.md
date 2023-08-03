@@ -3,8 +3,8 @@
 [% if entry.setup.description %]
 [[ entry.setup.description ]]
 [% else %]
-[% if entry.setup.prerequisites.list %]
 ### Prerequisites
+[% if entry.setup.prerequisites.list %]
 
 [% for prereq in entry.setup.prerequisites.list %]
 #### [[ prereq.title ]]
@@ -12,12 +12,17 @@
 [[ prereq.description ]]
 
 [% endfor %]
+
+[% else %]
+
+No action required.
+
 [% endif %]
-[% if entry.setup.configuration.file.name %]
 ### Configuration
 
 #### File
 
+[% if entry.setup.configuration.file.name %]
 The configuration file name for this integration is `[[ entry.setup.configuration.file.name ]]`.
 [% if 'section_name' in entry.setup.configuration.file %]
 Configuration for this specific integration is located in the `[[ entry.setup.configuration.file.section_name ]]` section within that file.
@@ -46,7 +51,9 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/c
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config [[ entry.setup.configuration.file.name ]]
 ```
-
+[% else %]
+There is no configuration file.
+[% endif %]
 #### Options
 
 [[ entry.setup.configuration.options.description ]]
@@ -72,9 +79,12 @@ sudo ./edit-config [[ entry.setup.configuration.file.name ]]
 [% if entry.setup.configuration.options.folding.enabled %]
 {% /details %}
 [% endif %]
+[% elif not entry.setup.configuration.options.description %]
+There are no configuration options.
+
 [% endif %]
-[% if entry.setup.configuration.examples.list %]
 #### Examples
+[% if entry.setup.configuration.examples.list %]
 
 [% for example in entry.setup.configuration.examples.list %]
 ##### [[ example.name ]]
@@ -91,6 +101,8 @@ sudo ./edit-config [[ entry.setup.configuration.file.name ]]
 {% /details %}
 [% endif %]
 [% endfor %]
-[% endif %]
+[% else%]
+There are no configuration examples.
+
 [% endif %]
 [% endif %]
