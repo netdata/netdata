@@ -78,6 +78,7 @@ BuildRequires: gcc-c++
 BuildRequires: make
 BuildRequires: git-core
 BuildRequires: autoconf
+BuildRequires: systemd-devel
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
 BuildRequires: autoconf-archive
 %if 0%{?rhel} <= 8 && 0%{?amzn} < 2023
@@ -157,6 +158,7 @@ Requires: netdata-plugin-debugfs
 Requires: netdata-plugin-chartsd
 Requires: netdata-plugin-slabinfo
 Requires: netdata-plugin-perf
+Suggests: netdata-plugin-systemd-journal
 %if 0%{?_have_nfacct}
 Requires:   netdata-plugin-nfacct
 %endif
@@ -305,6 +307,10 @@ install -m 4750 -p apps.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.
 # ###########################################################
 # Install debugfs.plugin
 install -m 0750 -p debugfs.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/debugfs.plugin"
+
+# ###########################################################
+# Install systemd-journal.plugin
+install -m 4750 -p systemd-journal.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/systemd-journal.plugin"
 
 # ###########################################################
 # Install perf.plugin
@@ -599,6 +605,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 # perf belongs to a different sub-package
 %exclude %{_libexecdir}/%{name}/plugins.d/perf.plugin
+
+# systemd-journal belongs to a different sub-package
+%exclude %{_libexecdir}/%{name}/plugins.d/systemd-journal.plugin
 
 # CUPS belongs to a different sub package
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
@@ -901,7 +910,30 @@ fi
 # CAP_DAC_READ_SEARCH required for data collection.
 %caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/debugfs.plugin
 
+%package plugin-systemd-journal
+Summary: The systemd-journal plugin for the Netdata Agent
+Group: Applications/System
+Requires: netdata = %{version}
+Conflicts: netdata < %{version}
+
+%description plugin-systemd-journal
+ This plugin allows the Netdata Agent to present entries from the systemd
+ journal on Netdata Cloud or the local Agent Dashboard.
+
+%pre plugin-systemd-journal
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
+
+%files plugin-systemd-journal
+%defattr(0750,root,netdata,0750)
+# CAP_DAC_READ_SEARCH required for data collection.
+%caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/systemd-journal.plugin
+
 %changelog
+* Thu Aug 03 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-21
+- Added systemd-journal plugin handling
 * Wed Jun 14 2023 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-20
 - Added eBPF build dependency (again)
 * Fri Apr 07 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-19
