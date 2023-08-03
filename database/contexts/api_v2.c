@@ -1114,8 +1114,9 @@ static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
         }
         else {
             // merge
-            string_freez(o->family);
+            STRING *old_family = o->family;
             o->family = string_2way_merge(o->family, n->family);
+            string_freez(old_family);
         }
     }
 
