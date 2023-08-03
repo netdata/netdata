@@ -328,8 +328,6 @@ typedef struct netdata_socket_idx {
 #define NETDATA_MAX_NETWORK_COMBINED_LENGTH 1018
 #define NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH 5 // :TCP:
 
-#define NETDATA_INBOUND_DIRECTION (uint32_t)1
-#define NETDATA_OUTBOUND_DIRECTION (uint32_t)2
 /**
  * Allocate the maximum number of structures in the beginning, this can force the collector to use more memory
  * in the long term, on the other had it is faster.
@@ -355,20 +353,6 @@ typedef struct netdata_socket_plot {
 
     uint32_t flags;
 } netdata_socket_plot_t;
-
-#define NETWORK_VIEWER_CHARTS_CREATED (uint32_t)1
-typedef struct netdata_vector_plot {
-    netdata_socket_plot_t *plot;    // Vector used to plot charts
-
-    avl_tree_lock tree;             // AVL tree to speed up search
-    uint32_t last;                  // The 'other' dimension, the last chart accepted.
-    uint32_t next;                  // The next position to store in the vector.
-    uint32_t max_plot;              // Max number of elements to plot.
-    uint32_t last_plot;             // Last element plot
-
-    uint32_t flags;                 // Flags
-
-} netdata_vector_plot_t;
 
 void clean_port_structure(ebpf_network_viewer_port_list_t **clean);
 extern ebpf_network_viewer_port_list_t *listen_ports;
