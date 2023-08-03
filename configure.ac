@@ -1117,24 +1117,29 @@ AM_CONDITIONAL([ENABLE_PLUGIN_FREEIPMI], [test "${enable_plugin_freeipmi}" = "ye
 
 LIBS_BAK="${LIBS}"
 
-AC_CHECK_LIB([systemd], [sd_journal_open], [have_systemd_libs=yes], [have_systemd_libs=no])
-AC_CHECK_HEADERS([systemd/sd-journal.h], [have_systemd_journal_header=yes], [have_systemd_journal_header=no])
-
-if test "${have_systemd_libs}" = "yes" -a "${have_systemd_journal_header}" = "yes"; then
-    have_systemd="yes"
-else
-    have_systemd="no"
-fi
+PKG_CHECK_MODULES(
+    [OPTIONAL_SYSTEMD],
+    [libsystemd>=245],
+    [AC_CHECK_LIB(
+        [systemd],
+        [sd_journal_open],
+        [AC_CHECK_HEADERS(
+            [systemd/sd-journal.h],
+            [have_systemd='yes'],
+            [have_systemd='no']
+        )],
+        [have_systemd='no'],
+    )],
+    [have_systemd='no']
+)
 
 test "${enable_plugin_systemd_journal}" = "yes" -a "${have_systemd}" != "yes" && \
-    AC_MSG_ERROR([systemd is required but not found. Try installing 'libsystemd-dev' or 'libsystemd-devel'])
+    AC_MSG_ERROR([systemd 245 or newer is required but not found. Try installing 'libsystemd-dev' or 'systemd-devel'])
 
 AC_MSG_CHECKING([if systemd-journal.plugin should be enabled])
 if test "${enable_plugin_systemd_journal}" != "no" -a "${have_systemd}" = "yes"; then
     enable_plugin_systemd_journal="yes"
     AC_DEFINE([HAVE_SYSTEMD], [1], [systemd usability])
-    OPTIONAL_SYSTEMD_CFLAGS="-I/usr/include"
-    OPTIONAL_SYSTEMD_LIBS="-lsystemd"
 else
     enable_plugin_systemd_journal="no"
 fi
