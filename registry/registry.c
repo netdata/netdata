@@ -58,7 +58,7 @@ static inline void registry_set_person_cookie(struct web_client *w, REGISTRY_PER
 static inline void registry_json_header(RRDHOST *host, struct web_client *w, const char *action, const char *status) {
     buffer_flush(w->response.data);
     w->response.data->content_type = CT_APPLICATION_JSON;
-    buffer_json_initialize(w->response.data, "\"", "\"", 0, true, false);
+    buffer_json_initialize(w->response.data, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     buffer_json_member_add_string(w->response.data, "action", action);
     buffer_json_member_add_string(w->response.data, "status", status);
     buffer_json_member_add_string(w->response.data, "hostname", rrdhost_registry_hostname(host));

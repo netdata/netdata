@@ -1052,7 +1052,8 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     if(query_target_has_percentage_of_group(qt))
         qt->window.options &= ~RRDR_OPTION_PERCENTAGE;
 
-    qt->internal.relative = rrdr_relative_window_to_absolute(&qt->window.after, &qt->window.before, &qt->window.now);
+    qt->internal.relative = rrdr_relative_window_to_absolute(&qt->window.after, &qt->window.before, &qt->window.now,
+                                                             unittest_running);
 
     // prepare our local variables - we need these across all these functions
     QUERY_TARGET_LOCALS qtl = {

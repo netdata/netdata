@@ -169,7 +169,7 @@ static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
                                                 size_t examined_dimensions, usec_t duration,
                                                 WEIGHTS_STATS *stats) {
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true, options & RRDR_OPTION_MINIFY);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, (options & RRDR_OPTION_MINIFY) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
 
     results_header_to_json(results, wb, after, before, baseline_after, baseline_before,
                            points, method, group, options, shifts, examined_dimensions, duration, stats);
@@ -221,7 +221,7 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
                                                   size_t examined_dimensions, usec_t duration,
                                                   WEIGHTS_STATS *stats) {
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true, options & RRDR_OPTION_MINIFY);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, (options & RRDR_OPTION_MINIFY) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
 
     results_header_to_json(results, wb, after, before, baseline_after, baseline_before,
                            points, method, group, options, shifts, examined_dimensions, duration, stats);
@@ -739,7 +739,7 @@ static size_t registered_results_to_json_multinode_no_group_by(
         size_t examined_dimensions, struct query_weights_data *qwd,
         WEIGHTS_STATS *stats,
         struct query_versions *versions) {
-    buffer_json_initialize(wb, "\"", "\"", 0, true, options & RRDR_OPTION_MINIFY);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, (options & RRDR_OPTION_MINIFY) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
     buffer_json_member_add_uint64(wb, "api", 2);
 
     results_header_to_json_v2(results, wb, qwd, after, before, baseline_after, baseline_before,
@@ -958,7 +958,7 @@ static size_t registered_results_to_json_multinode_group_by(
         size_t examined_dimensions, struct query_weights_data *qwd,
         WEIGHTS_STATS *stats,
         struct query_versions *versions) {
-    buffer_json_initialize(wb, "\"", "\"", 0, true, options & RRDR_OPTION_MINIFY);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, (options & RRDR_OPTION_MINIFY) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
     buffer_json_member_add_uint64(wb, "api", 2);
 
     results_header_to_json_v2(results, wb, qwd, after, before, baseline_after, baseline_before,
@@ -1806,7 +1806,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
             }
     };
 
-    if(!rrdr_relative_window_to_absolute(&qwr->after, &qwr->before, NULL))
+    if(!rrdr_relative_window_to_absolute(&qwr->after, &qwr->before, NULL, false))
         buffer_no_cacheable(wb);
     else
         buffer_cacheable(wb);
@@ -1823,7 +1823,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
         if(qwr->baseline_before <= API_RELATIVE_TIME_MAX)
             qwr->baseline_before += qwr->after;
 
-        rrdr_relative_window_to_absolute(&qwr->baseline_after, &qwr->baseline_before, NULL);
+        rrdr_relative_window_to_absolute(&qwr->baseline_after, &qwr->baseline_before, NULL, false);
 
         if (qwr->baseline_before <= qwr->baseline_after) {
             resp = HTTP_RESP_BAD_REQUEST;

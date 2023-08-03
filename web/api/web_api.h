@@ -11,9 +11,19 @@
 
 extern bool netdata_is_protected_by_bearer;
 extern DICTIONARY *netdata_authorized_bearers;
-bool api_check_bearer_token(struct web_client *w);
-bool extract_bearer_token_from_request(struct web_client *w, char *dst, size_t dst_len);
-void bearer_tokens_init(void);
+typedef enum __attribute__((packed)) {
+    BEARER_STATUS_NO_BEARER_IN_HEADERS,
+    BEARER_STATUS_BEARER_DOES_NOT_FIT,
+    BEARER_STATUS_NOT_PARSABLE,
+    BEARER_STATUS_EXTRACTED_FROM_HEADER,
+    BEARER_STATUS_NO_BEARERS_DICTIONARY,
+    BEARER_STATUS_NOT_FOUND_IN_DICTIONARY,
+    BEARER_STATUS_EXPIRED,
+    BEARER_STATUS_AVAILABLE_AND_VALIDATED,
+} BEARER_STATUS;
+
+BEARER_STATUS api_check_bearer_token(struct web_client *w);
+BEARER_STATUS extract_bearer_token_from_request(struct web_client *w, char *dst, size_t dst_len);
 
 struct web_api_command {
     const char *command;

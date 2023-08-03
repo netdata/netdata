@@ -154,6 +154,8 @@ LIBNETDATA_FILES = \
     libnetdata/dictionary/dictionary.h \
     libnetdata/eval/eval.c \
     libnetdata/eval/eval.h \
+    libnetdata/facets/facets.c \
+    libnetdata/facets/facets.h \
     libnetdata/gorilla/gorilla.h \
     libnetdata/gorilla/gorilla.cc \
     libnetdata/inlined.h \
@@ -299,6 +301,11 @@ TIMEX_PLUGIN_FILES = \
 
 FREEIPMI_PLUGIN_FILES = \
     collectors/freeipmi.plugin/freeipmi_plugin.c \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
+SYSTEMD_JOURNAL_PLUGIN_FILES = \
+    collectors/systemd-journal.plugin/systemd-journal.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -1229,6 +1236,15 @@ if ENABLE_PLUGIN_FREEIPMI
     freeipmi_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_IPMIMONITORING_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_SYSTEMD_JOURNAL
+    plugins_PROGRAMS += systemd-journal.plugin
+    systemd_journal_plugin_SOURCES = $(SYSTEMD_JOURNAL_PLUGIN_FILES)
+    systemd_journal_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(OPTIONAL_SYSTEMD_LIBS) \
         $(NULL)
 endif
 

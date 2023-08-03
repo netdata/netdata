@@ -54,13 +54,13 @@ static time_t bearer_get_token(uuid_t *uuid) {
 
 #define HTTP_REQUEST_AUTHORIZATION_BEARER "\r\nAuthorization: Bearer "
 
-bool extract_bearer_token_from_request(struct web_client *w, char *dst, size_t dst_len) {
+BEARER_STATUS extract_bearer_token_from_request(struct web_client *w, char *dst, size_t dst_len) {
     const char *req = buffer_tostring(w->response.data);
     size_t req_len = buffer_strlen(w->response.data);
     const char *bearer = strcasestr(req, HTTP_REQUEST_AUTHORIZATION_BEARER);
 
     if(!bearer)
-        return false;
+        return BEARER_STATUS_NO_BEARER_IN_HEADERS;
 
     const char *token_start = bearer + sizeof(HTTP_REQUEST_AUTHORIZATION_BEARER) - 1;
 
@@ -69,26 +69,33 @@ bool extract_bearer_token_from_request(struct web_client *w, char *dst, size_t d
 
     const char *token_end = token_start + UUID_STR_LEN - 1 + 2;
     if (token_end > req + req_len)
-        return false;
+        return BEARER_STATUS_BEARER_DOES_NOT_FIT;
 
     strncpyz(dst, token_start, dst_len - 1);
     uuid_t uuid;
     if (uuid_parse(dst, uuid) != 0)
-        return false;
+        return BEARER_STATUS_NOT_PARSABLE;
 
-    return true;
+    return BEARER_STATUS_EXTRACTED_FROM_HEADER;
 }
 
-bool api_check_bearer_token(struct web_client *w) {
+BEARER_STATUS api_check_bearer_token(struct web_client *w) {
     if(!netdata_authorized_bearers)
-        return false;
+        return BEARER_STATUS_NO_BEARERS_DICTIONARY;
 
     char token[UUID_STR_LEN];
-    if(!extract_bearer_token_from_request(w, token, sizeof(token)))
-        return false;
+    BEARER_STATUS t = extract_bearer_token_from_request(w, token, sizeof(token));
+    if(t != BEARER_STATUS_EXTRACTED_FROM_HEADER)
+        return t;
 
     struct bearer_token *z = dictionary_get(netdata_authorized_bearers, token);
-    return z && z->expires_s > now_monotonic_sec();
+    if(!z)
+        return BEARER_STATUS_NOT_FOUND_IN_DICTIONARY;
+
+    if(z->expires_s < now_monotonic_sec())
+        return BEARER_STATUS_EXPIRED;
+
+    return BEARER_STATUS_AVAILABLE_AND_VALIDATED;
 }
 
 static bool verify_agent_uuids(const char *machine_guid, const char *node_id, const char *claim_id) {
@@ -153,7 +160,7 @@ int api_v2_bearer_protection(RRDHOST *host __maybe_unused, struct web_client *w 
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     buffer_json_member_add_boolean(wb, "bearer_protection", netdata_is_protected_by_bearer);
     buffer_json_finalize(wb);
 
@@ -192,7 +199,7 @@ int api_v2_bearer_token(RRDHOST *host __maybe_unused, struct web_client *w __may
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     buffer_json_member_add_string(wb, "mg", localhost->machine_guid);
     buffer_json_member_add_boolean(wb, "bearer_protection", netdata_is_protected_by_bearer);
     buffer_json_member_add_uuid(wb, "token", &uuid);

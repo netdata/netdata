@@ -6,7 +6,7 @@ bool netdata_is_protected_by_bearer = false; // this is controlled by cloud, at 
 DICTIONARY *netdata_authorized_bearers = NULL;
 
 static bool web_client_check_acl_and_bearer(struct web_client *w, WEB_CLIENT_ACL endpoint_acl) {
-    if(endpoint_acl == WEB_CLIENT_ACL_NOCHECK)
+    if(endpoint_acl == WEB_CLIENT_ACL_NONE || (endpoint_acl & WEB_CLIENT_ACL_NOCHECK))
         // the endpoint is totally public
         return true;
 
@@ -23,10 +23,23 @@ static bool web_client_check_acl_and_bearer(struct web_client *w, WEB_CLIENT_ACL
         // endpoint does not require a bearer
         return true;
 
-    if((w->acl & (WEB_CLIENT_ACL_ACLK|WEB_CLIENT_ACL_WEBRTC)) || api_check_bearer_token(w))
+    if((w->acl & (WEB_CLIENT_ACL_ACLK|WEB_CLIENT_ACL_WEBRTC)))
         // the request is coming from ACLK or WEBRTC (authorized already),
-        // or we have a valid bearer on the request
         return true;
+
+    // at this point we need a bearer to serve the request
+    // either because:
+    //
+    // 1. WEB_CLIENT_ACL_BEARER_REQUIRED, or
+    // 2. netdata_is_protected_by_bearer == true
+    //
+
+    BEARER_STATUS t = api_check_bearer_token(w);
+    if(t == BEARER_STATUS_AVAILABLE_AND_VALIDATED)
+        // we have a valid bearer on the request
+        return true;
+
+    netdata_log_info("BEARER: bearer is required for request: code %d", t);
 
     return false;
 }
@@ -60,7 +73,7 @@ int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_pat
                 return HTTP_RESP_BAD_REQUEST;
             }
 
-            if(unlikely(api_commands[i].acl != WEB_CLIENT_ACL_NOCHECK) && !(w->acl & api_commands[i].acl))
+            if(unlikely(!web_client_check_acl_and_bearer(w, api_commands[i].acl)))
                 return web_client_permission_denied(w);
 
             char *query_string = (char *)buffer_tostring(w->url_query_string_decoded);

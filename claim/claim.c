@@ -356,7 +356,7 @@ int api_v2_claim(struct web_client *w, char *url) {
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
     time_t now_s = now_realtime_sec();
     CLOUD_STATUS status = buffer_json_cloud_status(wb, now_s);
@@ -462,7 +462,7 @@ int api_v2_claim(struct web_client *w, char *url) {
         // our status may have changed
         // refresh the status in our output
         buffer_flush(wb);
-        buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+        buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
         now_s = now_realtime_sec();
         buffer_json_cloud_status(wb, now_s);
 

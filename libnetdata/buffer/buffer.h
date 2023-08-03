@@ -68,6 +68,12 @@ typedef enum __attribute__ ((__packed__)) {
     CT_APPLICATION_ZIP,
 } HTTP_CONTENT_TYPE;
 
+typedef enum __attribute__ ((__packed__)) {
+    BUFFER_JSON_OPTIONS_DEFAULT = 0,
+    BUFFER_JSON_OPTIONS_MINIFY = (1 << 0),
+    BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAYS = (1 << 1),
+} BUFFER_JSON_OPTIONS;
+
 typedef struct web_buffer {
     size_t size;            // allocation size of buffer, in bytes
     size_t len;             // current data length in buffer, in bytes
@@ -82,7 +88,7 @@ typedef struct web_buffer {
         char key_quote[BUFFER_QUOTE_MAX_SIZE + 1];
         char value_quote[BUFFER_QUOTE_MAX_SIZE + 1];
         int8_t depth;
-        bool minify;
+        BUFFER_JSON_OPTIONS options;
         BUFFER_JSON_NODE stack[BUFFER_JSON_MAX_DEPTH];
     } json;
 } BUFFER;
@@ -148,7 +154,7 @@ static inline void buffer_need_bytes(BUFFER *buffer, size_t needed_free_size) {
 }
 
 void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value_quote, int depth,
-                            bool add_anonymous_object, bool minify);
+                            bool add_anonymous_object, BUFFER_JSON_OPTIONS options);
 
 void buffer_json_finalize(BUFFER *wb);
 
@@ -668,7 +674,8 @@ static inline void buffer_print_json_comma_newline_spacing(BUFFER *wb) {
     if(wb->json.stack[wb->json.depth].count)
         buffer_fast_strcat(wb, ",", 1);
 
-    if(wb->json.minify)
+    if((wb->json.options & BUFFER_JSON_OPTIONS_MINIFY) ||
+        (wb->json.stack[wb->json.depth].type == BUFFER_JSON_ARRAY && !(wb->json.options & BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAYS)))
         return;
 
     buffer_fast_strcat(wb, "\n", 1);
@@ -715,7 +722,7 @@ static inline void buffer_json_object_close(BUFFER *wb) {
     assert(wb->json.depth >= 0 && "BUFFER JSON: nothing is open to close it");
     assert(wb->json.stack[wb->json.depth].type == BUFFER_JSON_OBJECT && "BUFFER JSON: an object is not open to close it");
 #endif
-    if(!wb->json.minify) {
+    if(!(wb->json.options & BUFFER_JSON_OPTIONS_MINIFY)) {
         buffer_fast_strcat(wb, "\n", 1);
         buffer_print_spaces(wb, wb->json.depth);
     }
@@ -801,48 +808,42 @@ static inline void buffer_json_add_array_item_array(BUFFER *wb) {
 }
 
 static inline void buffer_json_add_array_item_string(BUFFER *wb, const char *value) {
-    if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",", 1);
+    buffer_print_json_comma_newline_spacing(wb);
 
     buffer_json_add_string_value(wb, value);
     wb->json.stack[wb->json.depth].count++;
 }
 
 static inline void buffer_json_add_array_item_double(BUFFER *wb, NETDATA_DOUBLE value) {
-    if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",", 1);
+    buffer_print_json_comma_newline_spacing(wb);
 
     buffer_print_netdata_double(wb, value);
     wb->json.stack[wb->json.depth].count++;
 }
 
 static inline void buffer_json_add_array_item_int64(BUFFER *wb, int64_t value) {
-    if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",", 1);
+    buffer_print_json_comma_newline_spacing(wb);
 
     buffer_print_int64(wb, value);
     wb->json.stack[wb->json.depth].count++;
 }
 
 static inline void buffer_json_add_array_item_uint64(BUFFER *wb, uint64_t value) {
-    if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",", 1);
+    buffer_print_json_comma_newline_spacing(wb);
 
     buffer_print_uint64(wb, value);
     wb->json.stack[wb->json.depth].count++;
 }
 
 static inline void buffer_json_add_array_item_time_t(BUFFER *wb, time_t value) {
-    if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",", 1);
+    buffer_print_json_comma_newline_spacing(wb);
 
     buffer_print_int64(wb, value);
     wb->json.stack[wb->json.depth].count++;
 }
 
 static inline void buffer_json_add_array_item_time_ms(BUFFER *wb, time_t value) {
-    if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",", 1);
+    buffer_print_json_comma_newline_spacing(wb);
 
     buffer_print_int64(wb, value);
     buffer_fast_strcat(wb, "000", 3);
@@ -850,8 +851,7 @@ static inline void buffer_json_add_array_item_time_ms(BUFFER *wb, time_t value) 
 }
 
 static inline void buffer_json_add_array_item_time_t2ms(BUFFER *wb, time_t value) {
-    if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",", 1);
+    buffer_print_json_comma_newline_spacing(wb);
 
     buffer_print_int64(wb, value);
     buffer_fast_strcat(wb, "000", 3);
@@ -859,8 +859,7 @@ static inline void buffer_json_add_array_item_time_t2ms(BUFFER *wb, time_t value
 }
 
 static inline void buffer_json_add_array_item_object(BUFFER *wb) {
-    if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",", 1);
+    buffer_print_json_comma_newline_spacing(wb);
 
     buffer_fast_strcat(wb, "{", 1);
     wb->json.stack[wb->json.depth].count++;
@@ -919,6 +918,11 @@ static inline void buffer_json_array_close(BUFFER *wb) {
     assert(wb->json.depth >= 0 && "BUFFER JSON: nothing is open to close it");
     assert(wb->json.stack[wb->json.depth].type == BUFFER_JSON_ARRAY && "BUFFER JSON: an array is not open to close it");
 #endif
+    if(wb->json.options & BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAYS) {
+        buffer_fast_strcat(wb, "\n", 1);
+        buffer_print_spaces(wb, wb->json.depth);
+    }
+
     buffer_fast_strcat(wb, "]", 1);
     _buffer_json_depth_pop(wb);
 }
@@ -928,6 +932,8 @@ typedef enum __attribute__((packed)) {
     RRDF_FIELD_OPTS_UNIQUE_KEY   = (1 << 0), // the field is the unique key of the row
     RRDF_FIELD_OPTS_VISIBLE      = (1 << 1), // the field should be visible by default
     RRDF_FIELD_OPTS_STICKY       = (1 << 2), // the field should be sticky
+    RRDF_FIELD_OPTS_FULL_WIDTH   = (1 << 3), // the field should get full width
+    RRDF_FIELD_OPTS_WRAP         = (1 << 4), // the field should get full width
 } RRDF_FIELD_OPTIONS;
 
 typedef enum __attribute__((packed)) {
@@ -969,7 +975,8 @@ static inline const char *rrdf_field_type_to_string(RRDF_FIELD_TYPE type) {
 typedef enum __attribute__((packed)) {
     RRDF_FIELD_VISUAL_VALUE,    // show the value, possibly applying a transformation
     RRDF_FIELD_VISUAL_BAR,      // show the value and a bar, respecting the max field to fill the bar at 100%
-    RRDF_FIELD_VISUAL_PILL,     // array of values (transformation is respected)
+    RRDF_FIELD_VISUAL_PILL,     //
+    RRDF_FIELD_VISUAL_MARKDOC,  //
 } RRDF_FIELD_VISUAL;
 
 static inline const char *rrdf_field_visual_to_string(RRDF_FIELD_VISUAL visual) {
@@ -983,14 +990,18 @@ static inline const char *rrdf_field_visual_to_string(RRDF_FIELD_VISUAL visual) 
 
         case RRDF_FIELD_VISUAL_PILL:
             return "pill";
+
+        case RRDF_FIELD_VISUAL_MARKDOC:
+            return "markdoc";
     }
 }
 
 typedef enum __attribute__((packed)) {
     RRDF_FIELD_TRANSFORM_NONE,      // show the value as-is
-    RRDF_FIELD_TRANSFORM_NUMBER,    // show the value repsecting the decimal_points
-    RRDF_FIELD_TRANSFORM_DURATION,  // transform as duration in second to a human readable duration
-    RRDF_FIELD_TRANSFORM_DATETIME,  // UNIX epoch timestamp in ms
+    RRDF_FIELD_TRANSFORM_NUMBER,    // show the value respecting the decimal_points
+    RRDF_FIELD_TRANSFORM_DURATION_S,  // transform as duration in second to a human-readable duration
+    RRDF_FIELD_TRANSFORM_DATETIME_MS,  // UNIX epoch timestamp in ms
+    RRDF_FIELD_TRANSFORM_DATETIME_USEC,  // UNIX epoch timestamp in usec
 } RRDF_FIELD_TRANSFORM;
 
 static inline const char *rrdf_field_transform_to_string(RRDF_FIELD_TRANSFORM transform) {
@@ -1002,11 +1013,14 @@ static inline const char *rrdf_field_transform_to_string(RRDF_FIELD_TRANSFORM tr
         case RRDF_FIELD_TRANSFORM_NUMBER:
             return "number";
 
-        case RRDF_FIELD_TRANSFORM_DURATION:
+        case RRDF_FIELD_TRANSFORM_DURATION_S:
             return "duration";
 
-        case RRDF_FIELD_TRANSFORM_DATETIME:
+        case RRDF_FIELD_TRANSFORM_DATETIME_MS:
             return "datetime";
+
+        case RRDF_FIELD_TRANSFORM_DATETIME_USEC:
+            return "datetime_usec";
     }
 }
 
@@ -1064,18 +1078,26 @@ static inline const char *rrdf_field_summary_to_string(RRDF_FIELD_SUMMARY summar
 }
 
 typedef enum __attribute__((packed)) {
+    RRDF_FIELD_FILTER_NONE,
     RRDF_FIELD_FILTER_RANGE,
     RRDF_FIELD_FILTER_MULTISELECT,
+    RRDF_FIELD_FILTER_FACET,
 } RRDF_FIELD_FILTER;
 
 static inline const char *rrdf_field_filter_to_string(RRDF_FIELD_FILTER filter) {
     switch(filter) {
-        default:
         case RRDF_FIELD_FILTER_RANGE:
             return "range";
 
         case RRDF_FIELD_FILTER_MULTISELECT:
             return "multiselect";
+
+        case RRDF_FIELD_FILTER_FACET:
+            return "facet";
+
+        default:
+        case RRDF_FIELD_FILTER_NONE:
+            return "none";
     }
 }
 
@@ -1114,6 +1136,9 @@ buffer_rrdf_table_add_field(BUFFER *wb, size_t field_id, const char *key, const 
         buffer_json_member_add_boolean(wb, "sticky", options & RRDF_FIELD_OPTS_STICKY);
         buffer_json_member_add_string(wb, "summary", rrdf_field_summary_to_string(summary));
         buffer_json_member_add_string(wb, "filter", rrdf_field_filter_to_string(filter));
+
+        buffer_json_member_add_boolean(wb, "full_width", options & RRDF_FIELD_OPTS_FULL_WIDTH);
+        buffer_json_member_add_boolean(wb, "wrap", options & RRDF_FIELD_OPTS_WRAP);
     }
     buffer_json_object_close(wb);
 }

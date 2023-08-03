@@ -13,7 +13,7 @@
 #define APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION "Detailed information on the currently running processes."
 
 #define APPS_PLUGIN_FUNCTIONS() do { \
-        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " \"processes\" 10 \"%s\"\n", APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION); \
+        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " \"processes\" %d \"%s\"\n", PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION); \
     } while(0)
 
 
@@ -4572,7 +4572,7 @@ static int check_capabilities() {
 }
 #endif
 
-netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
+static netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
 
 #define PROCESS_FILTER_CATEGORY "category:"
 #define PROCESS_FILTER_USER "user:"
@@ -4625,15 +4625,6 @@ static void get_MemTotal(void) {
 #endif
 }
 
-static void apps_plugin_function_error(const char *transaction, int code, const char *msg) {
-    char buffer[PLUGINSD_LINE_MAX + 1];
-    json_escape_string(buffer, msg, PLUGINSD_LINE_MAX);
-
-    pluginsd_function_result_begin_to_stdout(transaction, code, "application/json", now_realtime_sec());
-    fprintf(stdout, "{\"status\":%d,\"error_message\":\"%s\"}", code, buffer);
-    pluginsd_function_result_end_to_stdout();
-}
-
 static void apps_plugin_function_processes_help(const char *transaction) {
     pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600);
     fprintf(stdout, "%s",
@@ -4681,7 +4672,7 @@ static void apps_plugin_function_processes_help(const char *transaction) {
     buffer_json_add_array_item_double(wb, _tmp);                                                                \
 } while(0)
 
-static void apps_plugin_function_processes(const char *transaction, char *function __maybe_unused, char *line_buffer __maybe_unused, int line_max __maybe_unused, int timeout __maybe_unused) {
+static void function_processes(const char *transaction, char *function __maybe_unused, char *line_buffer __maybe_unused, int line_max __maybe_unused, int timeout __maybe_unused) {
     struct pid_stat *p;
 
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
@@ -4702,21 +4693,21 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         if(!category && strncmp(keyword, PROCESS_FILTER_CATEGORY, strlen(PROCESS_FILTER_CATEGORY)) == 0) {
             category = find_target_by_name(apps_groups_root_target, &keyword[strlen(PROCESS_FILTER_CATEGORY)]);
             if(!category) {
-                apps_plugin_function_error(transaction, HTTP_RESP_BAD_REQUEST, "No category with that name found.");
+                pluginsd_function_json_error(transaction, HTTP_RESP_BAD_REQUEST, "No category with that name found.");
                 return;
             }
         }
         else if(!user && strncmp(keyword, PROCESS_FILTER_USER, strlen(PROCESS_FILTER_USER)) == 0) {
             user = find_target_by_name(users_root_target, &keyword[strlen(PROCESS_FILTER_USER)]);
             if(!user) {
-                apps_plugin_function_error(transaction, HTTP_RESP_BAD_REQUEST, "No user with that name found.");
+                pluginsd_function_json_error(transaction, HTTP_RESP_BAD_REQUEST, "No user with that name found.");
                 return;
             }
         }
         else if(strncmp(keyword, PROCESS_FILTER_GROUP, strlen(PROCESS_FILTER_GROUP)) == 0) {
             group = find_target_by_name(groups_root_target, &keyword[strlen(PROCESS_FILTER_GROUP)]);
             if(!group) {
-                apps_plugin_function_error(transaction, HTTP_RESP_BAD_REQUEST, "No group with that name found.");
+                pluginsd_function_json_error(transaction, HTTP_RESP_BAD_REQUEST, "No group with that name found.");
                 return;
             }
         }
@@ -4742,7 +4733,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         else {
             char msg[PLUGINSD_LINE_MAX];
             snprintfz(msg, PLUGINSD_LINE_MAX, "Invalid parameter '%s'", keyword);
-            apps_plugin_function_error(transaction, HTTP_RESP_BAD_REQUEST, msg);
+            pluginsd_function_json_error(transaction, HTTP_RESP_BAD_REQUEST, msg);
             return;
         }
     }
@@ -4755,7 +4746,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
     unsigned int io_divisor = 1024 * RATES_DETAIL;
 
     BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAYS);
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", update_every);
@@ -5232,7 +5223,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
                                     RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
         buffer_rrdf_table_add_field(wb, field_id++, "Uptime", "Uptime in seconds", RRDF_FIELD_TYPE_DURATION,
-                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_DURATION, 2,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_DURATION_S, 2,
                                     "seconds", Uptime_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_MAX,
                                     RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
@@ -5532,9 +5523,9 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
     pluginsd_function_result_end_to_stdout();
 }
 
-bool apps_plugin_exit = false;
+static bool apps_plugin_exit = false;
 
-void *reader_main(void *arg __maybe_unused) {
+static void *reader_main(void *arg __maybe_unused) {
     char buffer[PLUGINSD_LINE_MAX + 1];
 
     char *s = NULL;
@@ -5566,9 +5557,9 @@ void *reader_main(void *arg __maybe_unused) {
                 netdata_mutex_lock(&mutex);
 
                 if(strncmp(function, "processes", strlen("processes")) == 0)
-                    apps_plugin_function_processes(transaction, function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
+                    function_processes(transaction, function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
                 else
-                    apps_plugin_function_error(transaction, HTTP_RESP_NOT_FOUND, "No function with this name found in apps.plugin.");
+                    pluginsd_function_json_error(transaction, HTTP_RESP_NOT_FOUND, "No function with this name found in apps.plugin.");
 
                 fflush(stdout);
                 netdata_mutex_unlock(&mutex);
@@ -5695,6 +5686,8 @@ int main(int argc, char **argv) {
     netdata_thread_t reader_thread;
     netdata_thread_create(&reader_thread, "APPS_READER", NETDATA_THREAD_OPTION_DONT_LOG, reader_main, NULL);
     netdata_mutex_lock(&mutex);
+
+    APPS_PLUGIN_FUNCTIONS();
 
     usec_t step = update_every * USEC_PER_SEC;
     global_iterations_counter = 1;

@@ -941,7 +941,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     char *cookie = strstr(w->response.data->buffer, NETDATA_REGISTRY_COOKIE_NAME "=");
     if(cookie)
         strncpyz(person_guid, &cookie[sizeof(NETDATA_REGISTRY_COOKIE_NAME)], UUID_STR_LEN - 1);
-    else if(!extract_bearer_token_from_request(w, person_guid, sizeof(person_guid)))
+    else if(extract_bearer_token_from_request(w, person_guid, sizeof(person_guid)) != BEARER_STATUS_EXTRACTED_FROM_HEADER)
         person_guid[0] = '\0';
 
     char action = '\0';
@@ -1199,7 +1199,7 @@ static void host_collectors(RRDHOST *host, BUFFER *wb) {
 
 extern int aclk_connected;
 inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb) {
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
     buffer_json_member_add_string(wb, "version", rrdhost_program_version(host));
     buffer_json_member_add_string(wb, "uid", host->machine_guid);
@@ -1319,7 +1319,7 @@ int web_client_api_request_v1_ml_info(RRDHOST *host, struct web_client *w, char 
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     ml_host_get_detection_info(host, wb);
     buffer_json_finalize(wb);
 
@@ -1424,7 +1424,7 @@ int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, cha
     wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     host_functions2json(host, wb);
     buffer_json_finalize(wb);
 

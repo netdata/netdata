@@ -99,8 +99,6 @@ void pluginsd_process_thread_cleanup(void *ptr);
 
 size_t pluginsd_initialize_plugin_directories();
 
-
-
 #define pluginsd_function_result_begin_to_buffer(wb, transaction, code, content_type, expires)      \
     buffer_sprintf(wb                                                                               \
                     , PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " \"%s\" %d \"%s\" %ld\n"              \
@@ -124,5 +122,14 @@ size_t pluginsd_initialize_plugin_directories();
 
 #define pluginsd_function_result_end_to_stdout() \
     fprintf(stdout, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n")
+
+static inline void pluginsd_function_json_error(const char *transaction, int code, const char *msg) {
+    char buffer[PLUGINSD_LINE_MAX + 1];
+    json_escape_string(buffer, msg, PLUGINSD_LINE_MAX);
+
+    pluginsd_function_result_begin_to_stdout(transaction, code, "application/json", now_realtime_sec());
+    fprintf(stdout, "{\"status\":%d,\"error_message\":\"%s\"}", code, buffer);
+    pluginsd_function_result_end_to_stdout();
+}
 
 #endif /* NETDATA_PLUGINS_D_H */

@@ -1966,3 +1966,135 @@ int hash256_string(const unsigned char *string, size_t size, char *hash) {
     EVP_MD_CTX_destroy(ctx);
     return 1;
 }
+
+// Returns 1 if an absolute period was requested or 0 if it was a relative period
+bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t *now_ptr, bool unittest_running) {
+    time_t now = now_realtime_sec() - 1;
+
+    if(now_ptr)
+        *now_ptr = now;
+
+    int absolute_period_requested = -1;
+    long long after_requested, before_requested;
+
+    before_requested = *before;
+    after_requested = *after;
+
+    // allow relative for before (smaller than API_RELATIVE_TIME_MAX)
+    if(ABS(before_requested) <= API_RELATIVE_TIME_MAX) {
+        // if the user asked for a positive relative time,
+        // flip it to a negative
+        if(before_requested > 0)
+            before_requested = -before_requested;
+
+        before_requested = now + before_requested;
+        absolute_period_requested = 0;
+    }
+
+    // allow relative for after (smaller than API_RELATIVE_TIME_MAX)
+    if(ABS(after_requested) <= API_RELATIVE_TIME_MAX) {
+        if(after_requested > 0)
+            after_requested = -after_requested;
+
+        // if the user didn't give an after, use the number of points
+        // to give a sane default
+        if(after_requested == 0)
+            after_requested = -600;
+
+        // since the query engine now returns inclusive timestamps
+        // it is awkward to return 6 points when after=-5 is given
+        // so for relative queries we add 1 second, to give
+        // more predictable results to users.
+        after_requested = before_requested + after_requested + 1;
+        absolute_period_requested = 0;
+    }
+
+    if(absolute_period_requested == -1)
+        absolute_period_requested = 1;
+
+    // check if the parameters are flipped
+    if(after_requested > before_requested) {
+        long long t = before_requested;
+        before_requested = after_requested;
+        after_requested = t;
+    }
+
+    // if the query requests future data
+    // shift the query back to be in the present time
+    // (this may also happen because of the rules above)
+    if(before_requested > now) {
+        long long delta = before_requested - now;
+        before_requested -= delta;
+        after_requested  -= delta;
+    }
+
+    time_t absolute_minimum_time = now - (10 * 365 * 86400);
+    time_t absolute_maximum_time = now + (1 * 365 * 86400);
+
+    if (after_requested < absolute_minimum_time && !unittest_running)
+        after_requested = absolute_minimum_time;
+
+    if (after_requested > absolute_maximum_time && !unittest_running)
+        after_requested = absolute_maximum_time;
+
+    if (before_requested < absolute_minimum_time && !unittest_running)
+        before_requested = absolute_minimum_time;
+
+    if (before_requested > absolute_maximum_time && !unittest_running)
+        before_requested = absolute_maximum_time;
+
+    *before = before_requested;
+    *after = after_requested;
+
+    return (absolute_period_requested != 1);
+}
+
+int netdata_base64_decode(const char *encoded, char *decoded, size_t decoded_size) {
+    static const unsigned char base64_table[256] = {
+            ['A'] = 0, ['B'] = 1, ['C'] = 2, ['D'] = 3, ['E'] = 4, ['F'] = 5, ['G'] = 6, ['H'] = 7,
+            ['I'] = 8, ['J'] = 9, ['K'] = 10, ['L'] = 11, ['M'] = 12, ['N'] = 13, ['O'] = 14, ['P'] = 15,
+            ['Q'] = 16, ['R'] = 17, ['S'] = 18, ['T'] = 19, ['U'] = 20, ['V'] = 21, ['W'] = 22, ['X'] = 23,
+            ['Y'] = 24, ['Z'] = 25, ['a'] = 26, ['b'] = 27, ['c'] = 28, ['d'] = 29, ['e'] = 30, ['f'] = 31,
+            ['g'] = 32, ['h'] = 33, ['i'] = 34, ['j'] = 35, ['k'] = 36, ['l'] = 37, ['m'] = 38, ['n'] = 39,
+            ['o'] = 40, ['p'] = 41, ['q'] = 42, ['r'] = 43, ['s'] = 44, ['t'] = 45, ['u'] = 46, ['v'] = 47,
+            ['w'] = 48, ['x'] = 49, ['y'] = 50, ['z'] = 51, ['0'] = 52, ['1'] = 53, ['2'] = 54, ['3'] = 55,
+            ['4'] = 56, ['5'] = 57, ['6'] = 58, ['7'] = 59, ['8'] = 60, ['9'] = 61, ['+'] = 62, ['/'] = 63,
+            [0 ... '+' - 1] = 255,
+            ['+' + 1 ... '/' - 1] = 255,
+            ['9' + 1 ... 'A' - 1] = 255,
+            ['Z' + 1 ... 'a' - 1] = 255,
+            ['z' + 1 ... 255] = 255
+    };
+
+    size_t count = 0;
+    unsigned int tmp = 0;
+    int i, bit;
+
+    if (decoded_size < 1)
+        return 0; // Buffer size must be at least 1 for null termination
+
+    for (i = 0, bit = 0; encoded[i]; i++) {
+        unsigned char value = base64_table[(unsigned char)encoded[i]];
+        if (value > 63)
+            return -1; // Invalid character in input
+
+        tmp = tmp << 6 | value;
+        if (++bit == 4) {
+            if (count + 3 >= decoded_size) break; // Stop decoding if buffer is full
+            decoded[count++] = (tmp >> 16) & 0xFF;
+            decoded[count++] = (tmp >> 8) & 0xFF;
+            decoded[count++] = tmp & 0xFF;
+            tmp = 0;
+            bit = 0;
+        }
+    }
+
+    if (bit > 0 && count + 1 < decoded_size) {
+        tmp <<= 6 * (4 - bit);
+        if (bit > 2 && count + 1 < decoded_size) decoded[count++] = (tmp >> 16) & 0xFF;
+        if (bit > 3 && count + 1 < decoded_size) decoded[count++] = (tmp >> 8) & 0xFF;
+    }
+
+    decoded[count] = '\0'; // Null terminate the output string
+    return count;
+}
