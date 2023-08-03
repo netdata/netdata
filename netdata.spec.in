@@ -158,15 +158,15 @@ Requires: netdata-plugin-debugfs
 Requires: netdata-plugin-chartsd
 Requires: netdata-plugin-slabinfo
 Requires: netdata-plugin-perf
-Suggests: netdata-plugin-systemd-journal
 %if 0%{?_have_nfacct}
-Requires:   netdata-plugin-nfacct
+Requires: netdata-plugin-nfacct
 %endif
 %if 0%{?_have_freeipmi} && 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
-Suggests:   netdata-plugin-freeipmi
+Suggests: netdata-plugin-freeipmi
 %endif
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
-Suggests:   netdata-plugin-cups
+Suggests: netdata-plugin-cups
+Suggests: netdata-plugin-systemd-journal
 %endif
 
 
