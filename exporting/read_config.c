@@ -380,11 +380,11 @@ struct engine *read_exporting_config()
 
         tmp_instance->config.options = exporting_parse_data_source(data_source, tmp_instance->config.options);
         if (EXPORTING_OPTIONS_DATA_SOURCE(tmp_instance->config.options) != EXPORTING_SOURCE_DATA_AS_COLLECTED &&
-            tmp_instance->config.update_every % rrdb.localhost->update_every)
+            tmp_instance->config.update_every % localhost->rrd_update_every)
             netdata_log_info(
                 "The update interval %d for instance %s is not a multiple of the database update interval %d. "
                 "Metric values will deviate at different points in time.",
-                tmp_instance->config.update_every, tmp_instance->config.name, rrdb.localhost->update_every);
+                tmp_instance->config.update_every, tmp_instance->config.name, localhost->rrd_update_every);
 
         if (exporter_get_boolean(instance_name, "send configured labels", CONFIG_BOOLEAN_YES))
             tmp_instance->config.options |= EXPORTING_OPTION_SEND_CONFIGURED_LABELS;

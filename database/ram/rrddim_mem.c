@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrddim_mem.h"
-#include "database/rrd.h"
+#include "Judy.h"
 
 static Pvoid_t rrddim_JudyHS_array = NULL;
 static netdata_rwlock_t rrddim_JudyHS_rwlock = NETDATA_RWLOCK_INITIALIZER;
@@ -143,6 +143,7 @@ STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *db_metric_han
     internal_fatal((uint32_t)mh->update_every_s != update_every, "RRDDIM: update requested does not match the dimension");
 
     struct mem_collect_handle *ch = callocz(1, sizeof(struct mem_collect_handle));
+    ch->common.backend = STORAGE_ENGINE_BACKEND_RRDDIM;
     ch->rd = rd;
     ch->db_metric_handle = db_metric_handle;
 
@@ -340,7 +341,7 @@ void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_e
     handle->start_time_s = start_time_s;
     handle->end_time_s = end_time_s;
     handle->priority = priority;
-
+    handle->backend = STORAGE_ENGINE_BACKEND_RRDDIM;
     struct mem_query_handle* h = mallocz(sizeof(struct mem_query_handle));
     h->db_metric_handle = db_metric_handle;
 
@@ -433,24 +434,4 @@ time_t rrddim_query_latest_time_s(STORAGE_METRIC_HANDLE *db_metric_handle) {
 time_t rrddim_query_oldest_time_s(STORAGE_METRIC_HANDLE *db_metric_handle) {
     struct mem_metric_handle *mh = (struct mem_metric_handle *)db_metric_handle;
     return (time_t)(mh->last_updated_s - metric_duration(mh));
-}
-
-size_t rrddim_disk_space_max(STORAGE_INSTANCE *db_instance) {
-    UNUSED(db_instance);
-    return 0;
-}
-
-size_t rrddim_disk_space_used(STORAGE_INSTANCE *db_instance) {
-    UNUSED(db_instance);
-    return 0;
-}
-
-time_t rrddim_global_first_time_s(STORAGE_INSTANCE *db_instance) {
-    UNUSED(db_instance);
-    return now_realtime_sec() - (time_t)(rrdb.default_rrd_history_entries * rrdb.default_update_every);
-}
-
-size_t rrddim_currently_collected_metrics(STORAGE_INSTANCE *db_instance) {
-    UNUSED(db_instance);
-    return 0;
 }

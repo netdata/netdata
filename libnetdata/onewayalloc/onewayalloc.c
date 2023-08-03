@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 #include "onewayalloc.h"
 
 // https://www.gnu.org/software/libc/manual/html_node/Aligned-Memory-Blocks.html

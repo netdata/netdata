@@ -38,7 +38,7 @@ static void aclk_stats_collect(struct aclk_metrics_per_sample *per_sample, struc
     if (unlikely(!st_aclkstats)) {
         st_aclkstats = rrdset_create_localhost(
             "netdata", "aclk_status", NULL, "aclk", NULL, "ACLK/Cloud connection status",
-            "connected", "netdata", "stats", 200000, rrdb.localhost->update_every, RRDSET_TYPE_LINE);
+            "connected", "netdata", "stats", 200000, localhost->rrd_update_every, RRDSET_TYPE_LINE);
 
         rd_online_status = rrddim_add(st_aclkstats, "online", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
@@ -57,10 +57,10 @@ static void aclk_stats_query_queue(struct aclk_metrics_per_sample *per_sample)
     if (unlikely(!st_query_thread)) {
         st_query_thread = rrdset_create_localhost(
             "netdata", "aclk_query_per_second", NULL, "aclk", NULL, "ACLK Queries per second", "queries/s",
-            "netdata", "stats", 200001, rrdb.localhost->update_every, RRDSET_TYPE_AREA);
+            "netdata", "stats", 200001, localhost->rrd_update_every, RRDSET_TYPE_AREA);
 
-        rd_queued = rrddim_add(st_query_thread, "added", NULL, 1, rrdb.localhost->update_every, RRD_ALGORITHM_ABSOLUTE);
-        rd_dispatched = rrddim_add(st_query_thread, "dispatched", NULL, -1, rrdb.localhost->update_every, RRD_ALGORITHM_ABSOLUTE);
+        rd_queued = rrddim_add(st_query_thread, "added", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        rd_dispatched = rrddim_add(st_query_thread, "dispatched", NULL, -1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(st_query_thread, rd_queued, per_sample->queries_queued);
@@ -79,7 +79,7 @@ static void aclk_stats_latency(struct aclk_metrics_per_sample *per_sample)
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
             "netdata", "aclk_latency_mqtt", NULL, "aclk", NULL, "ACLK Message Publish Latency", "ms",
-            "netdata", "stats", 200002, rrdb.localhost->update_every, RRDSET_TYPE_LINE);
+            "netdata", "stats", 200002, localhost->rrd_update_every, RRDSET_TYPE_LINE);
 
         rd_avg = rrddim_add(st, "avg", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         rd_max = rrddim_add(st, "max", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -105,10 +105,10 @@ static void aclk_stats_cloud_req(struct aclk_metrics_per_sample *per_sample)
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
             "netdata", "aclk_cloud_req", NULL, "aclk", NULL, "Requests received from cloud", "req/s",
-            "netdata", "stats", 200005, rrdb.localhost->update_every, RRDSET_TYPE_STACKED);
+            "netdata", "stats", 200005, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
-        rd_rq_rcvd = rrddim_add(st, "received", NULL, 1, rrdb.localhost->update_every, RRD_ALGORITHM_ABSOLUTE);
-        rd_rq_err = rrddim_add(st, "malformed", NULL, 1, rrdb.localhost->update_every, RRD_ALGORITHM_ABSOLUTE);
+        rd_rq_rcvd = rrddim_add(st, "received", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        rd_rq_err = rrddim_add(st, "malformed", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(st, rd_rq_rcvd, per_sample->cloud_req_recvd - per_sample->cloud_req_err);
@@ -125,10 +125,10 @@ static void aclk_stats_cloud_req_type(struct aclk_metrics_per_sample *per_sample
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
             "netdata", "aclk_processed_query_type", NULL, "aclk", NULL, "Query thread commands processed by their type", "cmd/s",
-            "netdata", "stats", 200006, rrdb.localhost->update_every, RRDSET_TYPE_STACKED);
+            "netdata", "stats", 200006, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         for (int i = 0; i < ACLK_QUERY_TYPE_COUNT; i++)
-            dims[i] = rrddim_add(st, aclk_query_get_name(i, 1), NULL, 1, rrdb.localhost->update_every, RRD_ALGORITHM_ABSOLUTE);
+            dims[i] = rrddim_add(st, aclk_query_get_name(i, 1), NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
 
     }
 
@@ -167,10 +167,10 @@ static void aclk_stats_cloud_req_http_type(struct aclk_metrics_per_sample *per_s
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
             "netdata", "aclk_cloud_req_http_type", NULL, "aclk", NULL, "Requests received from cloud via HTTP by their type", "req/s",
-            "netdata", "stats", 200007, rrdb.localhost->update_every, RRDSET_TYPE_STACKED);
+            "netdata", "stats", 200007, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         for (int i = 0; i < ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT; i++)
-            rd_rq_types[i] = rrddim_add(st, cloud_req_http_type_names[i], NULL, 1, rrdb.localhost->update_every, RRD_ALGORITHM_ABSOLUTE);
+            rd_rq_types[i] = rrddim_add(st, cloud_req_http_type_names[i], NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
     }
 
     for (int i = 0; i < ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT; i++)
@@ -189,12 +189,12 @@ static void aclk_stats_query_threads(uint32_t *queries_per_thread)
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
             "netdata", "aclk_query_threads", NULL, "aclk", NULL, "Queries Processed Per Thread", "req/s",
-            "netdata", "stats", 200009, rrdb.localhost->update_every, RRDSET_TYPE_STACKED);
+            "netdata", "stats", 200009, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         for (int i = 0; i < aclk_stats_cfg.query_thread_count; i++) {
             if (snprintfz(dim_name, MAX_DIM_NAME, "Query %d", i) < 0)
                 netdata_log_error("snprintf encoding error");
-            aclk_qt_data[i].dim = rrddim_add(st, dim_name, NULL, 1, rrdb.localhost->update_every, RRD_ALGORITHM_ABSOLUTE);
+            aclk_qt_data[i].dim = rrddim_add(st, dim_name, NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
         }
     }
 
@@ -215,11 +215,11 @@ static void aclk_stats_query_time(struct aclk_metrics_per_sample *per_sample)
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
             "netdata", "aclk_query_time", NULL, "aclk", NULL, "Time it took to process cloud requested DB queries", "us",
-            "netdata", "stats", 200008, rrdb.localhost->update_every, RRDSET_TYPE_LINE);
+            "netdata", "stats", 200008, localhost->rrd_update_every, RRDSET_TYPE_LINE);
 
-        rd_rq_avg = rrddim_add(st, "avg", NULL, 1, rrdb.localhost->update_every, RRD_ALGORITHM_ABSOLUTE);
-        rd_rq_max = rrddim_add(st, "max", NULL, 1, rrdb.localhost->update_every, RRD_ALGORITHM_ABSOLUTE);
-        rd_rq_total = rrddim_add(st, "total", NULL, 1, rrdb.localhost->update_every, RRD_ALGORITHM_ABSOLUTE);
+        rd_rq_avg = rrddim_add(st, "avg", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        rd_rq_max = rrddim_add(st, "max", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
+        rd_rq_total = rrddim_add(st, "total", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
     }
 
     if(per_sample->cloud_q_process_count)
@@ -240,10 +240,10 @@ static void aclk_stats_newproto_rx(uint32_t *rx_msgs_sample)
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
             "netdata", "aclk_protobuf_rx_types", NULL, "aclk", NULL, "Received new cloud architecture messages by their type.", "msg/s",
-            "netdata", "stats", 200010, rrdb.localhost->update_every, RRDSET_TYPE_STACKED);
+            "netdata", "stats", 200010, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         for (unsigned int i = 0; i < aclk_stats_cfg.proto_hdl_cnt; i++) {
-            aclk_stats_cfg.rx_msg_dims[i] = rrddim_add(st, rx_handler_get_name(i), NULL, 1, rrdb.localhost->update_every, RRD_ALGORITHM_ABSOLUTE);
+            aclk_stats_cfg.rx_msg_dims[i] = rrddim_add(st, rx_handler_get_name(i), NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
         }
     }
 
@@ -284,7 +284,7 @@ static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
     if (unlikely(!st)) {
         st = rrdset_create_localhost(
             "netdata", "aclk_openssl_bytes", NULL, "aclk", NULL, "Received and Sent bytes.", "B/s",
-            "netdata", "stats", 200011, rrdb.localhost->update_every, RRDSET_TYPE_STACKED);
+            "netdata", "stats", 200011, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         rd_sent  = rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         rd_recvd = rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -293,7 +293,7 @@ static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
     if (unlikely(!st_txbuf_perc)) {
         st_txbuf_perc = rrdset_create_localhost(
             "netdata", "aclk_mqtt_tx_perc", NULL, "aclk", NULL, "Actively used percentage of MQTT Tx Buffer,", "%",
-            "netdata", "stats", 200012, rrdb.localhost->update_every, RRDSET_TYPE_LINE);
+            "netdata", "stats", 200012, localhost->rrd_update_every, RRDSET_TYPE_LINE);
         
         rd_txbuf_perc = rrddim_add(st_txbuf_perc, "used", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
     }
@@ -301,7 +301,7 @@ static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
     if (unlikely(!st_txbuf)) {
         st_txbuf = rrdset_create_localhost(
             "netdata", "aclk_mqtt_tx_queue", NULL, "aclk", NULL, "State of transmit MQTT queue.", "B",
-            "netdata", "stats", 200013, rrdb.localhost->update_every, RRDSET_TYPE_LINE);
+            "netdata", "stats", 200013, localhost->rrd_update_every, RRDSET_TYPE_LINE);
 
         rd_tx_buffer_usable = rrddim_add(st_txbuf, "usable", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         rd_tx_buffer_reclaimable = rrddim_add(st_txbuf, "reclaimable", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -313,7 +313,7 @@ static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
     if (unlikely(!st_timing)) {
         st_timing = rrdset_create_localhost(
             "netdata", "aclk_mqtt_wss_time", NULL, "aclk", NULL, "Time spent handling MQTT, WSS, SSL and network communication.", "us",
-            "netdata", "stats", 200014, rrdb.localhost->update_every, RRDSET_TYPE_STACKED);
+            "netdata", "stats", 200014, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         rd_keepalive = rrddim_add(st_timing, "keep-alive", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         rd_read_socket = rrddim_add(st_timing, "socket_read_ssl", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -379,7 +379,7 @@ void *aclk_stats_main_thread(void *ptr)
 
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step_ut = rrdb.localhost->update_every * USEC_PER_SEC;
+    usec_t step_ut = localhost->rrd_update_every * USEC_PER_SEC;
 
     struct aclk_metrics_per_sample per_sample;
     struct aclk_metrics permanent;

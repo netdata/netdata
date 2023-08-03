@@ -35,9 +35,9 @@ static char *claiming_errors[] = {
 char *get_agent_claimid()
 {
     char *result;
-    rrdhost_aclk_state_lock(rrdb.localhost);
-    result = (rrdb.localhost->aclk_state.claimed_id == NULL) ? NULL : strdupz(rrdb.localhost->aclk_state.claimed_id);
-    rrdhost_aclk_state_unlock(rrdb.localhost);
+    rrdhost_aclk_state_lock(localhost);
+    result = (localhost->aclk_state.claimed_id == NULL) ? NULL : strdupz(localhost->aclk_state.claimed_id);
+    rrdhost_aclk_state_unlock(localhost);
     return result;
 }
 
@@ -89,7 +89,7 @@ CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, con
               command_exec_buffer,
               proxy_flag,
               netdata_configured_hostname,
-              rrdb.localhost->machine_guid,
+              localhost->machine_guid,
               cloud_base_url,
               claiming_arguments);
 
@@ -156,7 +156,6 @@ void load_claiming_state(void)
 #if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
     netdata_cloud_enabled = false;
 #else
-    RRDHOST *localhost = rrdb.localhost;
     uuid_t uuid;
 
     // Propagate into aclk and registry. Be kind of atomic...
@@ -327,7 +326,7 @@ void claim_reload_all(void) {
     error_log_limit_unlimited();
     load_claiming_state();
     registry_update_cloud_base_url();
-    rrdpush_send_claimed_id(rrdb.localhost);
+    rrdpush_send_claimed_id(localhost);
     error_log_limit_reset();
 }
 
@@ -424,7 +423,7 @@ int api_v2_claim(struct web_client *w, char *url) {
                     int ms = 0;
                     do {
                         status = cloud_status();
-                        if (status == CLOUD_STATUS_ONLINE && __atomic_load_n(&rrdb.localhost->node_id, __ATOMIC_RELAXED))
+                        if (status == CLOUD_STATUS_ONLINE && __atomic_load_n(&localhost->node_id, __ATOMIC_RELAXED))
                             break;
 
                         sleep_usec(50 * USEC_PER_MS);

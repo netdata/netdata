@@ -149,7 +149,7 @@ static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *w
 
         buffer_json_member_add_array(wb, "db_points_per_tier");
         {
-            for (size_t tier = 0; tier < rrdb.storage_tiers; tier++)
+            for (size_t tier = 0; tier < storage_tiers; tier++)
                 buffer_json_add_array_item_uint64(wb, stats->db_points_per_tier[tier]);
         }
         buffer_json_array_close(wb);
@@ -461,7 +461,7 @@ static void results_header_to_json_v2(DICTIONARY *results __maybe_unused, BUFFER
 
         buffer_json_member_add_array(wb, "db_points_per_tier");
         {
-            for (size_t tier = 0; tier < rrdb.storage_tiers; tier++)
+            for (size_t tier = 0; tier < storage_tiers; tier++)
                 buffer_json_add_array_item_uint64(wb, stats->db_points_per_tier[tier]);
         }
         buffer_json_array_close(wb);
@@ -1288,7 +1288,7 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
     stats->db_queries++;
     stats->result_points += r->stats.result_points_generated;
     stats->db_points += r->stats.db_points_read;
-    for(size_t tr = 0; tr < rrdb.storage_tiers ; tr++)
+    for(size_t tr = 0; tr < storage_tiers ; tr++)
         stats->db_points_per_tier[tr] += r->internal.qt->db.tiers[tr].points;
 
     if(r->d != 1 || r->internal.qt->query.used != 1) {
@@ -1395,7 +1395,7 @@ static void merge_query_value_to_stats(QUERY_VALUE *qv, WEIGHTS_STATS *stats, si
     stats->db_queries += queries;
     stats->result_points += qv->result_points;
     stats->db_points += qv->points_read;
-    for(size_t tier = 0; tier < rrdb.storage_tiers ; tier++)
+    for(size_t tier = 0; tier < storage_tiers ; tier++)
         stats->db_points_per_tier[tier] += qv->storage_points_per_tier[tier];
 }
 

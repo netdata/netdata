@@ -578,7 +578,7 @@ static inline const char *query_metric_name(QUERY_TARGET *qt, QUERY_METRIC *qm) 
     return rrdmetric_acquired_name(qd->rma);
 }
 
-STORAGE_ENGINE_ID query_metric_storage_engine(QUERY_TARGET *qt, QUERY_METRIC *qm, size_t tier);
+struct storage_engine *query_metric_storage_engine(QUERY_TARGET *qt, QUERY_METRIC *qm, size_t tier);
 
 STRING *query_instance_id_fqdn(QUERY_INSTANCE *qi, size_t version);
 STRING *query_instance_name_fqdn(QUERY_INSTANCE *qi, size_t version);

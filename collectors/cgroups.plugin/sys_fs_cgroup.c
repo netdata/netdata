@@ -301,9 +301,9 @@ void read_cgroup_plugin_configuration() {
     throttled_time_hash = simple_hash("throttled_time");
     throttled_usec_hash = simple_hash("throttled_usec");
 
-    cgroup_update_every = (int)config_get_number("plugin:cgroups", "update every", rrdb.localhost->update_every);
-    if(cgroup_update_every < rrdb.localhost->update_every)
-        cgroup_update_every = rrdb.localhost->update_every;
+    cgroup_update_every = (int)config_get_number("plugin:cgroups", "update every", localhost->rrd_update_every);
+    if(cgroup_update_every < localhost->rrd_update_every)
+        cgroup_update_every = localhost->rrd_update_every;
 
     cgroup_check_for_new_every = (int)config_get_number("plugin:cgroups", "check for new cgroups every", (long long)cgroup_check_for_new_every * (long long)cgroup_update_every);
     if(cgroup_check_for_new_every < cgroup_update_every)

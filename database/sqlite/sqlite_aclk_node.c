@@ -29,7 +29,7 @@ DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
 static void build_node_collectors(char *node_id __maybe_unused)
 {
 
-    RRDHOST *host = rrdhost_find_by_node_id(node_id);
+    RRDHOST *host = find_host_by_node_id(node_id);
 
     if (unlikely(!host))
         return;
@@ -59,7 +59,7 @@ static void build_node_info(char *node_id __maybe_unused)
 {
     struct update_node_info node_info;
 
-    RRDHOST *host = rrdhost_find_by_node_id(node_id);
+    RRDHOST *host = find_host_by_node_id(node_id);
 
     if (unlikely((!host))) {
         freez(node_id);
@@ -77,7 +77,7 @@ static void build_node_info(char *node_id __maybe_unused)
     node_info.node_id = wc->node_id;
     node_info.claim_id = get_agent_claimid();
     node_info.machine_guid = host->machine_guid;
-    node_info.child = (wc->host != rrdb.localhost);
+    node_info.child = (wc->host != localhost);
     node_info.ml_info.ml_capable = ml_capable();
     node_info.ml_info.ml_enabled = ml_enabled(wc->host);
 
@@ -86,7 +86,7 @@ static void build_node_info(char *node_id __maybe_unused)
     now_realtime_timeval(&node_info.updated_at);
 
     char *host_version = NULL;
-    if (host != rrdb.localhost) {
+    if (host != localhost) {
         netdata_mutex_lock(&host->receiver_lock);
         host_version = strdupz(host->receiver && host->receiver->program_version ? host->receiver->program_version : rrdhost_program_version(host));
         netdata_mutex_unlock(&host->receiver_lock);
@@ -124,7 +124,7 @@ static void build_node_info(char *node_id __maybe_unused)
     node_info.data.host_labels_ptr = host->rrdlabels;
 
     aclk_update_node_info(&node_info);
-    netdata_log_access("ACLK RES [%s (%s)]: NODE INFO SENT for guid [%s] (%s)", wc->node_id, rrdhost_hostname(wc->host), host->machine_guid, wc->host == rrdb.localhost ? "parent" : "child");
+    netdata_log_access("ACLK RES [%s (%s)]: NODE INFO SENT for guid [%s] (%s)", wc->node_id, rrdhost_hostname(wc->host), host->machine_guid, wc->host == localhost ? "parent" : "child");
 
     rrd_unlock();
     freez(node_info.claim_id);
@@ -145,7 +145,7 @@ void aclk_check_node_info_and_collectors(void)
         return;
 
     size_t pending = 0;
-    dfe_start_reentrant(rrdb.rrdhost_root_index, host) {
+    dfe_start_reentrant(rrdhost_root_index, host) {
 
         struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
         if (unlikely(!wc))

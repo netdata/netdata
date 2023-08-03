@@ -1,6 +1,5 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 #include "../libnetdata.h"
+#include "aral.h"
 
 #ifdef NETDATA_TRACE_ALLOCATIONS
 #define TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS , const char *file, const char *function, size_t line

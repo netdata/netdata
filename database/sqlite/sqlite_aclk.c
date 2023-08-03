@@ -104,7 +104,7 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
 
     sql_build_host_system_info((uuid_t *)argv[IDX_HOST_ID], system_info);
 
-    RRDHOST *host = rrdhost_get_or_create(
+    RRDHOST *host = rrdhost_find_or_create(
           (const char *) argv[IDX_HOSTNAME]
         , (const char *) argv[IDX_REGISTRY]
         , guid
@@ -117,7 +117,7 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
         , (const char *) (argv[IDX_PROGRAM_VERSION] ? argv[IDX_PROGRAM_VERSION] : "unknown")
         , argv[IDX_UPDATE_EVERY] ? str2i(argv[IDX_UPDATE_EVERY]) : 1
         , argv[IDX_ENTRIES] ? str2i(argv[IDX_ENTRIES]) : 0
-        , default_storage_engine_id
+        , default_rrd_memory_mode
         , 0 // health
         , 0 // rrdpush enabled
         , NULL  //destination
@@ -181,7 +181,7 @@ static int is_host_available(uuid_t *host_id)
     int rc;
 
     if (unlikely(!db_meta)) {
-        if (default_storage_engine_id == STORAGE_ENGINE_DBENGINE)
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             error_report("Database has not been initialized");
         return 1;
     }
@@ -319,7 +319,7 @@ static int aclk_config_parameters(void *data __maybe_unused, int argc __maybe_un
     uuid_unparse_lower(*((uuid_t *) argv[0]), uuid_str);
 
     RRDHOST *host = rrdhost_find_by_guid(uuid_str);
-    if (host == rrdb.localhost)
+    if (host == localhost)
         return 0;
 
     sql_create_aclk_table(host, (uuid_t *) argv[0], (uuid_t *) argv[1]);
@@ -424,7 +424,7 @@ static void aclk_synchronization(void *arg __maybe_unused)
 // NODE STATE
                 case ACLK_DATABASE_NODE_STATE:;
                     RRDHOST *host = cmd.param[0];
-                    int live = (host == rrdb.localhost || host->receiver || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) ? 1 : 0;
+                    int live = (host == localhost || host->receiver || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) ? 1 : 0;
                     struct aclk_sync_host_config *ahc = host->aclk_sync_host_config;
                     if (unlikely(!ahc))
                         sql_create_aclk_table(host, &host->host_uuid, host->node_id);
@@ -520,7 +520,7 @@ void sql_create_aclk_table(RRDHOST *host __maybe_unused, uuid_t *host_uuid __may
     strcpy(wc->uuid_str, uuid_str);
     wc->alert_updates = 0;
     time_t now = now_realtime_sec();
-    wc->node_info_send_time = (host == rrdb.localhost || NULL == rrdb.localhost) ? now - 25 : now;
+    wc->node_info_send_time = (host == localhost || NULL == localhost) ? now - 25 : now;
 #endif
 }
 
@@ -536,7 +536,7 @@ void sql_aclk_sync_init(void)
     int rc;
 
     if (unlikely(!db_meta)) {
-        if (default_storage_engine_id != STORAGE_ENGINE_DBENGINE) {
+        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
             return;
         }
         error_report("Database has not been initialized");
@@ -558,7 +558,7 @@ void sql_aclk_sync_init(void)
 
 #ifdef ENABLE_ACLK
     if (!number_of_children)
-        aclk_queue_node_info(rrdb.localhost, true);
+        aclk_queue_node_info(localhost, true);
 
     rc = sqlite3_exec_monitored(db_meta, SQL_FETCH_ALL_INSTANCES,aclk_config_parameters, NULL,&err_msg);
 

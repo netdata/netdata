@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "collectors/proc.plugin/plugin_proc.h"
-#include "collectors/utils.h"
+#include "../proc.plugin/plugin_proc.h"
 
 #define PLUGIN_DISKSPACE_NAME "diskspace.plugin"
 
@@ -627,9 +626,9 @@ void *diskspace_main(void *ptr) {
 
     cleanup_mount_points = config_get_boolean(CONFIG_SECTION_DISKSPACE, "remove charts of unmounted disks" , cleanup_mount_points);
 
-    int update_every = (int)config_get_number(CONFIG_SECTION_DISKSPACE, "update every", rrdb.localhost->update_every);
-    if(update_every < rrdb.localhost->update_every)
-        update_every = rrdb.localhost->update_every;
+    int update_every = (int)config_get_number(CONFIG_SECTION_DISKSPACE, "update every", localhost->rrd_update_every);
+    if(update_every < localhost->rrd_update_every)
+        update_every = localhost->rrd_update_every;
 
     check_for_new_mountpoints_every = (int)config_get_number(CONFIG_SECTION_DISKSPACE, "check for new mount points every", check_for_new_mountpoints_every);
     if(check_for_new_mountpoints_every < update_every)

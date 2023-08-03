@@ -52,7 +52,7 @@ static cmd_status_t cmd_dumpconfig(char *args, char **message);
 static command_info_t command_info_array[] = {
         {"help", cmd_help_execute, CMD_TYPE_HIGH_PRIORITY},                  // show help menu
         {"reload-health", cmd_reload_health_execute, CMD_TYPE_ORTHOGONAL},   // reload health configuration
-        {"save-database", cmd_save_database_execute, CMD_TYPE_ORTHOGONAL},   // save database for storage engine SAVE
+        {"save-database", cmd_save_database_execute, CMD_TYPE_ORTHOGONAL},   // save database for memory mode save
         {"reopen-logs", cmd_reopen_logs_execute, CMD_TYPE_ORTHOGONAL},       // Close and reopen log files
         {"shutdown-agent", cmd_exit_execute, CMD_TYPE_EXCLUSIVE},            // exit cleanly
         {"fatal-agent", cmd_fatal_execute, CMD_TYPE_HIGH_PRIORITY},          // exit with fatal error
@@ -218,10 +218,10 @@ static cmd_status_t cmd_reload_labels_execute(char *args, char **message)
 {
     (void)args;
     netdata_log_info("COMMAND: reloading host labels.");
-    localhost_load_labels();
+    reload_host_labels();
 
     BUFFER *wb = buffer_create(10, NULL);
-    rrdlabels_log_to_buffer(rrdb.localhost->rrdlabels, wb);
+    rrdlabels_log_to_buffer(localhost->rrdlabels, wb);
     (*message)=strdupz(buffer_tostring(wb));
     buffer_free(wb);
 

@@ -235,7 +235,7 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
 static int netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req)
 {
     UNUSED(self);
-    RRDHOST *host = rrdb.localhost;
+    RRDHOST *host = localhost;
 
     int ret = _netdata_uberhandler(req, &host);
 
@@ -249,7 +249,7 @@ static int netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req)
                    ", response: %d",
                    PRINTF_H2O_IOVEC(&req->method),
                    PRINTF_H2O_IOVEC(&req->input.path),
-                   host == rrdb.localhost ? "localhost" : host_uuid_str,
+                   host == localhost ? "localhost" : host_uuid_str,
                    req->res.status);
     } else {
         netdata_log_access("HTTPD %d"

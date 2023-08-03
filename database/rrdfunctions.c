@@ -1,5 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-
+#define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 
 #define MAX_FUNCTION_LENGTH (PLUGINSD_LINE_MAX - 512) // we need some space for the rest of the line
@@ -817,7 +816,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
     wb->content_type = CT_APPLICATION_JSON;
     buffer_json_initialize(wb, "\"", "\"", 0, true, false);
 
-    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(rrdb.localhost));
+    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(localhost));
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", 1);
@@ -830,7 +829,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
     size_t max_ml_anomalous = 0, max_ml_normal = 0, max_ml_trained = 0, max_ml_pending = 0, max_ml_silenced = 0;
     {
         RRDHOST *host;
-        dfe_start_read(rrdb.rrdhost_root_index, host) {
+        dfe_start_read(rrdhost_root_index, host) {
                     RRDHOST_STATUS s;
                     rrdhost_status(host, now, &s);
                     buffer_json_add_array_item_array(wb);
