@@ -1053,7 +1053,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
         qt->window.options &= ~RRDR_OPTION_PERCENTAGE;
 
     qt->internal.relative = rrdr_relative_window_to_absolute(&qt->window.after, &qt->window.before, &qt->window.now,
-                                                             rrdb.unittest_running);
+                                                             unittest_running);
 
     // prepare our local variables - we need these across all these functions
     QUERY_TARGET_LOCALS qtl = {
