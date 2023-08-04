@@ -108,7 +108,6 @@ include:
       <<: *amzn_packages
       repo_distro: amazonlinux/2023
 
-
   - distro: centos
     version: "7"
     support_type: Core
@@ -124,6 +123,30 @@ include:
         - x86_64
     test:
       ebpf-core: false
+
+  - &centos_stream
+    distro: centos-stream
+    base_image: 'quay.io/centos/centos:stream9'
+    version: '9'
+    support_type: 'Community'
+    notes: ''
+    jsonc_removal: |
+      dnf remove -y json-c-devel
+    eol_check: true
+    packages: &cs_packages
+      type: rpm
+      repo_distro: el/c9s
+      arches:
+        - x86_64
+        - aarch64
+    test:
+      ebpf-core: true
+  - <<: *centos_stream
+    version: '8'
+    base_image: 'quay.io/centos/centos:stream8'
+    packages:
+      <<: *cs_packages
+      repo_distro: el/c8s
 
   - &debian
     distro: debian
