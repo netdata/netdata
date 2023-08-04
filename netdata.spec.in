@@ -165,7 +165,7 @@ Suggests: netdata-plugin-freeipmi
 %endif
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
 Suggests: netdata-plugin-cups
-Suggests: netdata-plugin-systemd-journal
+Recommends: netdata-plugin-systemd-journal
 %endif
 
 

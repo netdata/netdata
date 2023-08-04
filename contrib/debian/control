@@ -53,8 +53,8 @@ Conflicts: netdata-core,
            netdata-plugins-python,
            netdata-web
 Suggests: netdata-plugin-cups,
-          netdata-plugin-freeipmi,
-          netdata-plugin-systemd-journal
+          netdata-plugin-freeipmi
+Recommends: netdata-plugin-systemd-journal
 Description: real-time charts for system monitoring
  Netdata is a daemon that collects data in realtime (per second)
  and presents a web site to view and analyze them. The presentation
