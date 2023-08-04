@@ -546,6 +546,11 @@ int https_request(https_req_t *request, https_req_response_t *response) {
         goto exit_CTX;
     }
 
+    if (!SSL_set_tlsext_host_name(ctx->ssl, connect_host)) {
+        netdata_log_error("Error setting TLS SNI host");
+        goto exit_CTX;
+    }
+
     SSL_set_fd(ctx->ssl, ctx->sock);
     ret = SSL_connect(ctx->ssl);
     if (ret != -1 && ret != 1) {
