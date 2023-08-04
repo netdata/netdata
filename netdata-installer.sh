@@ -1245,7 +1245,7 @@ if [ "$(id -u)" -eq 0 ]; then
     if ! iscontainer && command -v setcap 1> /dev/null 2>&1; then
       run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/systemd-journal.plugin"
       if run setcap cap_dac_read_search+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/systemd-journal.plugin"; then
-        "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/systemd-journal.plugin" -t > /dev/null 2>&1 && capabilities=1 || capabilities=0
+        capabilities=1 
       fi
     fi
 
