@@ -54,6 +54,7 @@ Conflicts: netdata-core,
            netdata-web
 Suggests: netdata-plugin-cups,
           netdata-plugin-freeipmi
+Recommends: netdata-plugin-systemd-journal
 Description: real-time charts for system monitoring
  Netdata is a daemon that collects data in realtime (per second)
  and presents a web site to view and analyze them. The presentation
@@ -182,10 +183,21 @@ Description: The perf metrics collector for the Netdata Agent
 
 Package: netdata-plugin-debugfs
 Architecture: any
-Depends: ${shlibs:Debends},
+Depends: ${shlibs:Depends},
          netdata (= ${source:Version})
 Pre-Depends: libcap2-bin, adduser
 Conflicts: netdata (<< ${source:Version})
 Description: The debugfs metrics collector for the Netdata Agent
  This plugin allows the Netdata Agent to collect Linux kernel metrics
  exposed through debugfs.
+
+Package: netdata-plugin-systemd-journal
+Architecture: any
+Depends: ${shlibs:Depends},
+         netdata (= ${source:Version})
+Pre-Depends: libcap2-bin, adduser
+Build-Depends: libsystemd-dev
+Conflicts: netdata (<< ${source:Version})
+Description: The systemd-journal collector for the Netdata Agent
+ This plugin allows the Netdata Agent to present logs from the systemd
+ journal on Netdata Cloud or the local Agent dashboard.
