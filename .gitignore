@@ -100,7 +100,7 @@ netdata-coverity-analysis.tgz
 .cproject/
 .idea/
 .vscode/*
-!.vscode/settings.json
+!.vscode/settings.default.json
 .project/
 .settings/
 README
