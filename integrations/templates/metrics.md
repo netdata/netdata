@@ -18,8 +18,8 @@ The scope defines the instance that the metric belongs to. An instance is unique
 [% if scope.labels %]
 Labels:
 
-| Label       | Description      |
-|:-----------:|:----------------:|
+| Label      | Description     |
+|:-----------|:----------------|
 [% for label in scope.labels %]
 | [[ label.name ]] | [[ label.description ]] |
 [% endfor %]
@@ -31,7 +31,7 @@ Metrics:
 
 | Metric | Dimensions | Unit |[% for a in entry.metrics.availability %] [[ a ]] |[% endfor %]
 
-|:------:|:----------:|:----:|[% for a in entry.metrics.availability %]:---:|[% endfor %]
+|:------|:----------|:----|[% for a in entry.metrics.availability %]:---:|[% endfor %]
 
 [% for metric in scope.metrics %]
 | [[ metric.name ]] | [% for d in metric.dimensions %][[ d.name ]][% if not loop.last %], [% endif %][% endfor %] | [[ metric.unit ]] |[% for a in entry.metrics.availability %] [% if not metric.availability|length or a in metric.availability %]•[% else %] [% endif %] |[% endfor %]
