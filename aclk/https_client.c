@@ -29,6 +29,8 @@ static const char *http_req_type_to_str(http_req_type_t req) {
     }
 }
 
+#define TRANSFER_ENCODING_CHUNKED (-2)
+
 typedef struct {
     enum http_parse_state state;
     int content_length;
@@ -60,6 +62,12 @@ static void process_http_hdr(http_parse_ctx *parse_ctx, const char *key, const c
     // it can be extended
     if (!strcmp("content-length", key)) {
         parse_ctx->content_length = atoi(val);
+        return;
+    }
+    if (!strcmp("transfer-encoding", key)) {
+        if (!strcmp("chunked", val))
+            parse_ctx->content_length = TRANSFER_ENCODING_CHUNKED;
+        return;
     }
 }
 
