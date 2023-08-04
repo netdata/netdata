@@ -134,6 +134,10 @@ collectors/statsd:
   - collectors/statsd.plugin/*
   - collectors/statsd.plugin/**/*
 
+collectors/systemd-journal:
+  - collectors/systemd-journal.plugin/*
+  - collectors/systemd-journal.plugin/**/*
+
 collectors/tc:
   - collectors/tc.plugin/*
   - collectors/tc.plugin/**/*
@@ -151,6 +155,11 @@ collectors/xenstat:
 area/health:
   - health/*
   - health/**/*
+
+area/metadata:
+  - "**/*metadata.yaml"
+  - integrations/*
+  - integrations/**/*
 
 area/ml:
   - ml/*
