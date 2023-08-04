@@ -50,7 +50,7 @@ static inline void http_parse_ctx_clear(http_parse_ctx *ctx) {
 #define HTTP_LINE_TERM "\x0D\x0A"
 #define RESP_PROTO "HTTP/1.1 "
 #define HTTP_KEYVAL_SEPARATOR ": "
-#define HTTP_HDR_BUFFER_SIZE 256
+#define HTTP_HDR_BUFFER_SIZE 1024
 #define PORT_STR_MAX_BYTES 12
 
 static void process_http_hdr(http_parse_ctx *parse_ctx, const char *key, const char *val)
