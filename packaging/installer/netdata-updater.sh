@@ -761,6 +761,7 @@ update_binpkg() {
       pm_cmd="apt-get"
       repo_subcmd="update"
       install_subcmd="install"
+      mark_auto_cmd="apt-mark auto"
       pkg_install_opts="${interactive_opts}"
       repo_update_opts="${interactive_opts}"
       pkg_installed_check="dpkg-query -s"
@@ -773,8 +774,10 @@ update_binpkg() {
       if command -v dnf > /dev/null; then
         pm_cmd="dnf"
         repo_subcmd="makecache"
+        mark_auto_cmd="dnf mark remove"
       else
         pm_cmd="yum"
+        mark_auto_cmd="yumdb set reason dep"
       fi
       upgrade_subcmd="upgrade"
       install_subcmd="install"
@@ -792,6 +795,7 @@ update_binpkg() {
       pm_cmd="zypper"
       repo_subcmd="--gpg-auto-import-keys refresh"
       install_subcmd="install"
+      mark_auto_cmd=""
       pkg_install_opts=""
       repo_update_opts=""
       pkg_installed_check="rpm -q"
@@ -826,6 +830,11 @@ update_binpkg() {
     if [ "${NETDATA_NO_SYSTEMD_JOURNAL}" -eq 0 ]; then
       if ! ${pkg_installed_check} netdata-plugin-systemd-journal > /dev/null 2>&1; then
         env ${env} ${pm_cmd} ${install_subcmd} ${pkg_install_opts} netdata-plugin-systemd-journal >&3 2>&3
+
+        if [ -n "${mark_auto_cmd}" ]; then
+          # shellcheck disable=SC2086
+          env ${env} ${mark_auto_cmd} netdata-plugin-systemd-journal >&3 2>&3
+        fi
       fi
     fi
   fi
