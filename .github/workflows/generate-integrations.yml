@@ -24,6 +24,7 @@ jobs:
   generate-integrations:
     name: Generate Integrations
     runs-on: ubuntu-latest
+    if: github.repository == 'netdata/netdata'
     steps:
       - name: Checkout Agent
         id: checkout-agent
