@@ -157,6 +157,7 @@ typedef enum ebpf_socket_idx {
 
 // ARAL name
 #define NETDATA_EBPF_SOCKET_ARAL_NAME "ebpf_socket"
+#define NETDATA_EBPF_SOCKET_ARAL_TABLE_NAME "ebpf_socket_tbl"
 
 typedef struct ebpf_socket_publish_apps {
     // Data read

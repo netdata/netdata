@@ -7,6 +7,7 @@
 
 // ----------------------------------------------------------------------------
 // ARAL vectors used to speed up processing
+static ARAL *ebpf_aral_socket_table = NULL;
 
 /*****************************************************************
  *
@@ -1535,6 +1536,9 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         ebpf_hash_socket_accumulator(values, &key, end);
         ebpf_socket_fill_publish_apps(key.pid, values);
 
+        // Use next line with Judy array
+        //netdata_socket_t *target = aral_mallocz(ebpf_aral_socket_table);
+
         memset(values, 0, length);
 
         key = next_key;
@@ -2400,6 +2404,8 @@ static void ebpf_socket_allocate_global_vectors(int apps)
         ebpf_socket_aral_init();
         socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
     }
+
+    ebpf_aral_socket_table = ebpf_allocate_pid_aral(NETDATA_EBPF_SOCKET_ARAL_TABLE_NAME, sizeof(netdata_socket_t));
 
     socket_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_socket_t));
 }
