@@ -1568,8 +1568,9 @@ void *ebpf_read_socket_thread(void *ptr)
 
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
+    usec_t period = update_every * USEC_PER_SEC;
     while (!ebpf_exit_plugin && running_time < lifetime) {
-        (void)heartbeat_next(&hb, USEC_PER_SEC);
+        (void)heartbeat_next(&hb, period);
         if (ebpf_exit_plugin || ++counter != update_every)
             continue;
 
