@@ -128,7 +128,8 @@ static void p_file_info_destroy(struct File_info *p_file_info){
         freez((void *) p_file_info->db_metadata);
         freez((void *) p_file_info->db_dir);
         freez(p_file_info->db_writer_thread);
-        sqlite3_finalize(p_file_info->stmt_retrieve_log_msg_metadata);
+        sqlite3_finalize(p_file_info->stmt_get_log_msg_metadata_asc);
+        sqlite3_finalize(p_file_info->stmt_get_log_msg_metadata_desc);
     }
 
     freez((void *) p_file_info->chart_name);

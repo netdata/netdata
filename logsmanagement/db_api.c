@@ -1108,15 +1108,25 @@ int db_init() {
             rc = sqlite3_finalize(stmt_retrieve_metadata_from_id);
             do_sqlite_error_check(p_file_info, rc, SQLITE_OK);
 
-            /* Prepare statement to be used in single database queries */
+            /* Prepare statements to be used in single database queries */
             rc = sqlite3_prepare_v2(p_file_info->db,
                                     "SELECT Timestamp, Msg_compr_size , Msg_decompr_size, "
                                     "BLOB_Offset, " BLOBS_TABLE".Id, Num_lines "
                                     "FROM " LOGS_TABLE " INNER JOIN " BLOBS_TABLE " "
                                     "ON " LOGS_TABLE ".FK_BLOB_Id = " BLOBS_TABLE ".Id "
-                                    "WHERE Timestamp BETWEEN ? AND ? "
+                                    "WHERE Timestamp >= ? AND Timestamp <= ? "
                                     "ORDER BY Timestamp;",
-                                    -1, &p_file_info->stmt_retrieve_log_msg_metadata, NULL);
+                                    -1, &p_file_info->stmt_get_log_msg_metadata_asc, NULL);
+            do_sqlite_error_check(p_file_info, rc, SQLITE_OK);
+
+            rc = sqlite3_prepare_v2(p_file_info->db,
+                                    "SELECT Timestamp, Msg_compr_size , Msg_decompr_size, "
+                                    "BLOB_Offset, " BLOBS_TABLE".Id, Num_lines "
+                                    "FROM " LOGS_TABLE " INNER JOIN " BLOBS_TABLE " "
+                                    "ON " LOGS_TABLE ".FK_BLOB_Id = " BLOBS_TABLE ".Id "
+                                    "WHERE Timestamp <= ? AND Timestamp >= ? "
+                                    "ORDER BY Timestamp DESC;",
+                                    -1, &p_file_info->stmt_get_log_msg_metadata_desc, NULL);
             do_sqlite_error_check(p_file_info, rc, SQLITE_OK);
 
             /* DB initialisation finished; release lock */
@@ -1169,19 +1179,22 @@ return_error:
 void db_search(logs_query_params_t *const p_query_params, struct File_info *const p_file_infos[]) {
     int rc = 0;
 
-    sqlite3_stmt *stmt_retrieve_log_msg_metadata;
+    const enum {ASC, DESC} order_by = p_query_params->req_to_ts >= p_query_params->req_from_ts ? ASC : DESC;
+
+    sqlite3_stmt *stmt_get_log_msg_metadata;
     sqlite3 *dbt = NULL; // Used only when multiple DBs are searched
         
     if(!p_file_infos[1]){ /* Single DB to be searched */
-        stmt_retrieve_log_msg_metadata = p_file_infos[0]->stmt_retrieve_log_msg_metadata;
+        stmt_get_log_msg_metadata = order_by == ASC ? 
+            p_file_infos[0]->stmt_get_log_msg_metadata_asc : p_file_infos[0]->stmt_get_log_msg_metadata_desc;
         if(unlikely(
-            SQLITE_OK != (rc = sqlite3_bind_int64(stmt_retrieve_log_msg_metadata, 1, p_query_params->req_from_ts)) ||
-            SQLITE_OK != (rc = sqlite3_bind_int64(stmt_retrieve_log_msg_metadata, 2, p_query_params->req_to_ts)) ||
-            (SQLITE_ROW != (rc = sqlite3_step(stmt_retrieve_log_msg_metadata)) && (SQLITE_DONE != rc))
+            SQLITE_OK != (rc = sqlite3_bind_int64(stmt_get_log_msg_metadata, 1, p_query_params->req_from_ts)) ||
+            SQLITE_OK != (rc = sqlite3_bind_int64(stmt_get_log_msg_metadata, 2, p_query_params->req_to_ts)) ||
+            (SQLITE_ROW != (rc = sqlite3_step(stmt_get_log_msg_metadata)) && (SQLITE_DONE != rc))
         )){
             throw_error(p_file_infos[0]->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
             // TODO: If there are errors here, should db_writer_db_mode_full() be terminated?
-            sqlite3_reset(stmt_retrieve_log_msg_metadata);
+            sqlite3_reset(stmt_get_log_msg_metadata);
             return;
         }
     } else { /* Multiple DBs to be searched */
@@ -1238,17 +1251,28 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
         if(unlikely(
             SQLITE_OK !=    (rc = sqlite3_prepare_v2(dbt, tmp_view_query, -1, &stmt_create_tmp_view, NULL)) ||
             SQLITE_DONE !=  (rc = sqlite3_step(stmt_create_tmp_view)) ||
-            SQLITE_OK !=    (rc = sqlite3_prepare_v2(dbt,
+            SQLITE_OK !=    (rc = sqlite3_prepare_v2(dbt, order_by == ASC ?
+
                                     "SELECT Timestamp, Msg_compr_size , Msg_decompr_size, "
                                     "BLOB_Offset, FK_BLOB_Id, Num_lines, column1 "
                                     "FROM " TMP_VIEW_TABLE " "
-                                    "WHERE Timestamp BETWEEN ? AND ? ;",
-                                    -1, &stmt_retrieve_log_msg_metadata, NULL)) ||
-            SQLITE_OK !=    (rc = sqlite3_bind_int64(stmt_retrieve_log_msg_metadata, 1, 
+                                    "WHERE Timestamp >= ? AND Timestamp <= ?;" : 
+
+                                    /* TODO: The following can also be done by defining 
+                                     * a descending order tmp_view_query, which will 
+                                     * probably be faster. Needs to be measured. */
+
+                                    "SELECT Timestamp, Msg_compr_size , Msg_decompr_size, "
+                                    "BLOB_Offset, FK_BLOB_Id, Num_lines, column1 "
+                                    "FROM " TMP_VIEW_TABLE " "
+                                    "WHERE Timestamp <= ? AND Timestamp >= ? ORDER BY Timestamp DESC;",
+
+                                    -1, &stmt_get_log_msg_metadata, NULL)) ||
+            SQLITE_OK !=    (rc = sqlite3_bind_int64(stmt_get_log_msg_metadata, 1, 
                                                         (sqlite3_int64)p_query_params->req_from_ts)) ||
-            SQLITE_OK !=    (rc = sqlite3_bind_int64(stmt_retrieve_log_msg_metadata, 2, 
+            SQLITE_OK !=    (rc = sqlite3_bind_int64(stmt_get_log_msg_metadata, 2, 
                                                         (sqlite3_int64)p_query_params->req_to_ts)) ||
-            (SQLITE_ROW !=  (rc = sqlite3_step(stmt_retrieve_log_msg_metadata)) && (SQLITE_DONE != rc))
+            (SQLITE_ROW !=  (rc = sqlite3_step(stmt_get_log_msg_metadata)) && (SQLITE_DONE != rc))
         )){
             throw_error(p_file_infos[0]->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
             sqlite3_close(dbt);
@@ -1270,13 +1294,13 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
     while (rc == SQLITE_ROW) {
 
         /* Retrieve metadata from DB */
-        tmp_itm.timestamp = (msec_t)sqlite3_column_int64(stmt_retrieve_log_msg_metadata, 0);
-        tmp_itm.text_compressed_size = (size_t)sqlite3_column_int64(stmt_retrieve_log_msg_metadata, 1);
-        tmp_itm.text_size = (size_t)sqlite3_column_int64(stmt_retrieve_log_msg_metadata, 2);
-        int64_t blob_offset = (int64_t) sqlite3_column_int64(stmt_retrieve_log_msg_metadata, 3);
-        int blob_handles_offset = sqlite3_column_int(stmt_retrieve_log_msg_metadata, 4);
-        unsigned long num_lines = (unsigned long) sqlite3_column_int64(stmt_retrieve_log_msg_metadata, 5);
-        int db_off = p_file_infos[1] ? sqlite3_column_int(stmt_retrieve_log_msg_metadata, 6) : 0;
+        tmp_itm.timestamp = (msec_t)sqlite3_column_int64(stmt_get_log_msg_metadata, 0);
+        tmp_itm.text_compressed_size = (size_t)sqlite3_column_int64(stmt_get_log_msg_metadata, 1);
+        tmp_itm.text_size = (size_t)sqlite3_column_int64(stmt_get_log_msg_metadata, 2);
+        int64_t blob_offset = (int64_t) sqlite3_column_int64(stmt_get_log_msg_metadata, 3);
+        int blob_handles_offset = sqlite3_column_int(stmt_get_log_msg_metadata, 4);
+        unsigned long num_lines = (unsigned long) sqlite3_column_int64(stmt_get_log_msg_metadata, 5);
+        int db_off = p_file_infos[1] ? sqlite3_column_int(stmt_get_log_msg_metadata, 6) : 0;
 
         /* If exceeding quota and new timestamp is different than previous, terminate query */
         if(res_buff->len >= p_query_params->quota && tmp_itm.timestamp != res_hdr.timestamp){
@@ -1338,7 +1362,7 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
 
         m_assert(TEST_MS_TIMESTAMP_VALID(res_hdr.timestamp), "res_hdr.timestamp is invalid");
 
-        rc = sqlite3_step(stmt_retrieve_log_msg_metadata);
+        rc = sqlite3_step(stmt_get_log_msg_metadata);
         if (unlikely(rc != SQLITE_ROW && rc != SQLITE_DONE)){
             throw_error(p_file_infos[db_off]->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
             // TODO: If there are errors here, should db_writer_db_mode_full() be terminated?
@@ -1349,7 +1373,7 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
     if(tmp_itm.text_compressed) freez(tmp_itm.text_compressed);
 
     if(p_file_infos[1]) rc = sqlite3_close(dbt);
-    else rc = sqlite3_reset(stmt_retrieve_log_msg_metadata);
+    else rc = sqlite3_reset(stmt_get_log_msg_metadata);
     if (unlikely(SQLITE_OK != rc)) 
         throw_error(p_file_infos[0]->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
 }

@@ -114,7 +114,8 @@ struct File_info {
     int64_t blob_total_size;                        /**< This is the total disk space that all BLOBs occupy (for this log source) **/
     int64_t db_write_duration;                      /**< Holds timing details related to duration of DB write operations **/
     int64_t db_rotate_duration;                     /**< Holds timing details related to duration of DB rorate operations **/
-    sqlite3_stmt *stmt_retrieve_log_msg_metadata;   /**< SQLITE3 statement used to retrieve metadata from database during queries **/
+    sqlite3_stmt *stmt_get_log_msg_metadata_asc;    /**< SQLITE3 statement used to retrieve metadata from database during queries in ascending order **/
+    sqlite3_stmt *stmt_get_log_msg_metadata_desc;   /**< SQLITE3 statement used to retrieve metadata from database during queries in descending order **/
 
     /* Struct members related to log parsing */
     Log_parser_config_t *parser_config;             /**< Configuration to be user by log parser - read from logsmanagement.conf **/ 
