@@ -106,7 +106,6 @@ struct netdata_static_thread ebpf_read_socket = {
 
 netdata_ebpf_socket_hs_t ebpf_socket_hs = {.socket_table = NULL, .index = {.JudyHSArray = NULL}};
 
-
 #ifdef NETDATA_DEV_MODE
 int socket_disable_priority;
 #endif
@@ -1499,6 +1498,28 @@ static void ebpf_read_socket_hash_table(BUFFER *buf, int fd, int maps_per_core)
 }
 
 /**
+ * Hashtable insert unsafe
+ *
+ * Find or create a value associated to the index
+ *
+ * @return The lsocket = 0 when new item added to the array otherwise the existing item value is returned in *lsocket
+ * we return a pointer to a pointer, so that the caller can put anything needed at the value of the index.
+ * The pointer to pointer we return has to be used before any other operation that may change the index (insert/delete).
+ *
+ */
+static inline void **ebpf_socket_hashtable_insert_unsafe(Pvoid_t *arr, netdata_socket_idx_t *key)
+{
+    JError_t J_Error;
+    Pvoid_t *lsocket = JudyHSIns(arr, (void *)key, sizeof(netdata_socket_idx_t), &J_Error);
+    if (unlikely(lsocket == PJERR)) {
+        netdata_log_error("SOCKET: Cannot add socket to JudyHS, JU_ERRNO_* == %u, ID == %d",
+                          JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+    }
+
+    return lsocket;
+}
+
+/**
  * Update array vectors
  *
  * Read data from hash table and update vectors.
@@ -1527,6 +1548,8 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
     // values for specific processor unless it is used to store data. As result of this behavior one the next socket
     // can have values from the previous one.
     memset(values, 0, length);
+    Pvoid_t hs = ebpf_socket_hs.index.JudyHSArray;
+    rw_spinlock_write_lock(&ebpf_socket_hs.index.rw_spinlock);
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         test = bpf_map_lookup_elem(fd, &key, values);
         if (test < 0) {
@@ -1542,13 +1565,18 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         ebpf_hash_socket_accumulator(values, &key, end);
         ebpf_socket_fill_publish_apps(key.pid, values);
 
-        // Use next line with Judy array
-        //netdata_socket_t *target = aral_mallocz(ebpf_socket_hs.socket_table);
+        netdata_socket_t **item_pptr = (netdata_socket_t **) ebpf_socket_hashtable_insert_unsafe(&hs, &key);
+        if (likely(*item_pptr == NULL)) {
+            // a new item added to the index
+            *item_pptr = aral_mallocz(ebpf_socket_hs.socket_table);
+        }
+        memcpy(*item_pptr, &values[0], sizeof(netdata_socket_t));
 
         memset(values, 0, length);
 
         key = next_key;
     }
+    rw_spinlock_write_unlock(&ebpf_socket_hs.index.rw_spinlock);
     netdata_thread_enable_cancelability();
 }
 
