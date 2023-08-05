@@ -1415,8 +1415,10 @@ static void ebpf_hash_socket_accumulator(netdata_socket_t *values, netdata_socke
             ct = w->current_timestamp;
     }
 
-    if (!network_viewer_opt.enabled || !is_socket_allowed(key, family))
+    /*
+    if (!is_socket_allowed(key, family))
         return;
+        */
 
     values[0].protocol          = (!protocol)?IPPROTO_TCP:protocol;
     values[0].current_timestamp = ct;
@@ -1528,6 +1530,11 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         test = bpf_map_lookup_elem(fd, &key, values);
         if (test < 0) {
+            key = next_key;
+            continue;
+        }
+
+        if (key.pid > pid_max) {
             key = next_key;
             continue;
         }
@@ -2401,10 +2408,8 @@ static void ebpf_socket_initialize_global_vectors(int apps)
     memset(socket_publish_aggregated, 0 ,NETDATA_MAX_SOCKET_VECTOR * sizeof(netdata_publish_syscall_t));
     socket_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
 
-    if (apps) {
-        ebpf_socket_aral_init();
-        socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
-    }
+    ebpf_socket_aral_init();
+    socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
 
     ebpf_socket_hs.socket_table = ebpf_allocate_pid_aral(NETDATA_EBPF_SOCKET_ARAL_TABLE_NAME, sizeof(netdata_socket_t));
 
