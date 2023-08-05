@@ -161,6 +161,10 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
         }
     }
 
+    query_params.order_by_asc = query_params.req_from_ts <= query_params.req_to_ts ? 1 : 0;
+
+    fn_off = cn_off = 0;
+
     if(!req_quota) query_params.quota = LOGS_MANAG_QUERY_QUOTA_DEFAULT;
     else if(req_quota > LOGS_MANAG_QUERY_QUOTA_MAX) query_params.quota = LOGS_MANAG_QUERY_QUOTA_MAX;
     else query_params.quota = req_quota;
@@ -169,8 +173,6 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
     getrusage(RUSAGE_THREAD, &start);
     const logs_qry_res_err_t *const res_err = execute_logs_manag_query(&query_params);
     getrusage(RUSAGE_THREAD, &end);
-
-    fn_off = cn_off = 0;
 
     int update_every = 1;
 

@@ -1600,6 +1600,8 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
         }
     }
 
+    query_params.order_by_asc = query_params.req_from_ts <= query_params.req_to_ts ? 1 : 0;
+
     fn_off = cn_off = 0;
 
     if(!req_quota) query_params.quota = LOGS_MANAG_QUERY_QUOTA_DEFAULT;

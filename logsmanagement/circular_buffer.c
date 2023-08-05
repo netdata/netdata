@@ -36,8 +36,6 @@ void circ_buff_search(Circ_buff_t *const buffs[], logs_query_params_t *const p_q
 
     BUFFER *const res_buff = p_query_params->results_buff;
 
-    const enum {ASC, DESC} order_by = p_query_params->req_to_ts >= p_query_params->req_from_ts ? ASC : DESC;
-
     int buffs_size = 0, buff_max_num_of_items = 0;
 
     if(unlikely(buffs[0] == NULL)) return; // No buffs to be searched
@@ -67,7 +65,8 @@ void circ_buff_search(Circ_buff_t *const buffs[], logs_query_params_t *const p_q
     items[items_off] = NULL;
 
     if(unlikely(items[0] == NULL)) return; // No items to be searched
-    else qsort(items, items_off, sizeof(items[0]), order_by == ASC ? qsort_timestamp : reverse_qsort_timestamp);
+    else qsort(items, items_off, sizeof(items[0]), 
+                p_query_params->order_by_asc ? qsort_timestamp : reverse_qsort_timestamp);
  
     logs_query_res_hdr_t res_hdr = { // result header
         .matches = 0, 
@@ -87,7 +86,7 @@ void circ_buff_search(Circ_buff_t *const buffs[], logs_query_params_t *const p_q
         res_hdr.timestamp = items[i]->timestamp;
         res_hdr.text_size = items[i]->text_size;
 
-        if (order_by == ASC ?
+        if (p_query_params->order_by_asc ?
             ( res_hdr.timestamp >= p_query_params->req_from_ts  && res_hdr.timestamp <= p_query_params->req_to_ts  ) : 
             ( res_hdr.timestamp >= p_query_params->req_to_ts    && res_hdr.timestamp <= p_query_params->req_from_ts) ){
 

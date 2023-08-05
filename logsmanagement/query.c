@@ -138,14 +138,13 @@ const logs_qry_res_err_t *execute_logs_manag_query(logs_query_params_t *p_query_
         uv_mutex_lock(p_file_infos[pfi_off]->db_mut);
 
 
-    /* Search DB(s) first */
-    db_search(p_query_params, p_file_infos);
+    /* If results are requested in ascending timestamp order, search DB(s) first 
+     * and then the circular buffers. Otherwise, search the circular buffers
+     * first and the DB(s) second. In both cases, the quota must be respected. */
+    if(p_query_params->order_by_asc) 
+        db_search(p_query_params, p_file_infos);
 
-    /* Search circular buffer ONLY IF the results len is less than the originally requested max size!
-     * p_query_params->end_timestamp will be the originally requested here, as 
-     * it won't have been updated in db_search() due to the
-     * (p_query_params->results_buff->len >=  p_query_params->quota) condition */
-    if (p_query_params->results_buff->len <  p_query_params->quota) {
+    if (p_query_params->results_buff->len < p_query_params->quota) {
         Circ_buff_t *circ_buffs[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES] = {NULL};
         int pfi_off = -1;
         while(p_file_infos[++pfi_off]){
@@ -157,6 +156,9 @@ const logs_qry_res_err_t *execute_logs_manag_query(logs_query_params_t *p_query_
             uv_rwlock_rdunlock(&circ_buffs[pfi_off]->buff_realloc_rwlock);
         }
     }
+
+    if(!p_query_params->order_by_asc && p_query_params->results_buff->len <  p_query_params->quota) 
+        db_search(p_query_params, p_file_infos);
 
     for(int pfi_off = 0; p_file_infos[pfi_off]; pfi_off++)
         uv_mutex_unlock(p_file_infos[pfi_off]->db_mut);

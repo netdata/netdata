@@ -1179,13 +1179,11 @@ return_error:
 void db_search(logs_query_params_t *const p_query_params, struct File_info *const p_file_infos[]) {
     int rc = 0;
 
-    const enum {ASC, DESC} order_by = p_query_params->req_to_ts >= p_query_params->req_from_ts ? ASC : DESC;
-
     sqlite3_stmt *stmt_get_log_msg_metadata;
     sqlite3 *dbt = NULL; // Used only when multiple DBs are searched
         
     if(!p_file_infos[1]){ /* Single DB to be searched */
-        stmt_get_log_msg_metadata = order_by == ASC ? 
+        stmt_get_log_msg_metadata = p_query_params->order_by_asc ? 
             p_file_infos[0]->stmt_get_log_msg_metadata_asc : p_file_infos[0]->stmt_get_log_msg_metadata_desc;
         if(unlikely(
             SQLITE_OK != (rc = sqlite3_bind_int64(stmt_get_log_msg_metadata, 1, p_query_params->req_from_ts)) ||
@@ -1251,7 +1249,7 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
         if(unlikely(
             SQLITE_OK !=    (rc = sqlite3_prepare_v2(dbt, tmp_view_query, -1, &stmt_create_tmp_view, NULL)) ||
             SQLITE_DONE !=  (rc = sqlite3_step(stmt_create_tmp_view)) ||
-            SQLITE_OK !=    (rc = sqlite3_prepare_v2(dbt, order_by == ASC ?
+            SQLITE_OK !=    (rc = sqlite3_prepare_v2(dbt, p_query_params->order_by_asc ?
 
                                     "SELECT Timestamp, Msg_compr_size , Msg_decompr_size, "
                                     "BLOB_Offset, FK_BLOB_Id, Num_lines, column1 "
@@ -1283,7 +1281,6 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
     Circ_buff_item_t tmp_itm = {0};
     
     BUFFER *const res_buff = p_query_params->results_buff;
-    m_assert(res_buff->len == 0, "res_buff->len should equal 0");
     logs_query_res_hdr_t res_hdr = { // results header
         .matches = 0,
         .text_size = 0,
