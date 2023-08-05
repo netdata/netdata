@@ -13,8 +13,6 @@
 #include "file_info.h"
 #include "helper.h"
 
-#define MEASURE_QUERY_TIME 0
-
 static const char esc_ch[] = "[]\\^$.|?*+(){}";
 
 /**
@@ -139,16 +137,9 @@ const logs_qry_res_err_t *execute_logs_manag_query(logs_query_params_t *p_query_
     for(int pfi_off = 0; p_file_infos[pfi_off]; pfi_off++)
         uv_mutex_lock(p_file_infos[pfi_off]->db_mut);
 
-#if MEASURE_QUERY_TIME
-    const msec_t start_time = now_realtime_msec();
-#endif // MEASURE_QUERY_TIME
 
     /* Search DB(s) first */
     db_search(p_query_params, p_file_infos);
-
-#if MEASURE_QUERY_TIME
-    const msec_t db_search_time = now_realtime_msec();
-#endif // MEASURE_QUERY_TIME
 
     /* Search circular buffer ONLY IF the results len is less than the originally requested max size!
      * p_query_params->end_timestamp will be the originally requested here, as 
@@ -170,14 +161,6 @@ const logs_qry_res_err_t *execute_logs_manag_query(logs_query_params_t *p_query_
     for(int pfi_off = 0; p_file_infos[pfi_off]; pfi_off++)
         uv_mutex_unlock(p_file_infos[pfi_off]->db_mut);
 
-#if MEASURE_QUERY_TIME
-    const msec_t end_time = now_realtime_msec();
-    netdata_log_debug(D_LOGS_MANAG, "It took %" PRId64 "ms to execute query (%" PRId64 "ms DB search, %" 
-          PRId64 "ms circ buffer search), retrieving %zuKB.\n",
-          (int64_t)end_time - start_time, (int64_t)db_search_time - start_time, 
-          (int64_t)end_time - db_search_time,
-          p_query_params->results_buff->len / 1000);
-#endif // MEASURE_QUERY_TIME
 
     /* If keyword has been sanitised, it needs to be freed - otherwise it's just a pointer to a substring */
     if(p_query_params->sanitize_keyword && p_query_params->keyword){
