@@ -314,6 +314,16 @@ typedef struct netdata_plot_values {
     uint16_t plot_retransmit;
 } netdata_plot_values_t;
 
+typedef struct netdata_ebpf_socket_hs {
+    ARAL *socket_table;
+
+    struct {                            // support for multiple indexing engines
+        Pvoid_t JudyHSArray;            // the hash table
+        RW_SPINLOCK rw_spinlock;        // protect the index
+    } index;
+
+} netdata_ebpf_socket_hs_t;
+
 /**
  * Index used together previous structure
  */

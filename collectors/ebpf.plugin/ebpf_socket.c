@@ -5,10 +5,6 @@
 #include "ebpf.h"
 #include "ebpf_socket.h"
 
-// ----------------------------------------------------------------------------
-// ARAL vectors used to speed up processing
-static ARAL *ebpf_aral_socket_table = NULL;
-
 /*****************************************************************
  *
  *  GLOBAL VARIABLES
@@ -107,6 +103,9 @@ struct netdata_static_thread ebpf_read_socket = {
         .init_routine = NULL,
         .start_routine = NULL
 };
+
+netdata_ebpf_socket_hs_t ebpf_socket_hs = {.socket_table = NULL, .index = {.JudyHSArray = NULL}};
+
 
 #ifdef NETDATA_DEV_MODE
 int socket_disable_priority;
@@ -1537,7 +1536,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         ebpf_socket_fill_publish_apps(key.pid, values);
 
         // Use next line with Judy array
-        //netdata_socket_t *target = aral_mallocz(ebpf_aral_socket_table);
+        //netdata_socket_t *target = aral_mallocz(ebpf_socket_hs.socket_table);
 
         memset(values, 0, length);
 
@@ -2388,13 +2387,14 @@ static void socket_collector(ebpf_module_t *em)
  *****************************************************************/
 
 /**
- * Allocate vectors used with this thread.
+ * Initialize vectors used with this thread.
+ *
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
  *
  * @param apps is apps enabled?
  */
-static void ebpf_socket_allocate_global_vectors(int apps)
+static void ebpf_socket_initialize_global_vectors(int apps)
 {
     memset(socket_aggregated_data, 0 ,NETDATA_MAX_SOCKET_VECTOR * sizeof(netdata_syscall_stat_t));
     memset(socket_publish_aggregated, 0 ,NETDATA_MAX_SOCKET_VECTOR * sizeof(netdata_publish_syscall_t));
@@ -2405,9 +2405,11 @@ static void ebpf_socket_allocate_global_vectors(int apps)
         socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
     }
 
-    ebpf_aral_socket_table = ebpf_allocate_pid_aral(NETDATA_EBPF_SOCKET_ARAL_TABLE_NAME, sizeof(netdata_socket_t));
+    ebpf_socket_hs.socket_table = ebpf_allocate_pid_aral(NETDATA_EBPF_SOCKET_ARAL_TABLE_NAME, sizeof(netdata_socket_t));
 
     socket_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_socket_t));
+
+    rw_spinlock_init(&ebpf_socket_hs.index.rw_spinlock);
 }
 
 /*****************************************************************
@@ -3361,7 +3363,7 @@ void *ebpf_socket_thread(void *ptr)
 
     parse_table_size_options(&socket_config);
 
-    ebpf_socket_allocate_global_vectors(em->apps_charts);
+    ebpf_socket_initialize_global_vectors(em->apps_charts);
 
     if (running_on_kernel < NETDATA_EBPF_KERNEL_5_0)
         em->mode = MODE_ENTRY;
