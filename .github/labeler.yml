@@ -11,8 +11,7 @@
 # Please keep the labels sorted and deduplicated.
 
 area/ACLK:
-  - aclk/*
-  - aclk/**/*
+  - aclk/**
   - database/sqlite/sqlite_aclk*
   - mqtt_websockets
 
@@ -20,178 +19,139 @@ area/claim:
   - claim/*
 
 area/exporting:
-  - exporting/*
-  - exporting/**/*
+  - exporting/**
 
 area/build:
-  - build/*
-  - build/**/*
-  - build_external/*
-  - build_external/**/*
+  - build/**
+  - build_external/**
   - CMakeLists.txt
   - configure.ac
   - Makefile.am
   - "**/Makefile.am"
 
 area/ci:
-  - .github/*
-  - .github/**/*
+  - .github/**
 
 area/daemon:
-  - daemon/*
-  - daemon/**/*
+  - daemon/**
 
 area/database:
-  - database/*
-  - database/**/*
+  - database/**
 
 area/docs:
   - "*.md"
   - "**/*.md"
   - "**/*.mdx"
-  - diagrams/*
-  - diagrams/**/*
+  - "!integrations/*.md"
+  - "!integrations/**/*.md"
+  - diagrams/**
 
 # -----------------collectors----------------------
 
 area/collectors:
-  - collectors/*
-  - collectors/**/*
+  - collectors/**
 
 collectors/plugins.d:
-  - collectors/plugins.d/*
-  - collectors/plugins.d/**/*
+  - collectors/plugins.d/**
 
 collectors/apps:
-  - collectors/apps.plugin/*
-  - collectors/apps.plugin/**/*
+  - collectors/apps.plugin/**
 
 collectors/cgroups:
-  - collectors/cgroups.plugin/*
-  - collectors/cgroups.plugin/**/*
+  - collectors/cgroups.plugin/**
 
 collectors/charts.d:
-  - collectors/charts.d.plugin/*
-  - collectors/charts.d.plugin/**/*
+  - collectors/charts.d.plugin/**
 
 collectors/cups:
-  - collectors/cups.plugin/*
-  - collectors/cups.plugin/**/*
+  - collectors/cups.plugin/**
 
 collectors/debugfs:
-  - collectors/debugfs.plugin/*
-  - collectors/debugfs.plugin/**/*
+  - collectors/debugfs.plugin/**
 
 collectors/diskspace:
-  - collectors/diskspace.plugin/*
-  - collectors/diskspace.plugin/**/*
+  - collectors/diskspace.plugin/**
 
 collectors/ebpf:
-  - collectors/ebpf.plugin/*
-  - collectors/ebpf.plugin/**/*
+  - collectors/ebpf.plugin/**
 
 collectors/freebsd:
-  - collectors/freebsd.plugin/*
-  - collectors/freebsd.plugin/**/*
+  - collectors/freebsd.plugin/**
 
 collectors/freeipmi:
-  - collectors/freeipmi.plugin/*
-  - collectors/freeipmi.plugin/**/*
+  - collectors/freeipmi.plugin/**
 
 collectors/idlejitter:
-  - collectors/idlejitter.plugin/*
-  - collectors/idlejitter.plugin/**/*
+  - collectors/idlejitter.plugin/**
 
 collectors/ioping:
-  - collectors/ioping.plugin/*
-  - collectors/ioping.plugin/**/*
+  - collectors/ioping.plugin/**
 
 collectors/macos:
-  - collectors/macos.plugin/*
-  - collectors/macos.plugin/**/*
+  - collectors/macos.plugin/**
 
 collectors/nfacct:
-  - collectors/nfacct.plugin/*
-  - collectors/nfacct.plugin/**/*
+  - collectors/nfacct.plugin/**
 
 collectors/perf:
-  - collectors/perf.plugin/*
-  - collectors/perf.plugin/**/*
+  - collectors/perf.plugin/**
 
 collectors/proc:
-  - collectors/proc.plugin/*
-  - collectors/proc.plugin/**/*
+  - collectors/proc.plugin/**
 
 collectors/python.d:
-  - collectors/python.d.plugin/*
-  - collectors/python.d.plugin/**/*
+  - collectors/python.d.plugin/**
 
 collectors/slabinfo:
-  - collectors/slabinfo.plugin/*
-  - collectors/slabinfo.plugin/**/*
+  - collectors/slabinfo.plugin/**
 
 collectors/statsd:
-  - collectors/statsd.plugin/*
-  - collectors/statsd.plugin/**/*
+  - collectors/statsd.plugin/**
 
 collectors/systemd-journal:
-  - collectors/systemd-journal.plugin/*
-  - collectors/systemd-journal.plugin/**/*
+  - collectors/systemd-journal.plugin/**
 
 collectors/tc:
-  - collectors/tc.plugin/*
-  - collectors/tc.plugin/**/*
+  - collectors/tc.plugin/**
 
 collectors/timex:
-  - collectors/timex.plugin/*
-  - collectors/timex.plugin/**/*
+  - collectors/timex.plugin/**
 
 collectors/xenstat:
-  - collectors/xenstat.plugin/*
-  - collectors/xenstat.plugin/**/*
+  - collectors/xenstat.plugin/**
 
 # ----------------/collectors----------------------
 
 area/health:
-  - health/*
-  - health/**/*
+  - health/**
 
 area/metadata:
   - "**/*metadata.yaml"
-  - integrations/*
-  - integrations/**/*
+  - integrations/**
 
 area/ml:
-  - ml/*
-  - ml/**/*
+  - ml/**
 
 area/packaging:
-  - contrib/*
-  - contrib/**/*
-  - packaging/*
-  - packaging/**/*
-  - system/*
-  - system/**/*
+  - contrib/**
+  - packaging/**
+  - system/**
   - Dockerfile*
   - netdata-installer.sh
   - netdata.spec.in
 
 area/registry:
-  - registry/*
-  - registry/**/*
+  - registry/**
 
 area/streaming:
-  - streaming/*
-  - streaming/**/*
+  - streaming/**
 
 area/tests:
-  - tests/*
-  - tests/**/*
+  - tests/**
   - daemon/unit_test*
   - coverity-scan.sh
   - cppcheck.sh
   - netdata.cppcheck
 
 area/web:
-  - web/*
-  - web/**/*
+  - web/**
