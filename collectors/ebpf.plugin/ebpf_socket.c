@@ -1557,7 +1557,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
             continue;
         }
 
-        if (key.pid > pid_max) {
+        if (key.pid > (uint32_t)pid_max) {
             key = next_key;
             continue;
         }
