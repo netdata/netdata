@@ -7,6 +7,7 @@
 **Merged pull requests:**
 
 - Regenerate integrations.js [\#15751](https://github.com/netdata/netdata/pull/15751) ([netdatabot](https://github.com/netdatabot))
+- ci labeler: remove integrations from area/docs [\#15750](https://github.com/netdata/netdata/pull/15750) ([ilyam8](https://github.com/ilyam8))
 - meta: align left metrics, alerts, and config options [\#15749](https://github.com/netdata/netdata/pull/15749) ([ilyam8](https://github.com/ilyam8))
 - Add dependencies for systemd journal plugin. [\#15747](https://github.com/netdata/netdata/pull/15747) ([Ferroin](https://github.com/Ferroin))
 - prefer cap over setuid for sysetmd-journal in installer [\#15741](https://github.com/netdata/netdata/pull/15741) ([ilyam8](https://github.com/ilyam8))
