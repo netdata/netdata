@@ -5202,7 +5202,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "This integration monitors AMD GPU metrics, such as utilization, clock frequency and memory usage."
-        method_description: ""
+        method_description: "It reads `/sys/class/drm` to collect metrics for every AMD GPU card instance it encounters."
       supported_platforms:
         include:
           - Linux
