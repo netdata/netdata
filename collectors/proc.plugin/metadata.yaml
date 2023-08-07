@@ -5281,37 +5281,37 @@ modules:
               unit: "percentage"
               chart_type: line
               dimensions:
-                - name: used
+                - name: usage
             - name: amdgpu.gpu_mem_vram_usage
               description: VRAM memory usage
               unit: "bytes"
               chart_type: area
               dimensions:
-                - name: used
                 - name: free
+                - name: used
             - name: amdgpu.gpu_mem_vis_vram_usage_perc
               description: visible VRAM memory usage percentage
               unit: "percentage"
               chart_type: line
               dimensions:
-                - name: used
+                - name: usage
             - name: amdgpu.gpu_mem_vis_vram_usage
               description: visible VRAM memory usage
               unit: "bytes"
               chart_type: area
               dimensions:
-                - name: used
                 - name: free
+                - name: used
             - name: amdgpu.gpu_mem_gtt_usage_perc
               description: GTT memory usage percentage
               unit: "percentage"
               chart_type: line
               dimensions:
-                - name: used
+                - name: usage
             - name: amdgpu.gpu_mem_gtt_usage
               description: GTT memory usage
               unit: "bytes"
               chart_type: area
               dimensions:
-                - name: used
                 - name: free
+                - name: used

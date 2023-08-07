@@ -1011,7 +1011,7 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                     rrdlabels_add(c->st_mem_usage_perc_vram->rrdlabels, "product_name", c->id.marketing_name, RRDLABEL_SRC_AUTO);
 
-                    c->rd_mem_used_perc_vram = rrddim_add(c->st_mem_usage_perc_vram, "used", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                    c->rd_mem_used_perc_vram = rrddim_add(c->st_mem_usage_perc_vram, "usage", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
 
 
                     c->st_mem_usage_vram = rrdset_create_localhost(
@@ -1031,8 +1031,8 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                     rrdlabels_add(c->st_mem_usage_vram->rrdlabels, "product_name", c->id.marketing_name, RRDLABEL_SRC_AUTO);
 
-                    c->rd_mem_used_vram = rrddim_add(c->st_mem_usage_vram, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                     c->rd_mem_free_vram = rrddim_add(c->st_mem_usage_vram, "free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    c->rd_mem_used_vram = rrddim_add(c->st_mem_usage_vram, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
 
                     add_do_rrd_x(c, do_rrd_vram);
@@ -1060,7 +1060,7 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                     rrdlabels_add(c->st_mem_usage_perc_vis_vram->rrdlabels, "product_name", c->id.marketing_name, RRDLABEL_SRC_AUTO);
 
-                    c->rd_mem_used_perc_vis_vram = rrddim_add(c->st_mem_usage_perc_vis_vram, "used", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                    c->rd_mem_used_perc_vis_vram = rrddim_add(c->st_mem_usage_perc_vis_vram, "usage", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
 
 
                     c->st_mem_usage_vis_vram = rrdset_create_localhost(
@@ -1080,8 +1080,8 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                     rrdlabels_add(c->st_mem_usage_vis_vram->rrdlabels, "product_name", c->id.marketing_name, RRDLABEL_SRC_AUTO);
 
-                    c->rd_mem_used_vis_vram = rrddim_add(c->st_mem_usage_vis_vram, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                     c->rd_mem_free_vis_vram = rrddim_add(c->st_mem_usage_vis_vram, "free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    c->rd_mem_used_vis_vram = rrddim_add(c->st_mem_usage_vis_vram, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
 
                     add_do_rrd_x(c, do_rrd_vis_vram);
@@ -1109,7 +1109,7 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                     rrdlabels_add(c->st_mem_usage_perc_gtt->rrdlabels, "product_name", c->id.marketing_name, RRDLABEL_SRC_AUTO);
 
-                    c->rd_mem_used_perc_gtt = rrddim_add(c->st_mem_usage_perc_gtt, "used", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                    c->rd_mem_used_perc_gtt = rrddim_add(c->st_mem_usage_perc_gtt, "usage", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
 
                     c->st_mem_usage_gtt = rrdset_create_localhost(
                             AMDGPU_CHART_TYPE
@@ -1128,8 +1128,8 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                     rrdlabels_add(c->st_mem_usage_gtt->rrdlabels, "product_name", c->id.marketing_name, RRDLABEL_SRC_AUTO);
 
-                    c->rd_mem_used_gtt = rrddim_add(c->st_mem_usage_gtt, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                     c->rd_mem_free_gtt = rrddim_add(c->st_mem_usage_gtt, "free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    c->rd_mem_used_gtt = rrddim_add(c->st_mem_usage_gtt, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
 
                     add_do_rrd_x(c, do_rrd_gtt);
