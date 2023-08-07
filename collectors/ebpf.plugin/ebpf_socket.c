@@ -1479,22 +1479,19 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_idx_t *key, net
 }
 
 /**
- * Read socket hash table
+ * Fill function buffer
  *
- * Read data from hash tables created on kernel ring.
+ * Fill the function buffer with socket information.
  *
- * @param buf                buffer used to store data to be shown by function.
- * @param fd                 the hash table with data.
- * @param maps_per_core      do I need to read all cores?
+ * @param buf    buffer used to store data to be shown by function.
  *
  * @return it returns 0 on success and -1 otherwise.
  */
-static void ebpf_read_socket_hash_table(BUFFER *buf, int fd, int maps_per_core)
+static void ebpf_socket_fill_function_buffer(BUFFER *buf)
 {
-    /*
-    if (buf)
-        ebpf_fill_function_buffer(buf, &key, values);
-        */
+    rw_spinlock_read_lock(&ebpf_socket_hs.index.rw_spinlock);
+    //ebpf_fill_function_buffer(buf, &key, &val);
+    rw_spinlock_read_unlock(&ebpf_socket_hs.index.rw_spinlock);
 }
 
 /**
@@ -1732,10 +1729,7 @@ void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
         return;
     }
 
-    int fd = em->maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd;
-    int maps_per_core = em->maps_per_core;
-
-    ebpf_read_socket_hash_table(buf, fd, maps_per_core);
+    ebpf_socket_fill_function_buffer(buf);
 }
 
 /**
