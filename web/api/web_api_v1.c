@@ -1642,11 +1642,11 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
     buffer_strcat(w->response.data, "\t\"data\":[\n");
     
     size_t res_off = 0;
-    logs_query_res_hdr_t res_hdr;
+    logs_query_res_hdr_t *p_res_hdr;
     while(query_params.results_buff->len - res_off > 0){
-        memcpy(&res_hdr, &query_params.results_buff->buffer[res_off], sizeof(res_hdr));
+        p_res_hdr = (logs_query_res_hdr_t *) &query_params.results_buff->buffer[res_off];
         
-        buffer_sprintf(w->response.data, "\t\t[\n\t\t\t%llu,\n" , res_hdr.timestamp);
+        buffer_sprintf(w->response.data, "\t\t[\n\t\t\t%llu,\n" , p_res_hdr->timestamp);
 
         if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)) buffer_strcat(w->response.data, "\t\t\t[\n\t");
 
@@ -1654,8 +1654,8 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
 
         /* Unfortunately '\n', '\\' (except for "\\n") and '"' need to be 
          * escaped, so we need to go through the result characters one by one.*/
-        char *p = &query_params.results_buff->buffer[res_off] + sizeof(res_hdr);
-        size_t remaining = res_hdr.text_size;
+        char *p = &query_params.results_buff->buffer[res_off] + sizeof(*p_res_hdr);
+        size_t remaining = p_res_hdr->text_size;
         while (remaining--){
             if(unlikely(*p == '\n')){
                 if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)){
@@ -1694,11 +1694,11 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
         }
         buffer_strcat(w->response.data, "\"");
         if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)) buffer_strcat(w->response.data, "\n\t\t\t]");
-        buffer_sprintf(w->response.data, ",\n\t\t\t%zu" , res_hdr.text_size);
-        buffer_sprintf(w->response.data, ",\n\t\t\t%d\n\t\t]" , res_hdr.matches);
+        buffer_sprintf(w->response.data, ",\n\t\t\t%zu" , p_res_hdr->text_size);
+        buffer_sprintf(w->response.data, ",\n\t\t\t%d\n\t\t]" , p_res_hdr->matches);
 
 
-        res_off += sizeof(res_hdr) + res_hdr.text_size;
+        res_off += sizeof(*p_res_hdr) + p_res_hdr->text_size;
 
         // Add comma and new line if there are more data to be printed
         if(query_params.results_buff->len - res_off > 0) buffer_strcat(w->response.data, ",\n");
