@@ -515,7 +515,7 @@ static struct amdgpu_id_struct amdgpu_ids[] = {
     {0x98E4, 0xEA, "AMD Radeon R4 Graphics"},
     {0x98E4, 0xEB, "AMD Radeon R3 Graphics"},
     {0x98E4, 0xEC, "AMD Radeon R4 Graphics"},
-    {0x0000, 0x00, "unknown AMD GPU"}
+    {0x0000, 0x00, "unknown AMD GPU"} // this must always be the last item
 };
 
 struct card {
@@ -789,7 +789,7 @@ static int do_rrd_gtt(struct card *const c){
     }
 }
 
-static char *set_id(const char *suf_1, const char *suf_2, const char *suf_3){
+static char *set_id(const char *const suf_1, const char *const suf_2, const char *const suf_3){
     static char id[RRD_ID_LENGTH_MAX + 1];
     snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s_%s", suf_1, suf_2, suf_3);
     return id;
@@ -827,14 +827,14 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                 snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, "device/device");
                 if(read_single_base64_or_hex_number_file(filename, (unsigned long long *) &c->id.asic_id)){
-                    collector_error("Cannot read asic_id from '%s'", filename);
+                    collector_info("Cannot read asic_id from '%s'", filename);
                     card_free(c);
                     continue;
                 }
 
                 snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, "device/revision");
                 if(read_single_base64_or_hex_number_file(filename, (unsigned long long *) &c->id.pci_rev_id)){
-                    collector_error("Cannot read pci_rev_id from '%s'", filename);
+                    collector_info("Cannot read pci_rev_id from '%s'", filename);
                     card_free(c);
                     continue;
                 }
@@ -856,7 +856,7 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                           !read_single_number_file(filename, (unsigned long long *) &tmp_val))  \
                         prop_pathname = strdupz(filename);                                      \
                     else                                                                        \
-                        collector_error("Cannot read file '%s'", filename);                     \
+                        collector_info("Cannot read file '%s'", filename);                     \
                 }
 
                 /* Initialize GPU and VRAM utilization metrics */
