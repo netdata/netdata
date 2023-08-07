@@ -10,6 +10,8 @@
 
 #include "daemon/global_statistics.h"
 
+#define DEFAULT_CHUNKED_RESPONSE_BUFFER_SIZE (4096)
+
 enum http_parse_state {
     HTTP_PARSE_INITIAL = 0,
     HTTP_PARSE_HEADERS,
@@ -29,10 +31,27 @@ static const char *http_req_type_to_str(http_req_type_t req) {
     }
 }
 
+#define TRANSFER_ENCODING_CHUNKED (-2)
+
 typedef struct {
     enum http_parse_state state;
     int content_length;
     int http_code;
+
+    // for chunked data only
+    char *chunked_response;
+    size_t chunked_response_size;
+    size_t chunked_response_written;
+
+    enum chunked_content_state {
+        CHUNKED_CONTENT_CHUNK_SIZE = 0,
+        CHUNKED_CONTENT_CHUNK_DATA,
+        CHUNKED_CONTENT_CHUNK_END_CRLF,
+        CHUNKED_CONTENT_FINAL_CRLF
+    } chunked_content_state;
+
+    size_t chunk_size;
+    size_t chunk_got;
 } http_parse_ctx;
 
 #define HTTP_PARSE_CTX_INITIALIZER { .state = HTTP_PARSE_INITIAL, .content_length = -1, .http_code = 0 }
@@ -50,17 +69,40 @@ static inline void http_parse_ctx_clear(http_parse_ctx *ctx) {
 #define HTTP_LINE_TERM "\x0D\x0A"
 #define RESP_PROTO "HTTP/1.1 "
 #define HTTP_KEYVAL_SEPARATOR ": "
-#define HTTP_HDR_BUFFER_SIZE 256
+#define HTTP_HDR_BUFFER_SIZE 1024
 #define PORT_STR_MAX_BYTES 12
 
-static void process_http_hdr(http_parse_ctx *parse_ctx, const char *key, const char *val)
+static int process_http_hdr(http_parse_ctx *parse_ctx, const char *key, const char *val)
 {
-    // currently we care only about content-length
-    // but in future the way this is written
-    // it can be extended
+    // currently we care only about specific headers
+    // we can skip the rest
     if (!strcmp("content-length", key)) {
+        if (parse_ctx->content_length == TRANSFER_ENCODING_CHUNKED) {
+            netdata_log_error("Content-length and transfer-encoding: chunked headers are mutually exclusive");
+            return 1;
+        }
+        if (parse_ctx->content_length != -1) {
+            netdata_log_error("Duplicate content-length header");
+            return 1;
+        }
         parse_ctx->content_length = atoi(val);
+        if (parse_ctx->content_length < 0) {
+            netdata_log_error("Invalid content-length %d", parse_ctx->content_length);
+            return 1;
+        }
+        return 0;
     }
+    if (!strcmp("transfer-encoding", key)) {
+        if (!strcmp("chunked", val)) {
+            if (parse_ctx->content_length != -1) {
+                netdata_log_error("Content-length and transfer-encoding: chunked headers are mutually exclusive");
+                return 1;
+            }
+            parse_ctx->content_length = TRANSFER_ENCODING_CHUNKED;
+        }
+        return 0;
+    }
+    return 0;
 }
 
 static int parse_http_hdr(rbuf_t buf, http_parse_ctx *parse_ctx)
@@ -100,9 +142,102 @@ static int parse_http_hdr(rbuf_t buf, http_parse_ctx *parse_ctx)
     for (ptr = buf_key; *ptr; ptr++)
         *ptr = tolower(*ptr);
 
-    process_http_hdr(parse_ctx, buf_key, buf_val);
+    if (process_http_hdr(parse_ctx, buf_key, buf_val))
+        return 1;
 
     return 0;
+}
+
+static inline void chunked_response_buffer_grow_by(http_parse_ctx *parse_ctx, size_t size)
+{
+    if (unlikely(parse_ctx->chunked_response_size == 0)) {
+        parse_ctx->chunked_response = mallocz(size);
+        parse_ctx->chunked_response_size = size;
+        return;
+    }
+    parse_ctx->chunked_response = reallocz((void *)parse_ctx->chunked_response, parse_ctx->chunked_response_size + size);
+    parse_ctx->chunked_response_size += size;
+}
+
+static int process_chunked_content(rbuf_t buf, http_parse_ctx *parse_ctx)
+{
+    int idx;
+    size_t bytes_to_copy;
+
+    do {
+        switch (parse_ctx->chunked_content_state) {
+            case CHUNKED_CONTENT_CHUNK_SIZE:
+                if (!rbuf_find_bytes(buf, HTTP_LINE_TERM, strlen(HTTP_LINE_TERM), &idx)) {
+                    if (rbuf_bytes_available(buf) >= rbuf_get_capacity(buf))
+                        return PARSE_ERROR;
+                    return NEED_MORE_DATA;
+                }
+                if (idx == 0) {
+                    parse_ctx->chunked_content_state = CHUNKED_CONTENT_FINAL_CRLF;
+                    continue;
+                }
+                if (idx >= HTTP_HDR_BUFFER_SIZE) {
+                    netdata_log_error("Chunk size is too long");
+                    return PARSE_ERROR;
+                }
+                char buf_size[HTTP_HDR_BUFFER_SIZE];
+                rbuf_pop(buf, buf_size, idx);
+                buf_size[idx] = 0;
+                parse_ctx->chunk_size = strtol(buf_size, NULL, 16);
+                if (parse_ctx->chunk_size < 0 || parse_ctx->chunk_size == LONG_MAX) {
+                    netdata_log_error("Chunk size out of range");
+                    return PARSE_ERROR;
+                }
+                if (parse_ctx->chunk_size == 0) {
+                    if (errno == EINVAL) {
+                        netdata_log_error("Invalid chunk size");
+                        return PARSE_ERROR;
+                    }
+                    parse_ctx->chunked_content_state = CHUNKED_CONTENT_CHUNK_END_CRLF;
+                    return 0;
+                }
+                parse_ctx->chunk_got = 0;
+                chunked_response_buffer_grow_by(parse_ctx, parse_ctx->chunk_size);
+                rbuf_bump_tail(buf, strlen(HTTP_LINE_TERM));
+                parse_ctx->chunked_content_state = CHUNKED_CONTENT_CHUNK_DATA;
+                // fallthrough
+            case CHUNKED_CONTENT_CHUNK_DATA:
+                if (!(bytes_to_copy = rbuf_bytes_available(buf)))
+                    return NEED_MORE_DATA;
+                if (bytes_to_copy > parse_ctx->chunk_size - parse_ctx->chunk_got)
+                    bytes_to_copy = parse_ctx->chunk_size - parse_ctx->chunk_got;
+                rbuf_pop(buf, parse_ctx->chunked_response + parse_ctx->chunked_response_written, bytes_to_copy);
+                parse_ctx->chunk_got += bytes_to_copy;
+                parse_ctx->chunked_response_written += bytes_to_copy;
+                if (parse_ctx->chunk_got != parse_ctx->chunk_size)
+                    continue;
+                parse_ctx->chunked_content_state = CHUNKED_CONTENT_CHUNK_END_CRLF;
+                // fallthrough
+            case CHUNKED_CONTENT_FINAL_CRLF:
+            case CHUNKED_CONTENT_CHUNK_END_CRLF:
+                if (rbuf_bytes_available(buf) < strlen(HTTP_LINE_TERM))
+                    return NEED_MORE_DATA;
+                char buf_crlf[strlen(HTTP_LINE_TERM)];
+                rbuf_pop(buf, buf_crlf, strlen(HTTP_LINE_TERM));
+                if (memcmp(buf_crlf, HTTP_LINE_TERM, strlen(HTTP_LINE_TERM))) {
+                    netdata_log_error("CRLF expected");
+                    return PARSE_ERROR;
+                }
+                if (parse_ctx->chunked_content_state == CHUNKED_CONTENT_FINAL_CRLF) {
+                    if (parse_ctx->chunked_response_size != parse_ctx->chunked_response_written)
+                        netdata_log_error("Chunked response size mismatch");
+                    chunked_response_buffer_grow_by(parse_ctx, 1);
+                    parse_ctx->chunked_response[parse_ctx->chunked_response_written] = 0;
+                    return PARSE_SUCCESS;
+                }
+                if (parse_ctx->chunk_size == 0) {
+                    parse_ctx->chunked_content_state = CHUNKED_CONTENT_FINAL_CRLF;
+                    continue;
+                }
+                parse_ctx->chunked_content_state = CHUNKED_CONTENT_CHUNK_SIZE;
+                continue;
+        }
+    } while(1);
 }
 
 static int parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx)
@@ -154,6 +289,9 @@ static int parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx)
                 break;
             case HTTP_PARSE_CONTENT:
                 // replies like CONNECT etc. do not have content
+                if (parse_ctx->content_length == TRANSFER_ENCODING_CHUNKED)
+                    return process_chunked_content(buf, parse_ctx);
+
                 if (parse_ctx->content_length < 0)
                     return PARSE_SUCCESS;
 
@@ -312,37 +450,39 @@ static int read_parse_response(https_req_ctx_t *ctx) {
         }
         ctx->poll_fd.events = 0;
 
-        ptr = rbuf_get_linear_insert_range(ctx->buf_rx, &size);
+        do {
+            ptr = rbuf_get_linear_insert_range(ctx->buf_rx, &size);
 
-        if (ctx->ssl_ctx)
-            ret = SSL_read(ctx->ssl, ptr, size);
-        else
-            ret = read(ctx->sock, ptr, size);
+            if (ctx->ssl_ctx)
+                ret = SSL_read(ctx->ssl, ptr, size);
+            else
+                ret = read(ctx->sock, ptr, size);
 
-        if (ret > 0) {
-            rbuf_bump_head(ctx->buf_rx, ret);
-        } else {
-            if (ctx->ssl_ctx) {
-                ret = SSL_get_error(ctx->ssl, ret);
-                switch (ret) {
-                    case SSL_ERROR_WANT_READ:
-                        ctx->poll_fd.events |= POLLIN;
-                        break;
-                    case SSL_ERROR_WANT_WRITE:
-                        ctx->poll_fd.events |= POLLOUT;
-                        break;
-                    default:
-                        netdata_log_error("SSL_read Err: %s", _ssl_err_tos(ret));
-                        return 3;
-                }
+            if (ret > 0) {
+                rbuf_bump_head(ctx->buf_rx, ret);
             } else {
-                if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                    netdata_log_error("write error");
-                    return 3;
+                if (ctx->ssl_ctx) {
+                    ret = SSL_get_error(ctx->ssl, ret);
+                    switch (ret) {
+                        case SSL_ERROR_WANT_READ:
+                            ctx->poll_fd.events |= POLLIN;
+                            break;
+                        case SSL_ERROR_WANT_WRITE:
+                            ctx->poll_fd.events |= POLLOUT;
+                            break;
+                        default:
+                            netdata_log_error("SSL_read Err: %s", _ssl_err_tos(ret));
+                            return 3;
+                    }
+                } else {
+                    if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                        netdata_log_error("write error");
+                        return 3;
+                    }
+                    ctx->poll_fd.events |= POLLIN;
                 }
-                ctx->poll_fd.events |= POLLIN;
             }
-        }
+        } while (ctx->poll_fd.events == 0 && rbuf_bytes_free(ctx->buf_rx) > 0);
     } while (!(ret = parse_http_response(ctx->buf_rx, &ctx->parse_ctx)));
 
     if (ret != PARSE_SUCCESS) {
@@ -435,6 +575,8 @@ static int handle_http_request(https_req_ctx_t *ctx) {
     // Read The Response
     if (read_parse_response(ctx)) {
         netdata_log_error("Error reading or parsing response from server");
+        if (ctx->parse_ctx.chunked_response)
+            freez(ctx->parse_ctx.chunked_response);
         rc = 4;
         goto err_exit;
     }
@@ -546,6 +688,11 @@ int https_request(https_req_t *request, https_req_response_t *response) {
         goto exit_CTX;
     }
 
+    if (!SSL_set_tlsext_host_name(ctx->ssl, connect_host)) {
+        netdata_log_error("Error setting TLS SNI host");
+        goto exit_CTX;
+    }
+
     SSL_set_fd(ctx->ssl, ctx->sock);
     ret = SSL_connect(ctx->ssl);
     if (ret != -1 && ret != 1) {
@@ -568,6 +715,10 @@ int https_request(https_req_t *request, https_req_response_t *response) {
         goto exit_SSL;
     }
     response->http_code = ctx->parse_ctx.http_code;
+    if (ctx->parse_ctx.content_length == TRANSFER_ENCODING_CHUNKED) {
+        response->payload_size = ctx->parse_ctx.chunked_response_size;
+        response->payload = ctx->parse_ctx.chunked_response;
+    }
     if (ctx->parse_ctx.content_length > 0) {
         response->payload_size = ctx->parse_ctx.content_length;
         response->payload = mallocz(response->payload_size + 1);
