@@ -20,6 +20,7 @@ modules:
         - power
         - supply
         - battery
+        - apcupsd
       most_popular: false
     overview:
       data_collection:
