@@ -140,6 +140,12 @@ netdataDashboard.menu = {
         info: 'Detailed information for each CPU of the system. A summary of the system for all CPUs can be found at the <a href="#menu_system">System Overview</a> section.'
     },
 
+    'amdgpu': {
+        title: 'AMD GPUs',
+        icon: '<i class="fas fa-microchip"></i>',
+        info: 'Detailed information for each AMD GPU of the system. Temperature, fan speed, voltage and power metrics can be found at the <a href="#menu_sensors">Sensors</a> section.'
+    },
+
     'mem': {
         title: 'Memory',
         icon: '<i class="fas fa-microchip"></i>',

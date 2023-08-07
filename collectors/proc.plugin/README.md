@@ -31,6 +31,7 @@ In detail, it collects metrics from:
 -   `/proc/spl/kstat/zfs/pool/state` (state of ZFS pools)
 -   `/sys/class/power_supply` (power supply properties)
 -   `/sys/class/infiniband` (infiniband interconnect)
+-   `/sys/class/drm` (AMD GPUs)
 -   `ipc` (IPC semaphores and message queues)
 -   `ksm` Kernel Same-Page Merging performance (several files under `/sys/kernel/mm/ksm`).
 -   `netdata` (internal Netdata resources utilization)
@@ -579,6 +580,36 @@ Default configuration will monitor only enabled infiniband ports, and refresh ne
   # refresh ports state every seconds = 30
 ```
 
+## AMD GPUs
+
+This module monitors every AMD GPU card discovered at agent startup.
+
+### Monitored GPU metrics
+
+The following charts will be provided:
+
+-   **GPU utilization**
+-   **GPU memory utilization**
+-   **GPU clock frequency**
+-   **GPU memory clock frequency**
+-   **VRAM memory usage percentage**
+-   **VRAM memory usage**
+-   **visible VRAM memory usage percentage**
+-   **visible VRAM memory usage**
+-   **GTT memory usage percentage**
+-   **GTT memory usage**
+
+### configuration
+
+The `drm` path can be configured if it differs from the default:
+
+```
+[plugin:proc:/sys/class/drm]
+  # directory to monitor = /sys/class/drm
+```
+
+> [!NOTE]  
+> Temperature, fan speed, voltage and power metrics for AMD GPUs can be monitored using the [Sensors](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/sensors/README.md) plugin.
 
 ## IPC
 

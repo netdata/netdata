@@ -423,6 +423,7 @@ PROC_PLUGIN_FILES = \
     collectors/proc.plugin/sys_fs_btrfs.c \
     collectors/proc.plugin/sys_class_power_supply.c \
     collectors/proc.plugin/sys_class_infiniband.c \
+    collectors/proc.plugin/sys_class_drm.c \
     $(NULL)
 
 PROFILE_PLUGIN_FILES = \

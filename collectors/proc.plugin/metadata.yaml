@@ -5180,3 +5180,138 @@ modules:
                 - name: now
                 - name: max
                 - name: max_design
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /sys/class/drm
+      monitored_instance:
+        name: AMD GPU
+        link: "https://www.amd.com"
+        categories:
+          - data-collection.hardware-devices-and-sensors
+        icon_filename: "amd.png"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - amd
+        - gpu
+        - hardware
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "This integration monitors AMD GPU metrics, such as utilization, clock frequency and memory usage."
+        method_description: "It reads `/sys/class/drm` to collect metrics for every AMD GPU card instance it encounters."
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: gpu
+          description: "These metrics refer to the GPU."
+          labels:
+            - name: product_name
+              description: GPU product name (e.g. AMD RX 6600)
+          metrics:
+            - name: amdgpu.gpu_utilization
+              description: GPU utilization
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: utilization
+            - name: amdgpu.gpu_mem_utilization
+              description: GPU memory utilization
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: utilization
+            - name: amdgpu.gpu_clk_frequency
+              description: GPU clock frequency
+              unit: "MHz"
+              chart_type: line
+              dimensions:
+                - name: frequency
+            - name: amdgpu.gpu_mem_clk_frequency
+              description: GPU memory clock frequency
+              unit: "MHz"
+              chart_type: line
+              dimensions:
+                - name: frequency
+            - name: amdgpu.gpu_mem_vram_usage_perc
+              description: VRAM memory usage percentage
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: usage
+            - name: amdgpu.gpu_mem_vram_usage
+              description: VRAM memory usage
+              unit: "bytes"
+              chart_type: area
+              dimensions:
+                - name: free
+                - name: used
+            - name: amdgpu.gpu_mem_vis_vram_usage_perc
+              description: visible VRAM memory usage percentage
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: usage
+            - name: amdgpu.gpu_mem_vis_vram_usage
+              description: visible VRAM memory usage
+              unit: "bytes"
+              chart_type: area
+              dimensions:
+                - name: free
+                - name: used
+            - name: amdgpu.gpu_mem_gtt_usage_perc
+              description: GTT memory usage percentage
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: usage
+            - name: amdgpu.gpu_mem_gtt_usage
+              description: GTT memory usage
+              unit: "bytes"
+              chart_type: area
+              dimensions:
+                - name: free
+                - name: used
