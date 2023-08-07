@@ -614,14 +614,32 @@ static void card_free(struct card *c){
     freez(c);
 }
 
-static int read_multiline_file(procfile *ff, char *pathname, collected_number *num){
+static int check_card_is_amdgpu(const char *const pathname){
+    procfile *const ff = procfile_open(pathname, " ", PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
+    if(unlikely(!procfile_readall(ff))){
+        procfile_close(ff);
+        return 1; // error
+    }
+
+    for(size_t l = 0; l < procfile_lines(ff); l++) {
+        if(!strcmp(procfile_lineword(ff, l, 0), "DRIVER=amdgpu")){
+            procfile_close(ff);
+            return 0;
+        }
+    }
+
+    procfile_close(ff);
+    return 2; // no match
+}
+
+static int read_multiline_file(procfile *ff, const char *const pathname, collected_number *num){
     if(!ff) ff = procfile_open(pathname, NULL, PROCFILE_FLAG_DEFAULT);
     if(unlikely(!procfile_readall(ff))){
         procfile_close(ff);
         return 1; // error
     }
 
-    for(size_t l = 0; l < procfile_lines(ff) ;l++) {
+    for(size_t l = 0; l < procfile_lines(ff) ; l++) {
 
         if(ff->lines->lines[l].words >= 3 && !strcmp(procfile_lineword(ff, l, 2), "*")){
             char *str_with_units = procfile_lineword(ff, l, 1);
@@ -635,6 +653,12 @@ static int read_multiline_file(procfile *ff, char *pathname, collected_number *n
 
     procfile_close(ff);
     return 2; // error
+}
+
+static char *set_id(const char *const suf_1, const char *const suf_2, const char *const suf_3){
+    static char id[RRD_ID_LENGTH_MAX + 1];
+    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s_%s", suf_1, suf_2, suf_3);
+    return id;
 }
 
 typedef int (*do_rrd_x_func)(struct card *const c);
@@ -789,12 +813,6 @@ static int do_rrd_gtt(struct card *const c){
     }
 }
 
-static char *set_id(const char *const suf_1, const char *const suf_2, const char *const suf_3){
-    static char id[RRD_ID_LENGTH_MAX + 1];
-    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s_%s", suf_1, suf_2, suf_3);
-    return id;
-}
-
 int do_sys_class_drm(int update_every, usec_t dt) {
     (void)dt;
     
@@ -817,24 +835,27 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                  (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0'))) continue;
             
             if(de->d_type == DT_LNK && !strncmp(de->d_name, "card", 4) && !strchr(de->d_name, '-')) {
-                struct card *const c = callocz(1, sizeof(struct card));  
+                char filename[FILENAME_MAX + 1];
+
+                snprintfz(filename, FILENAME_MAX, "%s/%s/%s", drm_dir_name, de->d_name, "device/uevent");
+                if(check_card_is_amdgpu(filename)) continue;
 
                 /* Get static info */              
 
-                char filename[FILENAME_MAX + 1];
+                struct card *const c = callocz(1, sizeof(struct card));
                 snprintfz(filename, FILENAME_MAX, "%s/%s", drm_dir_name, de->d_name);
                 c->pathname = strdupz(filename);
 
                 snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, "device/device");
                 if(read_single_base64_or_hex_number_file(filename, (unsigned long long *) &c->id.asic_id)){
-                    collector_info("Cannot read asic_id from '%s'", filename);
+                    collector_error("Cannot read asic_id from '%s'", filename);
                     card_free(c);
                     continue;
                 }
 
                 snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, "device/revision");
                 if(read_single_base64_or_hex_number_file(filename, (unsigned long long *) &c->id.pci_rev_id)){
-                    collector_info("Cannot read pci_rev_id from '%s'", filename);
+                    collector_error("Cannot read pci_rev_id from '%s'", filename);
                     card_free(c);
                     continue;
                 }
