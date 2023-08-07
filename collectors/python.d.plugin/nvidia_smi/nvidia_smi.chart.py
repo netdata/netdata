@@ -433,15 +433,20 @@ class GPU:
     @handle_attr_error
     def mem_clock(self):
         return self.root.find('clocks').find('mem_clock').text.split()[0]
+    
+    @handle_attr_error
+    def power_readings(self):
+        elem = self.root.find('power_readings')
+        return elem if elem else self.root.find('gpu_power_readings')
 
     @handle_attr_error
     def power_state(self):
-        return str(self.root.find('power_readings').find('power_state').text.split()[0])
+        return str(self.power_readings().find('power_state').text.split()[0])
 
     @handle_value_error
     @handle_attr_error
     def power_draw(self):
-        return float(self.root.find('power_readings').find('power_draw').text.split()[0]) * 100
+        return float(self.power_readings().find('power_draw').text.split()[0]) * 100
 
     @handle_attr_error
     def processes(self):
