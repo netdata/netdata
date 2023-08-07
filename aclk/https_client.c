@@ -209,10 +209,9 @@ static int process_chunked_content(rbuf_t buf, http_parse_ctx *parse_ctx)
                 rbuf_pop(buf, parse_ctx->chunked_response + parse_ctx->chunked_response_written, bytes_to_copy);
                 parse_ctx->chunk_got += bytes_to_copy;
                 parse_ctx->chunked_response_written += bytes_to_copy;
-                if (parse_ctx->chunk_got == parse_ctx->chunk_size)
-                    parse_ctx->chunked_content_state = CHUNKED_CONTENT_CHUNK_END_CRLF;
-                else
+                if (parse_ctx->chunk_got != parse_ctx->chunk_size)
                     continue;
+                parse_ctx->chunked_content_state = CHUNKED_CONTENT_CHUNK_END_CRLF;
                 // fallthrough
             case CHUNKED_CONTENT_FINAL_CRLF:
             case CHUNKED_CONTENT_CHUNK_END_CRLF:
