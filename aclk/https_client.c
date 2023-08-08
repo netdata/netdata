@@ -183,18 +183,19 @@ static int process_chunked_content(rbuf_t buf, http_parse_ctx *parse_ctx)
                 char buf_size[HTTP_HDR_BUFFER_SIZE];
                 rbuf_pop(buf, buf_size, idx);
                 buf_size[idx] = 0;
-                parse_ctx->chunk_size = strtol(buf_size, NULL, 16);
-                if (parse_ctx->chunk_size < 0 || parse_ctx->chunk_size == LONG_MAX) {
+                long chunk_size = strtol(buf_size, NULL, 16);
+                if (chunk_size < 0 || chunk_size == LONG_MAX) {
                     netdata_log_error("Chunk size out of range");
                     return PARSE_ERROR;
                 }
+                parse_ctx->chunk_size = chunk_size;
                 if (parse_ctx->chunk_size == 0) {
                     if (errno == EINVAL) {
                         netdata_log_error("Invalid chunk size");
                         return PARSE_ERROR;
                     }
                     parse_ctx->chunked_content_state = CHUNKED_CONTENT_CHUNK_END_CRLF;
-                    return 0;
+                    continue;
                 }
                 parse_ctx->chunk_got = 0;
                 chunked_response_buffer_grow_by(parse_ctx, parse_ctx->chunk_size);
