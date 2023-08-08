@@ -874,7 +874,7 @@ int do_vm_swap_info(int update_every, usec_t dt) {
 
         if (unlikely(!st)) {
             st = rrdset_create_localhost(
-                    "system",
+                    "mem",
                     "swap",
                     NULL,
                     "swap",
@@ -883,7 +883,7 @@ int do_vm_swap_info(int update_every, usec_t dt) {
                     "MiB",
                     "freebsd.plugin",
                     "vm.swap_info",
-                    NETDATA_CHART_PRIO_SYSTEM_SWAP,
+                    NETDATA_CHART_PRIO_MEM_SWAP,
                     update_every,
                     RRDSET_TYPE_STACKED
             );
