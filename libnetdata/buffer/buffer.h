@@ -71,7 +71,7 @@ typedef enum __attribute__ ((__packed__)) {
 typedef enum __attribute__ ((__packed__)) {
     BUFFER_JSON_OPTIONS_DEFAULT = 0,
     BUFFER_JSON_OPTIONS_MINIFY = (1 << 0),
-    BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAYS = (1 << 1),
+    BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAY_ITEMS = (1 << 1),
 } BUFFER_JSON_OPTIONS;
 
 typedef struct web_buffer {
@@ -670,12 +670,16 @@ static inline void buffer_print_spaces(BUFFER *wb, size_t spaces) {
     buffer_overflow_check(wb);
 }
 
-static inline void buffer_print_json_comma_newline_spacing(BUFFER *wb) {
+static inline void buffer_print_json_comma(BUFFER *wb) {
     if(wb->json.stack[wb->json.depth].count)
         buffer_fast_strcat(wb, ",", 1);
+}
+
+static inline void buffer_print_json_comma_newline_spacing(BUFFER *wb) {
+    buffer_print_json_comma(wb);
 
     if((wb->json.options & BUFFER_JSON_OPTIONS_MINIFY) ||
-        (wb->json.stack[wb->json.depth].type == BUFFER_JSON_ARRAY && !(wb->json.options & BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAYS)))
+        (wb->json.stack[wb->json.depth].type == BUFFER_JSON_ARRAY && !(wb->json.options & BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAY_ITEMS)))
         return;
 
     buffer_fast_strcat(wb, "\n", 1);
@@ -799,7 +803,14 @@ static inline void buffer_json_member_add_array(BUFFER *wb, const char *key) {
 }
 
 static inline void buffer_json_add_array_item_array(BUFFER *wb) {
-    buffer_print_json_comma_newline_spacing(wb);
+    if(!(wb->json.options & BUFFER_JSON_OPTIONS_MINIFY) && wb->json.stack[wb->json.depth].type == BUFFER_JSON_ARRAY) {
+        // an array inside another array
+        buffer_print_json_comma(wb);
+        buffer_fast_strcat(wb, "\n", 1);
+        buffer_print_spaces(wb, wb->json.depth + 1);
+    }
+    else
+        buffer_print_json_comma_newline_spacing(wb);
 
     buffer_fast_strcat(wb, "[", 1);
     wb->json.stack[wb->json.depth].count++;
@@ -918,7 +929,7 @@ static inline void buffer_json_array_close(BUFFER *wb) {
     assert(wb->json.depth >= 0 && "BUFFER JSON: nothing is open to close it");
     assert(wb->json.stack[wb->json.depth].type == BUFFER_JSON_ARRAY && "BUFFER JSON: an array is not open to close it");
 #endif
-    if(wb->json.options & BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAYS) {
+    if(wb->json.options & BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAY_ITEMS) {
         buffer_fast_strcat(wb, "\n", 1);
         buffer_print_spaces(wb, wb->json.depth);
     }

@@ -4746,7 +4746,7 @@ static void function_processes(const char *transaction, char *function __maybe_u
     unsigned int io_divisor = 1024 * RATES_DETAIL;
 
     BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAYS);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAY_ITEMS);
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", update_every);
