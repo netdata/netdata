@@ -5188,7 +5188,7 @@ modules:
         link: "https://www.amd.com"
         categories:
           - data-collection.hardware-devices-and-sensors
-        icon_filename: "amd.png"
+        icon_filename: amd.svg
       related_resources:
         integrations:
           list: []
