@@ -296,6 +296,17 @@ typedef struct netdata_socket {
     } udp;
 } netdata_socket_t;
 
+typedef struct netata_socket_plus {
+    netdata_socket_t data;           // Data read from database
+
+    struct  {
+        char src_ip[INET6_ADDRSTRLEN];
+        uint16_t src_port;
+        char dst_ip[INET6_ADDRSTRLEN];
+        uint16_t dst_port;
+    } socket_string;
+} netdata_socket_plus_t;
+
 typedef struct netdata_plot_values {
     // Values used in the previous iteration
     uint64_t recv_packets;
@@ -375,6 +386,7 @@ void ebpf_parse_ips(char *ptr);
 void ebpf_parse_ports(char *ptr);
 void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em);
 void ebpf_socket_fill_publish_apps(uint32_t current_pid, netdata_socket_t *ns);
+
 
 extern struct config socket_config;
 extern netdata_ebpf_targets_t socket_targets[];
