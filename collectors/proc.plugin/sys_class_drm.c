@@ -643,16 +643,18 @@ cleanup:
     return rc;
 }
 
-static int read_clk_freq_file(procfile *ff, const char *const pathname, collected_number *num){
-    if(unlikely(!ff)) ff = procfile_open(pathname, NULL, PROCFILE_FLAG_DEFAULT);
-    if(unlikely(!ff)) return -1;
+static int read_clk_freq_file(procfile **p_ff, const char *const pathname, collected_number *num){
+    if(unlikely(!*p_ff)){
+        *p_ff = procfile_open(pathname, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
+        if(unlikely(!*p_ff)) return -2;
+    }
+    
+    if(unlikely(NULL == (*p_ff = procfile_readall(*p_ff)))) return -3;
 
-    if(unlikely(NULL == (ff = procfile_readall(ff)))) return -2;
+    for(size_t l = 0; l < procfile_lines(*p_ff) ; l++) {
 
-    for(size_t l = 0; l < procfile_lines(ff) ; l++) {
-
-        if(ff->lines->lines[l].words >= 3 && !strcmp(procfile_lineword(ff, l, 2), "*")){
-            char *str_with_units = procfile_lineword(ff, l, 1);
+        if((*p_ff)->lines->lines[l].words >= 3 && !strcmp(procfile_lineword((*p_ff), l, 2), "*")){
+            char *str_with_units = procfile_lineword((*p_ff), l, 1);
             char *delim = strchr(str_with_units, 'M');
             char str_without_units[10];
             memcpy(str_without_units, str_with_units, delim - str_with_units);
@@ -661,8 +663,8 @@ static int read_clk_freq_file(procfile *ff, const char *const pathname, collecte
         }
     }
 
-    procfile_close(ff);
-    return -3;
+    procfile_close((*p_ff));
+    return -4;
 }
 
 static char *set_id(const char *const suf_1, const char *const suf_2, const char *const suf_3){
@@ -725,7 +727,7 @@ static int do_rrd_util_mem(struct card *const c){
 }
 
 static int do_rrd_clk_gpu(struct card *const c){
-    if(likely(!read_clk_freq_file(c->ff_clk_gpu, (char *) c->pathname_clk_gpu, &c->clk_gpu))){
+    if(likely(!read_clk_freq_file(&c->ff_clk_gpu, (char *) c->pathname_clk_gpu, &c->clk_gpu))){
         rrddim_set_by_pointer(c->st_clk_gpu, c->rd_clk_gpu, c->clk_gpu);
         rrdset_done(c->st_clk_gpu);
         return 0;
@@ -739,7 +741,7 @@ static int do_rrd_clk_gpu(struct card *const c){
 }
 
 static int do_rrd_clk_mem(struct card *const c){
-    if(likely(!read_clk_freq_file(c->ff_clk_mem, (char *) c->pathname_clk_mem, &c->clk_mem))){
+    if(likely(!read_clk_freq_file(&c->ff_clk_mem, (char *) c->pathname_clk_mem, &c->clk_mem))){
         rrddim_set_by_pointer(c->st_clk_mem, c->rd_clk_mem, c->clk_mem);
         rrdset_done(c->st_clk_mem);
         return 0;
@@ -879,13 +881,13 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
 
                 collected_number tmp_val; 
-                #define set_prop_pathname(prop_filename, prop_pathname, ff){                    \
+                #define set_prop_pathname(prop_filename, prop_pathname, p_ff){                  \
                     snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, prop_filename);     \
-                    if((ff && !read_clk_freq_file(ff, filename, &tmp_val)) ||                  \
+                    if((p_ff && !read_clk_freq_file(p_ff, filename, &tmp_val)) ||               \
                           !read_single_number_file(filename, (unsigned long long *) &tmp_val))  \
                         prop_pathname = strdupz(filename);                                      \
                     else                                                                        \
-                        collector_info("Cannot read file '%s'", filename);                     \
+                        collector_info("Cannot read file '%s'", filename);                      \
                 }
 
                 /* Initialize GPU and VRAM utilization metrics */
@@ -943,7 +945,7 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                 /* Initialize GPU and VRAM clock frequency metrics */
 
-                set_prop_pathname("device/pp_dpm_sclk", c->pathname_clk_gpu, c->ff_clk_gpu);
+                set_prop_pathname("device/pp_dpm_sclk", c->pathname_clk_gpu, &c->ff_clk_gpu);
                 
                 if(c->pathname_clk_gpu){
                     c->st_clk_gpu = rrdset_create_localhost(
@@ -969,7 +971,7 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                 }
 
-                set_prop_pathname("device/pp_dpm_mclk", c->pathname_clk_mem, c->ff_clk_mem);
+                set_prop_pathname("device/pp_dpm_mclk", c->pathname_clk_mem, &c->ff_clk_mem);
 
                 if(c->pathname_clk_mem){
                     c->st_clk_mem = rrdset_create_localhost(
