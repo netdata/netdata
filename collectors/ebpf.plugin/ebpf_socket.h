@@ -350,32 +350,6 @@ typedef struct netdata_socket_idx {
 #define NETDATA_MAX_NETWORK_COMBINED_LENGTH 1018
 #define NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH 5 // :TCP:
 
-/**
- * Allocate the maximum number of structures in the beginning, this can force the collector to use more memory
- * in the long term, on the other had it is faster.
- */
-typedef struct netdata_socket_plot {
-    // Search
-    avl_t avl;
-    netdata_socket_idx_t index;
-
-    // Current data
-    netdata_socket_t sock;
-
-    // Previous values and values used to write on chart.
-    netdata_plot_values_t plot;
-
-    int family;                     // AF_INET or AF_INET6
-    char *resolved_name;            // Resolve only in the first call
-    unsigned char resolved;
-
-    char *dimension_sent;
-    char *dimension_recv;
-    char *dimension_retransmit;
-
-    uint32_t flags;
-} netdata_socket_plot_t;
-
 void clean_port_structure(ebpf_network_viewer_port_list_t **clean);
 extern ebpf_network_viewer_port_list_t *listen_ports;
 void update_listen_table(uint16_t value, uint16_t proto, netdata_passive_connection_t *values);
