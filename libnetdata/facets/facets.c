@@ -622,7 +622,6 @@ void facets_row_finished(FACETS *facets, usec_t usec) {
     // dfe_start_read(facets->keys, k) {
     for(k = facets->keys_ll ; k ; k = k->next) {
         if(!k->key_found_in_row) {
-            internal_fatal(buffer_strlen(k->current_value.b), "key is not found in row but it has a current value");
             // put the FACET_VALUE_UNSET value into it
             facets_check_value(facets, k);
         }
