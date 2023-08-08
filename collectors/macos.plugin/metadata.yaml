@@ -317,7 +317,7 @@ modules:
                 - name: purgeable
                 - name: speculative
                 - name: free
-            - name: system.swapio
+            - name: mem.swapio
               description: Swap I/O
               unit: "KiB/s"
               chart_type: area
@@ -346,7 +346,7 @@ modules:
                 - name: load1
                 - name: load5
                 - name: load15
-            - name: system.swap
+            - name: mem.swap
               description: System Swap
               unit: "MiB"
               chart_type: stacked

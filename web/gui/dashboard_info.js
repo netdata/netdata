@@ -1530,7 +1530,7 @@ netdataDashboard.context = {
         info: 'Memory paged from/to disk. This is usually the total disk I/O of the system.'
     },
 
-    'system.swapio': {
+    'mem.swapio': {
         info: '<p>System swap I/O.</p>'+
         '<b>In</b> - pages the system has swapped in from disk to RAM. '+
         '<b>Out</b> - pages the system has swapped out from RAM to disk.'
@@ -1675,7 +1675,7 @@ netdataDashboard.context = {
         info: 'System Random Access Memory (i.e. physical memory) usage.'
     },
 
-    'system.swap': {
+    'mem.swap': {
         info: 'System swap memory usage. Swap space is used when the amount of physical memory (RAM) is full. When the system needs more memory resources and the RAM is full, inactive pages in memory are moved to the swap space (usually a disk, a disk partition or a file).'
     },
 

@@ -1376,7 +1376,7 @@ modules:
           description: "These metrics show total number of calls to functions inside kernel."
           labels: []
           metrics:
-            - name: system.swapcalls
+            - name: mem.swapcalls
               description: Calls to access swap memory
               unit: "calls/s"
               chart_type: line

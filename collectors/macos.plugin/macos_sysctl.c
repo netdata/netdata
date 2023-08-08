@@ -260,12 +260,12 @@ int do_macos_sysctl(int update_every, usec_t dt) {
     if (likely(do_swap)) {
         if (unlikely(GETSYSCTL_BY_NAME("vm.swapusage", swap_usage))) {
             do_swap = 0;
-            collector_error("DISABLED: system.swap");
+            collector_error("DISABLED: mem.swap");
         } else {
-            st = rrdset_find_active_localhost("system.swap");
+            st = rrdset_find_active_localhost("mem.swap");
             if (unlikely(!st)) {
                 st = rrdset_create_localhost(
-                        "system"
+                        "mem"
                         , "swap"
                         , NULL
                         , "swap"

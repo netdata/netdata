@@ -465,7 +465,7 @@ modules:
     alerts:
       - name: 30min_ram_swapped_out
         link: https://github.com/netdata/netdata/blob/master/health/health.d/swap.conf
-        metric: system.swapio
+        metric: mem.swapio
         info: percentage of the system RAM swapped in the last 30 minutes
         os: "linux freebsd"
       - name: oom_kill
@@ -484,7 +484,7 @@ modules:
           description: ""
           labels: []
           metrics:
-            - name: system.swapio
+            - name: mem.swapio
               description: Swap I/O
               unit: "KiB/s"
               chart_type: area
@@ -1340,7 +1340,7 @@ modules:
         os: "linux"
       - name: used_swap
         link: https://github.com/netdata/netdata/blob/master/health/health.d/swap.conf
-        metric: system.swap
+        metric: mem.swap
         info: swap memory utilization
         os: "linux freebsd"
       - name: 1hour_memory_hw_corrupted

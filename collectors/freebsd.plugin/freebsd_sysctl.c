@@ -834,7 +834,7 @@ int do_vm_swap_info(int update_every, usec_t dt) {
     static int mib[3] = {0, 0, 0};
 
     if (unlikely(getsysctl_mib("vm.swap_info", mib, 2))) {
-        collector_error("DISABLED: system.swap chart");
+        collector_error("DISABLED: mem.swap chart");
         collector_error("DISABLED: vm.swap_info module");
         return 1;
     } else {
@@ -853,13 +853,13 @@ int do_vm_swap_info(int update_every, usec_t dt) {
             if (unlikely(sysctl(mib, 3, &xsw, &size, NULL, 0) == -1 )) {
                 if (unlikely(errno != ENOENT)) {
                     collector_error("FREEBSD: sysctl(%s...) failed: %s", "vm.swap_info", strerror(errno));
-                    collector_error("DISABLED: system.swap chart");
+                    collector_error("DISABLED: mem.swap chart");
                     collector_error("DISABLED: vm.swap_info module");
                     return 1;
                 } else {
                     if (unlikely(size != sizeof(xsw))) {
                         collector_error("FREEBSD: sysctl(%s...) expected %lu, got %lu", "vm.swap_info", (unsigned long)sizeof(xsw), (unsigned long)size);
-                        collector_error("DISABLED: system.swap chart");
+                        collector_error("DISABLED: mem.swap chart");
                         collector_error("DISABLED: vm.swap_info module");
                         return 1;
                     } else break;
@@ -874,7 +874,7 @@ int do_vm_swap_info(int update_every, usec_t dt) {
 
         if (unlikely(!st)) {
             st = rrdset_create_localhost(
-                    "system",
+                    "mem",
                     "swap",
                     NULL,
                     "swap",
@@ -883,7 +883,7 @@ int do_vm_swap_info(int update_every, usec_t dt) {
                     "MiB",
                     "freebsd.plugin",
                     "vm.swap_info",
-                    NETDATA_CHART_PRIO_SYSTEM_SWAP,
+                    NETDATA_CHART_PRIO_MEM_SWAP,
                     update_every,
                     RRDSET_TYPE_STACKED
             );
@@ -1026,7 +1026,7 @@ int do_vm_stats_sys_v_swappgs(int update_every, usec_t dt) {
 
     if (unlikely(GETSYSCTL_SIMPLE("vm.stats.vm.v_swappgsin", mib_swappgsin, vmmeter_data.v_swappgsin) ||
                  GETSYSCTL_SIMPLE("vm.stats.vm.v_swappgsout", mib_swappgsout, vmmeter_data.v_swappgsout))) {
-        collector_error("DISABLED: system.swapio chart");
+        collector_error("DISABLED: mem.swapio chart");
         collector_error("DISABLED: vm.stats.vm.v_swappgs module");
         return 1;
     } else {
