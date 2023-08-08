@@ -7,8 +7,8 @@
 #define AMDGPU_CHART_TYPE "amdgpu"
 
 struct amdgpu_id_struct {
-    uint32_t asic_id;
-    uint32_t pci_rev_id;
+    unsigned long long asic_id;
+    unsigned long long pci_rev_id;
     const char *marketing_name;
 };
 
@@ -27,7 +27,7 @@ struct amdgpu_id_struct {
  * **IMPORTANT**: The amdgpu_ids has to be modified after new GPU releases. 
  * ------------------------------------------------------------------------*/
 
-static struct amdgpu_id_struct amdgpu_ids[] = {
+static const struct amdgpu_id_struct amdgpu_ids[] = {
     {0x1309, 0x00, "AMD Radeon R7 Graphics"},
     {0x130A, 0x00, "AMD Radeon R6 Graphics"},
     {0x130B, 0x00, "AMD Radeon R4 Graphics"},
@@ -855,14 +855,14 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                 c->pathname = strdupz(filename);
 
                 snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, "device/device");
-                if(read_single_base64_or_hex_number_file(filename, (unsigned long long *) &c->id.asic_id)){
+                if(read_single_base64_or_hex_number_file(filename, &c->id.asic_id)){
                     collector_error("Cannot read asic_id from '%s'", filename);
                     card_free(c);
                     continue;
                 }
 
                 snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, "device/revision");
-                if(read_single_base64_or_hex_number_file(filename, (unsigned long long *) &c->id.pci_rev_id)){
+                if(read_single_base64_or_hex_number_file(filename, &c->id.pci_rev_id)){
                     collector_error("Cannot read pci_rev_id from '%s'", filename);
                     card_free(c);
                     continue;
