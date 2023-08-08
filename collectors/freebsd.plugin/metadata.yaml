@@ -851,7 +851,7 @@ modules:
     alerts:
       - name: used_swap
         link: https://github.com/netdata/netdata/blob/master/health/health.d/swap.conf
-        metric: system.swap
+        metric: mem.swap
         info: swap memory utilization
         os: "linux freebsd"
     metrics:
@@ -865,7 +865,7 @@ modules:
           description: "This metric shows the SWAP usage."
           labels: []
           metrics:
-            - name: system.swap
+            - name: mem.swap
               description: System Swap
               unit: "MiB"
               chart_type: stacked
@@ -1043,7 +1043,7 @@ modules:
     alerts:
       - name: 30min_ram_swapped_out
         link: https://github.com/netdata/netdata/blob/master/health/health.d/swap.conf
-        metric: system.swapio
+        metric: mem.swapio
         info: percentage of the system RAM swapped in the last 30 minutes
         os: "linux freebsd"
     metrics:
@@ -1057,7 +1057,7 @@ modules:
           description: "This metric shows events happening on SWAP."
           labels: []
           metrics:
-            - name: system.swapio
+            - name: mem.swapio
               description: Swap I/O
               unit: "KiB/s"
               chart_type: area
