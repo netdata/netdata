@@ -2906,11 +2906,11 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         }
 
         // initialize partial trimming
-        r->partial_data_trimming.max_update_every = update_every_max;
+        r->partial_data_trimming.max_update_every = update_every_max * 2;
         r->partial_data_trimming.expected_after =
                 (!query_target_aggregatable(qt) &&
-                 qt->window.before >= qt->window.now - update_every_max) ?
-                qt->window.before - update_every_max :
+                 qt->window.before >= qt->window.now - r->partial_data_trimming.max_update_every) ?
+                qt->window.before - r->partial_data_trimming.max_update_every :
                 qt->window.before;
         r->partial_data_trimming.trimmed_after = qt->window.before;
 
@@ -3062,6 +3062,8 @@ static void rrdr2rrdr_group_by_partial_trimming(RRDR *r) {
     if(unlikely(i < 0))
         return;
 
+    // internal_error(true, "Found trimmable index %zd (from 0 to %zu)", i, r->n - 1);
+
     size_t last_row_gbc = 0;
     for (; i < (ssize_t)r->n; i++) {
         size_t row_gbc = 0;
@@ -3072,8 +3074,11 @@ static void rrdr2rrdr_group_by_partial_trimming(RRDR *r) {
             row_gbc += r->gbc[ i * r->d + d ];
         }
 
-        if (unlikely(r->t[i] >= trimmable_after && row_gbc < last_row_gbc)) {
+        // internal_error(true, "GBC of index %zd is %zu", i, row_gbc);
+
+        if (unlikely(r->t[i] >= trimmable_after && (row_gbc < last_row_gbc || !row_gbc))) {
             // discard the rest of the points
+            // internal_error(true, "Discarding points %zd to %zu", i, r->n - 1);
             r->partial_data_trimming.trimmed_after = r->t[i];
             r->rows = i;
             break;
