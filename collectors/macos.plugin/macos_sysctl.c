@@ -265,7 +265,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             st = rrdset_find_active_localhost("system.swap");
             if (unlikely(!st)) {
                 st = rrdset_create_localhost(
-                        "system"
+                        "mem"
                         , "swap"
                         , NULL
                         , "swap"

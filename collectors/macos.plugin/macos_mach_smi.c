@@ -151,7 +151,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                 st = rrdset_find_active_localhost("system.swapio");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
-                            "system"
+                            "mem"
                             , "swapio"
                             , NULL
                             , "swap"
