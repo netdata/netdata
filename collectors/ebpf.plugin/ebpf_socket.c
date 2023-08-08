@@ -1130,47 +1130,6 @@ int is_socket_allowed(netdata_socket_idx_t *key, int family)
 }
 
 /**
- * Build dimension name
- *
- * Fill dimension name vector with values given
- *
- * @param dimname       the output vector
- * @param hostname      the hostname for the socket.
- * @param service_name  the service used to connect.
- * @param proto         the protocol used in this connection
- * @param family        is this IPV4(AF_INET) or IPV6(AF_INET6)
- *
- * @return  it returns the size of the data copied on success and -1 otherwise.
- */
-static inline int ebpf_build_outbound_dimension_name(char *dimname, char *hostname, char *service_name,
-                                                     char *proto, int family)
-{
-    if (network_viewer_opt.included_port || network_viewer_opt.excluded_port)
-        return snprintf(dimname, CONFIG_MAX_NAME - 7, (family == AF_INET)?"%s:%s:%s_":"%s:%s:[%s]_",
-                        service_name, proto, hostname);
-
-    return snprintf(dimname, CONFIG_MAX_NAME - 7, (family == AF_INET)?"%s:%s_":"%s:[%s]_",
-                    proto, hostname);
-}
-
-/**
- * Fill inbound dimension name
- *
- * Mount the dimension name with the input given
- *
- * @param dimname       the output vector
- * @param service_name  the service used to connect.
- * @param proto         the protocol used in this connection
- *
- * @return  it returns the size of the data copied on success and -1 otherwise.
- */
-static inline int build_inbound_dimension_name(char *dimname, char *service_name, char *proto)
-{
-    return snprintf(dimname, CONFIG_MAX_NAME - 7, "%s:%s_", service_name,
-                    proto);
-}
-
-/**
  * Hash accumulator
  *
  * @param values        the values used to calculate the data.
