@@ -6,11 +6,16 @@
 
 **Merged pull requests:**
 
+- Update metadata.yaml [\#15762](https://github.com/netdata/netdata/pull/15762) ([ktsaou](https://github.com/ktsaou))
+- Update metadata.yaml [\#15761](https://github.com/netdata/netdata/pull/15761) ([ktsaou](https://github.com/ktsaou))
+- fix nvidia\_smi power\_readings for new drivers [\#15759](https://github.com/netdata/netdata/pull/15759) ([ilyam8](https://github.com/ilyam8))
+- update bundled UI to v2.26.2 [\#15758](https://github.com/netdata/netdata/pull/15758) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#15751](https://github.com/netdata/netdata/pull/15751) ([netdatabot](https://github.com/netdatabot))
 - ci labeler: remove integrations from area/docs [\#15750](https://github.com/netdata/netdata/pull/15750) ([ilyam8](https://github.com/ilyam8))
 - meta: align left metrics, alerts, and config options [\#15749](https://github.com/netdata/netdata/pull/15749) ([ilyam8](https://github.com/ilyam8))
 - Add dependencies for systemd journal plugin. [\#15747](https://github.com/netdata/netdata/pull/15747) ([Ferroin](https://github.com/Ferroin))
 - prefer cap over setuid for sysetmd-journal in installer [\#15741](https://github.com/netdata/netdata/pull/15741) ([ilyam8](https://github.com/ilyam8))
+- \[cloud-blocker\] https\_client add TLS ext. SNI + support chunked transfer encoding [\#15739](https://github.com/netdata/netdata/pull/15739) ([underhood](https://github.com/underhood))
 - Don't overwrite my vscode settings! [\#15738](https://github.com/netdata/netdata/pull/15738) ([underhood](https://github.com/underhood))
 - faster facets and journal fixes [\#15737](https://github.com/netdata/netdata/pull/15737) ([ktsaou](https://github.com/ktsaou))
 - Adjust namespace used for sd\_journal\_open [\#15736](https://github.com/netdata/netdata/pull/15736) ([stelfrag](https://github.com/stelfrag))
@@ -190,6 +195,7 @@
 - Allow to create alert hashes with --disable-cloud [\#15519](https://github.com/netdata/netdata/pull/15519) ([MrZammler](https://github.com/MrZammler))
 - Python collector yaml updates [\#15517](https://github.com/netdata/netdata/pull/15517) ([Ancairon](https://github.com/Ancairon))
 - eBPF Yaml complement [\#15516](https://github.com/netdata/netdata/pull/15516) ([thiagoftsm](https://github.com/thiagoftsm))
+- Add AMD GPU collector  [\#15515](https://github.com/netdata/netdata/pull/15515) ([Dim-P](https://github.com/Dim-P))
 - Update metadata.yaml for some python collectors [\#15513](https://github.com/netdata/netdata/pull/15513) ([MrZammler](https://github.com/MrZammler))
 - Update metadata.yaml for some python collectors [\#15510](https://github.com/netdata/netdata/pull/15510) ([andrewm4894](https://github.com/andrewm4894))
 - Add schema for deployment integrations and centralize integrations schemas. [\#15509](https://github.com/netdata/netdata/pull/15509) ([Ferroin](https://github.com/Ferroin))
@@ -406,8 +412,6 @@
 - Agent dashboard reorganization. [\#15200](https://github.com/netdata/netdata/pull/15200) ([Ferroin](https://github.com/Ferroin))
 - sqlite\_health.c: remove `uuid.h` include [\#15195](https://github.com/netdata/netdata/pull/15195) ([nandahkrishna](https://github.com/nandahkrishna))
 - RPM: Added elfutils-libelf-devel for build with eBPF \(again\) [\#15192](https://github.com/netdata/netdata/pull/15192) ([k0ste](https://github.com/k0ste))
-- Speed up eBPF exit before to bring functions [\#15187](https://github.com/netdata/netdata/pull/15187) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add two functions that allow someone to start/stop ML. [\#15185](https://github.com/netdata/netdata/pull/15185) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
@@ -416,15 +420,6 @@
 ## [v1.40.0](https://github.com/netdata/netdata/tree/v1.40.0) (2023-06-14)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.39.1...v1.40.0)
-
-**Merged pull requests:**
-
-- ebpf: disable sync by default [\#15190](https://github.com/netdata/netdata/pull/15190) ([ilyam8](https://github.com/ilyam8))
-- Add support for SUSE 15.5 [\#15189](https://github.com/netdata/netdata/pull/15189) ([tkatsoulas](https://github.com/tkatsoulas))
-- bump go.d.plugin to v0.53.2 [\#15184](https://github.com/netdata/netdata/pull/15184) ([ilyam8](https://github.com/ilyam8))
-- Do strdupz on empty string [\#15183](https://github.com/netdata/netdata/pull/15183) ([MrZammler](https://github.com/MrZammler))
-- set setuid for go.d.plugin in container [\#15180](https://github.com/netdata/netdata/pull/15180) ([ilyam8](https://github.com/ilyam8))
-- bump go.d.plugin to v0.53.1 [\#15179](https://github.com/netdata/netdata/pull/15179) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.39.1](https://github.com/netdata/netdata/tree/v1.39.1) (2023-05-18)
 
