@@ -521,8 +521,14 @@ static inline int read_single_base64_or_hex_number_file(const char *filename, un
 
     buffer[30] = '\0';
 
-    *result = str2ull_encoded(buffer);
-    return 0;
+    if(likely(buffer[0])){
+        *result = str2ull_encoded(buffer);
+        return 0;
+    }
+    else {
+        *result = 0;
+        return -1;
+    }
 }
 
 static inline int uuid_memcmp(const uuid_t *uu1, const uuid_t *uu2) {
