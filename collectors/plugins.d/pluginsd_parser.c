@@ -2145,25 +2145,43 @@ static inline PARSER_RC pluginsd_register_plugin(char **words __maybe_unused, si
     return PARSER_RC_OK;
 }
 
+#define LOG_MSG_SIZE (1024)
+#define MODULE_NAME_IDX (SERVING_PLUGINSD(parser) ? 1 : 2)
+#define MODULE_TYPE_IDX (SERVING_PLUGINSD(parser) ? 2 : 3)
 static inline PARSER_RC pluginsd_register_module(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser __maybe_unused) {
     netdata_log_info("PLUGINSD: DYNCFG_REG_MODULE");
 
-    struct configurable_plugin *plug_cfg = parser->user.cd->configuration;
-    if (unlikely(plug_cfg == NULL))
-        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_MODULE, "you have to enable dynamic configuration first using " PLUGINSD_KEYWORD_DYNCFG_ENABLE);
+    size_t expected_num_words = SERVING_PLUGINSD(parser) ? 3 : 4;
 
-    if (unlikely(num_words != 3))
-        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_MODULE, "expected 2 parameters module_name followed by module_type");
+    if (unlikely(num_words != expected_num_words)) {
+        char log[LOG_MSG_SIZE + 1];
+        snprintfz(log, LOG_MSG_SIZE, "expected %zu (got %zu) parameters: %smodule_name module_type", expected_num_words - 1, num_words - 1, SERVING_PLUGINSD(parser) ? "" : "plugin_name ");
+        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_MODULE, log);
+    }
+
+    struct configurable_plugin *plug_cfg;
+    const DICTIONARY_ITEM *di = NULL;
+    if (SERVING_PLUGINSD(parser)) {
+        plug_cfg = parser->user.cd->configuration;
+        if (unlikely(plug_cfg == NULL))
+            return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_MODULE, "you have to enable dynamic configuration first using " PLUGINSD_KEYWORD_DYNCFG_ENABLE);
+    } else {
+        di = dictionary_get_and_acquire_item(parser->user.host->configurable_plugins, words[1]);
+        if (unlikely(di == NULL))
+            return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_MODULE, "plugin not found");
+
+        plug_cfg = (struct configurable_plugin *)dictionary_acquired_item_value(di);
+    }
 
     struct module *mod = callocz(1, sizeof(struct module));
 
-    mod->type = str2_module_type(words[2]);
+    mod->type = str2_module_type(words[MODULE_TYPE_IDX]);
     if (unlikely(mod->type == MOD_TYPE_UNKNOWN)) {
         freez(mod);
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_MODULE, "unknown module type (allowed: job_array, single)");
     }
 
-    mod->name = strdupz(words[1]);
+    mod->name = strdupz(words[MODULE_NAME_IDX]);
 
     mod->set_config_cb = set_module_config_cb;
     mod->get_config_cb = get_module_config_cb;
@@ -2177,6 +2195,10 @@ static inline PARSER_RC pluginsd_register_module(char **words __maybe_unused, si
     mod->job_config_cb_usr_ctx = parser;
 
     register_module(parser->user.host->configurable_plugins, plug_cfg, mod);
+
+    if (di != NULL)
+        dictionary_acquired_item_release(parser->user.host->configurable_plugins, di);
+
     return PARSER_RC_OK;
 }
 
