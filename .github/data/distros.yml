@@ -198,7 +198,7 @@ include:
       zypper rm -y libjson-c-devel
     packages: &opensuse_packages
       type: rpm
-      repo_distro: opensuse/leap:15.4
+      repo_distro: opensuse/leap:15.5
       arches:
         - x86_64
         - aarch64
