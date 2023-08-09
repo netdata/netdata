@@ -42,8 +42,6 @@ area/docs:
   - "*.md"
   - "**/*.md"
   - "**/*.mdx"
-  - "!integrations/*.md"
-  - "!integrations/**/*.md"
   - diagrams/**
 
 # -----------------collectors----------------------
