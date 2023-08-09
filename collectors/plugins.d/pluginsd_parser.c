@@ -2202,24 +2202,35 @@ static inline PARSER_RC pluginsd_register_module(char **words __maybe_unused, si
     return PARSER_RC_OK;
 }
 
-// job_status <module_name> <job_name> <status_code> <state> <message>
-static inline PARSER_RC pluginsd_job_status(char **words, size_t num_words, PARSER *parser)
-{
-    if (unlikely(num_words != 6 && num_words != 5))
-        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_REPORT_JOB_STATUS, "expected 4 or 5 parameters: module_name, job_name, status_code, state, [optional: message]");
+static inline PARSER_RC pluginsd_job_status_common(char **words, size_t num_words, PARSER *parser, const char *plugin_name) {
+    int state = atoi(words[3]);
 
-    int state = atoi(words[4]);
-
-    enum job_status job_status = str2job_state(words[3]);
-    if (unlikely(job_status == JOB_STATUS_UNKNOWN))
-        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_REPORT_JOB_STATUS, "unknown job state");
+    enum job_status status = str2job_state(words[2]);
+    if (unlikely(SERVING_PLUGINSD(parser) && status == JOB_STATUS_UNKNOWN))
+        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_REPORT_JOB_STATUS, "unknown job status");
 
     char *message = NULL;
-    if (num_words == 6)
-        message = strdupz(words[5]);
+    if (num_words == 5)
+        message = strdupz(words[4]);
 
-    report_job_status(parser->user.host->configurable_plugins, parser->user.cd->configuration, words[1], words[2], job_status, state, message);
+    report_job_status(parser->user.host->configurable_plugins, plugin_name, words[0], words[1], status, state, message);
     return PARSER_RC_OK;
+}
+
+// job_status [plugin_name if streaming] <module_name> <job_name> <status_code> <state> [message]
+static PARSER_RC pluginsd_job_status(char **words, size_t num_words, PARSER *parser) {
+    if (SERVING_PLUGINSD(parser)) {
+        if (unlikely(num_words != 5 && num_words != 6))
+            return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_REPORT_JOB_STATUS, "expected 4 or 5 parameters: module_name, job_name, status_code, state, [optional: message]");
+    } else {
+        if (unlikely(num_words != 6 && num_words != 7))
+            return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_REPORT_JOB_STATUS, "expected 5 or 6 parameters: plugin_name, module_name, job_name, status_code, state, [optional: message]");
+    }
+
+    if (SERVING_PLUGINSD(parser)) {
+        return pluginsd_job_status_common(&words[1], num_words - 1, parser, parser->user.cd->configuration->name);
+    }
+    return pluginsd_job_status_common(&words[2], num_words - 2, parser, words[1]);
 }
 
 static inline PARSER_RC streaming_claimed_id(char **words, size_t num_words, PARSER *parser)

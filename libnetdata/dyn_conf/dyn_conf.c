@@ -836,12 +836,12 @@ void plugin_del_cb(const DICTIONARY_ITEM *item, void *value, void *data)
     freez(plugin);
 }
 
-void report_job_status(DICTIONARY *plugins_dict, struct configurable_plugin *plugin, const char *module_name, const char *job_name, enum job_status status, int status_code, char *reason)
+void report_job_status(DICTIONARY *plugins_dict, const char *plugin_name, const char *module_name, const char *job_name, enum job_status status, int status_code, char *reason)
 {
     struct job *job = NULL;
-    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(plugins_dict, plugin->name);
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(plugins_dict, plugin_name);
     if (item == NULL) {
-        netdata_log_error("plugin %s not found", plugin->name);
+        netdata_log_error("plugin %s not found", plugin_name);
         freez(reason);
         return;
     }

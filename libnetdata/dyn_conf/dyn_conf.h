@@ -119,7 +119,7 @@ const DICTIONARY_ITEM *register_plugin(DICTIONARY *plugins_dict, struct configur
 void unregister_plugin(DICTIONARY *plugins_dict, const DICTIONARY_ITEM *plugin);
 int register_module(DICTIONARY *plugins_dict, struct configurable_plugin *plugin, struct module *module);
 
-void report_job_status(DICTIONARY *plugins_dict, struct configurable_plugin *plugin, const char *module_name, const char *job_name, enum job_status status, int status_code, char *reason);
+void report_job_status(DICTIONARY *plugins_dict, const char *plugin_name, const char *module_name, const char *job_name, enum job_status status, int status_code, char *reason);
 
 // API to be used by the web server(s)
 json_object *get_list_of_plugins_json(DICTIONARY *plugins_dict);
