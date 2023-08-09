@@ -482,6 +482,7 @@ void *rrdpush_sender_thread(void *ptr);
 void rrdpush_send_host_labels(RRDHOST *host);
 void rrdpush_send_claimed_id(RRDHOST *host);
 void rrdpush_send_global_functions(RRDHOST *host);
+void rrdpush_send_dyncfg(RRDHOST *host);
 
 #define THREAD_TAG_STREAM_RECEIVER "RCVR" // "[host]" is appended
 #define THREAD_TAG_STREAM_SENDER "SNDR" // "[host]" is appended

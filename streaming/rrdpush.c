@@ -559,6 +559,37 @@ void rrdpush_send_global_functions(RRDHOST *host) {
     sender_thread_buffer_free();
 }
 
+void rrdpush_send_dyncfg(RRDHOST *host) {
+/*    if(!stream_has_capability(s->host->sender, STREAM_CAP_DYNCFG))
+        return;
+// TODO underhood */
+
+    if(unlikely(!rrdhost_can_send_definitions_to_parent(host)))
+        return;
+
+    BUFFER *wb = sender_start(host->sender);
+
+    DICTIONARY *plugins_dict = host->configurable_plugins;
+    
+    struct configurable_plugin *plug;
+    dfe_start_read(plugins_dict, plug) {
+        buffer_sprintf(wb, PLUGINSD_KEYWORD_DYNCFG_ENABLE " %s\n", plug->name);
+        struct module *mod;
+        dfe_start_read(plug->modules, mod) {
+            buffer_sprintf(wb, PLUGINSD_KEYWORD_DYNCFG_REGISTER_MODULE " %s %s %s\n", plug->name, mod->name, module_type2str(mod->type));
+            struct job *job;
+            dfe_start_read(mod->jobs, job) {
+                buffer_sprintf(wb, PLUGINSD_KEYWORD_DYNCFG_REGISTER_JOB " %s %s %s %s %"PRIu32"\n", plug->name, mod->name, job->name, job_type2str(job->type), job->flags);
+            } dfe_done(job);
+        } dfe_done(mod);
+    }
+    dfe_done(plug);
+
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+
+    sender_thread_buffer_free();
+}
+
 void rrdpush_send_claimed_id(RRDHOST *host) {
     if(!stream_has_capability(host->sender, STREAM_CAP_CLAIM))
         return;
