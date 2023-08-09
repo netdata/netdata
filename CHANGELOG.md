@@ -6,8 +6,17 @@
 
 **Merged pull requests:**
 
+- extend the trimming window to avoid empty points at the end of queries [\#15773](https://github.com/netdata/netdata/pull/15773) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations.js [\#15772](https://github.com/netdata/netdata/pull/15772) ([netdatabot](https://github.com/netdatabot))
+- Change FreeBSD / macOS system.swap\(io\) to mem.swap\(io\) [\#15769](https://github.com/netdata/netdata/pull/15769) ([Dim-P](https://github.com/Dim-P))
+- update ui to v6.26.3 [\#15767](https://github.com/netdata/netdata/pull/15767) ([ilyam8](https://github.com/ilyam8))
+- Fix CID 398318 [\#15766](https://github.com/netdata/netdata/pull/15766) ([underhood](https://github.com/underhood))
+- Fix coverity issues introduced via drm proc module [\#15765](https://github.com/netdata/netdata/pull/15765) ([Dim-P](https://github.com/Dim-P))
+- Regenerate integrations.js [\#15764](https://github.com/netdata/netdata/pull/15764) ([netdatabot](https://github.com/netdatabot))
+- meta update proc drm icon [\#15763](https://github.com/netdata/netdata/pull/15763) ([ilyam8](https://github.com/ilyam8))
 - Update metadata.yaml [\#15762](https://github.com/netdata/netdata/pull/15762) ([ktsaou](https://github.com/ktsaou))
 - Update metadata.yaml [\#15761](https://github.com/netdata/netdata/pull/15761) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations.js [\#15760](https://github.com/netdata/netdata/pull/15760) ([netdatabot](https://github.com/netdatabot))
 - fix nvidia\_smi power\_readings for new drivers [\#15759](https://github.com/netdata/netdata/pull/15759) ([ilyam8](https://github.com/ilyam8))
 - update bundled UI to v2.26.2 [\#15758](https://github.com/netdata/netdata/pull/15758) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#15751](https://github.com/netdata/netdata/pull/15751) ([netdatabot](https://github.com/netdatabot))
@@ -407,11 +416,6 @@
 - eBPF Functions \(enable/disable threads\) [\#15214](https://github.com/netdata/netdata/pull/15214) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix health crash [\#15209](https://github.com/netdata/netdata/pull/15209) ([stelfrag](https://github.com/stelfrag))
 - Fix file permissions under directory [\#15208](https://github.com/netdata/netdata/pull/15208) ([stelfrag](https://github.com/stelfrag))
-- RocketChat cloud integration docs [\#15205](https://github.com/netdata/netdata/pull/15205) ([car12o](https://github.com/car12o))
-- Obvious memory reductions [\#15204](https://github.com/netdata/netdata/pull/15204) ([ktsaou](https://github.com/ktsaou))
-- Agent dashboard reorganization. [\#15200](https://github.com/netdata/netdata/pull/15200) ([Ferroin](https://github.com/Ferroin))
-- sqlite\_health.c: remove `uuid.h` include [\#15195](https://github.com/netdata/netdata/pull/15195) ([nandahkrishna](https://github.com/nandahkrishna))
-- RPM: Added elfutils-libelf-devel for build with eBPF \(again\) [\#15192](https://github.com/netdata/netdata/pull/15192) ([k0ste](https://github.com/k0ste))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
