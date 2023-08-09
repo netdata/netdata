@@ -10,6 +10,7 @@ exclude_paths:
   - web/gui/lib/**
   - web/gui/old/**
   - web/gui/src/**
+  - web/gui/v2/**
   - web/gui/main.js
   - tests/**
   - aclk/tests/**
