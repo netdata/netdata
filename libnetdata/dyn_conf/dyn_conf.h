@@ -57,7 +57,7 @@ struct job
 {
     char *name;
 
-    //state reported by config
+    // state reported by plugin
     enum job_status status; // reported by plugin, enum as this has to be interpreted by UI
     int state; // code reported by plugin which can mean anything plugin wants
     char *reason; // reported by plugin, can be NULL (optional)
