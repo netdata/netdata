@@ -1,11 +1,15 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.42.0](https://github.com/netdata/netdata/tree/v1.42.0) (2023-08-09)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.41.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.41.0...v1.42.0)
 
 **Merged pull requests:**
 
+- ci: codacy exclude web/gui/v2/ [\#15780](https://github.com/netdata/netdata/pull/15780) ([ilyam8](https://github.com/ilyam8))
+- update UI to v6.27.0 [\#15778](https://github.com/netdata/netdata/pull/15778) ([ilyam8](https://github.com/ilyam8))
+- ci: fix labeler area/docs [\#15776](https://github.com/netdata/netdata/pull/15776) ([ilyam8](https://github.com/ilyam8))
+- fix claiming via UI for static build [\#15774](https://github.com/netdata/netdata/pull/15774) ([ilyam8](https://github.com/ilyam8))
 - extend the trimming window to avoid empty points at the end of queries [\#15773](https://github.com/netdata/netdata/pull/15773) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#15772](https://github.com/netdata/netdata/pull/15772) ([netdatabot](https://github.com/netdatabot))
 - Change FreeBSD / macOS system.swap\(io\) to mem.swap\(io\) [\#15769](https://github.com/netdata/netdata/pull/15769) ([Dim-P](https://github.com/Dim-P))
@@ -414,8 +418,6 @@
 - cgroups: remove pod\_uid and container\_id labels in k8s [\#15216](https://github.com/netdata/netdata/pull/15216) ([ilyam8](https://github.com/ilyam8))
 - Allow overriding pipename from env [\#15215](https://github.com/netdata/netdata/pull/15215) ([vkalintiris](https://github.com/vkalintiris))
 - eBPF Functions \(enable/disable threads\) [\#15214](https://github.com/netdata/netdata/pull/15214) ([thiagoftsm](https://github.com/thiagoftsm))
-- Fix health crash [\#15209](https://github.com/netdata/netdata/pull/15209) ([stelfrag](https://github.com/stelfrag))
-- Fix file permissions under directory [\#15208](https://github.com/netdata/netdata/pull/15208) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
