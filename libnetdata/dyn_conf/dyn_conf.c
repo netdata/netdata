@@ -504,6 +504,35 @@ int register_module(DICTIONARY *plugins_dict, struct configurable_plugin *plugin
     return 0;
 }
 
+int register_job(DICTIONARY *plugins_dict, const char *plugin_name, const char *module_name, const char *job_name, enum job_type job_type, dyncfg_job_flg_t flags)
+{
+    int rc = 1;
+    const DICTIONARY_ITEM *plugin_item = dictionary_get_and_acquire_item(plugins_dict, plugin_name);
+    if (plugin_item == NULL) {
+        error_report("plugin \"%s\" not registered", plugin_name);
+        return 1;
+    }
+    struct configurable_plugin *plugin = dictionary_acquired_item_value(plugin_item);
+    struct module *mod = get_module_by_name(plugin, module_name);
+    if (mod == NULL) {
+        error_report("module \"%s\" not registered", module_name);
+        goto ERR_EXIT;
+    }
+    if (mod->type != MOD_TYPE_ARRAY) {
+        error_report("module \"%s\" is not an array", module_name);
+        goto ERR_EXIT;
+    }
+    if (get_job_by_name(mod, job_name) != NULL) {
+        error_report("job \"%s\" already registered", job_name);
+        goto ERR_EXIT;
+    }
+
+    rc = (add_job(mod, job_name, NULL, job_type, flags) == NULL);
+ERR_EXIT:
+    dictionary_acquired_item_release(plugins_dict, plugin_item);
+    return rc;
+}
+
 void freez_dyncfg(void *ptr) {
     freez(ptr);
 }

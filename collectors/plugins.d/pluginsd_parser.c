@@ -2259,6 +2259,41 @@ static inline PARSER_RC pluginsd_register_module(char **words __maybe_unused, si
     return PARSER_RC_OK;
 }
 
+static inline PARSER_RC pluginsd_register_job_common(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser __maybe_unused, const char *plugin_name) {
+    dyncfg_job_flg_t flags = atol(words[3]);
+    if (flags < 0)
+        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_JOB, "invalid flags");
+    if (SERVING_PLUGINSD(parser))
+        flags |= JOB_FLG_PLUGIN_PUSHED;
+    else
+        flags |= JOB_FLG_STREAMING_PUSHED;
+
+    enum job_type job_type = str2job_type(words[2]);
+    if (job_type == JOB_TYPE_UNKNOWN)
+        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_JOB, "unknown job type");
+    if (SERVING_PLUGINSD(parser) && job_type == JOB_TYPE_USER)
+        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_JOB, "plugins cannot push jobs of type \"user\" (this is allowed only in streaming)");
+
+    if (register_job(parser->user.host->configurable_plugins, plugin_name, words[0], words[1], job_type, flags))
+        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_JOB, "error registering job");
+    return PARSER_RC_OK;
+}
+
+static inline PARSER_RC pluginsd_register_job(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser __maybe_unused) {
+    size_t expected_num_words = SERVING_PLUGINSD(parser) ? 5 : 6;
+
+    if (unlikely(num_words != expected_num_words)) {
+        char log[LOG_MSG_SIZE + 1];
+        snprintfz(log, LOG_MSG_SIZE, "expected %zu (got %zu) parameters: %smodule_name job_name job_type", expected_num_words - 1, num_words - 1, SERVING_PLUGINSD(parser) ? "" : "plugin_name ");
+        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_JOB, log);
+    }
+
+    if (SERVING_PLUGINSD(parser)) {
+        return pluginsd_register_job_common(&words[1], num_words - 1, parser,  parser->user.cd->configuration->name);
+    }
+    return pluginsd_register_job_common(&words[2], num_words - 2, parser, words[1]);
+}
+
 static inline PARSER_RC pluginsd_job_status_common(char **words, size_t num_words, PARSER *parser, const char *plugin_name) {
     int state = atoi(words[3]);
 
@@ -2606,6 +2641,9 @@ PARSER_RC parser_execute(PARSER *parser, PARSER_KEYWORD *keyword, char **words, 
 
         case 102:
             return pluginsd_register_module(words, num_words, parser);
+
+        case 103:
+            return pluginsd_register_job(words, num_words, parser);
 
         case 110:
             return pluginsd_job_status(words, num_words, parser);
