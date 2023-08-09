@@ -76,6 +76,48 @@ enum set_config_result {
     SET_CONFIG_DEFFER
 };
 
+typedef uint32_t dyncfg_job_flg_t;
+enum job_flags {
+    JOB_FLG_PS_LOADED        = 1 << 0, // PS abbr. Persistent Storage
+    JOB_FLG_PLUGIN_PUSHED    = 1 << 1, // got it from plugin (e.g. autodiscovered job)
+    JOB_FLG_STREAMING_PUSHED = 1 << 2, // got it trough streaming
+    JOB_FLG_USER_CREATED     = 1 << 3, // user created this job during agent runtime
+};
+
+enum job_type {
+    JOB_TYPE_UNKNOWN = 0,
+    JOB_TYPE_STOCK = 1,
+    JOB_TYPE_USER = 2,
+    JOB_TYPE_AUTODISCOVERED = 3,
+};
+
+static inline const char* job_type2str(enum job_type type)
+{
+    switch (type) {
+        case JOB_TYPE_STOCK:
+            return "stock";
+        case JOB_TYPE_USER:
+            return "user";
+        case JOB_TYPE_AUTODISCOVERED:
+            return "autodiscovered";
+        case JOB_TYPE_UNKNOWN:
+        default:
+            return "unknown";
+    }
+}
+
+static inline enum job_type str2job_type(const char *type_name)
+{
+    if (strcmp(type_name, "stock") == 0)
+        return JOB_TYPE_STOCK;
+    else if (strcmp(type_name, "user") == 0)
+        return JOB_TYPE_USER;
+    else if (strcmp(type_name, "autodiscovered") == 0)
+        return JOB_TYPE_AUTODISCOVERED;
+    error_report("Unknown job type: %s", type_name);
+    return JOB_TYPE_UNKNOWN;
+}
+
 struct job
 {
     char *name;
@@ -86,6 +128,9 @@ struct job
     char *reason; // reported by plugin, can be NULL (optional)
 
     usec_t last_state_update;
+
+    dyncfg_job_flg_t flags;
+    enum job_type type;
 
     struct module *module;
 };

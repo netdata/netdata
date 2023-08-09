@@ -11,6 +11,18 @@
 #define DYN_CONF_JOB_LIST "jobs"
 #define DYN_CONF_CFG_EXT ".cfg"
 
+void job_flags_wallktrough(dyncfg_job_flg_t flags, void (*cb)(const char *str, void *data), void *data)
+{
+    if (flags & JOB_FLG_PS_LOADED)
+        cb("JOB_FLG_PS_LOADED", data);
+    if (flags & JOB_FLG_PLUGIN_PUSHED)
+        cb("JOB_FLG_PLUGIN_PUSHED", data);
+    if (flags & JOB_FLG_STREAMING_PUSHED)
+        cb("JOB_FLG_STREAMING_PUSHED", data);
+    if (flags & JOB_FLG_USER_CREATED)
+        cb("JOB_FLG_USER_CREATED", data);
+}
+
 struct deferred_cfg_send {
     DICTIONARY *plugins_dict;
     char *plugin_name;
@@ -152,6 +164,12 @@ const char *job_status2str(enum job_status status)
     }
 }
 
+static void _job_flags2str_cb(const char *str, void *data)
+{
+    json_object *json_item = json_object_new_string(str);
+    json_object_array_add((json_object *)data, json_item);
+}
+
 static int _get_list_of_jobs_json_cb(const DICTIONARY_ITEM *item, void *entry, void *data)
 {
     UNUSED(item);
@@ -163,6 +181,10 @@ static int _get_list_of_jobs_json_cb(const DICTIONARY_ITEM *item, void *entry, v
     json_object_object_add(json_job, "name", json_item);
     json_item = json_object_new_string(job_status2str(job->status));
     json_object_object_add(json_job, "state", json_item);
+
+    json_item = json_object_new_string(job_type2str(job->type));
+    json_object_object_add(json_job, "type", json_item);
+
     int64_t last_state_update_s  = job->last_state_update / USEC_PER_SEC;
     int64_t last_state_update_us = job->last_state_update % USEC_PER_SEC;
 
@@ -171,6 +193,10 @@ static int _get_list_of_jobs_json_cb(const DICTIONARY_ITEM *item, void *entry, v
 
     json_item = json_object_new_int64(last_state_update_us);
     json_object_object_add(json_job, "last_state_update_us", json_item);
+
+    json_item = json_object_new_array();
+    job_flags_wallktrough(job->flags, _job_flags2str_cb, json_item);
+    json_object_object_add(json_job, "flags", json_item);
 
     json_object_array_add(obj, json_job);
 
@@ -356,13 +382,15 @@ static int set_job_config(struct job *job, dyncfg_config_t cfg)
     return 0;
 }
 
-struct job *add_job(struct module *mod, const char *job_id, dyncfg_config_t cfg)
+struct job *add_job(struct module *mod, const char *job_id, dyncfg_config_t *cfg, enum job_type job_type, dyncfg_job_flg_t flags)
 {
     struct job *job = job_new();
     job->name = strdupz(job_id);
     job->module = mod;
+    job->flags = flags;
+    job->type = job_type;
 
-    if (set_job_config(job, cfg)) {
+    if (cfg != NULL && set_job_config(job, *cfg)) {
         freez(job->name);
         freez(job);
         return NULL;
@@ -462,10 +490,7 @@ int register_module(DICTIONARY *plugins_dict, struct configurable_plugin *plugin
                     continue;
                 ent->d_name[len - strlen(DYN_CONF_CFG_EXT)] = '\0';
 
-                struct job *job = job_new();
-                job->name = strdupz(ent->d_name);
-                job->module = module;
-                dictionary_set(module->jobs, job->name, job, sizeof(job));
+                struct job *job = add_job(module, ent->d_name, NULL, JOB_TYPE_USER, JOB_FLG_PS_LOADED);
 
                 deferred_config_push_back(plugins_dict, plugin->name, module->name, job->name);
             }
@@ -640,7 +665,7 @@ static inline void _handle_job_root(struct uni_http_response *resp, int method, 
             .data = post_payload,
             .data_size = post_payload_size
         };
-        job = add_job(mod, job_id, cont);
+        job = add_job(mod, job_id, &cont, JOB_TYPE_USER, JOB_FLG_USER_CREATED);
         if (job == NULL) {
             resp->content = "failed to add job";
             resp->content_length = strlen(resp->content);
