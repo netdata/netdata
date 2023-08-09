@@ -1268,6 +1268,38 @@ static inline void **ebpf_socket_hashtable_insert_unsafe(Pvoid_t *arr, netdata_s
 }
 
 /**
+ * Translate socket
+ *
+ * Convert socket address to string
+ *
+ * @param dst structure where we will store
+ * @param key the socket address
+ */
+static void ebpf_socket_translate_socket(netdata_socket_plus_t *dst, netdata_socket_idx_t *key)
+{
+    if (dst->data.family == AF_INET) {
+        struct in_addr ipv4_addr = {.s_addr = key->saddr.addr32[0]};
+        if(inet_ntop(AF_INET, &ipv4_addr, dst->socket_string.src_ip, INET_ADDRSTRLEN))
+            netdata_log_info("Cannot convert IP %u .", ipv4_addr.s_addr);
+
+        ipv4_addr.s_addr = key->daddr.addr32[0];
+        if(inet_ntop(AF_INET, &ipv4_addr, dst->socket_string.dst_ip, INET_ADDRSTRLEN))
+            netdata_log_info("Cannot convert IP %u .", ipv4_addr.s_addr);
+    } else {
+        struct in6_addr ipv6_addr;
+        memcpy(ipv6_addr.s6_addr, key->saddr.addr8, sizeof(key->saddr.addr8));
+        if(inet_ntop(AF_INET6, &ipv6_addr, dst->socket_string.src_ip, INET_ADDRSTRLEN))
+            netdata_log_info("Cannot convert IPv6 Address.");
+
+        memcpy(ipv6_addr.s6_addr, key->daddr.addr8, sizeof(key->daddr.addr8));
+        if(inet_ntop(AF_INET6, &ipv6_addr, dst->socket_string.dst_ip, INET_ADDRSTRLEN))
+            netdata_log_info("Cannot convert IPv6 Address.");
+    }
+    dst->socket_string.src_port = ntohs(key->sport);
+    dst->socket_string.dst_port = ntohs(key->sport);
+}
+
+/**
  * Update array vectors
  *
  * Read data from hash table and update vectors.
@@ -1314,12 +1346,16 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         ebpf_socket_fill_publish_apps(key.pid, values);
 
         netdata_socket_plus_t **item_pptr = (netdata_socket_plus_t **) ebpf_socket_hashtable_insert_unsafe(&hs, &key);
+        bool update_string = true;
         if (likely(*item_pptr == NULL)) {
             // a new item added to the index
             *item_pptr = aral_mallocz(ebpf_socket_hs.socket_table);
+            update_string = false;
         }
         netdata_socket_plus_t *item = *item_pptr;
         memcpy(&item->data, &values[0], sizeof(netdata_socket_t));
+        if (update_string)
+            ebpf_socket_translate_socket(item, &key);
 
         memset(values, 0, length);
 

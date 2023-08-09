@@ -300,9 +300,9 @@ typedef struct netata_socket_plus {
     netdata_socket_t data;           // Data read from database
 
     struct  {
-        char src_ip[INET6_ADDRSTRLEN];
+        char src_ip[INET6_ADDRSTRLEN + 1];
         uint16_t src_port;
-        char dst_ip[INET6_ADDRSTRLEN];
+        char dst_ip[INET6_ADDRSTRLEN + 1];
         uint16_t dst_port;
     } socket_string;
 } netdata_socket_plus_t;
