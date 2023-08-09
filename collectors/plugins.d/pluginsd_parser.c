@@ -2125,15 +2125,23 @@ static inline PARSER_RC pluginsd_register_plugin(char **words __maybe_unused, si
     cfg->get_config_schema_cb = get_plugin_config_schema_cb;
     cfg->cb_usr_ctx = parser;
 
-    parser->user.cd->cfg_dict_item = register_plugin(parser->user.host->configurable_plugins, cfg);
-
-    if (unlikely(parser->user.cd->cfg_dict_item == NULL)) {
+    const DICTIONARY_ITEM *di = register_plugin(parser->user.host->configurable_plugins, cfg);
+    if (unlikely(di == NULL)) {
         freez(cfg->name);
         freez(cfg);
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_ENABLE, "error registering plugin");
     }
 
-    parser->user.cd->configuration = cfg;
+    if (SERVING_PLUGINSD(parser)) {
+        // this is optimization for pluginsd to avoid extra dictionary lookup
+        // as we know which plugin is comunicating with us
+        parser->user.cd->cfg_dict_item = di;
+        parser->user.cd->configuration = cfg;
+    } else {
+        // register_plugin keeps the item acquired, so we need to release it
+        dictionary_acquired_item_release(parser->user.host->configurable_plugins, di);
+    }
+
     return PARSER_RC_OK;
 }
 
