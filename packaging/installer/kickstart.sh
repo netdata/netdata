@@ -414,6 +414,7 @@ success_banner() {
 cleanup() {
   if [ -z "${NO_CLEANUP}" ] && [ -n "${tmpdir}" ]; then
     cd || true
+    DRY_RUN=0
     run_as_root rm -rf "${tmpdir}"
   fi
 }
