@@ -37,7 +37,7 @@ enum job_status {
     JOB_STATUS_ERROR
 };
 
-inline enum job_status str2job_state(const char *state_name) {
+static inline enum job_status str2job_state(const char *state_name) {
     if (strcmp(state_name, "stopped") == 0)
         return JOB_STATUS_STOPPED;
     else if (strcmp(state_name, "running") == 0)

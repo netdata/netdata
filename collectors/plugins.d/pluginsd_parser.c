@@ -2397,6 +2397,9 @@ PARSER_RC parser_execute(PARSER *parser, PARSER_KEYWORD *keyword, char **words, 
         case 102:
             return pluginsd_register_module(words, num_words, parser);
 
+        case 110:
+            return pluginsd_job_status(words, num_words, parser);
+
         default:
             fatal("Unknown keyword '%s' with id %zu", keyword->keyword, keyword->id);
     }
