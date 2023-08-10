@@ -792,13 +792,13 @@ void ebpf_update_controller(int fd, ebpf_module_t *em)
 {
     uint32_t values[NETDATA_CONTROLLER_END] = {
         (em->apps_charts & NETDATA_EBPF_APPS_FLAG_YES) | em->cgroup_charts,
-        em->apps_level
+        em->apps_level, 0, 0, 0, 0
     };
     uint32_t key;
-    uint32_t end = (em->apps_level != NETDATA_APPS_NOT_SET) ? NETDATA_CONTROLLER_END : NETDATA_CONTROLLER_APPS_LEVEL;
+    uint32_t end = NETDATA_CONTROLLER_PID_TABLE_ADD;
 
     for (key = NETDATA_CONTROLLER_APPS_ENABLED; key < end; key++) {
-        int ret = bpf_map_update_elem(fd, &key, &values[key], 0);
+        int ret = bpf_map_update_elem(fd, &key, &values[key], BPF_ANY);
         if (ret)
             netdata_log_error("Add key(%u) for controller table failed.", key);
     }
