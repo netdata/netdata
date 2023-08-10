@@ -117,6 +117,12 @@ struct File_info {
     sqlite3_stmt *stmt_get_log_msg_metadata_asc;    /**< SQLITE3 statement used to retrieve metadata from database during queries in ascending order **/
     sqlite3_stmt *stmt_get_log_msg_metadata_desc;   /**< SQLITE3 statement used to retrieve metadata from database during queries in descending order **/
 
+    /* Struct members related to queries */
+    struct {
+        usec_t user;
+        usec_t sys;
+    } cpu_time_per_mib;
+
     /* Struct members related to log parsing */
     Log_parser_config_t *parser_config;             /**< Configuration to be user by log parser - read from logsmanagement.conf **/ 
     Log_parser_cus_config_t **parser_cus_config;    /**< Array of custom log parsing configurations **/

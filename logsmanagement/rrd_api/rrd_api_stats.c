@@ -1,14 +1,5 @@
 #include "rrd_api_stats.h"
 
-/* NETDATA_CHART_PRIO for Stats_chart_data */
-#define NETDATA_CHART_PRIO_CIRC_BUFF_MEM_TOT    NETDATA_CHART_PRIO_LOGS_STATS_BASE + 1
-#define NETDATA_CHART_PRIO_CIRC_BUFF_NUM_ITEMS  NETDATA_CHART_PRIO_LOGS_STATS_BASE + 2
-#define NETDATA_CHART_PRIO_CIRC_BUFF_MEM_UNC    NETDATA_CHART_PRIO_LOGS_STATS_BASE + 3
-#define NETDATA_CHART_PRIO_CIRC_BUFF_MEM_COM    NETDATA_CHART_PRIO_LOGS_STATS_BASE + 4
-#define NETDATA_CHART_PRIO_COMPR_RATIO          NETDATA_CHART_PRIO_LOGS_STATS_BASE + 5
-#define NETDATA_CHART_PRIO_DISK_USAGE           NETDATA_CHART_PRIO_LOGS_STATS_BASE + 6
-#define NETDATA_CHART_PRIO_DB_TIMINGS           NETDATA_CHART_PRIO_LOGS_STATS_BASE + 7
-
 struct Stats_chart_data{
     char *rrd_type;
 
@@ -39,14 +30,21 @@ struct Stats_chart_data{
     RRDSET *st_db_timings;
     RRDDIM **dim_db_timings_write, **dim_db_timings_rotate;
     collected_number *num_db_timings_write, *num_db_timings_rotate;
+
+    RRDSET *st_qry_cpu_t_per_mib_user;
+    RRDDIM **dim_qry_cpu_t_per_mib_user;
+
+    RRDSET *st_qry_cpu_t_per_mib_sys;
+    RRDDIM **dim_qry_cpu_t_per_mib_sys;
 };
 
 static struct Stats_chart_data *stats_chart_data;
-static struct Chart_meta **chart_data_arr;
 
 void stats_charts_init(void){
     stats_chart_data = callocz(1, sizeof(struct Stats_chart_data));
     stats_chart_data->rrd_type = "netdata";
+
+    int chart_prio = NETDATA_CHART_PRIO_LOGS_STATS_BASE;
 
     /* Circular buffer total memory stats - initialise */
     stats_chart_data->st_circ_buff_mem_total = rrdset_create_localhost(
@@ -59,7 +57,7 @@ void stats_charts_init(void){
             , "bytes"
             , "logsmanagement.plugin"
             , NULL
-            , NETDATA_CHART_PRIO_CIRC_BUFF_MEM_TOT 
+            , ++chart_prio
             , g_logs_manag_config.update_every
             , RRDSET_TYPE_STACKED
     );
@@ -77,7 +75,7 @@ void stats_charts_init(void){
             , "items"
             , "logsmanagement.plugin"
             , NULL
-            , NETDATA_CHART_PRIO_CIRC_BUFF_NUM_ITEMS
+            , ++chart_prio
             , g_logs_manag_config.update_every
             , RRDSET_TYPE_LINE
     );
@@ -95,7 +93,7 @@ void stats_charts_init(void){
             , "bytes"
             , "logsmanagement.plugin"
             , NULL
-            , NETDATA_CHART_PRIO_CIRC_BUFF_MEM_UNC 
+            , ++chart_prio
             , g_logs_manag_config.update_every
             , RRDSET_TYPE_STACKED
     );
@@ -113,7 +111,7 @@ void stats_charts_init(void){
             , "bytes"
             , "logsmanagement.plugin"
             , NULL
-            , NETDATA_CHART_PRIO_CIRC_BUFF_MEM_COM 
+            , ++chart_prio
             , g_logs_manag_config.update_every
             , RRDSET_TYPE_STACKED
     );
@@ -131,7 +129,7 @@ void stats_charts_init(void){
             , "uncompressed / compressed ratio"
             , "logsmanagement.plugin"
             , NULL
-            , NETDATA_CHART_PRIO_COMPR_RATIO 
+            , ++chart_prio 
             , g_logs_manag_config.update_every
             , RRDSET_TYPE_LINE
     );
@@ -149,7 +147,7 @@ void stats_charts_init(void){
             , "bytes"
             , "logsmanagement.plugin"
             , NULL
-            , NETDATA_CHART_PRIO_DISK_USAGE 
+            , ++chart_prio 
             , g_logs_manag_config.update_every
             , RRDSET_TYPE_STACKED
     );
@@ -167,7 +165,7 @@ void stats_charts_init(void){
             , "ns"
             , "logsmanagement.plugin"
             , NULL
-            , NETDATA_CHART_PRIO_DB_TIMINGS 
+            , ++chart_prio 
             , g_logs_manag_config.update_every
             , RRDSET_TYPE_STACKED
     );
@@ -176,15 +174,43 @@ void stats_charts_init(void){
     stats_chart_data->num_db_timings_write = callocz(p_file_infos_arr->count, sizeof(collected_number));
     stats_chart_data->num_db_timings_rotate = callocz(p_file_infos_arr->count, sizeof(collected_number));
 
-    chart_data_arr = callocz(p_file_infos_arr->count, sizeof(struct Chart_meta *));
+    /* Query CPU time per byte (user) - initialise */
+    stats_chart_data->st_qry_cpu_t_per_mib_user = rrdset_create_localhost(
+            stats_chart_data->rrd_type
+            , "query_cpu_time_per_MiB_user"
+            , NULL
+            , "logsmanagement"
+            , NULL
+            , "CPU user time per MiB of query results"
+            , "usec/MiB"
+            , "logsmanagement.plugin"
+            , NULL
+            , ++chart_prio 
+            , g_logs_manag_config.update_every
+            , RRDSET_TYPE_STACKED
+    );
+    stats_chart_data->dim_qry_cpu_t_per_mib_user = callocz(p_file_infos_arr->count, sizeof(RRDDIM));
+
+    /* Query CPU time per byte (system) - initialise */
+    stats_chart_data->st_qry_cpu_t_per_mib_sys = rrdset_create_localhost(
+            stats_chart_data->rrd_type
+            , "query_cpu_time_per_MiB_sys"
+            , NULL
+            , "logsmanagement"
+            , NULL
+            , "CPU system time per MiB of query results"
+            , "usec/MiB"
+            , "logsmanagement.plugin"
+            , NULL
+            , ++chart_prio 
+            , g_logs_manag_config.update_every
+            , RRDSET_TYPE_STACKED
+    );
+    stats_chart_data->dim_qry_cpu_t_per_mib_sys = callocz(p_file_infos_arr->count, sizeof(RRDDIM));
 
     for(int i = 0; i < p_file_infos_arr->count; i++){
 
         struct File_info *p_file_info = p_file_infos_arr->data[i];
-        if(!p_file_info->parser_config){ // Check if there is parser configuration to be used for chart generation
-            chart_data_arr[i] = NULL;
-            continue; 
-        } 
 
         /* Circular buffer memory stats - add dimensions */
         stats_chart_data->dim_circ_buff_mem_total_arr[i] = 
@@ -221,6 +247,16 @@ void stats_charts_init(void){
         stats_chart_data->dim_db_timings_rotate[i] = 
             rrddim_add( stats_chart_data->st_db_timings, dim_db_timings_name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         freez(dim_db_timings_name);
+
+        /* Query CPU time per byte (user) - add dimensions */
+        stats_chart_data->dim_qry_cpu_t_per_mib_user[i] = 
+            rrddim_add( stats_chart_data->st_qry_cpu_t_per_mib_user, 
+                        p_file_info->chart_name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        /* Query CPU time per byte (system) - add dimensions */
+        stats_chart_data->dim_qry_cpu_t_per_mib_sys[i] = 
+            rrddim_add( stats_chart_data->st_qry_cpu_t_per_mib_sys, 
+                        p_file_info->chart_name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 }
 
@@ -284,9 +320,19 @@ void stats_charts_update(uv_timer_t *handle){
                                 stats_chart_data->dim_db_timings_rotate[i], 
                                 stats_chart_data->num_db_timings_rotate[i]);
 
+        /* Query CPU time per byte (user) - update */           
+        rrddim_set_by_pointer(stats_chart_data->st_qry_cpu_t_per_mib_user, 
+                                stats_chart_data->dim_qry_cpu_t_per_mib_user[i], 
+                                __atomic_load_n(&p_file_info->cpu_time_per_mib.user, __ATOMIC_RELAXED));
+
+        /* Query CPU time per byte (system) - update */           
+        rrddim_set_by_pointer(stats_chart_data->st_qry_cpu_t_per_mib_sys, 
+                                stats_chart_data->dim_qry_cpu_t_per_mib_sys[i], 
+                                __atomic_load_n(&p_file_info->cpu_time_per_mib.sys, __ATOMIC_RELAXED));
+
     }
 
-    // outside for loop as dimensions updated across different loop iterations, unlike chart_data_arr metrics.
+    // outside for loop as dimensions updated across different loop iterations.
     rrdset_done(stats_chart_data->st_circ_buff_mem_total); 
     rrdset_done(stats_chart_data->st_circ_buff_num_of_items); 
     rrdset_done(stats_chart_data->st_circ_buff_mem_uncompressed);
@@ -294,4 +340,6 @@ void stats_charts_update(uv_timer_t *handle){
     rrdset_done(stats_chart_data->st_compression_ratio);
     rrdset_done(stats_chart_data->st_disk_usage);
     rrdset_done(stats_chart_data->st_db_timings);
+    rrdset_done(stats_chart_data->st_qry_cpu_t_per_mib_user);
+    rrdset_done(stats_chart_data->st_qry_cpu_t_per_mib_sys);
 }

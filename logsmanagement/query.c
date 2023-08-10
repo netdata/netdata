@@ -6,8 +6,11 @@
  *  logs management querying API.
  */
 
+#define _GNU_SOURCE
+
 #include "query.h"
 #include <uv.h>
+#include <sys/resource.h>
 #include "circular_buffer.h"
 #include "db_api.h"
 #include "file_info.h"
@@ -128,7 +131,9 @@ const logs_qry_res_err_t *execute_logs_manag_query(logs_query_params_t *p_query_
         *p_query_params->keyword && strcmp(p_query_params->keyword, " ")){
         p_query_params->keyword = sanitise_string(p_query_params->keyword); // freez(p_query_params->keyword) in this case
     }
-    
+
+    struct rusage ru_start, ru_end;
+    getrusage(RUSAGE_THREAD, &ru_start);
 
     /* Secure DB lock to ensure no data will be transferred from the buffers to 
      * the DB during the query execution and also no other execute_logs_manag_query 
@@ -163,6 +168,21 @@ const logs_qry_res_err_t *execute_logs_manag_query(logs_query_params_t *p_query_
     for(int pfi_off = 0; p_file_infos[pfi_off]; pfi_off++)
         uv_mutex_unlock(p_file_infos[pfi_off]->db_mut);
 
+    getrusage(RUSAGE_THREAD, &ru_end);
+    
+    __atomic_add_fetch(&p_file_infos[0]->cpu_time_per_mib.user,
+        p_query_params->results_buff->len ? (   ru_end.ru_utime.tv_sec    * USEC_PER_SEC - 
+                                                ru_start.ru_utime.tv_sec  * USEC_PER_SEC +
+                                                ru_end.ru_utime.tv_usec   - 
+                                                ru_start.ru_utime.tv_usec ) * (1 MiB) / p_query_params->results_buff->len : 0
+        , __ATOMIC_RELAXED);
+
+    __atomic_add_fetch(&p_file_infos[0]->cpu_time_per_mib.sys,
+        p_query_params->results_buff->len ? (   ru_end.ru_stime.tv_sec    * USEC_PER_SEC - 
+                                                ru_start.ru_stime.tv_sec  * USEC_PER_SEC +
+                                                ru_end.ru_stime.tv_usec   - 
+                                                ru_start.ru_stime.tv_usec ) * (1 MiB) / p_query_params->results_buff->len : 0
+        , __ATOMIC_RELAXED);
 
     /* If keyword has been sanitised, it needs to be freed - otherwise it's just a pointer to a substring */
     if(p_query_params->sanitize_keyword && p_query_params->keyword){
