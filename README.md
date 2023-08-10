@@ -666,12 +666,12 @@ Users help Netdata in the following ways:
 4. **Netdata Cloud Subscriptions**<br/>
    Users who buy Netdata Cloud subscriptions, actively contribute in funding the project's roadmap.
    
-5. **Netdata Cloud On-Prem**<br/>
-   Users who buy Netdata Cloud On-Prem, help the company grow and become profitable.
+5. **Netdata Cloud On-Prem or Private**<br/>
+   Users who buy Netdata Cloud on-prem or private, help the company grow and become profitable.
 
 Some times people think that we offer Netdata Cloud for free, in order to somehow monetize "device heuristics" data. This is not true. There is no value associated to this kind of data and even if there was, we are not interested in monetizing it.
 
-Netdata can only grow when tehnnology intensive organizations and operators want the entire suite (including Netdata Cloud) on-prem or private. This is our main focus for monetization.
+Netdata can only grow when tehnnology intensive organizations and operators need, due to regulatory or business requirements, the entire suite (including Netdata Cloud) on-prem or private. This is our main focus for monetization.
 
 &nbsp;<br/>&nbsp;<br/>
 </details>
