@@ -4,6 +4,9 @@
 
 #define LOG_FUNCTIONS false
 
+#define SERVING_STREAMING(parser) (parser->repertoire == PARSER_INIT_STREAMING)
+#define SERVING_PLUGINSD(parser) (parser->repertoire == PARSER_INIT_PLUGINSD)
+
 static ssize_t send_to_plugin(const char *txt, void *data) {
     PARSER *parser = data;
 
