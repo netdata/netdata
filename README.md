@@ -647,15 +647,15 @@ The Netdata Cloud UI is not open-source. But we thought that it is to the benefi
 
 ### :moneybag: What is your monetization strategy?
 
-We sell subscriptions to Netdata Cloud advanced features, and on-prem (or private) versions of Netdata Cloud.
+Netdata generates revenue through subscriptions to advanced features in Netdata Cloud and sales of on-premises and private versions of Netdata Cloud.
 
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
 
-Users help Netdata in the following ways:
+Here's how our users support and contribute to Netdata:
 
 1. **Anonymous Telemetry Insights**<br/>
-   Users who leave anonymous telemetry enabled, help us make data informed decisions in refining and enhancing Netdata. This isn't a revenue stream, but knowing which features are used and how does contribute in building a better product for everyone.
+   Users who leave anonymous telemetry enabled, help us make data informed decisions in refining and enhancing Netdata. This isn't a revenue stream, but knowing which features are used and how, contributes in building a better product for everyone.
    
 2. **Netdata Cloud Community Use**<br/>
    The free usage of Netdata Cloud demonstrates its market relevance. While this doesn't generate revenue, it reinforces trust among new users and aids in securing appropriate project funding.
