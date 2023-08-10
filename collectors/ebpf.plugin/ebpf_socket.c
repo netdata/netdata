@@ -1180,50 +1180,46 @@ static void ebpf_hash_socket_accumulator(netdata_socket_t *values, netdata_socke
  * Fill buffer with data to be shown on cloud.
  *
  * @param wb          buffer where we store data.
- * @param key         socket information
  * @param values      data read from hash table
  */
-static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_idx_t *key, netdata_socket_t *values)
+static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values)
 {
     buffer_json_add_array_item_array(wb);
 
     // IMPORTANT!
     // THE ORDER SHOULD BE THE SAME WITH THE FIELDS!
 
+    collector_error("KILLME %s", values->socket_string.src_ip);
     // SRC IP
-    struct in_addr ip = { .s_addr = key->saddr.addr32[0] };
-    char *ptr = inet_ntoa(ip);
-    buffer_json_add_array_item_string(wb, ptr);
+    buffer_json_add_array_item_string(wb, values->socket_string.src_ip);
 
     // SRC Port
-    buffer_json_add_array_item_uint64(wb, (uint64_t) ntohs(key->sport));
+    buffer_json_add_array_item_uint64(wb, (uint64_t) values->socket_string.src_port);
 
     // DST IP
-    ip.s_addr = key->daddr.addr32[0];
-    ptr = inet_ntoa(ip);
-    buffer_json_add_array_item_string(wb, ptr);
+    buffer_json_add_array_item_string(wb, values->socket_string.dst_ip);
 
     // DST Port
-    buffer_json_add_array_item_uint64(wb, (uint64_t) ntohs(key->dport));
+    buffer_json_add_array_item_uint64(wb, (uint64_t) values->socket_string.dst_port);
 
-    if (values->protocol == IPPROTO_TCP) {
+    if (values->data.family == IPPROTO_TCP) {
         // Protocol
         buffer_json_add_array_item_string(wb, "TCP");
 
         // Traffic received
-        buffer_json_add_array_item_uint64(wb, (uint64_t) values->tcp.tcp_bytes_received);
+        buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.tcp.tcp_bytes_received);
 
         // Traffic sent
-        buffer_json_add_array_item_uint64(wb, (uint64_t) values->tcp.tcp_bytes_sent);
+        buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.tcp.tcp_bytes_sent);
     } else {
         // Protocol
         buffer_json_add_array_item_string(wb, "UDP");
 
         // Traffic received
-        buffer_json_add_array_item_uint64(wb, (uint64_t) values->udp.call_udp_received);
+        buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.udp.call_udp_received);
 
         // Traffic sent
-        buffer_json_add_array_item_uint64(wb, (uint64_t) values->udp.udp_bytes_sent);
+        buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.udp.udp_bytes_sent);
     }
 
     buffer_json_array_close(wb);
@@ -1241,7 +1237,13 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_idx_t *key, net
 static void ebpf_socket_fill_function_buffer(BUFFER *buf)
 {
     rw_spinlock_read_lock(&ebpf_socket_hs.index.rw_spinlock);
-    //ebpf_fill_function_buffer(buf, &key, &val);
+    Pvoid_t *PValue;
+    netdata_socket_idx_t key = {};
+    bool first = true;
+    while((PValue = JudyLFirstThenNext(&ebpf_socket_hs.index.rw_spinlock, (Word_t *)&key, &first))) {
+        netdata_socket_plus_t *values = (netdata_socket_plus_t *)PValue;
+        ebpf_fill_function_buffer(buf, values);
+    }
     rw_spinlock_read_unlock(&ebpf_socket_hs.index.rw_spinlock);
 }
 
@@ -1295,8 +1297,9 @@ static void ebpf_socket_translate_socket(netdata_socket_plus_t *dst, netdata_soc
         if(inet_ntop(AF_INET6, &ipv6_addr, dst->socket_string.dst_ip, INET_ADDRSTRLEN))
             netdata_log_info("Cannot convert IPv6 Address.");
     }
+    dst->pid = key->pid;
     dst->socket_string.src_port = ntohs(key->sport);
-    dst->socket_string.dst_port = ntohs(key->sport);
+    dst->socket_string.dst_port = ntohs(key->dport);
 }
 
 /**
@@ -1509,11 +1512,14 @@ void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
 {
     // thread was not initialized
     if (!em->maps || (em->maps && em->maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED)){
-        netdata_socket_idx_t key = {.daddr.addr32[0] = 2130706433, .dport = 0,
-                                    .saddr.addr32[0] = 2130706433, .sport = 0,
-                                    .pid = getpid()};
-        netdata_socket_t val = {};
-        ebpf_fill_function_buffer(buf, &key, &val);
+        netdata_socket_plus_t fake_values = { };
+
+        snprintfz(fake_values.socket_string.src_ip, INET6_ADDRSTRLEN, "127.0.0.1");
+        snprintfz(fake_values.socket_string.dst_ip, INET6_ADDRSTRLEN, "127.0.0.1");
+        fake_values.pid = getpid();
+        fake_values.data.family = AF_INET;
+
+        ebpf_fill_function_buffer(buf, &fake_values);
         return;
     }
 

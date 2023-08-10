@@ -298,6 +298,7 @@ typedef struct netdata_socket {
 
 typedef struct netata_socket_plus {
     netdata_socket_t data;           // Data read from database
+    uint32_t pid;
 
     struct  {
         char src_ip[INET6_ADDRSTRLEN + 1];
