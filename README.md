@@ -671,7 +671,7 @@ Users help Netdata in the following ways:
 
 Sometimes people think that we offer Netdata Cloud for free, in order to somehow monetize "device heuristics" data. This is not true. There is no value associated to this kind of data and even if there was, we are not interested in monetizing it.
 
-Our primary financial growth stems from tech-focused organizations needing the entire Netdata suite, including Netdata Cloud, on-premises or as a private solution, combined with top-tier support. This arrangement ensures these organizations receive a battle-tested, reliable and robust solution, while the broader community continues to benefit from our product at no cost.
+Netdata grows financially when tehnnology intensive organizations and operators, need - due to regulatory or business requirements - the entire Netdata suite (including Netdata Cloud) on-prem or private, bundled with top-tier support. It is a win-win case for all parties involved: these companies get a battle tested, robust and reliable solution, while the broader community that helps us build this product, enjoys it at no cost.
 
 &nbsp;<br/>&nbsp;<br/>
 </details>
