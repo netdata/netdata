@@ -37,7 +37,7 @@ enum job_status {
     JOB_STATUS_ERROR
 };
 
-inline enum job_status str2job_state(const char *state_name) {
+static inline enum job_status str2job_state(const char *state_name) {
     if (strcmp(state_name, "stopped") == 0)
         return JOB_STATUS_STOPPED;
     else if (strcmp(state_name, "running") == 0)
@@ -57,7 +57,7 @@ struct job
 {
     char *name;
 
-    //state reported by config
+    // state reported by plugin
     enum job_status status; // reported by plugin, enum as this has to be interpreted by UI
     int state; // code reported by plugin which can mean anything plugin wants
     char *reason; // reported by plugin, can be NULL (optional)
