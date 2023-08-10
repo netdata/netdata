@@ -739,6 +739,107 @@ static int web_client_api_request_v2_config(RRDHOST *host __maybe_unused, struct
     return resp.status;
 }
 
+static json_object *job_statuses_grouped() {
+    json_object *top_obj = json_object_new_object();
+    json_object *host_vec = json_object_new_array();
+
+
+    RRDHOST *host;
+
+    rrd_rdlock();
+    rrdhost_foreach_read(host) {
+        json_object *host_obj = json_object_new_object();
+        json_object *host_sub_obj = json_object_new_string(host->machine_guid);
+        json_object_object_add(host_obj, "host_guid", host_sub_obj);
+        host_sub_obj = json_object_new_array();
+
+        DICTIONARY *plugins_dict = host->configurable_plugins;
+
+        struct configurable_plugin *plugin;
+        dfe_start_read(plugins_dict, plugin) {
+            json_object *plugin_obj = json_object_new_object();
+            json_object *plugin_sub_obj = json_object_new_string(plugin->name);
+            json_object_object_add(plugin_obj, "name", plugin_sub_obj);
+            plugin_sub_obj = json_object_new_array();
+
+            struct module *module;
+            dfe_start_read(plugin->modules, module) {
+                json_object *module_obj = json_object_new_object();
+                json_object *module_sub_obj = json_object_new_string(module->name);
+                json_object_object_add(module_obj, "name", module_sub_obj);
+                module_sub_obj = json_object_new_array();
+
+                struct job *job;
+                dfe_start_read(module->jobs, job) {
+                    json_object *job_obj = json_object_new_object();
+                    json_object *job_sub_obj = json_object_new_string(job->name);
+                    json_object_object_add(job_obj, "name", job_sub_obj);
+                    job_sub_obj = job2json(job);
+                    json_object_object_add(job_obj, "job", job_sub_obj);
+                    json_object_array_add(module_sub_obj, job_obj);
+                } dfe_done(job);
+                json_object_object_add(module_obj, "jobs", module_sub_obj);
+                json_object_array_add(plugin_sub_obj, module_obj);
+            } dfe_done(module);
+            json_object_object_add(plugin_obj, "modules", plugin_sub_obj);
+            json_object_array_add(host_sub_obj, plugin_obj);
+        } dfe_done(plugin);
+        json_object_object_add(host_obj, "plugins", host_sub_obj);
+        json_object_array_add(host_vec, host_obj);
+    }
+    rrd_unlock();
+
+    json_object_object_add(top_obj, "hosts", host_vec);
+    return top_obj;
+}
+
+static json_object *job_statuses_flat() {
+    RRDHOST *host;
+
+    json_object *ret = json_object_new_array();
+
+    rrd_rdlock();
+    rrdhost_foreach_read(host) {
+        DICTIONARY *plugins_dict = host->configurable_plugins;
+
+        struct configurable_plugin *plugin;
+        dfe_start_read(plugins_dict, plugin) {
+            struct module *module;
+            dfe_start_read(plugin->modules, module) {
+                struct job *job;
+                dfe_start_read(module->jobs, job) {
+                    json_object *job_rich = json_object_new_object();
+                    json_object *obj = json_object_new_string(host->machine_guid);
+                    json_object_object_add(job_rich, "host_guid", obj);
+                    obj = json_object_new_string(plugin->name);
+                    json_object_object_add(job_rich, "plugin_name", obj);
+                    obj = json_object_new_string(module->name);
+                    json_object_object_add(job_rich, "module_name", obj);
+                    obj = job2json(job);
+                    json_object_object_add(job_rich, "job", obj);
+                    json_object_array_add(ret, job_rich);
+                } dfe_done(job);
+            } dfe_done(module);
+        } dfe_done(plugin);
+    }
+    rrd_unlock();
+
+    return ret;
+}
+
+static int web_client_api_request_v2_job_statuses(RRDHOST *host, struct web_client *w, char *query) {
+    json_object *json;
+    if (strstr(query, "grouped") != NULL)
+        json = job_statuses_grouped();
+    else
+        json = job_statuses_flat();
+
+    buffer_flush(w->response.data);
+    buffer_strcat(w->response.data, json_object_to_json_string_ext(json, JSON_C_TO_STRING_PRETTY));
+    w->response.data->content_type = CT_APPLICATION_JSON;
+    return HTTP_RESP_OK;
+}
+
 static struct web_api_command api_commands_v2[] = {
         {"info",                0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_info, 0},
 
@@ -762,7 +863,8 @@ static struct web_api_command api_commands_v2[] = {
         {"bearer_protection",   0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, api_v2_bearer_protection, 0},
         {"bearer_get_token",    0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, api_v2_bearer_token, 0},
 
-        {"config", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_config, 1},
+        {"config",        0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_config,       1},
+        {"job_statuses",  0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_job_statuses, 0},
 
         { "ilove.svg",       0, WEB_CLIENT_ACL_NOCHECK, web_client_api_request_v2_ilove, 0 },
 
