@@ -1950,6 +1950,75 @@ static void virt_fnc_got_data_cb(BUFFER *wb __maybe_unused, int code, void *call
 }
 
 #define VIRT_FNC_TIMEOUT 1
+void call_virtual_function_async(BUFFER *wb, RRDHOST *host, const char *name, const char *payload, rrd_function_result_callback_t callback, void *callback_data) {
+    PARSER *parser = NULL;
+
+    //TODO simplify (as we really need only first parameter to get plugin name maybe we can avoid parsing all)
+    char *words[PLUGINSD_MAX_WORDS];
+    char *function_with_params = strdupz(name);
+    BUFFER *function_out = buffer_create(strlen(name), NULL);
+    size_t num_words = quoted_strings_splitter(function_with_params, words, PLUGINSD_MAX_WORDS, isspace_map_pluginsd);
+
+    if (num_words < 2) {
+        netdata_log_error("PLUGINSD: virtual function name is emptya.");
+        return;
+    }
+
+    const DICTIONARY_ITEM *cpi = dictionary_get_and_acquire_item(host->configurable_plugins, get_word(words, num_words, 1));
+    if (unlikely(cpi == NULL)) {
+        netdata_log_error("PLUGINSD: virtual function plugin '%s' not found.", name);
+        freez(function_with_params);
+        return;
+    }
+    struct configurable_plugin *cp = dictionary_acquired_item_value(cpi);
+    parser = (PARSER *)cp->cb_usr_ctx;
+
+    // if we are forwarding this to a plugin (as opposed to streaming/child) we have to remove the first parameter (plugin_name)
+    buffer_strcat(function_out, get_word(words, num_words, 0));
+    for (size_t i = 1; i < num_words; i++) {
+        if (i == 1 && SERVING_PLUGINSD(parser))
+            continue;
+        buffer_sprintf(function_out, " %s", get_word(words, num_words, i));
+    }
+    freez(function_with_params);
+
+    usec_t now = now_realtime_usec();
+
+    struct inflight_function tmp = {
+        .started_ut = now,
+        .timeout_ut = now + VIRT_FNC_TIMEOUT + USEC_PER_SEC,
+        .result_body_wb = wb,
+        .timeout = VIRT_FNC_TIMEOUT * 10,
+        .function = string_strdupz(buffer_tostring(function_out)),
+        .result_cb = callback,
+        .result_cb_data = callback_data,
+        .payload = NULL,
+    };
+    buffer_free(function_out);
+
+    uuid_t uuid;
+    uuid_generate_time(uuid);
+
+    char key[UUID_STR_LEN];
+    uuid_unparse_lower(uuid, key);
+
+    dictionary_write_lock(parser->inflight.functions);
+
+    // if there is any error, our dictionary callbacks will call the caller callback to notify
+    // the caller about the error - no need for error handling here.
+    dictionary_set(parser->inflight.functions, key, &tmp, sizeof(struct inflight_function));
+
+    if(!parser->inflight.smaller_timeout || tmp.timeout_ut < parser->inflight.smaller_timeout)
+        parser->inflight.smaller_timeout = tmp.timeout_ut;
+
+    // garbage collect stale inflight functions
+    if(parser->inflight.smaller_timeout < now)
+        inflight_functions_garbage_collect(parser, now);
+
+    dictionary_write_unlock(parser->inflight.functions);
+}
+
+
 dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name, int *rc, const char *payload) {
     usec_t now = now_realtime_usec();
     BUFFER *wb = buffer_create(4096, NULL);
