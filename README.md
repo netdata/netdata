@@ -645,6 +645,37 @@ The Netdata Cloud UI is not open-source. But we thought that it is to the benefi
 &nbsp;<br/>&nbsp;<br/>
 </details>
 
+### :moneybag: What is your monetization strategy?
+
+We sell subscriptions to Netdata Cloud advanced features, and on-prem (or private) versions of Netdata Cloud.
+
+<details><summary>Click to see detailed answer ...</summary>
+&nbsp;<br/>&nbsp;<br/>
+
+Users help Netdata in the following ways:
+
+1. **Anonymous Telemetry**<br/>
+   Users that leave anonymous telemetry enabled, help us make data informed decisions about the future of the project. There is no direct monetization related to this, but knowing which features are used and how, does contribute in building a better product for everyone.
+   
+2. **Netdata Cloud Free**<br/>
+   Users who use Netdata Cloud for free, help us provide evidence of product market fit. Again, there is no direct monetization related to this, but it helps the project in two ways: it makes the project trustworthy to new users, and helps us attract the right investors for funding the project's roadmap.
+   
+3. **Feedback**<br/>
+   Users who report issues and bugs help us improve the project itself, to offer a battle tested, mature, reliable and robust solution to everyone. There is no monetization related to this, but it is a crucial part for a successful project.
+   
+4. **Netdata Cloud Subscriptions**<br/>
+   Users who buy Netdata Cloud subscriptions, actively contribute in funding the project's roadmap.
+   
+5. **Netdata Cloud On-Prem**<br/>
+   Users who buy Netdata Cloud On-Prem, help the company grow and become profitable.
+
+Some times people think that we offer Netdata Cloud for free, in order to somehow monetize "device heuristics" data. This is not true. There is no value associated to this kind of data and even if there was, we are not interested in monetizing it.
+
+Netdata can only grow when tehnnology intensive organizations and operators want the entire suite (including Netdata Cloud) on-prem or private. This is our main focus for monetization.
+
+&nbsp;<br/>&nbsp;<br/>
+</details>
+
 ## :book: Documentation
 
 Netdata's documentation is available at [**Netdata Learn**](https://learn.netdata.cloud).
