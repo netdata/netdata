@@ -187,7 +187,7 @@ services:
     security_opt:
       - apparmor:unconfined
     volumes:
-      - ./netdataconfig/netdata:/etc/netdata:ro
+      - ./netdataconfig/netdata:/etc/netdata
       - netdatalib:/var/lib/netdata
       - netdatacache:/var/cache/netdata
       - /etc/passwd:/host/etc/passwd:ro
