@@ -439,6 +439,8 @@ So, the biggest difference of Netdata to Prometheus, and Grafana, is that we dec
 
     Maintaining such an index is a challenge: first, because the raw metrics collected do not provide this information, so we have to add it, and second because we need to maintain this index for the lifetime of each metric, which with our current database retention, it is usually more than a year.
 
+    At the same time, Netdata provides better retention than Prometheus due to database tiering, scales easier than Prometheus due to streaming, supports anomaly detection and it has a mertrics scoring engine to find the needle in the haystack when needed.
+
   - When compared to Grafana, Netdata is fully automated. Grafana has more customization capabilities than Netdata, but Netdata presents fully functional dashboards by itself and most importantly it gives you the means to understand, analyze, filter, slice and dice the data without the need for you to edit queries or be aware of any peculiarities the underlying metrics may have.
 
     Furthermore, to help you when you need to find the needle in the haystack, Netdata has advanced troubleshooting tools provided by the Netdata metrics scoring engine, that allows it to score metrics based on their anomaly rate, their differences or similarities for any given time frame.
