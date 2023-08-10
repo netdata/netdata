@@ -98,9 +98,6 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
 ## What's New and Coming?
 
-> **Spoiler!**<br/>
-> Netdata Integrations Marketplace is coming...
-
 <details><summary>Click to see our immediate development plans and a summary view of the last 12 months' releases...</summary>
 &nbsp;<br/>
 
