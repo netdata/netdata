@@ -2014,48 +2014,105 @@ dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name,
     return cfg;
 }
 
-static dyncfg_config_t get_plugin_config_cb(void *usr_ctx)
+#define CVF_MAX_LEN (1024)
+static dyncfg_config_t get_plugin_config_cb(void *usr_ctx, const char *plugin_name)
 {
     PARSER *parser = usr_ctx;
-    return call_virtual_function_blocking(parser, "get_plugin_config", NULL, NULL);
+
+    if (SERVING_STREAMING(parser)) {
+        char buf[CVF_MAX_LEN + 1];
+        snprintfz(buf, CVF_MAX_LEN, FUNCTION_NAME_GET_PLUGIN_CONFIG " %s", plugin_name);
+        return call_virtual_function_blocking(parser, buf, NULL, NULL);
+    }
+
+    return call_virtual_function_blocking(parser, FUNCTION_NAME_GET_PLUGIN_CONFIG, NULL, NULL);
 }
 
-static dyncfg_config_t get_plugin_config_schema_cb(void *usr_ctx)
+static dyncfg_config_t get_plugin_config_schema_cb(void *usr_ctx, const char *plugin_name)
 {
     PARSER *parser = usr_ctx;
+
+    if (SERVING_STREAMING(parser)) {
+        char buf[CVF_MAX_LEN + 1];
+        snprintfz(buf, CVF_MAX_LEN, FUNCTION_NAME_GET_PLUGIN_CONFIG_SCHEMA " %s", plugin_name);
+        return call_virtual_function_blocking(parser, buf, NULL, NULL);
+    }
+
     return call_virtual_function_blocking(parser, "get_plugin_config_schema", NULL, NULL);
 }
 
-static dyncfg_config_t get_module_config_cb(void *usr_ctx, const char *module_name)
+static dyncfg_config_t get_module_config_cb(void *usr_ctx, const char *plugin_name, const char *module_name)
 {
     PARSER *parser = usr_ctx;
-    char buf[1024];
-    snprintfz(buf, sizeof(buf), "get_module_config %s", module_name);
-    return call_virtual_function_blocking(parser, buf, NULL, NULL);
+    BUFFER *wb = buffer_create(CVF_MAX_LEN, NULL);
+
+    buffer_strcat(wb, FUNCTION_NAME_GET_MODULE_CONFIG);
+    if (SERVING_STREAMING(parser))
+        buffer_sprintf(wb, " %s", plugin_name);
+    
+    buffer_sprintf(wb, " %s", module_name);
+
+    dyncfg_config_t ret = call_virtual_function_blocking(parser, buffer_tostring(wb), NULL, NULL);
+
+    buffer_free(wb);
+
+    return ret;
 }
 
-static dyncfg_config_t get_module_config_schema_cb(void *usr_ctx, const char *module_name)
+static dyncfg_config_t get_module_config_schema_cb(void *usr_ctx, const char *plugin_name, const char *module_name)
 {
     PARSER *parser = usr_ctx;
-    char buf[1024];
-    snprintfz(buf, sizeof(buf), "get_module_config_schema %s", module_name);
-    return call_virtual_function_blocking(parser, buf, NULL, NULL);
+    BUFFER *wb = buffer_create(CVF_MAX_LEN, NULL);
+
+    buffer_strcat(wb, FUNCTION_NAME_GET_MODULE_CONFIG_SCHEMA);
+    if (SERVING_STREAMING(parser))
+        buffer_sprintf(wb, " %s", plugin_name);
+
+    buffer_sprintf(wb, " %s", module_name);
+
+    dyncfg_config_t ret = call_virtual_function_blocking(parser, buffer_tostring(wb), NULL, NULL);
+
+    buffer_free(wb);
+
+    return ret;
 }
 
-static dyncfg_config_t get_job_config_schema_cb(void *usr_ctx, const char *module_name)
+static dyncfg_config_t get_job_config_schema_cb(void *usr_ctx, const char *plugin_name, const char *module_name)
 {
     PARSER *parser = usr_ctx;
-    char buf[1024];
-    snprintfz(buf, sizeof(buf), "get_job_config_schema %s", module_name);
-    return call_virtual_function_blocking(parser, buf, NULL, NULL);
+    BUFFER *wb = buffer_create(CVF_MAX_LEN, NULL);
+
+    buffer_strcat(wb, FUNCTION_NAME_GET_JOB_CONFIG_SCHEMA);
+
+    if (SERVING_STREAMING(parser))
+        buffer_sprintf(wb, " %s", plugin_name);
+
+    buffer_sprintf(wb, " %s", module_name);
+
+    dyncfg_config_t ret = call_virtual_function_blocking(parser, buffer_tostring(wb), NULL, NULL);
+
+    buffer_free(wb);
+
+    return ret;
 }
 
-static dyncfg_config_t get_job_config_cb(void *usr_ctx, const char *module_name, const char* job_name)
+static dyncfg_config_t get_job_config_cb(void *usr_ctx, const char *plugin_name, const char *module_name, const char* job_name)
 {
     PARSER *parser = usr_ctx;
-    char buf[1024];
-    snprintfz(buf, sizeof(buf), "get_job_config %s %s", module_name, job_name);
-    return call_virtual_function_blocking(parser, buf, NULL, NULL);
+    BUFFER *wb = buffer_create(CVF_MAX_LEN, NULL);
+
+    buffer_strcat(wb, FUNCTION_NAME_GET_JOB_CONFIG);
+
+    if (SERVING_STREAMING(parser))
+        buffer_sprintf(wb, " %s", plugin_name);
+
+    buffer_sprintf(wb, " %s %s", module_name, job_name);
+
+    dyncfg_config_t ret = call_virtual_function_blocking(parser, buffer_tostring(wb), NULL, NULL);
+
+    buffer_free(wb);
+
+    return ret;
 }
 
 enum set_config_result set_plugin_config_cb(void *usr_ctx, dyncfg_config_t *cfg)

@@ -518,7 +518,7 @@ static void handle_plugin_root(struct uni_http_response *resp, int method, struc
     switch(method) {
         case HTTP_METHOD_GET:
         {
-            dyncfg_config_t cfg = plugin->get_config_cb(plugin->cb_usr_ctx);
+            dyncfg_config_t cfg = plugin->get_config_cb(plugin->cb_usr_ctx, plugin->name);
             resp->content = mallocz(cfg.data_size);
             memcpy(resp->content, cfg.data, cfg.data_size);
             resp->status = HTTP_RESP_OK;
@@ -562,7 +562,7 @@ static void handle_plugin_root(struct uni_http_response *resp, int method, struc
 void handle_module_root(struct uni_http_response *resp, int method, struct configurable_plugin *plugin, const char *module, void *post_payload, size_t post_payload_size)
 {
     if (strncmp(module, DYN_CONF_SCHEMA, strlen(DYN_CONF_SCHEMA)) == 0) {
-        dyncfg_config_t cfg = plugin->get_config_schema_cb(plugin->cb_usr_ctx);
+        dyncfg_config_t cfg = plugin->get_config_schema_cb(plugin->cb_usr_ctx, plugin->name);
         resp->content = mallocz(cfg.data_size);
         memcpy(resp->content, cfg.data, cfg.data_size);
         resp->status = HTTP_RESP_OK;
@@ -596,7 +596,7 @@ void handle_module_root(struct uni_http_response *resp, int method, struct confi
         return;
     }
     if (method == HTTP_METHOD_GET) {
-        dyncfg_config_t cfg = mod->get_config_cb(mod->config_cb_usr_ctx, mod->name);
+        dyncfg_config_t cfg = mod->get_config_cb(mod->config_cb_usr_ctx, plugin->name, mod->name);
         resp->content = mallocz(cfg.data_size);
         memcpy(resp->content, cfg.data, cfg.data_size);
         resp->status = HTTP_RESP_OK;
@@ -672,7 +672,7 @@ static inline void _handle_job_root(struct uni_http_response *resp, int method, 
     switch (method) {
         case HTTP_METHOD_GET:
         {
-            dyncfg_config_t cfg = mod->get_job_config_cb(mod->job_config_cb_usr_ctx, mod->name, job->name);
+            dyncfg_config_t cfg = mod->get_job_config_cb(mod->job_config_cb_usr_ctx, mod->plugin->name, mod->name, job->name);
             resp->content = mallocz(cfg.data_size);
             memcpy(resp->content, cfg.data, cfg.data_size);
             resp->status = HTTP_RESP_OK;
@@ -727,7 +727,7 @@ static inline void _handle_job_root(struct uni_http_response *resp, int method, 
 void handle_job_root(struct uni_http_response *resp, int method, struct module *mod, const char *job_id, void *post_payload, size_t post_payload_size)
 {
     if (strncmp(job_id, DYN_CONF_SCHEMA, strlen(DYN_CONF_SCHEMA)) == 0) {
-        dyncfg_config_t cfg = mod->get_config_schema_cb(mod->config_cb_usr_ctx, mod->name);
+        dyncfg_config_t cfg = mod->get_config_schema_cb(mod->config_cb_usr_ctx, mod->plugin->name, mod->name);
         resp->content = mallocz(cfg.data_size);
         memcpy(resp->content, cfg.data, cfg.data_size);
         resp->status = HTTP_RESP_OK;
@@ -736,7 +736,7 @@ void handle_job_root(struct uni_http_response *resp, int method, struct module *
         return;
     }
     if (strncmp(job_id, DYN_CONF_JOB_SCHEMA, strlen(DYN_CONF_JOB_SCHEMA)) == 0) {
-        dyncfg_config_t cfg = mod->get_job_config_schema_cb(mod->job_config_cb_usr_ctx, mod->name);
+        dyncfg_config_t cfg = mod->get_job_config_schema_cb(mod->job_config_cb_usr_ctx, mod->plugin->name, mod->name);
         resp->content = mallocz(cfg.data_size);
         memcpy(resp->content, cfg.data, cfg.data_size);
         resp->status = HTTP_RESP_OK;
