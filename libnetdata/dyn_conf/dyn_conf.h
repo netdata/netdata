@@ -186,6 +186,8 @@ struct configurable_plugin *get_plugin_by_name(DICTIONARY *plugins_dict, const c
 json_object *get_list_of_modules_json(struct configurable_plugin *plugin);
 struct module *get_module_by_name(struct configurable_plugin *plugin, const char *module_name);
 
+json_object *job2json(struct job *job);
+
 // helper struct to make interface between internal webserver and h2o same
 struct uni_http_response {
     int status;

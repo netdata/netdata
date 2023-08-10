@@ -170,15 +170,12 @@ static void _job_flags2str_cb(const char *str, void *data)
     json_object_array_add((json_object *)data, json_item);
 }
 
-static int _get_list_of_jobs_json_cb(const DICTIONARY_ITEM *item, void *entry, void *data)
-{
-    UNUSED(item);
-    json_object *obj = (json_object *)data;
-    struct job *job = (struct job *)entry;
-
+json_object *job2json(struct job *job) {
     json_object *json_job = json_object_new_object();
+
     json_object *json_item = json_object_new_string(job->name);
     json_object_object_add(json_job, "name", json_item);
+
     json_item = json_object_new_string(job_status2str(job->status));
     json_object_object_add(json_job, "state", json_item);
 
@@ -197,6 +194,16 @@ static int _get_list_of_jobs_json_cb(const DICTIONARY_ITEM *item, void *entry, v
     json_item = json_object_new_array();
     job_flags_wallktrough(job->flags, _job_flags2str_cb, json_item);
     json_object_object_add(json_job, "flags", json_item);
+
+    return json_job;
+}
+
+static int _get_list_of_jobs_json_cb(const DICTIONARY_ITEM *item, void *entry, void *data)
+{
+    UNUSED(item);
+    json_object *obj = (json_object *)data;
+
+    json_object *json_job = job2json((struct job *)entry);
 
     json_object_array_add(obj, json_job);
 
