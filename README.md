@@ -655,23 +655,23 @@ We sell subscriptions to Netdata Cloud advanced features, and on-prem (or privat
 Users help Netdata in the following ways:
 
 1. **Anonymous Telemetry**<br/>
-   Users that leave anonymous telemetry enabled, help us make data informed decisions about the future of the project. There is no monetization related to this, but knowing which features are used and how, does contribute in building a better product for everyone.
+   Users who leave anonymous telemetry enabled, help us make data informed decisions about the future of the project. There is no monetization related to this, but knowing which features are used and how, does contribute in building a better product for everyone.
    
-2. **Netdata Cloud Free**<br/>
+2. **Netdata Cloud Community Accounts**<br/>
    Users who use Netdata Cloud for free, help us provide evidence of product market fit. Again, there is no monetization related to this, but it helps the project in two ways: it makes the project trustworthy to new users, and helps us attract the right investors for funding the project's roadmap.
    
 3. **Feedback**<br/>
-   Users who report issues and bugs help us improve the project itself, to offer a battle tested, mature, reliable and robust solution to everyone. There is no monetization related to this, but it is a crucial part for a successful project.
+   Users who report issues and bugs help us improve the project, to offer a mature, reliable and robust solution to everyone. There is no monetization related to this, but it is a crucial part for a successful project.
    
 4. **Netdata Cloud Subscriptions**<br/>
    Users who buy Netdata Cloud subscriptions, actively contribute in funding the project's roadmap.
    
 5. **Netdata Cloud On-Prem or Private**<br/>
-   Users who buy Netdata Cloud on-prem or private, help the company grow and become profitable.
+   Users who buy Netdata Cloud on-prem or private, help the company grow financially.
 
-Some times people think that we offer Netdata Cloud for free, in order to somehow monetize "device heuristics" data. This is not true. There is no value associated to this kind of data and even if there was, we are not interested in monetizing it.
+Sometimes people think that we offer Netdata Cloud for free, in order to somehow monetize "device heuristics" data. This is not true. There is no value associated to this kind of data and even if there was, we are not interested in monetizing it.
 
-Netdata can only grow when tehnnology intensive organizations and operators need, due to regulatory or business requirements, the entire suite (including Netdata Cloud) on-prem or private. This is our main focus for monetization.
+Netdata grows financially when tehnnology intensive organizations and operators, need - due to regulatory or business requirements - the entire Netdata suite (including Netdata Cloud) on-prem or private, bundled with premium support. It is a win-win case for all parties involved: these companies get a battle tested, robust and reliable solution, and the community that helps us build this product, enjoys it for free.
 
 &nbsp;<br/>&nbsp;<br/>
 </details>
