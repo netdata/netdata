@@ -5,6 +5,17 @@
 
 #include "../libnetdata.h"
 
+#define FUNCTION_NAME_GET_PLUGIN_CONFIG "get_plugin_config"
+#define FUNCTION_NAME_GET_PLUGIN_CONFIG_SCHEMA "get_plugin_config_schema"
+#define FUNCTION_NAME_GET_MODULE_CONFIG "get_module_config"
+#define FUNCTION_NAME_GET_MODULE_CONFIG_SCHEMA "get_module_config_schema"
+#define FUNCTION_NAME_GET_JOB_CONFIG "get_job_config"
+#define FUNCTION_NAME_GET_JOB_CONFIG_SCHEMA "get_job_config_schema"
+#define FUNCTION_NAME_SET_PLUGIN_CONFIG "set_plugin_config"
+#define FUNCTION_NAME_SET_MODULE_CONFIG "set_module_config"
+#define FUNCTION_NAME_SET_JOB_CONFIG "set_job_config"
+#define FUNCTION_NAME_DELETE_JOB "delete_job"
+
 enum module_type {
     MOD_TYPE_UNKNOWN = 0,
     MOD_TYPE_ARRAY,
