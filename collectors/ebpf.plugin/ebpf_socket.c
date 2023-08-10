@@ -1300,6 +1300,16 @@ static void ebpf_socket_translate_socket(netdata_socket_plus_t *dst, netdata_soc
     dst->pid = key->pid;
     dst->socket_string.src_port = ntohs(key->sport);
     dst->socket_string.dst_port = ntohs(key->dport);
+
+#ifdef NETDATA_DEV_MODE
+    collector_info("New socket: (SRC IP: %s, SRC PORT: %u,  DST IP:%s, DST PORT: %u, PID %u)",
+                   dst->socket_string.src_ip,
+                   dst->socket_string.src_port,
+                   dst->socket_string.dst_ip,
+                   dst->socket_string.dst_port,
+                   dst->pid
+                   );
+#endif
 }
 
 /**
@@ -1349,16 +1359,17 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         ebpf_socket_fill_publish_apps(key.pid, values);
 
         netdata_socket_plus_t **item_pptr = (netdata_socket_plus_t **) ebpf_socket_hashtable_insert_unsafe(&hs, &key);
-        bool update_string = true;
+        bool update_string = false;
         if (likely(*item_pptr == NULL)) {
             // a new item added to the index
             *item_pptr = aral_mallocz(ebpf_socket_hs.socket_table);
-            update_string = false;
+            update_string = true;
         }
         netdata_socket_plus_t *item = *item_pptr;
         memcpy(&item->data, &values[0], sizeof(netdata_socket_t));
-        if (update_string)
+        if (update_string) {
             ebpf_socket_translate_socket(item, &key);
+        }
 
         memset(values, 0, length);
 
