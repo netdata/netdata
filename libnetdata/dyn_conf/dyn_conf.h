@@ -205,4 +205,14 @@ void plugin_del_cb(const DICTIONARY_ITEM *item, void *value, void *data);
 
 void *dyncfg_main(void *in);
 
+#define DYNCFG_FUNCTION_TYPE_REGULAR (1 << 0)
+#define DYNCFG_FUNCTION_TYPE_PAYLOAD (1 << 1)
+#define DYNCFG_FUNCTION_TYPE_GET     (1 << 2)
+#define DYNCFG_FUNCTION_TYPE_SET     (1 << 3)
+#define DYNCFG_FUNCTION_TYPE_DELETE  (1 << 4)
+#define DYNCFG_FUNCTION_TYPE_ALL \
+    (DYNCFG_FUNCTION_TYPE_REGULAR | DYNCFG_FUNCTION_TYPE_PAYLOAD | DYNCFG_FUNCTION_TYPE_GET | DYNCFG_FUNCTION_TYPE_SET | DYNCFG_FUNCTION_TYPE_DELETE)
+
+bool is_dyncfg_function(const char *function_name, uint8_t type);
+
 #endif //DYN_CONF_H
