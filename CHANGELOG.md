@@ -1,5 +1,14 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.42.0...HEAD)
+
+**Merged pull requests:**
+
+- mark integrations milestones as completed in README.md [\#15783](https://github.com/netdata/netdata/pull/15783) ([tkatsoulas](https://github.com/tkatsoulas))
+- Update an oversight on the openSUSE 15.5 packages [\#15781](https://github.com/netdata/netdata/pull/15781) ([tkatsoulas](https://github.com/tkatsoulas))
+
 ## [v1.42.0](https://github.com/netdata/netdata/tree/v1.42.0) (2023-08-09)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.41.0...v1.42.0)
