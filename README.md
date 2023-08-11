@@ -652,24 +652,26 @@ Netdata generates revenue through subscriptions to advanced features in Netdata 
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
 
-Here's how our users support and contribute to Netdata:
+Netdata generates revenue from these activities:
 
-1. **Anonymous Telemetry Insights**<br/>
-   Users who leave anonymous telemetry enabled, help us make data informed decisions in refining and enhancing Netdata. This isn't a revenue stream, but knowing which features are used and how, contributes in building a better product for everyone.
-   
-2. **Netdata Cloud Community Use**<br/>
-   The free usage of Netdata Cloud demonstrates its market relevance. While this doesn't generate revenue, it reinforces trust among new users and aids in securing appropriate project funding.
-   
-3. **User Feedback**<br/>
-   Feedback, especially issues and bug reports, is invaluable. It steers us towards a more resilient and efficient product. This, too, isn't a revenue source but is pivotal for our project's evolution.
-   
-4. **Netdata Cloud Subscriptions**<br/>
+1. **Netdata Cloud Subscriptions**<br/>
    Direct funding for our project's vision comes from users subscribing to Netdata Cloud's advanced features.
    
-5. **Netdata Cloud On-Prem or Private**<br/>
+2. **Netdata Cloud On-Prem or Private**<br/>
    Purchasing the on-premises or private versions of Netdata Cloud supports our financial growth.
 
-Sometimes people think that we offer Netdata Cloud for free, in order to somehow monetize "device heuristics" data. This is not true. There is no value associated to this kind of data and even if there was, we are not interested in monetizing it.
+Our Open-Source Community and the free access to Netdata Cloud, contribute to Netdata in the following ways:
+
+- **Netdata Cloud Community Use**<br/>
+  The free usage of Netdata Cloud demonstrates its market relevance. While this doesn't generate revenue, it reinforces trust among new users and aids in securing appropriate project funding.
+
+- **User Feedback**<br/>
+  Feedback, especially issues and bug reports, is invaluable. It steers us towards a more resilient and efficient product. This, too, isn't a revenue source but is pivotal for our project's evolution.
+
+- **Anonymous Telemetry Insights**<br/>
+  Users who leave anonymous telemetry enabled, help us make data informed decisions in refining and enhancing Netdata. This isn't a revenue stream, but knowing which features are used and how, contributes in building a better product for everyone.
+
+We don't monetize, directly or indirectly, users' or "device heuristics" data. Any data collected from community members are exclusively used for the purposes stated above.
 
 Netdata grows financially when tehnnology intensive organizations and operators, need - due to regulatory or business requirements - the entire Netdata suite (including Netdata Cloud) on-prem or private, bundled with top-tier support. It is a win-win case for all parties involved: these companies get a battle tested, robust and reliable solution, while the broader community that helps us build this product, enjoys it at no cost.
 
