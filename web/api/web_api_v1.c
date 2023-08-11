@@ -1522,6 +1522,7 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
 }
 #endif
 
+#define ENABLE_LOGSMANAGEMENT
 #ifdef ENABLE_LOGSMANAGEMENT
 inline int web_client_api_request_v1_logsmanagement_sources(RRDHOST *host, struct web_client *w, char *url) {
     UNUSED(host);
@@ -1679,19 +1680,17 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
                 w->response.data->buffer[w->response.data->len++] = '\\';
                 w->response.data->buffer[w->response.data->len++] = '"';
             }
-            else {
+            else if(unlikely(iscntrl(*p) && *(p+1) == '[')) {
                 // Escape control characters like [90m
-                if(unlikely(iscntrl(*p) && *(p+1) == '[')) {
-                    while(*p != 'm'){
-                        // buffer_need_bytes(w->response.data, 1);
-                        p++;
-                        remaining--;
-                    }
-                }
-                else{
+                while(*p != 'm'){
                     // buffer_need_bytes(w->response.data, 1);
-                    w->response.data->buffer[w->response.data->len++] = *p;
+                    p++;
+                    remaining--;
                 }
+            }
+            else{
+                // buffer_need_bytes(w->response.data, 1);
+                w->response.data->buffer[w->response.data->len++] = *p;
             }
             p++;
         }
@@ -1711,21 +1710,25 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
         if(query_params.results_buff->len - res_off > 0) buffer_strcat(w->response.data, ",\n");
     }
 
-
-    
-    buffer_strcat(w->response.data, "\n\t],\n");
-    buffer_sprintf(w->response.data, "\t\"num_lines\": %lu,\n", query_params.num_lines);
     getrusage(RUSAGE_THREAD, &end);
-    buffer_sprintf(w->response.data, "\t\"user_time\": %llu,\n", end.ru_utime.tv_sec * USEC_PER_SEC + 
-                                                                 end.ru_utime.tv_usec - 
-                                                                 start.ru_utime.tv_sec * USEC_PER_SEC -
-                                                                 start.ru_utime.tv_usec);
-    buffer_sprintf(w->response.data, "\t\"system_time\": %llu,\n", end.ru_stime.tv_sec * USEC_PER_SEC + 
-                                                                   end.ru_stime.tv_usec - 
-                                                                   start.ru_stime.tv_sec * USEC_PER_SEC -
-                                                                   start.ru_stime.tv_usec);
-    buffer_sprintf(w->response.data, "\t\"error_code\": %d,\n", res_err->err_code);
-    buffer_sprintf(w->response.data, "\t\"error\": \"%s\"\n}", res_err->err_str);
+    
+    buffer_sprintf(w->response.data,    "\n\t],\n"
+                                        "\t\"num_lines\": %lu,\n"
+                                        "\t\"user_time\": %llu,\n"
+                                        "\t\"system_time\": %llu,\n"
+                                        "\t\"error_code\": %d,\n"
+                                        "\t\"error\": \"%s\"\n}", 
+                                        query_params.num_lines,
+                                        end.ru_utime.tv_sec * USEC_PER_SEC + 
+                                            end.ru_utime.tv_usec - 
+                                            start.ru_utime.tv_sec * USEC_PER_SEC -
+                                            start.ru_utime.tv_usec,
+                                        end.ru_stime.tv_sec * USEC_PER_SEC + 
+                                            end.ru_stime.tv_usec - 
+                                            start.ru_stime.tv_sec * USEC_PER_SEC -
+                                            start.ru_stime.tv_usec,
+                                        res_err->err_code,
+                                        res_err->err_str);
         
     buffer_free(query_params.results_buff);
 
