@@ -1636,19 +1636,19 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
     buffer_sprintf(w->response.data, "\t\"requested_chart_name\":[\n");
     while(query_params.chart_name[cn_off]) buffer_sprintf(w->response.data, "\t\t\"%s\",\n", query_params.chart_name[cn_off++]);
     if(query_params.chart_name[0])  w->response.data->len -= 2;
-    buffer_strcat(w->response.data, "\n\t],\n");
-    buffer_strcat(w->response.data, "\t\"data\":[\n");
+    buffer_strcat(w->response.data, "\n\t],\n"
+                                    "\t\"data\":[\n");
     
     size_t res_off = 0;
     logs_query_res_hdr_t *p_res_hdr;
     while(query_params.results_buff->len - res_off > 0){
         p_res_hdr = (logs_query_res_hdr_t *) &query_params.results_buff->buffer[res_off];
         
-        buffer_sprintf(w->response.data, "\t\t[\n\t\t\t%llu,\n" , p_res_hdr->timestamp);
-
-        buffer_strcat(w->response.data, "\t\t\t[\n\t");
-
-        buffer_strcat(w->response.data, "\t\t\t\"");
+        buffer_sprintf(w->response.data,    "\t\t[\n"
+                                            "\t\t\t%llu,\n"
+                                            "\t\t\t[\n"
+                                            "\t\t\t\t\"" , 
+                                            p_res_hdr->timestamp);
 
         buffer_need_bytes(w->response.data, p_res_hdr->text_size);
 
@@ -1676,12 +1676,12 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
             }
             p++;
         }
-        buffer_strcat(w->response.data, "\"");
 
-        buffer_strcat(w->response.data, "\n\t\t\t]");
-
-        buffer_sprintf(w->response.data,    ",\n\t\t\t%zu"
-                                            ",\n\t\t\t%d\n\t\t]",
+        buffer_sprintf(w->response.data,    "\"\n"
+                                            "\t\t\t],\n"
+                                            "\t\t\t%zu,\n"
+                                            "\t\t\t%d\n"
+                                            "\t\t]",
                                             p_res_hdr->text_size,
                                             p_res_hdr->matches);
 

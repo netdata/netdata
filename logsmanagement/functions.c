@@ -235,13 +235,11 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
         
         buffer_sprintf( dest_wb, 
                         "      [\n"
-                        "         %llu,\n", 
+                        "         %llu,\n"
+                        "         [\n   "
+                        "         \"", 
                         p_res_hdr->timestamp
         );
-
-        buffer_strcat(dest_wb, "         [\n   ");
-
-        buffer_strcat(dest_wb, "         \"");
 
         buffer_need_bytes(dest_wb, p_res_hdr->text_size);
 
@@ -269,17 +267,14 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
             }
             p++;
         }
-        buffer_strcat(dest_wb, "\"");
-
-        buffer_strcat(dest_wb, "\n         ]");
         
-        buffer_sprintf( dest_wb, 
-                        ",\n"
-                        "         %zu,\n"
-                        "         %d\n"
-                        "      ]" , 
-                        p_res_hdr->text_size,
-                        p_res_hdr->matches);
+        buffer_sprintf( dest_wb,    "\"\n"
+                                    "         ],\n"
+                                    "         %zu,\n"
+                                    "         %d\n"
+                                    "      ]" , 
+                                    p_res_hdr->text_size,
+                                    p_res_hdr->matches);
 
         res_off += sizeof(*p_res_hdr) + p_res_hdr->text_size;
 
