@@ -1648,9 +1648,12 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
         
         buffer_sprintf(w->response.data, "\t\t[\n\t\t\t%llu,\n" , p_res_hdr->timestamp);
 
-        if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)) buffer_strcat(w->response.data, "\t\t\t[\n\t");
+        if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)) 
+            buffer_strcat(w->response.data, "\t\t\t[\n\t");
 
         buffer_strcat(w->response.data, "\t\t\t\"");
+
+        buffer_need_bytes(w->response.data, p_res_hdr->text_size);
 
         /* Unfortunately '\n', '\\' (except for "\\n") and '"' need to be 
          * escaped, so we need to go through the result characters one by one.*/
@@ -1661,18 +1664,18 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
                 if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)){
                     buffer_strcat(w->response.data, "\",\n\t\t\t\t\"");
                 } else {
-                    buffer_need_bytes(w->response.data, 2);
+                    buffer_need_bytes(w->response.data, 1);
                     w->response.data->buffer[w->response.data->len++] = '\\';
                     w->response.data->buffer[w->response.data->len++] = 'n';
                 }
             } 
             else if(unlikely(*p == '\\' && *(p+1) != 'n')) {
-                buffer_need_bytes(w->response.data, 2);
+                buffer_need_bytes(w->response.data, 1);
                 w->response.data->buffer[w->response.data->len++] = '\\';
                 w->response.data->buffer[w->response.data->len++] = '\\';
             }
             else if(unlikely(*p == '"')) {
-                buffer_need_bytes(w->response.data, 2);
+                buffer_need_bytes(w->response.data, 1);
                 w->response.data->buffer[w->response.data->len++] = '\\';
                 w->response.data->buffer[w->response.data->len++] = '"';
             }
@@ -1680,23 +1683,27 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
                 // Escape control characters like [90m
                 if(unlikely(iscntrl(*p) && *(p+1) == '[')) {
                     while(*p != 'm'){
-                        buffer_need_bytes(w->response.data, 1);
+                        // buffer_need_bytes(w->response.data, 1);
                         p++;
                         remaining--;
                     }
                 }
                 else{
-                    buffer_need_bytes(w->response.data, 1);
+                    // buffer_need_bytes(w->response.data, 1);
                     w->response.data->buffer[w->response.data->len++] = *p;
                 }
             }
             p++;
         }
         buffer_strcat(w->response.data, "\"");
-        if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)) buffer_strcat(w->response.data, "\n\t\t\t]");
-        buffer_sprintf(w->response.data, ",\n\t\t\t%zu" , p_res_hdr->text_size);
-        buffer_sprintf(w->response.data, ",\n\t\t\t%d\n\t\t]" , p_res_hdr->matches);
 
+        if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)) 
+            buffer_strcat(w->response.data, "\n\t\t\t]");
+
+        buffer_sprintf(w->response.data,    ",\n\t\t\t%zu"
+                                            ",\n\t\t\t%d\n\t\t]",
+                                            p_res_hdr->text_size,
+                                            p_res_hdr->matches);
 
         res_off += sizeof(*p_res_hdr) + p_res_hdr->text_size;
 

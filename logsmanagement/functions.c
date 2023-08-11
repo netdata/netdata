@@ -249,6 +249,8 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
 
         buffer_strcat(dest_wb, "         \"");
 
+        buffer_need_bytes(dest_wb, p_res_hdr->text_size);
+
         /* Unfortunately '\n', '\\' (except for "\\n") and '"' need to be 
          * escaped, so we need to go through the result characters one by one.*/
         char *p = &query_params.results_buff->buffer[res_off] + sizeof(*p_res_hdr);
@@ -258,19 +260,19 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
                 if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)){
                     buffer_strcat(dest_wb, "\",\n            \"");
                 } else {
-                    buffer_need_bytes(dest_wb, 2);
+                    buffer_need_bytes(dest_wb, 1);
                     dest_wb->buffer[dest_wb->len++] = '\\';
                     dest_wb->buffer[dest_wb->len++] = 'n';
                 }
                 
             } 
             else if(unlikely(*p == '\\' && *(p+1) != 'n')) {
-                buffer_need_bytes(dest_wb, 2);
+                buffer_need_bytes(dest_wb, 1);
                 dest_wb->buffer[dest_wb->len++] = '\\';
                 dest_wb->buffer[dest_wb->len++] = '\\';
             }
             else if(unlikely(*p == '"')) {
-                buffer_need_bytes(dest_wb, 2);
+                buffer_need_bytes(dest_wb, 1);
                 dest_wb->buffer[dest_wb->len++] = '\\';
                 dest_wb->buffer[dest_wb->len++] = '"';
             }
@@ -278,13 +280,13 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
                 // Escape control characters like [90m
                 if(unlikely(iscntrl(*p) && *(p+1) == '[')) {
                     while(*p != 'm'){
-                        buffer_need_bytes(dest_wb, 1);
+                        // buffer_need_bytes(dest_wb, 1);
                         p++;
                         remaining--;
                     }
                 }
                 else{
-                    buffer_need_bytes(dest_wb, 1);
+                    // buffer_need_bytes(dest_wb, 1);
                     dest_wb->buffer[dest_wb->len++] = *p;
                 }
             }
