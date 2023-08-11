@@ -647,7 +647,7 @@ The Netdata Cloud UI is not open-source. But we thought that it is to the benefi
 
 ### :moneybag: What is your monetization strategy?
 
-Netdata generates revenue through subscriptions to advanced features in Netdata Cloud and sales of on-premises and private versions of Netdata Cloud.
+Netdata generates revenue through subscriptions to advanced features of Netdata Cloud and sales of on-premise and private versions of Netdata Cloud.
 
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
