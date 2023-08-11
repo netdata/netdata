@@ -41,8 +41,6 @@
     "   "LOGS_QRY_KW_SANITIZE_KW":BOOL\n" \
     "      If non-zero, the keyword will be sanitized before used by the regex engine (it will *not* be interpreted as a regex), default: " \
             LOGS_MANAG_STR(LOGS_MANAG_QUERY_SANITIZE_KEYWORD_DEFAULT) "\n\n" \
-    "   "LOGS_QRY_KW_DATA_FORMAT":STRING\n" \
-    "      Grouping of results per collection interval, options: '"LOGS_QRY_KW_JSON_ARRAY"' (default), '"LOGS_QRY_KW_NEWLINE"'\n\n" \
     "All arguments except for either '"LOGS_QRY_KW_CHARTNAME"' or '"LOGS_QRY_KW_FILENAME"' are optional.\n" \
     "If 'help' or 'sources' is passed on, all other arguments will be ignored."
 
@@ -152,9 +150,6 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
         else if(!strcmp(key, LOGS_QRY_KW_SANITIZE_KW)){
             query_params.sanitize_keyword = strtol(value, NULL, 10) ? 1 : 0;
         }
-        else if(unlikely(!strcmp(key, LOGS_QRY_KW_DATA_FORMAT) && !strcmp(value, LOGS_QRY_KW_NEWLINE))) {
-            query_params.data_format = LOGS_QUERY_DATA_FORMAT_NEW_LINE;
-        }
         else {
             collector_error("functions: logsmanagement invalid parameter");
             return HTTP_RESP_BAD_REQUEST;
@@ -244,8 +239,7 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
                         p_res_hdr->timestamp
         );
 
-        if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)) 
-            buffer_strcat(dest_wb, "         [\n   ");
+        buffer_strcat(dest_wb, "         [\n   ");
 
         buffer_strcat(dest_wb, "         \"");
 
@@ -257,14 +251,7 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
         size_t remaining = p_res_hdr->text_size;
         while (remaining--){
             if(unlikely(*p == '\n')){
-                if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)){
-                    buffer_strcat(dest_wb, "\",\n            \"");
-                } else {
-                    buffer_need_bytes(dest_wb, 1);
-                    dest_wb->buffer[dest_wb->len++] = '\\';
-                    dest_wb->buffer[dest_wb->len++] = 'n';
-                }
-                
+                buffer_strcat(dest_wb, "\",\n            \"");                
             } 
             else if(unlikely(*p == '\\' && *(p+1) != 'n')) {
                 buffer_need_bytes(dest_wb, 1);
@@ -292,8 +279,7 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
         }
         buffer_strcat(dest_wb, "\"");
 
-        if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)) 
-            buffer_strcat(dest_wb, "\n         ]");
+        buffer_strcat(dest_wb, "\n         ]");
         
         buffer_sprintf( dest_wb, 
                         ",\n"

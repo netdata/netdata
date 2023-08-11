@@ -1596,9 +1596,6 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
         else if(!strcmp(name, LOGS_QRY_KW_SANITIZE_KW)) {
             query_params.sanitize_keyword = strtol(value, NULL, 10) ? 1 : 0;
         }
-        else if(unlikely(!strcmp(name, LOGS_QRY_KW_DATA_FORMAT) && !strcmp(value, LOGS_QRY_KW_NEWLINE))) {
-            query_params.data_format = LOGS_QUERY_DATA_FORMAT_NEW_LINE;
-        }
     }
 
     query_params.order_by_asc = query_params.req_from_ts <= query_params.req_to_ts ? 1 : 0;
@@ -1649,8 +1646,7 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
         
         buffer_sprintf(w->response.data, "\t\t[\n\t\t\t%llu,\n" , p_res_hdr->timestamp);
 
-        if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)) 
-            buffer_strcat(w->response.data, "\t\t\t[\n\t");
+        buffer_strcat(w->response.data, "\t\t\t[\n\t");
 
         buffer_strcat(w->response.data, "\t\t\t\"");
 
@@ -1662,13 +1658,7 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
         size_t remaining = p_res_hdr->text_size;
         while (remaining--){
             if(unlikely(*p == '\n')){
-                if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)){
-                    buffer_strcat(w->response.data, "\",\n\t\t\t\t\"");
-                } else {
-                    buffer_need_bytes(w->response.data, 1);
-                    w->response.data->buffer[w->response.data->len++] = '\\';
-                    w->response.data->buffer[w->response.data->len++] = 'n';
-                }
+                buffer_strcat(w->response.data, "\",\n\t\t\t\t\"");
             } 
             else if(unlikely(*p == '\\' && *(p+1) != 'n')) {
                 buffer_need_bytes(w->response.data, 1);
@@ -1696,8 +1686,7 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
         }
         buffer_strcat(w->response.data, "\"");
 
-        if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)) 
-            buffer_strcat(w->response.data, "\n\t\t\t]");
+        buffer_strcat(w->response.data, "\n\t\t\t]");
 
         buffer_sprintf(w->response.data,    ",\n\t\t\t%zu"
                                             ",\n\t\t\t%d\n\t\t]",

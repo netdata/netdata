@@ -22,9 +22,6 @@
 #define LOGS_QRY_KW_KEYWORD     "keyword"
 #define LOGS_QRY_KW_IGNORE_CASE "ignore_case"
 #define LOGS_QRY_KW_SANITIZE_KW "sanitize_keyword"
-#define LOGS_QRY_KW_DATA_FORMAT "data_format"
-#define LOGS_QRY_KW_JSON_ARRAY  "json_array"
-#define LOGS_QRY_KW_NEWLINE     "newline"
 
 typedef struct {
     const enum {LOGS_QRY_RES_ERR_CODE_OK, 
@@ -48,10 +45,6 @@ static const logs_qry_res_err_t logs_qry_res_err[] = {
 
 const logs_qry_res_err_t *fetch_log_sources(BUFFER *wb);
 
-typedef enum logs_query_data_format {
-    LOGS_QUERY_DATA_FORMAT_JSON_ARRAY, // default
-    LOGS_QUERY_DATA_FORMAT_NEW_LINE
-} LOGS_QUERY_DATA_FORMAT;
 
 /**
  * @brief Parameters of the query.
@@ -117,7 +110,6 @@ typedef struct logs_query_params {
     char *keyword;
     int ignore_case;
     int sanitize_keyword;
-    LOGS_QUERY_DATA_FORMAT data_format;
     BUFFER *results_buff;
     unsigned long num_lines;
 } logs_query_params_t;
