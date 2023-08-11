@@ -2733,14 +2733,20 @@ void parser_init_repertoire(PARSER *parser, PARSER_REPERTOIRE repertoire) {
     }
 }
 
+static void parser_destroy_dyncfg(PARSER *parser) {
+    if (parser->user.cd != NULL && parser->user.cd->configuration != NULL) {
+        unregister_plugin(parser->user.host->configurable_plugins, parser->user.cd->cfg_dict_item);
+        parser->user.cd->configuration = NULL;
+    } else if (parser->user.host != NULL && SERVING_STREAMING(parser) && parser->user.host != localhost){
+        dictionary_flush(parser->user.host->configurable_plugins);
+    }
+}
+
 void parser_destroy(PARSER *parser) {
     if (unlikely(!parser))
         return;
 
-    if (parser->user.cd != NULL && parser->user.cd->configuration != NULL) {
-        unregister_plugin(parser->user.host->configurable_plugins, parser->user.cd->cfg_dict_item);
-        parser->user.cd->configuration = NULL;
-    }
+    parser_destroy_dyncfg(parser);
 
     dictionary_destroy(parser->inflight.functions);
     freez(parser);

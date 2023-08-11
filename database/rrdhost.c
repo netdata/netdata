@@ -562,7 +562,7 @@ int is_legacy = 1;
          , string2str(host->health.health_default_recipient)
     );
 
-    host->configurable_plugins = dictionary_create(DICT_OPTION_VALUE_LINK_DONT_CLONE);
+    host->configurable_plugins = dyncfg_dictionary_create();
     dictionary_register_delete_callback(host->configurable_plugins, plugin_del_cb, NULL);
 
     if(!archived) {

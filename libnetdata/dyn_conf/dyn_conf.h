@@ -203,6 +203,8 @@ struct uni_http_response dyn_conf_process_http_request(DICTIONARY *plugins_dict,
 int dyn_conf_init(void);
 void freez_dyncfg(void *ptr);
 
+#define dyncfg_dictionary_create() dictionary_create(DICT_OPTION_VALUE_LINK_DONT_CLONE)
+
 void plugin_del_cb(const DICTIONARY_ITEM *item, void *value, void *data);
 
 void *dyncfg_main(void *in);
