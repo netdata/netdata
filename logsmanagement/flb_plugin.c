@@ -713,7 +713,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
 
         size_t tmp_item_off = buff->in->text_size;
 
-        memcpy(&buff->in->data[tmp_item_off], message, message_size);
+        memcpy_iscntrl_fix(&buff->in->data[tmp_item_off], message, message_size);
         tmp_item_off += message_size;  
 
         buff->in->data[tmp_item_off++] = '\n';
@@ -777,7 +777,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
 
         size_t tmp_item_off = buff->in->text_size;
 
-        memcpy(&buff->in->data[tmp_item_off], message, message_size);
+        memcpy_iscntrl_fix(&buff->in->data[tmp_item_off], message, message_size);
         tmp_item_off += message_size;  
 
         buff->in->data[tmp_item_off++] = '\n';
@@ -921,7 +921,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
         buff->in->data[tmp_item_off++] = ' ';
 
         if(likely(message)){
-            memcpy(&buff->in->data[tmp_item_off], message, message_size);
+            memcpy_iscntrl_fix(&buff->in->data[tmp_item_off], message, message_size);
             tmp_item_off += message_size;  
         }
 

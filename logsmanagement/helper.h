@@ -263,4 +263,11 @@ error:
     return NULL;
 }
 
+static inline void memcpy_iscntrl_fix(char *dest, char *src, size_t num){
+    while(num--){
+        *dest++ = unlikely(!iscntrl(*src)) ? *src : ' ';
+        src++;
+    }
+}
+
 #endif  // HELPER_H_

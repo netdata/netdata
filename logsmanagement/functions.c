@@ -263,14 +263,6 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
                 dest_wb->buffer[dest_wb->len++] = '\\';
                 dest_wb->buffer[dest_wb->len++] = '"';
             }
-            else if(unlikely(iscntrl(*p) && *(p+1) == '[')) {
-                // Escape control characters like [90m
-                while(*p != 'm'){
-                    // buffer_need_bytes(dest_wb, 1);
-                    p++;
-                    remaining--;
-                }
-            }
             else{
                 // buffer_need_bytes(dest_wb, 1);
                 dest_wb->buffer[dest_wb->len++] = *p;
