@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- count functions as collections, to restart plugins [\#15787](https://github.com/netdata/netdata/pull/15787) ([ktsaou](https://github.com/ktsaou))
+- Set correct path for ansible-playbook in deployment tutorial [\#15786](https://github.com/netdata/netdata/pull/15786) ([novotnyJiri](https://github.com/novotnyJiri))
+- minor Dyncfg mvp0 fixes [\#15785](https://github.com/netdata/netdata/pull/15785) ([underhood](https://github.com/underhood))
+- fix docker-compose example [\#15784](https://github.com/netdata/netdata/pull/15784) ([zhqu1148980644](https://github.com/zhqu1148980644))
 - mark integrations milestones as completed in README.md [\#15783](https://github.com/netdata/netdata/pull/15783) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update an oversight on the openSUSE 15.5 packages [\#15781](https://github.com/netdata/netdata/pull/15781) ([tkatsoulas](https://github.com/tkatsoulas))
 
@@ -423,10 +427,6 @@
 - Fix SSL non-blocking retry handling in the web server [\#15222](https://github.com/netdata/netdata/pull/15222) ([ktsaou](https://github.com/ktsaou))
 - Update dashboard to version v3.0.0. [\#15219](https://github.com/netdata/netdata/pull/15219) ([netdatabot](https://github.com/netdatabot))
 - fix arch detection on i386 \(native packages\) [\#15218](https://github.com/netdata/netdata/pull/15218) ([ilyam8](https://github.com/ilyam8))
-- RW\_SPINLOCK: recursive readers support [\#15217](https://github.com/netdata/netdata/pull/15217) ([ktsaou](https://github.com/ktsaou))
-- cgroups: remove pod\_uid and container\_id labels in k8s [\#15216](https://github.com/netdata/netdata/pull/15216) ([ilyam8](https://github.com/ilyam8))
-- Allow overriding pipename from env [\#15215](https://github.com/netdata/netdata/pull/15215) ([vkalintiris](https://github.com/vkalintiris))
-- eBPF Functions \(enable/disable threads\) [\#15214](https://github.com/netdata/netdata/pull/15214) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
