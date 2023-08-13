@@ -305,14 +305,23 @@ static void systemd_journal_transform_gid(FACETS *facets __maybe_unused, BUFFER 
 }
 
 static void systemd_journal_dynamic_row_id(FACETS *facets __maybe_unused, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row, void *data __maybe_unused) {
-    FACET_ROW_KEY_VALUE *syslog_identifier_rkv = dictionary_get(row->dict, "SYSLOG_IDENTIFIER");
     FACET_ROW_KEY_VALUE *pid_rkv = dictionary_get(row->dict, "_PID");
+    const char *pid = pid_rkv ? buffer_tostring(pid_rkv->wb) : FACET_VALUE_UNSET;
 
-    const char *identifier = syslog_identifier_rkv ? buffer_tostring(syslog_identifier_rkv->wb) : "UNKNOWN";
-    const char *pid = pid_rkv ? buffer_tostring(pid_rkv->wb) : "UNKNOWN";
+    FACET_ROW_KEY_VALUE *syslog_identifier_rkv = dictionary_get(row->dict, "SYSLOG_IDENTIFIER");
+    const char *identifier = syslog_identifier_rkv ? buffer_tostring(syslog_identifier_rkv->wb) : FACET_VALUE_UNSET;
+
+    if(strcmp(identifier, FACET_VALUE_UNSET) == 0) {
+        FACET_ROW_KEY_VALUE *comm_rkv = dictionary_get(row->dict, "_COMM");
+        identifier = comm_rkv ? buffer_tostring(comm_rkv->wb) : FACET_VALUE_UNSET;
+    }
 
     buffer_flush(rkv->wb);
-    buffer_sprintf(rkv->wb, "%s[%s]", identifier, pid);
+
+    if(strcmp(pid, FACET_VALUE_UNSET) == 0)
+        buffer_strcat(rkv->wb, identifier);
+    else
+        buffer_sprintf(rkv->wb, "%s[%s]", identifier, pid);
 
     buffer_json_add_array_item_string(json_array, buffer_tostring(rkv->wb));
 }
