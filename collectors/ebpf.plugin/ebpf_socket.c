@@ -1175,6 +1175,22 @@ static void ebpf_hash_socket_accumulator(netdata_socket_t *values, netdata_socke
 }
 
 /**
+ * Fill Fake socket
+ *
+ * Fill socket with an invalid request.
+ *
+ * @param fake_values is the structure where we are storing the value.
+ */
+static inline void ebpf_socket_fill_fake_socket(netdata_socket_plus_t *fake_values)
+{
+    snprintfz(fake_values->socket_string.src_ip, INET6_ADDRSTRLEN, "127.0.0.1");
+    snprintfz(fake_values->socket_string.dst_ip, INET6_ADDRSTRLEN, "127.0.0.1");
+    fake_values->pid = getpid();
+    fake_values->data.family = AF_INET;
+    fake_values->data.protocol = AF_UNSPEC;
+}
+
+/**
  * Fill function buffer
  *
  * Fill buffer with data to be shown on cloud.
@@ -1189,7 +1205,6 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values)
     // IMPORTANT!
     // THE ORDER SHOULD BE THE SAME WITH THE FIELDS!
 
-    collector_error("KILLME %s", values->socket_string.src_ip);
     // SRC IP
     buffer_json_add_array_item_string(wb, values->socket_string.src_ip);
 
@@ -1211,7 +1226,7 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values)
 
         // Traffic sent
         buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.tcp.tcp_bytes_sent);
-    } else {
+    } else if (values->data.family == IPPROTO_UDP) {
         // Protocol
         buffer_json_add_array_item_string(wb, "UDP");
 
@@ -1220,6 +1235,15 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values)
 
         // Traffic sent
         buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.udp.udp_bytes_sent);
+    } else {
+        // Protocol
+        buffer_json_add_array_item_string(wb, "UNSPEC");
+
+        // Traffic received
+        buffer_json_add_array_item_uint64(wb, 0);
+
+        // Traffic sent
+        buffer_json_add_array_item_uint64(wb, 0);
     }
 
     buffer_json_array_close(wb);
@@ -1239,12 +1263,20 @@ static void ebpf_socket_fill_function_buffer(BUFFER *buf)
     rw_spinlock_read_lock(&ebpf_socket_hs.index.rw_spinlock);
     Pvoid_t *PValue;
     netdata_socket_idx_t key = {};
+    int counter = 0;
     bool first = true;
-    while((PValue = JudyLFirstThenNext(&ebpf_socket_hs.index.rw_spinlock, (Word_t *)&key, &first))) {
+    while((PValue = JudyLFirstThenNext(ebpf_socket_hs.index.JudyHSArray, (Word_t *)&key, &first))) {
         netdata_socket_plus_t *values = (netdata_socket_plus_t *)PValue;
         ebpf_fill_function_buffer(buf, values);
+        counter++;
     }
     rw_spinlock_read_unlock(&ebpf_socket_hs.index.rw_spinlock);
+
+    if (!counter) {
+        netdata_socket_plus_t fake_values = { };
+        ebpf_socket_fill_fake_socket(&fake_values);
+        ebpf_fill_function_buffer(buf, &fake_values);
+    }
 }
 
 /**
@@ -1257,7 +1289,7 @@ static void ebpf_socket_fill_function_buffer(BUFFER *buf)
  * The pointer to pointer we return has to be used before any other operation that may change the index (insert/delete).
  *
  */
-static inline void **ebpf_socket_hashtable_insert_unsafe(Pvoid_t *arr, netdata_socket_idx_t *key)
+static inline void **ebpf_socket_hashtable_insert_unsafe(PPvoid_t arr, netdata_socket_idx_t *key)
 {
     JError_t J_Error;
     Pvoid_t *lsocket = JudyHSIns(arr, (void *)key, sizeof(netdata_socket_idx_t), &J_Error);
@@ -1525,10 +1557,7 @@ void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
     if (!em->maps || (em->maps && em->maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED)){
         netdata_socket_plus_t fake_values = { };
 
-        snprintfz(fake_values.socket_string.src_ip, INET6_ADDRSTRLEN, "127.0.0.1");
-        snprintfz(fake_values.socket_string.dst_ip, INET6_ADDRSTRLEN, "127.0.0.1");
-        fake_values.pid = getpid();
-        fake_values.data.family = AF_INET;
+        ebpf_socket_fill_fake_socket(&fake_values);
 
         ebpf_fill_function_buffer(buf, &fake_values);
         return;
