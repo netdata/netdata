@@ -412,7 +412,7 @@ typedef struct ebpf_filesystem_partitions {
 #else
     void *fs_obj;
 #endif
-    const char *functions[NETDATA_FS_BTF_END];
+    netdata_ebpf_targets_t functions[NETDATA_FS_BTF_END + 1];
 } ebpf_filesystem_partitions_t;
 
 typedef struct ebpf_sync_syscalls {
