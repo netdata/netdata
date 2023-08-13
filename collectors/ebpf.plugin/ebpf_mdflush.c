@@ -392,20 +392,15 @@ static int ebpf_mdflush_load_bpf(ebpf_module_t *em)
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else {
-        mdflush_bpf_obj = mdflush_bpf__open();
-        if (!mdflush_bpf_obj)
-            ret = -1;
-        else {
-            ret = ebpf_mdflush_load_and_attach(mdflush_bpf_obj, em);
-            if (ret && em->targets[NETDATA_MD_FLUSH_REQUEST].mode == EBPF_LOAD_TRAMPOLINE) {
-                mdflush_bpf__destroy(mdflush_bpf_obj);
-                mdflush_bpf_obj = mdflush_bpf__open();
-                if (!mdflush_bpf_obj)
-                    ret = -1;
-                else {
-                    em->targets[NETDATA_MD_FLUSH_REQUEST].mode = EBPF_LOAD_PROBE;
-                    ret = ebpf_mdflush_load_and_attach(mdflush_bpf_obj, em);
-                }
+        ret = ebpf_mdflush_load_and_attach(mdflush_bpf_obj, em);
+        if (ret && em->targets[NETDATA_MD_FLUSH_REQUEST].mode == EBPF_LOAD_TRAMPOLINE) {
+            mdflush_bpf__destroy(mdflush_bpf_obj);
+            mdflush_bpf_obj = mdflush_bpf__open();
+            if (!mdflush_bpf_obj)
+                ret = -1;
+            else {
+                em->targets[NETDATA_MD_FLUSH_REQUEST].mode = EBPF_LOAD_PROBE;
+                ret = ebpf_mdflush_load_and_attach(mdflush_bpf_obj, em);
             }
         }
     }
