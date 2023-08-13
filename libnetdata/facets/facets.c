@@ -1,6 +1,5 @@
 #include "facets.h"
 
-#define FACET_VALUE_UNSET "-"
 #define HISTOGRAM_COLUMNS 60
 
 static void facets_row_free(FACETS *facets __maybe_unused, FACET_ROW *row);

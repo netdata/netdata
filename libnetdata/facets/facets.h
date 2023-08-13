@@ -3,6 +3,8 @@
 
 #include "../libnetdata.h"
 
+#define FACET_VALUE_UNSET "-"
+
 typedef enum __attribute__((packed)) {
     FACET_KEY_OPTION_FACET      = (1 << 0), // filterable values
     FACET_KEY_OPTION_NO_FACET   = (1 << 1), // non-filterable value
