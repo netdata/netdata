@@ -166,7 +166,7 @@ ebpf_module_t ebpf_modules[] = {
       .apps_routine = NULL, .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &hardirq_config,
       .config_file = NETDATA_HARDIRQ_CONFIG_FILE,
       .kernels =  NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
-      .load = EBPF_LOAD_LEGACY, .targets = NULL, .probe_links = NULL, .objects = NULL,
+      .load = EBPF_LOAD_LEGACY, .targets = hardirq_targets, .probe_links = NULL, .objects = NULL,
       .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES, .lifetime = EBPF_DEFAULT_LIFETIME, .running_time = 0},
     { .thread_name = "softirq", .config_name = "softirq", .thread_description = NETDATA_EBPF_SOFTIRQ_MODULE_DESC,
       .enabled = 0, .start_routine = ebpf_softirq_thread,
