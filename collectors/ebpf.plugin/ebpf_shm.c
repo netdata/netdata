@@ -1220,7 +1220,7 @@ static int ebpf_shm_load_bpf(ebpf_module_t *em)
             if (ret && em->targets[NETDATA_KEY_SHMGET_CALL].mode == EBPF_LOAD_TRAMPOLINE) {
                 shm_bpf__destroy(shm_bpf_obj);
                 shm_bpf_obj = shm_bpf__open();
-                if (shm_bpf_obj)
+                if (!shm_bpf_obj)
                     ret = -1;
                 else {
                     ebpf_update_target_value(em, EBPF_LOAD_PROBE);

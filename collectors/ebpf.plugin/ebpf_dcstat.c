@@ -1310,7 +1310,7 @@ static int ebpf_dcstat_load_bpf(ebpf_module_t *em)
             if (ret && em->targets[NETDATA_DC_TARGET_LOOKUP_FAST].mode == EBPF_LOAD_TRAMPOLINE) {
                 dc_bpf__destroy(dc_bpf_obj);
                 dc_bpf_obj = dc_bpf__open();
-                if (dc_bpf_obj)
+                if (!dc_bpf_obj)
                     ret = -1;
                 else {
                     ebpf_update_target_value(em, EBPF_LOAD_PROBE);

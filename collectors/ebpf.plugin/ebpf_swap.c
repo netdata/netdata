@@ -958,7 +958,7 @@ static int ebpf_swap_load_bpf(ebpf_module_t *em)
             if (ret && em->targets[NETDATA_DC_TARGET_LOOKUP_FAST].mode == EBPF_LOAD_TRAMPOLINE) {
                 swap_bpf__destroy(bpf_obj);
                 bpf_obj = swap_bpf__open();
-                if (bpf_obj)
+                if (!bpf_obj)
                     ret = -1;
                 else {
                     ebpf_update_target_value(em, EBPF_LOAD_PROBE);

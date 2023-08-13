@@ -1336,7 +1336,7 @@ static int ebpf_fd_load_bpf(ebpf_module_t *em)
             if (ret && em->targets[NETDATA_FD_SYSCALL_OPEN].mode == EBPF_LOAD_TRAMPOLINE) {
                 fd_bpf__destroy(fd_bpf_obj);
                 fd_bpf_obj = fd_bpf__open();
-                if (fd_bpf_obj)
+                if (!fd_bpf_obj)
                     ret = -1;
                 else {
                     ebpf_update_target_value(em, EBPF_LOAD_PROBE);

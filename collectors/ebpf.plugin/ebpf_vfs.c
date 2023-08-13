@@ -2378,7 +2378,7 @@ static int ebpf_vfs_load_bpf(ebpf_module_t *em)
             if (ret && em->targets[NETDATA_EBPF_VFS_WRITE].mode == EBPF_LOAD_TRAMPOLINE) {
                 vfs_bpf__destroy(vfs_bpf_obj);
                 vfs_bpf_obj = vfs_bpf__open();
-                if (vfs_bpf_obj)
+                if (!vfs_bpf_obj)
                     ret = -1;
                 else {
                     ebpf_update_target_value(em, EBPF_LOAD_PROBE);

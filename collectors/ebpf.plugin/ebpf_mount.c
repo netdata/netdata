@@ -465,7 +465,7 @@ static int ebpf_mount_load_bpf(ebpf_module_t *em)
             if (ret && em->targets[NETDATA_MOUNT_SYSCALL].mode == EBPF_LOAD_TRAMPOLINE) {
                 mount_bpf__destroy(mount_bpf_obj);
                 mount_bpf_obj = mount_bpf__open();
-                if (mount_bpf_obj)
+                if (!mount_bpf_obj)
                     ret = -1;
                 else {
                     ebpf_update_target_value(em, EBPF_LOAD_PROBE);

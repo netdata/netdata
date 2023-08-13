@@ -3964,7 +3964,7 @@ static int ebpf_socket_load_bpf(ebpf_module_t *em)
             if (ret && em->targets[NETDATA_FCNT_INET_CSK_ACCEPT].mode == EBPF_LOAD_TRAMPOLINE) {
                 socket_bpf__destroy(socket_bpf_obj);
                 socket_bpf_obj = socket_bpf__open();
-                if (socket_bpf_obj)
+                if (!socket_bpf_obj)
                     ret = -1;
                 else {
                     ebpf_update_target_value(em, EBPF_LOAD_PROBE);
