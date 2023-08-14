@@ -17,6 +17,7 @@ Build-Depends: debhelper (>= 9.20160709),
                libsnappy-dev,
                libprotobuf-dev,
                libprotoc-dev,
+               libsystemd-dev,
                cmake,
                autogen,
                autoconf,
@@ -196,7 +197,6 @@ Architecture: any
 Depends: ${shlibs:Depends},
          netdata (= ${source:Version})
 Pre-Depends: libcap2-bin, adduser
-Build-Depends: libsystemd-dev
 Conflicts: netdata (<< ${source:Version})
 Description: The systemd-journal collector for the Netdata Agent
  This plugin allows the Netdata Agent to present logs from the systemd
