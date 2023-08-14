@@ -1524,6 +1524,25 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
 }
 #endif
 
+#define HLT_MGM "manage/health"
+int web_client_api_request_v1_mgmt(RRDHOST *host, struct web_client *w, char *url) {
+    const char *haystack = buffer_tostring(w->url_path_decoded);
+    char *needle;
+
+    buffer_flush(w->response.data);
+
+    if ((needle = strstr(haystack, HLT_MGM)) == NULL) {
+        buffer_strcat(w->response.data, "Invalid management request. Curently only 'health' is supported.");
+        return HTTP_RESP_NOT_FOUND;
+    }
+    needle += strlen(HLT_MGM);
+    if (*needle != '\0') {
+        buffer_strcat(w->response.data, "Invalid management request. Curently only 'health' is supported.");
+        return HTTP_RESP_NOT_FOUND;
+    }
+    return web_client_api_request_v1_mgmt_health(host, w, url);
+}
+
 static struct web_api_command api_commands_v1[] = {
         { "info",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_info,     0                     },
         { "data",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_data,     0                     },
@@ -1550,7 +1569,7 @@ static struct web_api_command api_commands_v1[] = {
         // { "ml_models",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_models          },
 #endif
 
-        {"manage/health",        0, WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_mgmt_health, 0 },
+        {"manage",        0, WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_mgmt, 1 },
         { "aclk",                0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_aclk_state, 0            },
         { "metric_correlations", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_metric_correlations, 0   },
         { "weights",             0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_weights, 0               },
