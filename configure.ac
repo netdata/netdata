@@ -1117,31 +1117,25 @@ AM_CONDITIONAL([ENABLE_PLUGIN_FREEIPMI], [test "${enable_plugin_freeipmi}" = "ye
 
 LIBS_BAK="${LIBS}"
 
-AC_CHECK_LIB([systemd], [sd_journal_open], [have_systemd_libs=yes], [have_systemd_libs=no])
-AC_CHECK_HEADERS([systemd/sd-journal.h], [have_systemd_journal_header=yes], [have_systemd_journal_header=no])
-
-if test "${have_systemd_libs}" = "yes" -a "${have_systemd_journal_header}" = "yes"; then
-    have_systemd="yes"
-else
-    have_systemd="no"
-fi
-
-test "${enable_plugin_systemd_journal}" = "yes" -a "${have_systemd}" != "yes" && \
-    AC_MSG_ERROR([systemd is required but not found. Try installing 'libsystemd-dev' or 'libsystemd-devel'])
-
-AC_MSG_CHECKING([if systemd-journal.plugin should be enabled])
-if test "${enable_plugin_systemd_journal}" != "no" -a "${have_systemd}" = "yes"; then
-    enable_plugin_systemd_journal="yes"
-    AC_DEFINE([HAVE_SYSTEMD], [1], [systemd usability])
-    OPTIONAL_SYSTEMD_CFLAGS="-I/usr/include"
-    OPTIONAL_SYSTEMD_LIBS="-lsystemd"
-else
+AS_IF([test "x${enable_plugin_systemd_journal}" != "xno"], [
+    PKG_CHECK_MODULES([OPTIONAL_SYSTEMD], [libsystemd], [
+        enable_plugin_systemd_journal="yes"
+    ], [
+        PKG_CHECK_MODULES([OPTIONAL_SYSTEMD], [libelogind], [
+            enable_plugin_systemd_journal="yes"
+        ], [
+            if test "x${enable_plugin_systemd_journal}" = "xyes"; then
+                AC_MSG_ERROR([systemd is required but not found. Try installing 'libsystemd-dev' or 'systemd-devel'])
+            fi
+            enable_plugin_systemd_journal="no"
+        ])
+    ])
+], [
     enable_plugin_systemd_journal="no"
-fi
+])
+AC_MSG_CHECKING([if systemd-journal.plugin should be enabled])
 AC_MSG_RESULT([${enable_plugin_systemd_journal}])
 AM_CONDITIONAL([ENABLE_PLUGIN_SYSTEMD_JOURNAL], [test "${enable_plugin_systemd_journal}" = "yes"])
-
-AC_MSG_NOTICE([OPTIONAL_SYSTEMD_LIBS is set to: ${OPTIONAL_SYSTEMD_LIBS}])
 
 LIBS="${LIBS_BAK}"
 
