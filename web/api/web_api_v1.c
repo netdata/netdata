@@ -1524,12 +1524,19 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
 }
 #endif
 
+#define HLT_MGM "manage/health"
 int web_client_api_request_v1_mgmt(RRDHOST *host, struct web_client *w, char *url) {
     const char *haystack = buffer_tostring(w->url_path_decoded);
+    char *needle;
 
     buffer_flush(w->response.data);
 
-    if (strstr(haystack, "manage/health") == NULL) {
+    if ((needle = strstr(haystack, HLT_MGM)) == NULL) {
+        buffer_strcat(w->response.data, "Invalid management request. Curently only 'health' is supported.");
+        return HTTP_RESP_NOT_FOUND;
+    }
+    needle += strlen(HLT_MGM);
+    if (*needle != '\0') {
         buffer_strcat(w->response.data, "Invalid management request. Curently only 'health' is supported.");
         return HTTP_RESP_NOT_FOUND;
     }
