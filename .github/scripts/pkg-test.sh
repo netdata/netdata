@@ -14,6 +14,7 @@ install_debian_like() {
 
   # Install Netdata
   # Strange quoting is required here so that glob matching works.
+  # shellcheck disable=SC2046
   apt-get install -y $(find /netdata/artifacts -type f -name 'netdata*.deb' \
 ! -name '*dbgsym*' ! -name '*cups*' ! -name '*freeipmi*') || exit 3
 
