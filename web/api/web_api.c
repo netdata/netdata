@@ -5,27 +5,27 @@
 bool netdata_is_protected_by_bearer = false; // this is controlled by cloud, at the point the agent logs in - this should also be saved to /var/lib/netdata
 DICTIONARY *netdata_authorized_bearers = NULL;
 
-static bool web_client_check_acl_and_bearer(struct web_client *w, WEB_CLIENT_ACL endpoint_acl) {
+static short int web_client_check_acl_and_bearer(struct web_client *w, WEB_CLIENT_ACL endpoint_acl) {
     if(endpoint_acl == WEB_CLIENT_ACL_NONE || (endpoint_acl & WEB_CLIENT_ACL_NOCHECK))
         // the endpoint is totally public
-        return true;
+        return HTTP_RESP_OK;
 
     bool acl_allows = w->acl & endpoint_acl;
     if(!acl_allows)
         // the channel we received the request from (w->acl) is not compatible with the endpoint
-        return false;
+        return HTTP_RESP_FORBIDDEN;
 
     if(!netdata_is_protected_by_bearer && !(endpoint_acl & WEB_CLIENT_ACL_BEARER_REQUIRED))
         // bearer protection is not enabled and is not required by the endpoint
-        return true;
+        return HTTP_RESP_OK;
 
     if(!(endpoint_acl & (WEB_CLIENT_ACL_BEARER_REQUIRED|WEB_CLIENT_ACL_BEARER_OPTIONAL)))
         // endpoint does not require a bearer
-        return true;
+        return HTTP_RESP_OK;
 
     if((w->acl & (WEB_CLIENT_ACL_ACLK|WEB_CLIENT_ACL_WEBRTC)))
         // the request is coming from ACLK or WEBRTC (authorized already),
-        return true;
+        return HTTP_RESP_OK;
 
     // at this point we need a bearer to serve the request
     // either because:
@@ -37,11 +37,11 @@ static bool web_client_check_acl_and_bearer(struct web_client *w, WEB_CLIENT_ACL
     BEARER_STATUS t = api_check_bearer_token(w);
     if(t == BEARER_STATUS_AVAILABLE_AND_VALIDATED)
         // we have a valid bearer on the request
-        return true;
+        return HTTP_RESP_OK;
 
     netdata_log_info("BEARER: bearer is required for request: code %d", t);
 
-    return false;
+    return HTTP_RESP_PRECOND_FAIL;
 }
 
 int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_path_endpoint, struct web_api_command *api_commands) {
@@ -73,8 +73,19 @@ int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_pat
                 return HTTP_RESP_BAD_REQUEST;
             }
 
-            if(unlikely(!web_client_check_acl_and_bearer(w, api_commands[i].acl)))
-                return web_client_permission_denied(w);
+            short int code = web_client_check_acl_and_bearer(w, api_commands[i].acl);
+            if(code != HTTP_RESP_OK) {
+                if(code == HTTP_RESP_FORBIDDEN)
+                    return web_client_permission_denied(w);
+
+                if(code == HTTP_RESP_PRECOND_FAIL)
+                    return web_client_bearer_required(w);
+
+                buffer_flush(w->response.data);
+                buffer_sprintf(w->response.data, "Failed with code %d", code);
+                w->response.code = code;
+                return code;
+            }
 
             char *query_string = (char *)buffer_tostring(w->url_query_string_decoded);
 

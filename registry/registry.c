@@ -192,6 +192,7 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w) {
 
     buffer_json_member_add_string(w->response.data, "registry", registry.registry_to_announce);
     buffer_json_member_add_boolean(w->response.data, "anonymous_statistics", netdata_anonymous_statistics_enabled);
+    buffer_json_member_add_boolean(w->response.data, "X-Netdata-Auth", true);
 
     buffer_json_member_add_array(w->response.data, "nodes");
     RRDHOST *h;

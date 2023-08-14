@@ -22,8 +22,8 @@ inline int web_client_bearer_required(struct web_client *w) {
     w->response.data->content_type = CT_TEXT_PLAIN;
     buffer_flush(w->response.data);
     buffer_strcat(w->response.data, "An authorization bearer is required to access the resource.");
-    w->response.code = HTTP_RESP_UNAUTHORIZED;
-    return HTTP_RESP_UNAUTHORIZED;
+    w->response.code = HTTP_RESP_PRECOND_FAIL;
+    return HTTP_RESP_PRECOND_FAIL;
 }
 
 static inline int bad_request_multiple_dashboard_versions(struct web_client *w) {

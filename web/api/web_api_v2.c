@@ -53,16 +53,27 @@ static time_t bearer_get_token(uuid_t *uuid) {
 }
 
 #define HTTP_REQUEST_AUTHORIZATION_BEARER "\r\nAuthorization: Bearer "
+#define HTTP_REQUEST_X_NETDATA_AUTH_BEARER "\r\nX-Netdata-Auth: Bearer "
 
 BEARER_STATUS extract_bearer_token_from_request(struct web_client *w, char *dst, size_t dst_len) {
     const char *req = buffer_tostring(w->response.data);
     size_t req_len = buffer_strlen(w->response.data);
-    const char *bearer = strcasestr(req, HTTP_REQUEST_AUTHORIZATION_BEARER);
+    const char *bearer = NULL;
+    const char *bearer_end = NULL;
 
-    if(!bearer)
+    bearer = strcasestr(req, HTTP_REQUEST_X_NETDATA_AUTH_BEARER);
+    if(bearer)
+        bearer_end = bearer + sizeof(HTTP_REQUEST_X_NETDATA_AUTH_BEARER) - 1;
+    else {
+        bearer = strcasestr(req, HTTP_REQUEST_AUTHORIZATION_BEARER);
+        if(bearer)
+            bearer_end = bearer + sizeof(HTTP_REQUEST_AUTHORIZATION_BEARER) - 1;
+    }
+
+    if(!bearer || !bearer_end)
         return BEARER_STATUS_NO_BEARER_IN_HEADERS;
 
-    const char *token_start = bearer + sizeof(HTTP_REQUEST_AUTHORIZATION_BEARER) - 1;
+    const char *token_start = bearer_end;
 
     while(isspace(*token_start))
         token_start++;
