@@ -27,7 +27,7 @@
         demoFavourites: {"postgresql":["postgres"],"redis":["redis"],"dns-query":["dns_query"],"http-endpoints":["httpcheck"],"nginx":["web_log","nginx"],"apache":["apache"],"host-reachability":["ping"],"cassandra":["cassandra"],"coredns":["coredns"],"logind":["logind"],"iis":["iis"],"active-directory":["ad"],"windows":["windows","ad","iis","mssql","exchange","netframework"],"docker":["cgroup","docker"]},
         webpackPublicPath: "https://app.netdata.cloud",
         agentApiUrl: searchParams.get("agent") || getBasename(),
-        version: "6.27.0",
+        version: "6.28.0",
         tracking: false,
         cookieDomain: ".netdata.cloud",
         onprem: false
@@ -139,7 +139,8 @@
             mg: data.agent.machine_guid,
             nd: data.agent.node_id,
             claimId: data.agent.claim_id,
-            cloudStatus: data.cloud_status
+            cloudStatus: data.cloud_status,
+            xNetdataAuthHeader: data["X-Netdata-Auth"] || false
           }
 
 
