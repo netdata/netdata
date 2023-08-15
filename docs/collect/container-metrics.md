@@ -71,13 +71,13 @@ _entirely for free_. These methods work together to help you troubleshoot perfor
 your k8s infrastructure.
 
 -   A [Helm chart](https://github.com/netdata/helmchart), which bootstraps a Netdata Agent pod on every node in your
-    cluster, plus an additional parent pod for storing metrics and managing alarm notifications.
+    cluster, plus an additional parent pod for storing metrics and managing alert notifications.
 -   A [service discovery plugin](https://github.com/netdata/agent-service-discovery), which discovers and creates
     configuration files for [compatible
     applications](https://github.com/netdata/helmchart#service-discovery-and-supported-services) and any endpoints
     covered by our [generic Prometheus
     collector](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/README.md). With these
-    configuration files, Netdata collects metrics from any compatible applications as they run _inside_ of a pod.
+    configuration files, Netdata collects metrics from any compatible applications as they run _inside_ a pod.
     Service discovery happens without manual intervention as pods are created, destroyed, or moved between nodes. 
 -   A [Kubelet collector](https://github.com/netdata/go.d.plugin/blob/master/modules/k8s_kubelet/README.md), which runs
     on each node in a k8s cluster to monitor the number of pods/containers, the volume of operations on each container,

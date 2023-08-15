@@ -64,45 +64,45 @@ of
 To disable specific collectors, open `go.d.conf`, `python.d.conf` or `charts.d.conf` and find the line
 for that specific module. Uncomment the line and change its value to `no`.
 
-## Modify alarms and notifications
+## Modify alerts and notifications
 
 Netdata's health monitoring watchdog uses hundreds of preconfigured health entities, with intelligent thresholds, to
-generate warning and critical alarms for most production systems and their applications without configuration. However,
-each alarm and notification method is completely customizable.
+generate warning and critical alerts for most production systems and their applications without configuration. However,
+each alert and notification method is completely customizable.
 
-### Add a new alarm
+### Add a new alert
 
-To create a new alarm configuration file, initiate an empty file, with a filename that ends in `.conf`, in the
-`health.d/` directory. The Netdata Agent loads any valid alarm configuration file ending in `.conf` in that directory.
-Next, edit the new file with `edit-config`. For example, with a file called `example-alarm.conf`.
+To create a new alert configuration file, initiate an empty file, with a filename that ends in `.conf`, in the
+`health.d/` directory. The Netdata Agent loads any valid alert configuration file ending in `.conf` in that directory.
+Next, edit the new file with `edit-config`. For example, with a file called `example-alert.conf`.
 
 ```bash
-sudo touch health.d/example-alarm.conf
-sudo ./edit-config health.d/example-alarm.conf
+sudo touch health.d/example-alert.conf
+sudo ./edit-config health.d/example-alert.conf
 ```
 
-Or, append your new alarm to an existing file by editing a relevant existing file in the `health.d/` directory.
+Or, append your new alert to an existing file by editing a relevant existing file in the `health.d/` directory.
 
-Read more about [configuring alarms](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) to
+Read more about [configuring alerts](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) to
 get started, and see
 the [health monitoring reference](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) for a full listing
 of options available in health entities.
 
-### Configure a specific alarm
+### Configure a specific alert
 
-Tweak existing alarms by editing files in the `health.d/` directory. For example, edit `health.d/cpu.conf` to change how
+Tweak existing alerts by editing files in the `health.d/` directory. For example, edit `health.d/cpu.conf` to change how
 the Agent responds to anomalies related to CPU utilization.
 
 To see which configuration file you need to edit to configure a specific
-alarm, [view your active alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alarms.md) in
+alert, [view your active alerts](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alerts.md) in
 Netdata Cloud or the local Agent dashboard and look for the **source** line. For example, it might
 read `source  4@/usr/lib/netdata/conf.d/health.d/cpu.conf`.
 
-Because the source path contains `health.d/cpu.conf`, run `sudo edit-config health.d/cpu.conf` to configure that alarm.
+Because the source path contains `health.d/cpu.conf`, run `sudo edit-config health.d/cpu.conf` to configure that alert.
 
-### Disable a specific alarm
+### Disable a specific alert
 
-Open the configuration file for that alarm and set the `to` line to `silent`.
+Open the configuration file for that alert and set the `to` line to `silent`.
 
 ```conf
 template: disk_fill_rate
@@ -113,14 +113,13 @@ template: disk_fill_rate
        to: silent
 ```
 
-### Turn of all alarms and notifications
+### Turn of all alerts and notifications
 
 Set `enabled` to `no` in
-the [`[health]` section](https://github.com/netdata/netdata/blob/master/daemon/config/README.md#health-section-options)
-section of
-`netdata.conf`.
+the [`[health]`](https://github.com/netdata/netdata/blob/master/daemon/config/README.md#health-section-options)
+section of `netdata.conf`.
 
-### Enable alarm notifications
+### Enable alert notifications
 
 Open `health_alarm_notify.conf` for editing. First, read the [enabling
 notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md#netdata-agent) doc
@@ -156,5 +155,5 @@ The following restrictions apply to host label names:
 - Names only accept alphabet letters, numbers, dots, and dashes.
 
 The policy for values is more flexible, but you can not use exclamation marks (`!`), whitespaces (` `), single quotes
-(`'`), double quotes (`"`), or asterisks (`*`), because they are used to compare label values in health alarms and
+(`'`), double quotes (`"`), or asterisks (`*`), because they are used to compare label values in health alerts and
 templates.

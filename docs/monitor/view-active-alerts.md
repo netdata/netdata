@@ -43,28 +43,28 @@ At the bottom of the panel you can click the green button "View dedicated alert 
 <!-- 
 ## Local Netdata Agent dashboard
 
-Find the alarms icon ![Alarms
+Find the alerts icon ![Alerts
 icon](https://raw.githubusercontent.com/netdata/netdata-ui/98e31799c1ec0983f433537ff16d2ac2b0d994aa/src/components/icon/assets/alarm.svg)
-in the top navigation to bring up a modal that shows currently raised alarms, all running alarms, and the alarms log.
-Here is an example of a raised `system.cpu` alarm, followed by the full list and alarm log:
+in the top navigation to bring up a modal that shows currently raised alerts, all running alerts, and the alerts log.
+Here is an example of a raised `system.cpu` alert, followed by the full list and alert log:
 
-![Animated GIF of looking at raised alarms and the alarm
+![Animated GIF of looking at raised alerts and the alert
 log](https://user-images.githubusercontent.com/1153921/80842482-8c289500-8bb6-11ea-9791-600cfdbe82ce.gif)
 
-And a static screenshot of the raised CPU alarm: 
+And a static screenshot of the raised CPU alert: 
 
 ![Screenshot of a raised system CPU
-alarm](https://user-images.githubusercontent.com/1153921/80842330-2dfbb200-8bb6-11ea-8147-3cd366eb0f37.png)
+alert](https://user-images.githubusercontent.com/1153921/80842330-2dfbb200-8bb6-11ea-8147-3cd366eb0f37.png)
 
-The alarm itself is named **system - cpu**, and its context is `system.cpu`. Beneath that is an auto-updating badge that
-shows the latest value of the chart that triggered the alarm.
+The alert itself is named **system - cpu**, and its context is `system.cpu`. Beneath that is an auto-updating badge that
+shows the latest value of the chart that triggered the alert.
 
 With the three icons beneath that and the **role** designation, you can:
 
-1.  Scroll to the chart associated with this raised alarm.
+1.  Scroll to the chart associated with this raised alert.
 2.  Copy a link to the badge to your clipboard.
 3.  Copy the code to embed the badge onto another web page using an `<embed>` element.
 
-The table on the right-hand side displays information about the health entity that triggered the alarm, which you can
-use as a reference to [configure alarms](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md).
+The table on the right-hand side displays information about the health entity that triggered the alert, which you can
+use as a reference to [configure alerts](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md).
  -->

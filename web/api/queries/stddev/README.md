@@ -18,10 +18,10 @@ out over a wider range of values.
 
 ## how to use
 
-Use it in alarms like this:
+Use it in alerts like this:
 
 ```
- alarm: my_alarm
+ alarm: my_alert
     on: my_chart
 lookup: stddev -1m unaligned of my_dimension
   warn: $this > 1000
@@ -61,16 +61,16 @@ and its standard deviation is 100 (meaning that it variates from 900 to 1100), t
 
 This is an easy way to check the % variation, without using absolute values.
 
-For example, you may trigger an alarm if your web server requests/sec `cv` is above 20 (`%`)
+For example, you may trigger an alert if your web server requests/sec `cv` is above 20 (`%`)
 over the last minute. So if your web server was serving 1000 reqs/sec over the last minute,
-it will trigger the alarm if had spikes below 800/sec or above 1200/sec.
+it will trigger the alert if had spikes below 800/sec or above 1200/sec.
 
 ## how to use
 
-Use it in alarms like this:
+Use it in alerts like this:
 
 ```
- alarm: my_alarm
+ alarm: my_alert
     on: my_chart
 lookup: cv -1m unaligned of my_dimension
  units: %

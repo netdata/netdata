@@ -5,7 +5,7 @@ replicate metrics data across multiple nodes, or centralize all your metrics dat
 (TSDB).
 
 When one node streams metrics to another, the node receiving metrics can visualize them on the dashboard, run health checks to 
-[trigger alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alarms.md) and 
+[trigger alerts](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alerts.md) and 
 [send notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md), and
 [export](https://github.com/netdata/netdata/blob/master/docs/export/external-databases.md) all metrics to an external TSDB. When Netdata streams metrics to another
 Netdata, the receiving one is able to perform everything a Netdata instance is capable of.
@@ -48,16 +48,16 @@ Here are a few example streaming configurations:
 - **Headless collector**: 
   - Child `A`, _without_ a database or web dashboard, streams metrics to parent `B`.
   - `A` metrics are only available via the local Agent dashboard for `B`.
-  - `B` generates alarms for `A`.
+  - `B` generates alerts for `A`.
 - **Replication**: 
   - Child `A`, _with_ a database and web dashboard, streams metrics to parent `B`. 
   - `A` metrics are available on both local Agent dashboards, and can be stored with the same or different metrics
     retention policies.
-  - Both `A` and `B` generate alarms.
+  - Both `A` and `B` generate alerts.
 - **Proxy**:
   - Child `A`, _with or without_ a database, sends metrics to proxy `C`, also _with or without_ a database. `C` sends
     metrics to parent `B`.
-  - Any node with a database can generate alarms.
+  - Any node with a database can generate alerts.
 
 
 
@@ -102,7 +102,7 @@ parent node, and both nodes retain metrics in their own databases.
 To configure replication, you need two nodes, each running Netdata. First you'll first enable streaming on your parent
 node, then enable streaming on your child node. When you're finished, you'll be able to see the child node's metrics in
 the parent node's dashboard, quickly switch between the two dashboards, and be able to serve 
-[alarm notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) from either or both nodes.
+[alert notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) from either or both nodes.
 
 ### Enable streaming on the parent node
 

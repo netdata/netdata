@@ -33,10 +33,10 @@ request_size="4k"
 ioping_opts="-T 1000000 -R"
 ```
 
-## alarms
+## alerts
 
-Netdata will automatically attach a few alarms for each host.
-Check the [latest versions of the ioping alarms](https://raw.githubusercontent.com/netdata/netdata/master/health/health.d/ioping.conf)
+Netdata will automatically attach a few alerts for each host.
+Check the [latest versions of the ioping alerts](https://raw.githubusercontent.com/netdata/netdata/master/health/health.d/ioping.conf)
 
 ## Multiple ioping Plugins With Different Settings
 

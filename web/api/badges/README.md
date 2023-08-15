@@ -77,11 +77,11 @@ Here is what you can put for `options` (these are standard Netdata API options):
 
 -   `alarm=NAME`
 
-    Render the current value and status of an alarm linked to the chart. This option can be ignored if the badge to be generated is not related to an alarm.
+    Render the current value and status of an alert linked to the chart. This option can be ignored if the badge to be generated is not related to an alert.
 
-    The current value of the alarm will be rendered. The color of the badge will indicate the status of the alarm.
+    The current value of the alert will be rendered. The color of the badge will indicate the status of the alert.
 
-    For alarm badges, **both `chart` and `alarm` parameters are required**.
+    For alert badges, **both `chart` and `alarm` parameters are required**.
 
 -   `dimensions=DIMENSION1|DIMENSION2|...`
 

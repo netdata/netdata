@@ -1,15 +1,15 @@
 # Configure alerts
 
-Netdata's health watchdog is highly configurable, with support for dynamic thresholds, hysteresis, alarm templates, and
-more. You can tweak any of the existing alarms based on your infrastructure's topology or specific monitoring needs, or
+Netdata's health watchdog is highly configurable, with support for dynamic thresholds, hysteresis, alert templates, and
+more. You can tweak any of the existing alerts based on your infrastructure's topology or specific monitoring needs, or
 create new entities.
 
-You can use health alarms in conjunction with any of Netdata's [collectors](https://github.com/netdata/netdata/blob/master/collectors/README.md) (see
+You can use health alerts in conjunction with any of Netdata's [collectors](https://github.com/netdata/netdata/blob/master/collectors/README.md) (see
 the [supported collector list](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md)) to monitor the health of your systems, containers, and
 applications in real time.
 
-While you can see active alarms both on the local dashboard and Netdata Cloud, all health alarms are configured _per
-node_ via individual Netdata Agents. If you want to deploy a new alarm across your
+While you can see active alerts both on the local dashboard and Netdata Cloud, all health alerts are configured _per
+node_ via individual Netdata Agents. If you want to deploy a new alert across your
 [infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md), you must configure each node with the same health configuration
 files.
 
@@ -55,7 +55,7 @@ template: 10min_cpu_usage
       to: sysadmin
 ```
 
-To tune this alarm to trigger warning and critical alarms at a lower CPU utilization, change the `warn` and `crit` lines
+To tune this alert to trigger warning and critical alerts at a lower CPU utilization, change the `warn` and `crit` lines
 to the values of your choosing. For example:
 
 ```yaml
@@ -79,7 +79,7 @@ In the `netdata.conf` `[health]` section, set `enabled` to `no`, and restart the
 
 In the `netdata.conf` `[health]` section, set `enabled alarms` to a
 [simple pattern](https://github.com/netdata/netdata/edit/master/libnetdata/simple_pattern/README.md) that
-excludes one or more alerts. e.g. `enabled alarms = !oom_kill *` will load all alarms except `oom_kill`.
+excludes one or more alerts. e.g. `enabled alarms = !oom_kill *` will load all alerts except `oom_kill`.
 
 You can also [edit the file where the alert is defined](#edit-individual-alerts), comment out its definition,
 and [reload Netdata's health configuration](#reload-health-configuration).
@@ -112,7 +112,7 @@ or restarting the agent.
 
 ## Write a new health entity
 
-While tuning existing alarms may work in some cases, you may need to write entirely new health entities based on how
+While tuning existing alerts may work in some cases, you may need to write entirely new health entities based on how
 your systems, containers, and applications work.
 
 Read the [health entity reference](#health-entity-reference) for a full listing of the format,
@@ -128,8 +128,8 @@ sudo touch health.d/ram-usage.conf
 sudo ./edit-config health.d/ram-usage.conf
 ```
 
-For example, here is a health entity that triggers a warning alarm when a node's RAM usage rises above 80%, and a
-critical alarm above 90%:
+For example, here is a health entity that triggers a warning alert when a node's RAM usage rises above 80%, and a
+critical alert above 90%:
 
 ```yaml
  alarm: ram_usage
@@ -151,7 +151,7 @@ Let's look into each of the lines to see how they create a working health entity
 
 - `on`: Which chart the entity listens to.
 
-- `lookup`: Which metrics the alarm monitors, the duration of time to monitor, and how to process the metrics into a
+- `lookup`: Which metrics the alert monitors, the duration of time to monitor, and how to process the metrics into a
     usable format.
   - `average`: Calculate the average of all the metrics collected.
   - `-1m`: Use metrics from 1 minute ago until now to calculate that average.
@@ -160,13 +160,13 @@ Let's look into each of the lines to see how they create a working health entity
 
 - `units`: Use percentages rather than absolute units.
 
-- `every`: How often to perform the `lookup` calculation to decide whether or not to trigger this alarm.
+- `every`: How often to perform the `lookup` calculation to decide whether to trigger this alert.
 
-- `warn`/`crit`: The value at which Netdata should trigger a warning or critical alarm. This example uses simple
+- `warn`/`crit`: The value at which Netdata should trigger a warning or critical alert. This example uses simple
     syntax, but most pre-configured health entities use
     [hysteresis](#special-use-of-the-conditional-operator) to avoid superfluous notifications.
 
-- `info`: A description of the alarm, which will appear in the dashboard and notifications.
+- `info`: A description of the alert, which will appear in the dashboard and notifications.
 
 In human-readable format:
 
@@ -174,8 +174,8 @@ In human-readable format:
 > metrics from the **used** dimension and calculates the **average** of all those metrics in a **percentage** format,
 > using a **% unit**. The entity performs this lookup **every minute**.
 >
-> If the average RAM usage percentage over the last 1 minute is **more than 80%**, the entity triggers a warning alarm.
-> If the usage is **more than 90%**, the entity triggers a critical alarm.
+> If the average RAM usage percentage over the last 1 minute is **more than 80%**, the entity triggers a warning alert.
+> If the usage is **more than 90%**, the entity triggers a critical alert.
 
 When you finish writing this new health entity, [reload Netdata's health configuration](#reload-health-configuration) to
 see it live on the local dashboard or Netdata Cloud.
@@ -188,20 +188,20 @@ without restarting all of Netdata, run `netdatacli reload-health` or `killall -U
 ## Health entity reference
 
 The following reference contains information about the syntax and options of _health entities_, which Netdata attaches
-to charts in order to trigger alarms.
+to charts in order to trigger alerts.
 
 ### Entity types
 
 There are two entity types: **alarms** and **templates**. They have the same format and feature set—the only difference
 is their label.
 
-**Alarms** are attached to specific charts and use the `alarm` label.
+**Alerts** are attached to specific charts and use the `alarm` label.
 
 **Templates** define rules that apply to all charts of a specific context, and use the `template` label. Templates help
 you apply one entity to all disks, all network interfaces, all MySQL databases, and so on.
 
-Alarms have higher precedence and will override templates. If an alarm and template entity have the same name and attach
-to the same chart, Netdata will use the alarm.
+Alerts have higher precedence and will override templates.
+If the `alert` and `template` entities have the same name and are attached to the same chart, Netdata will use `alarm`.
 
 ### Entity format
 
@@ -219,39 +219,39 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
     This comes in handy if your `info` line consists of several sentences.  
 
 | line                                                | required        | functionality                                                                         |
-| --------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------- |
-| [`alarm`/`template`](#alarm-line-alarm-or-template) | yes             | Name of the alarm/template.                                                           |
-| [`on`](#alarm-line-on)                              | yes             | The chart this alarm should attach to.                                                |
-| [`class`](#alarm-line-class)                        | no              | The general alarm classification.                                                     |
-| [`type`](#alarm-line-type)                          | no              | What area of the system the alarm monitors.                                           |
-| [`component`](#alarm-line-component)                | no              | Specific component of the type of the alarm.                                          |
-| [`os`](#alarm-line-os)                              | no              | Which operating systems to run this chart.                                            |
-| [`hosts`](#alarm-line-hosts)                        | no              | Which hostnames will run this alarm.                                                  |
-| [`plugin`](#alarm-line-plugin)                      | no              | Restrict an alarm or template to only a certain plugin.                                             |
-| [`module`](#alarm-line-module)                      | no              | Restrict an alarm or template to only a certain module.                                             |
-| [`charts`](#alarm-line-charts)                      | no              | Restrict an alarm or template to only certain charts.                                             |
-| [`families`](#alarm-line-families)                  | no              | Restrict a template to only certain families.                                         |
-| [`lookup`](#alarm-line-lookup)                      | yes             | The database lookup to find and process metrics for the chart specified through `on`. |
-| [`calc`](#alarm-line-calc)                          | yes (see above) | A calculation to apply to the value found via `lookup` or another variable.           |
-| [`every`](#alarm-line-every)                        | no              | The frequency of the alarm.                                                           |
-| [`green`/`red`](#alarm-lines-green-and-red)         | no              | Set the green and red thresholds of a chart.                                          |
-| [`warn`/`crit`](#alarm-lines-warn-and-crit)         | yes (see above) | Expressions evaluating to true or false, and when true, will trigger the alarm.       |
-| [`to`](#alarm-line-to)                              | no              | A list of roles to send notifications to.                                             |
-| [`exec`](#alarm-line-exec)                          | no              | The script to execute when the alarm changes status.                                  |
-| [`delay`](#alarm-line-delay)                        | no              | Optional hysteresis settings to prevent floods of notifications.                      |
-| [`repeat`](#alarm-line-repeat)                      | no              | The interval for sending notifications when an alarm is in WARNING or CRITICAL mode.  |
-| [`options`](#alarm-line-options)                    | no              | Add an option to not clear alarms.                                                    |
-| [`host labels`](#alarm-line-host-labels)            | no              | Restrict an alarm or template to a list of matching labels present on a host.         |
-| [`chart labels`](#alarm-line-chart-labels)          | no              | Restrict an alarm or template to a list of matching labels present on a host.         |
-| [`info`](#alarm-line-info)                          | no              | A brief description of the alarm.                                                           |
+|-----------------------------------------------------|-----------------|---------------------------------------------------------------------------------------|
+| [`alarm`/`template`](#alert-line-alarm-or-template) | yes             | Name of the alert/template.                                                           |
+| [`on`](#alert-line-on)                              | yes             | The chart this alert should attach to.                                                |
+| [`class`](#alert-line-class)                        | no              | The general alert classification.                                                     |
+| [`type`](#alert-line-type)                          | no              | What area of the system the alert monitors.                                           |
+| [`component`](#alert-line-component)                | no              | Specific component of the type of the alert.                                          |
+| [`os`](#alert-line-os)                              | no              | Which operating systems to run this chart.                                            |
+| [`hosts`](#alert-line-hosts)                        | no              | Which hostnames will run this alert.                                                  |
+| [`plugin`](#alert-line-plugin)                      | no              | Restrict an alert or template to only a certain plugin.                               |
+| [`module`](#alert-line-module)                      | no              | Restrict an alert or template to only a certain module.                               |
+| [`charts`](#alert-line-charts)                      | no              | Restrict an alert or template to only certain charts.                                 |
+| [`families`](#alert-line-families)                  | no              | Restrict a template to only certain families.                                         |
+| [`lookup`](#alert-line-lookup)                      | yes             | The database lookup to find and process metrics for the chart specified through `on`. |
+| [`calc`](#alert-line-calc)                          | yes (see above) | A calculation to apply to the value found via `lookup` or another variable.           |
+| [`every`](#alert-line-every)                        | no              | The frequency of the alert.                                                           |
+| [`green`/`red`](#alert-lines-green-and-red)         | no              | Set the green and red thresholds of a chart.                                          |
+| [`warn`/`crit`](#alert-lines-warn-and-crit)         | yes (see above) | Expressions evaluating to true or false, and when true, will trigger the alert.       |
+| [`to`](#alert-line-to)                              | no              | A list of roles to send notifications to.                                             |
+| [`exec`](#alert-line-exec)                          | no              | The script to execute when the alert changes status.                                  |
+| [`delay`](#alert-line-delay)                        | no              | Optional hysteresis settings to prevent floods of notifications.                      |
+| [`repeat`](#alert-line-repeat)                      | no              | The interval for sending notifications when an alert is in WARNING or CRITICAL mode.  |
+| [`options`](#alert-line-options)                    | no              | Add an option to not clear alerts.                                                    |
+| [`host labels`](#alert-line-host-labels)            | no              | Restrict an alert or template to a list of matching labels present on a host.         |
+| [`chart labels`](#alert-line-chart-labels)          | no              | Restrict an alert or template to a list of matching labels present on a host.         |
+| [`info`](#alert-line-info)                          | no              | A brief description of the alert.                                                     |
 
 The `alarm` or `template` line must be the first line of any entity.
 
-#### Alarm line `alarm` or `template`
+#### Alert line `alarm` or `template`
 
-This line starts an alarm or template based on the [entity type](#entity-types) you're interested in creating.
+This line starts an alert or template based on the [entity type](#entity-types) you're interested in creating.
 
-**Alarm:**
+**Alert:**
 
 ```yaml
 alarm: NAME
@@ -266,11 +266,11 @@ template: NAME
 `NAME` can be any alpha character, with `.` (period) and `_` (underscore) as the only allowed symbols, but the names
 cannot be `chart name`, `dimension name`, `family name`, or `chart variables names`.
 
-#### Alarm line `on`
+#### Alert line `on`
 
-This line defines the chart this alarm should attach to.
+This line defines the chart this alert should attach to.
 
-**Alarms:**
+**Alerts:**
 
 ```yaml
 on: CHART
@@ -297,40 +297,40 @@ shows a disk I/O chart, the tooltip reads: `proc:/proc/diskstats, disk.io`.
 
 You're interested in what comes after the comma: `disk.io`. That's the name of the chart's context.
 
-If you create a template using the `disk.io` context, it will apply an alarm to every disk available on your system.
+If you create a template using the `disk.io` context, it will apply an alert to every disk available on your system.
 
-#### Alarm line `class`
+#### Alert line `class`
 
-This indicates the type of error (or general problem area) that the alarm or template applies to. For example, `Latency` can be used for alarms that trigger on latency issues on network interfaces, web servers, or database systems. Example:
+This indicates the type of error (or general problem area) that the alert or template applies to. For example, `Latency` can be used for alerts that trigger on latency issues on network interfaces, web servers, or database systems. Example:
 
 ```yaml
 class: Latency
 ```
 
 <details>
-<summary>Netdata's stock alarms use the following `class` attributes by default:</summary>
+<summary>Netdata's stock alerts use the following `class` attributes by default:</summary>
 
-| Class           |
-| ----------------|
-| Errors          |
-| Latency         |
-| Utilization     |
-| Workload        |
+| Class       |
+|-------------|
+| Errors      |
+| Latency     |
+| Utilization |
+| Workload    |
 
 </details>
 
-`class` will default to `Unknown` if the line is missing from the alarm configuration.
+`class` will default to `Unknown` if the line is missing from the alert configuration.
 
-#### Alarm line `type`
+#### Alert line `type`
 
-Type can be used to indicate the broader area of the system that the alarm applies to. For example, under the general `Database` type, you can group together alarms that operate on various database systems, like `MySQL`, `CockroachDB`, `CouchDB` etc. Example:
+Type can be used to indicate the broader area of the system that the alert applies to. For example, under the general `Database` type, you can group together alerts that operate on various database systems, like `MySQL`, `CockroachDB`, `CouchDB` etc. Example:
 
 ```yaml
 type: Database
 ```
 
 <details>
-<summary>Netdata's stock alarms use the following `type` attributes by default, but feel free to adjust for your own requirements.</summary>
+<summary>Netdata's stock alerts use the following `type` attributes by default, but feel free to adjust for your own requirements.</summary>
 
 | Type            | Description                                                                                    |
 |-----------------|------------------------------------------------------------------------------------------------|
@@ -352,7 +352,7 @@ type: Database
 | Power Supply    | Alerts from power supply related services (e.g. apcupsd)                                       |
 | Search engine   | Alerts for search services (e.g. elasticsearch)                                                |
 | Storage         | Class for alerts dealing with storage services (storage devices typically live under `System`) |
-| System          | General system alarms (e.g. cpu, network, etc.)                                                |
+| System          | General system alerts (e.g. cpu, network, etc.)                                                |
 | Virtual Machine | Virtual Machine software                                                                       |
 | Web Proxy       | Web proxy software (e.g. squid)                                                                |
 | Web Server      | Web server software (e.g. Apache, ngnix, etc.)                                                 |
@@ -360,11 +360,11 @@ type: Database
 
 </details>
 
-If an alarm configuration is missing the `type` line, its value will default to `Unknown`.
+If an alert configuration is missing the `type` line, its value will default to `Unknown`.
 
-#### Alarm line `component`
+#### Alert line `component`
 
-Component can be used to narrow down what the previous `type` value specifies for each alarm or template. Continuing from the previous example, `component` might include `MySQL`, `CockroachDB`, `MongoDB`, all under the same `Database` type. Example:
+Component can be used to narrow down what the previous `type` value specifies for each alert or template. Continuing from the previous example, `component` might include `MySQL`, `CockroachDB`, `MongoDB`, all under the same `Database` type. Example:
 
 ```yaml
 component: MySQL
@@ -372,9 +372,9 @@ component: MySQL
 
 As with the `class` and `type` line, if `component` is missing from the configuration, its value will default to `Unknown`.
 
-#### Alarm line `os`
+#### Alert line `os`
 
-The alarm or template will be used only if the operating system of the host matches this list specified in `os`. The
+The alert or template will be used only if the operating system of the host matches this list specified in `os`. The
 value is a space-separated list.
 
 The following example enables the entity on Linux, FreeBSD, and macOS, but no other operating systems.
@@ -383,9 +383,9 @@ The following example enables the entity on Linux, FreeBSD, and macOS, but no ot
 os: linux freebsd macos
 ```
 
-#### Alarm line `hosts`
+#### Alert line `hosts`
 
-The alarm or template will be used only if the hostname of the host matches this space-separated list.
+The alert or template will be used only if the hostname of the host matches this space-separated list.
 
 The following example will load on systems with the hostnames `server` and `server2`, and any system with hostnames that
 begin with `database`. It _will not load_ on the host `redis3`, but will load on any _other_ systems with hostnames that
@@ -395,47 +395,47 @@ begin with `redis`.
 hosts: server1 server2 database* !redis3 redis*
 ```
 
-#### Alarm line `plugin`
+#### Alert line `plugin`
 
-The `plugin` line filters which plugin within the context this alarm should apply to. The value is a space-separated
+The `plugin` line filters which plugin within the context this alert should apply to. The value is a space-separated
 list of [simple patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md). For example,
-you can create a filter for an alarm that applies specifically to `python.d.plugin`:
+you can create a filter for an alert that applies specifically to `python.d.plugin`:
 
 ```yaml
 plugin: python.d.plugin
 ```
 
 The `plugin` line is best used with other options like `module`. When used alone, the `plugin` line creates a very
-inclusive filter that is unlikely to be of much use in production. See [`module`](#alarm-line-module) for a
+inclusive filter that is unlikely to be of much use in production. See [`module`](#alert-line-module) for a
 comprehensive example using both.
 
-#### Alarm line `module`
+#### Alert line `module`
 
-The `module` line filters which module within the context this alarm should apply to. The value is a space-separated
+The `module` line filters which module within the context this alert should apply to. The value is a space-separated
 list of [simple patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md). For
-example, you can create an alarm that applies only on the `isc_dhcpd` module started by `python.d.plugin`:
+example, you can create an alert that applies only on the `isc_dhcpd` module started by `python.d.plugin`:
 
 ```yaml
 plugin: python.d.plugin
 module: isc_dhcpd
 ```
 
-#### Alarm line `charts`
+#### Alert line `charts`
 
-The `charts` line filters which chart this alarm should apply to. It is only available on entities using the
-[`template`](#alarm-line-alarm-or-template) line.
+The `charts` line filters which chart this alert should apply to. It is only available on entities using the
+[`template`](#alert-line-alarm-or-template) line.
 The value is a space-separated list of [simple patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md). For
-example, a template that applies to `disk.svctm` (Average Service Time) context, but excludes the disk `sdb` from alarms:
+example, a template that applies to `disk.svctm` (Average Service Time) context, but excludes the disk `sdb` from alerts:
 
 ```yaml
-template: disk_svctm_alarm
+template: disk_svctm_alert
       on: disk.svctm
   charts: !*sdb* *
 ```
 
-#### Alarm line `families`
+#### Alert line `families`
 
-The `families` line, used only alongside templates, filters which families within the context this alarm should apply
+The `families` line, used only alongside templates, filters which families within the context this alert should apply
 to. The value is a space-separated list.
 
 The value is a space-separate list of simple patterns. See our [simple patterns docs](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) for
@@ -448,9 +448,9 @@ families: sda sdb
 ```
 
 Please note that the use of the `families` filter is planned to be deprecated in upcoming Netdata releases. 
-Please use [`chart labels`](#alarm-line-chart-labels) instead.
+Please use [`chart labels`](#alert-line-chart-labels) instead.
 
-#### Alarm line `lookup`
+#### Alert line `lookup`
 
 This line makes a database lookup to find a value. This result of this lookup is available as `$this`.
 
@@ -485,17 +485,17 @@ The full [database query API](https://github.com/netdata/netdata/blob/master/web
      `,` or `|` instead of spaces)_ and the `match-ids` and `match-names` options affect the searches
      for dimensions.
 
-- `foreach DIMENSIONS` is optional and works only with [templates](#alarm-line-alarm-or-template), will always be the last parameter, and uses the same `,`/`|`
+- `foreach DIMENSIONS` is optional and works only with [templates](#alert-line-alarm-or-template), will always be the last parameter, and uses the same `,`/`|`
      rules as the `of` parameter. Each dimension you specify in `foreach` will use the same rule
-     to trigger an alarm. If you set both `of` and `foreach`, Netdata will ignore the `of` parameter
+     to trigger an alert. If you set both `of` and `foreach`, Netdata will ignore the `of` parameter
      and replace it with one of the dimensions you gave to `foreach`. This option allows you to
-     [use dimension templates to create dynamic alarms](#use-dimension-templates-to-create-dynamic-alarms).
+     [use dimension templates to create dynamic alerts](#use-dimension-templates-to-create-dynamic-alerts).
 
 The result of the lookup will be available as `$this` and `$NAME` in expressions.
 The timestamps of the timeframe evaluated by the database lookup is available as variables
 `$after` and `$before` (both are unix timestamps).
 
-#### Alarm line `calc`
+#### Alert line `calc`
 
 A `calc` is designed to apply some calculation to the values or variables available to the entity. The result of the
 calculation will be made available at the `$this` variable, overwriting the value from your `lookup`, to use in warning
@@ -512,9 +512,9 @@ The `calc` line uses [expressions](#expressions) for its syntax.
 calc: EXPRESSION
 ```
 
-#### Alarm line `every`
+#### Alert line `every`
 
-Sets the update frequency of this alarm.  This is the same to the `every DURATION` given
+Sets the update frequency of this alert.  This is the same to the `every DURATION` given
 in the `lookup` lines.
 
 Format:
@@ -525,11 +525,11 @@ every: DURATION
 
 `DURATION` accepts `s` for seconds, `m` is minutes, `h` for hours, `d` for days.
 
-#### Alarm lines `green` and `red`
+#### Alert lines `green` and `red`
 
 Set the green and red thresholds of a chart. Both are available as `$green` and `$red` in expressions. If multiple
-alarms define different thresholds, the ones defined by the first alarm will be used. These will eventually visualized
-on the dashboard, so only one set of them is allowed. If you need multiple sets of them in different alarms, use
+alerts define different thresholds, the ones defined by the first alert will be used. Eventually it will be visualized
+on the dashboard, so only one set of them is allowed If you need multiple sets of them in different alerts, use
 absolute numbers instead of `$red` and `$green`.
 
 Format:
@@ -539,9 +539,9 @@ green: NUMBER
 red: NUMBER
 ```
 
-#### Alarm lines `warn` and `crit`
+#### Alert lines `warn` and `crit`
 
-Define the expression that triggers either a warning or critical alarm. These are optional, and should evaluate to
+Define the expression that triggers either a warning or critical alert. These are optional, and should evaluate to
 either true or false (or zero/non-zero).
 
 The format uses Netdata's [expressions syntax](#expressions).
@@ -551,9 +551,9 @@ warn: EXPRESSION
 crit: EXPRESSION
 ```
 
-#### Alarm line `to`
+#### Alert line `to`
 
-This will be the first parameter of the script to be executed when the alarm switches status. Its meaning is left up to
+This will be the first script parameter that will be executed when the alert changes its status. Its meaning is left up to
 the `exec` script.
 
 The default `exec` script, `alarm-notify.sh`, uses this field as a space separated list of roles, which are then
@@ -565,9 +565,9 @@ Format:
 to: ROLE1 ROLE2 ROLE3 ...
 ```
 
-#### Alarm line `exec`
+#### Alert line `exec`
 
-The script that will be executed when the alarm changes status.
+Script to be executed when the alert status changes.
 
 Format:
 
@@ -578,10 +578,10 @@ exec: SCRIPT
 The default `SCRIPT` is Netdata's `alarm-notify.sh`, which supports all the notifications methods Netdata supports,
 including custom hooks.
 
-#### Alarm line `delay`
+#### Alert line `delay`
 
 This is used to provide optional hysteresis settings for the notifications, to defend against notification floods. These
-settings do not affect the actual alarm - only the time the `exec` script is executed.
+settings do not affect the actual alert - only the time the `exec` script is executed.
 
 Format:
 
@@ -589,45 +589,45 @@ Format:
 delay: [[[up U] [down D] multiplier M] max X]
 ```
 
-- `up U` defines the delay to be applied to a notification for an alarm that raised its status
+- `up U` defines the delay to be applied to a notification for an alert that raised its status
      (i.e. CLEAR to WARNING, CLEAR to CRITICAL, WARNING to CRITICAL). For example, `up 10s`, the
      notification for this event will be sent 10 seconds after the actual event. This is used in
-     hope the alarm will get back to its previous state within the duration given. The default `U`
+     hope the alert will get back to its previous state within the duration given. The default `U`
      is zero.
 
-- `down D` defines the delay to be applied to a notification for an alarm that moves to lower
+- `down D` defines the delay to be applied to a notification for an alert that moves to lower
      state (i.e. CRITICAL to WARNING, CRITICAL to CLEAR, WARNING to CLEAR). For example, `down 1m`
      will delay the notification by 1 minute. This is used to prevent notifications for flapping
-     alarms. The default `D` is zero.
+     alerts. The default `D` is zero.
 
-- `multiplier M` multiplies `U` and `D` when an alarm changes state, while a notification is
+- `multiplier M` multiplies `U` and `D` when an alert changes state, while a notification is
      delayed. The default multiplier is `1.0`.
 
-- `max X`  defines the maximum absolute notification delay an alarm may get. The default `X`
+- `max X`  defines the maximum absolute notification delay an alert may get. The default `X`
      is `max(U * M, D * M)` (i.e. the max duration of `U` or `D` multiplied once with `M`).
 
     Example:
 
     `delay: up 10s down 15m multiplier 2 max 1h`
 
-    The time is `00:00:00` and the status of the alarm is CLEAR.
+    The time is `00:00:00` and the status of the alert is CLEAR.
 
     | time of event | new status | delay               | notification will be sent | why                                                                           |
-    | ------------- | ---------- | ---                 | ------------------------- | ---                                                                           |
+    |---------------|------------|---------------------|---------------------------|-------------------------------------------------------------------------------|
     | 00:00:01      | WARNING    | `up 10s`            | 00:00:11                  | first state switch                                                            |
-    | 00:00:05      | CLEAR      | `down 15m x2`       | 00:30:05                  | the alarm changes state while a notification is delayed, so it was multiplied |
+    | 00:00:05      | CLEAR      | `down 15m x2`       | 00:30:05                  | the alert changes state while a notification is delayed, so it was multiplied |
     | 00:00:06      | WARNING    | `up 10s x2 x2`      | 00:00:26                  | multiplied twice                                                              |
     | 00:00:07      | CLEAR      | `down 15m x2 x2 x2` | 00:45:07                  | multiplied 3 times.                                                           |
 
     So:
 
-  - `U` and `D` are multiplied by `M` every time the alarm changes state (any state, not just
+  - `U` and `D` are multiplied by `M` every time the alert changes state (any state, not just
         their matching one) and a delay is in place.
-  - All are reset to their defaults when the alarm switches state without a delay in place.
+  - All are reset to their defaults when the alert switches state without a delay in place.
 
-#### Alarm line `repeat`
+#### Alert line `repeat`
 
-Defines the interval between repeating notifications for the alarms in CRITICAL or WARNING mode. This will override the
+Defines the interval between repeating notifications for the alerts in CRITICAL or WARNING mode. This will override the
 default interval settings inherited from health settings in `netdata.conf`. The default settings for repeating
 notifications are `default repeat warning = DURATION` and `default repeat critical = DURATION` which can be found in
 health stock configuration, when one of these interval is bigger than 0, Netdata will activate the repeat notification
@@ -639,14 +639,14 @@ Format:
 repeat: [off] [warning DURATION] [critical DURATION]
 ```
 
-- `off`: Turns off the repeating feature for the current alarm. This is effective when the default repeat settings has
+- `off`: Turns off the repeating feature for the current alert. This is effective when the default repeat settings has
     been enabled in health configuration.
-- `warning DURATION`: Defines the interval when the alarm is in WARNING state. Use `0s` to turn off the repeating
+- `warning DURATION`: Defines the interval when the alert is in WARNING state. Use `0s` to turn off the repeating
     notification for WARNING mode.
-- `critical DURATION`: Defines the interval when the alarm is in CRITICAL state. Use `0s` to turn off the repeating
+- `critical DURATION`: Defines the interval when the alert is in CRITICAL state. Use `0s` to turn off the repeating
     notification for CRITICAL mode.
 
-#### Alarm line `options`
+#### Alert line `options`
 
 The only possible value for the `options` line is
 
@@ -654,16 +654,16 @@ The only possible value for the `options` line is
 options: no-clear-notification
 ```
 
-For some alarms we need compare two time-frames, to detect anomalies. For example, `health.d/httpcheck.conf` has an
-alarm template called `web_service_slow` that compares the average http call response time over the last 3 minutes,
-compared to the average over the last hour. It triggers a warning alarm when the average of the last 3 minutes is twice
-the average of the last hour. In such cases, it is easy to trigger the alarm, but difficult to tell when the alarm is
+For some alerts we need compare two time-frames, to detect anomalies. For example, `health.d/httpcheck.conf` has an
+alert template called `web_service_slow` that compares the average http call response time over the last 3 minutes,
+compared to the average over the last hour. It triggers a warning alert when the average of the last 3 minutes is twice
+the average of the last hour. In such cases, it is easy to trigger the alert, but difficult to tell when the alert is
 cleared. As time passes, the newest window moves into the older, so the average response time of the last hour will keep
-increasing. Eventually, the comparison will find the averages in the two time-frames close enough to clear the alarm.
-However, the issue was not resolved, it's just a matter of the newer data "polluting" the old. For such alarms, it's a
+increasing. Eventually, the comparison will find the averages in the two time-frames close enough to clear the alert.
+However, the issue was not resolved, it's just a matter of the newer data "polluting" the old. For such alerts, it's a
 good idea to tell Netdata to not clear the notification, by using the `no-clear-notification` option.
 
-#### Alarm line `host labels`
+#### Alert line `host labels`
 
 Defines the list of labels present on a host. See our [host labels guide](https://github.com/netdata/netdata/blob/master/docs/guides/using-host-labels.md) for
 an explanation of host labels and how to implement them.
@@ -684,14 +684,14 @@ And more labels in `netdata.conf` for workstations:
     room = workstation
 ```
 
-By defining labels inside of `netdata.conf`, you can now apply labels to alarms. For example, you can add the following
-line to any alarms you'd like to apply to hosts that have the label `room = server`.
+By defining labels inside of `netdata.conf`, you can now apply labels to alerts. For example, you can add the following
+line to any alerts you'd like to apply to hosts that have the label `room = server`.
 
 ```yaml
 host labels: room = server
 ```
 
-The `host labels` is a space-separated list that accepts simple patterns. For example, you can create an alarm
+The `host labels` is a space-separated list that accepts simple patterns. For example, you can create an alert
 that will be applied to all hosts installed in the last decade with the following line:
 
 ```yaml
@@ -700,9 +700,9 @@ host labels: installed = 201*
 
 See our [simple patterns docs](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) for more examples.
 
-#### Alarm line `chart labels`
+#### Alert line `chart labels`
 
-Similar to host labels, the `chart labels` key can be used to filter if an alarm will load or not for a specific chart, based on
+Similar to host labels, the `chart labels` key can be used to filter if an alert will load or not for a specific chart, based on
 whether these chart labels match or not.
 
 The list of chart labels present on each chart can be obtained from http://localhost:19999/api/v1/charts?all
@@ -729,10 +729,10 @@ is specified that does not exist in the chart, the chart won't be matched.
 
 See our [simple patterns docs](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) for more examples.
 
-#### Alarm line `info`
+#### Alert line `info`
 
-The info field can contain a small piece of text describing the alarm or template. This will be rendered in
-notifications and UI elements whenever the specific alarm is in focus. An example for the `ram_available` alarm is:
+The info field can contain a small piece of text describing the alert or template. This will be rendered in
+notifications and UI elements whenever the specific alert is in focus. An example for the `ram_available` alert is:
 
 ```yaml
 info: percentage of estimated amount of RAM available for userspace processes, without causing swapping
@@ -741,10 +741,10 @@ info: percentage of estimated amount of RAM available for userspace processes, w
 info fields can contain special variables in their text that will be replaced during run-time to provide more specific
 alert information. Current variables supported are:
 
-| variable | description |
-| ---------| ----------- |
-| ${family}  | Will be replaced by the family instance for the alert (e.g. eth0) |
-| ${label:LABEL_NAME}  | The variable will be replaced with the value of the label |
+| variable            | description                                                       |
+|---------------------|-------------------------------------------------------------------|
+| ${family}           | Will be replaced by the family instance for the alert (e.g. eth0) |
+| ${label:LABEL_NAME} | The variable will be replaced with the value of the label         |
 
 For example, an info field like the following:
 
@@ -771,7 +771,7 @@ Will become:
 info: average ratio of HTTP responses with unexpected status over the last 5 minutes for the site https://netdata.cloud/
 ```
 
-> Please note that variable names are case sensitive.
+> Please note that variable names are case-sensitive.
 
 ## Expressions
 
@@ -797,10 +797,10 @@ Expressions can have variables. Variables start with `$`. Check below for more i
 There are two special values you can use:
 
 - `nan`, for example `$this != nan` will check if the variable `this` is available. A variable can be `nan` if the
-    database lookup failed. All calculations (i.e. addition, multiplication, etc) with a `nan` result in a `nan`.
+    database lookup failed. All calculations (i.e. addition, multiplication, etc.) with a `nan` result in a `nan`.
 
 - `inf`, for example `$this != inf` will check if `this` is not infinite. A value or variable can be set to infinite
-    if divided by zero. All calculations (i.e. addition, multiplication, etc) with a `inf` result in a `inf`.
+    if divided by zero. All calculations (i.e. addition, multiplication, etc.) with a `inf` result in a `inf`.
 
 ### Special use of the conditional operator
 
@@ -809,7 +809,7 @@ A common (but not necessarily obvious) use of the conditional evaluation operato
 avoid bogus messages resulting from small variations in the value when it is varying regularly but staying close to the
 threshold value, without needing to delay sending messages at all.
 
-An example of such usage from the default CPU usage alarms bundled with Netdata is:
+An example of such usage from the default CPU usage alerts bundled with Netdata is:
 
 ```yaml
 warn: $this > (($status >= $WARNING)  ? (75) : (85))
@@ -818,9 +818,9 @@ crit: $this > (($status == $CRITICAL) ? (85) : (95))
 
 The above say:
 
-- If the alarm is currently a warning, then the threshold for being considered a warning is 75, otherwise it's 85.
+- If the alert is currently a warning, then the threshold for being considered a warning is 75, otherwise it's 85.
 
-- If the alarm is currently critical, then the threshold for being considered critical is 85, otherwise it's 95.
+- If the alert is currently critical, then the threshold for being considered critical is 85, otherwise it's 95.
 
 Which in turn, results in the following behavior:
 
@@ -846,26 +846,25 @@ registry](https://registry.my-netdata.io/api/v1/alarm_variables?chart=system.cpu
 
 Netdata supports 3 internal indexes for variables that will be used in health monitoring.
 
-<details markdown="1"><summary>The variables below can be used in both chart alarms and context templates.</summary>
+<details markdown="1"><summary>The variables below can be used in both chart alerts and context templates.</summary>
 
 Although the `alarm_variables` link shows you variables for a particular chart, the same variables can also be used in
 templates for charts belonging to a given [context](https://github.com/netdata/netdata/blob/master/web/README.md#contexts). The reason is that all charts of a given
 context are essentially identical, with the only difference being the [family](https://github.com/netdata/netdata/blob/master/web/README.md#families) that
 identifies a particular hardware or software instance. Charts and templates do not apply to specific families anyway,
-unless if you explicitly limit an alarm with the [alarm line `families`](#alarm-line-families).
+unless if you explicitly limit an alert with the [alert line `families`](#alert-line-families).
 
 </details>
 
 - **chart local variables**. All the dimensions of the chart are exposed as local variables. The value of `$this` for
-    the other configured alarms of the chart also appears, under the name of each configured alarm.
+    the other configured alerts of the chart also appears, under the name of each configured alert.
 
      Charts also define a few special variables:
 
   - `$last_collected_t` is the unix timestamp of the last data collection
   - `$collected_total_raw` is the sum of all the dimensions (their last collected values)
   - `$update_every` is the update frequency of the chart
-  - `$green` and `$red` the threshold defined in alarms (these are per chart - the charts
-            inherits them from the the first alarm that defined them)
+  - `$green` and `$red` the threshold defined in alerts (these are per chart - the charts inherits them from the first alert that defined them)
 
         Chart dimensions define their last calculated (i.e. interpolated) value, exactly as
         shown on the charts, but also a variable with their name and suffix `_raw` that resolves
@@ -877,35 +876,35 @@ unless if you explicitly limit an alarm with the [alarm line `families`](#alarm-
      charts, have `family = eth0`. This index includes all local variables, but if there are
      overlapping variables, only the first are exposed.
 
-- **host variables**. All the dimensions of all charts, including all alarms, in fullname.
+- **host variables**. All the dimensions of all charts, including all alerts, in fullname.
      Fullname is `CHART.VARIABLE`, where `CHART` is either the chart id or the chart name (both
      are supported).
 
 - **special variables\*** are:
 
-  - `$this`, which is resolved to the value of the current alarm.
+  - `$this`, which is resolved to the value of the current alert.
 
-  - `$status`, which is resolved to the current status of the alarm (the current = the last
+  - `$status`, which is resolved to the current status of the alert (the current = the last
          status, i.e. before the current database lookup and the evaluation of the `calc` line).
          This values can be compared with `$REMOVED`, `$UNINITIALIZED`, `$UNDEFINED`, `$CLEAR`,
-         `$WARNING`, `$CRITICAL`. These values are incremental, ie. `$status > $CLEAR` works as
+         `$WARNING`, `$CRITICAL`. These values are incremental, e.g. `$status > $CLEAR` works as
          expected.
 
   - `$now`, which is resolved to current unix timestamp.
 
-## Alarm statuses
+## Alert statuses
 
-Alarms can have the following statuses:
+Alerts can have the following statuses:
 
-- `REMOVED` - the alarm has been deleted (this happens when a SIGUSR2 is sent to Netdata
+- `REMOVED` - the alert has been deleted (this happens when a SIGUSR2 is sent to Netdata
      to reload health configuration)
 
-- `UNINITIALIZED` - the alarm is not initialized yet
+- `UNINITIALIZED` - the alert is not initialized yet
 
-- `UNDEFINED` - the alarm failed to be calculated (i.e. the database lookup failed,
-     a division by zero occurred, etc)
+- `UNDEFINED` - the alert failed to be calculated (i.e. the database lookup failed,
+     a division by zero occurred, etc.)
 
-- `CLEAR` - the alarm is not armed / raised (i.e. is OK)
+- `CLEAR` - the alert is not armed / raised (i.e. is OK)
 
 - `WARNING` - the warning expression resulted in true or non-zero
 
@@ -913,9 +912,9 @@ Alarms can have the following statuses:
 
 The external script will be called for all status changes.
 
-## Example alarms
+## Example alerts
 
-Check the `health/health.d/` directory for all alarms shipped with Netdata.
+Check the `health/health.d/` directory for all alerts shipped with Netdata.
 
 Here are a few examples:
 
@@ -962,16 +961,16 @@ The above applies the **template** to all charts that have `context = apache.req
    every: 10s
 ```
 
-The alarm will be evaluated every 10 seconds.
+The alert will be evaluated every 10 seconds.
 
 ```yaml
     warn: $this > ( 5 * $update_every)
     crit: $this > (10 * $update_every)
 ```
 
-If these result in non-zero or true, they trigger the alarm.
+If these result in non-zero or true, they trigger the alert.
 
-- `$this` refers to the value of this alarm (i.e. the result of the `calc` line.
+- `$this` refers to the value of this alert (e.g. the result of the `calc` line).
      We could also use `$apache_last_collected_secs`.
 
 `$update_every` is the update frequency of the chart, in seconds.
@@ -997,8 +996,8 @@ template: disk_full_percent
 
 So, the `calc` line finds the percentage of used space. `$this` resolves to this percentage.
 
-This is a repeating alarm and if the alarm becomes CRITICAL it repeats the notifications every 10 seconds. It also
-repeats notifications every 2 minutes if the alarm goes into WARNING mode.
+This is a repeating alert and if the alert becomes CRITICAL it repeats the notifications every 10 seconds. It also
+repeats notifications every 2 minutes if the alert goes into WARNING mode.
 
 ### Example 3 - disk fill rate
 
@@ -1018,7 +1017,7 @@ Calculate the disk fill rate:
 
 In the `calc` line: `$this` is the result of the `lookup` line (i.e. the free space 30 minutes
 ago) and `$avail` is the current disk free space. So the `calc` line will either have a positive
-number of GB/second if the disk if filling up, or a negative number of GB/second if the disk is
+number of GB/second if the disk is filling up, or a negative number of GB/second if the disk is
 freeing up space.
 
 There is no `warn` or `crit` lines here. So, this template will just do the calculation and
@@ -1039,7 +1038,7 @@ The `calc` line estimates the time in hours, we will run out of disk space. Of c
 positive values are interesting for this check, so the warning and critical conditions check
 for positive values and that we have enough free space for 48 and 24 hours respectively.
 
-Once this alarm triggers we will receive an email like this:
+Once this alert triggers we will receive an email like this:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/17839993/87872b32-6802-11e6-8e08-b2e4afef93bb.png)
 
@@ -1057,11 +1056,11 @@ template: 30min_packet_drops
 
 The `lookup` line will calculate the sum of the all dropped packets in the last 30 minutes.
 
-The `crit` line will issue a critical alarm if even a single packet has been dropped.
+The `crit` line will issue a critical alert if even a single packet has been dropped.
 
 Note that the drops chart does not exist if a network interface has never dropped a single packet.
-When Netdata detects a dropped packet, it will add the chart and it will automatically attach this
-alarm to it.
+When Netdata detects a dropped packet, it will add the chart, and it will automatically attach this
+alert to it.
 
 ### Example 5 - CPU usage
 
@@ -1079,7 +1078,7 @@ template: cpu_template
 ```
 
 The `lookup` line will calculate the average CPU usage from system and user over the last minute. Because we have
-the foreach in the `lookup` line, Netdata will create two independent alarms called `cpu_template_system`
+the foreach in the `lookup` line, Netdata will create two independent alerts called `cpu_template_system`
 and `dim_template_user` that will have all the other parameters shared among them.
 
 ### Example 6 - CPU usage
@@ -1098,11 +1097,11 @@ template: cpu_template
 ```
 
 The `lookup` line will calculate the average of CPU usage from system and user over the last minute. In this case
-Netdata will create alarms for all dimensions of the chart.
+Netdata will create alerts for all dimensions of the chart.
 
-### Example 7 - Z-Score based alarm
+### Example 7 - Z-Score based alert
 
-Derive a "[Z Score](https://en.wikipedia.org/wiki/Standard_score)" based alarm on `user` dimension of the `system.cpu` chart:
+Derive a "[Z Score](https://en.wikipedia.org/wiki/Standard_score)" based alert on `user` dimension of the `system.cpu` chart:
 
 ```yaml
  alarm: cpu_user_mean
@@ -1124,9 +1123,9 @@ lookup: mean -10s of user
   crit: $this < -3 or $this > 3
 ```
 
-Since [`z = (x - mean) / stddev`](https://en.wikipedia.org/wiki/Standard_score) we create two input alarms, one for `mean` and one for `stddev` and then use them both as inputs in our final `cpu_user_zscore` alarm.
+Since [`z = (x - mean) / stddev`](https://en.wikipedia.org/wiki/Standard_score) we create two input alerts, one for `mean` and one for `stddev` and then use them both as inputs in our final `cpu_user_zscore` alert.
 
-### Example 8 - [Anomaly rate](https://github.com/netdata/netdata/blob/master/ml/README.md#anomaly-rate) based CPU dimensions alarm
+### Example 8 - [Anomaly rate](https://github.com/netdata/netdata/blob/master/ml/README.md#anomaly-rate) based CPU dimensions alert
 
 Warning if 5 minute rolling [anomaly rate](https://github.com/netdata/netdata/blob/master/ml/README.md#anomaly-rate) for any CPU dimension is above 5%, critical if it goes above 20%:
 
@@ -1145,9 +1144,9 @@ template: ml_5min_cpu_dims
 ```
 
 The `lookup` line will calculate the average anomaly rate of each `system.cpu` dimension over the last 5 minues. In this case
-Netdata will create alarms for all dimensions of the chart.
+Netdata will create alerts for all dimensions of the chart.
 
-### Example 9 - [Anomaly rate](https://github.com/netdata/netdata/blob/master/ml/README.md#anomaly-rate) based CPU chart alarm
+### Example 9 - [Anomaly rate](https://github.com/netdata/netdata/blob/master/ml/README.md#anomaly-rate) based CPU chart alert
 
 Warning if 5 minute rolling [anomaly rate](https://github.com/netdata/netdata/blob/master/ml/README.md#anomaly-rate) averaged across all CPU dimensions is above 5%, critical if it goes above 20%:
 
@@ -1166,9 +1165,9 @@ template: ml_5min_cpu_chart
 ```
 
 The `lookup` line will calculate the average anomaly rate across all `system.cpu` dimensions over the last 5 minues. In this case
-Netdata will create one alarm for the chart.
+Netdata will create one alert for the chart.
 
-### Example 10 - [Anomaly rate](https://github.com/netdata/netdata/blob/master/ml/README.md#anomaly-rate) based node level alarm
+### Example 10 - [Anomaly rate](https://github.com/netdata/netdata/blob/master/ml/README.md#anomaly-rate) based node level alert
 
 Warning if 5 minute rolling [anomaly rate](https://github.com/netdata/netdata/blob/master/ml/README.md#anomaly-rate) averaged across all ML enabled dimensions is above 5%, critical if it goes above 20%:
 
@@ -1188,10 +1187,10 @@ template: ml_5min_node
 
 The `lookup` line will use the `anomaly_rate` dimension of the `anomaly_detection.anomaly_rate` ML chart to calculate the average [node level anomaly rate](https://github.com/netdata/netdata/blob/master/ml/README.md#node-anomaly-rate) over the last 5 minues.
 
-## Use dimension templates to create dynamic alarms
+## Use dimension templates to create dynamic alerts
 
-In v1.18 of Netdata, we introduced **dimension templates** for alarms, which simplifies the process of
-writing [alarm entities](#health-entity-reference) for
+In v1.18 of Netdata, we introduced **dimension templates** for alerts, which simplifies the process of
+writing [alert entities](#health-entity-reference) for
 charts with many dimensions.
 
 Dimension templates can condense many individual entities into one—no more copy-pasting one entity and changing the
@@ -1199,21 +1198,21 @@ Dimension templates can condense many individual entities into one—no more cop
 
 ### The fundamentals of `foreach`
 
-> **Note**: works only with [templates](#alarm-line-alarm-or-template).
+> **Note**: works only with [templates](#alert-line-alarm-or-template).
 
 Our dimension templates update creates a new `foreach` parameter to the
-existing [`lookup` line](#alarm-line-lookup). This
+existing [`lookup` line](#alert-line-lookup). This
 is where the magic happens.
 
-You use the `foreach` parameter to specify which dimensions you want to monitor with this single alarm. You can separate
+You use the `foreach` parameter to specify which dimensions you want to monitor with this single alert. You can separate
 them with a comma (`,`) or a pipe (`|`). You can also use
 a [Netdata simple pattern](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) to create
-many alarms with a regex-like syntax.
+many alerts with a regex-like syntax.
 
 The `foreach` parameter _has_ to be the last parameter in your `lookup` line, and if you have both `of` and `foreach` in
 the same `lookup` line, Netdata will ignore the `of` parameter and use `foreach` instead.
 
-Let's get into some examples so you can see how the new parameter works.
+Let's get into some examples, so you can see how the new parameter works.
 
 > ⚠️ The following entities are examples to showcase the functionality and syntax of dimension templates. They are not
 > meant to be run as-is on production systems.
@@ -1246,7 +1245,7 @@ lookup: average -10m of nice
   crit: $this > 80
 ```
 
-With dimension templates, you can condense these into a single template. Take note of the `alarm` and `lookup` lines.
+With dimension templates, you can condense these into a single template. Take note of the `lookup` line.
 
 ```yaml
 template: cpu_template
@@ -1262,27 +1261,27 @@ and `_` being the only allowed symbols.
 
 The `lookup` line has changed from `of` to `foreach`, and we're now passing three dimensions.
 
-In this example, Netdata will create three alarms with the names `cpu_template_system`, `cpu_template_user`, and
-`cpu_template_nice`. Every minute, each alarm will use the same database query to calculate the average CPU usage for
-the `system`, `user`, and `nice` dimensions over the last 10 minutes and send out alarms if necessary.
+In this example, Netdata will create three alerts with the names `cpu_template_system`, `cpu_template_user`, and
+`cpu_template_nice`. Every minute, each alert will use the same database query to calculate the average CPU usage for
+the `system`, `user`, and `nice` dimensions over the last 10 minutes and send out alerts if necessary.
 
-You can find these three alarms active by clicking on the **Alarms** button in the top navigation, and then clicking on
+You can find these three alerts active by clicking on the **Alerts** button in the top navigation, and then clicking on
 the **All** tab and scrolling to the **system - cpu** collapsible section.
 
-![Three new alarms created from the dimension template](https://user-images.githubusercontent.com/1153921/66218994-29523800-e67f-11e9-9bcb-9bca23e2c554.png)
+![Three new alerts created from the dimension template](https://user-images.githubusercontent.com/1153921/66218994-29523800-e67f-11e9-9bcb-9bca23e2c554.png)
 
-Let's look at some other examples of how `foreach` works so you can best apply it in your configurations.
+Let's look at some other examples of how `foreach` works, so you can best apply it in your configurations.
 
 ### Using a Netdata simple pattern in `foreach`
 
-In the last example, we used `foreach system,user,nice` to create three distinct alarms using dimension templates. But
-what if you want to quickly create alarms for _all_ the dimensions of a given chart?
+In the last example, we used `foreach system,user,nice` to create three distinct alerts using dimension templates. But
+what if you want to quickly create alerts for _all_ the dimensions of a given chart?
 
 Use a [simple pattern](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md)! One example of a simple pattern is a single wildcard
 (`*`).
 
 Instead of monitoring system CPU usage, let's monitor per-application CPU usage using the `apps.cpu` chart. Passing a
-wildcard as the simple pattern tells Netdata to create a separate alarm for _every_ process on your system:
+wildcard as the simple pattern tells Netdata to create a separate alert for _every_ process on your system:
 
 ```yaml
  alarm: app_cpu
@@ -1293,21 +1292,21 @@ lookup: average -10m percentage foreach *
   crit: $this > 80
 ```
 
-This entity will now create alarms for every dimension in the `apps.cpu` chart. Given that most `apps.cpu` charts have
+This entity will now create alerts for every dimension in the `apps.cpu` chart. Given that most `apps.cpu` charts have
 10 or more dimensions, using the wildcard ensures you catch every CPU-hogging process.
 
 To learn more about how to use simple patterns with dimension templates, see
 our [simple patterns documentation](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md).
 
-### Using `foreach` with alarm templates
+### Using `foreach` with alert templates
 
 Dimension templates also work
-with [alarm templates](#alarm-line-alarm-or-template).
-Alarm templates help you create alarms for all the charts with a given context—for example, all the cores of your
+with [alert templates](#alert-line-alarm-or-template).
+Alert templates help you create alerts for all the charts with a given context—for example, all the cores of your
 system's CPU.
 
-By combining the two, you can create dozens of individual alarms with a single template entity. Here's how you would
-create alarms for the `system`, `user`, and `nice` dimensions for every chart in the `cpu.cpu` context—or, in other
+By combining the two, you can create dozens of individual alerts with a single template entity. Here's how you would
+create alerts for the `system`, `user`, and `nice` dimensions for every chart in the `cpu.cpu` context—or, in other
 words, every CPU core.
 
 ```yaml
@@ -1319,7 +1318,7 @@ template: cpu_template
     crit: $this > 80
 ```
 
-On a system with a 6-core, 12-thread Ryzen 5 1600 CPU, this one entity creates alarms on the following charts and
+On a system with a 6-core, 12-thread Ryzen 5 1600 CPU, this one entity creates alerts on the following charts and
 dimensions:
 
 - `cpu.cpu0`
@@ -1344,11 +1343,11 @@ dimensions:
   - `cpu_template_system`
   - `cpu_template_nice`
 
-And how just a few of those dimension template-generated alarms look like in the Netdata dashboard.
+And how just a few of those dimension template-generated alerts look like in the Netdata dashboard.
 
-![A few of the created alarms in the Netdata dashboard](https://user-images.githubusercontent.com/1153921/66219669-708cf880-e680-11e9-8b3a-7bfe178fa28b.png)
+![A few of the created alerts in the Netdata dashboard](https://user-images.githubusercontent.com/1153921/66219669-708cf880-e680-11e9-8b3a-7bfe178fa28b.png)
 
-All in all, this single entity creates 36 individual alarms. Much easier than writing 36 separate entities in your
+All in all, this single entity creates 36 individual alerts. Much easier than writing 36 separate entities in your
 health configuration files!
 
 ## Troubleshooting
@@ -1366,7 +1365,7 @@ output in debug.log.
 You can find the context of charts by looking up the chart in either `http://NODE:19999/netdata.conf` or
 `http://NODE:19999/api/v1/charts`, replacing `NODE` with the IP address or hostname for your Agent dashboard.
 
-You can find how Netdata interpreted the expressions by examining the alarm at
+You can find how Netdata interpreted the expressions by examining the alert at
 `http://NODE:19999/api/v1/alarms?all`. For each expression, Netdata will return the expression as given in its
 config file, and the same expression with additional parentheses added to indicate the evaluation flow of the
 expression.

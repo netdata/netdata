@@ -21,7 +21,7 @@ You will need:
 - An API Space. This is the URL part of the page you have access in order to generate the API Token.  
   For example, the URL for a generated API token might look like: `https://monitor.illumineit.com/e/2a93fe0e-4cd5-469a-9d0d-1a064235cfce/#settings/integration/apikeys;gf=all` In that case, the Space is `2a93fe0e-4cd5-469a-9d0d-1a064235cfce`.
 - A Server Tag. To generate one on your Dynatrace Server, go to **Settings** --> **Tags** --> **Manually applied tags** and create the Tag.
-  The Netdata alarm is sent as a Dynatrace Event to be correlated with all those hosts tagged with this Tag you have created.
+  The Netdata alert is sent as a Dynatrace Event to be correlated with all those hosts tagged with this Tag you have created.
 - terminal access to the Agent you wish to configure
 
 ## Configure Netdata to send alert notifications to Dynatrace
@@ -42,7 +42,7 @@ Edit `health_alarm_notify.conf`:
 3. Set `DYNATRACE_TOKEN` to your Dynatrace API authentication token
 4. Set `DYNATRACE_SPACE` to the API Space, it is the URL part of the page you have access in order to generate the API Token. For example, the URL for a generated API token might look like: `https://monitor.illumineit.com/e/2a93fe0e-4cd5-469a-9d0d-1a064235cfce/#settings/integration/apikeys;gf=all` In that case, the Space is `2a93fe0e-4cd5-469a-9d0d-1a064235cfce`.
 5. Set `DYNATRACE_TAG_VALUE` to your Dynatrace Server Tag.
-6. `DYNATRACE_ANNOTATION_TYPE` can be left to its default value `Netdata Alarm`, but you can change it to better fit  your needs.
+6. `DYNATRACE_ANNOTATION_TYPE` can be left to its default value `Netdata Alert`, but you can change it to better fit  your needs.
 7. Set `DYNATRACE_EVENT` to the Dynatrace `eventType` you want, possible values are:  
    `AVAILABILITY_EVENT`, `CUSTOM_ALERT`, `CUSTOM_ANNOTATION`, `CUSTOM_CONFIGURATION`, `CUSTOM_DEPLOYMENT`, `CUSTOM_INFO`, `ERROR_EVENT`, `MARKED_FOR_TERMINATION`, `PERFORMANCE_EVENT`, `RESOURCE_CONTENTION_EVENT`. You can read more [here](https://www.dynatrace.com/support/help/dynatrace-api/environment-api/events-v2/post-event#request-body-objects)
 

@@ -51,10 +51,10 @@ learn more about [how data collectors work](https://github.com/netdata/netdata/b
 collector](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md) for metrics you need, [configure the collector](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md)
 or read about its requirements to configure your endpoint to publish metrics in the correct format and endpoint.
 
-#### Alarms & notifications
+#### Alerts & notifications
 
-Netdata comes with hundreds of preconfigured alarms, designed by our monitoring gurus in parallel with our open-source
-community, but you may want to [edit alarms](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) or
+Netdata comes with hundreds of preconfigured alerts, designed by our monitoring gurus in parallel with our open-source
+community, but you may want to [edit alerts](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) or
 [enable notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to customize your Netdata experience.
 
 #### Make your deployment production ready

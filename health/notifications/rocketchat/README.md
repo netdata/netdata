@@ -34,7 +34,7 @@ Edit `health_alarm_notify.conf`, changes to this file do not require restarting 
 2. Set `ROCKETCHAT_WEBHOOK_URL` to your webhook URL.
 3. Set `DEFAULT_RECIPIENT_ROCKETCHAT` to the channel you want the alert notifications to be sent to.  
    You can define multiple channels like this: `alerts systems`.  
-   All roles will default to this variable if left unconfigured.
+   All roles will default to this variable if it is not configured.
 
 You can then have different channels per **role**, by editing `DEFAULT_RECIPIENT_ROCKETCHAT` with the channel you want, in the following entries at the bottom of the same file:
 
@@ -57,7 +57,7 @@ An example of a working configuration would be:
 
 SEND_ROCKETCHAT="YES"
 ROCKETCHAT_WEBHOOK_URL="<your_incoming_webhook_url>"
-DEFAULT_RECIPIENT_ROCKETCHAT="monitoring_alarms"
+DEFAULT_RECIPIENT_ROCKETCHAT="monitoring_alerts"
 ```
 
 ## Test the notification method

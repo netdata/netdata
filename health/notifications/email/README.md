@@ -47,7 +47,7 @@ Edit `health_alarm_notify.conf`, changes to this file do not require restarting 
 
 2. Set `SEND_EMAIL` to `YES`.
 3. Set `DEFAULT_RECIPIENT_EMAIL` to the email address you want the email to be sent by default.  
-   You can define multiple email addresses like this: `alarms@example.com systems@example.com`.  
+   You can define multiple email addresses like this: `alerts@example.com systems@example.com`.  
    All roles will default to this variable if left unconfigured.
 4. There are also other optional configuration entries that can be found in the same section of the file.
 

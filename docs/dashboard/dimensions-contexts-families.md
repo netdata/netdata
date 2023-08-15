@@ -5,7 +5,7 @@ they have a lot of underlying complexity. To meaningfully organize charts out of
 your nodes, Netdata uses the concepts of **dimensions**, **contexts**, and **families**. 
 
 Understanding how these work will help you more easily navigate the dashboard, 
-[write new alarms](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md), or play around 
+[write new alerts](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md), or play around 
 with the [API](https://github.com/netdata/netdata/blob/master/web/api/README.md).
 
 ## Dimension
@@ -42,8 +42,8 @@ whereas anything after the `.` is specified either by the chart's developer or b
 
 By default, a chart's type affects where it fits in the menu, while its family creates submenus.
 
-Netdata also relies on contexts for [alarm configuration](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) (the [`on`
-line](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#alarm-line-on)).
+Netdata also relies on contexts for [alert configuration](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) (the [`on`
+line](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#alert-line-on)).
 
 ## Family
 
@@ -62,7 +62,7 @@ Given the four example contexts, and two families of `sda` and `sdb`, Netdata wi
 names:
 
 | Context        | `sda` family       | `sdb` family       |
-| :------------- | ------------------ | ------------------ |
+|:---------------|--------------------|--------------------|
 | `disk.io`      | `disk_io.sda`      | `disk_io.sdb`      |
 | `disk.ops`     | `disk_ops.sda`     | `disk_ops.sdb`     |
 | `disk.backlog` | `disk_backlog.sda` | `disk_backlog.sdb` |

@@ -265,4 +265,4 @@ We also suggest that you:
    
 3. [Use host labels](https://github.com/netdata/netdata/blob/master/docs/guides/using-host-labels.md)
    
-   To organize systems, metrics, and alarms.
+   To organize systems, metrics, and alerts.

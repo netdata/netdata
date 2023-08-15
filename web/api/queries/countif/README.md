@@ -31,7 +31,7 @@ The target number and the desired condition can be set using the `group_options`
 
 ## how to use
 
-This query cannot be used in alarms.
+This query cannot be used in alerts.
 
 `countif` changes the units of charts. The result of the calculation is always from zero to 1, expressing the percentage of database points that matched the condition. 
 
