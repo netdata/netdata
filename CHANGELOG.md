@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- bump ui to v6.28.0 [\#15810](https://github.com/netdata/netdata/pull/15810) ([ilyam8](https://github.com/ilyam8))
+- return 412 instead of 403 when a bearer token is required [\#15808](https://github.com/netdata/netdata/pull/15808) ([ktsaou](https://github.com/ktsaou))
+- fix api v1 mgmt/health [\#15806](https://github.com/netdata/netdata/pull/15806) ([underhood](https://github.com/underhood))
+- Fix systemd journal build deps in DEB packages. [\#15805](https://github.com/netdata/netdata/pull/15805) ([Ferroin](https://github.com/Ferroin))
+- Clean up python deps for RPM packages. [\#15804](https://github.com/netdata/netdata/pull/15804) ([Ferroin](https://github.com/Ferroin))
+- Add proper SUID fallback for DEB plugin packages. [\#15803](https://github.com/netdata/netdata/pull/15803) ([Ferroin](https://github.com/Ferroin))
 - Function systemd-journal: always have a nd\_journal\_process [\#15798](https://github.com/netdata/netdata/pull/15798) ([ktsaou](https://github.com/ktsaou))
 - prevent reporting negative retention when the db is empty [\#15796](https://github.com/netdata/netdata/pull/15796) ([ktsaou](https://github.com/ktsaou))
 - Fix typo in Readme [\#15794](https://github.com/netdata/netdata/pull/15794) ([shyamvalsan](https://github.com/shyamvalsan))
@@ -16,6 +22,7 @@
 - fix docker-compose example [\#15784](https://github.com/netdata/netdata/pull/15784) ([zhqu1148980644](https://github.com/zhqu1148980644))
 - mark integrations milestones as completed in README.md [\#15783](https://github.com/netdata/netdata/pull/15783) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update an oversight on the openSUSE 15.5 packages [\#15781](https://github.com/netdata/netdata/pull/15781) ([tkatsoulas](https://github.com/tkatsoulas))
+- Bump openssl version of static builds to 1.1.1v [\#15779](https://github.com/netdata/netdata/pull/15779) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.42.0](https://github.com/netdata/netdata/tree/v1.42.0) (2023-08-09)
 
@@ -418,14 +425,6 @@
 - Assorted kickstart script improvements. [\#15243](https://github.com/netdata/netdata/pull/15243) ([Ferroin](https://github.com/Ferroin))
 - Install the correct systemd unit file on older RPM systems. [\#15240](https://github.com/netdata/netdata/pull/15240) ([Ferroin](https://github.com/Ferroin))
 - Add yaml metadata for metrics.csv files [\#15238](https://github.com/netdata/netdata/pull/15238) ([Ancairon](https://github.com/Ancairon))
-- Add module column to apps.plugin csv [\#15235](https://github.com/netdata/netdata/pull/15235) ([Ancairon](https://github.com/Ancairon))
-- Fix coverity 393183 & 393182 [\#15234](https://github.com/netdata/netdata/pull/15234) ([MrZammler](https://github.com/MrZammler))
-- Create index for health log migration [\#15233](https://github.com/netdata/netdata/pull/15233) ([stelfrag](https://github.com/stelfrag))
-- New alerts endpoint [\#15232](https://github.com/netdata/netdata/pull/15232) ([stelfrag](https://github.com/stelfrag))
-- fix not handling N/A value in python.d/nvidia\_smi [\#15231](https://github.com/netdata/netdata/pull/15231) ([ilyam8](https://github.com/ilyam8))
-- Fix handling of plugin ownership in static builds. [\#15230](https://github.com/netdata/netdata/pull/15230) ([Ferroin](https://github.com/Ferroin))
-- /api/v2 improvements [\#15227](https://github.com/netdata/netdata/pull/15227) ([ktsaou](https://github.com/ktsaou))
-- Remove erroneous space for unit [\#15226](https://github.com/netdata/netdata/pull/15226) ([ralphm](https://github.com/ralphm))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
