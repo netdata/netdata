@@ -420,7 +420,7 @@ void module_del_cb(const DICTIONARY_ITEM *item, void *value, void *data)
 }
 
 
-const DICTIONARY_ITEM *register_plugin(DICTIONARY *plugins_dict, struct configurable_plugin *plugin)
+const DICTIONARY_ITEM *register_plugin(DICTIONARY *plugins_dict, struct configurable_plugin *plugin, bool localhost)
 {
     if (get_plugin_by_name(plugins_dict, plugin->name) != NULL) {
         error_report("DYNCFG plugin \"%s\" already registered", plugin->name);
@@ -437,7 +437,8 @@ const DICTIONARY_ITEM *register_plugin(DICTIONARY *plugins_dict, struct configur
     plugin->modules = dictionary_create(DICT_OPTION_VALUE_LINK_DONT_CLONE);
     dictionary_register_delete_callback(plugin->modules, module_del_cb, NULL);
 
-    deferred_config_push_back(plugins_dict, plugin->name, NULL, NULL);
+    if (localhost)
+        deferred_config_push_back(plugins_dict, plugin->name, NULL, NULL);
 
     dictionary_set(plugins_dict, plugin->name, plugin, sizeof(plugin));
 
@@ -462,7 +463,7 @@ void job_del_cb(const DICTIONARY_ITEM *item, void *value, void *data)
     freez(job);
 }
 
-int register_module(DICTIONARY *plugins_dict, struct configurable_plugin *plugin, struct module *module)
+int register_module(DICTIONARY *plugins_dict, struct configurable_plugin *plugin, struct module *module, bool localhost)
 {
     if (get_module_by_name(plugin, module->name) != NULL) {
         error_report("DYNCFG module \"%s\" already registered", module->name);
@@ -471,7 +472,8 @@ int register_module(DICTIONARY *plugins_dict, struct configurable_plugin *plugin
 
     pthread_mutex_init(&module->lock, NULL);
 
-    deferred_config_push_back(plugins_dict, plugin->name, module->name, NULL);
+    if (localhost)
+        deferred_config_push_back(plugins_dict, plugin->name, module->name, NULL);
 
     module->plugin = plugin;
 
@@ -479,31 +481,33 @@ int register_module(DICTIONARY *plugins_dict, struct configurable_plugin *plugin
         module->jobs = dictionary_create(DICT_OPTION_VALUE_LINK_DONT_CLONE);
         dictionary_register_delete_callback(module->jobs, job_del_cb, NULL);
 
-        // load all jobs from disk
-        BUFFER *path = buffer_create(DYN_CONF_PATH_MAX, NULL);
-        buffer_sprintf(path, "%s/%s/%s", DYN_CONF_DIR, plugin->name, module->name);
-        DIR *dir = opendir(buffer_tostring(path));
-        if (dir != NULL) {
-            struct dirent *ent;
-            while ((ent = readdir(dir)) != NULL) {
-                if (ent->d_name[0] == '.')
-                    continue;
-                if (ent->d_type != DT_REG)
-                    continue;
-                size_t len = strnlen(ent->d_name, NAME_MAX);
-                if (len <= strlen(DYN_CONF_CFG_EXT))
-                    continue;
-                if (strcmp(ent->d_name + len - strlen(DYN_CONF_CFG_EXT), DYN_CONF_CFG_EXT) != 0)
-                    continue;
-                ent->d_name[len - strlen(DYN_CONF_CFG_EXT)] = '\0';
+        if (localhost) {
+            // load all jobs from disk
+            BUFFER *path = buffer_create(DYN_CONF_PATH_MAX, NULL);
+            buffer_sprintf(path, "%s/%s/%s", DYN_CONF_DIR, plugin->name, module->name);
+            DIR *dir = opendir(buffer_tostring(path));
+            if (dir != NULL) {
+                struct dirent *ent;
+                while ((ent = readdir(dir)) != NULL) {
+                    if (ent->d_name[0] == '.')
+                        continue;
+                    if (ent->d_type != DT_REG)
+                        continue;
+                    size_t len = strnlen(ent->d_name, NAME_MAX);
+                    if (len <= strlen(DYN_CONF_CFG_EXT))
+                        continue;
+                    if (strcmp(ent->d_name + len - strlen(DYN_CONF_CFG_EXT), DYN_CONF_CFG_EXT) != 0)
+                        continue;
+                    ent->d_name[len - strlen(DYN_CONF_CFG_EXT)] = '\0';
 
-                struct job *job = add_job(module, ent->d_name, NULL, JOB_TYPE_USER, JOB_FLG_PS_LOADED);
+                    struct job *job = add_job(module, ent->d_name, NULL, JOB_TYPE_USER, JOB_FLG_PS_LOADED);
 
-                deferred_config_push_back(plugins_dict, plugin->name, module->name, job->name);
+                    deferred_config_push_back(plugins_dict, plugin->name, module->name, job->name);
+                }
+                closedir(dir);
             }
-            closedir(dir);
+            buffer_free(path);
         }
-        buffer_free(path);
     }
 
     dictionary_set(plugin->modules, module->name, module, sizeof(module));

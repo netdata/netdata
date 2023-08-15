@@ -2276,7 +2276,7 @@ static inline PARSER_RC pluginsd_register_plugin(char **words __maybe_unused, si
     cfg->get_config_schema_cb = get_plugin_config_schema_cb;
     cfg->cb_usr_ctx = parser;
 
-    const DICTIONARY_ITEM *di = register_plugin(parser->user.host->configurable_plugins, cfg);
+    const DICTIONARY_ITEM *di = register_plugin(parser->user.host->configurable_plugins, cfg, SERVING_PLUGINSD(parser));
     if (unlikely(di == NULL)) {
         freez(cfg->name);
         freez(cfg);
@@ -2345,7 +2345,7 @@ static inline PARSER_RC pluginsd_register_module(char **words __maybe_unused, si
     mod->delete_job_cb = delete_job_cb;
     mod->job_config_cb_usr_ctx = parser;
 
-    register_module(parser->user.host->configurable_plugins, plug_cfg, mod);
+    register_module(parser->user.host->configurable_plugins, plug_cfg, mod, SERVING_PLUGINSD(parser));
 
     if (di != NULL)
         dictionary_acquired_item_release(parser->user.host->configurable_plugins, di);
