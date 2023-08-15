@@ -1992,7 +1992,7 @@ void call_virtual_function_async(BUFFER *wb, RRDHOST *host, const char *name, co
         .function = string_strdupz(buffer_tostring(function_out)),
         .result_cb = callback,
         .result_cb_data = callback_data,
-        .payload = NULL,
+        .payload = payload,
     };
     buffer_free(function_out);
 

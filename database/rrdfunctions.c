@@ -958,7 +958,7 @@ void call_virtual_function_async(BUFFER *wb, RRDHOST *host, const char *name, co
 int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout, const char *cmd,
                      bool wait, const char *transaction,
                      rrd_function_result_callback_t result_cb, void *result_cb_data,
-                     rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data) {
+                     rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data, const char *payload) {
 
     int code;
     char sanitized_cmd[PLUGINSD_LINE_MAX + 1];

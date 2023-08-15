@@ -232,6 +232,13 @@ typedef enum __attribute__((packed)) {
     SENDER_FLAG_COMPRESSION  = (1 << 1), // The stream needs to have and has compression
 } SENDER_FLAGS;
 
+struct function_payload_state {
+    BUFFER *payload;
+    char *txid;
+    char *fn_name;
+    char *timeout;
+};
+
 struct sender_state {
     RRDHOST *host;
     pid_t tid;                              // the thread id of the sender, from gettid()
@@ -260,6 +267,9 @@ struct sender_state {
 
     int rrdpush_sender_pipe[2];                     // collector to sender thread signaling
     int rrdpush_sender_socket;
+
+    int receiving_function_payload;
+    struct function_payload_state function_payload; // state when receiving function with payload
 
     uint16_t hops;
 
