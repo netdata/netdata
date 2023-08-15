@@ -1321,18 +1321,18 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
             break;
         }
         
-        /* Append retrieved results to BUFFER */
+        /* Append retrieved results to BUFFER.
+         * In the case of search_keyword(), less than sizeof(res_hdr) + tmp_itm.text_size 
+         *space may be required, but go for worst case scenario for now */
         buffer_increase(res_buff, sizeof(res_hdr) + tmp_itm.text_size);
                                                         
         if(!p_query_params->keyword || !*p_query_params->keyword || !strcmp(p_query_params->keyword, " ")){
             // TODO: decompress_text does not handle or return any errors currently. How should any errors be handled?
             decompress_text(&tmp_itm, &res_buff->buffer[res_buff->len + sizeof(res_hdr)]);
             res_hdr.matches = num_lines;
-            res_hdr.text_size = tmp_itm.text_size - 1; // tmp_itm.text_size - 1 to get rid of last '\0' or '\n' 
+            res_hdr.text_size = tmp_itm.text_size;
         } 
         else {
-            /* In case of search_keyword, less than sizeof(res_hdr) + tmp_itm.text_size 
-             * space may be required, but go for worst case scenario for now */
             decompress_text(&tmp_itm, NULL);
             res_hdr.matches = search_keyword(   tmp_itm.data, tmp_itm.text_size, 
                                                 &res_buff->buffer[res_buff->len + sizeof(res_hdr)], 
@@ -1340,18 +1340,18 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
                                                 p_query_params->ignore_case);
             freez(tmp_itm.data);
 
-            if(likely(res_hdr.matches > 0)) {
-                m_assert(res_hdr.text_size > 0, "res_hdr.text_size can't be <= 0");
-                res_hdr.text_size--; // res_hdr.text_size-- to get rid of last '\0' or '\n' 
-            }
-            else if(unlikely(res_hdr.matches == 0)) m_assert(res_hdr.text_size == 0, "res_hdr.text_size must be == 0");
-            else{ /* res_hdr.matches < 0 - error during keyword search */
+            m_assert(   (res_hdr.matches > 0 && res_hdr.text_size > 0) || 
+                        (res_hdr.matches == 0 && res_hdr.text_size == 0), 
+                        "res_hdr.matches and res_hdr.text_size must both be > 0 or == 0.");
+
+            if(unlikely(res_hdr.matches < 0)){ /* res_hdr.matches < 0 - error during keyword search */
                 throw_error(p_file_infos[db_off]->chart_name, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
                 break; 
             } 
         }
 
         if(res_hdr.text_size){
+            res_buff->buffer[res_buff->len + sizeof(res_hdr) + res_hdr.text_size - 1] = '\n'; // replace '\0' with '\n' 
             memcpy(&res_buff->buffer[res_buff->len], &res_hdr, sizeof(res_hdr));
             res_buff->len += sizeof(res_hdr) + res_hdr.text_size; 
             p_query_params->num_lines += res_hdr.matches;

@@ -1522,7 +1522,6 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
 }
 #endif
 
-#define ENABLE_LOGSMANAGEMENT
 #ifdef ENABLE_LOGSMANAGEMENT
 inline int web_client_api_request_v1_logsmanagement_sources(RRDHOST *host, struct web_client *w, char *url) {
     UNUSED(host);
@@ -1630,11 +1629,14 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
                     query_params.quota / (1 KiB)
     );
 
-    while(query_params.filename[fn_off]) buffer_sprintf(w->response.data, "\t\t\"%s\",\n", query_params.filename[fn_off++]);
+    while(query_params.filename[fn_off]) 
+        buffer_sprintf(w->response.data, "\t\t\"%s\",\n", query_params.filename[fn_off++]);
     if(query_params.filename[0])  w->response.data->len -= 2;
-    buffer_strcat(w->response.data, "\n\t],\n");
-    buffer_sprintf(w->response.data, "\t\"requested_chart_name\":[\n");
-    while(query_params.chart_name[cn_off]) buffer_sprintf(w->response.data, "\t\t\"%s\",\n", query_params.chart_name[cn_off++]);
+    buffer_strcat(w->response.data, "\n\t],\n"
+                                    "\t\"requested_chart_name\":[\n");
+
+    while(query_params.chart_name[cn_off]) 
+        buffer_sprintf(w->response.data, "\t\t\"%s\",\n", query_params.chart_name[cn_off++]);
     if(query_params.chart_name[0])  w->response.data->len -= 2;
     buffer_strcat(w->response.data, "\n\t],\n"
                                     "\t\"data\":[\n");
@@ -1653,12 +1655,33 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
         buffer_need_bytes(w->response.data, p_res_hdr->text_size);
 
         /* Unfortunately '\n', '\\' (except for "\\n") and '"' need to be 
-         * escaped, so we need to go through the result characters one by one.*/
-        char *p = &query_params.results_buff->buffer[res_off] + sizeof(*p_res_hdr);
+         * escaped, so we need to go through the result characters one by one.
+         * The first part below is needed only for descending timestamp order 
+         * queries. */
+
+        int order_desc_rem = p_res_hdr->text_size - 1;
+        char *line_s = &query_params.results_buff->buffer[res_off] + sizeof(*p_res_hdr) + p_res_hdr->text_size - 2;
+        if(!query_params.order_by_asc){
+            while(order_desc_rem > 0 && *line_s != '\n') {
+                line_s--;
+                order_desc_rem--;
+            }
+        }
+
+        char *p = query_params.order_by_asc ? 
+            &query_params.results_buff->buffer[res_off] + sizeof(*p_res_hdr) : line_s + 1;
+
         size_t remaining = p_res_hdr->text_size;
-        while (remaining--){
+        while (--remaining){ /* --remaining instead of remaing-- to exclude the last '\n' */
             if(unlikely(*p == '\n')){
                 buffer_strcat(w->response.data, "\",\n\t\t\t\t\"");
+                if(!query_params.order_by_asc){
+                    do{
+                        order_desc_rem--;
+                        line_s--;
+                    } while(order_desc_rem > 0 && *line_s != '\n');
+                    p = line_s;
+                }
             } 
             else if(unlikely(*p == '\\' && *(p+1) != 'n')) {
                 buffer_need_bytes(w->response.data, 1);

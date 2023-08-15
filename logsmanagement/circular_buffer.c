@@ -99,7 +99,6 @@ void circ_buff_search(Circ_buff_t *const buffs[], logs_query_params_t *const p_q
                  * might not be 100% correct, since parsing must have taken place 
                  * already to return correct count. Maybe an issue under heavy load. */
                 res_hdr.matches = items[i]->num_lines;
-                res_hdr.text_size--; // res_hdr.text_size-- to get rid of last '\0' or '\n' 
                 memcpy(&res_buff->buffer[res_buff->len + sizeof(res_hdr)], items[i]->data, res_hdr.text_size);
             }
             else {
@@ -107,15 +106,17 @@ void circ_buff_search(Circ_buff_t *const buffs[], logs_query_params_t *const p_q
                                                     &res_buff->buffer[res_buff->len + sizeof(res_hdr)], 
                                                     &res_hdr.text_size, p_query_params->keyword, NULL, 
                                                     p_query_params->ignore_case);
-                if(likely(res_hdr.matches > 0)) {
-                    m_assert(res_hdr.text_size > 0, "res_hdr.text_size can't be <= 0");
-                    res_hdr.text_size--; // res_hdr.text_size-- to get rid of last '\0' or '\n' 
-                }
-                else if(unlikely(res_hdr.matches == 0)) m_assert(res_hdr.text_size == 0, "res_hdr.text_size must be == 0");
-                else break; /* res_hdr.matches < 0 - error during keyword search */        
+
+                m_assert(   (res_hdr.matches > 0 && res_hdr.text_size > 0) || 
+                            (res_hdr.matches == 0 && res_hdr.text_size == 0), 
+                            "res_hdr.matches and res_hdr.text_size must both be > 0 or == 0.");
+
+                if(unlikely(res_hdr.matches < 0)) 
+                    break; /* res_hdr.matches < 0 - error during keyword search */        
             }
 
             if(res_hdr.text_size){
+                res_buff->buffer[res_buff->len + sizeof(res_hdr) + res_hdr.text_size - 1] = '\n'; // replace '\0' with '\n' 
                 memcpy(&res_buff->buffer[res_buff->len], &res_hdr, sizeof(res_hdr));
                 res_buff->len += sizeof(res_hdr) + res_hdr.text_size; 
                 p_query_params->num_lines += res_hdr.matches;
