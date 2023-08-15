@@ -332,7 +332,7 @@ dyncfg_config_t load_config(const char *plugin_name, const char *module_name, co
 
 char *set_plugin_config(struct configurable_plugin *plugin, dyncfg_config_t cfg)
 {
-    enum set_config_result rc = plugin->set_config_cb(plugin->cb_usr_ctx, &cfg);
+    enum set_config_result rc = plugin->set_config_cb(plugin->cb_usr_ctx, plugin->name, &cfg);
     if (rc != SET_CONFIG_ACCEPTED) {
         error_report("DYNCFG plugin \"%s\" rejected config", plugin->name);
         return "plugin rejected config";
@@ -349,7 +349,7 @@ static char *set_module_config(struct module *mod, dyncfg_config_t cfg)
 {
     struct configurable_plugin *plugin = mod->plugin;
 
-    enum set_config_result rc = mod->set_config_cb(mod->config_cb_usr_ctx, mod->name, &cfg);
+    enum set_config_result rc = mod->set_config_cb(mod->config_cb_usr_ctx, plugin->name, mod->name, &cfg);
     if (rc != SET_CONFIG_ACCEPTED) {
         error_report("DYNCFG module \"%s\" rejected config", plugin->name);
         return "module rejected config";
@@ -374,7 +374,7 @@ struct job *job_new()
 static int set_job_config(struct job *job, dyncfg_config_t cfg)
 {
     struct module *mod = job->module;
-    enum set_config_result rt = mod->set_job_config_cb(mod->job_config_cb_usr_ctx, mod->name, job->name, &cfg);
+    enum set_config_result rt = mod->set_job_config_cb(mod->job_config_cb_usr_ctx, mod->plugin->name, mod->name, job->name, &cfg);
 
     if (rt != SET_CONFIG_ACCEPTED) {
         error_report("DYNCFG module \"%s\" rejected config for job \"%s\"", mod->name, job->name);
@@ -982,21 +982,21 @@ void *dyncfg_main(void *ptr)
         if (dcs->module_name == NULL) {
             dyncfg_config_t cfg = load_config(dcs->plugin_name, NULL, NULL);
             if (cfg.data != NULL) {
-                plugin->set_config_cb(plugin->cb_usr_ctx, &cfg);
+                plugin->set_config_cb(plugin->cb_usr_ctx, plugin->name, &cfg);
                 freez(cfg.data);
             }
         } else if (dcs->job_name == NULL) {
             dyncfg_config_t cfg = load_config(dcs->plugin_name, dcs->module_name, NULL);
             if (cfg.data != NULL) {
                 struct module *mod = get_module_by_name(plugin, dcs->module_name);
-                mod->set_config_cb(mod->config_cb_usr_ctx, mod->name, &cfg);
+                mod->set_config_cb(mod->config_cb_usr_ctx, plugin->name, mod->name, &cfg);
                 freez(cfg.data);
             }
         } else {
             dyncfg_config_t cfg = load_config(dcs->plugin_name, dcs->module_name, dcs->job_name);
             if (cfg.data != NULL) {
                 struct module *mod = get_module_by_name(plugin, dcs->module_name);
-                mod->set_job_config_cb(mod->job_config_cb_usr_ctx, mod->name, dcs->job_name, &cfg);
+                mod->set_job_config_cb(mod->job_config_cb_usr_ctx, plugin->name, mod->name, dcs->job_name, &cfg);
                 freez(cfg.data);
             }
         }

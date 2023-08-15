@@ -2184,38 +2184,63 @@ static dyncfg_config_t get_job_config_cb(void *usr_ctx, const char *plugin_name,
     return ret;
 }
 
-enum set_config_result set_plugin_config_cb(void *usr_ctx, dyncfg_config_t *cfg)
+enum set_config_result set_plugin_config_cb(void *usr_ctx, const char *plugin_name ,dyncfg_config_t *cfg)
 {
     PARSER *parser = usr_ctx;
+    BUFFER *wb = buffer_create(CVF_MAX_LEN, NULL);
+
+    buffer_strcat(wb, FUNCTION_NAME_SET_PLUGIN_CONFIG);
+
+    if (SERVING_STREAMING(parser))
+        buffer_sprintf(wb, " %s", plugin_name);
+
     int rc;
-    call_virtual_function_blocking(parser, "set_plugin_config", &rc, cfg->data);
+    call_virtual_function_blocking(parser, buffer_tostring(wb), &rc, cfg->data);
+
+    buffer_free(wb);
     if(rc != 1)
         return SET_CONFIG_REJECTED;
     return SET_CONFIG_ACCEPTED;
 }
 
-enum set_config_result set_module_config_cb(void *usr_ctx, const char *module_name, dyncfg_config_t *cfg)
+enum set_config_result set_module_config_cb(void *usr_ctx, const char *plugin_name, const char *module_name, dyncfg_config_t *cfg)
 {
     PARSER *parser = usr_ctx;
-    int rc;
+    BUFFER *wb = buffer_create(CVF_MAX_LEN, NULL);
 
-    char buf[1024];
-    snprintfz(buf, sizeof(buf), "set_module_config %s", module_name);
-    call_virtual_function_blocking(parser, buf, &rc, cfg->data);
+    buffer_strcat(wb, FUNCTION_NAME_SET_MODULE_CONFIG);
+
+    if (SERVING_STREAMING(parser))
+        buffer_sprintf(wb, " %s", plugin_name);
+
+    buffer_sprintf(wb, " %s", module_name);
+
+    int rc;
+    call_virtual_function_blocking(parser, buffer_tostring(wb), &rc, cfg->data);
+
+    buffer_free(wb);
 
     if(rc != 1)
         return SET_CONFIG_REJECTED;
     return SET_CONFIG_ACCEPTED;
 }
 
-enum set_config_result set_job_config_cb(void *usr_ctx, const char *module_name, const char *job_name, dyncfg_config_t *cfg)
+enum set_config_result set_job_config_cb(void *usr_ctx, const char *plugin_name, const char *module_name, const char *job_name, dyncfg_config_t *cfg)
 {
     PARSER *parser = usr_ctx;
-    int rc;
+    BUFFER *wb = buffer_create(CVF_MAX_LEN, NULL);
 
-    char buf[1024];
-    snprintfz(buf, sizeof(buf), "set_job_config %s %s", module_name, job_name);
-    call_virtual_function_blocking(parser, buf, &rc, cfg->data);
+    buffer_strcat(wb, FUNCTION_NAME_SET_JOB_CONFIG);
+
+    if (SERVING_STREAMING(parser))
+        buffer_sprintf(wb, " %s", plugin_name);
+    
+    buffer_sprintf(wb, " %s %s", module_name, job_name);
+
+    int rc;
+    call_virtual_function_blocking(parser, buffer_tostring(wb), &rc, cfg->data);
+
+    buffer_free(wb);
 
     if(rc != 1)
         return SET_CONFIG_REJECTED;

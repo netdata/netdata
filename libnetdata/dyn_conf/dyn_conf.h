@@ -144,7 +144,7 @@ struct module
     struct configurable_plugin *plugin;
 
     // module config
-    enum set_config_result (*set_config_cb)(void *usr_ctx, const char *module_name, dyncfg_config_t *cfg);
+    enum set_config_result (*set_config_cb)(void *usr_ctx, const char *plugin_name, const char *module_name, dyncfg_config_t *cfg);
     dyncfg_config_t (*get_config_cb)(void *usr_ctx, const char *plugin_name, const char *module_name);
     dyncfg_config_t (*get_config_schema_cb)(void *usr_ctx, const char *plugin_name, const char *module_name);
     void *config_cb_usr_ctx;
@@ -154,7 +154,7 @@ struct module
     // jobs config
     dyncfg_config_t (*get_job_config_cb)(void *usr_ctx, const char *plugin_name, const char *module_name, const char *job_name);
     dyncfg_config_t (*get_job_config_schema_cb)(void *usr_ctx, const char *plugin_name, const char *module_name);
-    enum set_config_result (*set_job_config_cb)(void *usr_ctx, const char *module_name, const char *job_name, dyncfg_config_t *cfg);
+    enum set_config_result (*set_job_config_cb)(void *usr_ctx, const char *plugin_name, const char *module_name, const char *job_name, dyncfg_config_t *cfg);
     enum set_config_result (*delete_job_cb)(void *usr_ctx, const char *module_name, const char *job_name);
     void *job_config_cb_usr_ctx;
 };
@@ -167,7 +167,7 @@ struct configurable_plugin {
 
     dyncfg_config_t (*get_config_cb)(void *usr_ctx, const char *plugin_name);
     dyncfg_config_t (*get_config_schema_cb)(void *usr_ctx, const char *plugin_name);
-    enum set_config_result (*set_config_cb)(void *usr_ctx, dyncfg_config_t *cfg);
+    enum set_config_result (*set_config_cb)(void *usr_ctx, const char *plugin_name, dyncfg_config_t *cfg);
     void *cb_usr_ctx; // context for all callbacks (split if needed in future)
 };
 
