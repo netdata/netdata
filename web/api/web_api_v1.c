@@ -1660,7 +1660,8 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
          * queries. */
 
         int order_desc_rem = p_res_hdr->text_size - 1;
-        char *line_s = &query_params.results_buff->buffer[res_off] + sizeof(*p_res_hdr) + p_res_hdr->text_size - 2;
+        char *line_s = &query_params.results_buff->buffer[res_off] + 
+                        sizeof(*p_res_hdr) + p_res_hdr->text_size - 2;
         if(!query_params.order_by_asc){
             while(order_desc_rem > 0 && *line_s != '\n') {
                 line_s--;
@@ -1694,7 +1695,6 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
                 w->response.data->buffer[w->response.data->len++] = '"';
             }
             else{
-                // buffer_need_bytes(w->response.data, 1);
                 w->response.data->buffer[w->response.data->len++] = *p;
             }
             p++;

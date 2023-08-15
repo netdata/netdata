@@ -79,6 +79,9 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
     UNUSED(callback);
     UNUSED(callback_data);
 
+    struct rusage start, end;
+    getrusage(RUSAGE_THREAD, &start);
+
     logs_query_params_t query_params = {0};
     unsigned long req_quota = 0;
 
@@ -133,12 +136,10 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
         else if(!strcmp(key, LOGS_QRY_KW_QUOTA)){
             req_quota = strtoll(value, NULL, 10);
         }
-        else if(!strcmp(key, LOGS_QRY_KW_FILENAME) && 
-                fn_off < LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES){
+        else if(!strcmp(key, LOGS_QRY_KW_FILENAME) && fn_off < LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES){
             query_params.filename[fn_off++] = value;
         }
-        else if(!strcmp(key, LOGS_QRY_KW_CHARTNAME) && 
-                cn_off < LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES){
+        else if(!strcmp(key, LOGS_QRY_KW_CHARTNAME) && cn_off < LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES){
             query_params.chart_name[cn_off++] = value;
         }
         else if(!strcmp(key, LOGS_QRY_KW_KEYWORD)){
@@ -164,8 +165,8 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
     else if(req_quota > LOGS_MANAG_QUERY_QUOTA_MAX) query_params.quota = LOGS_MANAG_QUERY_QUOTA_MAX;
     else query_params.quota = req_quota;
 
-    struct rusage start, end;
-    getrusage(RUSAGE_THREAD, &start);
+    query_params.results_buff = buffer_create(query_params.quota, &netdata_buffers_statistics.buffers_api);
+
     const logs_qry_res_err_t *const res_err = execute_logs_manag_query(&query_params);
     getrusage(RUSAGE_THREAD, &end);
 
@@ -198,23 +199,27 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
                     query_params.quota / (1 KiB)
     );
 
-    while(query_params.filename[fn_off]) buffer_sprintf(dest_wb, "         \"%s\",\n", query_params.filename[fn_off++]);
+    while(query_params.filename[fn_off]) 
+        buffer_sprintf(dest_wb, "         \"%s\",\n", query_params.filename[fn_off++]);
     if(query_params.filename[0])  dest_wb->len -= 2;
-
     buffer_strcat(  dest_wb, 
                     "\n      ],\n"
                     "      \"requested_chart_name\": [\n"
     );
-    while(query_params.chart_name[cn_off]) buffer_sprintf(dest_wb, "         \"%s\",\n", query_params.chart_name[cn_off++]);
+
+    while(query_params.chart_name[cn_off]) 
+        buffer_sprintf(dest_wb, "         \"%s\",\n", query_params.chart_name[cn_off++]);
     if(query_params.chart_name[0])  dest_wb->len -= 2;
-    buffer_strcat(dest_wb, "\n      ],\n");
 
     buffer_sprintf( dest_wb, 
+                    "\n      ],\n"
                     "      \"num_lines\": %lu, \n"
                     "      \"user_time\": %llu,\n"
                     "      \"system_time\": %llu,\n"
                     "      \"error_code\": %d,\n"
-                    "      \"error\": \"%s\"\n",
+                    "      \"error\": \"%s\"\n"
+                    "   },\n"
+                    "   \"data\":[\n",
                     query_params.num_lines,
                     end.ru_utime.tv_sec * USEC_PER_SEC + end.ru_utime.tv_usec - 
                     start.ru_utime.tv_sec * USEC_PER_SEC - start.ru_utime.tv_usec,
@@ -222,10 +227,6 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
                     start.ru_stime.tv_sec * USEC_PER_SEC - start.ru_stime.tv_usec,
                     res_err->err_code,
                     res_err->err_str
-    );
-    buffer_strcat(  dest_wb, 
-                    "   },\n"
-                    "   \"data\":[\n"
     );
 
     size_t res_off = 0;
@@ -244,12 +245,34 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
         buffer_need_bytes(dest_wb, p_res_hdr->text_size);
 
         /* Unfortunately '\n', '\\' (except for "\\n") and '"' need to be 
-         * escaped, so we need to go through the result characters one by one.*/
-        char *p = &query_params.results_buff->buffer[res_off] + sizeof(*p_res_hdr);
+         * escaped, so we need to go through the result characters one by one.
+         * The first part below is needed only for descending timestamp order 
+         * queries. */
+
+        int order_desc_rem = p_res_hdr->text_size - 1;
+        char *line_s = &query_params.results_buff->buffer[res_off] + 
+                        sizeof(*p_res_hdr) + p_res_hdr->text_size - 2;
+        if(!query_params.order_by_asc){
+            while(order_desc_rem > 0 && *line_s != '\n') {
+                line_s--;
+                order_desc_rem--;
+            }
+        }
+
+        char *p = query_params.order_by_asc ? 
+            &query_params.results_buff->buffer[res_off] + sizeof(*p_res_hdr) : line_s + 1;
+
         size_t remaining = p_res_hdr->text_size;
-        while (remaining--){
+        while (--remaining){ /* --remaining instead of remaing-- to exclude the last '\n' */
             if(unlikely(*p == '\n')){
-                buffer_strcat(dest_wb, "\",\n            \"");                
+                buffer_strcat(dest_wb, "\",\n\t\t\t\t\"");
+                if(!query_params.order_by_asc){
+                    do{
+                        order_desc_rem--;
+                        line_s--;
+                    } while(order_desc_rem > 0 && *line_s != '\n');
+                    p = line_s;
+                }
             } 
             else if(unlikely(*p == '\\' && *(p+1) != 'n')) {
                 buffer_need_bytes(dest_wb, 1);
@@ -262,7 +285,6 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
                 dest_wb->buffer[dest_wb->len++] = '"';
             }
             else{
-                // buffer_need_bytes(dest_wb, 1);
                 dest_wb->buffer[dest_wb->len++] = *p;
             }
             p++;
@@ -297,7 +319,7 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
 
     buffer_free(query_params.results_buff);
 
-    // buffer_no_cacheable(dest_wb);  
+    buffer_no_cacheable(dest_wb);  
 
     return res_err->http_code;
 }
