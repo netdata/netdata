@@ -566,7 +566,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     bool tty = isatty(fileno(stderr)) == 1;
 
     netdata_mutex_lock(&mutex);
-    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " \"%s\" %d \"%s\"\n",
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\"\n",
             SYSTEMD_JOURNAL_FUNCTION_NAME, SYSTEMD_JOURNAL_DEFAULT_TIMEOUT, SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION);
 
     heartbeat_t hb;
