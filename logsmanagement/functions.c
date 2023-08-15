@@ -168,65 +168,17 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
     query_params.results_buff = buffer_create(query_params.quota, &netdata_buffers_statistics.buffers_api);
 
     const logs_qry_res_err_t *const res_err = execute_logs_manag_query(&query_params);
-    getrusage(RUSAGE_THREAD, &end);
 
-    int update_every = 1;
+    const int update_every = 1;
 
     buffer_sprintf( dest_wb,
                     "{\n"
                     "   \"status\": %d,\n"
                     "   \"type\": \"table\",\n"
                     "   \"update_every\": %d,\n"
-                    "   \"logs_management_meta\": {\n"
-                    "      \"api_version\": %s,\n"
-                    "      \"requested_from\": %llu,\n"
-                    "      \"requested_to\": %llu,\n"
-                    "      \"requested_quota\": %llu,\n"
-                    "      \"requested_keyword\": \"%s\",\n"
-                    "      \"actual_from\": %llu,\n"
-                    "      \"actual_to\": %llu,\n"
-                    "      \"actual_quota\": %llu,\n"
-                    "      \"requested_filename\": [\n",
-                    res_err->http_code,
-                    update_every,
-                    LOGS_QRY_VERSION,
-                    query_params.req_from_ts,
-                    query_params.req_to_ts,
-                    req_quota / (1 KiB),
-                    query_params.keyword ? query_params.keyword : "",
-                    query_params.act_from_ts,
-                    query_params.act_to_ts,
-                    query_params.quota / (1 KiB)
-    );
-
-    while(query_params.filename[fn_off]) 
-        buffer_sprintf(dest_wb, "         \"%s\",\n", query_params.filename[fn_off++]);
-    if(query_params.filename[0])  dest_wb->len -= 2;
-    buffer_strcat(  dest_wb, 
-                    "\n      ],\n"
-                    "      \"requested_chart_name\": [\n"
-    );
-
-    while(query_params.chart_name[cn_off]) 
-        buffer_sprintf(dest_wb, "         \"%s\",\n", query_params.chart_name[cn_off++]);
-    if(query_params.chart_name[0])  dest_wb->len -= 2;
-
-    buffer_sprintf( dest_wb, 
-                    "\n      ],\n"
-                    "      \"num_lines\": %lu, \n"
-                    "      \"user_time\": %llu,\n"
-                    "      \"system_time\": %llu,\n"
-                    "      \"error_code\": %d,\n"
-                    "      \"error\": \"%s\"\n"
-                    "   },\n"
                     "   \"data\":[\n",
-                    query_params.num_lines,
-                    end.ru_utime.tv_sec * USEC_PER_SEC + end.ru_utime.tv_usec - 
-                    start.ru_utime.tv_sec * USEC_PER_SEC - start.ru_utime.tv_usec,
-                    end.ru_stime.tv_sec * USEC_PER_SEC + end.ru_stime.tv_usec - 
-                    start.ru_stime.tv_sec * USEC_PER_SEC - start.ru_stime.tv_usec,
-                    res_err->err_code,
-                    res_err->err_str
+                    res_err->http_code,
+                    update_every
     );
 
     size_t res_off = 0;
@@ -304,7 +256,61 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
         if(query_params.results_buff->len - res_off > 0) buffer_strcat(dest_wb, ",\n");
     }
 
-    buffer_fast_strcat(dest_wb, "\n   ],\n   \"columns\": {", sizeof("\n   ],\n   \"columns\": {") - 1);
+    getrusage(RUSAGE_THREAD, &end);
+
+    buffer_sprintf( dest_wb,
+                    "\n   ],\n"
+                    "   \"logs_management_meta\": {\n"
+                    "      \"api_version\": %s,\n"
+                    "      \"requested_from\": %llu,\n"
+                    "      \"requested_to\": %llu,\n"
+                    "      \"requested_quota\": %llu,\n"
+                    "      \"requested_keyword\": \"%s\",\n"
+                    "      \"actual_from\": %llu,\n"
+                    "      \"actual_to\": %llu,\n"
+                    "      \"actual_quota\": %llu,\n"
+                    "      \"requested_filename\": [\n",
+                    LOGS_QRY_VERSION,
+                    query_params.req_from_ts,
+                    query_params.req_to_ts,
+                    req_quota / (1 KiB),
+                    query_params.keyword ? query_params.keyword : "",
+                    query_params.act_from_ts,
+                    query_params.act_to_ts,
+                    query_params.quota / (1 KiB)
+    );
+
+    while(query_params.filename[fn_off]) 
+        buffer_sprintf(dest_wb, "         \"%s\",\n", query_params.filename[fn_off++]);
+    if(query_params.filename[0])  dest_wb->len -= 2;
+    buffer_strcat(  dest_wb, 
+                    "\n      ],\n"
+                    "      \"requested_chart_name\": [\n"
+    );
+
+    while(query_params.chart_name[cn_off]) 
+        buffer_sprintf(dest_wb, "         \"%s\",\n", query_params.chart_name[cn_off++]);
+    if(query_params.chart_name[0])  dest_wb->len -= 2;
+
+    buffer_sprintf( dest_wb, 
+                    "\n      ],\n"
+                    "      \"num_lines\": %lu, \n"
+                    "      \"user_time\": %llu,\n"
+                    "      \"system_time\": %llu,\n"
+                    "      \"error_code\": %d,\n"
+                    "      \"error\": \"%s\"\n"
+                    "   },\n",
+                    query_params.num_lines,
+                    end.ru_utime.tv_sec * USEC_PER_SEC + end.ru_utime.tv_usec - 
+                    start.ru_utime.tv_sec * USEC_PER_SEC - start.ru_utime.tv_usec,
+                    end.ru_stime.tv_sec * USEC_PER_SEC + end.ru_stime.tv_usec - 
+                    start.ru_stime.tv_sec * USEC_PER_SEC - start.ru_stime.tv_usec,
+                    res_err->err_code,
+                    res_err->err_str
+    );
+
+
+    buffer_strcat(dest_wb, "   \"columns\": {");
     int fields_added = 0;
     add_table_field(dest_wb, "Timestamp", "Timestamp in Milliseconds", true, "time", "milliseconds", NAN, "ascending", true, true, false, NULL, "average", false);
     add_table_field(dest_wb, "Logs", "Logs collected in last interval", true, "string", NULL, NAN, "ascending", false, false, false, NULL, "N/A", false);
