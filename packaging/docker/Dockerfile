@@ -113,6 +113,9 @@ RUN chown -R root:root \
     if [ -f /usr/libexec/netdata/plugins.d/go.d.plugin ]; then \
         chmod 4755 /usr/libexec/netdata/plugins.d/go.d.plugin; \
     fi && \
+    if [ -f /usr/libexec/netdata/plugins.d/systemd-journal.plugin ]; then \
+        chmod 4755 /usr/libexec/netdata/plugins.d/systemd-journal.plugin; \
+    fi && \
     # Group write permissions due to: https://github.com/netdata/netdata/pull/6543
     find /var/lib/netdata /var/cache/netdata -type d -exec chmod 0770 {} \; && \
     find /var/lib/netdata /var/cache/netdata -type f -exec chmod 0660 {} \; && \
