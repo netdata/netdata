@@ -58,7 +58,7 @@ An example of a working configuration would be:
 
 SEND_FLOCK="YES"
 FLOCK_WEBHOOK_URL="https://api.flock.com/hooks/sendMessage/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-DEFAULT_RECIPIENT_FLOCK="alarms"
+DEFAULT_RECIPIENT_FLOCK="alerts"
 ```
 
 ## Test the notification method

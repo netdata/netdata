@@ -18,8 +18,8 @@ Netdata can export snapshots of the contents of your dashboard at a given time, 
 node running Netdata. Or, you can create a print-ready version of your dashboard to save to PDF or actually print to
 paper.
 
-Snapshots can be incredibly useful for diagnosing anomalies after they've already happened. Let's say Netdata triggered a warning alarm while you were asleep. In the morning, you can [select the
-timeframe](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.md) when the alarm triggered, export a snapshot, and send it to a
+Snapshots can be incredibly useful for diagnosing anomalies after they've already happened. Let's say Netdata triggered a warning alert while you were asleep. In the morning, you can [select the
+timeframe](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.md) when the alert triggered, export a snapshot, and send it to a
 
 colleague for further analysis.
 

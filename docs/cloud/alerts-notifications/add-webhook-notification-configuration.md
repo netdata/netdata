@@ -42,23 +42,23 @@ Netdata webhook integration service will send alert notifications to the destina
 
 The notification content sent to the destination service will be a JSON object having these properties:
 
-| field   | type   | description |
-| :--     | :--    | :--         |
-| message | string | A summary message of the alert. |
-| alarm | string | The alarm the notification is about. |
-| info | string | Additional info related with the alert. |
-| chart | string | The chart associated with the alert. |
-| context | string | The chart context. |
-| space | string | The space where the node that raised the alert is assigned. |
-| rooms | object[object(string,string)] | Object with list of rooms names and urls where the node belongs to. |
-| family | string | Context family. |
-| class | string | Classification of the alert, e.g. "Error". |
-| severity | string | Alert severity, can be one of "warning", "critical" or "clear". |
-| date | string | Date of the alert in ISO8601 format. |
-| duration | string |  Duration the alert has been raised. |
-| additional_active_critical_alerts | integer | Number of additional critical alerts currently existing on the same node. |
-| additional_active_warning_alerts | integer | Number of additional warning alerts currently existing on the same node. |
-| alarm_url | string | Netdata Cloud URL for this alarm. |
+| field                             | type                          | description                                                               |
+|:----------------------------------|:------------------------------|:--------------------------------------------------------------------------|
+| message                           | string                        | A summary message of the alert.                                           |
+| alarm                             | string                        | The alert the notification is about.                                      |
+| info                              | string                        | Additional info related with the alert.                                   |
+| chart                             | string                        | The chart associated with the alert.                                      |
+| context                           | string                        | The chart context.                                                        |
+| space                             | string                        | The space where the node that raised the alert is assigned.               |
+| rooms                             | object[object(string,string)] | Object with list of rooms names and urls where the node belongs to.       |
+| family                            | string                        | Context family.                                                           |
+| class                             | string                        | Classification of the alert, e.g. "Error".                                |
+| severity                          | string                        | Alert severity, can be one of "warning", "critical" or "clear".           |
+| date                              | string                        | Date of the alert in ISO8601 format.                                      |
+| duration                          | string                        | Duration the alert has been raised.                                       |
+| additional_active_critical_alerts | integer                       | Number of additional critical alerts currently existing on the same node. |
+| additional_active_warning_alerts  | integer                       | Number of additional warning alerts currently existing on the same node.  |
+| alarm_url                         | string                        | Netdata Cloud URL for this alert.                                         |
 
 ### Extra headers
 
@@ -66,9 +66,9 @@ When setting up a webhook integration, the user can specify a set of headers to 
 
 By default, the following headers will be sent in the HTTP request
 
-|            **Header**            | **Value**                 |
-|:-------------------------------:|-----------------------------|
-|     Content-Type             | application/json        |
+|  **Header**  | **Value**        |
+|:------------:|------------------|
+| Content-Type | application/json |
 
 ### Authentication mechanisms
 

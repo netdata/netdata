@@ -34,7 +34,7 @@ of required setup.
 In this tutorial, you'll set up robust LAMP stack monitoring with Netdata in just a few minutes. When you're done,
 you'll have one dashboard to monitor every part of your web application, including each essential LAMP stack service.
 
-This dashboard updates every second with new metrics, and pairs those metrics up with preconfigured alarms to keep you
+This dashboard updates every second with new metrics, and pairs those metrics up with preconfigured alerts to keep you
 informed of any errors or odd behavior.
 
 ## What you need to get started
@@ -192,18 +192,18 @@ Here's a quick reference for what charts you might want to focus on after settin
 | Active Connections (`mysql_local.connections_active`) | MySQL monitoring    | If the `active` dimension nears the `limit`, your MySQL database will bottleneck responses.                                                                                                                     |
 | Performance (phpfpm_local.performance)                | PHP monitoring      | The `slow requests` dimension lets you know if any requests exceed the configured `request_slowlog_timeout`. If so, users might be having a less-than-ideal experience.                                         |
 
-## Get alarms for LAMP stack errors
+## Get alerts for LAMP stack errors
 
-The Netdata Agent comes with hundreds of pre-configured alarms to help you keep tabs on your system, including 19 alarms
+The Netdata Agent comes with hundreds of pre-configured alerts to help you keep tabs on your system, including 19 alerts
 designed for smarter LAMP stack monitoring.
 
-Click the 🔔 icon in the top navigation to [see active alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alarms.md). The **Active** tabs
-shows any alarms currently triggered, while the **All** tab displays a list of _every_ pre-configured alarm. The 
+Click the 🔔 icon in the top navigation to [see active alerts](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alerts.md). The **Active** tabs
+shows any alerts currently triggered, while the **All** tab displays a list of _every_ pre-configured alert. The 
 
 ![An example of LAMP stack
-alarms](https://user-images.githubusercontent.com/1153921/109524120-5883f900-7a6d-11eb-830e-0e7baaa28163.png)
+alerts](https://user-images.githubusercontent.com/1153921/109524120-5883f900-7a6d-11eb-830e-0e7baaa28163.png)
 
-[Tweak alarms](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) based on your infrastructure monitoring needs, and to see these alarms
+[Tweak alerts](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) based on your infrastructure monitoring needs, and to see these alerts
 in other places, like your inbox or a Slack channel, [enable a notification
 method](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md).
 

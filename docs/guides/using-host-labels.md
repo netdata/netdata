@@ -41,7 +41,7 @@ To define your windows server as a virtual node you need to:
 
 Host labels can be extremely useful when:
 
-- You need alarms that adapt to the system's purpose
+- You need alerts that adapt to the system's purpose
 - You need properly-labeled metrics archiving so you can sort, correlate, and mash-up your data to your heart's content.
 - You need to keep tabs on ephemeral Docker containers in a Kubernetes cluster.
 
@@ -149,7 +149,7 @@ exporting. Speaking of which...
 ### Host labels in alerts
 
 You can use host labels to logically organize your systems by their type, purpose, or location, and then apply specific
-alarms to them.
+alerts to them.
 
 For example, let's use configuration example from earlier:
 
@@ -178,7 +178,7 @@ Or, by using one of the automatic labels, for only webserver systems running a s
  host labels: _os_name = Debian*
 ```
 
-In a streaming configuration where a parent node is triggering alarms for its child nodes, you could create health
+In a streaming configuration where a parent node is triggering alerts for its child nodes, you could create health
 entities that apply only to child nodes:
 
 ```yaml
@@ -192,7 +192,7 @@ Or when ephemeral Docker nodes are involved:
 ```
 
 Of course, there are many more possibilities for intuitively organizing your systems with host labels. See the [health
-documentation](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#alarm-line-host-labels) for more details, and then get creative!
+documentation](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#alert-line-host-labels) for more details, and then get creative!
 
 ### Host labels in metrics exporting
 

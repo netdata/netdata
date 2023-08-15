@@ -14,20 +14,20 @@ from external processes, thus allowing Netdata to use **external plugins**.
 
 ## Provided External Plugins
 
-|plugin|language|O/S|description|
-|:----:|:------:|:-:|:----------|
-|[apps.plugin](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md)|`C`|linux, freebsd|monitors the whole process tree on Linux and FreeBSD and breaks down system resource usage by **process**, **user** and **user group**.|
-|[charts.d.plugin](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/README.md)|`BASH`|all|a **plugin orchestrator** for data collection modules written in `BASH` v4+.|
-|[cups.plugin](https://github.com/netdata/netdata/blob/master/collectors/cups.plugin/README.md)|`C`|all|monitors **CUPS**|
-|[ebpf.plugin](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md)|`C`|linux|monitors different metrics on environments using kernel internal functions.|
-|[go.d.plugin](https://github.com/netdata/go.d.plugin/blob/master/README.md)|`GO`|all|collects metrics from the system, applications, or third-party APIs.|
-|[ioping.plugin](https://github.com/netdata/netdata/blob/master/collectors/ioping.plugin/README.md)|`C`|all|measures disk latency.|
-|[freeipmi.plugin](https://github.com/netdata/netdata/blob/master/collectors/freeipmi.plugin/README.md)|`C`|linux|collects metrics from enterprise hardware sensors, on Linux servers.|
-|[nfacct.plugin](https://github.com/netdata/netdata/blob/master/collectors/nfacct.plugin/README.md)|`C`|linux|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`.|
-|[xenstat.plugin](https://github.com/netdata/netdata/blob/master/collectors/xenstat.plugin/README.md)|`C`|linux|collects XenServer and XCP-ng metrics using `lxenstat`.|
-|[perf.plugin](https://github.com/netdata/netdata/blob/master/collectors/perf.plugin/README.md)|`C`|linux|collects CPU performance metrics using performance monitoring units (PMU).|
-|[python.d.plugin](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/README.md)|`python`|all|a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported).|
-|[slabinfo.plugin](https://github.com/netdata/netdata/blob/master/collectors/slabinfo.plugin/README.md)|`C`|linux|collects kernel internal cache objects (SLAB) metrics.|
+|                                                 plugin                                                 | language |      O/S       | description                                                                                                                             |
+|:------------------------------------------------------------------------------------------------------:|:--------:|:--------------:|:----------------------------------------------------------------------------------------------------------------------------------------|
+|     [apps.plugin](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md)     |   `C`    | linux, freebsd | monitors the whole process tree on Linux and FreeBSD and breaks down system resource usage by **process**, **user** and **user group**. |
+| [charts.d.plugin](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/README.md) |  `BASH`  |      all       | a **plugin orchestrator** for data collection modules written in `BASH` v4+.                                                            |
+|     [cups.plugin](https://github.com/netdata/netdata/blob/master/collectors/cups.plugin/README.md)     |   `C`    |      all       | monitors **CUPS**                                                                                                                       |
+|     [ebpf.plugin](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md)     |   `C`    |     linux      | monitors different metrics on environments using kernel internal functions.                                                             |
+|              [go.d.plugin](https://github.com/netdata/go.d.plugin/blob/master/README.md)               |   `GO`   |      all       | collects metrics from the system, applications, or third-party APIs.                                                                    |
+|   [ioping.plugin](https://github.com/netdata/netdata/blob/master/collectors/ioping.plugin/README.md)   |   `C`    |      all       | measures disk latency.                                                                                                                  |
+| [freeipmi.plugin](https://github.com/netdata/netdata/blob/master/collectors/freeipmi.plugin/README.md) |   `C`    |     linux      | collects metrics from enterprise hardware sensors, on Linux servers.                                                                    |
+|   [nfacct.plugin](https://github.com/netdata/netdata/blob/master/collectors/nfacct.plugin/README.md)   |   `C`    |     linux      | collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`.                          |
+|  [xenstat.plugin](https://github.com/netdata/netdata/blob/master/collectors/xenstat.plugin/README.md)  |   `C`    |     linux      | collects XenServer and XCP-ng metrics using `lxenstat`.                                                                                 |
+|     [perf.plugin](https://github.com/netdata/netdata/blob/master/collectors/perf.plugin/README.md)     |   `C`    |     linux      | collects CPU performance metrics using performance monitoring units (PMU).                                                              |
+| [python.d.plugin](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/README.md) | `python` |      all       | a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported).                                |
+| [slabinfo.plugin](https://github.com/netdata/netdata/blob/master/collectors/slabinfo.plugin/README.md) |   `C`    |     linux      | collects kernel internal cache objects (SLAB) metrics.                                                                                  |
 
 Plugin orchestrators may also be described as **modular plugins**. They are modular since they accept custom made modules to be included. Writing modules for these plugins is easier than accessing the native Netdata API directly. You will find modules already available for each orchestrator under the directory of the particular modular plugin (e.g. under python.d.plugin for the python orchestrator).
 Each of these modular plugins has each own methods for defining modules. Please check the examples and their documentation.
@@ -154,18 +154,18 @@ every 5 seconds.
 There are a few environment variables that are set by `netdata` and are
 available for the plugin to use.
 
-|variable|description|
-|:------:|:----------|
-|`NETDATA_USER_CONFIG_DIR`|The directory where all Netdata-related user configuration should be stored. If the plugin requires custom user configuration, this is the place the user has saved it (normally under `/etc/netdata`).|
-|`NETDATA_STOCK_CONFIG_DIR`|The directory where all Netdata -related stock configuration should be stored. If the plugin is shipped with configuration files, this is the place they can be found (normally under `/usr/lib/netdata/conf.d`).|
-|`NETDATA_PLUGINS_DIR`|The directory where all Netdata plugins are stored.|
-|`NETDATA_USER_PLUGINS_DIRS`|The list of directories where custom plugins are stored.|
-|`NETDATA_WEB_DIR`|The directory where the web files of Netdata are saved.|
-|`NETDATA_CACHE_DIR`|The directory where the cache files of Netdata are stored. Use this directory if the plugin requires a place to store data. A new directory should be created for the plugin for this purpose, inside this directory.|
-|`NETDATA_LOG_DIR`|The directory where the log files are stored. By default the `stderr` output of the plugin will be saved in the `error.log` file of Netdata.|
-|`NETDATA_HOST_PREFIX`|This is used in environments where system directories like `/sys` and `/proc` have to be accessed at a different path.|
-|`NETDATA_DEBUG_FLAGS`|This is a number (probably in hex starting with `0x`), that enables certain Netdata debugging features. Check **\[[Tracing Options]]** for more information.|
-|`NETDATA_UPDATE_EVERY`|The minimum number of seconds between chart refreshes. This is like the **internal clock** of Netdata (it is user configurable, defaulting to `1`). There is no meaning for a plugin to update its values more frequently than this number of seconds.|
+|          variable           | description                                                                                                                                                                                                                                            |
+|:---------------------------:|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|  `NETDATA_USER_CONFIG_DIR`  | The directory where all Netdata-related user configuration should be stored. If the plugin requires custom user configuration, this is the place the user has saved it (normally under `/etc/netdata`).                                                |
+| `NETDATA_STOCK_CONFIG_DIR`  | The directory where all Netdata -related stock configuration should be stored. If the plugin is shipped with configuration files, this is the place they can be found (normally under `/usr/lib/netdata/conf.d`).                                      |
+|    `NETDATA_PLUGINS_DIR`    | The directory where all Netdata plugins are stored.                                                                                                                                                                                                    |
+| `NETDATA_USER_PLUGINS_DIRS` | The list of directories where custom plugins are stored.                                                                                                                                                                                               |
+|      `NETDATA_WEB_DIR`      | The directory where the web files of Netdata are saved.                                                                                                                                                                                                |
+|     `NETDATA_CACHE_DIR`     | The directory where the cache files of Netdata are stored. Use this directory if the plugin requires a place to store data. A new directory should be created for the plugin for this purpose, inside this directory.                                  |
+|      `NETDATA_LOG_DIR`      | The directory where the log files are stored. By default the `stderr` output of the plugin will be saved in the `error.log` file of Netdata.                                                                                                           |
+|    `NETDATA_HOST_PREFIX`    | This is used in environments where system directories like `/sys` and `/proc` have to be accessed at a different path.                                                                                                                                 |
+|    `NETDATA_DEBUG_FLAGS`    | This is a number (probably in hex starting with `0x`), that enables certain Netdata debugging features. Check **\[[Tracing Options]]** for more information.                                                                                           |
+|   `NETDATA_UPDATE_EVERY`    | The minimum number of seconds between chart refreshes. This is like the **internal clock** of Netdata (it is user configurable, defaulting to `1`). There is no meaning for a plugin to update its values more frequently than this number of seconds. |
 
 ### The output of the plugin
 
@@ -298,7 +298,7 @@ the template is:
 
     the context is giving the template of the chart. For example, if multiple charts present the same information for a different family, they should have the same `context`
 
-    this is used for looking up rendering information for the chart (colors, sizes, informational texts) and also apply alarms to it
+    this is used for looking up rendering information for the chart (colors, sizes, informational texts) and also apply alerts to it
 
 -   `charttype`
 
@@ -388,12 +388,12 @@ the template is:
 
 > VARIABLE [SCOPE] name = value
 
-`VARIABLE` defines a variable that can be used in alarms. This is to used for setting constants (like the max connections a server may accept).
+`VARIABLE` defines a variable that can be used in alerts. This is to used for setting constants (like the max connections a server may accept).
 
 Variables support 2 scopes:
 
 -   `GLOBAL` or `HOST` to define the variable at the host level.
--   `LOCAL` or `CHART` to define the variable at the chart level. Use chart-local variables when the same variable may exist for different charts (i.e. Netdata monitors 2 mysql servers, and you need to set the `max_connections` each server accepts). Using chart-local variables is the ideal to build alarm templates.
+-   `LOCAL` or `CHART` to define the variable at the chart level. Use chart-local variables when the same variable may exist for different charts (i.e. Netdata monitors 2 mysql servers, and you need to set the `max_connections` each server accepts). Using chart-local variables is the ideal to build alert templates.
 
 The position of the `VARIABLE` line, sets its default scope (in case you do not specify a scope). So, defining a `VARIABLE` before any `CHART`, or between `END` and `BEGIN` (outside any chart), sets `GLOBAL` scope, while defining a `VARIABLE` just after a `CHART` or a `DIMENSION`, or within the `BEGIN` - `END` block of a chart, sets `LOCAL` scope.
 
