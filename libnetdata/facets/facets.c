@@ -196,14 +196,14 @@ static void facet_value_insert_callback(const DICTIONARY_ITEM *item __maybe_unus
     FACET_VALUE *v = value;
     FACET_KEY *k = data;
 
+    if(!v->selected)
+        v->selected = k->default_selected_for_values;
+
     if(v->name) {
         // an actual value, not a filter
         v->name = strdupz(v->name);
         facet_value_is_used(k, v);
     }
-
-    if(!v->selected)
-        v->selected = k->default_selected_for_values;
 }
 
 static bool facet_value_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data) {
@@ -217,6 +217,9 @@ static bool facet_value_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
 
     if(v->name)
         facet_value_is_used(k, v);
+
+    internal_fatal(v->name && strcmp(v->name, nv->name) != 0, "hash conflict: '%s' and '%s' have the same hash '%s'", v->name, nv->name,
+                   dictionary_acquired_item_name(item));
 
     return false;
 }
