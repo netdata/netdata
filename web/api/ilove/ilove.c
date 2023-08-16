@@ -188,8 +188,28 @@ static double ibm_plex_sans_bold_word_width(const char *s, double fontSize) {
 
  */
 
+static bool word_goes_below_baseline(const char *love) {
+    const char *s = love;
+    while(*s) {
+        switch(*s) {
+            case 'g':
+            case 'j':
+            case 'p':
+            case 'q':
+            case 'y':
+            case 'Q':
+                return true;
+        }
+
+        s++;
+    }
+
+    return false;
+}
+
 static void generate_ilove_svg(BUFFER *wb, const char *love) {
     const char *i = "I";
+    const char *stretch = "spacing";
 
     double font_size = 250.0;
     double border_width = 25.0;
@@ -197,8 +217,27 @@ static void generate_ilove_svg(BUFFER *wb, const char *love) {
     double logo_width = 1000.0 * logo_scale;
     double i_width = ibm_plex_sans_bold_word_width(i, font_size);
     double first_line_width = i_width + logo_width;
-    double second_line_width = ibm_plex_sans_bold_word_width(love, font_size);
-    double width = MAX(first_line_width, second_line_width) + border_width * 4.0;
+    double second_line_font_size = font_size;
+    double second_line_width = ibm_plex_sans_bold_word_width(love, second_line_font_size);
+
+    if(second_line_width <= first_line_width) {
+        second_line_width = first_line_width;
+        stretch = "spacingAndGlyphs";
+        second_line_font_size *= 1.10;
+    }
+    else if(second_line_width > first_line_width * 4) {
+        second_line_width *= 0.80;
+        stretch = "spacingAndGlyphs";
+        second_line_font_size *= 0.90;
+    }
+    else if(second_line_width > first_line_width * 2) {
+        second_line_width *= 0.93;
+        stretch = "spacing";
+    }
+
+    bool second_line_needs_height = word_goes_below_baseline(love);
+
+    double width = second_line_width + border_width * 4.0;
 
     buffer_flush(wb);
 
@@ -225,8 +264,12 @@ static void generate_ilove_svg(BUFFER *wb, const char *love) {
                    (width - first_line_width) / 2, first_line_baseline, font_size, i);
 
     // second line
-    buffer_sprintf(wb, "    <text x=\"%.0f\" y=\"%.0f\" font-family=\"IBM Plex Sans\" font-weight=\"bold\" font-size=\"%.0f\" fill=\"white\" textLength=\"%.0f\" lengthAdjust=\"spacingAndGlyphs\">%s</text>\n",
-                   border_width * 2, first_line_baseline + font_size * 0.85, font_size, second_line_width, love);
+    double second_line_baseline = first_line_baseline + font_size * 0.85;
+    if(second_line_needs_height)
+        second_line_baseline = first_line_baseline + font_size * 0.78;
+
+    buffer_sprintf(wb, "    <text x=\"%.0f\" y=\"%.0f\" font-family=\"IBM Plex Sans\" font-weight=\"bold\" font-size=\"%.0f\" fill=\"white\" textLength=\"%.0f\" lengthAdjust=\"%s\">%s</text>\n",
+                   border_width * 2, second_line_baseline, second_line_font_size, second_line_width, stretch, love);
 
     buffer_sprintf(wb, "</svg>");
 
