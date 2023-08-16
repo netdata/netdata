@@ -584,6 +584,7 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
     if (sqlite3_step_monitored(res) == SQLITE_ROW) {
 
         int param = 0;
+        UNUSED(param);
         alarm_config.alarm = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
         alarm_config.alarm = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
         alarm_config.tmpl = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
