@@ -4,6 +4,15 @@
 #include "rrd.h"
 
 // Key OF HS ARRRAY
+
+struct {
+    Pvoid_t JudyHS;
+    SPINLOCK spinlock;
+} global_labels = {
+    .JudyHS = (Pvoid_t) NULL,
+    .spinlock = NETDATA_SPINLOCK_INITIALIZER
+};
+
 typedef struct label_registry_idx {
     STRING *key;
     STRING *value;
@@ -575,15 +584,15 @@ static void dup_label(RRDLABEL *label_index)
     if (!label_index)
         return;
 
-    spinlock_lock(&rrdb.labels.spinlock);
+    spinlock_lock(&global_labels.spinlock);
 
-    Pvoid_t *PValue = JudyHSGet(rrdb.labels.JudyHS, (void *)label_index, sizeof(*label_index));
+    Pvoid_t *PValue = JudyHSGet(global_labels.JudyHS, (void *)label_index, sizeof(*label_index));
     if (PValue && *PValue) {
         RRDLABEL_IDX *rrdlabel = *PValue;
         __atomic_add_fetch(&rrdlabel->refcount, 1, __ATOMIC_RELAXED);
     }
 
-    spinlock_unlock(&rrdb.labels.spinlock);
+    spinlock_unlock(&global_labels.spinlock);
 }
 
 static RRDLABEL *add_label_name_value(const char *name, const char *value)
@@ -598,9 +607,9 @@ static RRDLABEL *add_label_name_value(const char *name, const char *value)
     label_index.key = string_strdupz(n);
     label_index.value = string_strdupz(v);
 
-    spinlock_lock(&rrdb.labels.spinlock);
+    spinlock_lock(&global_labels.spinlock);
 
-    Pvoid_t *PValue = JudyHSIns(&rrdb.labels.JudyHS, (void *)&label_index, sizeof(label_index), PJE0);
+    Pvoid_t *PValue = JudyHSIns(&global_labels.JudyHS, (void *)&label_index, sizeof(label_index), PJE0);
     if (PValue && *PValue) {
         rrdlabel = *PValue;
         string_freez(label_index.key);
@@ -613,21 +622,21 @@ static RRDLABEL *add_label_name_value(const char *name, const char *value)
     }
     __atomic_add_fetch(&rrdlabel->refcount, 1, __ATOMIC_RELAXED);
 
-    spinlock_unlock(&rrdb.labels.spinlock);
+    spinlock_unlock(&global_labels.spinlock);
     return &rrdlabel->label;
 }
 
 static void delete_label(RRDLABEL *label)
 {
-    spinlock_lock(&rrdb.labels.spinlock);
+    spinlock_lock(&global_labels.spinlock);
 
-    Pvoid_t *PValue = JudyHSGet(rrdb.labels.JudyHS, &label->index, sizeof(label->index));
+    Pvoid_t *PValue = JudyHSGet(global_labels.JudyHS, &label->index, sizeof(label->index));
     if (PValue && *PValue) {
         RRDLABEL_IDX *rrdlabel = *PValue;
         size_t refcount = __atomic_sub_fetch(&rrdlabel->refcount, 1, __ATOMIC_RELAXED);
         if (refcount == 0) {
             JError_t J_Error;
-            int ret = JudyHSDel(&rrdb.labels.JudyHS, (void *)label, sizeof(*label), PJE0);
+            int ret = JudyHSDel(&global_labels.JudyHS, (void *)label, sizeof(*label), PJE0);
             if (unlikely(ret == JERR)) {
                 // Log error but continue
                 netdata_log_error(
@@ -643,7 +652,7 @@ static void delete_label(RRDLABEL *label)
             freez(rrdlabel);
         }
     }
-    spinlock_unlock(&rrdb.labels.spinlock);
+    spinlock_unlock(&global_labels.spinlock);
 }
 
 // ----------------------------------------------------------------------------
@@ -760,21 +769,6 @@ void rrdlabels_add_pair(RRDLABELS *labels, const char *string, RRDLABEL_SRC ls)
 }
 
 // ----------------------------------------------------------------------------
-// rrdlabels_get_value_to_buffer_or_null()
-
-void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const char *key, const char *quote, const char *null) {
-    if(!labels) return;
-
-    const DICTIONARY_ITEM *acquired_item = dictionary_get_and_acquire_item(labels, key);
-    RRDLABEL *lb = dictionary_acquired_item_value(acquired_item);
-
-    if(lb && lb->label_value)
-        buffer_sprintf(wb, "%s%s%s", quote, string2str(lb->label_value), quote);
-    else
-        buffer_strcat(wb, null);
-
-    dictionary_acquired_item_release(labels, acquired_item);
-}
 
 void rrdlabels_value_to_buffer_array_item_or_null(RRDLABELS *labels, BUFFER *wb, const char *key) {
     if(!labels) return;
@@ -998,7 +992,6 @@ struct simple_pattern_match_name_value {
 };
 
 static int simple_pattern_match_name_only_callback(const char *name, const char *value, RRDLABEL_SRC ls __maybe_unused, void *data) {
-//    const char *name = dictionary_acquired_item_name(item);
     struct simple_pattern_match_name_value *t = (struct simple_pattern_match_name_value *)data;
     (void)value;
 
@@ -1208,7 +1201,7 @@ size_t label_version(RRDLABELS *labels __maybe_unused)
     return (size_t) labels->version;
 }
 
-void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels) {
+void rrdset_update_rrdlabels(RRDSET *st, RRDLABELS *new_rrdlabels) {
     if(!st->rrdlabels)
         st->rrdlabels = rrdlabels_create();
 

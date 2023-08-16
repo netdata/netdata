@@ -5,7 +5,7 @@
 
 #include "rrd.h"
 
-typedef enum __attribute__ ((__packed__)) {
+typedef enum __attribute__ ((__packed__)) rrdlabel_source {
     RRDLABEL_SRC_AUTO       = (1 << 0), // set when Netdata found the label by some automation
     RRDLABEL_SRC_CONFIG     = (1 << 1), // set when the user configured the label
     RRDLABEL_SRC_K8S        = (1 << 2), // set when this label is found from k8s (RRDLABEL_SRC_AUTO should also be set)
