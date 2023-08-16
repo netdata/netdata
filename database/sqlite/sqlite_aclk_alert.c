@@ -25,35 +25,40 @@ static void update_filtered(ALARM_ENTRY *ae, uint32_t unique_id, char *uuid_str)
     ae->flags |= HEALTH_ENTRY_FLAG_ACLK_QUEUED;
 }
 
-#define SQL_SELECT_VARIABLE_ALERT_BY_UNIQUE_ID "SELECT hld.unique_id FROM health_log hl, alert_hash ah, health_log_detail hld WHERE hld.unique_id = %u " \
-                            "AND hl.config_hash_id = ah.hash_id AND hld.health_log_id = hl.health_log_id AND host_id = @host_id " \
-                            "AND ah.warn IS NULL AND ah.crit IS NULL;"
-static inline bool is_event_from_alert_variable_config(uint32_t unique_id, uuid_t *host_id) {
+#define SQL_SELECT_VARIABLE_ALERT_BY_UNIQUE_ID                                                                         \
+    "SELECT hld.unique_id FROM health_log hl, alert_hash ah, health_log_detail hld "                                   \
+    "WHERE hld.unique_id = @unique_id AND hl.config_hash_id = ah.hash_id AND hld.health_log_id = hl.health_log_id "    \
+    "AND hl.host_id = @host_id AND ah.warn IS NULL AND ah.crit IS NULL"
+
+static inline bool is_event_from_alert_variable_config(uint32_t unique_id, uuid_t *host_id)
+{
     sqlite3_stmt *res = NULL;
     int rc = 0;
     bool ret = false;
 
-    char sql[ACLK_SYNC_QUERY_SIZE];
-    snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, SQL_SELECT_VARIABLE_ALERT_BY_UNIQUE_ID, unique_id);
-
-    rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_VARIABLE_ALERT_BY_UNIQUE_ID, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement when trying to check for alert variables.");
         return false;
     }
 
-    rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
+    rc = sqlite3_bind_int(res, 1, (int) unique_id);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host_id for checking alert variable.");
-        sqlite3_finalize(res);
-        return false;
+        goto fail;
+    }
+
+    rc = sqlite3_bind_blob(res, 2, host_id, sizeof(*host_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id for checking alert variable.");
+        goto fail;
     }
 
     rc = sqlite3_step_monitored(res);
-    if (likely(rc == SQLITE_ROW)) {
+    if (likely(rc == SQLITE_ROW))
         ret = true;
-    }
 
+fail:
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement when trying to check for alert variables, rc = %d", rc);
