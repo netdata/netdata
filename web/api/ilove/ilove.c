@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "ilove.h"
 
 static const unsigned short int ibm_plex_sans_bold_250[128][128] = {
