@@ -3,7 +3,7 @@
 
 # This image contains preinstalled dependencies
 # hadolint ignore=DL3007
-FROM netdata/builder:v1 as builder
+FROM netdata/builder:v2 as builder
 
 # One of 'nightly' or 'stable'
 ARG RELEASE_CHANNEL=nightly
@@ -59,7 +59,7 @@ RUN mkdir -p /app/usr/sbin/ \
 #####################################################################
 # This image contains preinstalled dependencies
 # hadolint ignore=DL3007
-FROM netdata/base:v1 as base
+FROM netdata/base:v2 as base
 
 LABEL org.opencontainers.image.authors="Netdatabot <bot@netdata.cloud>"
 LABEL org.opencontainers.image.url="https://netdata.cloud"
@@ -83,7 +83,7 @@ ENV DOCKER_USR netdata
 ENV NETDATA_LISTENER_PORT 19999
 EXPOSE $NETDATA_LISTENER_PORT
 
-ENV NETDATA_EXTRA_APK_PACKAGES=""
+ENV NETDATA_EXTRA_DEB_PACKAGES=""
 
 RUN mkdir -p /opt/src /var/log/netdata && \
     ln -sf /dev/stdout /var/log/netdata/access.log && \
@@ -91,8 +91,8 @@ RUN mkdir -p /opt/src /var/log/netdata && \
     ln -sf /dev/stderr /var/log/netdata/error.log && \
     ln -sf /dev/stdout /var/log/netdata/collector.log && \
     ln -sf /dev/stdout /var/log/netdata/health.log && \
-    addgroup -g ${NETDATA_GID} -S "${DOCKER_GRP}" && \
-    adduser -S -H -s /usr/sbin/nologin -u ${NETDATA_GID} -h /etc/netdata -G "${DOCKER_GRP}" "${DOCKER_USR}"
+    addgroup --gid ${NETDATA_GID} --system "${DOCKER_GRP}" && \
+    adduser --system --no-create-home --shell /usr/sbin/nologin --uid ${NETDATA_UID} --home /etc/netdata --group "${DOCKER_USR}"
 
 COPY --from=builder /app /
 
