@@ -7,8 +7,18 @@
 #include "../../aclk/aclk_alarm_api.h"
 #endif
 
-#define SQL_UPDATE_FILTERED_ALERT "UPDATE aclk_alert_%s SET filtered_alert_unique_id = %u, date_created = unixepoch() where filtered_alert_unique_id = %u"
-void update_filtered(ALARM_ENTRY *ae, uint32_t unique_id, char *uuid_str) {
+#define SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param)                                                                     \
+    ({                                                                                                                 \
+        int _param = (param);                                                                                          \
+        sqlite3_column_bytes((res), (_param)) ? strdupz((char *)sqlite3_column_text((res), (_param))) : NULL;          \
+    })
+
+
+#define SQL_UPDATE_FILTERED_ALERT                                                                                      \
+    "UPDATE aclk_alert_%s SET filtered_alert_unique_id = %u, date_created = unixepoch() where filtered_alert_unique_id = %u"
+
+static void update_filtered(ALARM_ENTRY *ae, uint32_t unique_id, char *uuid_str)
+{
     char sql[ACLK_SYNC_QUERY_SIZE];
     snprintfz(sql, ACLK_SYNC_QUERY_SIZE-1, SQL_UPDATE_FILTERED_ALERT, uuid_str, ae->unique_id, unique_id);
     sqlite3_exec_monitored(db_meta, sql, 0, 0, NULL);
@@ -564,37 +574,35 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
 
     if (sqlite3_step_monitored(res) == SQLITE_ROW) {
 
-        alarm_config.alarm = sqlite3_column_bytes(res, 0) > 0 ? strdupz((char *)sqlite3_column_text(res, 0)) : NULL;
-        alarm_config.tmpl = sqlite3_column_bytes(res, 1) > 0 ? strdupz((char *)sqlite3_column_text(res, 1)) : NULL;
-        alarm_config.on_chart = sqlite3_column_bytes(res, 2) > 0 ? strdupz((char *)sqlite3_column_text(res, 2)) : NULL;
-        alarm_config.classification = sqlite3_column_bytes(res, 3) > 0 ? strdupz((char *)sqlite3_column_text(res, 3)) : NULL;
-        alarm_config.type = sqlite3_column_bytes(res, 4) > 0 ? strdupz((char *)sqlite3_column_text(res, 4)) : NULL;
-        alarm_config.component = sqlite3_column_bytes(res, 5) > 0 ? strdupz((char *)sqlite3_column_text(res, 5)) : NULL;
-
-        alarm_config.os = sqlite3_column_bytes(res, 6) > 0 ? strdupz((char *)sqlite3_column_text(res, 6)) : NULL;
-        alarm_config.hosts = sqlite3_column_bytes(res, 7) > 0 ? strdupz((char *)sqlite3_column_text(res, 7)) : NULL;
-        alarm_config.plugin = sqlite3_column_bytes(res, 8) > 0 ? strdupz((char *)sqlite3_column_text(res, 8)) : NULL;
-        alarm_config.module = sqlite3_column_bytes(res, 9) > 0 ? strdupz((char *)sqlite3_column_text(res, 9)) : NULL;
-        alarm_config.charts = sqlite3_column_bytes(res, 10) > 0 ? strdupz((char *)sqlite3_column_text(res, 10)) : NULL;
-        alarm_config.families = sqlite3_column_bytes(res, 11) > 0 ? strdupz((char *)sqlite3_column_text(res, 11)) : NULL;
-        alarm_config.lookup = sqlite3_column_bytes(res, 12) > 0 ? strdupz((char *)sqlite3_column_text(res, 12)) : NULL;
-        alarm_config.every = sqlite3_column_bytes(res, 13) > 0 ? strdupz((char *)sqlite3_column_text(res, 13)) : NULL;
-        alarm_config.units = sqlite3_column_bytes(res, 14) > 0 ? strdupz((char *)sqlite3_column_text(res, 14)) : NULL;
-
-        alarm_config.green = sqlite3_column_bytes(res, 15) > 0 ? strdupz((char *)sqlite3_column_text(res, 15)) : NULL;
-        alarm_config.red = sqlite3_column_bytes(res, 16) > 0 ? strdupz((char *)sqlite3_column_text(res, 16)) : NULL;
-
-        alarm_config.calculation_expr = sqlite3_column_bytes(res, 17) > 0 ? strdupz((char *)sqlite3_column_text(res, 17)) : NULL;
-        alarm_config.warning_expr = sqlite3_column_bytes(res, 18) > 0 ? strdupz((char *)sqlite3_column_text(res, 18)) : NULL;
-        alarm_config.critical_expr = sqlite3_column_bytes(res, 19) > 0 ? strdupz((char *)sqlite3_column_text(res, 19)) : NULL;
-
-        alarm_config.recipient = sqlite3_column_bytes(res, 20) > 0 ? strdupz((char *)sqlite3_column_text(res, 20)) : NULL;
-        alarm_config.exec = sqlite3_column_bytes(res, 21) > 0 ? strdupz((char *)sqlite3_column_text(res, 21)) : NULL;
-        alarm_config.delay = sqlite3_column_bytes(res, 22) > 0 ? strdupz((char *)sqlite3_column_text(res, 22)) : NULL;
-        alarm_config.repeat = sqlite3_column_bytes(res, 23) > 0 ? strdupz((char *)sqlite3_column_text(res, 23)) : NULL;
-        alarm_config.info = sqlite3_column_bytes(res, 24) > 0 ? strdupz((char *)sqlite3_column_text(res, 24)) : NULL;
-        alarm_config.options = sqlite3_column_bytes(res, 25) > 0 ? strdupz((char *)sqlite3_column_text(res, 25)) : NULL;
-        alarm_config.host_labels = sqlite3_column_bytes(res, 26) > 0 ? strdupz((char *)sqlite3_column_text(res, 26)) : NULL;
+        int param = 0;
+        alarm_config.alarm = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.alarm = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.tmpl = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.on_chart = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.classification = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.type = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.component = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.os = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.hosts = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.plugin = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.module = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.charts = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.families = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.lookup = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.every = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.units = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.green = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.red = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.calculation_expr = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.warning_expr = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.critical_expr = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.recipient = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.exec = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.delay = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.repeat = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.info = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.options = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
+        alarm_config.host_labels = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);  // Current param 26
 
         alarm_config.p_db_lookup_dimensions = NULL;
         alarm_config.p_db_lookup_method = NULL;
@@ -604,8 +612,8 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
 
         if (sqlite3_column_bytes(res, 30) > 0) {
 
-            alarm_config.p_db_lookup_dimensions = sqlite3_column_bytes(res, 27) > 0 ? strdupz((char *)sqlite3_column_text(res, 27)) : NULL;
-            alarm_config.p_db_lookup_method = sqlite3_column_bytes(res, 28) > 0 ? strdupz((char *)sqlite3_column_text(res, 28)) : NULL;
+            alarm_config.p_db_lookup_dimensions = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);  // Current param 27
+            alarm_config.p_db_lookup_method = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);      // Current param 28
 
             BUFFER *tmp_buf = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
             buffer_data_options2string(tmp_buf, sqlite3_column_int(res, 29));
@@ -618,7 +626,7 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
 
         alarm_config.p_update_every = sqlite3_column_int(res, 32);
 
-        alarm_config.chart_labels = sqlite3_column_bytes(res, 33) > 0 ? strdupz((char *)sqlite3_column_text(res, 33)) : NULL;
+        alarm_config.chart_labels = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, 33);
 
         p_alarm_config.cfg_hash = strdupz((char *) config_hash);
         p_alarm_config.cfg = alarm_config;
