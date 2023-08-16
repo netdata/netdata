@@ -1183,9 +1183,11 @@ static void ebpf_hash_socket_accumulator(netdata_socket_t *values, netdata_socke
  */
 static inline void ebpf_socket_fill_fake_socket(netdata_socket_plus_t *fake_values)
 {
-    snprintfz(fake_values->socket_string.src_ip, INET6_ADDRSTRLEN, "127.0.0.1");
-    snprintfz(fake_values->socket_string.dst_ip, INET6_ADDRSTRLEN, "127.0.0.1");
+    snprintfz(fake_values->socket_string.src_ip, INET6_ADDRSTRLEN, "%s", "127.0.0.1");
+    snprintfz(fake_values->socket_string.dst_ip, INET6_ADDRSTRLEN, "%s", "127.0.0.1");
     fake_values->pid = getpid();
+    fake_values->socket_string.src_port = 0;
+    fake_values->socket_string.dst_port = 0;
     fake_values->data.family = AF_INET;
     fake_values->data.protocol = AF_UNSPEC;
 }
@@ -1204,6 +1206,9 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values)
 
     // IMPORTANT!
     // THE ORDER SHOULD BE THE SAME WITH THE FIELDS!
+
+    // PID
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->pid);
 
     // SRC IP
     buffer_json_add_array_item_string(wb, values->socket_string.src_ip);
@@ -1260,13 +1265,14 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values)
  */
 static void ebpf_socket_fill_function_buffer(BUFFER *buf)
 {
-    rw_spinlock_read_lock(&ebpf_socket_hs.index.rw_spinlock);
     Pvoid_t *PValue;
-    netdata_socket_idx_t key = {};
+    Word_t key;
     int counter = 0;
+    rw_spinlock_read_lock(&ebpf_socket_hs.index.rw_spinlock);
     bool first = true;
-    while((PValue = JudyLFirstThenNext(ebpf_socket_hs.index.JudyHSArray, (Word_t *)&key, &first))) {
-        netdata_socket_plus_t *values = (netdata_socket_plus_t *)PValue;
+
+    while((PValue = JudyLFirstThenNext(ebpf_socket_hs.index.JudyHSArray, &key, &first))) {
+        netdata_socket_plus_t *values = (netdata_socket_plus_t *)*PValue;
         ebpf_fill_function_buffer(buf, values);
         counter++;
     }
@@ -1373,24 +1379,24 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
     // values for specific processor unless it is used to store data. As result of this behavior one the next socket
     // can have values from the previous one.
     memset(values, 0, length);
-    Pvoid_t hs = ebpf_socket_hs.index.JudyHSArray;
+    PPvoid_t hs = &ebpf_socket_hs.index.JudyHSArray;
     rw_spinlock_write_lock(&ebpf_socket_hs.index.rw_spinlock);
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         test = bpf_map_lookup_elem(fd, &key, values);
         if (test < 0) {
-            key = next_key;
+            memcpy(&key, &next_key, sizeof(key));
             continue;
         }
 
         if (key.pid > (uint32_t)pid_max) {
-            key = next_key;
+            memcpy(&key, &next_key, sizeof(key));
             continue;
         }
 
         ebpf_hash_socket_accumulator(values, &key, end);
         ebpf_socket_fill_publish_apps(key.pid, values);
 
-        netdata_socket_plus_t **item_pptr = (netdata_socket_plus_t **) ebpf_socket_hashtable_insert_unsafe(&hs, &key);
+        netdata_socket_plus_t **item_pptr = (netdata_socket_plus_t **) ebpf_socket_hashtable_insert_unsafe(hs, &key);
         bool update_string = false;
         if (likely(*item_pptr == NULL)) {
             // a new item added to the index
@@ -1405,7 +1411,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
 
         memset(values, 0, length);
 
-        key = next_key;
+        memcpy(&key, &next_key, sizeof(key));
     }
     rw_spinlock_write_unlock(&ebpf_socket_hs.index.rw_spinlock);
     netdata_thread_enable_cancelability();
