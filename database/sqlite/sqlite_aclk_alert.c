@@ -584,7 +584,6 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
     if (sqlite3_step_monitored(res) == SQLITE_ROW) {
 
         int param = 0;
-        UNUSED(param);
         alarm_config.alarm = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
         alarm_config.alarm = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
         alarm_config.tmpl = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
@@ -624,6 +623,8 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
 
             alarm_config.p_db_lookup_dimensions = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);  // Current param 27
             alarm_config.p_db_lookup_method = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);      // Current param 28
+            if (param != 29)
+                netdata_log_error("aclk_push_alert_config_event: Unexpected param number %d", param);
 
             BUFFER *tmp_buf = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
             buffer_data_options2string(tmp_buf, sqlite3_column_int(res, 29));
