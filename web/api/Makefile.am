@@ -5,6 +5,7 @@ MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 SUBDIRS = \
     badges \
+    ilove \
     queries \
     exporters \
     formatters \
