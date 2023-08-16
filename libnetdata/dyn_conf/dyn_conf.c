@@ -820,9 +820,11 @@ void plugin_del_cb(const DICTIONARY_ITEM *item, void *value, void *data)
 
 void report_job_status(struct configurable_plugin *plugin, const char *module_name, const char *job_name, enum job_status status, int status_code, char *reason)
 {
+    struct job *job = NULL;
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(plugins_dict, plugin->name);
     if (item == NULL) {
         netdata_log_error("plugin %s not found", plugin->name);
+        freez(reason);
         return;
     }
     struct configurable_plugin *plug = dictionary_acquired_item_value(item);
@@ -840,7 +842,7 @@ void report_job_status(struct configurable_plugin *plugin, const char *module_na
         netdata_log_error("job %s not found", job_name);
         goto EXIT_PLUGIN;
     }
-    struct job *job = dictionary_acquired_item_value(job_item);
+    job = dictionary_acquired_item_value(job_item);
     job->status = status;
     job->state = status_code;
     if (job->reason != NULL) {
@@ -852,6 +854,8 @@ void report_job_status(struct configurable_plugin *plugin, const char *module_na
     dictionary_acquired_item_release(mod->jobs, job_item);
 
 EXIT_PLUGIN:
+    if (!job)
+        freez(reason);
     dictionary_acquired_item_release(plugins_dict, item);
 }
 
