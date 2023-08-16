@@ -219,11 +219,14 @@ static void generate_ilove_svg(BUFFER *wb, const char *love) {
     double first_line_width = i_width + logo_width;
     double second_line_font_size = font_size;
     double second_line_width = ibm_plex_sans_bold_word_width(love, second_line_font_size);
+    bool second_line_needs_height = word_goes_below_baseline(love);
 
     if(second_line_width <= first_line_width) {
         second_line_width = first_line_width;
         stretch = "spacingAndGlyphs";
-        second_line_font_size *= 1.10;
+
+        if(!second_line_needs_height)
+            second_line_font_size *= 1.10;
     }
     else if(second_line_width > first_line_width * 4) {
         second_line_width *= 0.80;
@@ -234,8 +237,6 @@ static void generate_ilove_svg(BUFFER *wb, const char *love) {
         second_line_width *= 0.93;
         stretch = "spacing";
     }
-
-    bool second_line_needs_height = word_goes_below_baseline(love);
 
     double width = second_line_width + border_width * 4.0;
 
