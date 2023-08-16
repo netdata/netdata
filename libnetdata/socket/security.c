@@ -232,8 +232,13 @@ ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num) {
 
     int bytes = SSL_read(ssl->conn, buf, (int)num);
 
-    if(unlikely(bytes < 0)) {
+    if(unlikely(bytes <= 0)) {
         int err = SSL_get_error(ssl->conn, bytes);
+        if (err == SSL_ERROR_ZERO_RETURN) {
+            ssl->ssl_errno = err;
+            return bytes;
+        }
+
         if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
             ssl->ssl_errno = err;
             errno = EWOULDBLOCK;
