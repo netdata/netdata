@@ -811,16 +811,22 @@ static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __m
     return false;
 }
 
-static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func, void *parser_ptr __maybe_unused) {
+static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func, void *parser_ptr) {
     struct inflight_function *pf = func;
+    struct parser *parser = (struct parser *)parser_ptr;
 
     internal_error(LOG_FUNCTIONS,
                    "FUNCTION '%s' result of transaction '%s' received from collector (%zu bytes, request %"PRIu64" usec, response %"PRIu64" usec)",
                    string2str(pf->function), dictionary_acquired_item_name(item),
                    buffer_strlen(pf->result_body_wb), pf->sent_ut - pf->started_ut, now_realtime_usec() - pf->sent_ut);
 
+    if (pf->payload && SERVING_PLUGINSD(parser))
+        dyn_conf_store_config(string2str(pf->function), pf->payload, parser->user.cd->configuration);
+
     pf->result_cb(pf->result_body_wb, pf->code, pf->result_cb_data);
+
     string_freez(pf->function);
+    freez(pf->payload);
 }
 
 void inflight_functions_init(PARSER *parser) {
@@ -1992,7 +1998,7 @@ void call_virtual_function_async(BUFFER *wb, RRDHOST *host, const char *name, co
         .function = string_strdupz(buffer_tostring(function_out)),
         .result_cb = callback,
         .result_cb_data = callback_data,
-        .payload = payload,
+        .payload = payload != NULL ? strdupz(payload) : NULL,
     };
     buffer_free(function_out);
 
@@ -2036,7 +2042,7 @@ dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name,
         .function = string_strdupz(name),
         .result_cb = virt_fnc_got_data_cb,
         .result_cb_data = &cond,
-        .payload = payload,
+        .payload = payload != NULL ? strdupz(payload) : NULL,
     };
 
     uuid_t uuid;

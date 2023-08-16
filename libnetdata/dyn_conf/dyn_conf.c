@@ -304,6 +304,60 @@ static int store_config(const char *module_name, const char *submodule_name, con
     return 0;
 }
 
+#ifdef NETDATA_DEV_MODE
+#define netdata_dev_fatal(...) fatal(__VA_ARGS__)
+#else
+#define netdata_dev_fatal(...) error_report(__VA_ARGS__)
+#endif
+
+#define DYNCFG_MAX_WORDS 5
+void dyn_conf_store_config(const char *function, const char *payload, struct configurable_plugin *plugin) {
+    dyncfg_config_t config = {
+        .data = (char*)payload,
+        .data_size = strlen(payload)
+    };
+
+    char *fnc = strdupz(function);
+    // split fnc to words
+    char *words[DYNCFG_MAX_WORDS];
+    size_t words_c = quoted_strings_splitter(fnc, words, DYNCFG_MAX_WORDS, isspace_map_pluginsd);
+
+    const char *fnc_name = get_word(words, words_c, 0);
+    if (fnc_name == NULL) {
+        error_report("Function name expected \"%s\"", function);
+        goto CLEANUP;
+    }
+    if (strncmp(fnc_name, FUNCTION_NAME_SET_PLUGIN_CONFIG, strlen(FUNCTION_NAME_SET_PLUGIN_CONFIG)) == 0) {
+        store_config(plugin->name, NULL, NULL, config);
+        goto CLEANUP;
+    }
+
+    if (words_c < 2) {
+        error_report("Module name expected \"%s\"", function);
+        goto CLEANUP;
+    }
+    const char *module_name = get_word(words, words_c, 1);
+    if (strncmp(fnc_name, FUNCTION_NAME_SET_MODULE_CONFIG, strlen(FUNCTION_NAME_SET_MODULE_CONFIG)) == 0) {
+        store_config(plugin->name, module_name, NULL, config);
+        goto CLEANUP;
+    }
+
+    if (words_c < 3) {
+        error_report("Job name expected \"%s\"", function);
+        goto CLEANUP;
+    }
+    const char *job_name = get_word(words, words_c, 2);
+    if (strncmp(fnc_name, FUNCTION_NAME_SET_JOB_CONFIG, strlen(FUNCTION_NAME_SET_JOB_CONFIG)) == 0) {
+        store_config(plugin->name, module_name, job_name, config);
+        goto CLEANUP;
+    }
+
+    netdata_dev_fatal("Unknown function \"%s\"", function);
+
+CLEANUP:
+    freez(fnc);
+}
+
 dyncfg_config_t load_config(const char *plugin_name, const char *module_name, const char *job_id)
 {
     BUFFER *filename = buffer_create(DYN_CONF_PATH_MAX, NULL);
@@ -338,10 +392,6 @@ char *set_plugin_config(struct configurable_plugin *plugin, dyncfg_config_t cfg)
         return "plugin rejected config";
     }
 
-    if (store_config(plugin->name, NULL, NULL, cfg)) {
-        error_report("DYNCFG could not store config for module \"%s\"", plugin->name);
-        return "could not store config on disk";
-    }
     return NULL;
 }
 
@@ -353,11 +403,6 @@ static char *set_module_config(struct module *mod, dyncfg_config_t cfg)
     if (rc != SET_CONFIG_ACCEPTED) {
         error_report("DYNCFG module \"%s\" rejected config", plugin->name);
         return "module rejected config";
-    }
-
-    if (store_config(plugin->name, mod->name, NULL, cfg)) {
-        error_report("DYNCFG could not store config for module \"%s\"", mod->name);
-        return "could not store config on disk";
     }
 
     return NULL;
@@ -378,11 +423,6 @@ static int set_job_config(struct job *job, dyncfg_config_t cfg)
 
     if (rt != SET_CONFIG_ACCEPTED) {
         error_report("DYNCFG module \"%s\" rejected config for job \"%s\"", mod->name, job->name);
-        return 1;
-    }
-
-    if (store_config(mod->plugin->name, mod->name, job->name, cfg)) {
-        error_report("DYNCFG could not store config for module \"%s\"", mod->name);
         return 1;
     }
 

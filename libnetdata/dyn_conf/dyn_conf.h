@@ -179,6 +179,8 @@ int register_job(DICTIONARY *plugins_dict, const char *plugin_name, const char *
 
 void report_job_status(DICTIONARY *plugins_dict, const char *plugin_name, const char *module_name, const char *job_name, enum job_status status, int status_code, char *reason);
 
+void dyn_conf_store_config(const char *function, const char *payload, struct configurable_plugin *plugin);
+
 // API to be used by the web server(s)
 json_object *get_list_of_plugins_json(DICTIONARY *plugins_dict);
 struct configurable_plugin *get_plugin_by_name(DICTIONARY *plugins_dict, const char *name);
