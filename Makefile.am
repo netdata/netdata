@@ -598,6 +598,8 @@ API_PLUGIN_FILES = \
     web/api/exporters/allmetrics.h \
     web/api/exporters/shell/allmetrics_shell.c \
     web/api/exporters/shell/allmetrics_shell.h \
+    web/api/ilove/ilove.c \
+    web/api/ilove/ilove.h \
     web/api/queries/average/average.c \
     web/api/queries/average/average.h \
     web/api/queries/countif/countif.c \

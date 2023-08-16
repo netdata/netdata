@@ -752,6 +752,8 @@ static struct web_api_command api_commands_v2[] = {
 
         {"config", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_config, 1},
 
+        { "ilove.svg",       0, WEB_CLIENT_ACL_NOCHECK, web_client_api_request_v2_ilove, 0 },
+
         // terminator
         {NULL,                  0, WEB_CLIENT_ACL_NONE,                 NULL, 0},
 };
