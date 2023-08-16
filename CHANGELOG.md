@@ -6,12 +6,16 @@
 
 **Merged pull requests:**
 
+- systemd-journal fixes [\#15814](https://github.com/netdata/netdata/pull/15814) ([ktsaou](https://github.com/ktsaou))
+- fix packaging: link health.log to stdout [\#15813](https://github.com/netdata/netdata/pull/15813) ([ilyam8](https://github.com/ilyam8))
+- docs rename alarm to alert [\#15812](https://github.com/netdata/netdata/pull/15812) ([ilyam8](https://github.com/ilyam8))
 - bump ui to v6.28.0 [\#15810](https://github.com/netdata/netdata/pull/15810) ([ilyam8](https://github.com/ilyam8))
 - return 412 instead of 403 when a bearer token is required [\#15808](https://github.com/netdata/netdata/pull/15808) ([ktsaou](https://github.com/ktsaou))
 - fix api v1 mgmt/health [\#15806](https://github.com/netdata/netdata/pull/15806) ([underhood](https://github.com/underhood))
 - Fix systemd journal build deps in DEB packages. [\#15805](https://github.com/netdata/netdata/pull/15805) ([Ferroin](https://github.com/Ferroin))
 - Clean up python deps for RPM packages. [\#15804](https://github.com/netdata/netdata/pull/15804) ([Ferroin](https://github.com/Ferroin))
 - Add proper SUID fallback for DEB plugin packages. [\#15803](https://github.com/netdata/netdata/pull/15803) ([Ferroin](https://github.com/Ferroin))
+- nfacct.plugin increase restart time from 4 hours to 1 day [\#15801](https://github.com/netdata/netdata/pull/15801) ([ilyam8](https://github.com/ilyam8))
 - Function systemd-journal: always have a nd\_journal\_process [\#15798](https://github.com/netdata/netdata/pull/15798) ([ktsaou](https://github.com/ktsaou))
 - prevent reporting negative retention when the db is empty [\#15796](https://github.com/netdata/netdata/pull/15796) ([ktsaou](https://github.com/ktsaou))
 - Fix typo in Readme [\#15794](https://github.com/netdata/netdata/pull/15794) ([shyamvalsan](https://github.com/shyamvalsan))
@@ -23,6 +27,7 @@
 - mark integrations milestones as completed in README.md [\#15783](https://github.com/netdata/netdata/pull/15783) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update an oversight on the openSUSE 15.5 packages [\#15781](https://github.com/netdata/netdata/pull/15781) ([tkatsoulas](https://github.com/tkatsoulas))
 - Bump openssl version of static builds to 1.1.1v [\#15779](https://github.com/netdata/netdata/pull/15779) ([tkatsoulas](https://github.com/tkatsoulas))
+- fix: the cleanup was not performed during the kickstart.sh dry run [\#15775](https://github.com/netdata/netdata/pull/15775) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.42.0](https://github.com/netdata/netdata/tree/v1.42.0) (2023-08-09)
 
@@ -420,11 +425,6 @@
 - Fix $\(libh2o\_dir\) not expanded properly sometimes. [\#15253](https://github.com/netdata/netdata/pull/15253) ([Dim-P](https://github.com/Dim-P))
 - use gperf for the pluginsd/streaming parser hashtable [\#15251](https://github.com/netdata/netdata/pull/15251) ([ktsaou](https://github.com/ktsaou))
 - Update pfsense.md package install instructions [\#15250](https://github.com/netdata/netdata/pull/15250) ([MYanello](https://github.com/MYanello))
-- URL rewrite at the agent web server to support multiple dashboard versions [\#15247](https://github.com/netdata/netdata/pull/15247) ([ktsaou](https://github.com/ktsaou))
-- delay collecting virtual network interfaces [\#15244](https://github.com/netdata/netdata/pull/15244) ([ilyam8](https://github.com/ilyam8))
-- Assorted kickstart script improvements. [\#15243](https://github.com/netdata/netdata/pull/15243) ([Ferroin](https://github.com/Ferroin))
-- Install the correct systemd unit file on older RPM systems. [\#15240](https://github.com/netdata/netdata/pull/15240) ([Ferroin](https://github.com/Ferroin))
-- Add yaml metadata for metrics.csv files [\#15238](https://github.com/netdata/netdata/pull/15238) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
