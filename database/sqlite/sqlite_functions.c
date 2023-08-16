@@ -55,10 +55,9 @@ const char *database_config[] = {
     "info text, exec_code int, new_status real, old_status real, delay int, "
     "new_value double, old_value double, last_repeat int, transition_id blob, global_id int);",
 
-    "CREATE INDEX IF NOT EXISTS health_log_d_ind_1 ON health_log_detail (unique_id);",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_2 ON health_log_detail (global_id);",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_3 ON health_log_detail (transition_id);",
-    "CREATE INDEX IF NOT EXISTS health_log_d_ind_4 ON health_log_detail (health_log_id);",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_5 ON health_log_detail (health_log_id, unique_id DESC);",
 
     NULL
 };
@@ -74,6 +73,8 @@ const char *database_cleanup[] = {
     "DROP INDEX IF EXISTS ind_c1;",
     "DROP INDEX IF EXISTS ind_c2;",
     "DROP INDEX IF EXISTS alert_hash_index;",
+    "DROP INDEX IF EXISTS health_log_d_ind_4;",
+    "DROP INDEX IF EXISTS health_log_d_ind_1;",
     NULL
 };
 
