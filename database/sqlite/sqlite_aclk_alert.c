@@ -850,7 +850,7 @@ static int have_recent_alarm(RRDHOST *host, uint32_t alarm_id, uint32_t mark)
 }
 #endif
 
-#define ALARM_EVENTS_PER_CHUNK 10
+#define ALARM_EVENTS_PER_CHUNK 1000
 void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
 {
 #ifdef ENABLE_ACLK
