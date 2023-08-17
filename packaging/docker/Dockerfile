@@ -111,17 +111,16 @@ RUN chown -R root:root \
     chown -R netdata:netdata /var/lib/netdata/cloud.d && \
     chmod 0700 /var/lib/netdata/cloud.d && \
     chmod 0755 /usr/libexec/netdata/plugins.d/*.plugin && \
-    chmod 4755 \
-        /usr/libexec/netdata/plugins.d/cgroup-network \
-        /usr/libexec/netdata/plugins.d/local-listeners \
-        /usr/libexec/netdata/plugins.d/apps.plugin \
-        /usr/libexec/netdata/plugins.d/debugfs.plugin && \
-    if [ -f /usr/libexec/netdata/plugins.d/freeipmi.plugin ]; then \
-        chmod 4755 /usr/libexec/netdata/plugins.d/freeipmi.plugin; \
-    fi && \
-    if [ -f /usr/libexec/netdata/plugins.d/go.d.plugin ]; then \
-        chmod 4755 /usr/libexec/netdata/plugins.d/go.d.plugin; \
-    fi && \
+    for name in cgroup-network \
+                local-listeners \
+                apps.plugin \
+                debugfs.plugin \
+                freeipmi.plugin \
+                go.d.plugin \
+                perf.plugin \
+                slabinfo.plugin; do \
+        [ -f "/usr/libexec/netdata/plugins.d/$name" ] && chmod 4755 "/usr/libexec/netdata/plugins.d/$name"; \
+    done && \
     # Group write permissions due to: https://github.com/netdata/netdata/pull/6543
     find /var/lib/netdata /var/cache/netdata -type d -exec chmod 0770 {} \; && \
     find /var/lib/netdata /var/cache/netdata -type f -exec chmod 0660 {} \; && \
