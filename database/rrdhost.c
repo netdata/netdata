@@ -331,6 +331,9 @@ int is_legacy = 1;
     host->rrd_history_entries        = align_entries_to_pagesize(memory_mode, entries);
     host->health.health_enabled      = ((memory_mode == RRD_MEMORY_MODE_NONE)) ? 0 : health_enabled;
 
+    netdata_mutex_init(&host->aclk_state_lock);
+    netdata_mutex_init(&host->receiver_lock);
+
     if (likely(!archived)) {
         rrdfunctions_init(host);
         host->rrdlabels = rrdlabels_create();
@@ -360,9 +363,6 @@ int is_legacy = 1;
         case RRD_MEMORY_MODE_DBENGINE:
             break;
     }
-
-    netdata_mutex_init(&host->aclk_state_lock);
-    netdata_mutex_init(&host->receiver_lock);
 
     host->system_info = system_info;
 
