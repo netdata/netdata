@@ -1725,6 +1725,9 @@ void ml_stop_threads()
     Cfg.detection_stop = true;
     Cfg.training_stop = true;
 
+    if (!Cfg.detection_thread)
+        return;
+
     netdata_thread_cancel(Cfg.detection_thread);
     netdata_thread_join(Cfg.detection_thread, NULL);
 
