@@ -118,7 +118,8 @@ RUN chown -R root:root \
                 freeipmi.plugin \
                 go.d.plugin \
                 perf.plugin \
-                slabinfo.plugin; do \
+                slabinfo.plugin \
+                systemd-journal.plugin; do \
         [ -f "/usr/libexec/netdata/plugins.d/$name" ] && chmod 4755 "/usr/libexec/netdata/plugins.d/$name"; \
     done && \
     # Group write permissions due to: https://github.com/netdata/netdata/pull/6543
