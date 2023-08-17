@@ -10,6 +10,8 @@ HEREDOC
         @parent = $config[:http_endpoints][:parent]
         @child  = $config[:http_endpoints][:child]
         @plugin = $config[:global][:test_plugin_name]
+        @arry_mod = $config[:global][:test_array_module_name]
+        @test_job = $config[:global][:test_job_name]
     end
     def check_test_plugin_modules_list(host, child = nil)
         rc = DynCfgHttpClient.get_plugin_module_list(host, @plugin, child)
@@ -70,6 +72,39 @@ HEREDOC
 
         TEST("child/plugin_module_list", "Get child (hops:0) plugin module list directly and check its contents")
         check_test_plugin_modules_list(@child, nil)
+        PASS()
+
+        TEST("parent/child/module/jobs", "Get list of jobs from child (hops:1) trough parent and check its contents, check job updates")
+        rc = DynCfgHttpClient.get_job_list(@parent, @plugin, @arry_mod, @child)
+        assert_eq(rc.code, 200, "as HTTP code for get_jobs request")
+        jobs = nil
+        assert_nothing_raised do
+            jobs = JSON.parse(rc.parsed_response, symbolize_names: true)
+        end
+        assert_has_key?(jobs, :jobs)
+        new_job = jobs[:jobs].find {|i| i[:name] == @test_job}
+        assert_not_nil(new_job)
+        assert_has_key?(new_job, :status)
+        asser_not_eq_str(new_job[:status], "unknown", "job status is other than unknown")
+        assert_has_key?(new_job, :flags)
+        assert_array_include?(new_job[:flags], "JOB_FLG_STREAMING_PUSHED")
+        PASS()
+
+        TEST("child/module/jobs", "Get list of jobs direct from child (hops:0) and check its contents, check job updates")
+        rc = DynCfgHttpClient.get_job_list(@child, @plugin, @arry_mod, nil)
+        assert_eq(rc.code, 200, "as HTTP code for get_jobs request")
+        jobs = nil
+        assert_nothing_raised do
+            jobs = JSON.parse(rc.parsed_response, symbolize_names: true)
+        end
+        assert_has_key?(jobs, :jobs)
+        new_job = jobs[:jobs].find {|i| i[:name] == @test_job}
+        assert_not_nil(new_job)
+        assert_has_key?(new_job, :status)
+        asser_not_eq_str(new_job[:status], "unknown", "job status is other than unknown")
+        assert_has_key?(new_job, :flags)
+
+        assert_array_not_include?(new_job[:flags], "JOB_FLG_STREAMING_PUSHED") # this is plugin directly at child so it should not show this flag
         PASS()
     end
 end

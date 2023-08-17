@@ -112,6 +112,12 @@ def asser_eq_str(got, expected, msg = nil)
     end
     $test_runner.add_assertion()
 end
+def asser_not_eq_str(got, expected, msg = nil)
+    unless got != expected
+        FAIL("Strings shoud not match #{msg ? "(#{msg})" : ""}", nil, caller_locations(1, 1).first)
+    end
+    $test_runner.add_assertion()
+end
 def assert_nothing_raised()
     begin
         yield
@@ -132,9 +138,21 @@ def assert_array_include?(array, value)
     end
     $test_runner.add_assertion()
 end
+def assert_array_not_include?(array, value)
+    if array.include?(value)
+        FAIL("Expected array to not include \"#{value}\"", nil, caller_locations(1, 1).first)
+    end
+    $test_runner.add_assertion()
+end
 def assert_is_one_of(value, *values)
     unless values.include?(value)
         FAIL("Expected value to be one of #{values.join(", ")}", nil, caller_locations(1, 1).first)
+    end
+    $test_runner.add_assertion()
+end
+def assert_not_nil(value)
+    if value == nil
+        FAIL("Expected value to not be nil", nil, caller_locations(1, 1).first)
     end
     $test_runner.add_assertion()
 end
@@ -150,16 +168,15 @@ class DynCfgHttpClient
     def self.get_url_cfg_base(host, child = nil)
         url = url_base(host)
         url += "/host/#{child[:mguid]}" if child
-        url += "/api/v2/config/"
+        url += "/api/v2/config"
         return url
     end
     def self.get_url_cfg_plugin(host, plugin, child = nil)
-        url = url_base(host)
-        url += "/host/#{child[:mguid]}" if child
-        url += "/api/v2/config/#{plugin}"
-        return url
+        return get_url_cfg_base(host, child) + '/' + plugin
     end
-
+    def self.get_url_cfg_module(host, plugin, mod, child = nil)
+        return get_url_cfg_plugin(host, plugin, child) + '/' + mod
+    end
     def self.get_plugin_list(host, child = nil)
         begin
             return HTTParty.get(get_url_cfg_base(host, child), verify: false, format: :plain)
@@ -184,6 +201,13 @@ class DynCfgHttpClient
     def self.get_plugin_module_list(host, plugin, child = nil)
         begin
             return HTTParty.get(get_url_cfg_plugin(host, plugin, child) + "/modules", verify: false, format: :plain)
+        rescue => e
+            FAIL(e.message, e)
+        end
+    end
+    def self.get_job_list(host, plugin, mod, child = nil)
+        begin
+            return HTTParty.get(get_url_cfg_module(host, plugin, mod, child) + "/jobs", verify: false, format: :plain)
         rescue => e
             FAIL(e.message, e)
         end
