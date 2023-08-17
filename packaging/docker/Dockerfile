@@ -96,10 +96,12 @@ RUN mkdir -p /opt/src /var/log/netdata && \
 
 COPY --from=builder /app /
 
-# Apply the permissions as described in
+# Add netdata user and apply the permissions as described in
 # https://docs.netdata.cloud/docs/netdata-security/#netdata-directories, but own everything by root group due to https://github.com/netdata/netdata/pull/6543
 # hadolint ignore=DL3013
-RUN chown -R root:root \
+RUN addgroup --gid ${NETDATA_GID} --system "${DOCKER_GRP}" && \
+    adduser --system --no-create-home --shell /usr/sbin/nologin --uid ${NETDATA_UID} --home /etc/netdata --group "${DOCKER_USR}" && \
+    chown -R root:root \
         /etc/netdata \
         /usr/share/netdata \
         /usr/libexec/netdata && \
