@@ -1217,6 +1217,7 @@ void ml_host_new(RRDHOST *rh)
     host->rh = rh;
     host->mls = ml_machine_learning_stats_t();
     host->host_anomaly_rate = 0.0;
+    host->anomaly_rate_rs = NULL;
 
     static std::atomic<size_t> times_called(0);
     host->training_queue = Cfg.training_threads[times_called++ % Cfg.num_training_threads].training_queue;
