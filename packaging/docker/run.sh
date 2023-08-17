@@ -43,7 +43,7 @@ if [ -n "${PGID}" ]; then
   echo "Creating docker group ${PGID}"
   addgroup --gid "${PGID}" "docker" || echo >&2 "Could not add group docker with ID ${PGID}, its already there probably"
   echo "Assign netdata user to docker group ${PGID}"
-  usermod --append --gid "${PGID}" "${DOCKER_USR}" || echo >&2 "Could not add netdata user to group docker with ID ${PGID}"
+  usermod --append --groups "docker" "${DOCKER_USR}" || echo >&2 "Could not add netdata user to group docker with ID ${PGID}"
 fi
 
 # Needed to read Proxmox VMs and (LXC) containers configuration files (name resolution + CPU and memory limits)
