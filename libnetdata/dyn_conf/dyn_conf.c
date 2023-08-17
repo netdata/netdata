@@ -176,11 +176,15 @@ json_object *job2json(struct job *job) {
     json_object *json_item = json_object_new_string(job->name);
     json_object_object_add(json_job, "name", json_item);
 
-    json_item = json_object_new_string(job_status2str(job->status));
-    json_object_object_add(json_job, "state", json_item);
-
     json_item = json_object_new_string(job_type2str(job->type));
     json_object_object_add(json_job, "type", json_item);
+
+    netdata_mutex_lock(&job->lock);
+    json_item = json_object_new_string(job_status2str(job->status));
+    json_object_object_add(json_job, "status", json_item);
+
+    json_item = json_object_new_int(job->state);
+    json_object_object_add(json_job, "state", json_item);
 
     int64_t last_state_update_s  = job->last_state_update / USEC_PER_SEC;
     int64_t last_state_update_us = job->last_state_update % USEC_PER_SEC;
@@ -194,6 +198,8 @@ json_object *job2json(struct job *job) {
     json_item = json_object_new_array();
     job_flags_wallktrough(job->flags, _job_flags2str_cb, json_item);
     json_object_object_add(json_job, "flags", json_item);
+
+    netdata_mutex_unlock(&job->lock);
 
     return json_job;
 }
@@ -413,6 +419,7 @@ struct job *job_new()
     struct job *job = callocz(1, sizeof(struct job));
     job->state = JOB_STATUS_UNKNOWN;
     job->last_state_update = now_realtime_usec();
+    netdata_mutex_init(&job->lock);
     return job;
 }
 
@@ -498,6 +505,7 @@ void job_del_cb(const DICTIONARY_ITEM *item, void *value, void *data)
     UNUSED(item);
     UNUSED(data);
     struct job *job = (struct job *)value;
+    netdata_mutex_destroy(&job->lock);
     freez(job->reason);
     freez(job->name);
     freez(job);
@@ -930,45 +938,53 @@ void plugin_del_cb(const DICTIONARY_ITEM *item, void *value, void *data)
     freez(plugin);
 }
 
-void report_job_status(DICTIONARY *plugins_dict, const char *plugin_name, const char *module_name, const char *job_name, enum job_status status, int status_code, char *reason)
+// on failure - return NULL - all unlocked, nothing acquired
+// on success - return pointer to job item - keep job and plugin acquired and locked!!!
+//              for caller convenience (to prevent another lock and races)
+//              caller is responsible to unlock the job and release it when not needed anymore
+//              this also avoids dependency creep
+const DICTIONARY_ITEM *report_job_status_acq_lock(DICTIONARY *plugins_dict, const DICTIONARY_ITEM **plugin_acq_item, DICTIONARY **job_dict, const char *plugin_name, const char *module_name, const char *job_name, enum job_status status, int status_code, char *reason)
 {
-    struct job *job = NULL;
-    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(plugins_dict, plugin_name);
-    if (item == NULL) {
+    *plugin_acq_item = dictionary_get_and_acquire_item(plugins_dict, plugin_name);
+    if (*plugin_acq_item == NULL) {
         netdata_log_error("plugin %s not found", plugin_name);
-        freez(reason);
-        return;
+        return NULL;
     }
-    struct configurable_plugin *plug = dictionary_acquired_item_value(item);
+
+    struct configurable_plugin *plug = dictionary_acquired_item_value(*plugin_acq_item);
     struct module *mod = get_module_by_name(plug, module_name);
     if (mod == NULL) {
         netdata_log_error("module %s not found", module_name);
-        goto EXIT_PLUGIN;
+        dictionary_acquired_item_release(plugins_dict, *plugin_acq_item);
+        return NULL;
     }
     if (mod->type != MOD_TYPE_ARRAY) {
         netdata_log_error("module %s is not array", module_name);
-        goto EXIT_PLUGIN;
+        dictionary_acquired_item_release(plugins_dict, *plugin_acq_item);
+        return NULL;
     }
+    *job_dict = mod->jobs;
     const DICTIONARY_ITEM *job_item = dictionary_get_and_acquire_item(mod->jobs, job_name);
     if (job_item == NULL) {
         netdata_log_error("job %s not found", job_name);
-        goto EXIT_PLUGIN;
+        dictionary_acquired_item_release(plugins_dict, *plugin_acq_item);
+        return NULL;
     }
-    job = dictionary_acquired_item_value(job_item);
+    struct job *job = dictionary_acquired_item_value(job_item);
+
+    pthread_mutex_lock(&job->lock);
     job->status = status;
     job->state = status_code;
     if (job->reason != NULL) {
         freez(job->reason);
     }
-    job->reason = reason;
+    job->reason = reason != NULL ? strdupz(reason) : NULL; // reason is optional
     job->last_state_update = now_realtime_usec();
 
-    dictionary_acquired_item_release(mod->jobs, job_item);
+    job->dirty = true;
 
-EXIT_PLUGIN:
-    if (!job)
-        freez(reason);
-    dictionary_acquired_item_release(plugins_dict, item);
+    // no unlock and acquired_item_release on success on purpose
+    return job_item;
 }
 
 int dyn_conf_init(void)

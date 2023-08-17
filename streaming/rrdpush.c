@@ -465,6 +465,27 @@ void rrdset_push_metrics_finished(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
     *rsb = (RRDSET_STREAM_BUFFER){ .wb = NULL, };
 }
 
+// assumes job is locked and acquired!!!
+void rrdpush_send_job_status_update(RRDHOST *host, const char *plugin_name, const char *module_name, struct job *job) {
+    if(unlikely(!rrdhost_can_send_definitions_to_parent(host)))
+        return;
+
+/* TODO    if(!stream_has_capability(host->sender, STREAM_CAP_DYNCFG))
+        return;*/
+
+    BUFFER *wb = sender_start(host->sender);
+
+    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPORT_JOB_STATUS " %s %s %s %s %d\n", plugin_name, module_name, job->name, job_status2str(job->status), job->state);
+    if (job->reason)
+        buffer_sprintf(wb, " \"%s\"", job->reason);
+
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+
+    sender_thread_buffer_free();
+
+    job->dirty = 0;
+}
+
 RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock_time) {
     RRDHOST *host = st->rrdhost;
 
@@ -579,7 +600,14 @@ void rrdpush_send_dyncfg(RRDHOST *host) {
             buffer_sprintf(wb, PLUGINSD_KEYWORD_DYNCFG_REGISTER_MODULE " %s %s %s\n", plug->name, mod->name, module_type2str(mod->type));
             struct job *job;
             dfe_start_read(mod->jobs, job) {
+                pthread_mutex_lock(&job->lock);
                 buffer_sprintf(wb, PLUGINSD_KEYWORD_DYNCFG_REGISTER_JOB " %s %s %s %s %"PRIu32"\n", plug->name, mod->name, job->name, job_type2str(job->type), job->flags);
+                buffer_sprintf(wb, PLUGINSD_KEYWORD_REPORT_JOB_STATUS " %s %s %s %s %d", plug->name, mod->name, job->name, job_status2str(job->status), job->state);
+                if (job->reason)
+                    buffer_sprintf(wb, " \"%s\"", job->reason);
+                buffer_sprintf(wb, "\n");
+                job->dirty = 0;
+                pthread_mutex_unlock(&job->lock);
             } dfe_done(job);
         } dfe_done(mod);
     }

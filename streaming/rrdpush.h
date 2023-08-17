@@ -775,4 +775,6 @@ typedef struct rrdhost_status {
 void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s);
 bool rrdhost_state_cloud_emulation(RRDHOST *host);
 
+void rrdpush_send_job_status_update(RRDHOST *host, const char *plugin_name, const char *module_name, struct job *job);
+
 #endif //NETDATA_RRDPUSH_H

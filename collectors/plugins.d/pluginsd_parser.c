@@ -2403,9 +2403,21 @@ static inline PARSER_RC pluginsd_job_status_common(char **words, size_t num_word
 
     char *message = NULL;
     if (num_words == 5)
-        message = strdupz(words[4]);
+        message = words[4];
 
-    report_job_status(parser->user.host->configurable_plugins, plugin_name, words[0], words[1], status, state, message);
+    const DICTIONARY_ITEM *plugin_item;
+    DICTIONARY *job_dict;
+    const DICTIONARY_ITEM *job_item = report_job_status_acq_lock(parser->user.host->configurable_plugins, &plugin_item, &job_dict, plugin_name, words[0], words[1], status, state, message);
+
+    if (job_item != NULL) {
+        struct job *job = dictionary_acquired_item_value(job_item);
+        rrdpush_send_job_status_update(parser->user.host, plugin_name, words[0], job);
+
+        pthread_mutex_unlock(&job->lock);
+        dictionary_acquired_item_release(job_dict, job_item);
+        dictionary_acquired_item_release(parser->user.host->configurable_plugins, plugin_item);
+    }
+
     return PARSER_RC_OK;
 }
 

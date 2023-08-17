@@ -70,6 +70,8 @@ static inline enum job_status str2job_state(const char *state_name) {
     return JOB_STATUS_UNKNOWN;
 }
 
+const char *job_status2str(enum job_status status);
+
 enum set_config_result {
     SET_CONFIG_ACCEPTED = 0,
     SET_CONFIG_REJECTED,
@@ -121,18 +123,22 @@ static inline enum job_type str2job_type(const char *type_name)
 struct job
 {
     char *name;
+    enum job_type type;
+    struct module *module;
+
+    pthread_mutex_t lock;
+    // lock protexts only fields below (which are modified during job existence)
+    // others are static during lifetime of job
+
+    int dirty; // this relates to rrdpush, true if parent has different data than us
 
     // state reported by plugin
+    usec_t last_state_update;
     enum job_status status; // reported by plugin, enum as this has to be interpreted by UI
     int state; // code reported by plugin which can mean anything plugin wants
     char *reason; // reported by plugin, can be NULL (optional)
 
-    usec_t last_state_update;
-
     dyncfg_job_flg_t flags;
-    enum job_type type;
-
-    struct module *module;
 };
 
 struct module
@@ -177,7 +183,7 @@ void unregister_plugin(DICTIONARY *plugins_dict, const DICTIONARY_ITEM *plugin);
 int register_module(DICTIONARY *plugins_dict, struct configurable_plugin *plugin, struct module *module, bool localhost);
 int register_job(DICTIONARY *plugins_dict, const char *plugin_name, const char *module_name, const char *job_name, enum job_type job_type, dyncfg_job_flg_t flags);
 
-void report_job_status(DICTIONARY *plugins_dict, const char *plugin_name, const char *module_name, const char *job_name, enum job_status status, int status_code, char *reason);
+const DICTIONARY_ITEM *report_job_status_acq_lock(DICTIONARY *plugins_dict, const DICTIONARY_ITEM **plugin_acq_item, DICTIONARY **job_dict, const char *plugin_name, const char *module_name, const char *job_name, enum job_status status, int status_code, char *reason);
 
 void dyn_conf_store_config(const char *function, const char *payload, struct configurable_plugin *plugin);
 
