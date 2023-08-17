@@ -540,9 +540,9 @@ int register_module(DICTIONARY *plugins_dict, struct configurable_plugin *plugin
                         continue;
                     ent->d_name[len - strlen(DYN_CONF_CFG_EXT)] = '\0';
 
-                    struct job *job = add_job(module, ent->d_name, NULL, JOB_TYPE_USER, JOB_FLG_PS_LOADED);
+                    add_job(module, ent->d_name, NULL, JOB_TYPE_USER, JOB_FLG_PS_LOADED);
 
-                    deferred_config_push_back(plugins_dict, plugin->name, module->name, job->name);
+                    deferred_config_push_back(plugins_dict, plugin->name, module->name, ent->d_name);
                 }
                 closedir(dir);
             }
