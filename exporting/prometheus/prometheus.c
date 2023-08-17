@@ -354,8 +354,7 @@ static int check_existing_label(BUFFER *b, const char *name, int keepExistingLab
         b->len -= matchEnd - match;
     } else if (unlikely(match == b->buffer)) {
         // Match is the only label in the buffer, set length to 0.
-        match[0] = '\0';
-        b->len = 0;
+        buffer_reset(b);
     } else {
         // Matched label is the last label, just reduce the length.
         if (likely(*(match - 1) == ',')) {
