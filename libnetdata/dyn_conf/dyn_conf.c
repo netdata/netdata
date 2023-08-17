@@ -186,6 +186,9 @@ json_object *job2json(struct job *job) {
     json_item = json_object_new_int(job->state);
     json_object_object_add(json_job, "state", json_item);
 
+    json_item = job->reason == NULL ? NULL : json_object_new_string(job->reason);
+    json_object_object_add(json_job, "reason", json_item);
+
     int64_t last_state_update_s  = job->last_state_update / USEC_PER_SEC;
     int64_t last_state_update_us = job->last_state_update % USEC_PER_SEC;
 
