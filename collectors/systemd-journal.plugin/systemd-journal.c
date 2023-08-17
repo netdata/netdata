@@ -11,12 +11,6 @@
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
-#ifndef SD_JOURNAL_ALL_NAMESPACES
-#define JOURNAL_NAMESPACE SD_JOURNAL_LOCAL_ONLY
-#else
-#define JOURNAL_NAMESPACE SD_JOURNAL_ALL_NAMESPACES
-#endif
-
 #include <systemd/sd-journal.h>
 #include <syslog.h>
 
@@ -65,15 +59,21 @@ static bool plugin_should_exit = false;
 DICTIONARY *uids = NULL;
 DICTIONARY *gids = NULL;
 
-
 // ----------------------------------------------------------------------------
 
 int systemd_journal_query(BUFFER *wb, FACETS *facets, usec_t after_ut, usec_t before_ut, usec_t stop_monotonic_ut) {
-    sd_journal *j;
+    sd_journal *j = NULL;
     int r;
 
-    // Open the system journal for reading
-    r = sd_journal_open(&j, JOURNAL_NAMESPACE);
+    if(*netdata_configured_host_prefix) {
+        // Give our host prefix to systemd journal
+        r = sd_journal_open_directory(&j, netdata_configured_host_prefix, SD_JOURNAL_OS_ROOT);
+    }
+    else {
+        // Open the system journal for reading
+        r = sd_journal_open(&j, 0);
+    }
+
     if (r < 0)
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
 
@@ -542,6 +542,9 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     uids = dictionary_create(0);
     gids = dictionary_create(0);
+
+    netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
+    if(verify_netdata_host_prefix() == -1) exit(1);
 
     // ------------------------------------------------------------------------
     // debug
