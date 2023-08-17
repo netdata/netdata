@@ -66,8 +66,14 @@ int systemd_journal_query(BUFFER *wb, FACETS *facets, usec_t after_ut, usec_t be
     int r;
 
     if(*netdata_configured_host_prefix) {
+#ifdef HAVE_SD_JOURNAL_OS_ROOT
         // Give our host prefix to systemd journal
         r = sd_journal_open_directory(&j, netdata_configured_host_prefix, SD_JOURNAL_OS_ROOT);
+#else
+        char buf[FILENAME_MAX + 1];
+        snprintfz(buf, FILENAME_MAX, "%s/var/log/journal", netdata_configured_host_prefix);
+        r = sd_journal_open_directory(&j, buf, 0);
+#endif
     }
     else {
         // Open the system journal for reading
