@@ -2,15 +2,18 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.42.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.42.1...HEAD)
 
 **Merged pull requests:**
 
+- Release job message status to avoid memory leak [\#15822](https://github.com/netdata/netdata/pull/15822) ([stelfrag](https://github.com/stelfrag))
+- added /api/v2/ilove.svg endpoint [\#15815](https://github.com/netdata/netdata/pull/15815) ([ktsaou](https://github.com/ktsaou))
 - systemd-journal fixes [\#15814](https://github.com/netdata/netdata/pull/15814) ([ktsaou](https://github.com/ktsaou))
 - fix packaging: link health.log to stdout [\#15813](https://github.com/netdata/netdata/pull/15813) ([ilyam8](https://github.com/ilyam8))
 - docs rename alarm to alert [\#15812](https://github.com/netdata/netdata/pull/15812) ([ilyam8](https://github.com/ilyam8))
 - bump ui to v6.28.0 [\#15810](https://github.com/netdata/netdata/pull/15810) ([ilyam8](https://github.com/ilyam8))
 - return 412 instead of 403 when a bearer token is required [\#15808](https://github.com/netdata/netdata/pull/15808) ([ktsaou](https://github.com/ktsaou))
+- installer setuid fallback for perf and slabinfo plugins [\#15807](https://github.com/netdata/netdata/pull/15807) ([ilyam8](https://github.com/ilyam8))
 - fix api v1 mgmt/health [\#15806](https://github.com/netdata/netdata/pull/15806) ([underhood](https://github.com/underhood))
 - Fix systemd journal build deps in DEB packages. [\#15805](https://github.com/netdata/netdata/pull/15805) ([Ferroin](https://github.com/Ferroin))
 - Clean up python deps for RPM packages. [\#15804](https://github.com/netdata/netdata/pull/15804) ([Ferroin](https://github.com/Ferroin))
@@ -28,6 +31,10 @@
 - Update an oversight on the openSUSE 15.5 packages [\#15781](https://github.com/netdata/netdata/pull/15781) ([tkatsoulas](https://github.com/tkatsoulas))
 - Bump openssl version of static builds to 1.1.1v [\#15779](https://github.com/netdata/netdata/pull/15779) ([tkatsoulas](https://github.com/tkatsoulas))
 - fix: the cleanup was not performed during the kickstart.sh dry run [\#15775](https://github.com/netdata/netdata/pull/15775) ([ilyam8](https://github.com/ilyam8))
+
+## [v1.42.1](https://github.com/netdata/netdata/tree/v1.42.1) (2023-08-16)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.42.0...v1.42.1)
 
 ## [v1.42.0](https://github.com/netdata/netdata/tree/v1.42.0) (2023-08-09)
 
@@ -423,8 +430,6 @@
 - Update libbpf version [\#15258](https://github.com/netdata/netdata/pull/15258) ([thiagoftsm](https://github.com/thiagoftsm))
 - rewrite /api/v2/alerts [\#15257](https://github.com/netdata/netdata/pull/15257) ([ktsaou](https://github.com/ktsaou))
 - Fix $\(libh2o\_dir\) not expanded properly sometimes. [\#15253](https://github.com/netdata/netdata/pull/15253) ([Dim-P](https://github.com/Dim-P))
-- use gperf for the pluginsd/streaming parser hashtable [\#15251](https://github.com/netdata/netdata/pull/15251) ([ktsaou](https://github.com/ktsaou))
-- Update pfsense.md package install instructions [\#15250](https://github.com/netdata/netdata/pull/15250) ([MYanello](https://github.com/MYanello))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
