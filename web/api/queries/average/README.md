@@ -21,10 +21,10 @@ average = sum(numbers) / count(numbers)
 
 ## how to use
 
-Use it in alarms like this:
+Use it in alerts like this:
 
 ```
- alarm: my_alarm
+ alarm: my_alert
     on: my_chart
 lookup: average -1m unaligned of my_dimension
   warn: $this > 1000

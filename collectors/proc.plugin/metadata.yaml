@@ -1,0 +1,5317 @@
+plugin_name: proc.plugin
+modules:
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/stat
+      monitored_instance:
+        name: System statistics
+        link: ""
+        categories:
+          - data-collection.linux-systems.system-metrics
+        icon_filename: "linuxserver.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - cpu utilization
+        - process counts
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          CPU utilization, states and frequencies and key Linux system performance metrics.
+          
+          The `/proc/stat` file provides various types of system statistics:
+          
+          - The overall system CPU usage statistics
+          - Per CPU core statistics
+          - The total context switching of the system
+          - The total number of processes running
+          - The total CPU interrupts
+          - The total CPU softirqs
+          
+          The collector also reads:
+          
+          - `/proc/schedstat` for statistics about the process scheduler in the Linux kernel.
+          - `/sys/devices/system/cpu/[X]/thermal_throttle/core_throttle_count` to get the count of thermal throttling events for a specific CPU core on Linux systems.
+          - `/sys/devices/system/cpu/[X]/thermal_throttle/package_throttle_count` to get the count of thermal throttling events for a specific CPU package on a Linux system.
+          - `/sys/devices/system/cpu/[X]/cpufreq/scaling_cur_freq` to get the current operating frequency of a specific CPU core.
+          - `/sys/devices/system/cpu/[X]/cpufreq/stats/time_in_state` to get the amount of time the CPU has spent in each of its available frequency states.
+          - `/sys/devices/system/cpu/[X]/cpuidle/state[X]/name` to get the names of the idle states for each CPU core in a Linux system.
+          - `/sys/devices/system/cpu/[X]/cpuidle/state[X]/time` to get the total time each specific CPU core has spent in each idle state since the system was started.
+        method_description: ""
+      supported_platforms:
+        include: ["linux"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector auto-detects all metrics. No configuration is needed.
+        limits:
+          description: ""
+        performance_impact:
+          description: |
+            The collector disables cpu frequency and idle state monitoring when there are more than 128 CPU cores available.
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          section_name: "plugin:proc:/proc/stat"
+          name: "netdata.conf"
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: 10min_cpu_usage
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
+        metric: system.cpu
+        info: average CPU utilization over the last 10 minutes (excluding iowait, nice and steal)
+        os: "linux"
+      - name: 10min_cpu_iowait
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
+        metric: system.cpu
+        info: average CPU iowait time over the last 10 minutes
+        os: "linux"
+      - name: 20min_steal_cpu
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
+        metric: system.cpu
+        info: average CPU steal time over the last 20 minutes
+        os: "linux"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: system.cpu
+              description: Total CPU utilization
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: guest_nice
+                - name: guest
+                - name: steal
+                - name: softirq
+                - name: irq
+                - name: user
+                - name: system
+                - name: nice
+                - name: iowait
+                - name: idle
+            - name: system.intr
+              description: CPU Interrupts
+              unit: "interrupts/s"
+              chart_type: line
+              dimensions:
+                - name: interrupts
+            - name: system.ctxt
+              description: CPU Context Switches
+              unit: "context switches/s"
+              chart_type: line
+              dimensions:
+                - name: switches
+            - name: system.forks
+              description: Started Processes
+              unit: "processes/s"
+              chart_type: line
+              dimensions:
+                - name: started
+            - name: system.processes
+              description: System Processes
+              unit: "processes"
+              chart_type: line
+              dimensions:
+                - name: running
+                - name: blocked
+            - name: cpu.core_throttling
+              description: Core Thermal Throttling Events
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: a dimension per cpu core
+            - name: cpu.package_throttling
+              description: Package Thermal Throttling Events
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: a dimension per package
+            - name: cpu.cpufreq
+              description: Current CPU Frequency
+              unit: "MHz"
+              chart_type: line
+              dimensions:
+                - name: a dimension per cpu core
+        - name: cpu core
+          description: ""
+          labels:
+            - name: cpu
+              description: TBD
+          metrics:
+            - name: cpu.cpu
+              description: Core utilization
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: guest_nice
+                - name: guest
+                - name: steal
+                - name: softirq
+                - name: irq
+                - name: user
+                - name: system
+                - name: nice
+                - name: iowait
+                - name: idle
+            - name: cpuidle.cpu_cstate_residency_time
+              description: C-state residency time
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per c-state
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/sys/kernel/random/entropy_avail
+      monitored_instance:
+        name: Entropy
+        link: ""
+        categories:
+          - data-collection.linux-systems.system-metrics
+        icon_filename: "syslog.png"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - entropy
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Entropy, a measure of the randomness or unpredictability of data.
+          
+          In the context of cryptography, entropy is used to generate random numbers or keys that are essential for
+          secure communication and encryption. Without a good source of entropy, cryptographic protocols can become
+          vulnerable to attacks that exploit the predictability of the generated keys.
+          
+          In most operating systems, entropy is generated by collecting random events from various sources, such as
+          hardware interrupts, mouse movements, keyboard presses, and disk activity. These events are fed into a pool
+          of entropy, which is then used to generate random numbers when needed.
+          
+          The `/dev/random` device in Linux is one such source of entropy, and it provides an interface for programs
+          to access the pool of entropy. When a program requests random numbers, it reads from the `/dev/random` device,
+          which blocks until enough entropy is available to generate the requested numbers. This ensures that the
+          generated numbers are truly random and not predictable. 
+          
+          However, if the pool of entropy gets depleted, the `/dev/random` device may block indefinitely, causing
+          programs that rely on random numbers to slow down or even freeze. This is especially problematic for
+          cryptographic protocols that require a continuous stream of random numbers, such as SSL/TLS and SSH.
+          
+          To avoid this issue, some systems use a hardware random number generator (RNG) to generate high-quality
+          entropy. A hardware RNG generates random numbers by measuring physical phenomena, such as thermal noise or
+          radioactive decay. These sources of randomness are considered to be more reliable and unpredictable than
+          software-based sources.
+          
+          One such hardware RNG is the Trusted Platform Module (TPM), which is a dedicated hardware chip that is used
+          for cryptographic operations and secure boot. The TPM contains a built-in hardware RNG that generates
+          high-quality entropy, which can be used to seed the pool of entropy in the operating system.
+          
+          Alternatively, software-based solutions such as `Haveged` can be used to generate additional entropy by
+          exploiting sources of randomness in the system, such as CPU utilization and network traffic. These solutions
+          can help to mitigate the risk of entropy depletion, but they may not be as reliable as hardware-based solutions.
+        method_description: ""
+      supported_platforms:
+        include: ["linux"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: lowest_entropy
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/entropy.conf
+        metric: system.entropy
+        info: minimum number of bits of entropy available for the kernel’s random number generator
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: system.entropy
+              description: Available Entropy
+              unit: "entropy"
+              chart_type: line
+              dimensions:
+                - name: entropy
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/uptime
+      monitored_instance:
+        name: System Uptime
+        link: ""
+        categories:
+          - data-collection.linux-systems.system-metrics
+        icon_filename: "linuxserver.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - uptime
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          The amount of time the system has been up (running).
+          
+          Uptime is a critical aspect of overall system performance:
+          
+          - **Availability**: Uptime monitoring can show whether a server is consistently available or experiences frequent downtimes.
+          - **Performance Monitoring**: While server uptime alone doesn't provide detailed performance data, analyzing the duration and frequency of downtimes can help identify patterns or trends.
+          - **Proactive problem detection**: If server uptime monitoring reveals unexpected downtimes or a decreasing uptime trend, it can serve as an early warning sign of potential problems.
+          - **Root cause analysis**: When investigating server downtime, the uptime metric alone may not provide enough information to pinpoint the exact cause.
+          - **Load balancing**: Uptime data can indirectly indicate load balancing issues if certain servers have significantly lower uptimes than others.
+          - **Optimize maintenance efforts**: Servers with consistently low uptimes or frequent downtimes may require more attention.
+          - **Compliance requirements**: Server uptime data can be used to demonstrate compliance with regulatory requirements or SLAs that mandate a minimum level of server availability.
+        method_description: ""
+      supported_platforms:
+        include: ["linux"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: system.uptime
+              description: System Uptime
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: uptime
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/vmstat
+      monitored_instance:
+        name: Memory Statistics
+        link: ""
+        categories:
+          - data-collection.linux-systems.memory-metrics
+        icon_filename: "linuxserver.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - swap
+        - page faults
+        - oom
+        - numa
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Linux Virtual memory subsystem.
+          
+          Information about memory management, indicating how effectively the kernel allocates and frees
+          memory resources in response to system demands.
+          
+          Monitors page faults, which occur when a process requests a portion of its memory that isn't
+          immediately available. Monitoring these events can help diagnose inefficiencies in memory management and
+          provide insights into application behavior.
+          
+          Tracks swapping activity — a vital aspect of memory management where the kernel moves data from RAM to
+          swap space, and vice versa, based on memory demand and usage. It also monitors the utilization of zswap,
+          a compressed cache for swap pages, and provides insights into its usage and performance implications.
+          
+          In the context of virtualized environments, it tracks the ballooning mechanism which is used to balance
+          memory resources between host and guest systems.
+          
+          For systems using NUMA architecture, it provides insights into the local and remote memory accesses, which
+          can impact the performance based on the memory access times.
+
+          The collector also watches for 'Out of Memory' kills, a drastic measure taken by the system when it runs out
+          of memory resources.
+        method_description: ""
+      supported_platforms:
+        include: ["linux"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: 30min_ram_swapped_out
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/swap.conf
+        metric: mem.swapio
+        info: percentage of the system RAM swapped in the last 30 minutes
+        os: "linux freebsd"
+      - name: oom_kill
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
+        metric: mem.oom_kill
+        info: number of out of memory kills in the last 30 minutes
+        os: "linux"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: mem.swapio
+              description: Swap I/O
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out
+            - name: system.pgpgio
+              description: Memory Paged from/to disk
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out
+            - name: system.pgfaults
+              description: Memory Page Faults
+              unit: "faults/s"
+              chart_type: line
+              dimensions:
+                - name: minor
+                - name: major
+            - name: mem.balloon
+              description: Memory Ballooning Operations
+              unit: "KiB/s"
+              chart_type: line
+              dimensions:
+                - name: inflate
+                - name: deflate
+                - name: migrate
+            - name: mem.zswapio
+              description: ZSwap I/O
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out
+            - name: mem.ksm_cow
+              description: KSM Copy On Write Operations
+              unit: "KiB/s"
+              chart_type: line
+              dimensions:
+                - name: swapin
+                - name: write
+            - name: mem.thp_faults
+              description: Transparent Huge Page Fault Allocations
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: alloc
+                - name: fallback
+                - name: fallback_charge
+            - name: mem.thp_file
+              description: Transparent Huge Page File Allocations
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: alloc
+                - name: fallback
+                - name: mapped
+                - name: fallback_charge
+            - name: mem.thp_zero
+              description: Transparent Huge Zero Page Allocations
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: alloc
+                - name: failed
+            - name: mem.thp_collapse
+              description: Transparent Huge Pages Collapsed by khugepaged
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: alloc
+                - name: failed
+            - name: mem.thp_split
+              description: Transparent Huge Page Splits
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: split
+                - name: failed
+                - name: split_pmd
+                - name: split_deferred
+            - name: mem.thp_swapout
+              description: Transparent Huge Pages Swap Out
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: swapout
+                - name: fallback
+            - name: mem.thp_compact
+              description: Transparent Huge Pages Compaction
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: success
+                - name: fail
+                - name: stall
+            - name: mem.oom_kill
+              description: Out of Memory Kills
+              unit: "kills/s"
+              chart_type: line
+              dimensions:
+                - name: kills
+            - name: mem.numa
+              description: NUMA events
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: local
+                - name: foreign
+                - name: interleave
+                - name: other
+                - name: pte_updates
+                - name: huge_pte_updates
+                - name: hint_faults
+                - name: hint_faults_local
+                - name: pages_migrated
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/interrupts
+      monitored_instance:
+        name: Interrupts
+        link: ""
+        categories:
+          - data-collection.linux-systems.cpu-metrics
+        icon_filename: "linuxserver.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - interrupts
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitors `/proc/interrupts`, a file organized by CPU and then by the type of interrupt.
+          The numbers reported are the counts of the interrupts that have occurred of each type.
+
+          An interrupt is a signal to the processor emitted by hardware or software indicating an event that needs
+          immediate attention. The processor then interrupts its current activities and executes the interrupt handler
+          to deal with the event. This is part of the way a computer multitasks and handles concurrent processing.
+          
+          The types of interrupts include:
+
+          - **I/O interrupts**: These are caused by I/O devices like the keyboard, mouse, printer, etc. For example, when
+            you type something on the keyboard, an interrupt is triggered so the processor can handle the new input.
+
+          - **Timer interrupts**: These are generated at regular intervals by the system's timer circuit. It's primarily
+            used to switch the CPU among different tasks.
+
+          - **Software interrupts**: These are generated by a program requiring disk I/O operations, or other system resources.
+
+          - **Hardware interrupts**: These are caused by hardware conditions such as power failure, overheating, etc.
+          
+          Monitoring `/proc/interrupts` can be used for:
+
+          - **Performance tuning**: If an interrupt is happening very frequently, it could be a sign that a device is not
+            configured correctly, or there is a software bug causing unnecessary interrupts. This could lead to system
+            performance degradation.
+
+          - **System troubleshooting**: If you're seeing a lot of unexpected interrupts, it could be a sign of a hardware problem.
+
+          - **Understanding system behavior**: More generally, keeping an eye on what interrupts are occurring can help you
+            understand what your system is doing. It can provide insights into the system's interaction with hardware,
+            drivers, and other parts of the kernel.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: system.interrupts
+              description: System interrupts
+              unit: "interrupts/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per device
+        - name: cpu core
+          description: ""
+          labels:
+            - name: cpu
+              description: TBD
+          metrics:
+            - name: cpu.interrupts
+              description: CPU interrupts
+              unit: "interrupts/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per device
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/loadavg
+      monitored_instance:
+        name: System Load Average
+        link: ""
+        categories:
+          - data-collection.linux-systems.system-metrics
+        icon_filename: "linuxserver.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - load
+        - load average
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          The `/proc/loadavg` file provides information about the system load average.
+          
+          The load average is a measure of the amount of computational work that a system performs. It is a
+          representation of the average system load over a period of time.
+
+          This file contains three numbers representing the system load averages for the last 1, 5, and 15 minutes,
+          respectively. It also includes the currently running processes and the total number of processes.
+          
+          Monitoring the load average can be used for:
+
+          - **System performance**: If the load average is too high, it may indicate that your system is overloaded.
+            On a system with a single CPU, if the load average is 1, it means the single CPU is fully utilized. If the
+            load averages are consistently higher than the number of CPUs/cores, it may indicate that your system is
+            overloaded and tasks are waiting for CPU time.
+
+          - **Troubleshooting**: If the load average is unexpectedly high, it can be a sign of a problem. This could be
+            due to a runaway process, a software bug, or a hardware issue.
+
+          - **Capacity planning**: By monitoring the load average over time, you can understand the trends in your
+            system's workload. This can help with capacity planning and scaling decisions.
+
+          Remember that load average not only considers CPU usage, but also includes processes waiting for disk I/O.
+          Therefore, high load averages could be due to I/O contention as well as CPU contention.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: load_cpu_number
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
+        metric: system.load
+        info: number of active CPU cores in the system
+        os: "linux"
+      - name: load_average_15
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
+        metric: system.load
+        info: system fifteen-minute load average
+        os: "linux"
+      - name: load_average_5
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
+        metric: system.load
+        info: system five-minute load average
+        os: "linux"
+      - name: load_average_1
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
+        metric: system.load
+        info: system one-minute load average
+        os: "linux"
+      - name: active_processes
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/processes.conf
+        metric: system.active_processes
+        info: system process IDs (PID) space utilization
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: system.load
+              description: System Load Average
+              unit: "load"
+              chart_type: line
+              dimensions:
+                - name: load1
+                - name: load5
+                - name: load15
+            - name: system.active_processes
+              description: System Active Processes
+              unit: "processes"
+              chart_type: line
+              dimensions:
+                - name: active
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/pressure
+      monitored_instance:
+        name: Pressure Stall Information
+        link: ""
+        categories:
+          - data-collection.linux-systems.pressure-metrics
+        icon_filename: "linuxserver.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - pressure
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Introduced in Linux kernel 4.20, `/proc/pressure` provides information about system pressure stall information
+          (PSI). PSI is a feature that allows the system to track the amount of time the system is stalled due to
+          resource contention, such as CPU, memory, or I/O.
+
+          The collectors monitored 3 separate files for CPU, memory, and I/O:
+
+          - **cpu**: Tracks the amount of time tasks are stalled due to CPU contention.
+          - **memory**: Tracks the amount of time tasks are stalled due to memory contention.
+          - **io**: Tracks the amount of time tasks are stalled due to I/O contention.
+          - **irq**: Tracks the amount of time tasks are stalled due to IRQ contention.
+          
+          Each of them provides metrics for stall time over the last 10 seconds, 1 minute, 5 minutes, and 15 minutes.
+          
+          Monitoring the /proc/pressure files can provide important insights into system performance and capacity planning:
+          
+          - **Identifying resource contention**: If these metrics are consistently high, it indicates that tasks are
+            frequently being stalled due to lack of resources, which can significantly degrade system performance.
+          
+          - **Troubleshooting performance issues**: If a system is experiencing performance issues, these metrics can
+            help identify whether resource contention is the cause.
+
+          - **Capacity planning**: By monitoring these metrics over time, you can understand trends in resource
+            utilization and make informed decisions about when to add more resources to your system.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: system.cpu_some_pressure
+              description: CPU some pressure
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: some10
+                - name: some60
+                - name: some300
+            - name: system.cpu_some_pressure_stall_time
+              description: CPU some pressure stall time
+              unit: "ms"
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: system.cpu_full_pressure
+              description: CPU full pressure
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: some10
+                - name: some60
+                - name: some300
+            - name: system.cpu_full_pressure_stall_time
+              description: CPU full pressure stall time
+              unit: "ms"
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: system.memory_some_pressure
+              description: Memory some pressure
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: some10
+                - name: some60
+                - name: some300
+            - name: system.memory_some_pressure_stall_time
+              description: Memory some pressure stall time
+              unit: "ms"
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: system.memory_full_pressure
+              description: Memory full pressure
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: some10
+                - name: some60
+                - name: some300
+            - name: system.memory_full_pressure_stall_time
+              description: Memory full pressure stall time
+              unit: "ms"
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: system.io_some_pressure
+              description: I/O some pressure
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: some10
+                - name: some60
+                - name: some300
+            - name: system.io_some_pressure_stall_time
+              description: I/O some pressure stall time
+              unit: "ms"
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: system.io_full_pressure
+              description: I/O some pressure
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: some10
+                - name: some60
+                - name: some300
+            - name: system.io_full_pressure_stall_time
+              description: I/O some pressure stall time
+              unit: "ms"
+              chart_type: line
+              dimensions:
+                - name: time
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/softirqs
+      monitored_instance:
+        name: SoftIRQ statistics
+        link: ""
+        categories:
+          - data-collection.linux-systems.cpu-metrics
+        icon_filename: "linuxserver.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - softirqs
+        - interrupts
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          In the Linux kernel, handling of hardware interrupts is split into two halves: the top half and the bottom half.
+          The top half is the routine that responds immediately to an interrupt, while the bottom half is deferred to be processed later.
+          
+          Softirqs are a mechanism in the Linux kernel used to handle the bottom halves of interrupts, which can be
+          deferred and processed later in a context where it's safe to enable interrupts.
+          
+          The actual work of handling the interrupt is offloaded to a softirq and executed later when the system
+          decides it's a good time to process them. This helps to keep the system responsive by not blocking the top
+          half for too long, which could lead to missed interrupts.
+          
+          Monitoring `/proc/softirqs` is useful for:
+
+          - **Performance tuning**: A high rate of softirqs could indicate a performance issue. For instance, a high
+            rate of network softirqs (`NET_RX` and `NET_TX`) could indicate a network performance issue.
+
+          - **Troubleshooting**: If a system is behaving unexpectedly, checking the softirqs could provide clues about
+            what is going on. For example, a sudden increase in block device softirqs (BLOCK) might indicate a problem
+            with a disk.
+
+          - **Understanding system behavior**: Knowing what types of softirqs are happening can help you understand what
+            your system is doing, particularly in terms of how it's interacting with hardware and how it's handling
+            interrupts.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: system.softirqs
+              description: System softirqs
+              unit: "softirqs/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per softirq
+        - name: cpu core
+          description: ""
+          labels:
+            - name: cpu
+              description: TBD
+          metrics:
+            - name: cpu.softirqs
+              description: CPU softirqs
+              unit: "softirqs/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per softirq
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/softnet_stat
+      monitored_instance:
+        name: Softnet Statistics
+        link: ""
+        categories:
+          - data-collection.linux-systems.network-metrics
+        icon_filename: "linuxserver.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - softnet
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          `/proc/net/softnet_stat` provides statistics that relate to the handling of network packets by softirq.
+          
+          It provides information about:
+          
+          - Total number of processed packets (`processed`).
+          - Times ksoftirq ran out of quota (`dropped`).
+          - Times net_rx_action was rescheduled.
+          - Number of times processed all lists before quota.
+          - Number of times did not process all lists due to quota.
+          - Number of times net_rx_action was rescheduled for GRO (Generic Receive Offload) cells.
+          - Number of times GRO cells were processed.
+          
+          Monitoring the /proc/net/softnet_stat file can be useful for:
+          
+          - **Network performance monitoring**: By tracking the total number of processed packets and how many packets
+            were dropped, you can gain insights into your system's network performance.
+          
+          - **Troubleshooting**: If you're experiencing network-related issues, this collector can provide valuable clues.
+            For instance, a high number of dropped packets may indicate a network problem.
+          
+          - **Capacity planning**: If your system is consistently processing near its maximum capacity of network
+            packets, it might be time to consider upgrading your network infrastructure.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: 1min_netdev_backlog_exceeded
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/softnet.conf
+        metric: system.softnet_stat
+        info: average number of dropped packets in the last minute due to exceeded net.core.netdev_max_backlog
+        os: "linux"
+      - name: 1min_netdev_budget_ran_outs
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/softnet.conf
+        metric: system.softnet_stat
+        info:
+          average number of times ksoftirq ran out of sysctl net.core.netdev_budget or net.core.netdev_budget_usecs with work remaining over the last
+          minute (this can be a cause for dropped packets)
+        os: "linux"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: system.softnet_stat
+              description: System softnet_stat
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: processed
+                - name: dropped
+                - name: squeezed
+                - name: received_rps
+                - name: flow_limit_count
+        - name: cpu core
+          description: ""
+          labels: []
+          metrics:
+            - name: cpu.softnet_stat
+              description: CPU softnet_stat
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: processed
+                - name: dropped
+                - name: squeezed
+                - name: received_rps
+                - name: flow_limit_count
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/meminfo
+      monitored_instance:
+        name: Memory Usage
+        link: ""
+        categories:
+          - data-collection.linux-systems.memory-metrics
+        icon_filename: "linuxserver.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - memory
+        - ram
+        - available
+        - committed
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          `/proc/meminfo` provides detailed information about the system's current memory usage. It includes information
+          about different types of memory, RAM, Swap, ZSwap, HugePages, Transparent HugePages (THP), Kernel memory,
+          SLAB memory, memory mappings, and more.
+          
+          Monitoring /proc/meminfo can be useful for:
+
+          - **Performance Tuning**: Understanding your system's memory usage can help you make decisions about system
+            tuning and optimization. For example, if your system is frequently low on free memory, it might benefit
+            from more RAM.
+          
+          - **Troubleshooting**: If your system is experiencing problems, `/proc/meminfo` can provide clues about
+            whether memory usage is a factor. For example, if your system is slow and cached swap is high, it could
+            mean that your system is swapping out a lot of memory to disk, which can degrade performance.
+          
+          - **Capacity Planning**: By monitoring memory usage over time, you can understand trends and make informed
+            decisions about future capacity needs.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: ram_in_use
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
+        metric: system.ram
+        info: system memory utilization
+        os: "linux"
+      - name: ram_available
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
+        metric: mem.available
+        info: percentage of estimated amount of RAM available for userspace processes, without causing swapping
+        os: "linux"
+      - name: used_swap
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/swap.conf
+        metric: mem.swap
+        info: swap memory utilization
+        os: "linux freebsd"
+      - name: 1hour_memory_hw_corrupted
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/memory.conf
+        metric: mem.hwcorrupt
+        info: amount of memory corrupted due to a hardware failure
+        os: "linux"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: system.ram
+              description: System RAM
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used
+                - name: cached
+                - name: buffers
+            - name: mem.available
+              description: Available RAM for applications
+              unit: "MiB"
+              chart_type: area
+              dimensions:
+                - name: avail
+            - name: mem.swap
+              description: System Swap
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used
+            - name: mem.swap_cached
+              description: Swap Memory Cached in RAM
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: cached
+            - name: mem.zswap
+              description: Zswap Usage
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: in-ram
+                - name: on-disk
+            - name: mem.hwcorrupt
+              description: Corrupted Memory detected by ECC
+              unit: "MiB"
+              chart_type: line
+              dimensions:
+                - name: HardwareCorrupted
+            - name: mem.commited
+              description: Committed (Allocated) Memory
+              unit: "MiB"
+              chart_type: area
+              dimensions:
+                - name: Commited_AS
+            - name: mem.writeback
+              description: Writeback Memory
+              unit: "MiB"
+              chart_type: line
+              dimensions:
+                - name: Dirty
+                - name: Writeback
+                - name: FuseWriteback
+                - name: NfsWriteback
+                - name: Bounce
+            - name: mem.kernel
+              description: Memory Used by Kernel
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: Slab
+                - name: KernelStack
+                - name: PageTables
+                - name: VmallocUsed
+                - name: Percpu
+            - name: mem.slab
+              description: Reclaimable Kernel Memory
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: reclaimable
+                - name: unreclaimable
+            - name: mem.hugepages
+              description: Dedicated HugePages Memory
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used
+                - name: surplus
+                - name: reserved
+            - name: mem.thp
+              description: Transparent HugePages Memory
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: anonymous
+                - name: shmem
+            - name: mem.thp_details
+              description: Details of Transparent HugePages Usage
+              unit: "MiB"
+              chart_type: line
+              dimensions:
+                - name: ShmemPmdMapped
+                - name: FileHugePages
+                - name: FilePmdMapped
+            - name: mem.reclaiming
+              description: Memory Reclaiming
+              unit: "MiB"
+              chart_type: line
+              dimensions:
+                - name: Active
+                - name: Inactive
+                - name: Active(anon)
+                - name: Inactive(anon)
+                - name: Active(file)
+                - name: Inactive(file)
+                - name: Unevictable
+                - name: Mlocked
+            - name: mem.high_low
+              description: High and Low Used and Free Memory Areas
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: high_used
+                - name: low_used
+                - name: high_free
+                - name: low_free
+            - name: mem.cma
+              description: Contiguous Memory Allocator (CMA) Memory
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: free
+            - name: mem.directmaps
+              description: Direct Memory Mappings
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: 4k
+                - name: 2m
+                - name: 4m
+                - name: 1g
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/pagetypeinfo
+      monitored_instance:
+        name: Page types
+        link: ""
+        categories:
+          - data-collection.linux-systems.memory-metrics
+        icon_filename: "microchip.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - memory page types
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "This integration provides metrics about the system's memory page types"
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: mem.pagetype_global
+              description: System orders available
+              unit: "B"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per pagesize
+        - name: node, zone, type
+          description: ""
+          labels:
+            - name: node_id
+              description: TBD
+            - name: node_zone
+              description: TBD
+            - name: node_type
+              description: TBD
+          metrics:
+            - name: mem.pagetype
+              description: pagetype_Node{node}_{zone}_{type}
+              unit: "B"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per pagesize
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /sys/devices/system/edac/mc
+      monitored_instance:
+        name: Memory modules (DIMMs)
+        link: ""
+        categories:
+          - data-collection.linux-systems.memory-metrics
+        icon_filename: "microchip.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - edac
+        - ecc
+        - dimm
+        - ram
+        - hardware
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          The Error Detection and Correction (EDAC) subsystem is detecting and reporting errors in the system's memory,
+          primarily ECC (Error-Correcting Code) memory errors.
+          
+          The collector provides data for:
+          
+          - Per memory controller (MC): correctable and uncorrectable errors. These can be of 2 kinds:
+            - errors related to a DIMM
+            - errors that cannot be associated with a DIMM
+          
+          - Per memory DIMM: correctable and uncorrectable errors. There are 2 kinds:
+            - memory controllers that can identify the physical DIMMS and report errors directly for them,
+            - memory controllers that report errors for memory address ranges that can be linked to dimms.
+              In this case the DIMMS reported may be more than the physical DIMMS installed.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: ecc_memory_mc_noinfo_correctable
+        metric: mem.edac_mc
+        info: memory controller ${label:controller} ECC correctable errors (unknown DIMM slot) in the last 10 minutes
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/memory.conf
+      - name: ecc_memory_mc_noinfo_uncorrectable
+        metric: mem.edac_mc
+        info: memory controller ${label:controller} ECC uncorrectable errors (unknown DIMM slot) in the last 10 minutes
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/memory.conf
+      - name: ecc_memory_dimm_correctable
+        metric: mem.edac_mc_dimm
+        info: DIMM ${label:dimm} controller ${label:controller} (location ${label:dimm_location}) ECC correctable errors in the last 10 minutes
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/memory.conf
+      - name: ecc_memory_dimm_uncorrectable
+        metric: mem.edac_mc_dimm
+        info: DIMM ${label:dimm} controller ${label:controller} (location ${label:dimm_location}) ECC uncorrectable errors in the last 10 minutes
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/memory.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: memory controller
+          description: These metrics refer to the memory controller.
+          labels:
+            - name: controller
+              description: "[mcX](https://www.kernel.org/doc/html/v5.0/admin-guide/ras.html#mcx-directories) directory name of this memory controller."
+            - name: mc_name
+              description: Memory controller type.
+            - name: size_mb
+              description: The amount of memory in megabytes that this memory controller manages.
+            - name: max_location
+              description: Last available memory slot in this memory controller.
+          metrics:
+            - name: mem.edac_mc
+              description: Memory Controller (MC) Error Detection And Correction (EDAC) Errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: correctable
+                - name: uncorrectable
+                - name: correctable_noinfo
+                - name: uncorrectable_noinfo
+        - name: memory module
+          description: These metrics refer to the memory module (or rank, [depends on the memory controller](https://www.kernel.org/doc/html/v5.0/admin-guide/ras.html#f5)).
+          labels:
+            - name: controller
+              description: "[mcX](https://www.kernel.org/doc/html/v5.0/admin-guide/ras.html#mcx-directories) directory name of this memory controller."
+            - name: dimm
+              description: "[dimmX or rankX](https://www.kernel.org/doc/html/v5.0/admin-guide/ras.html#dimmx-or-rankx-directories) directory name of this memory module."
+            - name: dimm_dev_type
+              description: Type of DRAM device used in this memory module. For example, x1, x2, x4, x8.
+            - name: dimm_edac_mode
+              description: Used type of error detection and correction. For example, S4ECD4ED would mean a Chipkill with x4 DRAM.
+            - name: dimm_label
+              description: Label assigned to this memory module.
+            - name: dimm_location
+              description: Location of the memory module.
+            - name: dimm_mem_type
+              description: Type of the memory module.
+            - name: size
+              description: The amount of memory in megabytes that this memory module manages.
+          metrics:
+            - name: mem.edac_mc
+              description: DIMM Error Detection And Correction (EDAC) Errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: correctable
+                - name: uncorrectable
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /sys/devices/system/node
+      monitored_instance:
+        name: Non-Uniform Memory Access
+        link: ""
+        categories:
+          - data-collection.linux-systems.memory-metrics
+        icon_filename: "linuxserver.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - numa
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Information about NUMA (Non-Uniform Memory Access) nodes on the system.
+          
+          NUMA is a method of configuring a cluster of microprocessor in a multiprocessing system so that they can
+          share memory locally, improving performance and the ability of the system to be expanded. NUMA is used in a
+          symmetric multiprocessing (SMP) system.
+
+          In a NUMA system, processors, memory, and I/O devices are grouped together into cells, also known as nodes.
+          Each node has its own memory and set of I/O devices, and one or more processors. While a processor can access
+          memory in any of the nodes, it does so faster when accessing memory within its own node.
+
+          The collector provides statistics on memory allocations for processes running on the NUMA nodes, revealing the
+          efficiency of memory allocations in multi-node systems.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: numa node
+          description: ""
+          labels:
+            - name: numa_node
+              description: TBD
+          metrics:
+            - name: mem.numa_nodes
+              description: NUMA events
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: hit
+                - name: miss
+                - name: local
+                - name: foreign
+                - name: interleave
+                - name: other
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /sys/kernel/mm/ksm
+      monitored_instance:
+        name: Kernel Same-Page Merging
+        link: ""
+        categories:
+          - data-collection.linux-systems.memory-metrics
+        icon_filename: "microchip.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - ksm
+        - samepage
+        - merging
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Kernel Samepage Merging (KSM) is a memory-saving feature in Linux that enables the kernel to examine the
+          memory of different processes and identify identical pages. It then merges these identical pages into a
+          single page that the processes share. This is particularly useful for virtualization, where multiple virtual
+          machines might be running the same operating system or applications and have many identical pages.
+          
+          The collector provides information about the operation and effectiveness of KSM on your system.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: mem.ksm
+              description: Kernel Same Page Merging
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: shared
+                - name: unshared
+                - name: sharing
+                - name: volatile
+            - name: mem.ksm_savings
+              description: Kernel Same Page Merging Savings
+              unit: "MiB"
+              chart_type: area
+              dimensions:
+                - name: savings
+                - name: offered
+            - name: mem.ksm_ratios
+              description: Kernel Same Page Merging Effectiveness
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: savings
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /sys/block/zram
+      monitored_instance:
+        name: ZRAM
+        link: ""
+        categories:
+          - data-collection.linux-systems.memory-metrics
+        icon_filename: "microchip.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - zram
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          zRAM, or compressed RAM, is a block device that uses a portion of your system's RAM as a block device.
+          The data written to this block device is compressed and stored in memory.
+          
+          The collectors provides information about the operation and the effectiveness of zRAM on your system.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: zram device
+          description: ""
+          labels:
+            - name: device
+              description: TBD
+          metrics:
+            - name: mem.zram_usage
+              description: ZRAM Memory Usage
+              unit: "MiB"
+              chart_type: area
+              dimensions:
+                - name: compressed
+                - name: metadata
+            - name: mem.zram_savings
+              description: ZRAM Memory Savings
+              unit: "MiB"
+              chart_type: area
+              dimensions:
+                - name: savings
+                - name: original
+            - name: mem.zram_ratio
+              description: ZRAM Compression Ratio (original to compressed)
+              unit: "ratio"
+              chart_type: line
+              dimensions:
+                - name: ratio
+            - name: mem.zram_efficiency
+              description: ZRAM Efficiency
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: percent
+  - meta:
+      plugin_name: proc.plugin
+      module_name: ipc
+      monitored_instance:
+        name: Inter Process Communication
+        link: ""
+        categories:
+          - data-collection.linux-systems.ipc-metrics
+        icon_filename: "network-wired.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - ipc
+        - semaphores
+        - shared memory
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          IPC stands for Inter-Process Communication. It is a mechanism which allows processes to communicate with each
+          other and synchronize their actions.
+          
+          This collector exposes information about:
+
+          - Message Queues: This allows messages to be exchanged between processes. It's a more flexible method that
+            allows messages to be placed onto a queue and read at a later time.
+
+          - Shared Memory: This method allows for the fastest form of IPC because processes can exchange data by
+            reading/writing into shared memory segments.
+
+          - Semaphores: They are used to synchronize the operations performed by independent processes. So, if multiple
+            processes are trying to access a single shared resource, semaphores can ensure that only one process
+            accesses the resource at a given time.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: semaphores_used
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/ipc.conf
+        metric: system.ipc_semaphores
+        info: IPC semaphore utilization
+        os: "linux"
+      - name: semaphore_arrays_used
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/ipc.conf
+        metric: system.ipc_semaphore_arrays
+        info: IPC semaphore arrays utilization
+        os: "linux"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: system.ipc_semaphores
+              description: IPC Semaphores
+              unit: "semaphores"
+              chart_type: area
+              dimensions:
+                - name: semaphores
+            - name: system.ipc_semaphore_arrays
+              description: IPC Semaphore Arrays
+              unit: "arrays"
+              chart_type: area
+              dimensions:
+                - name: arrays
+            - name: system.message_queue_message
+              description: IPC Message Queue Number of Messages
+              unit: "messages"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per queue
+            - name: system.message_queue_bytes
+              description: IPC Message Queue Used Bytes
+              unit: "bytes"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per queue
+            - name: system.shared_memory_segments
+              description: IPC Shared Memory Number of Segments
+              unit: "segments"
+              chart_type: stacked
+              dimensions:
+                - name: segments
+            - name: system.shared_memory_bytes
+              description: IPC Shared Memory Used Bytes
+              unit: "bytes"
+              chart_type: stacked
+              dimensions:
+                - name: bytes
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/diskstats
+      monitored_instance:
+        name: Disk Statistics
+        link: ""
+        categories:
+          - data-collection.linux-systems.disk-metrics
+        icon_filename: "hard-drive.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - disk
+        - disks
+        - io
+        - bcache
+        - block devices
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Detailed statistics for each of your system's disk devices and partitions.
+          The data is reported by the kernel and can be used to monitor disk activity on a Linux system.
+          
+          Get valuable insight into how your disks are performing and where potential bottlenecks might be.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: 10min_disk_backlog
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
+        metric: disk.backlog
+        info: average backlog size of the ${label:device} disk over the last 10 minutes
+        os: "linux"
+      - name: 10min_disk_utilization
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
+        metric: disk.util
+        info: average percentage of time ${label:device} disk was busy over the last 10 minutes
+        os: "linux freebsd"
+      - name: bcache_cache_dirty
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/bcache.conf
+        metric: disk.bcache_cache_alloc
+        info: percentage of cache space used for dirty data and metadata (this usually means your SSD cache is too small)
+      - name: bcache_cache_errors
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/bcache.conf
+        metric: disk.bcache_cache_read_races
+        info:
+          number of times data was read from the cache, the bucket was reused and invalidated in the last 10 minutes (when this occurs the data is
+          reread from the backing device)
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: system.io
+              description: Disk I/O
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out
+        - name: disk
+          description: ""
+          labels:
+            - name: device
+              description: TBD
+            - name: mount_point
+              description: TBD
+            - name: device_type
+              description: TBD
+          metrics:
+            - name: disk.io
+              description: Disk I/O Bandwidth
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk_ext.io
+              description: Amount of Discarded Data
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: discards
+            - name: disk.ops
+              description: Disk Completed I/O Operations
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk_ext.ops
+              description: Disk Completed Extended I/O Operations
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: discards
+                - name: flushes
+            - name: disk.qops
+              description: Disk Current I/O Operations
+              unit: "operations"
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: disk.backlog
+              description: Disk Backlog
+              unit: "milliseconds"
+              chart_type: area
+              dimensions:
+                - name: backlog
+            - name: disk.busy
+              description: Disk Busy Time
+              unit: "milliseconds"
+              chart_type: area
+              dimensions:
+                - name: busy
+            - name: disk.util
+              description: Disk Utilization Time
+              unit: "% of time working"
+              chart_type: area
+              dimensions:
+                - name: utilization
+            - name: disk.mops
+              description: Disk Merged Operations
+              unit: "merged operations/s"
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk_ext.mops
+              description: Disk Merged Discard Operations
+              unit: "merged operations/s"
+              chart_type: line
+              dimensions:
+                - name: discards
+            - name: disk.iotime
+              description: Disk Total I/O Time
+              unit: "milliseconds/s"
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk_ext.iotime
+              description: Disk Total I/O Time for Extended Operations
+              unit: "milliseconds/s"
+              chart_type: line
+              dimensions:
+                - name: discards
+                - name: flushes
+            - name: disk.await
+              description: Average Completed I/O Operation Time
+              unit: "milliseconds/operation"
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk_ext.await
+              description: Average Completed Extended I/O Operation Time
+              unit: "milliseconds/operation"
+              chart_type: line
+              dimensions:
+                - name: discards
+                - name: flushes
+            - name: disk.avgsz
+              description: Average Completed I/O Operation Bandwidth
+              unit: "KiB/operation"
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk_ext.avgsz
+              description: Average Amount of Discarded Data
+              unit: "KiB/operation"
+              chart_type: area
+              dimensions:
+                - name: discards
+            - name: disk.svctm
+              description: Average Service Time
+              unit: "milliseconds/operation"
+              chart_type: line
+              dimensions:
+                - name: svctm
+            - name: disk.bcache_cache_alloc
+              description: BCache Cache Allocations
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: ununsed
+                - name: dirty
+                - name: clean
+                - name: metadata
+                - name: undefined
+            - name: disk.bcache_hit_ratio
+              description: BCache Cache Hit Ratio
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: 5min
+                - name: 1hour
+                - name: 1day
+                - name: ever
+            - name: disk.bcache_rates
+              description: BCache Rates
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: congested
+                - name: writeback
+            - name: disk.bcache_size
+              description: BCache Cache Sizes
+              unit: "MiB"
+              chart_type: area
+              dimensions:
+                - name: dirty
+            - name: disk.bcache_usage
+              description: BCache Cache Usage
+              unit: "percentage"
+              chart_type: area
+              dimensions:
+                - name: avail
+            - name: disk.bcache_cache_read_races
+              description: BCache Cache Read Races
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: races
+                - name: errors
+            - name: disk.bcache
+              description: BCache Cache I/O Operations
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: hits
+                - name: misses
+                - name: collisions
+                - name: readaheads
+            - name: disk.bcache_bypass
+              description: BCache Cache Bypass I/O Operations
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: hits
+                - name: misses
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/mdstat
+      monitored_instance:
+        name: MD RAID
+        link: ""
+        categories:
+          - data-collection.linux-systems.disk-metrics
+        icon_filename: "hard-drive.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - raid
+        - mdadm
+        - mdstat
+        - raid
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "This integration monitors the status of MD RAID devices."
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: mdstat_last_collected
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/mdstat.conf
+        metric: md.disks
+        info: number of seconds since the last successful data collection
+      - name: mdstat_disks
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/mdstat.conf
+        metric: md.disks
+        info:
+          number of devices in the down state for the ${label:device} ${label:raid_level} array. Any number > 0 indicates that the array is degraded.
+      - name: mdstat_mismatch_cnt
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/mdstat.conf
+        metric: md.mismatch_cnt
+        info: number of unsynchronized blocks for the ${label:device} ${label:raid_level} array
+      - name: mdstat_nonredundant_last_collected
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/mdstat.conf
+        metric: md.nonredundant
+        info: number of seconds since the last successful data collection
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: md.health
+              description: Faulty Devices In MD
+              unit: "failed disks"
+              chart_type: line
+              dimensions:
+                - name: a dimension per md array
+        - name: md array
+          description: ""
+          labels:
+            - name: device
+              description: TBD
+            - name: raid_level
+              description: TBD
+          metrics:
+            - name: md.disks
+              description: Disks Stats
+              unit: "disks"
+              chart_type: stacked
+              dimensions:
+                - name: inuse
+                - name: down
+            - name: md.mismatch_cnt
+              description: Mismatch Count
+              unit: "unsynchronized blocks"
+              chart_type: line
+              dimensions:
+                - name: count
+            - name: md.status
+              description: Current Status
+              unit: "percent"
+              chart_type: line
+              dimensions:
+                - name: check
+                - name: resync
+                - name: recovery
+                - name: reshape
+            - name: md.expected_time_until_operation_finish
+              description: Approximate Time Until Finish
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: finish_in
+            - name: md.operation_speed
+              description: Operation Speed
+              unit: "KiB/s"
+              chart_type: line
+              dimensions:
+                - name: speed
+            - name: md.nonredundant
+              description: Nonredundant Array Availability
+              unit: "boolean"
+              chart_type: line
+              dimensions:
+                - name: available
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/dev
+      monitored_instance:
+        name: Network interfaces
+        link: ""
+        categories:
+          - data-collection.linux-systems.network-metrics
+        icon_filename: "network-wired.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - network interfaces
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Monitor network interface metrics about bandwidth, state, errors and more."
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: interface_speed
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.net
+        info: network interface ${label:device} current speed
+        os: "*"
+      - name: 1m_received_traffic_overflow
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.net
+        info: average inbound utilization for the network interface ${label:device} over the last minute
+        os: "linux"
+      - name: 1m_sent_traffic_overflow
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.net
+        info: average outbound utilization for the network interface ${label:device} over the last minute
+        os: "linux"
+      - name: inbound_packets_dropped_ratio
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.packets
+        info: ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes
+        os: "linux"
+      - name: outbound_packets_dropped_ratio
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.packets
+        info: ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes
+        os: "linux"
+      - name: wifi_inbound_packets_dropped_ratio
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.packets
+        info: ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes
+        os: "linux"
+      - name: wifi_outbound_packets_dropped_ratio
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.packets
+        info: ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes
+        os: "linux"
+      - name: 1m_received_packets_rate
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.packets
+        info: average number of packets received by the network interface ${label:device} over the last minute
+        os: "linux freebsd"
+      - name: 10s_received_packets_storm
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.packets
+        info:
+          ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over
+          the last minute
+        os: "linux freebsd"
+      - name: inbound_packets_dropped
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.drops
+        info: number of inbound dropped packets for the network interface ${label:device} in the last 10 minutes
+        os: "linux"
+      - name: outbound_packets_dropped
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.drops
+        info: number of outbound dropped packets for the network interface ${label:device} in the last 10 minutes
+        os: "linux"
+      - name: 10min_fifo_errors
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.fifo
+        info: number of FIFO errors for the network interface ${label:device} in the last 10 minutes
+        os: "linux"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: system.net
+              description: Physical Network Interfaces Aggregated Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+        - name: network device
+          description: ""
+          labels:
+            - name: interface_type
+              description: TBD
+            - name: device
+              description: TBD
+          metrics:
+            - name: net.net
+              description: Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: net.speed
+              description: Interface Speed
+              unit: "kilobits/s"
+              chart_type: line
+              dimensions:
+                - name: speed
+            - name: net.duplex
+              description: Interface Duplex State
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: full
+                - name: half
+                - name: unknown
+            - name: net.operstate
+              description: Interface Operational State
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: up
+                - name: down
+                - name: notpresent
+                - name: lowerlayerdown
+                - name: testing
+                - name: dormant
+                - name: unknown
+            - name: net.carrier
+              description: Interface Physical Link State
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: up
+                - name: down
+            - name: net.mtu
+              description: Interface MTU
+              unit: "octets"
+              chart_type: line
+              dimensions:
+                - name: mtu
+            - name: net.packets
+              description: Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+                - name: multicast
+            - name: net.errors
+              description: Interface Errors
+              unit: "errors/s"
+              chart_type: line
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: net.drops
+              description: Interface Drops
+              unit: "drops/s"
+              chart_type: line
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: net.fifo
+              description: Interface FIFO Buffer Errors
+              unit: "errors"
+              chart_type: line
+              dimensions:
+                - name: receive
+                - name: transmit
+            - name: net.compressed
+              description: Compressed Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: net.events
+              description: Network Interface Events
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: frames
+                - name: collisions
+                - name: carrier
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/wireless
+      monitored_instance:
+        name: Wireless network interfaces
+        link: ""
+        categories:
+          - data-collection.linux-systems.network-metrics
+        icon_filename: "network-wired.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - wireless devices
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Monitor wireless devices with metrics about status, link quality, signal level, noise level and more."
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: wireless device
+          description: ""
+          labels: []
+          metrics:
+            - name: wireless.status
+              description: Internal status reported by interface.
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: status
+            - name: wireless.link_quality
+              description: Overall quality of the link. This is an aggregate value, and depends on the driver and hardware.
+              unit: "value"
+              chart_type: line
+              dimensions:
+                - name: link_quality
+            - name: wireless.signal_level
+              description:
+                The signal level is the wireless signal power level received by the wireless client. The closer the value is to 0, the stronger the
+                signal.
+              unit: "dBm"
+              chart_type: line
+              dimensions:
+                - name: signal_level
+            - name: wireless.noise_level
+              description:
+                The noise level indicates the amount of background noise in your environment. The closer the value to 0, the greater the noise level.
+              unit: "dBm"
+              chart_type: line
+              dimensions:
+                - name: noise_level
+            - name: wireless.discarded_packets
+              description: Packet discarded in the wireless adapter due to wireless specific problems.
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: nwid
+                - name: crypt
+                - name: frag
+                - name: retry
+                - name: misc
+            - name: wireless.missed_beacons
+              description: Number of missed beacons.
+              unit: "frames/s"
+              chart_type: line
+              dimensions:
+                - name: missed_beacons
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /sys/class/infiniband
+      monitored_instance:
+        name: InfiniBand
+        link: ""
+        categories:
+          - data-collection.linux-systems.network-metrics
+        icon_filename: "network-wired.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - infiniband
+        - rdma
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "This integration monitors InfiniBand network inteface statistics."
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: infiniband port
+          description: ""
+          labels: []
+          metrics:
+            - name: ib.bytes
+              description: Bandwidth usage
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: Received
+                - name: Sent
+            - name: ib.packets
+              description: Packets Statistics
+              unit: "packets/s"
+              chart_type: area
+              dimensions:
+                - name: Received
+                - name: Sent
+                - name: Mcast_rcvd
+                - name: Mcast_sent
+                - name: Ucast_rcvd
+                - name: Ucast_sent
+            - name: ib.errors
+              description: Error Counters
+              unit: "errors/s"
+              chart_type: line
+              dimensions:
+                - name: Pkts_malformated
+                - name: Pkts_rcvd_discarded
+                - name: Pkts_sent_discarded
+                - name: Tick_Wait_to_send
+                - name: Pkts_missed_resource
+                - name: Buffer_overrun
+                - name: Link_Downed
+                - name: Link_recovered
+                - name: Link_integrity_err
+                - name: Link_minor_errors
+                - name: Pkts_rcvd_with_EBP
+                - name: Pkts_rcvd_discarded_by_switch
+                - name: Pkts_sent_discarded_by_switch
+            - name: ib.hwerrors
+              description: Hardware Errors
+              unit: "errors/s"
+              chart_type: line
+              dimensions:
+                - name: Duplicated_packets
+                - name: Pkt_Seq_Num_gap
+                - name: Ack_timer_expired
+                - name: Drop_missing_buffer
+                - name: Drop_out_of_sequence
+                - name: NAK_sequence_rcvd
+                - name: CQE_err_Req
+                - name: CQE_err_Resp
+                - name: CQE_Flushed_err_Req
+                - name: CQE_Flushed_err_Resp
+                - name: Remote_access_err_Req
+                - name: Remote_access_err_Resp
+                - name: Remote_invalid_req
+                - name: Local_length_err_Resp
+                - name: RNR_NAK_Packets
+                - name: CNP_Pkts_ignored
+                - name: RoCE_ICRC_Errors
+            - name: ib.hwpackets
+              description: Hardware Packets Statistics
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: RoCEv2_Congestion_sent
+                - name: RoCEv2_Congestion_rcvd
+                - name: IB_Congestion_handled
+                - name: ATOMIC_req_rcvd
+                - name: Connection_req_rcvd
+                - name: Read_req_rcvd
+                - name: Write_req_rcvd
+                - name: RoCE_retrans_adaptive
+                - name: RoCE_retrans_timeout
+                - name: RoCE_slow_restart
+                - name: RoCE_slow_restart_congestion
+                - name: RoCE_slow_restart_count
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/netstat
+      monitored_instance:
+        name: Network statistics
+        link: ""
+        categories:
+          - data-collection.linux-systems.network-metrics
+        icon_filename: "network-wired.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - ip
+        - udp
+        - udplite
+        - icmp
+        - netstat
+        - snmp
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "This integration provides metrics from the `netstat`, `snmp` and `snmp6` modules."
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: 1m_tcp_syn_queue_drops
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_listen.conf
+        metric: ip.tcp_syn_queue
+        info: average number of SYN requests was dropped due to the full TCP SYN queue over the last minute (SYN cookies were not enabled)
+        os: "linux"
+      - name: 1m_tcp_syn_queue_cookies
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_listen.conf
+        metric: ip.tcp_syn_queue
+        info: average number of sent SYN cookies due to the full TCP SYN queue over the last minute
+        os: "linux"
+      - name: 1m_tcp_accept_queue_overflows
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_listen.conf
+        metric: ip.tcp_accept_queue
+        info: average number of overflows in the TCP accept queue over the last minute
+        os: "linux"
+      - name: 1m_tcp_accept_queue_drops
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_listen.conf
+        metric: ip.tcp_accept_queue
+        info: average number of dropped packets in the TCP accept queue over the last minute
+        os: "linux"
+      - name: tcp_connections
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_conn.conf
+        metric: ipv4.tcpsock
+        info: IPv4 TCP connections utilization
+        os: "linux"
+      - name: 1m_ipv4_tcp_resets_sent
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
+        metric: ipv4.tcphandshake
+        info: average number of sent TCP RESETS over the last minute
+        os: "linux"
+      - name: 10s_ipv4_tcp_resets_sent
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
+        metric: ipv4.tcphandshake
+        info:
+          average number of sent TCP RESETS over the last 10 seconds. This can indicate a port scan, or that a service running on this host has
+          crashed. Netdata will not send a clear notification for this alarm.
+        os: "linux"
+      - name: 1m_ipv4_tcp_resets_received
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
+        metric: ipv4.tcphandshake
+        info: average number of received TCP RESETS over the last minute
+        os: "linux freebsd"
+      - name: 10s_ipv4_tcp_resets_received
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
+        metric: ipv4.tcphandshake
+        info:
+          average number of received TCP RESETS over the last 10 seconds. This can be an indication that a service this host needs has crashed.
+          Netdata will not send a clear notification for this alarm.
+        os: "linux freebsd"
+      - name: 1m_ipv4_udp_receive_buffer_errors
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf
+        metric: ipv4.udperrors
+        info: average number of UDP receive buffer errors over the last minute
+        os: "linux freebsd"
+      - name: 1m_ipv4_udp_send_buffer_errors
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf
+        metric: ipv4.udperrors
+        info: average number of UDP send buffer errors over the last minute
+        os: "linux"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: system.ip
+              description: IP Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ip.inerrors
+              description: IP Input Errors
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: noroutes
+                - name: truncated
+                - name: checksum
+            - name: ip.mcast
+              description: IP Multicast Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ip.bcast
+              description: IP Broadcast Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ip.mcastpkts
+              description: IP Multicast Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ip.bcastpkts
+              description: IP Broadcast Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ip.ecnpkts
+              description: IP ECN Statistics
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: CEP
+                - name: NoECTP
+                - name: ECTP0
+                - name: ECTP1
+            - name: ip.tcpmemorypressures
+              description: TCP Memory Pressures
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: pressures
+            - name: ip.tcpconnaborts
+              description: TCP Connection Aborts
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: baddata
+                - name: userclosed
+                - name: nomemory
+                - name: timeout
+                - name: linger
+                - name: failed
+            - name: ip.tcpreorders
+              description: TCP Reordered Packets by Detection Method
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: timestamp
+                - name: sack
+                - name: fack
+                - name: reno
+            - name: ip.tcpofo
+              description: TCP Out-Of-Order Queue
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: inqueue
+                - name: dropped
+                - name: merged
+                - name: pruned
+            - name: ip.tcpsyncookies
+              description: TCP SYN Cookies
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+                - name: failed
+            - name: ip.tcp_syn_queue
+              description: TCP SYN Queue Issues
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: drops
+                - name: cookies
+            - name: ip.tcp_accept_queue
+              description: TCP Accept Queue Issues
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: overflows
+                - name: drops
+            - name: ipv4.packets
+              description: IPv4 Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+                - name: forwarded
+                - name: delivered
+            - name: ipv4.fragsout
+              description: IPv4 Fragments Sent
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: created
+            - name: ipv4.fragsin
+              description: IPv4 Fragments Reassembly
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: all
+            - name: ipv4.errors
+              description: IPv4 Errors
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InDiscards
+                - name: OutDiscards
+                - name: InHdrErrors
+                - name: OutNoRoutes
+                - name: InAddrErrors
+                - name: InUnknownProtos
+            - name: ipv4.icmp
+              description: IPv4 ICMP Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.icmp_errors
+              description: IPv4 ICMP Errors
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InErrors
+                - name: OutErrors
+                - name: InCsumErrors
+            - name: ipv4.icmpmsg
+              description: IPv4 ICMP Messages
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InEchoReps
+                - name: OutEchoReps
+                - name: InDestUnreachs
+                - name: OutDestUnreachs
+                - name: InRedirects
+                - name: OutRedirects
+                - name: InEchos
+                - name: OutEchos
+                - name: InRouterAdvert
+                - name: OutRouterAdvert
+                - name: InRouterSelect
+                - name: OutRouterSelect
+                - name: InTimeExcds
+                - name: OutTimeExcds
+                - name: InParmProbs
+                - name: OutParmProbs
+                - name: InTimestamps
+                - name: OutTimestamps
+                - name: InTimestampReps
+                - name: OutTimestampReps
+            - name: ipv4.tcpsock
+              description: IPv4 TCP Connections
+              unit: "active connections"
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: ipv4.tcppackets
+              description: IPv4 TCP Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.tcperrors
+              description: IPv4 TCP Errors
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InErrs
+                - name: InCsumErrors
+                - name: RetransSegs
+            - name: ipv4.tcpopens
+              description: IPv4 TCP Opens
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: passive
+            - name: ipv4.tcphandshake
+              description: IPv4 TCP Handshake Issues
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: EstabResets
+                - name: OutRsts
+                - name: AttemptFails
+                - name: SynRetrans
+            - name: ipv4.udppackets
+              description: IPv4 UDP Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.udperrors
+              description: IPv4 UDP Errors
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: RcvbufErrors
+                - name: SndbufErrors
+                - name: InErrors
+                - name: NoPorts
+                - name: InCsumErrors
+                - name: IgnoredMulti
+            - name: ipv4.udplite
+              description: IPv4 UDPLite Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.udplite_errors
+              description: IPv4 UDPLite Errors
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: RcvbufErrors
+                - name: SndbufErrors
+                - name: InErrors
+                - name: NoPorts
+                - name: InCsumErrors
+                - name: IgnoredMulti
+            - name: system.ipv6
+              description: IPv6 Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: system.ipv6
+              description: IPv6 Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+                - name: forwarded
+                - name: delivers
+            - name: ipv6.fragsout
+              description: IPv6 Fragments Sent
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: all
+            - name: ipv6.fragsin
+              description: IPv6 Fragments Reassembly
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: timeout
+                - name: all
+            - name: ipv6.errors
+              description: IPv6 Errors
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InDiscards
+                - name: OutDiscards
+                - name: InHdrErrors
+                - name: InAddrErrors
+                - name: InUnknownProtos
+                - name: InTooBigErrors
+                - name: InTruncatedPkts
+                - name: InNoRoutes
+                - name: OutNoRoutes
+            - name: ipv6.udppackets
+              description: IPv6 UDP Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.udperrors
+              description: IPv6 UDP Errors
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: RcvbufErrors
+                - name: SndbufErrors
+                - name: InErrors
+                - name: NoPorts
+                - name: InCsumErrors
+                - name: IgnoredMulti
+            - name: ipv6.udplitepackets
+              description: IPv6 UDPlite Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.udpliteerrors
+              description: IPv6 UDP Lite Errors
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: RcvbufErrors
+                - name: SndbufErrors
+                - name: InErrors
+                - name: NoPorts
+                - name: InCsumErrors
+            - name: ipv6.mcast
+              description: IPv6 Multicast Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.bcast
+              description: IPv6 Broadcast Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.mcastpkts
+              description: IPv6 Multicast Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.icmp
+              description: IPv6 ICMP Messages
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.icmpredir
+              description: IPv6 ICMP Redirects
+              unit: "redirects/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.icmperrors
+              description: IPv6 ICMP Errors
+              unit: "errors/s"
+              chart_type: line
+              dimensions:
+                - name: InErrors
+                - name: OutErrors
+                - name: InCsumErrors
+                - name: InDestUnreachs
+                - name: InPktTooBigs
+                - name: InTimeExcds
+                - name: InParmProblems
+                - name: OutDestUnreachs
+                - name: OutPktTooBigs
+                - name: OutTimeExcds
+                - name: OutParmProblems
+            - name: ipv6.icmpechos
+              description: IPv6 ICMP Echo
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: InEchos
+                - name: OutEchos
+                - name: InEchoReplies
+                - name: OutEchoReplies
+            - name: ipv6.groupmemb
+              description: IPv6 ICMP Group Membership
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: InQueries
+                - name: OutQueries
+                - name: InResponses
+                - name: OutResponses
+                - name: InReductions
+                - name: OutReductions
+            - name: ipv6.icmprouter
+              description: IPv6 Router Messages
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: InSolicits
+                - name: OutSolicits
+                - name: InAdvertisements
+                - name: OutAdvertisements
+            - name: ipv6.icmpneighbor
+              description: IPv6 Neighbor Messages
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: InSolicits
+                - name: OutSolicits
+                - name: InAdvertisements
+                - name: OutAdvertisements
+            - name: ipv6.icmpmldv2
+              description: IPv6 ICMP MLDv2 Reports
+              unit: "reports/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.icmptypes
+              description: IPv6 ICMP Types
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: InType1
+                - name: InType128
+                - name: InType129
+                - name: InType136
+                - name: OutType1
+                - name: OutType128
+                - name: OutType129
+                - name: OutType133
+                - name: OutType135
+                - name: OutType143
+            - name: ipv6.ect
+              description: IPv6 ECT Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InNoECTPkts
+                - name: InECT1Pkts
+                - name: InECT0Pkts
+                - name: InCEPkts
+            - name: ipv6.ect
+              description: IPv6 ECT Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InNoECTPkts
+                - name: InECT1Pkts
+                - name: InECT0Pkts
+                - name: InCEPkts
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/sockstat
+      monitored_instance:
+        name: Socket statistics
+        link: ""
+        categories:
+          - data-collection.linux-systems.network-metrics
+        icon_filename: "network-wired.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - sockets
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "This integration provides socket statistics."
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: tcp_orphans
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_orphans.conf
+        metric: ipv4.sockstat_tcp_sockets
+        info: orphan IPv4 TCP sockets utilization
+        os: "linux"
+      - name: tcp_memory
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_mem.conf
+        metric: ipv4.sockstat_tcp_mem
+        info: TCP memory utilization
+        os: "linux"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: ipv4.sockstat_sockets
+              description: IPv4 Sockets Used
+              unit: "sockets"
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: ipv4.sockstat_tcp_sockets
+              description: IPv4 TCP Sockets
+              unit: "sockets"
+              chart_type: line
+              dimensions:
+                - name: alloc
+                - name: orphan
+                - name: inuse
+                - name: timewait
+            - name: ipv4.sockstat_tcp_mem
+              description: IPv4 TCP Sockets Memory
+              unit: "KiB"
+              chart_type: area
+              dimensions:
+                - name: mem
+            - name: ipv4.sockstat_udp_sockets
+              description: IPv4 UDP Sockets
+              unit: "sockets"
+              chart_type: line
+              dimensions:
+                - name: inuse
+            - name: ipv4.sockstat_udp_mem
+              description: IPv4 UDP Sockets Memory
+              unit: "sockets"
+              chart_type: line
+              dimensions:
+                - name: mem
+            - name: ipv4.sockstat_udplite_sockets
+              description: IPv4 UDPLITE Sockets
+              unit: "sockets"
+              chart_type: line
+              dimensions:
+                - name: inuse
+            - name: ipv4.sockstat_raw_sockets
+              description: IPv4 RAW Sockets
+              unit: "sockets"
+              chart_type: line
+              dimensions:
+                - name: inuse
+            - name: ipv4.sockstat_frag_sockets
+              description: IPv4 FRAG Sockets
+              unit: "fragments"
+              chart_type: line
+              dimensions:
+                - name: inuse
+            - name: ipv4.sockstat_frag_mem
+              description: IPv4 FRAG Sockets Memory
+              unit: "KiB"
+              chart_type: area
+              dimensions:
+                - name: mem
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/sockstat6
+      monitored_instance:
+        name: IPv6 Socket Statistics
+        link: ""
+        categories:
+          - data-collection.linux-systems.network-metrics
+        icon_filename: "network-wired.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - ipv6 sockets
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "This integration provides IPv6 socket statistics."
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: ipv6.sockstat6_tcp_sockets
+              description: IPv6 TCP Sockets
+              unit: "sockets"
+              chart_type: line
+              dimensions:
+                - name: inuse
+            - name: ipv6.sockstat6_udp_sockets
+              description: IPv6 UDP Sockets
+              unit: "sockets"
+              chart_type: line
+              dimensions:
+                - name: inuse
+            - name: ipv6.sockstat6_udplite_sockets
+              description: IPv6 UDPLITE Sockets
+              unit: "sockets"
+              chart_type: line
+              dimensions:
+                - name: inuse
+            - name: ipv6.sockstat6_raw_sockets
+              description: IPv6 RAW Sockets
+              unit: "sockets"
+              chart_type: line
+              dimensions:
+                - name: inuse
+            - name: ipv6.sockstat6_frag_sockets
+              description: IPv6 FRAG Sockets
+              unit: "fragments"
+              chart_type: line
+              dimensions:
+                - name: inuse
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/ip_vs_stats
+      monitored_instance:
+        name: IP Virtual Server
+        link: ""
+        categories:
+          - data-collection.linux-systems.network-metrics
+        icon_filename: "network-wired.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - ip virtual server
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "This integration monitors IP Virtual Server statistics"
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: ipvs.sockets
+              description: IPVS New Connections
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: ipvs.packets
+              description: IPVS Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipvs.net
+              description: IPVS Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/rpc/nfs
+      monitored_instance:
+        name: NFS Client
+        link: ""
+        categories:
+          - data-collection.linux-systems.filesystem-metrics.nfs
+        icon_filename: "nfs.png"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - nfs client
+        - filesystem
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "This integration provides statistics from the Linux kernel's NFS Client."
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: nfs.net
+              description: NFS Client Network
+              unit: "operations/s"
+              chart_type: stacked
+              dimensions:
+                - name: udp
+                - name: tcp
+            - name: nfs.rpc
+              description: NFS Client Remote Procedure Calls Statistics
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: calls
+                - name: retransmits
+                - name: auth_refresh
+            - name: nfs.proc2
+              description: NFS v2 Client Remote Procedure Calls
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per proc2 call
+            - name: nfs.proc3
+              description: NFS v3 Client Remote Procedure Calls
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per proc3 call
+            - name: nfs.proc4
+              description: NFS v4 Client Remote Procedure Calls
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per proc4 call
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/rpc/nfsd
+      monitored_instance:
+        name: NFS Server
+        link: ""
+        categories:
+          - data-collection.linux-systems.filesystem-metrics.nfs
+        icon_filename: "nfs.png"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - nfs server
+        - filesystem
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "This integration provides statistics from the Linux kernel's NFS Server."
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: nfsd.readcache
+              description: NFS Server Read Cache
+              unit: "reads/s"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+                - name: nocache
+            - name: nfsd.filehandles
+              description: NFS Server File Handles
+              unit: "handles/s"
+              chart_type: line
+              dimensions:
+                - name: stale
+            - name: nfsd.io
+              description: NFS Server I/O
+              unit: "kilobytes/s"
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: nfsd.threads
+              description: NFS Server Threads
+              unit: "threads"
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: nfsd.net
+              description: NFS Server Network Statistics
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: udp
+                - name: tcp
+            - name: nfsd.rpc
+              description: NFS Server Remote Procedure Calls Statistics
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: calls
+                - name: bad_format
+                - name: bad_auth
+            - name: nfsd.proc2
+              description: NFS v2 Server Remote Procedure Calls
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per proc2 call
+            - name: nfsd.proc3
+              description: NFS v3 Server Remote Procedure Calls
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per proc3 call
+            - name: nfsd.proc4
+              description: NFS v4 Server Remote Procedure Calls
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per proc4 call
+            - name: nfsd.proc4ops
+              description: NFS v4 Server Operations
+              unit: "operations/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per proc4 operation
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/sctp/snmp
+      monitored_instance:
+        name: SCTP Statistics
+        link: ""
+        categories:
+          - data-collection.linux-systems.network-metrics
+        icon_filename: "network-wired.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - sctp
+        - stream control transmission protocol
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "This integration provides statistics about the Stream Control Transmission Protocol (SCTP)."
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: sctp.established
+              description: SCTP current total number of established associations
+              unit: "associations"
+              chart_type: line
+              dimensions:
+                - name: established
+            - name: sctp.transitions
+              description: SCTP Association Transitions
+              unit: "transitions/s"
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: passive
+                - name: aborted
+                - name: shutdown
+            - name: sctp.packets
+              description: SCTP Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: sctp.packet_errors
+              description: SCTP Packet Errors
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: invalid
+                - name: checksum
+            - name: sctp.fragmentation
+              description: SCTP Fragmentation
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: reassembled
+                - name: fragmented
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/stat/nf_conntrack
+      monitored_instance:
+        name: Conntrack
+        link: ""
+        categories:
+          - data-collection.linux-systems.firewall-metrics
+        icon_filename: "firewall.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - connection tracking mechanism
+        - netfilter
+        - conntrack
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "This integration monitors the connection tracking mechanism of Netfilter in the Linux Kernel."
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: netfilter_conntrack_full
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/netfilter.conf
+        metric: netfilter.conntrack_sockets
+        info: netfilter connection tracker table size utilization
+        os: "linux"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: netfilter.conntrack_sockets
+              description: Connection Tracker Connections
+              unit: "active connections"
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: netfilter.conntrack_new
+              description: Connection Tracker New Connections
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: new
+                - name: ignore
+                - name: invalid
+            - name: netfilter.conntrack_changes
+              description: Connection Tracker Changes
+              unit: "changes/s"
+              chart_type: line
+              dimensions:
+                - name: inserted
+                - name: deleted
+                - name: delete_list
+            - name: netfilter.conntrack_expect
+              description: Connection Tracker Expectations
+              unit: "expectations/s"
+              chart_type: line
+              dimensions:
+                - name: created
+                - name: deleted
+                - name: new
+            - name: netfilter.conntrack_search
+              description: Connection Tracker Searches
+              unit: "searches/s"
+              chart_type: line
+              dimensions:
+                - name: searched
+                - name: restarted
+                - name: found
+            - name: netfilter.conntrack_errors
+              description: Connection Tracker Errors
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: icmp_error
+                - name: error_failed
+                - name: drop
+                - name: early_drop
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/net/stat/synproxy
+      monitored_instance:
+        name: Synproxy
+        link: ""
+        categories:
+          - data-collection.linux-systems.firewall-metrics
+        icon_filename: "firewall.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - synproxy
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "This integration provides statistics about the Synproxy netfilter module."
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: netfilter.synproxy_syn_received
+              description: SYNPROXY SYN Packets received
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+            - name: netfilter.synproxy_conn_reopened
+              description: SYNPROXY Connections Reopened
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: reopened
+            - name: netfilter.synproxy_cookies
+              description: SYNPROXY TCP Cookies
+              unit: "cookies/s"
+              chart_type: line
+              dimensions:
+                - name: valid
+                - name: invalid
+                - name: retransmits
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/spl/kstat/zfs
+      monitored_instance:
+        name: ZFS Pools
+        link: ""
+        categories:
+          - data-collection.linux-systems.filesystem-metrics.zfs
+        icon_filename: "filesystem.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - zfs pools
+        - pools
+        - zfs
+        - filesystem
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "This integration provides metrics about the state of ZFS pools."
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: zfs_pool_state_warn
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/zfs.conf
+        metric: zfspool.state
+        info: ZFS pool ${label:pool} state is degraded
+      - name: zfs_pool_state_crit
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/zfs.conf
+        metric: zfspool.state
+        info: ZFS pool ${label:pool} state is faulted or unavail
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: zfs pool
+          description: ""
+          labels:
+            - name: pool
+              description: TBD
+          metrics:
+            - name: zfspool.state
+              description: ZFS pool state
+              unit: "boolean"
+              chart_type: line
+              dimensions:
+                - name: online
+                - name: degraded
+                - name: faulted
+                - name: offline
+                - name: removed
+                - name: unavail
+                - name: suspended
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /proc/spl/kstat/zfs/arcstats
+      monitored_instance:
+        name: ZFS Adaptive Replacement Cache
+        link: ""
+        categories:
+          - data-collection.linux-systems.filesystem-metrics.zfs
+        icon_filename: "filesystem.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - zfs arc
+        - arc
+        - zfs
+        - filesystem
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "This integration monitors  ZFS Adadptive Replacement Cache (ARC) statistics."
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: zfs_memory_throttle
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/zfs.conf
+        metric: zfs.memory_ops
+        info: number of times ZFS had to limit the ARC growth in the last 10 minutes
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: zfs.arc_size
+              description: ZFS ARC Size
+              unit: "MiB"
+              chart_type: area
+              dimensions:
+                - name: arcsz
+                - name: target
+                - name: min
+                - name: max
+            - name: zfs.l2_size
+              description: ZFS L2 ARC Size
+              unit: "MiB"
+              chart_type: area
+              dimensions:
+                - name: actual
+                - name: size
+            - name: zfs.reads
+              description: ZFS Reads
+              unit: "reads/s"
+              chart_type: area
+              dimensions:
+                - name: arc
+                - name: demand
+                - name: prefetch
+                - name: metadata
+                - name: l2
+            - name: zfs.bytes
+              description: ZFS ARC L2 Read/Write Rate
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: zfs.hits
+              description: ZFS ARC Hits
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.hits_rate
+              description: ZFS ARC Hits Rate
+              unit: "events/s"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.dhits
+              description: ZFS Demand Hits
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.dhits_rate
+              description: ZFS Demand Hits Rate
+              unit: "events/s"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.phits
+              description: ZFS Prefetch Hits
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.phits_rate
+              description: ZFS Prefetch Hits Rate
+              unit: "events/s"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.mhits
+              description: ZFS Metadata Hits
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.mhits_rate
+              description: ZFS Metadata Hits Rate
+              unit: "events/s"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.l2hits
+              description: ZFS L2 Hits
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.l2hits_rate
+              description: ZFS L2 Hits Rate
+              unit: "events/s"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.list_hits
+              description: ZFS List Hits
+              unit: "hits/s"
+              chart_type: area
+              dimensions:
+                - name: mfu
+                - name: mfu_ghost
+                - name: mru
+                - name: mru_ghost
+            - name: zfs.arc_size_breakdown
+              description: ZFS ARC Size Breakdown
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: recent
+                - name: frequent
+            - name: zfs.memory_ops
+              description: ZFS Memory Operations
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: direct
+                - name: throttled
+                - name: indirect
+            - name: zfs.important_ops
+              description: ZFS Important Operations
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: evict_skip
+                - name: deleted
+                - name: mutex_miss
+                - name: hash_collisions
+            - name: zfs.actual_hits
+              description: ZFS Actual Cache Hits
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.actual_hits_rate
+              description: ZFS Actual Cache Hits Rate
+              unit: "events/s"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.demand_data_hits
+              description: ZFS Data Demand Efficiency
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.demand_data_hits_rate
+              description: ZFS Data Demand Efficiency Rate
+              unit: "events/s"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.prefetch_data_hits
+              description: ZFS Data Prefetch Efficiency
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.prefetch_data_hits_rate
+              description: ZFS Data Prefetch Efficiency Rate
+              unit: "events/s"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.hash_elements
+              description: ZFS ARC Hash Elements
+              unit: "elements"
+              chart_type: line
+              dimensions:
+                - name: current
+                - name: max
+            - name: zfs.hash_chains
+              description: ZFS ARC Hash Chains
+              unit: "chains"
+              chart_type: line
+              dimensions:
+                - name: current
+                - name: max
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /sys/fs/btrfs
+      monitored_instance:
+        name: BTRFS
+        link: ""
+        categories:
+          - data-collection.linux-systems.filesystem-metrics.btrfs
+        icon_filename: "filesystem.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - btrfs
+        - filesystem
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "This integration provides usage and error statistics from the BTRFS filesystem."
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: btrfs_allocated
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
+        metric: btrfs.disk
+        info: percentage of allocated BTRFS physical disk space
+        os: "*"
+      - name: btrfs_data
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
+        metric: btrfs.data
+        info: utilization of BTRFS data space
+        os: "*"
+      - name: btrfs_metadata
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
+        metric: btrfs.metadata
+        info: utilization of BTRFS metadata space
+        os: "*"
+      - name: btrfs_system
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
+        metric: btrfs.system
+        info: utilization of BTRFS system space
+        os: "*"
+      - name: btrfs_device_read_errors
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
+        metric: btrfs.device_errors
+        info: number of encountered BTRFS read errors
+        os: "*"
+      - name: btrfs_device_write_errors
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
+        metric: btrfs.device_errors
+        info: number of encountered BTRFS write errors
+        os: "*"
+      - name: btrfs_device_flush_errors
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
+        metric: btrfs.device_errors
+        info: number of encountered BTRFS flush errors
+        os: "*"
+      - name: btrfs_device_corruption_errors
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
+        metric: btrfs.device_errors
+        info: number of encountered BTRFS corruption errors
+        os: "*"
+      - name: btrfs_device_generation_errors
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
+        metric: btrfs.device_errors
+        info: number of encountered BTRFS generation errors
+        os: "*"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: btrfs filesystem
+          description: ""
+          labels:
+            - name: filesystem_uuid
+              description: TBD
+            - name: filesystem_label
+              description: TBD
+          metrics:
+            - name: btrfs.disk
+              description: BTRFS Physical Disk Allocation
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: unallocated
+                - name: data_free
+                - name: data_used
+                - name: meta_free
+                - name: meta_used
+                - name: sys_free
+                - name: sys_used
+            - name: btrfs.data
+              description: BTRFS Data Allocation
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used
+            - name: btrfs.metadata
+              description: BTRFS Metadata Allocation
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used
+                - name: reserved
+            - name: btrfs.system
+              description: BTRFS System Allocation
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used
+            - name: btrfs.commits
+              description: BTRFS Commits
+              unit: "commits"
+              chart_type: line
+              dimensions:
+                - name: commits
+            - name: btrfs.commits_perc_time
+              description: BTRFS Commits Time Share
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: commits
+            - name: btrfs.commit_timings
+              description: BTRFS Commit Timings
+              unit: "ms"
+              chart_type: line
+              dimensions:
+                - name: last
+                - name: max
+        - name: btrfs device
+          description: ""
+          labels:
+            - name: device_id
+              description: TBD
+            - name: filesystem_uuid
+              description: TBD
+            - name: filesystem_label
+              description: TBD
+          metrics:
+            - name: btrfs.device_errors
+              description: BTRFS Device Errors
+              unit: "errors"
+              chart_type: line
+              dimensions:
+                - name: write_errs
+                - name: read_errs
+                - name: flush_errs
+                - name: corruption_errs
+                - name: generation_errs
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /sys/class/power_supply
+      monitored_instance:
+        name: Power Supply
+        link: ""
+        categories:
+          - data-collection.linux-systems.power-supply-metrics
+        icon_filename: "powersupply.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - psu
+        - power supply
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "This integration monitors Power supply metrics, such as battery status, AC power status and more."
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: linux_power_supply_capacity
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/linux_power_supply.conf
+        metric: powersupply.capacity
+        info: percentage of remaining power supply capacity
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: power device
+          description: ""
+          labels:
+            - name: device
+              description: TBD
+          metrics:
+            - name: powersupply.capacity
+              description: Battery capacity
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: capacity
+            - name: powersupply.charge
+              description: Battery charge
+              unit: "Ah"
+              chart_type: line
+              dimensions:
+                - name: empty_design
+                - name: empty
+                - name: now
+                - name: full
+                - name: full_design
+            - name: powersupply.energy
+              description: Battery energy
+              unit: "Wh"
+              chart_type: line
+              dimensions:
+                - name: empty_design
+                - name: empty
+                - name: now
+                - name: full
+                - name: full_design
+            - name: powersupply.voltage
+              description: Power supply voltage
+              unit: "V"
+              chart_type: line
+              dimensions:
+                - name: min_design
+                - name: min
+                - name: now
+                - name: max
+                - name: max_design
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /sys/class/drm
+      monitored_instance:
+        name: AMD GPU
+        link: "https://www.amd.com"
+        categories:
+          - data-collection.hardware-devices-and-sensors
+        icon_filename: amd.svg
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - amd
+        - gpu
+        - hardware
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "This integration monitors AMD GPU metrics, such as utilization, clock frequency and memory usage."
+        method_description: "It reads `/sys/class/drm` to collect metrics for every AMD GPU card instance it encounters."
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: gpu
+          description: "These metrics refer to the GPU."
+          labels:
+            - name: product_name
+              description: GPU product name (e.g. AMD RX 6600)
+          metrics:
+            - name: amdgpu.gpu_utilization
+              description: GPU utilization
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: utilization
+            - name: amdgpu.gpu_mem_utilization
+              description: GPU memory utilization
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: utilization
+            - name: amdgpu.gpu_clk_frequency
+              description: GPU clock frequency
+              unit: "MHz"
+              chart_type: line
+              dimensions:
+                - name: frequency
+            - name: amdgpu.gpu_mem_clk_frequency
+              description: GPU memory clock frequency
+              unit: "MHz"
+              chart_type: line
+              dimensions:
+                - name: frequency
+            - name: amdgpu.gpu_mem_vram_usage_perc
+              description: VRAM memory usage percentage
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: usage
+            - name: amdgpu.gpu_mem_vram_usage
+              description: VRAM memory usage
+              unit: "bytes"
+              chart_type: area
+              dimensions:
+                - name: free
+                - name: used
+            - name: amdgpu.gpu_mem_vis_vram_usage_perc
+              description: visible VRAM memory usage percentage
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: usage
+            - name: amdgpu.gpu_mem_vis_vram_usage
+              description: visible VRAM memory usage
+              unit: "bytes"
+              chart_type: area
+              dimensions:
+                - name: free
+                - name: used
+            - name: amdgpu.gpu_mem_gtt_usage_perc
+              description: GTT memory usage percentage
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: usage
+            - name: amdgpu.gpu_mem_gtt_usage
+              description: GTT memory usage
+              unit: "bytes"
+              chart_type: area
+              dimensions:
+                - name: free
+                - name: used

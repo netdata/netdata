@@ -270,7 +270,7 @@ static inline size_t sanitize_function_text(char *dst, const char *src, size_t d
 // we keep a dictionary per RRDSET with these functions
 // the dictionary is created on demand (only when a function is added to an RRDSET)
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     RRD_FUNCTION_LOCAL  = (1 << 0),
     RRD_FUNCTION_GLOBAL = (1 << 1),
 
@@ -279,7 +279,7 @@ typedef enum {
 
 struct rrd_collector_function {
     bool sync;                      // when true, the function is called synchronously
-    uint8_t options;                // RRD_FUNCTION_OPTIONS
+    RRD_FUNCTION_OPTIONS options;   // RRD_FUNCTION_OPTIONS
     STRING *help;
     int timeout;                    // the default timeout of the function
 
@@ -814,7 +814,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
 
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
     buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(localhost));
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
@@ -858,8 +858,8 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
 
                     // retention
                     buffer_json_add_array_item_string(wb, rrdhost_hostname(s.host)); // Node
-                    buffer_json_add_array_item_uint64(wb, s.db.first_time_s * 1000); // dbFrom
-                    buffer_json_add_array_item_uint64(wb, s.db.last_time_s * 1000); // dbTo
+                    buffer_json_add_array_item_uint64(wb, s.db.first_time_s * MSEC_PER_SEC); // dbFrom
+                    buffer_json_add_array_item_uint64(wb, s.db.last_time_s * MSEC_PER_SEC); // dbTo
 
                     if(s.db.first_time_s && s.db.last_time_s && s.db.last_time_s > s.db.first_time_s)
                         buffer_json_add_array_item_uint64(wb, s.db.last_time_s - s.db.first_time_s); // dbDuration
@@ -877,7 +877,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
 
                     // collection
                     if(s.ingest.since) {
-                        buffer_json_add_array_item_uint64(wb, s.ingest.since * 1000); // InSince
+                        buffer_json_add_array_item_uint64(wb, s.ingest.since * MSEC_PER_SEC); // InSince
                         buffer_json_add_array_item_time_t(wb, s.now - s.ingest.since); // InAge
                     }
                     else {
@@ -897,7 +897,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
 
                     // streaming
                     if(s.stream.since) {
-                        buffer_json_add_array_item_uint64(wb, s.stream.since * 1000); // OutSince
+                        buffer_json_add_array_item_uint64(wb, s.stream.since * MSEC_PER_SEC); // OutSince
                         buffer_json_add_array_item_time_t(wb, s.now - s.stream.since); // OutAge
                     }
                     else {
@@ -990,19 +990,19 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
                                     NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "dbFrom", "DB Data Retention From",
-                                    RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME,
+                                    RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME_MS,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MIN, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "dbTo", "DB Data Retention To",
-                                    RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME,
+                                    RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME_MS,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "dbDuration", "DB Data Retention Duration",
-                                    RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION,
+                                    RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION_S,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
@@ -1049,13 +1049,13 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
         // --- collection ---
 
         buffer_rrdf_table_add_field(wb, field_id++, "InSince", "Last Data Collection Status Change",
-                                    RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME,
+                                    RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME_MS,
                                     0, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MIN, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "InAge", "Last Data Collection Online Status Change Age",
-                                    RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION,
+                                    RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION_S,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
@@ -1124,13 +1124,13 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
         // --- streaming ---
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutSince", "Last Streaming Status Change",
-                                    RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME,
+                                    RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME_MS,
                                     0, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutAge", "Last Streaming Status Change Age",
-                                    RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION,
+                                    RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION_S,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MIN, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
@@ -1242,14 +1242,14 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutAttemptSince",
                                     "Last Outbound Connection Attempt Status Change Time",
-                                    RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME,
+                                    RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME_MS,
                                     0, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutAttemptAge",
                                     "Last Outbound Connection Attempt Status Change Age",
-                                    RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION,
+                                    RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION_S,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MIN, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);

@@ -1,2 +1,0 @@
-metric,scope,dimensions,unit,description,chart_type,labels,plugin,module
-icecast.listeners,,a dimension for each active source,listeners,Number Of Listeners,line,,python.d.plugin,icecast

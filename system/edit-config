@@ -57,6 +57,12 @@ is_prefix() {
 }
 
 check_directories() {
+  if [ -f "${script_dir}/.container-hostname" ]; then
+    NETDATA_USER_CONFIG_DIR="${script_dir}"
+    NETDATA_STOCK_CONFIG_DIR="/usr/lib/netdata/conf.d"
+    return
+  fi
+
   if [ -e "${script_dir}/.environment" ]; then
     OLDPATH="${PATH}"
     # shellcheck disable=SC1091

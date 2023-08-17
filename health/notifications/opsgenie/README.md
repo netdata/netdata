@@ -7,11 +7,10 @@ Learn how to send notifications to Opsgenie using Netdata's Agent alert notifica
 > This file assumes you have read the [Introduction to Agent alert notifications](https://github.com/netdata/netdata/blob/master/health/notifications/README.md), detailing how the Netdata Agent's alert notification method works.
 
 [Opsgenie](https://www.atlassian.com/software/opsgenie) is an alerting and incident response tool.
-It is designed to group and filter alarms, build custom routing rules for on-call teams, and correlate deployments and commits to incidents.
+It is designed to group and filter alerts, build custom routing rules for on-call teams, and correlate deployments and commits to incidents.
 
 This is what you will get:
-![Example alarm notifications in
-Opsgenie](https://user-images.githubusercontent.com/49162938/92184518-f725f900-ee40-11ea-9afa-e7c639c72206.png)
+![Example alert notifications in Opsgenie](https://user-images.githubusercontent.com/49162938/92184518-f725f900-ee40-11ea-9afa-e7c639c72206.png)
 
 ## Prerequisites
 

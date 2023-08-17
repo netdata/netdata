@@ -37,7 +37,9 @@ PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packag
 NETDATA_STABLE_BASE_URL="${NETDATA_BASE_URL:-https://github.com/netdata/netdata/releases}"
 NETDATA_NIGHTLY_BASE_URL="${NETDATA_BASE_URL:-https://github.com/netdata/netdata-nightlies/releases}"
 
+# Following variables are intended to be overridden by the updater config file.
 NETDATA_UPDATER_JITTER=3600
+NETDATA_NO_SYSTEMD_JOURNAL=0
 
 script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
@@ -744,42 +746,57 @@ update_binpkg() {
     esac
   fi
 
-  if [ "${INTERACTIVE}" = "0" ]; then
-    interactive_opts="-y"
-    env="DEBIAN_FRONTEND=noninteractive"
-  else
-    interactive_opts=""
-    env=""
-  fi
+  interactive_opts=""
+  env=""
 
   case "${DISTRO_COMPAT_NAME}" in
     debian|ubuntu)
+      if [ "${INTERACTIVE}" = "0" ]; then
+        upgrade_subcmd="-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold --only-upgrade install"
+        interactive_opts="-y"
+        env="DEBIAN_FRONTEND=noninteractive"
+      else
+        upgrade_subcmd="--only-upgrade install"
+      fi
       pm_cmd="apt-get"
       repo_subcmd="update"
-      upgrade_cmd="--only-upgrade install"
+      install_subcmd="install"
+      mark_auto_cmd="apt-mark auto"
       pkg_install_opts="${interactive_opts}"
       repo_update_opts="${interactive_opts}"
-      pkg_installed_check="dpkg -s"
+      pkg_installed_check="dpkg-query -s"
       INSTALL_TYPE="binpkg-deb"
       ;;
     centos|fedora|ol|amzn)
+      if [ "${INTERACTIVE}" = "0" ]; then
+        interactive_opts="-y"
+      fi
       if command -v dnf > /dev/null; then
         pm_cmd="dnf"
         repo_subcmd="makecache"
+        mark_auto_cmd="dnf mark remove"
       else
         pm_cmd="yum"
+        mark_auto_cmd="yumdb set reason dep"
       fi
-      upgrade_cmd="upgrade"
+      upgrade_subcmd="upgrade"
+      install_subcmd="install"
       pkg_install_opts="${interactive_opts}"
       repo_update_opts="${interactive_opts}"
       pkg_installed_check="rpm -q"
       INSTALL_TYPE="binpkg-rpm"
       ;;
     opensuse)
+      if [ "${INTERACTIVE}" = "0" ]; then
+        upgrade_subcmd="--non-interactive update"
+      else
+        upgrade_subcmd="update"
+      fi
       pm_cmd="zypper"
       repo_subcmd="--gpg-auto-import-keys refresh"
-      upgrade_cmd="update"
-      pkg_install_opts="${interactive_opts}"
+      install_subcmd="install"
+      mark_auto_cmd=""
+      pkg_install_opts=""
       repo_update_opts=""
       pkg_installed_check="rpm -q"
       INSTALL_TYPE="binpkg-rpm"
@@ -798,7 +815,7 @@ update_binpkg() {
   for repopkg in netdata-repo netdata-repo-edge; do
     if ${pkg_installed_check} ${repopkg} > /dev/null 2>&1; then
       # shellcheck disable=SC2086
-      env ${env} ${pm_cmd} ${upgrade_cmd} ${pkg_install_opts} ${repopkg} >&3 2>&3 || fatal "Failed to update Netdata repository config." U000D
+      env ${env} ${pm_cmd} ${upgrade_subcmd} ${pkg_install_opts} ${repopkg} >&3 2>&3 || fatal "Failed to update Netdata repository config." U000D
       # shellcheck disable=SC2086
       if [ -n "${repo_subcmd}" ]; then
         env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} >&3 2>&3 || fatal "Failed to update repository metadata." U000E
@@ -807,7 +824,21 @@ update_binpkg() {
   done
 
   # shellcheck disable=SC2086
-  env ${env} ${pm_cmd} ${upgrade_cmd} ${pkg_install_opts} netdata >&3 2>&3 || fatal "Failed to update Netdata package." U000F
+  env ${env} ${pm_cmd} ${upgrade_subcmd} ${pkg_install_opts} netdata >&3 2>&3 || fatal "Failed to update Netdata package." U000F
+
+  if ${pkg_installed_check} systemd > /dev/null 2>&1; then
+    if [ "${NETDATA_NO_SYSTEMD_JOURNAL}" -eq 0 ]; then
+      if ! ${pkg_installed_check} netdata-plugin-systemd-journal > /dev/null 2>&1; then
+        env ${env} ${pm_cmd} ${install_subcmd} ${pkg_install_opts} netdata-plugin-systemd-journal >&3 2>&3
+
+        if [ -n "${mark_auto_cmd}" ]; then
+          # shellcheck disable=SC2086
+          env ${env} ${mark_auto_cmd} netdata-plugin-systemd-journal >&3 2>&3
+        fi
+      fi
+    fi
+  fi
+
   [ -n "${logfile}" ] && rm "${logfile}" && logfile=
   return 0
 }

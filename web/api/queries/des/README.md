@@ -46,10 +46,10 @@ You can change the fixed value `15` by setting in `netdata.conf`:
 
 ## how to use
 
-Use it in alarms like this:
+Use it in alerts like this:
 
 ```
- alarm: my_alarm
+ alarm: my_alert
     on: my_chart
 lookup: des -1m unaligned of my_dimension
   warn: $this > 1000

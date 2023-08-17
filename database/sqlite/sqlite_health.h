@@ -19,6 +19,7 @@ int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_S
 void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *chart);
 int health_migrate_old_health_log_table(char *table);
 uint32_t sql_get_alarm_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, uuid_t *config_hash_id);
+uint32_t sql_get_alarm_id_check_zero_hash(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, uuid_t *config_hash_id);
 void sql_alert_transitions(
     DICTIONARY *nodes,
     time_t after,
@@ -37,4 +38,6 @@ int sql_get_alert_configuration(
     bool debug __maybe_unused);
 
 bool sql_find_alert_transition(const char *transition, void (*cb)(const char *machine_guid, const char *context, time_t alert_id, void *data), void *data);
+bool is_chart_name_populated(uuid_t  *host_uuid);
+void chart_name_populate(uuid_t *host_uuid);
 #endif //NETDATA_SQLITE_HEALTH_H

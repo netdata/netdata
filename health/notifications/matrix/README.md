@@ -12,7 +12,7 @@ You will need:
 
 - The url of the homeserver (`https://homeserver:port`).
 - Credentials for connecting to the homeserver, in the form of a valid access token for your account (or for a dedicated notification account). These tokens usually don't expire.
-- The room ids that you want to sent the notification to.
+- The room ids that you want to send the notification to.
 
 ## Configure Netdata to send alert notifications to Matrix
 

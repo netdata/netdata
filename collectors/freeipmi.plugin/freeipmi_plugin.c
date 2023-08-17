@@ -1799,8 +1799,10 @@ int main (int argc, char **argv) {
     for(iteration = 0; 1 ; iteration++) {
         usec_t dt = heartbeat_next(&hb, step);
 
-        if(!tty)
+        if (!tty) {
             fprintf(stdout, "\n"); // keepalive to avoid parser read timeout (2 minutes) during ipmi_detect_speed_secs()
+            fflush(stdout);
+        }
 
         struct netdata_ipmi_state state = {0 };
 
@@ -1890,7 +1892,7 @@ int main (int argc, char **argv) {
 
         // restart check (14400 seconds)
         if (now_monotonic_sec() - started_t > IPMI_RESTART_EVERY_SECONDS) {
-            collector_error("%s(): reached my lifetime expectancy. Exiting to restart.", __FUNCTION__);
+            collector_info("%s(): reached my lifetime expectancy. Exiting to restart.", __FUNCTION__);
             fprintf(stdout, "EXIT\n");
             fflush(stdout);
             exit(0);

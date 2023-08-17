@@ -24,7 +24,7 @@ Each chart in Netdata has several properties (common to all its metrics):
 - `chart_name` - a more human friendly name for `chart_id`, also unique.
 
 - `context` - this is the template of the chart. All disk I/O charts have the same context, all mysql requests charts
-  have the same context, etc. This is used for alarm templates to match all the charts they should be attached to.
+  have the same context, etc. This is used for alert templates to match all the charts they should be attached to.
 
 - `family` groups a set of charts together. It is used as the submenu of the dashboard.
 

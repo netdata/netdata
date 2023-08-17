@@ -243,7 +243,7 @@ inline bool url_is_request_complete(char *begin, char *end, size_t length, char 
     if(likely(strncmp(begin, "GET ", 4)) == 0) {
         return strstr(end - 4, "\r\n\r\n");
     }
-    else if(unlikely(strncmp(begin, "POST ", 5) == 0)) {
+    else if(unlikely(strncmp(begin, "POST ", 5) == 0 || strncmp(begin, "PUT ", 4) == 0)) {
         char *cl = strstr(begin, "Content-Length: ");
         if(!cl) return false;
         cl = &cl[16];

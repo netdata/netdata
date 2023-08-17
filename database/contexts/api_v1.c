@@ -148,7 +148,7 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
     if(options & RRDCONTEXT_OPTION_SHOW_METRICS || t_parent->chart_dimensions) {
 
         wb_metrics = buffer_create(4096, &netdata_buffers_statistics.buffers_api);
-        buffer_json_initialize(wb_metrics, "\"", "\"", wb->json.depth + 2, false, false);
+        buffer_json_initialize(wb_metrics, "\"", "\"", wb->json.depth + 2, false, BUFFER_JSON_OPTIONS_DEFAULT);
 
         struct rrdcontext_to_json t_metrics = {
                 .wb = wb_metrics,
@@ -268,7 +268,7 @@ static inline int rrdcontext_to_json_callback(const DICTIONARY_ITEM *item, void 
        || t_parent->chart_dimensions) {
 
         wb_instances = buffer_create(4096, &netdata_buffers_statistics.buffers_api);
-        buffer_json_initialize(wb_instances, "\"", "\"", wb->json.depth + 2, false, false);
+        buffer_json_initialize(wb_instances, "\"", "\"", wb->json.depth + 2, false, BUFFER_JSON_OPTIONS_DEFAULT);
 
         struct rrdcontext_to_json t_instances = {
                 .wb = wb_instances,
@@ -366,9 +366,9 @@ int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, R
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
 
     if(after != 0 && before != 0)
-        rrdr_relative_window_to_absolute(&after, &before, NULL);
+        rrdr_relative_window_to_absolute(&after, &before, NULL, false);
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     struct rrdcontext_to_json t_contexts = {
             .wb = wb,
             .options = options|RRDCONTEXT_OPTION_SKIP_ID,
@@ -403,9 +403,9 @@ int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, 
         uuid_unparse(*host->node_id, node_uuid);
 
     if(after != 0 && before != 0)
-        rrdr_relative_window_to_absolute(&after, &before, NULL);
+        rrdr_relative_window_to_absolute(&after, &before, NULL, false);
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
     buffer_json_member_add_string(wb, "machine_guid", host->machine_guid);
     buffer_json_member_add_string(wb, "node_id", node_uuid);

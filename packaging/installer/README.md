@@ -38,12 +38,6 @@ but we have some hints on what you might want to do next.
 Explore our [general advanced installation options and troubleshooting](#advanced-installation-options-and-troubleshooting), specific options
 for the [single line installer](#install-on-linux-with-one-line-installer), or [other installation methods](#other-installation-methods).
 
-#### Agent user interface
-
-To access the UI provided by the locally installed agent, open a browser and navigate to `http://NODE:19999`, replacing `NODE` with either `localhost` or
-the hostname/IP address of the remote node. You can also read more about
-[the agent dashboard](https://github.com/netdata/netdata/blob/master/web/gui/README.md).
-
 #### Configuration
 
 Discover the recommended way to [configure Netdata's settings or behavior](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) using our built-in
@@ -57,10 +51,10 @@ learn more about [how data collectors work](https://github.com/netdata/netdata/b
 collector](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md) for metrics you need, [configure the collector](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md)
 or read about its requirements to configure your endpoint to publish metrics in the correct format and endpoint.
 
-#### Alarms & notifications
+#### Alerts & notifications
 
-Netdata comes with hundreds of preconfigured alarms, designed by our monitoring gurus in parallel with our open-source
-community, but you may want to [edit alarms](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) or
+Netdata comes with hundreds of preconfigured alerts, designed by our monitoring gurus in parallel with our open-source
+community, but you may want to [edit alerts](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) or
 [enable notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to customize your Netdata experience.
 
 #### Make your deployment production ready
@@ -94,7 +88,7 @@ To install, copy the script, paste it into your node's terminal, and hit `Enter`
 > If you plan to also claim the node to Netdata Cloud, make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space, and `YOUR_ROOM_ID` with the ID of the room you are claiming to.
 > You can leave the room id blank to have your node claimed to the default "All nodes" room.
 
-Jump down to [what's next](#whats-next) to learn how to view your new dashboard and take your next steps monitoring and
+Jump up to [what's next](#whats-next) to learn how to view your new dashboard and take your next steps in monitoring and
 troubleshooting with Netdata.
 
 ## Other installation methods
@@ -227,7 +221,7 @@ PowerTools, to gather hard dependencies. See the [CentOS 6](https://github.com/n
 
 #### Access to file is not permitted
 
-If you see an error similar to `Access to file is not permitted: /usr/share/netdata/web//index.html` when you try to
+If you see an error similar to `Access to file is not permitted: /usr/share/netdata/web/index.html` when you try to
 visit the Agent dashboard at `http://NODE:19999`, you need to update Netdata's permissions to match those of your
 system.
 
@@ -244,7 +238,7 @@ These files need to have the same user and group used to install your netdata. S
 `netdata` and group `netdata`, in this scenario you will need to run the following command to fix the error:
 
 ```bash
-# chown -R netdata.netdata /usr/share/netdata/web
+# chown -R netdata:netdata /usr/share/netdata/web
 ```
 
 #### Multiple versions of OpenSSL

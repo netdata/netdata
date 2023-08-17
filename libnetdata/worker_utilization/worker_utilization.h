@@ -7,7 +7,7 @@
 
 #define WORKER_UTILIZATION_MAX_JOB_TYPES 50
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     WORKER_METRIC_EMPTY = 0,
     WORKER_METRIC_IDLE_BUSY = 1,
     WORKER_METRIC_ABSOLUTE = 2,

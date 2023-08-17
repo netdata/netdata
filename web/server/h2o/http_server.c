@@ -46,6 +46,8 @@ static int create_listener(const char *ip, int port)
     if ((fd = socket(AF_INET, SOCK_STREAM, 0)) == -1 ||
         setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr_flag, sizeof(reuseaddr_flag)) != 0 ||
         bind(fd, (struct sockaddr *)&addr, sizeof(addr)) != 0 || listen(fd, SOMAXCONN) != 0) {
+        if (fd != -1)
+            close(fd);
         return -1;
     }
 
@@ -73,6 +75,10 @@ static int ssl_init()
 #else
     accept_ctx.ssl_ctx = SSL_CTX_new(TLS_server_method());
 #endif
+    if (!accept_ctx.ssl_ctx) {
+        netdata_log_error("Could not allocate a new SSL_CTX");
+        return -1;
+    }
 
     SSL_CTX_set_options(accept_ctx.ssl_ctx, SSL_OP_NO_SSLv2);
 

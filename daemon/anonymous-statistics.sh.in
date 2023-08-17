@@ -71,6 +71,23 @@ NETDATA_PREBUILT_DISTRO="${42}"
 
 [ -z "$NETDATA_REGISTRY_UNIQUE_ID" ] && NETDATA_REGISTRY_UNIQUE_ID="00000000-0000-0000-0000-000000000000"
 
+KERNEL_NAME="$(uname -s)"
+MD5_PATH="$(exec <&- 2>&-; which md5sum || command -v md5sum || type md5sum)"
+
+if [ "${KERNEL_NAME}" = Darwin ] && command -v ioreg >/dev/null 2>&1; then
+  SYSTEM_DISTINCT_ID="macos-$(ioreg -rd1 -c IOPlatformExpertDevice | awk '/IOPlatformUUID/ { split($0, line, "\""); printf("%s\n", line[4]); }')"
+elif [ -f /etc/machine-id ] && [ -n "$MD5_PATH" ]; then
+  SYSTEM_DISTINCT_ID="machine-$($MD5_PATH < /etc/machine-id | cut -f1 -d" ")"
+elif [ -f /var/db/dbus/machine-id ] && [ -n "$MD5_PATH" ]; then
+  SYSTEM_DISTINCT_ID="dbus-$($MD5_PATH < /var/db/dbus/machine-id | cut -f1 -d" ")"
+elif [ -f /var/lib/dbus/machine-id ] && [ -n "$MD5_PATH" ]; then
+  SYSTEM_DISTINCT_ID="dbus-$($MD5_PATH < /var/lib/dbus/machine-id | cut -f1 -d" ")"
+elif command -v uuidgen > /dev/null 2>&1; then
+  SYSTEM_DISTINCT_ID="uuid-$(uuidgen | tr '[:upper:]' '[:lower:]')"
+else
+  SYSTEM_DISTINCT_ID="null"
+fi
+
 # define body of request to be sent
 REQ_BODY="$(cat << EOF
 {
@@ -105,6 +122,7 @@ REQ_BODY="$(cat << EOF
         "system_virt_detection": "${NETDATA_SYSTEM_VIRT_DETECTION}",
         "system_container": "${NETDATA_SYSTEM_CONTAINER}",
         "system_container_detection": "${NETDATA_SYSTEM_CONTAINER_DETECTION}",
+        "system_distinct_id": "${SYSTEM_DISTINCT_ID}",
         "container_os_name": "${NETDATA_CONTAINER_OS_NAME}",
         "container_os_id": "${NETDATA_CONTAINER_OS_ID}",
         "container_os_id_like": "${NETDATA_CONTAINER_OS_ID_LIKE}",

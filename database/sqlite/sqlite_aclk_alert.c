@@ -7,7 +7,7 @@
 #include "../../aclk/aclk_alarm_api.h"
 #endif
 
-#define SQL_UPDATE_FILTERED_ALERT "UPDATE aclk_alert_%s SET filtered_alert_unique_id = %u where filtered_alert_unique_id = %u"
+#define SQL_UPDATE_FILTERED_ALERT "UPDATE aclk_alert_%s SET filtered_alert_unique_id = %u, date_created = unixepoch() where filtered_alert_unique_id = %u"
 void update_filtered(ALARM_ENTRY *ae, uint32_t unique_id, char *uuid_str) {
     char sql[ACLK_SYNC_QUERY_SIZE];
     snprintfz(sql, ACLK_SYNC_QUERY_SIZE-1, SQL_UPDATE_FILTERED_ALERT, uuid_str, ae->unique_id, unique_id);
@@ -268,7 +268,7 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
     buffer_sprintf(sql, "select aa.sequence_id, hld.unique_id, hld.alarm_id, hl.config_hash_id, hld.updated_by_id, hld.when_key, " \
         " hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, hld.delay_up_to_timestamp, hl.name,  " \
         " hl.chart, hl.family, hl.exec, hl.recipient, ha.source, hl.units, hld.info, hld.exec_code, hld.new_status,  " \
-        " hld.old_status, hld.delay, hld.new_value, hld.old_value, hld.last_repeat, hl.chart_context, hld.transition_id, hld.alarm_event_id  " \
+        " hld.old_status, hld.delay, hld.new_value, hld.old_value, hld.last_repeat, hl.chart_context, hld.transition_id, hld.alarm_event_id, hl.chart_name  " \
         " from health_log hl, aclk_alert_%s aa, alert_hash ha, health_log_detail hld " \
         " where hld.unique_id = aa.alert_unique_id and hl.config_hash_id = ha.hash_id and aa.date_submitted is null " \
         " and hl.host_id = @host_id and hl.health_log_id = hld.health_log_id " \
@@ -371,14 +371,12 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
 
         alarm_log.value = (NETDATA_DOUBLE) sqlite3_column_double(res, 23);
         alarm_log.old_value = (NETDATA_DOUBLE) sqlite3_column_double(res, 24);
-
         alarm_log.updated = (sqlite3_column_int64(res, 8) & HEALTH_ENTRY_FLAG_UPDATED) ? 1 : 0;
         alarm_log.rendered_info = sqlite3_text_strdupz_empty(res, 18);
-
         alarm_log.chart_context = sqlite3_text_strdupz_empty(res, 26);
         alarm_log.transition_id = sqlite3_uuid_unparse_strdupz(res, 27);
-
         alarm_log.event_id = (time_t) sqlite3_column_int64(res, 28);
+        alarm_log.chart_name = sqlite3_text_strdupz_empty(res, 29);
 
         aclk_send_alarm_log_entry(&alarm_log);
 
@@ -788,7 +786,7 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
     char transition_id[UUID_STR_LEN];
     uuid_unparse_lower(ae->transition_id, transition_id);
 
-    alarm_log->chart = strdupz(ae_chart_name(ae));
+    alarm_log->chart = strdupz(ae_chart_id(ae));
     alarm_log->name = strdupz(ae_name(ae));
     alarm_log->family = strdupz(ae_family(ae));
 
@@ -827,6 +825,7 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
     alarm_log->updated = (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) ? 1 : 0;
     alarm_log->rendered_info = strdupz(ae_info(ae));
     alarm_log->chart_context = strdupz(ae_chart_context(ae));
+    alarm_log->chart_name = strdupz(ae_chart_name(ae));
 
     alarm_log->transition_id = strdupz((char *)transition_id);
     alarm_log->event_id = (uint64_t) ae->alarm_event_id;
@@ -851,7 +850,7 @@ static int have_recent_alarm(RRDHOST *host, uint32_t alarm_id, uint32_t mark)
 }
 #endif
 
-#define ALARM_EVENTS_PER_CHUNK 10
+#define ALARM_EVENTS_PER_CHUNK 1000
 void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
 {
 #ifdef ENABLE_ACLK
@@ -980,7 +979,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
 #endif
 }
 
-#define SQL_DELETE_ALERT_ENTRIES "DELETE FROM aclk_alert_%s WHERE filtered_alert_unique_id + %d < UNIXEPOCH();"
+#define SQL_DELETE_ALERT_ENTRIES "DELETE FROM aclk_alert_%s WHERE date_created + %d < UNIXEPOCH();"
 void sql_aclk_alert_clean_dead_entries(RRDHOST *host)
 {
     char uuid_str[UUID_STR_LEN];

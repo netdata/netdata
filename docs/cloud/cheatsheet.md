@@ -99,13 +99,13 @@ modules:
 sudo ./edit-config go.d/mysql.conf
 ```
 
-### Alarms & notifications
+### Alerts & notifications
 
-<!-- #### Add a new alarm
+<!-- #### Add a new alert
 
 ```
-sudo touch health.d/example-alarm.conf
-sudo ./edit-config health.d/example-alarm.conf
+sudo touch health.d/example-alert.conf
+sudo ./edit-config health.d/example-alert.conf
 ``` -->
 After any change, reload the Netdata health configuration:
 
@@ -115,23 +115,23 @@ netdatacli reload-health
 killall -USR2 netdata
 ```
 
-#### Configure a specific alarm
+#### Configure a specific alert
 
 ```bash
-sudo ./edit-config health.d/example-alarm.conf
+sudo ./edit-config health.d/example-alert.conf
 ```
 
-#### Silence a specific alarm
+#### Silence a specific alert
 
 ```bash
-sudo ./edit-config health.d/example-alarm.conf
+sudo ./edit-config health.d/example-alert.conf
 ```
 
 ```
  to: silent
 ```
 
-<!-- #### Disable alarms and notifications
+<!-- #### Disable alerts and notifications
 
 ```conf
 [health]
@@ -142,14 +142,14 @@ sudo ./edit-config health.d/example-alarm.conf
 
 ### Manage the daemon
 
-| Intent                      |                                                                Action |
-| :-------------------------- | --------------------------------------------------------------------: |
-| Start Netdata               |                                      `$ sudo service netdata start` |
-| Stop Netdata                |                                       `$ sudo service netdata stop` |
-| Restart Netdata             |                                    `$ sudo service netdata restart` |
-| Reload health configuration |           `$ sudo netdatacli reload-health` `$ killall -USR2 netdata` |
-| View error logs             |                                     `less /var/log/netdata/error.log` |
-| View collectors logs        |                               `less /var/log/netdata/collector.log` |
+| Intent                      |                                                      Action |
+|:----------------------------|------------------------------------------------------------:|
+| Start Netdata               |                              `$ sudo service netdata start` |
+| Stop Netdata                |                               `$ sudo service netdata stop` |
+| Restart Netdata             |                            `$ sudo service netdata restart` |
+| Reload health configuration | `$ sudo netdatacli reload-health` `$ killall -USR2 netdata` |
+| View error logs             |                           `less /var/log/netdata/error.log` |
+| View collectors logs        |                       `less /var/log/netdata/collector.log` |
 
 #### Change the port Netdata listens to (example, set it to port 39999)
 

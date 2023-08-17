@@ -24,34 +24,35 @@ else
 fi
 
 declare -a package_tree=(
-  findutils
-  gcc
-  gcc-c++
-  make
   autoconf
   autoconf-archive
   autogen
   automake
-  libatomic
-  libtool
-  cmake
-  zlib-devel
-  libuuid-devel
-  libmnl-devel
-  json-c-devel
-  libyaml-devel
-  libuv-devel
-  lz4-devel
-  openssl-devel
-  elfutils-libelf-devel
-  git
-  pkgconfig
-  tar
-  curl
-  gzip
-  python3
   bison
+  cmake
+  curl
+  elfutils-libelf-devel
+  findutils
   flex
+  gcc
+  gcc-c++
+  git
+  gzip
+  json-c-devel
+  libatomic
+  libmnl-devel
+  libtool
+  libuuid-devel
+  libuv-devel
+  libyaml-devel
+  lz4-devel
+  make
+  openssl-devel
+  pkgconfig
+  python3
+  systemd-devel
+  tar
+  zlib-devel
   "${ulogd_pkg}"
 )
 

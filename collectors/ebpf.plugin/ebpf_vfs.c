@@ -964,30 +964,25 @@ static void ebpf_vfs_send_data(ebpf_module_t *em)
 /**
  * Read the hash table and store data to allocated vectors.
  *
+ * @param stats         vector used to read data from control table.
  * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_vfs_read_global_table(int maps_per_core)
+static void ebpf_vfs_read_global_table(netdata_idx_t *stats, int maps_per_core)
 {
-    uint64_t idx;
     netdata_idx_t res[NETDATA_VFS_COUNTER];
+    ebpf_read_global_table_stats(res,
+                                 vfs_hash_values,
+                                 vfs_maps[NETDATA_VFS_ALL].map_fd,
+                                 maps_per_core,
+                                 NETDATA_KEY_CALLS_VFS_WRITE,
+                                 NETDATA_VFS_COUNTER);
 
-    netdata_idx_t *val = vfs_hash_values;
-    size_t length = sizeof(netdata_idx_t);
-    if (maps_per_core)
-        length *= ebpf_nprocs;
-
-    int fd = vfs_maps[NETDATA_VFS_ALL].map_fd;
-    for (idx = 0; idx < NETDATA_VFS_COUNTER; idx++) {
-        uint64_t total = 0;
-        if (!bpf_map_lookup_elem(fd, &idx, val)) {
-            int i;
-            int end = (maps_per_core) ? ebpf_nprocs : 1;
-            for (i = 0; i < end; i++)
-                total += val[i];
-        }
-        res[idx] = total;
-        memset(val, 0, length);
-    }
+    ebpf_read_global_table_stats(stats,
+                                 vfs_hash_values,
+                                 vfs_maps[NETDATA_VFS_CTRL].map_fd,
+                                 maps_per_core,
+                                 NETDATA_CONTROLLER_PID_TABLE_ADD,
+                                 NETDATA_CONTROLLER_END);
 
     vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_UNLINK].ncall = res[NETDATA_KEY_CALLS_VFS_UNLINK];
     vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_READ].ncall = res[NETDATA_KEY_CALLS_VFS_READ] +
@@ -1963,6 +1958,8 @@ static void vfs_collector(ebpf_module_t *em)
     int maps_per_core = em->maps_per_core;
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
+    netdata_idx_t *stats = em->hash_table_stats;
+    memset(stats, 0, sizeof(em->hash_table_stats));
     while (!ebpf_exit_plugin && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_exit_plugin || ++counter != update_every)
@@ -1970,7 +1967,7 @@ static void vfs_collector(ebpf_module_t *em)
 
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
-        ebpf_vfs_read_global_table(maps_per_core);
+        ebpf_vfs_read_global_table(stats, maps_per_core);
         pthread_mutex_lock(&collect_data_mutex);
         if (apps)
             ebpf_vfs_read_apps(maps_per_core);

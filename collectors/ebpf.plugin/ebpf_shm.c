@@ -646,30 +646,24 @@ static void shm_send_global()
  *
  * Read the table with number of calls for all functions
  *
+ * @param stats         vector used to read data from control table.
  * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_shm_read_global_table(int maps_per_core)
+static void ebpf_shm_read_global_table(netdata_idx_t *stats, int maps_per_core)
 {
-    netdata_idx_t *stored = shm_values;
-    netdata_idx_t *val = shm_hash_values;
-    int fd = shm_maps[NETDATA_SHM_GLOBAL_TABLE].map_fd;
-    size_t length = sizeof(netdata_idx_t);
-    if (maps_per_core)
-        length *= ebpf_nprocs;
+    ebpf_read_global_table_stats(shm_hash_values,
+                                 shm_values,
+                                 shm_maps[NETDATA_SHM_GLOBAL_TABLE].map_fd,
+                                 maps_per_core,
+                                 NETDATA_KEY_SHMGET_CALL,
+                                 NETDATA_SHM_END);
 
-    uint32_t i, end = NETDATA_SHM_END;
-    for (i = NETDATA_KEY_SHMGET_CALL; i < end; i++) {
-        if (!bpf_map_lookup_elem(fd, &i, stored)) {
-            int j;
-            int last = (maps_per_core) ? ebpf_nprocs : 1;
-            netdata_idx_t total = 0;
-            for (j = 0; j < last; j++)
-                total += stored[j];
-
-            val[i] = total;
-            memset(stored, 0 , length);
-        }
-    }
+    ebpf_read_global_table_stats(stats,
+                                 shm_values,
+                                 shm_maps[NETDATA_SHM_CONTROLLER].map_fd,
+                                 maps_per_core,
+                                 NETDATA_CONTROLLER_PID_TABLE_ADD,
+                                 NETDATA_CONTROLLER_END);
 }
 
 /**
@@ -1039,6 +1033,8 @@ static void shm_collector(ebpf_module_t *em)
     int maps_per_core = em->maps_per_core;
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
+    netdata_idx_t *stats = em->hash_table_stats;
+    memset(stats, 0, sizeof(em->hash_table_stats));
     while (!ebpf_exit_plugin && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_exit_plugin || ++counter != update_every)
@@ -1046,7 +1042,7 @@ static void shm_collector(ebpf_module_t *em)
 
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
-        ebpf_shm_read_global_table(maps_per_core);
+        ebpf_shm_read_global_table(stats, maps_per_core);
         pthread_mutex_lock(&collect_data_mutex);
         if (apps) {
             read_shm_apps_table(maps_per_core);

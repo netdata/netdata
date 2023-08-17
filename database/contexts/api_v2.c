@@ -1104,9 +1104,20 @@ static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
     o->count++;
 
     if(o->family != n->family) {
-        STRING *m = string_2way_merge(o->family, n->family);
-        string_freez(o->family);
-        o->family = m;
+        if((o->flags & RRD_FLAG_COLLECTED) && !(n->flags & RRD_FLAG_COLLECTED))
+            // keep old
+            ;
+        else if(!(o->flags & RRD_FLAG_COLLECTED) && (n->flags & RRD_FLAG_COLLECTED)) {
+            // keep new
+            string_freez(o->family);
+            o->family = string_dup(n->family);
+        }
+        else {
+            // merge
+            STRING *old_family = o->family;
+            o->family = string_2way_merge(o->family, n->family);
+            string_freez(old_family);
+        }
     }
 
     if(o->priority != n->priority) {
@@ -1287,7 +1298,7 @@ int contexts_v2_alert_config_to_json(struct web_client *w, const char *config_ha
 
     buffer_flush(w->response.data);
 
-    buffer_json_initialize(w->response.data, "\"", "\"", 0, true, false);
+    buffer_json_initialize(w->response.data, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
     int added = sql_get_alert_configuration(configs, contexts_v2_alert_config_to_json_from_sql_alert_config_data, &data, false);
     buffer_json_finalize(w->response.data);
@@ -1923,14 +1934,14 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     }
 
     if(req->after || req->before) {
-        ctl.window.relative = rrdr_relative_window_to_absolute(&ctl.window.after, &ctl.window.before, &ctl.now);
+        ctl.window.relative = rrdr_relative_window_to_absolute(&ctl.window.after, &ctl.window.before, &ctl.now, false);
         ctl.window.enabled = !(mode & CONTEXTS_V2_ALERT_TRANSITIONS);
     }
     else
         ctl.now = now_realtime_sec();
 
-    buffer_json_initialize(wb, "\"", "\"", 0,
-                           true, (req->options & CONTEXT_V2_OPTION_MINIFY) && !(req->options & CONTEXT_V2_OPTION_DEBUG));
+    buffer_json_initialize(wb, "\"", "\"", 0, true,
+                           ((req->options & CONTEXT_V2_OPTION_MINIFY) && !(req->options & CONTEXT_V2_OPTION_DEBUG)) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
 
     buffer_json_member_add_uint64(wb, "api", 2);
 

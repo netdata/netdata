@@ -23,11 +23,7 @@ rules:
   empty-values: enable
   hyphens: enable
   indentation: enable
-  line-length:
-    max: 150
-    level: warning
-    allow-non-breakable-words: true
-    allow-non-breakable-inline-mappings: true
+  line-length: disable
   key-duplicates: enable
   key-ordering: disable
   new-line-at-end-of-file: enable

@@ -451,7 +451,7 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
 - [MegaRAID controllers](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/megacli/README.md):
   Collect adapter, physical drives, and
   battery stats using the `megacli` tool.
-- [NVIDIA GPU](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/nvidia_smi/README.md): Monitor
+- [NVIDIA GPU](https://github.com/netdata/go.d.plugin/blob/master/modules/nvidia_smi/README.md): Monitor
   performance metrics (memory usage, fan
   speed, pcie bandwidth utilization, temperature, and more) using the `nvidia-smi` tool.
 - [Sensors](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/sensors/README.md): Reads system
@@ -581,9 +581,9 @@ collectors are described only in code and associated charts in Netdata dashboard
 - [ACLK (code only)](https://github.com/netdata/netdata/blob/master/aclk/legacy/aclk_stats.c): View whether a Netdata
   Agent is connected to Netdata Cloud via the [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md), the
   volume of queries, process times, and more.
-- [Alarms](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/alarms/README.md): This collector
+- [Alerts](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/alarms/README.md): This collector
   creates an
-  **Alarms** menu with one line plot showing the alarm states of a Netdata Agent over time.
+  **Alerts** menu with one line plot showing the alert states of a Netdata Agent over time.
 - [Anomalies](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/anomalies/README.md): This
   collector uses the
   Python PyOD library to perform unsupervised anomaly detection on your Netdata charts and/or dimensions.
@@ -669,6 +669,7 @@ $ sudo systemctl restart netdata
 - [netdata-debsecan](https://github.com/nodiscc/netdata-debsecan) - Check/graph the number of CVEs in currently installed packages.
 - [netdata-logcount](https://github.com/nodiscc/netdata-logcount) - Check/graph the number of syslog messages, by level over time.
 - [netdata-apt](https://github.com/nodiscc/netdata-apt) - Check/graph and alert on the number of upgradeable packages, and available distribution upgrades.
+- [diskquota](https://github.com/netdata/community/tree/main/collectors/python.d.plugin/diskquota) - Monitors the defined quotas on one or more filesystems depending on configuration.
 
 ## Etc
 

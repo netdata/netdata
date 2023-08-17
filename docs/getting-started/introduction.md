@@ -17,7 +17,7 @@ Netdata is:
 - **One-line deployment** for Linux distributions, plus support for Kubernetes/Docker infrastructures.
 - **Zero configuration and maintenance** required to collect thousands of metrics, every second, from the underlying
     OS and running applications.
-- **Prebuilt charts and alarms** alert you to common anomalies and performance issues without manual configuration.
+- **Prebuilt charts and alerts** alert you to common anomalies and performance issues without manual configuration.
 - **Distributed storage** to simplify the cost and complexity of storing metrics data from any number of nodes.
 
 ### Powerful and scalable
@@ -48,7 +48,7 @@ Netdata offers many benefits over the existing monitoring landscape, whether the
 open-source tools.
 
 | Netdata                                                         | Others (open-source and commercial)                              |
-| :-------------------------------------------------------------- | :--------------------------------------------------------------- |
+|:----------------------------------------------------------------|:-----------------------------------------------------------------|
 | **High resolution metrics** (1s granularity)                    | Low resolution metrics (10s granularity at best)                 |
 | Collects **thousands of metrics per node**                      | Collects just a few metrics                                      |
 | Fast UI optimized for **anomaly detection**                     | UI is good for just an abstract view                             |
@@ -64,7 +64,7 @@ Netdata works with tons of applications, notifications platforms, and other time
 - **300+ system, container, and application endpoints**: Collectors autodetect metrics from default endpoints and
     immediately visualize them into meaningful charts designed for troubleshooting. See [everything we
     support](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md).
-- **20+ notification platforms**: Netdata's health watchdog sends warning and critical alarms to your [favorite
+- **20+ notification platforms**: Netdata's health watchdog sends warning and critical alerts to your [favorite
     platform](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to inform you of anomalies just seconds
     after they affect your node.
 - **30+ external time-series databases**: Export resampled metrics as they're collected to other [local- and
@@ -96,9 +96,9 @@ You can install Netdata on most Linux distributions (Ubuntu, Debian, CentOS, and
 
 ### Netdata Cloud
 
-Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alarms from all your nodes in a single web interface. When an anomaly strikes, seamlessly navigate to any node to troubleshoot and discover the root cause with the familiar Netdata dashboard.
+Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alerts from all your nodes in a single web interface. When an anomaly strikes, seamlessly navigate to any node to troubleshoot and discover the root cause with the familiar Netdata dashboard.
 
-Netdata Cloud is free! You can add an entire infrastructure of nodes, invite all your colleagues, and visualize any number of metrics, charts, and alarms entirely for free.
+Netdata Cloud is free! You can add an entire infrastructure of nodes, invite all your colleagues, and visualize any number of metrics, charts, and alerts entirely for free.
 
 While Netdata Cloud offers a centralized method of monitoring your Agents, your metrics data is not stored or centralized in any way. Metrics data remains with your nodes and is only streamed to your browser, through Cloud, when you're viewing the Netdata Cloud interface.
 
@@ -189,5 +189,5 @@ _When people first hear about a new product, they frequently ask if it is any go
 [remarked](https://news.ycombinator.com/item?id=3067434):_
 
 > Note to self: Starting immediately, all raganwald projects will have a “Is it any good?” section in the readme, and
-> the answer shall be “yes.".
+> the answer shall be "yes.".
 *******************************************************************************

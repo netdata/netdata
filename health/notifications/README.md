@@ -58,7 +58,7 @@ You can send the notification to multiple recipients by separating the emails wi
 # RECIPIENTS PER ROLE
 
 # -----------------------------------------------------------------------------
-# generic system alarms
+# generic system alerts
 # CPU, disks, network interfaces, entropy, etc
 
 role_recipients_email[sysadmin]="someone@exaple.com someoneelse@example.com"
@@ -106,10 +106,10 @@ sudo su -s /bin/bash netdata
 # enable debugging info on the console
 export NETDATA_ALARM_NOTIFY_DEBUG=1
 
-# send test alarms to sysadmin
+# send test alerts to sysadmin
 /usr/libexec/netdata/plugins.d/alarm-notify.sh test
 
-# send test alarms to any role
+# send test alerts to any role
 /usr/libexec/netdata/plugins.d/alarm-notify.sh test "ROLE"
 ```
 
@@ -129,17 +129,17 @@ If you are [running your own registry](https://github.com/netdata/netdata/blob/m
 
 When you define recipients per role for notification methods, you can append `|critical` to limit the notifications that are sent.
 
-In the following examples, the first recipient receives all the alarms, while the second one receives only notifications for alarms that have at some point become critical.
-The second user may still receive warning and clear notifications, but only for the event that previously caused a critical alarm.
+In the following examples, the first recipient receives all the alerts, while the second one receives only notifications for alerts that have at some point become critical.
+The second user may still receive warning and clear notifications, but only for the event that previously caused a critical alert.
 
 ```conf
  email      : "user1@example.com user2@example.com|critical"
  pushover   : "2987343...9437837 8756278...2362736|critical"
  telegram   : "111827421 112746832|critical"
- slack      : "alarms disasters|critical"
- alerta     : "alarms disasters|critical"
- flock      : "alarms disasters|critical"
- discord    : "alarms disasters|critical"
+ slack      : "alerts disasters|critical"
+ alerta     : "alerts disasters|critical"
+ flock      : "alerts disasters|critical"
+ discord    : "alerts disasters|critical"
  twilio     : "+15555555555 +17777777777|critical"
  messagebird: "+15555555555 +17777777777|critical"
  kavenegar  : "09155555555 09177777777|critical"
@@ -148,7 +148,7 @@ The second user may still receive warning and clear notifications, but only for 
 ```
 
 If a per role recipient is set to an empty string, the default recipient of the given
-notification method (email, pushover, telegram, slack, alerta, etc) will be used.
+notification method (email, pushover, telegram, slack, alerta, etc.) will be used.
 
 To disable a notification, use the recipient called: disabled
 This works for all notification methods (including the default recipients).

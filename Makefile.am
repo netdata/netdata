@@ -155,6 +155,8 @@ LIBNETDATA_FILES = \
     libnetdata/dictionary/dictionary.h \
     libnetdata/eval/eval.c \
     libnetdata/eval/eval.h \
+    libnetdata/facets/facets.c \
+    libnetdata/facets/facets.h \
     libnetdata/gorilla/gorilla.h \
     libnetdata/gorilla/gorilla.cc \
     libnetdata/inlined.h \
@@ -201,6 +203,8 @@ LIBNETDATA_FILES = \
     libnetdata/worker_utilization/worker_utilization.c \
     libnetdata/worker_utilization/worker_utilization.h \
     libnetdata/http/http_defs.h \
+    libnetdata/dyn_conf/dyn_conf.c \
+    libnetdata/dyn_conf/dyn_conf.h \
     $(NULL)
 
 if ENABLE_PLUGIN_EBPF
@@ -220,6 +224,7 @@ DEBUGFS_PLUGIN_FILES = \
     collectors/debugfs.plugin/debugfs_plugin.h \
     collectors/debugfs.plugin/debugfs_extfrag.c \
     collectors/debugfs.plugin/debugfs_zswap.c \
+    collectors/debugfs.plugin/sys_devices_virtual_powercap.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -297,6 +302,11 @@ TIMEX_PLUGIN_FILES = \
 
 FREEIPMI_PLUGIN_FILES = \
     collectors/freeipmi.plugin/freeipmi_plugin.c \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
+SYSTEMD_JOURNAL_PLUGIN_FILES = \
+    collectors/systemd-journal.plugin/systemd-journal.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -409,10 +419,12 @@ PROC_PLUGIN_FILES = \
     collectors/proc.plugin/sys_kernel_mm_ksm.c \
     collectors/proc.plugin/sys_block_zram.c \
     collectors/proc.plugin/sys_devices_system_edac_mc.c \
+    collectors/proc.plugin/sys_devices_pci_aer.c \
     collectors/proc.plugin/sys_devices_system_node.c \
     collectors/proc.plugin/sys_fs_btrfs.c \
     collectors/proc.plugin/sys_class_power_supply.c \
     collectors/proc.plugin/sys_class_infiniband.c \
+    collectors/proc.plugin/sys_class_drm.c \
     $(NULL)
 
 PROFILE_PLUGIN_FILES = \
@@ -587,6 +599,8 @@ API_PLUGIN_FILES = \
     web/api/exporters/allmetrics.h \
     web/api/exporters/shell/allmetrics_shell.c \
     web/api/exporters/shell/allmetrics_shell.h \
+    web/api/ilove/ilove.c \
+    web/api/ilove/ilove.h \
     web/api/queries/average/average.c \
     web/api/queries/average/average.h \
     web/api/queries/countif/countif.c \
@@ -1273,6 +1287,15 @@ if ENABLE_PLUGIN_FREEIPMI
     freeipmi_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_IPMIMONITORING_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_SYSTEMD_JOURNAL
+    plugins_PROGRAMS += systemd-journal.plugin
+    systemd_journal_plugin_SOURCES = $(SYSTEMD_JOURNAL_PLUGIN_FILES)
+    systemd_journal_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(OPTIONAL_SYSTEMD_LIBS) \
         $(NULL)
 endif
 

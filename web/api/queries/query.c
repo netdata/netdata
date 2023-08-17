@@ -17,6 +17,7 @@
 #include "percentile/percentile.h"
 #include "trimmed_mean/trimmed_mean.h"
 
+#define QUERY_PLAN_MIN_POINTS 10
 #define POINTS_TO_EXPAND_QUERY 5
 
 // ----------------------------------------------------------------------------
@@ -995,6 +996,10 @@ static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t afte
 
     if(unlikely(after_wanted == before_wanted || points_wanted <= 0))
         return query_metric_first_working_tier(qm);
+
+    if(points_wanted < QUERY_PLAN_MIN_POINTS)
+        // when selecting tiers, aim for a resolution of at least QUERY_PLAN_MIN_POINTS points
+        points_wanted = (before_wanted - after_wanted) > QUERY_PLAN_MIN_POINTS ? QUERY_PLAN_MIN_POINTS : before_wanted - after_wanted;
 
     time_t min_first_time_s = 0;
     time_t max_last_time_s = 0;
@@ -2070,88 +2075,6 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
 }
 #endif // NETDATA_INTERNAL_CHECKS
 
-// Returns 1 if an absolute period was requested or 0 if it was a relative period
-bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t *now_ptr) {
-    time_t now = now_realtime_sec() - 1;
-
-    if(now_ptr)
-        *now_ptr = now;
-
-    int absolute_period_requested = -1;
-    long long after_requested, before_requested;
-
-    before_requested = *before;
-    after_requested = *after;
-
-    // allow relative for before (smaller than API_RELATIVE_TIME_MAX)
-    if(ABS(before_requested) <= API_RELATIVE_TIME_MAX) {
-        // if the user asked for a positive relative time,
-        // flip it to a negative
-        if(before_requested > 0)
-            before_requested = -before_requested;
-
-        before_requested = now + before_requested;
-        absolute_period_requested = 0;
-    }
-
-    // allow relative for after (smaller than API_RELATIVE_TIME_MAX)
-    if(ABS(after_requested) <= API_RELATIVE_TIME_MAX) {
-        if(after_requested > 0)
-            after_requested = -after_requested;
-
-        // if the user didn't give an after, use the number of points
-        // to give a sane default
-        if(after_requested == 0)
-            after_requested = -600;
-
-        // since the query engine now returns inclusive timestamps
-        // it is awkward to return 6 points when after=-5 is given
-        // so for relative queries we add 1 second, to give
-        // more predictable results to users.
-        after_requested = before_requested + after_requested + 1;
-        absolute_period_requested = 0;
-    }
-
-    if(absolute_period_requested == -1)
-        absolute_period_requested = 1;
-
-    // check if the parameters are flipped
-    if(after_requested > before_requested) {
-        long long t = before_requested;
-        before_requested = after_requested;
-        after_requested = t;
-    }
-
-    // if the query requests future data
-    // shift the query back to be in the present time
-    // (this may also happen because of the rules above)
-    if(before_requested > now) {
-        long long delta = before_requested - now;
-        before_requested -= delta;
-        after_requested  -= delta;
-    }
-
-    time_t absolute_minimum_time = now - (10 * 365 * 86400);
-    time_t absolute_maximum_time = now + (1 * 365 * 86400);
-
-    if (after_requested < absolute_minimum_time && !unittest_running)
-        after_requested = absolute_minimum_time;
-
-    if (after_requested > absolute_maximum_time && !unittest_running)
-        after_requested = absolute_maximum_time;
-
-    if (before_requested < absolute_minimum_time && !unittest_running)
-        before_requested = absolute_minimum_time;
-
-    if (before_requested > absolute_maximum_time && !unittest_running)
-        before_requested = absolute_maximum_time;
-
-    *before = before_requested;
-    *after = after_requested;
-
-    return (absolute_period_requested != 1);
-}
-
 // #define DEBUG_QUERY_LOGIC 1
 
 #ifdef DEBUG_QUERY_LOGIC
@@ -2278,7 +2201,7 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     }
 
     // convert our before_wanted and after_wanted to absolute
-    rrdr_relative_window_to_absolute(&after_wanted, &before_wanted, NULL);
+    rrdr_relative_window_to_absolute(&after_wanted, &before_wanted, NULL, unittest_running);
     query_debug_log(":relative2absolute after %ld, before %ld", after_wanted, before_wanted);
 
     if (natural_points && (options & RRDR_OPTION_SELECTED_TIER) && tier > 0 && storage_tiers > 1) {
@@ -2983,11 +2906,11 @@ static RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         }
 
         // initialize partial trimming
-        r->partial_data_trimming.max_update_every = update_every_max;
+        r->partial_data_trimming.max_update_every = update_every_max * 2;
         r->partial_data_trimming.expected_after =
                 (!query_target_aggregatable(qt) &&
-                 qt->window.before >= qt->window.now - update_every_max) ?
-                qt->window.before - update_every_max :
+                 qt->window.before >= qt->window.now - r->partial_data_trimming.max_update_every) ?
+                qt->window.before - r->partial_data_trimming.max_update_every :
                 qt->window.before;
         r->partial_data_trimming.trimmed_after = qt->window.before;
 
@@ -3139,6 +3062,8 @@ static void rrdr2rrdr_group_by_partial_trimming(RRDR *r) {
     if(unlikely(i < 0))
         return;
 
+    // internal_error(true, "Found trimmable index %zd (from 0 to %zu)", i, r->n - 1);
+
     size_t last_row_gbc = 0;
     for (; i < (ssize_t)r->n; i++) {
         size_t row_gbc = 0;
@@ -3149,8 +3074,11 @@ static void rrdr2rrdr_group_by_partial_trimming(RRDR *r) {
             row_gbc += r->gbc[ i * r->d + d ];
         }
 
-        if (unlikely(r->t[i] >= trimmable_after && row_gbc < last_row_gbc)) {
+        // internal_error(true, "GBC of index %zd is %zu", i, row_gbc);
+
+        if (unlikely(r->t[i] >= trimmable_after && (row_gbc < last_row_gbc || !row_gbc))) {
             // discard the rest of the points
+            // internal_error(true, "Discarding points %zd to %zu", i, r->n - 1);
             r->partial_data_trimming.trimmed_after = r->t[i];
             r->rows = i;
             break;

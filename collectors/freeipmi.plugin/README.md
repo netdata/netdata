@@ -90,9 +90,9 @@ Metrics:
 | ipmi.sensor_power           |                power                |   Watts    |
 | ipmi.sensor_reading_percent |             percentage              |     %      |
 
-## Alarms
+## Alerts
 
-There are 2 alarms:
+There are 2 alerts:
 
 - The sensor is in a warning or critical state.
 - System Event Log (SEL) is non-empty.

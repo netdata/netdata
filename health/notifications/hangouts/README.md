@@ -12,7 +12,7 @@ learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 # Google Hangouts agent alert notifications
 
 [Google Hangouts](https://hangouts.google.com/) is a cross-platform messaging app developed by Google. You can configure
-Netdata to send alarm notifications to a Hangouts room in order to stay aware of possible health or performance issues
+Netdata to send alert notifications to a Hangouts room in order to stay aware of possible health or performance issues
 on your nodes. Here's an example of the notification in action:
 
 ![Netdata on Hangouts](https://user-images.githubusercontent.com/1153921/66427166-47de6900-e9c8-11e9-8322-b4b03f084dc1.png)
@@ -30,7 +30,7 @@ Set the webhook URIs and room names in `health_alarm_notify.conf`. To edit it on
 
 ## Threads (optional)
 
-Instead to receive alarms on different threads, Netdata allows you to concentrate them inside an unique thread when you
+Instead, to receive alerts on different threads, Netdata allows you to concentrate them inside a unique thread when you
 set the variable `HANGOUTS_WEBHOOK_THREAD[NAME]`.
 
 ```
@@ -49,11 +49,11 @@ HANGOUTS_WEBHOOK_URI[development]="https://chat.googleapis.com/v1/spaces/AAAAYYY
 # if a DEFAULT_RECIPIENT_HANGOUTS are not configured,
 # notifications wouldn't be send to hangouts rooms.
 # DEFAULT_RECIPIENT_HANGOUTS="systems development|critical"
-DEFAULT_RECIPIENT_HANGOUTS="sysadmin devops alarms|critical"
+DEFAULT_RECIPIENT_HANGOUTS="sysadmin devops alerts|critical"
 ```
 
-You can define multiple rooms like this: `sysadmin devops alarms|critical`.
+You can define multiple rooms like this: `sysadmin devops alerts|critical`.
 
-The keywords `sysadmin`, `devops`, and `alarms` are Hangouts rooms.
+The keywords `sysadmin`, `devops`, and `alerts` are Hangouts rooms.
 
 

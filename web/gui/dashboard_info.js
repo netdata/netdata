@@ -140,6 +140,12 @@ netdataDashboard.menu = {
         info: 'Detailed information for each CPU of the system. A summary of the system for all CPUs can be found at the <a href="#menu_system">System Overview</a> section.'
     },
 
+    'amdgpu': {
+        title: 'AMD GPUs',
+        icon: '<i class="fas fa-microchip"></i>',
+        info: 'Detailed information for each AMD GPU of the system. Temperature, fan speed, voltage and power metrics can be found at the <a href="#menu_sensors">Sensors</a> section.'
+    },
+
     'mem': {
         title: 'Memory',
         icon: '<i class="fas fa-microchip"></i>',
@@ -1220,6 +1226,10 @@ netdataDashboard.submenu = {
         info: 'A connection is an established line of communication between a client and the PostgreSQL server. Each connection adds to the load on the PostgreSQL server. To guard against running out of memory or overloading the database the <i>max_connections</i> parameter (default = 100) defines the maximum number of concurrent connections to the database server. A separate parameter, <i>superuser_reserved_connections</i> (default = 3), defines the quota for superuser connections (so that superusers can connect even if all other connection slots are blocked).'
     },
 
+    'system.power_consumption': {
+        info: 'The current power consumption of the zones defined by the <a href="https://www.kernel.org/doc/html/next/power/powercap/powercap.html" target="_blank">power capping framework</a>.'
+    }
+
 };
 
 // ----------------------------------------------------------------------------
@@ -1563,7 +1573,7 @@ netdataDashboard.context = {
         info: 'Memory paged from/to disk. This is usually the total disk I/O of the system.'
     },
 
-    'system.swapio': {
+    'mem.swapio': {
         info: '<p>System swap I/O.</p>'+
         '<b>In</b> - pages the system has swapped in from disk to RAM. '+
         '<b>Out</b> - pages the system has swapped out from RAM to disk.'
@@ -1708,7 +1718,7 @@ netdataDashboard.context = {
         info: 'System Random Access Memory (i.e. physical memory) usage.'
     },
 
-    'system.swap': {
+    'mem.swap': {
         info: 'System swap memory usage. Swap space is used when the amount of physical memory (RAM) is full. When the system needs more memory resources and the RAM is full, inactive pages in memory are moved to the swap space (usually a disk, a disk partition or a file).'
     },
 
@@ -1771,6 +1781,10 @@ netdataDashboard.context = {
     'system.process_status': {
         title : 'Task status',
         info: 'Difference between the number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#process-exit" target="_blank">functions</a> that close a task and release a task.'+ ebpfChartProvides
+    },
+
+    'system.power_consumption': {
+        info: 'The current power consumption of the zones defined by the <a href="https://www.kernel.org/doc/html/next/power/powercap/powercap.html" target="_blank">power capping framework</a>.'
     },
 
     // ------------------------------------------------------------------------

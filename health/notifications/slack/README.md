@@ -36,7 +36,7 @@ Edit `health_alarm_notify.conf`, changes to this file do not require restarting 
 2. Set `SLACK_WEBHOOK_URL` to your Slack app's webhook URL.
 3. Set `DEFAULT_RECIPIENT_SLACK` to the Slack channel your Slack app is set to send messages to.  
    The syntax for channels is `#channel` or `channel`.  
-   All roles will default to this variable if left unconfigured.
+   All roles will default to this variable if it is not configured.
 
 An example of a working configuration would be:
 
@@ -46,7 +46,7 @@ An example of a working configuration would be:
 
 SEND_SLACK="YES"
 SLACK_WEBHOOK_URL="https://hooks.slack.com/services/XXXXXXXX/XXXXXXXX/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" 
-DEFAULT_RECIPIENT_SLACK="#alarms"
+DEFAULT_RECIPIENT_SLACK="#alerts"
 ```
 
 ## Test the notification method

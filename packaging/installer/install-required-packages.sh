@@ -732,6 +732,19 @@ declare -A pkg_libatomic=(
   ['default']="libatomic"
 )
 
+declare -A pkg_libsystemd_dev=(
+  ['alpine']="NOTREQUIRED"
+  ['arch']="NOTREQUIRED" # inherently present on systems actually using systemd
+  ['clearlinux']="system-os-dev"
+  ['debian']="libsystemd-dev"
+  ['freebsd']="NOTREQUIRED"
+  ['gentoo']="NOTREQUIRED" # inherently present on systems actually using systemd
+  ['macos']="NOTREQUIRED"
+  ['sabayon']="NOTREQUIRED" # inherently present on systems actually using systemd
+  ['ubuntu']="libsystemd-dev"
+  ['default']="systemd-devel"
+)
+
 declare -A pkg_bridge_utils=(
   ['gentoo']="net-misc/bridge-utils"
   ['clearlinux']="network-basic"
@@ -1275,6 +1288,7 @@ packages() {
     suitable_package json-c-dev
     suitable_package fts-dev
     suitable_package libyaml-dev
+    suitable_package libsystemd-dev
   fi
 
   # -------------------------------------------------------------------------

@@ -43,6 +43,11 @@
 #define PLUGINSD_KEYWORD_HOST_LABEL             "HOST_LABEL"
 #define PLUGINSD_KEYWORD_HOST                   "HOST"
 
+#define PLUGINSD_KEYWORD_DYNCFG_ENABLE          "DYNCFG_ENABLE"
+#define PLUGINSD_KEYWORD_DYNCFG_REGISTER_MODULE "DYNCFG_REGISTER_MODULE"
+
+#define PLUGINSD_KEYWORD_REPORT_JOB_STATUS      "REPORT_JOB_STATUS"
+
 #define PLUGINSD_KEYWORD_EXIT                   "EXIT"
 
 #define PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT 10 // seconds
@@ -80,6 +85,9 @@ struct plugind {
 
     time_t started_t;
 
+    const DICTIONARY_ITEM *cfg_dict_item;
+    struct configurable_plugin *configuration;
+
     struct plugind *prev;
     struct plugind *next;
 };
@@ -90,8 +98,6 @@ size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input
 void pluginsd_process_thread_cleanup(void *ptr);
 
 size_t pluginsd_initialize_plugin_directories();
-
-
 
 #define pluginsd_function_result_begin_to_buffer(wb, transaction, code, content_type, expires)      \
     buffer_sprintf(wb                                                                               \
@@ -116,5 +122,14 @@ size_t pluginsd_initialize_plugin_directories();
 
 #define pluginsd_function_result_end_to_stdout() \
     fprintf(stdout, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n")
+
+static inline void pluginsd_function_json_error(const char *transaction, int code, const char *msg) {
+    char buffer[PLUGINSD_LINE_MAX + 1];
+    json_escape_string(buffer, msg, PLUGINSD_LINE_MAX);
+
+    pluginsd_function_result_begin_to_stdout(transaction, code, "application/json", now_realtime_sec());
+    fprintf(stdout, "{\"status\":%d,\"error_message\":\"%s\"}", code, buffer);
+    pluginsd_function_result_end_to_stdout();
+}
 
 #endif /* NETDATA_PLUGINS_D_H */

@@ -10,7 +10,7 @@ Learn how to send alerts to an ntfy server using Netdata's Agent alert notificat
 
 This is what you will get:
 
-<img src="https://user-images.githubusercontent.com/5953192/230661442-a180abe2-c8bd-496e-88be-9038e62fb4f7.png" alt="Example alarm notifications in Ntfy" width="60%"></img>
+<img src="https://user-images.githubusercontent.com/5953192/230661442-a180abe2-c8bd-496e-88be-9038e62fb4f7.png" alt="Example alert notifications in Ntfy" width="60%"></img>
 
 ## Prerequisites
 
@@ -37,7 +37,7 @@ Edit `health_alarm_notify.conf`, changes to this file do not require restarting 
 2. Set `DEFAULT_RECIPIENT_NTFY` to the URL formed by the server-topic combination you want the alert notifications to be sent to. Unless you are hosting your own server, the server should always be set to [https://ntfy.sh](https://ntfy.sh)
 
     You can define multiple recipient URLs like this: `https://SERVER1/TOPIC1 https://SERVER2/TOPIC2`  
-    All roles will default to this variable if left unconfigured.
+    All roles will default to this variable if it is not configured.
 
 > ### Warning
 > All topics published on https://ntfy.sh are public, so anyone can subscribe to them and follow your notifications. To avoid that, ensure the topic is unique enough using a long, randomly generated ID, like in the following examples.

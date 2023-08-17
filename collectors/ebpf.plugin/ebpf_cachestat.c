@@ -854,26 +854,24 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
  *
  * Read the table with number of calls for all functions
  *
+ * @param stats         vector used to read data from control table.
  * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_cachestat_read_global_table(int maps_per_core)
+static void ebpf_cachestat_read_global_tables(netdata_idx_t *stats, int maps_per_core)
 {
-    uint32_t idx;
-    netdata_idx_t *val = cachestat_hash_values;
-    netdata_idx_t *stored = cachestat_values;
-    int fd = cachestat_maps[NETDATA_CACHESTAT_GLOBAL_STATS].map_fd;
+    ebpf_read_global_table_stats(cachestat_hash_values,
+                                 cachestat_values,
+                                 cachestat_maps[NETDATA_CACHESTAT_GLOBAL_STATS].map_fd,
+                                 maps_per_core,
+                                 NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU,
+                                 NETDATA_CACHESTAT_END);
 
-    for (idx = NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU; idx < NETDATA_CACHESTAT_END; idx++) {
-        if (!bpf_map_lookup_elem(fd, &idx, stored)) {
-            int i;
-            int end = (maps_per_core) ? ebpf_nprocs: 1;
-            netdata_idx_t total = 0;
-            for (i = 0; i < end; i++)
-                total += stored[i];
-
-            val[idx] = total;
-        }
-    }
+    ebpf_read_global_table_stats(stats,
+                                 cachestat_values,
+                                 cachestat_maps[NETDATA_CACHESTAT_CTRL].map_fd,
+                                 maps_per_core,
+                                 NETDATA_CONTROLLER_PID_TABLE_ADD,
+                                 NETDATA_CONTROLLER_END);
 }
 
 /**
@@ -1288,6 +1286,8 @@ static void cachestat_collector(ebpf_module_t *em)
     //This will be cancelled by its parent
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
+    netdata_idx_t *stats = em->hash_table_stats;
+    memset(stats, 0, sizeof(em->hash_table_stats));
     while (!ebpf_exit_plugin && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
 
@@ -1296,7 +1296,7 @@ static void cachestat_collector(ebpf_module_t *em)
 
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
-        ebpf_cachestat_read_global_table(maps_per_core);
+        ebpf_cachestat_read_global_tables(stats, maps_per_core);
         pthread_mutex_lock(&collect_data_mutex);
         if (apps)
             ebpf_read_cachestat_apps_table(maps_per_core);

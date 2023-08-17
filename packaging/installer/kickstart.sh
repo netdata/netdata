@@ -50,7 +50,7 @@ SELECTED_INSTALL_METHOD="none"
 INSTALL_TYPE="unknown"
 INSTALL_PREFIX=""
 NETDATA_AUTO_UPDATES="default"
-NETDATA_CLAIM_URL="https://api.netdata.cloud"
+NETDATA_CLAIM_URL="https://app.netdata.cloud"
 NETDATA_COMMAND="default"
 NETDATA_DISABLE_CLOUD=0
 NETDATA_INSTALLER_OPTIONS=""
@@ -257,14 +257,16 @@ telemetry_event() {
     TOTAL_RAM="$((TOTAL_RAM * 1024))"
   fi
 
+  MD5_PATH="$(exec <&- 2>&-; which md5sum || command -v md5sum || type md5sum)"
+
   if [ "${KERNEL_NAME}" = Darwin ] && command -v ioreg >/dev/null 2>&1; then
     DISTINCT_ID="macos-$(ioreg -rd1 -c IOPlatformExpertDevice | awk '/IOPlatformUUID/ { split($0, line, "\""); printf("%s\n", line[4]); }')"
-  elif [ -f /etc/machine-id ]; then
-    DISTINCT_ID="machine-$(cat /etc/machine-id)"
-  elif [ -f /var/db/dbus/machine-id ]; then
-    DISTINCT_ID="dbus-$(cat /var/db/dbus/machine-id)"
-  elif [ -f /var/lib/dbus/machine-id ]; then
-    DISTINCT_ID="dbus-$(cat /var/lib/dbus/machine-id)"
+  elif [ -f /etc/machine-id ] && [ -n "$MD5_PATH" ]; then
+    DISTINCT_ID="machine-$($MD5_PATH < /etc/machine-id | cut -f1 -d" ")"
+  elif [ -f /var/db/dbus/machine-id ] && [ -n "$MD5_PATH" ]; then
+    DISTINCT_ID="dbus-$($MD5_PATH < /var/db/dbus/machine-id | cut -f1 -d" ")"
+  elif [ -f /var/lib/dbus/machine-id ] && [ -n "$MD5_PATH" ]; then
+    DISTINCT_ID="dbus-$($MD5_PATH < /var/lib/dbus/machine-id | cut -f1 -d" ")"
   elif command -v uuidgen > /dev/null 2>&1; then
     DISTINCT_ID="uuid-$(uuidgen | tr '[:upper:]' '[:lower:]')"
   else
@@ -300,7 +302,8 @@ telemetry_event() {
     "system_kernel_name": "${KERNEL_NAME}",
     "system_kernel_version": "$(uname -r)",
     "system_architecture": "$(uname -m)",
-    "system_total_ram": "${TOTAL_RAM:-unknown}"
+    "system_total_ram": "${TOTAL_RAM:-unknown}",
+    "system_distinct_id": "${DISTINCT_ID}"
   }
 }
 EOF
@@ -411,6 +414,7 @@ success_banner() {
 cleanup() {
   if [ -z "${NO_CLEANUP}" ] && [ -n "${tmpdir}" ]; then
     cd || true
+    DRY_RUN=0
     run_as_root rm -rf "${tmpdir}"
   fi
 }
@@ -1330,7 +1334,7 @@ check_special_native_deps() {
         progress "EPEL is available, attempting to install so that required dependencies are available."
 
         # shellcheck disable=SC2086
-        if ! run_as_root env ${env} ${pm_cmd} install ${pkg_install_opts} epel-release; then
+        if ! run_as_root env ${env} ${pm_cmd} ${install_subcmd} ${pkg_install_opts} epel-release; then
           warning "Failed to install EPEL, even though it is required to install native packages on this system."
           return 1
         fi
@@ -1350,12 +1354,16 @@ common_rpm_opts() {
 }
 
 common_dnf_opts() {
+  if [ "${INTERACTIVE}" = "0" ]; then
+    interactive_opts="-y"
+  fi
   if command -v dnf > /dev/null; then
     pm_cmd="dnf"
     repo_subcmd="makecache"
   else
     pm_cmd="yum"
   fi
+  install_subcmd="install"
   pkg_install_opts="${interactive_opts}"
   repo_update_opts="${interactive_opts}"
   uninstall_subcmd="remove"
@@ -1390,16 +1398,18 @@ try_package_install() {
     release=""
   fi
 
-  if [ "${INTERACTIVE}" = "0" ]; then
-    interactive_opts="-y"
-    env="DEBIAN_FRONTEND=noninteractive"
-  else
-    interactive_opts=""
-    env=""
-  fi
+  interactive_opts=""
+  env=""
 
   case "${DISTRO_COMPAT_NAME}" in
     debian|ubuntu)
+      if [ "${INTERACTIVE}" = "0" ]; then
+        install_subcmd="-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold install"
+        interactive_opts="-y"
+        env="DEBIAN_FRONTEND=noninteractive"
+      else
+        install_subcmd="install"
+      fi
       needs_early_refresh=1
       pm_cmd="apt-get"
       repo_subcmd="update"
@@ -1427,6 +1437,11 @@ try_package_install() {
       repo_prefix="${DISTRO_COMPAT_NAME}/${SYSVERSION}"
       ;;
     opensuse)
+      if [ "${INTERACTIVE}" = "0" ]; then
+        install_subcmd="--non-interactive --no-gpg-checks install"
+      else
+        install_subcmd="--no-gpg-checks install"
+      fi
       common_rpm_opts
       pm_cmd="zypper"
       repo_subcmd="--gpg-auto-import-keys refresh"
@@ -1497,7 +1512,7 @@ try_package_install() {
     fi
 
     # shellcheck disable=SC2086
-    if ! run_as_root env ${env} ${pm_cmd} install ${pkg_install_opts} "${tmpdir}/${repoconfig_file}"; then
+    if ! run_as_root env ${env} ${pm_cmd} ${install_subcmd} ${pkg_install_opts} "${tmpdir}/${repoconfig_file}"; then
       warning "Failed to install repository configuration package."
       return 2
     fi
@@ -1546,7 +1561,7 @@ try_package_install() {
   fi
 
   # shellcheck disable=SC2086
-  if ! run_as_root env ${env} ${pm_cmd} install ${pkg_install_opts} "netdata${NATIVE_VERSION}"; then
+  if ! run_as_root env ${env} ${pm_cmd} ${install_subcmd} ${pkg_install_opts} "netdata${NATIVE_VERSION}"; then
     warning "Failed to install Netdata package."
     if [ -z "${NO_CLEANUP}" ]; then
       progress "Attempting to uninstall repository configuration package."
@@ -1559,7 +1574,7 @@ try_package_install() {
   if [ -n "${explicitly_install_native_plugins}" ]; then
     progress "Installing external plugins."
     # shellcheck disable=SC2086
-    if ! run_as_root env ${env} ${pm_cmd} install ${DEFAULT_PLUGIN_PACKAGES}; then
+    if ! run_as_root env ${env} ${pm_cmd} ${install_subcmd} ${DEFAULT_PLUGIN_PACKAGES}; then
       warning "Failed to install external plugin packages. Some collectors may not be available."
     fi
   fi

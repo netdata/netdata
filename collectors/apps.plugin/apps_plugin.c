@@ -13,9 +13,12 @@
 #define APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION "Detailed information on the currently running processes."
 
 #define APPS_PLUGIN_FUNCTIONS() do { \
-        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " \"processes\" 10 \"%s\"\n", APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION); \
+        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " \"processes\" %d \"%s\"\n", PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION); \
     } while(0)
 
+#define APPS_PLUGIN_GLOBAL_FUNCTIONS() do { \
+        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"processes\" %d \"%s\"\n", PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION); \
+    } while(0)
 
 // ----------------------------------------------------------------------------
 // debugging
@@ -144,12 +147,13 @@ static const char *proc_states[] = {
 // log each problem once per process
 // log flood protection flags (log_thrown)
 typedef enum __attribute__((packed)) {
-    PID_LOG_IO      = (1 << 0),
-    PID_LOG_STATUS  = (1 << 1),
-    PID_LOG_CMDLINE = (1 << 2),
-    PID_LOG_FDS     = (1 << 3),
-    PID_LOG_STAT    = (1 << 4),
-    PID_LOG_LIMITS  = (1 << 5),
+    PID_LOG_IO              = (1 << 0),
+    PID_LOG_STATUS          = (1 << 1),
+    PID_LOG_CMDLINE         = (1 << 2),
+    PID_LOG_FDS             = (1 << 3),
+    PID_LOG_STAT            = (1 << 4),
+    PID_LOG_LIMITS          = (1 << 5),
+    PID_LOG_LIMITS_DETAIL   = (1 << 6),
 } PID_LOG;
 
 static int
@@ -1362,6 +1366,9 @@ static inline kernel_uint_t get_proc_pid_limits_limit(char *buf, const char *key
     char *v = &line[key_len];
     while(isspace(*v)) v++;
 
+    if(strcmp(v, "unlimited") == 0)
+        return 0;
+
     return str2ull(v, NULL);
 }
 
@@ -1373,11 +1380,17 @@ static inline int read_proc_pid_limits(struct pid_stat *p, void *ptr) {
 #else
     static char proc_pid_limits_buffer[MAX_PROC_PID_LIMITS + 1];
     int ret = 0;
+    bool read_limits = false;
+
+    errno = 0;
+    proc_pid_limits_buffer[0] = '\0';
 
     kernel_uint_t all_fds = pid_openfds_sum(p);
-    if(all_fds < p->limits.max_open_files / 2 && p->io_collected_usec > p->last_limits_collected_usec && p->io_collected_usec - p->last_limits_collected_usec <= 60 * USEC_PER_SEC)
+    if(all_fds < p->limits.max_open_files / 2 && p->io_collected_usec > p->last_limits_collected_usec && p->io_collected_usec - p->last_limits_collected_usec <= 60 * USEC_PER_SEC) {
         // too frequent, we want to collect limits once per minute
+        ret = 1;
         goto cleanup;
+    }
 
     if(unlikely(!p->limits_filename)) {
         char filename[FILENAME_MAX + 1];
@@ -1394,8 +1407,25 @@ static inline int read_proc_pid_limits(struct pid_stat *p, void *ptr) {
     if(bytes <= 0)
         goto cleanup;
 
+    // make it '\0' terminated
+    if(bytes < MAX_PROC_PID_LIMITS)
+        proc_pid_limits_buffer[bytes] = '\0';
+    else
+        proc_pid_limits_buffer[MAX_PROC_PID_LIMITS - 1] = '\0';
+
     p->limits.max_open_files = get_proc_pid_limits_limit(proc_pid_limits_buffer, PROC_PID_LIMITS_MAX_OPEN_FILES_KEY, sizeof(PROC_PID_LIMITS_MAX_OPEN_FILES_KEY) - 1, 0);
+    if(p->limits.max_open_files == 1) {
+        // it seems a bug in the kernel or something similar
+        // it sets max open files to 1 but the number of files
+        // the process has open are more than 1...
+        // https://github.com/netdata/netdata/issues/15443
+        p->limits.max_open_files = 0;
+        ret = 1;
+        goto cleanup;
+    }
+
     p->last_limits_collected_usec = p->io_collected_usec;
+    read_limits = true;
 
     ret = 1;
 
@@ -1404,6 +1434,62 @@ cleanup:
         p->openfds_limits_percent = (NETDATA_DOUBLE)all_fds * 100.0 / (NETDATA_DOUBLE)p->limits.max_open_files;
     else
         p->openfds_limits_percent = 0.0;
+
+    if(p->openfds_limits_percent > 100.0) {
+        if(!(p->log_thrown & PID_LOG_LIMITS_DETAIL)) {
+            char *line;
+
+            if(!read_limits) {
+                proc_pid_limits_buffer[0] = '\0';
+                line = "NOT READ";
+            }
+            else {
+                line = strstr(proc_pid_limits_buffer, PROC_PID_LIMITS_MAX_OPEN_FILES_KEY);
+                if (line) {
+                    line++; // skip the initial newline
+
+                    char *end = strchr(line, '\n');
+                    if (end)
+                        *end = '\0';
+                }
+            }
+
+            netdata_log_info(
+                    "FDS_LIMITS: PID %d (%s) is using "
+                    "%0.2f %% of its fds limits, "
+                    "open fds = %llu ("
+                    "files = %llu, "
+                    "pipes = %llu, "
+                    "sockets = %llu, "
+                    "inotifies = %llu, "
+                    "eventfds = %llu, "
+                    "timerfds = %llu, "
+                    "signalfds = %llu, "
+                    "eventpolls = %llu "
+                    "other = %llu "
+                    "), open fds limit = %llu, "
+                    "%s, "
+                    "original line [%s]",
+                    p->pid, p->comm, p->openfds_limits_percent, all_fds,
+                    p->openfds.files,
+                    p->openfds.pipes,
+                    p->openfds.sockets,
+                    p->openfds.inotifies,
+                    p->openfds.eventfds,
+                    p->openfds.timerfds,
+                    p->openfds.signalfds,
+                    p->openfds.eventpolls,
+                    p->openfds.other,
+                    p->limits.max_open_files,
+                    read_limits ? "and we have read the limits AFTER counting the fds"
+                                : "but we have read the limits BEFORE counting the fds",
+                    line);
+
+            p->log_thrown |= PID_LOG_LIMITS_DETAIL;
+        }
+    }
+    else
+        p->log_thrown &= ~PID_LOG_LIMITS_DETAIL;
 
     return ret;
 #endif
@@ -4489,7 +4575,7 @@ static int check_capabilities() {
 }
 #endif
 
-netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
+static netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
 
 #define PROCESS_FILTER_CATEGORY "category:"
 #define PROCESS_FILTER_USER "user:"
@@ -4542,15 +4628,6 @@ static void get_MemTotal(void) {
 #endif
 }
 
-static void apps_plugin_function_error(const char *transaction, int code, const char *msg) {
-    char buffer[PLUGINSD_LINE_MAX + 1];
-    json_escape_string(buffer, msg, PLUGINSD_LINE_MAX);
-
-    pluginsd_function_result_begin_to_stdout(transaction, code, "application/json", now_realtime_sec());
-    fprintf(stdout, "{\"status\":%d,\"error_message\":\"%s\"}", code, buffer);
-    pluginsd_function_result_end_to_stdout();
-}
-
 static void apps_plugin_function_processes_help(const char *transaction) {
     pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600);
     fprintf(stdout, "%s",
@@ -4598,7 +4675,7 @@ static void apps_plugin_function_processes_help(const char *transaction) {
     buffer_json_add_array_item_double(wb, _tmp);                                                                \
 } while(0)
 
-static void apps_plugin_function_processes(const char *transaction, char *function __maybe_unused, char *line_buffer __maybe_unused, int line_max __maybe_unused, int timeout __maybe_unused) {
+static void function_processes(const char *transaction, char *function __maybe_unused, char *line_buffer __maybe_unused, int line_max __maybe_unused, int timeout __maybe_unused) {
     struct pid_stat *p;
 
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
@@ -4619,21 +4696,21 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         if(!category && strncmp(keyword, PROCESS_FILTER_CATEGORY, strlen(PROCESS_FILTER_CATEGORY)) == 0) {
             category = find_target_by_name(apps_groups_root_target, &keyword[strlen(PROCESS_FILTER_CATEGORY)]);
             if(!category) {
-                apps_plugin_function_error(transaction, HTTP_RESP_BAD_REQUEST, "No category with that name found.");
+                pluginsd_function_json_error(transaction, HTTP_RESP_BAD_REQUEST, "No category with that name found.");
                 return;
             }
         }
         else if(!user && strncmp(keyword, PROCESS_FILTER_USER, strlen(PROCESS_FILTER_USER)) == 0) {
             user = find_target_by_name(users_root_target, &keyword[strlen(PROCESS_FILTER_USER)]);
             if(!user) {
-                apps_plugin_function_error(transaction, HTTP_RESP_BAD_REQUEST, "No user with that name found.");
+                pluginsd_function_json_error(transaction, HTTP_RESP_BAD_REQUEST, "No user with that name found.");
                 return;
             }
         }
         else if(strncmp(keyword, PROCESS_FILTER_GROUP, strlen(PROCESS_FILTER_GROUP)) == 0) {
             group = find_target_by_name(groups_root_target, &keyword[strlen(PROCESS_FILTER_GROUP)]);
             if(!group) {
-                apps_plugin_function_error(transaction, HTTP_RESP_BAD_REQUEST, "No group with that name found.");
+                pluginsd_function_json_error(transaction, HTTP_RESP_BAD_REQUEST, "No group with that name found.");
                 return;
             }
         }
@@ -4659,7 +4736,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         else {
             char msg[PLUGINSD_LINE_MAX];
             snprintfz(msg, PLUGINSD_LINE_MAX, "Invalid parameter '%s'", keyword);
-            apps_plugin_function_error(transaction, HTTP_RESP_BAD_REQUEST, msg);
+            pluginsd_function_json_error(transaction, HTTP_RESP_BAD_REQUEST, msg);
             return;
         }
     }
@@ -4672,7 +4749,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
     unsigned int io_divisor = 1024 * RATES_DETAIL;
 
     BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAY_ITEMS);
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", update_every);
@@ -5149,7 +5226,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
                                     RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
         buffer_rrdf_table_add_field(wb, field_id++, "Uptime", "Uptime in seconds", RRDF_FIELD_TYPE_DURATION,
-                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_DURATION, 2,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_DURATION_S, 2,
                                     "seconds", Uptime_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_MAX,
                                     RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
@@ -5449,9 +5526,9 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
     pluginsd_function_result_end_to_stdout();
 }
 
-bool apps_plugin_exit = false;
+static bool apps_plugin_exit = false;
 
-void *reader_main(void *arg __maybe_unused) {
+static void *reader_main(void *arg __maybe_unused) {
     char buffer[PLUGINSD_LINE_MAX + 1];
 
     char *s = NULL;
@@ -5483,9 +5560,9 @@ void *reader_main(void *arg __maybe_unused) {
                 netdata_mutex_lock(&mutex);
 
                 if(strncmp(function, "processes", strlen("processes")) == 0)
-                    apps_plugin_function_processes(transaction, function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
+                    function_processes(transaction, function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
                 else
-                    apps_plugin_function_error(transaction, HTTP_RESP_NOT_FOUND, "No function with this name found in apps.plugin.");
+                    pluginsd_function_json_error(transaction, HTTP_RESP_NOT_FOUND, "No function with this name found in apps.plugin.");
 
                 fflush(stdout);
                 netdata_mutex_unlock(&mutex);
@@ -5612,6 +5689,8 @@ int main(int argc, char **argv) {
     netdata_thread_t reader_thread;
     netdata_thread_create(&reader_thread, "APPS_READER", NETDATA_THREAD_OPTION_DONT_LOG, reader_main, NULL);
     netdata_mutex_lock(&mutex);
+
+    APPS_PLUGIN_GLOBAL_FUNCTIONS();
 
     usec_t step = update_every * USEC_PER_SEC;
     global_iterations_counter = 1;

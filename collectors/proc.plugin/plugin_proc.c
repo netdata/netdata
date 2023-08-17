@@ -33,7 +33,8 @@ static struct proc_module {
     {.name = "/proc/meminfo",                .dim = "meminfo",      .func = do_proc_meminfo},
     {.name = "/sys/kernel/mm/ksm",           .dim = "ksm",          .func = do_sys_kernel_mm_ksm},
     {.name = "/sys/block/zram",              .dim = "zram",         .func = do_sys_block_zram},
-    {.name = "/sys/devices/system/edac/mc",  .dim = "ecc",          .func = do_proc_sys_devices_system_edac_mc},
+    {.name = "/sys/devices/system/edac/mc",  .dim = "edac",         .func = do_proc_sys_devices_system_edac_mc},
+    {.name = "/sys/devices/pci/aer",         .dim = "pci_aer",      .func = do_proc_sys_devices_pci_aer},
     {.name = "/sys/devices/system/node",     .dim = "numa",         .func = do_proc_sys_devices_system_node},
     {.name = "/proc/pagetypeinfo",           .dim = "pagetypeinfo", .func = do_proc_pagetypeinfo},
 
@@ -69,8 +70,11 @@ static struct proc_module {
     // IPC metrics
     {.name = "ipc",                          .dim = "ipc",          .func = do_ipc},
 
-    {.name = "/sys/class/power_supply",      .dim = "power_supply", .func = do_sys_class_power_supply},
     // linux power supply metrics
+    {.name = "/sys/class/power_supply",      .dim = "power_supply", .func = do_sys_class_power_supply},
+    
+    // GPU metrics
+    {.name = "/sys/class/drm",               .dim = "drm",          .func = do_sys_class_drm},
 
     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL}

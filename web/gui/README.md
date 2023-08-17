@@ -1,13 +1,4 @@
-<!--
-title: "Local Agent dashboard"
-description: "The local Netdata Agent dashboard is the heart of health monitoring and performance troubleshooting, with hundreds of real-time charts."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/web/gui/README.md
-sidebar_label: "Local Agent dashboard"
-learn_status: "Published"
-learn_rel_path: "Operations"
--->
-
-# Local Agent dashboard
+# Legacy Agent dashboard
 
 > ⚠️ You're checking the documentation for the legacy Agent dashboard. For the current version please check [Accessing Netdata Dashboards](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/accessing-netdata-dashboards.md).
 

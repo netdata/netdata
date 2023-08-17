@@ -30,7 +30,7 @@ a predefined set of members (of course, only process groups found running are re
 Unlike traditional process monitoring tools (like `top`), `apps.plugin` is able to account the resource
 utilization of exit processes. Their utilization is accounted at their currently running parents.
 So, `apps.plugin` is perfectly able to measure the resources used by shell scripts and other processes
-that fork/spawn other short lived processes hundreds of times per second.
+that fork/spawn other short-lived processes hundreds of times per second.
 
 ## Charts
 
@@ -75,7 +75,7 @@ The above are reported:
 
 -   For **Applications** per target configured.
 -   For **Users** per username or UID (when the username is not available).
--   For **User Groups** per groupname or GID (when groupname is not available).
+-   For **User Groups** per group name or GID (when group name is not available).
 
 ## Performance
 
@@ -183,8 +183,7 @@ If this fails (i.e. `setcap` fails), `apps.plugin` is setuid to `root`.
 There are a few cases, like `docker` and `virtuozzo` containers, where `setcap` succeeds, but the capabilities
 are silently ignored (in `lxc` containers `setcap` fails).
 
-In these cases ()`setcap` succeeds but capabilities do not work), you will have to setuid
-to root `apps.plugin` by running these commands:
+In this case, you will have to setuid to root `apps.plugin` by running these commands:
 
 ```sh
 chown root:netdata /usr/libexec/netdata/plugins.d/apps.plugin
@@ -200,7 +199,7 @@ iterating forever, collecting metrics for each running process and sending them 
 This is a one-way communication, from `apps.plugin` to Netdata.
 
 So, since `apps.plugin` cannot be instructed by Netdata for the actions it performs,
-we think it is pretty safe to allow it have these increased privileges.
+we think it is pretty safe to allow it to have these increased privileges.
 
 Keep in mind that `apps.plugin` will still run without escalated permissions,
 but it will not be able to collect all the information.
@@ -219,7 +218,7 @@ Here is an example for the process group `sql` at `https://registry.my-netdata.i
 
 ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.processes&dimensions=sql&value_color=green%3E0%7Cred)
 
-Netdata is able give you a lot more badges for your app.
+Netdata is able to give you a lot more badges for your app.
 Examples below for process group `sql`:
 
 -   CPU usage: ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.cpu&dimensions=sql&value_color=green=0%7Corange%3C50%7Cred)
@@ -227,7 +226,7 @@ Examples below for process group `sql`:
 -   Disk Physical Writes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.pwrites&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
 -   Disk Logical Reads ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.lreads&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
 -   Disk Logical Writes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.lwrites&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
--   Open Files ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.files&dimensions=sql&value_color=green%3E30%7Cred)
+-   Open Files ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.fds_files&dimensions=sql&value_color=green%3E30%7Cred)
 -   Real Memory ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.mem&dimensions=sql&value_color=green%3C100%7Corange%3C200%7Cred)
 -   Virtual Memory ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.vmem&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
 -   Swap Memory ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.swap&dimensions=sql&value_color=green=0%7Cred)
@@ -235,8 +234,8 @@ Examples below for process group `sql`:
 -   Processes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.processes&dimensions=sql&value_color=green%3E0%7Cred)
 -   Threads ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.threads&dimensions=sql&value_color=green%3E=28%7Cred)
 -   Major Faults (swap activity) ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.major_faults&dimensions=sql&value_color=green=0%7Cred)
--   Open Pipes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.pipes&dimensions=sql&value_color=green=0%7Cred)
--   Open Sockets ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.sockets&dimensions=sql&value_color=green%3E=3%7Cred)
+-   Open Pipes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.fds_pipes&dimensions=sql&value_color=green=0%7Cred)
+-   Open Sockets ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.fds_sockets&dimensions=sql&value_color=green%3E=3%7Cred)
 
 For more information about badges check [Generating Badges](https://github.com/netdata/netdata/blob/master/web/api/badges/README.md)
 

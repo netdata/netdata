@@ -1,0 +1,7 @@
+[% if entry.integration_type == 'collector' %]
+[% include 'overview/collector.md' %]
+[% elif entry.integration_type == 'exporter' %]
+[% include 'overview/exporter.md' %]
+[% elif entry.integration_type == 'notification' %]
+[% include 'overview/notification.md' %]
+[% endif %]

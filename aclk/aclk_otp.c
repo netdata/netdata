@@ -414,6 +414,10 @@ int aclk_send_otp_response(const char *agent_id, const unsigned char *response, 
             aclk_parse_otp_error(resp.payload);
         goto cleanup_response;
     }
+    if (resp.payload_size == 0 || resp.payload == NULL) {
+        netdata_log_error("ACLK_OTP Password response payload is empty despite returning 201 Created!");
+        goto cleanup_response;
+    }
     netdata_log_info("ACLK_OTP Got Password from Cloud");
 
     if (parse_passwd_response(resp.payload, mqtt_auth)){

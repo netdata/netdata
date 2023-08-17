@@ -1,0 +1,327 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Shared definitions used for all integrations schemas.",
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "A unique ID for the item. Must be URL safe."
+    },
+    "instance": {
+      "type": "object",
+      "description": "Information about the integration instance.",
+      "properties": {
+        "name": {
+          "description": "Integration display name. Use official spelling for applications.",
+          "type": "string"
+        },
+        "link": {
+          "description": "Link to the instance official website if any.",
+          "type": "string"
+        },
+        "categories": {
+          "type": "array",
+          "description": "Category IDs that this integration falls into. IDs can be found in integrations/categories.yaml",
+          "items": {
+            "type": "string",
+            "description": "String defining integration category"
+          }
+        },
+        "icon_filename": {
+          "type": "string",
+          "description": "The filename of the integration's icon, as sourced from https://github.com/netdata/website/tree/master/themes/tailwind/static/img."
+        },
+        "variables": {
+          "type": "object",
+          "description": "A mapping of variables to be used when templating other keys.",
+          "patternProperties": {
+            "^[a-zA-Z_][a-zA-Z0-9_]*$": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "name",
+        "link",
+        "categories",
+        "icon_filename"
+      ]
+    },
+    "keywords": {
+      "type": "array",
+      "description": "An array of terms related to the integration.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "short_setup": {
+      "type": "object",
+      "description": "Simplified information about how to enable and configure the integration.",
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "A description of how to enable and configure the integration."
+        }
+      },
+      "required": [
+        "description"
+      ]
+    },
+    "full_setup": {
+      "type": "object",
+      "description": "Complete information that is needed to enable and configure the integration.",
+      "properties": {
+        "prerequisites": {
+          "type": "object",
+          "description": "Actions the user must take to make the integration work, if any. It includes both configuring Netdata (e.g. if the integration is disabled by default) and configuring any external components the integration interacts with.",
+          "properties": {
+            "list": {
+              "type": "array",
+              "description": "List of prerequisites.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "description": "Title should reflect the description, be short and in the form of a command (e.g. Create netdata user, Enable build-in web server)."
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Steps to follow to meet this prerequisite."
+                  }
+                },
+                "required": [
+                  "title",
+                  "description"
+                ]
+              }
+            }
+          },
+          "required": [
+            "list"
+          ]
+        },
+        "configuration": {
+          "description": "Information on how to configure the integration and available configuration options.",
+          "type": "object",
+          "properties": {
+            "file": {
+              "type": "object",
+              "description": "Configuration file.",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Configuration file name."
+                },
+                "section_name": {
+                  "type": "string",
+                  "description": "The name of the section in the configuration file. Only for data collectors whose configuration is in netdata.conf (e.g. proc.plugin modules)."
+                }
+              },
+              "required": [
+                "name"
+              ]
+            },
+            "options": {
+              "type": "object",
+              "description": "All information about the available configuration options.",
+              "properties": {
+                "description": {
+                  "type": "string",
+                  "description": "Optional common information about options."
+                },
+                "folding": {
+                  "$ref": "./shared.json#/$defs/_folding"
+                },
+                "list": {
+                  "type": "array",
+                  "description": "List of configuration options.",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "Option name."
+                      },
+                      "description": {
+                        "type": "string",
+                        "description": "Option description. Must be short. Use 'detailed_description' for a long description."
+                      },
+                      "detailed_description": {
+                        "type": "string",
+                        "description": "Option detailed description. Use it to describe in details complex options."
+                      },
+                      "default_value": {
+                        "type": [
+                          "string",
+                          "number",
+                          "boolean"
+                        ],
+                        "description": "Default value. Leave empty if none."
+                      },
+                      "required": {
+                        "type": "boolean",
+                        "description": "Indicates whether this option is required or not. The option is required if the integration does not work if it is not set."
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "description",
+                      "default_value",
+                      "required"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "description",
+                "folding",
+                "list"
+              ]
+            },
+            "examples": {
+              "type": "object",
+              "description": "Configuration examples. The more examples the better!",
+              "properties": {
+                "folding": {
+                  "$ref": "./shared.json#/$defs/_folding"
+                },
+                "list": {
+                  "type": "array",
+                  "description": "List of configuration examples.",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "Example name."
+                      },
+                      "folding": {
+                        "$ref": "./shared.json#/$defs/_folding_relaxed"
+                      },
+                      "description": {
+                        "type": "string",
+                        "description": "Example description."
+                      },
+                      "config": {
+                        "type": "string",
+                        "description": "Example configuration."
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "description",
+                      "config"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "folding",
+                "list"
+              ]
+            }
+          },
+          "required": [
+            "file",
+            "options",
+            "examples"
+          ]
+        }
+      },
+      "required": [
+        "prerequisites",
+        "configuration"
+      ]
+    },
+    "troubleshooting": {
+      "type": "object",
+      "description": "Information needed to troubleshoot issues with this collector.",
+      "properties": {
+        "problems": {
+          "type": "object",
+          "description": "Common problems that users face again and again... and their solutions.",
+          "properties": {
+            "list": {
+              "type": "array",
+              "description": "List of common problems.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Problem name."
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Explanation of the problem and its solution."
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "description"
+              ]
+            }
+          },
+          "required": [
+            "list"
+          ]
+        }
+      },
+      "required": [
+        "problems"
+      ]
+    },
+    "_folding": {
+      "type": "object",
+      "description": "Content folding settings.",
+      "properties": {
+        "title": {
+          "description": "Folded content summary title.",
+          "type": "string"
+        },
+        "enabled": {
+          "description": "Determines if this content should be folded.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "title",
+        "enabled"
+      ]
+    },
+    "_folding_relaxed": {
+      "type": "object",
+      "description": "Content folding settings with optional title.",
+      "properties": {
+        "title": {
+          "description": "Folded content summary title.",
+          "type": "string"
+        },
+        "enabled": {
+          "description": "Determines if this content should be folded.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    }
+  }
+}
