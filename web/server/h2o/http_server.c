@@ -46,6 +46,8 @@ static int create_listener(const char *ip, int port)
     if ((fd = socket(AF_INET, SOCK_STREAM, 0)) == -1 ||
         setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr_flag, sizeof(reuseaddr_flag)) != 0 ||
         bind(fd, (struct sockaddr *)&addr, sizeof(addr)) != 0 || listen(fd, SOMAXCONN) != 0) {
+        if (fd != -1)
+            close(fd);
         return -1;
     }
 
