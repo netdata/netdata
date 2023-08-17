@@ -122,7 +122,7 @@ static inline enum job_type str2job_type(const char *type_name)
 
 struct job
 {
-    char *name;
+    const char *name;
     enum job_type type;
     struct module *module;
 

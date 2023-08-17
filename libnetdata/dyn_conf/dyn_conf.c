@@ -414,13 +414,29 @@ static char *set_module_config(struct module *mod, dyncfg_config_t cfg)
     return NULL;
 }
 
-struct job *job_new()
+struct job *job_new(const char *job_id)
 {
     struct job *job = callocz(1, sizeof(struct job));
     job->state = JOB_STATUS_UNKNOWN;
     job->last_state_update = now_realtime_usec();
+    job->name = strdupz(job_id);
     netdata_mutex_init(&job->lock);
     return job;
+}
+
+static inline void job_del(struct job *job)
+{
+    netdata_mutex_destroy(&job->lock);
+    freez(job->reason);
+    freez((void*)job->name);
+    freez(job);
+}
+
+void job_del_cb(const DICTIONARY_ITEM *item, void *value, void *data)
+{
+    UNUSED(item);
+    UNUSED(data);
+    job_del((struct job *)value);
 }
 
 static int set_job_config(struct job *job, dyncfg_config_t cfg)
@@ -438,15 +454,13 @@ static int set_job_config(struct job *job, dyncfg_config_t cfg)
 
 struct job *add_job(struct module *mod, const char *job_id, dyncfg_config_t *cfg, enum job_type job_type, dyncfg_job_flg_t flags)
 {
-    struct job *job = job_new();
-    job->name = strdupz(job_id);
+    struct job *job = job_new(job_id);
     job->module = mod;
     job->flags = flags;
     job->type = job_type;
 
     if (cfg != NULL && set_job_config(job, *cfg)) {
-        freez(job->name);
-        freez(job);
+        job_del(job);
         return NULL;
     }
 
@@ -498,17 +512,6 @@ void unregister_plugin(DICTIONARY *plugins_dict, const DICTIONARY_ITEM *plugin)
     struct configurable_plugin *plug = dictionary_acquired_item_value(plugin);
     dictionary_acquired_item_release(plugins_dict, plugin);
     dictionary_del(plugins_dict, plug->name);
-}
-
-void job_del_cb(const DICTIONARY_ITEM *item, void *value, void *data)
-{
-    UNUSED(item);
-    UNUSED(data);
-    struct job *job = (struct job *)value;
-    netdata_mutex_destroy(&job->lock);
-    freez(job->reason);
-    freez(job->name);
-    freez(job);
 }
 
 int register_module(DICTIONARY *plugins_dict, struct configurable_plugin *plugin, struct module *module, bool localhost)
