@@ -509,7 +509,8 @@ int is_legacy = 1;
     if(t != host) {
         netdata_log_error("Host '%s': cannot add host with machine guid '%s' to index. It already exists as host '%s' with machine guid '%s'.",
                           rrdhost_hostname(host), host->machine_guid, rrdhost_hostname(t), t->machine_guid);
-        rrdhost_free___while_having_rrd_wrlock(host, true);
+        if (!is_localhost)
+            rrdhost_free___while_having_rrd_wrlock(host, true);
         rrd_unlock();
         return NULL;
     }
