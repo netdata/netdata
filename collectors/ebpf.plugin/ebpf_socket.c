@@ -1222,7 +1222,7 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values)
     // DST Port
     buffer_json_add_array_item_uint64(wb, (uint64_t) values->socket_string.dst_port);
 
-    if (values->data.family == IPPROTO_TCP) {
+    if (values->data.protocol == IPPROTO_TCP) {
         // Protocol
         buffer_json_add_array_item_string(wb, "TCP");
 
@@ -1231,7 +1231,7 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values)
 
         // Traffic sent
         buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.tcp.tcp_bytes_sent);
-    } else if (values->data.family == IPPROTO_UDP) {
+    } else if (values->data.protocol == IPPROTO_UDP) {
         // Protocol
         buffer_json_add_array_item_string(wb, "UDP");
 
@@ -1340,12 +1340,13 @@ static void ebpf_socket_translate_socket(netdata_socket_plus_t *dst, netdata_soc
     dst->socket_string.dst_port = ntohs(key->dport);
 
 #ifdef NETDATA_DEV_MODE
-    collector_info("New socket: (SRC IP: %s, SRC PORT: %u,  DST IP:%s, DST PORT: %u, PID %u)",
+    collector_info("New socket: { SRC IP: %s, SRC PORT: %u, DST IP:%s, DST PORT: %u, PID: %u, Protocol: %s}",
                    dst->socket_string.src_ip,
                    dst->socket_string.src_port,
                    dst->socket_string.dst_ip,
                    dst->socket_string.dst_port,
-                   dst->pid
+                   dst->pid,
+                   (dst->data.protocol == IPPROTO_TCP ) ? "TCP" : "UDP"
                    );
 #endif
 }
