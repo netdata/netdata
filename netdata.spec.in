@@ -691,7 +691,7 @@ fi
 %{_libexecdir}/%{name}/plugins.d/charts.d.plugin
 %{_libexecdir}/%{name}/plugins.d/charts.d.dryrun-helper.sh
 %{_libexecdir}/%{name}/charts.d/
-%defattr(0644,root,netdata,0644)
+%defattr(0644,root,netdata,0755)
 %{_libdir}/%{name}/conf.d/charts.d.conf
 %{_libdir}/%{name}/conf.d/charts.d/
 
@@ -721,7 +721,7 @@ fi
 %files plugin-ebpf
 %defattr(4750,root,netdata,4750)
 %{_libexecdir}/%{name}/plugins.d/ebpf.plugin
-%defattr(0644,root,netdata,0644)
+%defattr(0644,root,netdata,0755)
 %{_libdir}/%{name}/conf.d/ebpf.d.conf
 %{_libdir}/%{name}/conf.d/ebpf.d
 
@@ -776,7 +776,7 @@ fi
 %defattr(0750,root,netdata,0750)
 %{_libexecdir}/%{name}/plugins.d/python.d.plugin
 %{_libexecdir}/%{name}/python.d
-%defattr(0640,root,netdata,0640)
+%defattr(0644,root,netdata,0755)
 %{_libdir}/%{name}/conf.d/python.d.conf
 %{_libdir}/%{name}/conf.d/python.d
 
@@ -806,7 +806,7 @@ fi
 # CAP_NET_ADMIN needed for WireGuard collector
 # CAP_NET_RAW needed for ping collector
 %caps(cap_net_admin,cap_net_raw=eip) %{_libexecdir}/%{name}/plugins.d/go.d.plugin
-%defattr(0644,root,netdata,0644)
+%defattr(0644,root,netdata,0755)
 %{_libdir}/%{name}/conf.d/go.d.conf
 %{_libdir}/%{name}/conf.d/go.d
 
@@ -829,7 +829,7 @@ fi
 %defattr(0750,root,netdata,0750)
 # CAP_DAC_READ_SEARCH and CAP_SYS_PTRACE needed for data collection by the plugin.
 %caps(cap_dac_read_search,cap_sys_ptrace=ep) %{_libexecdir}/%{name}/plugins.d/apps.plugin
-%defattr(0644,root,netdata,0644)
+%defattr(0644,root,netdata,0755)
 %{_libdir}/%{name}/conf.d/apps_groups.conf
 
 %package plugin-slabinfo
