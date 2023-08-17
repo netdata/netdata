@@ -20,9 +20,18 @@ struct deferred_cfg_send {
     struct deferred_cfg_send *next;
 };
 
+bool dyncfg_shutdown = false;
 struct deferred_cfg_send *deferred_configs = NULL;
 pthread_mutex_t deferred_configs_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t deferred_configs_cond = PTHREAD_COND_INITIALIZER;
+
+static void deferred_config_free(struct deferred_cfg_send *dcs)
+{
+    freez(dcs->plugin_name);
+    freez(dcs->module_name);
+    freez(dcs->job_name);
+    freez(dcs);
+}
 
 static void deferred_config_push_back(const char *plugin_name, const char *module_name, const char *job_name)
 {
@@ -34,6 +43,11 @@ static void deferred_config_push_back(const char *plugin_name, const char *modul
             deferred->job_name = strdupz(job_name);
     }
     pthread_mutex_lock(&deferred_configs_lock);
+    if (dyncfg_shutdown) {
+        pthread_mutex_unlock(&deferred_configs_lock);
+        deferred_config_free(deferred);
+        return;
+    }
     struct deferred_cfg_send *last = deferred_configs;
     if (last == NULL)
         deferred_configs = deferred;
@@ -46,23 +60,27 @@ static void deferred_config_push_back(const char *plugin_name, const char *modul
     pthread_mutex_unlock(&deferred_configs_lock);
 }
 
-static struct deferred_cfg_send *deferred_config_pop()
+static void deferred_configs_unlock()
+{
+    dyncfg_shutdown = true;
+    // if we get cancelled in pthread_cond_wait
+    // we will arrive at cancelled cleanup handler
+    // with mutex locked we need to unlock it
+    pthread_mutex_unlock(&deferred_configs_lock);
+}
+
+static struct deferred_cfg_send *deferred_config_pop(void *ptr)
 {
     pthread_mutex_lock(&deferred_configs_lock);
-    while (deferred_configs == NULL)
+    while (deferred_configs == NULL) {
+        netdata_thread_cleanup_push(deferred_configs_unlock, ptr);
         pthread_cond_wait(&deferred_configs_cond, &deferred_configs_lock);
+        netdata_thread_cleanup_pop(0);
+    }
     struct deferred_cfg_send *deferred = deferred_configs;
     deferred_configs = deferred_configs->next;
     pthread_mutex_unlock(&deferred_configs_lock);
     return deferred;
-}
-
-static void deferred_config_free(struct deferred_cfg_send *dcs)
-{
-    freez(dcs->plugin_name);
-    freez(dcs->module_name);
-    freez(dcs->job_name);
-    freez(dcs);
 }
 
 static int _get_list_of_plugins_json_cb(const DICTIONARY_ITEM *item, void *entry, void *data)
@@ -874,10 +892,30 @@ int dyn_conf_init(void)
     return 0;
 }
 
-void *dyncfg_main(void *in)
+static void dyncfg_cleanup(void *ptr) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *) ptr;
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+
+    netdata_log_info("cleaning up...");
+
+    pthread_mutex_lock(&deferred_configs_lock);
+    dyncfg_shutdown = true;
+    while (deferred_configs != NULL) {
+        struct deferred_cfg_send *dcs = deferred_configs;
+        deferred_configs = dcs->next;
+        deferred_config_free(dcs);
+    }
+    pthread_mutex_unlock(&deferred_configs_lock);
+
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+}
+
+void *dyncfg_main(void *ptr)
 {
+    netdata_thread_cleanup_push(dyncfg_cleanup, ptr);
+
     while (!netdata_exit) {
-        struct deferred_cfg_send *dcs = deferred_config_pop();
+        struct deferred_cfg_send *dcs = deferred_config_pop(ptr);
         const DICTIONARY_ITEM *plugin_item = dictionary_get_and_acquire_item(plugins_dict, dcs->plugin_name);
         if (plugin_item == NULL) {
             error_report("DYNCFG, plugin %s not found", dcs->plugin_name);
@@ -909,5 +947,7 @@ void *dyncfg_main(void *in)
         deferred_config_free(dcs);
         dictionary_acquired_item_release(plugins_dict, plugin_item);
     }
+
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }

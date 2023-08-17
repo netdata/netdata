@@ -20,6 +20,39 @@ typedef enum {
 
 typedef pthread_t netdata_thread_t;
 
+struct netdata_static_thread {
+    // the name of the thread as it should appear in the logs
+    char *name;
+
+    // the section of netdata.conf to check if this is enabled or not
+    char *config_section;
+
+    // the name of the config option to check if it is true or false
+    char *config_name;
+
+    // the current status of the thread
+    volatile sig_atomic_t enabled;
+
+    // internal use, to maintain a pointer to the created thread
+    netdata_thread_t *thread;
+
+    // an initialization function to run before spawning the thread
+    void (*init_routine) (void);
+
+    // the threaded worker
+    void *(*start_routine) (void *);
+
+    // the environment variable to create
+    char *env_name;
+
+    // global variable
+    bool *global_variable;
+};
+
+#define NETDATA_MAIN_THREAD_RUNNING     CONFIG_BOOLEAN_YES
+#define NETDATA_MAIN_THREAD_EXITING     (CONFIG_BOOLEAN_YES + 1)
+#define NETDATA_MAIN_THREAD_EXITED      CONFIG_BOOLEAN_NO
+
 #define NETDATA_THREAD_TAG_MAX 100
 const char *netdata_thread_tag(void);
 int netdata_thread_tag_exists(void);
