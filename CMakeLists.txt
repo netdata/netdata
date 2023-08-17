@@ -488,7 +488,7 @@ set(LIBNETDATA_FILES
         libnetdata/threads/threads.h
         libnetdata/url/url.c
         libnetdata/url/url.h
-		libnetdata/dyn_conf/dyn_conf.c
+        libnetdata/dyn_conf/dyn_conf.c
         libnetdata/dyn_conf/dyn_conf.h
         libnetdata/string/utf8.h
         libnetdata/worker_utilization/worker_utilization.c
