@@ -488,6 +488,8 @@ set(LIBNETDATA_FILES
         libnetdata/threads/threads.h
         libnetdata/url/url.c
         libnetdata/url/url.h
+        libnetdata/dyn_conf/dyn_conf.c
+        libnetdata/dyn_conf/dyn_conf.h
         libnetdata/string/utf8.h
         libnetdata/worker_utilization/worker_utilization.c
         libnetdata/worker_utilization/worker_utilization.h
@@ -709,6 +711,10 @@ set(REGISTRY_PLUGIN_FILES
 
 set(STATSD_PLUGIN_FILES
         collectors/statsd.plugin/statsd.c
+        )
+
+set(SYSTEMD_JOURNAL_PLUGIN_FILES
+        collectors/systemd-journal.plugin/systemd-journal.c
         )
 
 set(RRD_PLUGIN_FILES
@@ -1067,6 +1073,7 @@ set(NETDATA_FILES
         ${RRD_PLUGIN_FILES}
         ${REGISTRY_PLUGIN_FILES}
         ${STATSD_PLUGIN_FILES}
+        ${SYSTEMD_JOURNAL_PLUGIN_FILES}
         ${STREAMING_PLUGIN_FILES}
         ${WEB_PLUGIN_FILES}
         ${CLAIM_PLUGIN_FILES}
