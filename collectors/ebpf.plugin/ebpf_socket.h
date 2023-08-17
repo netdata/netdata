@@ -157,6 +157,7 @@ typedef enum ebpf_socket_idx {
 
 // ARAL name
 #define NETDATA_EBPF_SOCKET_ARAL_NAME "ebpf_socket"
+#define NETDATA_EBPF_PID_SOCKET_ARAL_TABLE_NAME "ebpf_pid_socket"
 #define NETDATA_EBPF_SOCKET_ARAL_TABLE_NAME "ebpf_socket_tbl"
 
 typedef struct ebpf_socket_publish_apps {
@@ -326,15 +327,23 @@ typedef struct netdata_plot_values {
     uint16_t plot_retransmit;
 } netdata_plot_values_t;
 
-typedef struct netdata_ebpf_socket_hs {
-    ARAL *socket_table;
+typedef struct netdata_ebpf_socket_judy_pid {
+    ARAL *pid_table;
 
+    // Index for PIDs
     struct {                            // support for multiple indexing engines
         Pvoid_t JudyHSArray;            // the hash table
         RW_SPINLOCK rw_spinlock;        // protect the index
     } index;
+} netdata_ebpf_socket_judy_pid_t;
 
-} netdata_ebpf_socket_hs_t;
+typedef struct netdata_ebpf_socket_judy_connections {
+    // Index for Socket timestamp
+    struct {                            // support for multiple indexing engines
+        Pvoid_t JudyHSArray;            // the hash table
+        RW_SPINLOCK rw_spinlock;        // protect the index
+    } index;
+} netdata_ebpf_socket_judy_connections_t;
 
 /**
  * Index used together previous structure

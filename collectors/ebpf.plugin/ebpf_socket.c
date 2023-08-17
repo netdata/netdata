@@ -104,7 +104,8 @@ struct netdata_static_thread ebpf_read_socket = {
         .start_routine = NULL
 };
 
-netdata_ebpf_socket_hs_t ebpf_socket_hs = {.socket_table = NULL, .index = {.JudyHSArray = NULL}};
+netdata_ebpf_socket_judy_pid_t ebpf_socket_pid = {.pid_table = NULL, .index = {.JudyHSArray = NULL}};
+ARAL *aral_socket_table = NULL;
 
 #ifdef NETDATA_DEV_MODE
 int socket_disable_priority;
@@ -1142,6 +1143,7 @@ static void ebpf_hash_socket_accumulator(netdata_socket_t *values, netdata_socke
     int i;
     uint8_t protocol = values[0].protocol;
     uint64_t ct = values[0].current_timestamp;
+    uint64_t ft = values[0].first_timestamp;
     uint16_t family = AF_UNSPEC;
     for (i = 1; i < end; i++) {
         netdata_socket_t *w = &values[i];
@@ -1162,7 +1164,9 @@ static void ebpf_hash_socket_accumulator(netdata_socket_t *values, netdata_socke
             family = w->family;
 
         if (w->current_timestamp != ct)
-            ct = w->current_timestamp;
+
+        if (!ft)
+            ft = w->first_timestamp;
     }
 
     /*
@@ -1172,6 +1176,7 @@ static void ebpf_hash_socket_accumulator(netdata_socket_t *values, netdata_socke
 
     values[0].protocol          = (!protocol)?IPPROTO_TCP:protocol;
     values[0].current_timestamp = ct;
+    values[0].first_timestamp = ft;
 }
 
 /**
@@ -1265,18 +1270,25 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values)
  */
 static void ebpf_socket_fill_function_buffer(BUFFER *buf)
 {
-    Pvoid_t *PValue;
-    Word_t key;
     int counter = 0;
-    rw_spinlock_read_lock(&ebpf_socket_hs.index.rw_spinlock);
-    bool first = true;
 
-    while((PValue = JudyLFirstThenNext(ebpf_socket_hs.index.JudyHSArray, &key, &first))) {
-        netdata_socket_plus_t *values = (netdata_socket_plus_t *)*PValue;
-        ebpf_fill_function_buffer(buf, values);
-        counter++;
+    Pvoid_t *pid_value, *socket_value;
+    Word_t local_pid = 0;
+    bool first_pid = true;
+    rw_spinlock_read_lock(&ebpf_socket_pid.index.rw_spinlock);
+    while ((pid_value = JudyLFirstThenNext(ebpf_socket_pid.index.JudyHSArray, &local_pid, &first_pid))) {
+        netdata_ebpf_socket_judy_connections_t *pid_ptr = (netdata_ebpf_socket_judy_connections_t *)*pid_value;
+        bool first_socket = true;
+        Word_t local_timestamp = 0;
+        while ((socket_value = JudyLFirstThenNext(pid_ptr->index.JudyHSArray, &local_timestamp, &first_socket))) {
+            counter++;
+            /*
+            netdata_socket_plus_t *values = (netdata_socket_plus_t *)*SocketValue;
+            ebpf_fill_function_buffer(buf, values);
+            */
+        }
     }
-    rw_spinlock_read_unlock(&ebpf_socket_hs.index.rw_spinlock);
+    rw_spinlock_read_unlock(&ebpf_socket_pid.index.rw_spinlock);
 
     if (!counter) {
         netdata_socket_plus_t fake_values = { };
@@ -1295,16 +1307,16 @@ static void ebpf_socket_fill_function_buffer(BUFFER *buf)
  * The pointer to pointer we return has to be used before any other operation that may change the index (insert/delete).
  *
  */
-static inline void **ebpf_socket_hashtable_insert_unsafe(PPvoid_t arr, netdata_socket_idx_t *key)
+static inline void **ebpf_socket_hashtable_insert_unsafe(PPvoid_t arr, Word_t key)
 {
     JError_t J_Error;
-    Pvoid_t *lsocket = JudyHSIns(arr, (void *)key, sizeof(netdata_socket_idx_t), &J_Error);
-    if (unlikely(lsocket == PJERR)) {
-        netdata_log_error("SOCKET: Cannot add socket to JudyHS, JU_ERRNO_* == %u, ID == %d",
+    Pvoid_t *idx = JudyLIns(arr, key, &J_Error);
+    if (unlikely(idx == PJERR)) {
+        netdata_log_error("SOCKET: Cannot add PID to JudyL, JU_ERRNO_* == %u, ID == %d",
                           JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
     }
 
-    return lsocket;
+    return idx;
 }
 
 /**
@@ -1315,7 +1327,7 @@ static inline void **ebpf_socket_hashtable_insert_unsafe(PPvoid_t arr, netdata_s
  * @param dst structure where we will store
  * @param key the socket address
  */
-static void ebpf_socket_translate_socket(netdata_socket_plus_t *dst, netdata_socket_idx_t *key)
+static void ebpf_socket_translate(netdata_socket_plus_t *dst, netdata_socket_idx_t *key)
 {
     if (dst->data.family == AF_INET) {
         struct in_addr ipv4_addr = {.s_addr = key->saddr.addr32[0]};
@@ -1340,13 +1352,14 @@ static void ebpf_socket_translate_socket(netdata_socket_plus_t *dst, netdata_soc
     dst->socket_string.dst_port = ntohs(key->dport);
 
 #ifdef NETDATA_DEV_MODE
-    collector_info("New socket: { SRC IP: %s, SRC PORT: %u, DST IP:%s, DST PORT: %u, PID: %u, Protocol: %s}",
+    collector_info("New socket: { SRC IP: %s, SRC PORT: %u, DST IP:%s, DST PORT: %u, PID: %u, Protocol: %d, Family: %d}",
                    dst->socket_string.src_ip,
                    dst->socket_string.src_port,
                    dst->socket_string.dst_ip,
                    dst->socket_string.dst_port,
                    dst->pid,
-                   (dst->data.protocol == IPPROTO_TCP ) ? "TCP" : "UDP"
+                   dst->data.protocol,
+                   dst->data.family
                    );
 #endif
 }
@@ -1380,8 +1393,8 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
     // values for specific processor unless it is used to store data. As result of this behavior one the next socket
     // can have values from the previous one.
     memset(values, 0, length);
-    PPvoid_t hs = &ebpf_socket_hs.index.JudyHSArray;
-    rw_spinlock_write_lock(&ebpf_socket_hs.index.rw_spinlock);
+    PPvoid_t judy_array = &ebpf_socket_pid.index.JudyHSArray;
+    rw_spinlock_write_lock(&ebpf_socket_pid.index.rw_spinlock);
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         test = bpf_map_lookup_elem(fd, &key, values);
         if (test < 0) {
@@ -1397,24 +1410,39 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         ebpf_hash_socket_accumulator(values, &key, end);
         ebpf_socket_fill_publish_apps(key.pid, values);
 
-        netdata_socket_plus_t **item_pptr = (netdata_socket_plus_t **) ebpf_socket_hashtable_insert_unsafe(hs, &key);
-        bool update_string = false;
-        if (likely(*item_pptr == NULL)) {
-            // a new item added to the index
-            *item_pptr = aral_mallocz(ebpf_socket_hs.socket_table);
-            update_string = true;
+        // Get PID structure
+        netdata_ebpf_socket_judy_connections_t **pid_pptr =
+            (netdata_ebpf_socket_judy_connections_t **) ebpf_socket_hashtable_insert_unsafe(judy_array, key.pid);
+        netdata_ebpf_socket_judy_connections_t *pid_ptr = *pid_pptr;
+        if (likely(*pid_pptr == NULL)) {
+            // a new PID added to the index
+            *pid_pptr = aral_mallocz(ebpf_socket_pid.pid_table);
+
+            pid_ptr = *pid_pptr;
+
+            pid_ptr->index.JudyHSArray = NULL;
+            rw_spinlock_init(&pid_ptr->index.rw_spinlock);
         }
-        netdata_socket_plus_t *item = *item_pptr;
-        memcpy(&item->data, &values[0], sizeof(netdata_socket_t));
-        if (update_string) {
-            ebpf_socket_translate_socket(item, &key);
+
+        rw_spinlock_write_lock(&pid_ptr->index.rw_spinlock);
+        netdata_socket_plus_t **socket_pptr = (netdata_socket_plus_t **) ebpf_socket_hashtable_insert_unsafe(&pid_ptr->index.JudyHSArray,
+                                                                                                          values[0].first_timestamp);
+        netdata_socket_plus_t *socket_ptr = *socket_pptr;
+        if (likely(*socket_pptr == NULL)) {
+            *socket_pptr = aral_mallocz(aral_socket_table);
+
+            socket_ptr = *socket_pptr;
+
+            ebpf_socket_translate(socket_ptr, &key);
         }
+        memcpy(&socket_ptr->data, &values[0], sizeof(netdata_socket_t));
+        rw_spinlock_write_unlock(&pid_ptr->index.rw_spinlock);
 
         memset(values, 0, length);
 
         memcpy(&key, &next_key, sizeof(key));
     }
-    rw_spinlock_write_unlock(&ebpf_socket_hs.index.rw_spinlock);
+    rw_spinlock_write_unlock(&ebpf_socket_pid.index.rw_spinlock);
     netdata_thread_enable_cancelability();
 }
 
@@ -2274,12 +2302,14 @@ static void ebpf_socket_initialize_global_vectors(int apps)
     ebpf_socket_aral_init();
     socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
 
-    ebpf_socket_hs.socket_table = ebpf_allocate_pid_aral(NETDATA_EBPF_SOCKET_ARAL_TABLE_NAME,
-                                                         sizeof(netdata_socket_plus_t));
+    ebpf_socket_pid.pid_table = ebpf_allocate_pid_aral(NETDATA_EBPF_PID_SOCKET_ARAL_TABLE_NAME,
+                                                       sizeof(netdata_ebpf_socket_judy_connections_t));
+    aral_socket_table = ebpf_allocate_pid_aral(NETDATA_EBPF_SOCKET_ARAL_TABLE_NAME,
+                                               sizeof(netdata_socket_plus_t));
 
     socket_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_socket_t));
 
-    rw_spinlock_init(&ebpf_socket_hs.index.rw_spinlock);
+    rw_spinlock_init(&ebpf_socket_pid.index.rw_spinlock);
 }
 
 /*****************************************************************
