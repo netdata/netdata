@@ -73,6 +73,9 @@ int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_pat
                 return HTTP_RESP_BAD_REQUEST;
             }
 
+            if (api_command != url_path_endpoint)
+                freez(api_command);
+
             short int code = web_client_check_acl_and_bearer(w, api_commands[i].acl);
             if(code != HTTP_RESP_OK) {
                 if(code == HTTP_RESP_FORBIDDEN)
