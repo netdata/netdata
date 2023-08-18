@@ -375,11 +375,6 @@ bool netdata_ssl_accept(NETDATA_SSL *ssl) {
     if(unlikely(!is_handshake_initialized(ssl, "accept")))
         return false;
 
-#ifdef NETDATA_SSL_ACCEPT_SINGLE_THREADED
-    SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
-    spinlock_lock(&sp);
-#endif
-
     SSL_set_accept_state(ssl->conn);
 
     int err;
@@ -387,10 +382,6 @@ bool netdata_ssl_accept(NETDATA_SSL *ssl) {
         if(!want_read_write_should_retry(ssl, err))
             break;
     }
-
-#ifdef NETDATA_SSL_ACCEPT_SINGLE_THREADED
-    spinlock_unlock(&sp);
-#endif
 
     if (err != 1) {
         err = SSL_get_error(ssl->conn, err);
