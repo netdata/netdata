@@ -737,7 +737,7 @@ update_binpkg() {
       opensuse-leap|opensuse-tumbleweed)
         DISTRO_COMPAT_NAME="opensuse"
         ;;
-      cloudlinux|almalinux|rocky|rhel)
+      cloudlinux|almalinux|centos-stream|rocky|rhel)
         DISTRO_COMPAT_NAME="centos"
         ;;
       *)
