@@ -1428,14 +1428,17 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         netdata_socket_plus_t **socket_pptr = (netdata_socket_plus_t **) ebpf_socket_hashtable_insert_unsafe(&pid_ptr->index.JudyHSArray,
                                                                                                           values[0].first_timestamp);
         netdata_socket_plus_t *socket_ptr = *socket_pptr;
+        bool translate = false;
         if (likely(*socket_pptr == NULL)) {
             *socket_pptr = aral_mallocz(aral_socket_table);
 
             socket_ptr = *socket_pptr;
 
-            ebpf_socket_translate(socket_ptr, &key);
+            translate = true;
         }
         memcpy(&socket_ptr->data, &values[0], sizeof(netdata_socket_t));
+        if (translate)
+            ebpf_socket_translate(socket_ptr, &key);
         rw_spinlock_write_unlock(&pid_ptr->index.rw_spinlock);
 
         memset(values, 0, length);
