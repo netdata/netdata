@@ -106,13 +106,13 @@ def assert_eq(got, expected, msg = nil)
     end
     $test_runner.add_assertion()
 end
-def asser_eq_str(got, expected, msg = nil)
+def assert_eq_str(got, expected, msg = nil)
     unless got == expected
         FAIL("Strings do not match #{msg ? "(#{msg})" : ""}", nil, caller_locations(1, 1).first)
     end
     $test_runner.add_assertion()
 end
-def asser_not_eq_str(got, expected, msg = nil)
+def assert_not_eq_str(got, expected, msg = nil)
     unless got != expected
         FAIL("Strings shoud not match #{msg ? "(#{msg})" : ""}", nil, caller_locations(1, 1).first)
     end

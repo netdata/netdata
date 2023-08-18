@@ -11,6 +11,7 @@ HEREDOC
         @child  = $config[:http_endpoints][:child]
         @plugin = $config[:global][:test_plugin_name]
         @arry_mod = $config[:global][:test_array_module_name]
+        @single_mod = $config[:global][:test_single_module_name]
         @test_job = $config[:global][:test_job_name]
     end
     def check_test_plugin_modules_list(host, child = nil)
@@ -27,8 +28,8 @@ HEREDOC
             assert_has_key?(m, :type)
             assert_is_one_of(m[:type], "job_array", "single")
         end
-        asser_eq_str(modules[:modules][0][:name], "module_of_the_future", "name of first module in plugin \"#{@plugin}\"")
-        asser_eq_str(modules[:modules][1][:name], "module_of_the_future_single_type", "name of second module in plugin \"#{@plugin}\"")
+        assert_eq_str(modules[:modules][0][:name], @arry_mod, "name of first module in plugin \"#{@plugin}\"")
+        assert_eq_str(modules[:modules][1][:name], @single_mod, "name of second module in plugin \"#{@plugin}\"")
     end
     def run
         TEST_SUITE("Parent/Child plugin config")
@@ -49,7 +50,7 @@ HEREDOC
 
         rc = DynCfgHttpClient.get_plugin_config(@parent, @plugin, @child)
         assert_eq(rc.code, 200, "as HTTP code for get_plugin_config request")
-        asser_eq_str(rc.parsed_response.chomp!, @@plugin_cfg, "as plugin config")
+        assert_eq_str(rc.parsed_response.chomp!, @@plugin_cfg, "as plugin config")
 
         # We do this twice with different configs to ensure first config was not loaded from persistent storage (from previous tests)
         rc = DynCfgHttpClient.set_plugin_config(@parent, @plugin, @@plugin_cfg2, @child)
@@ -57,13 +58,13 @@ HEREDOC
 
         rc = DynCfgHttpClient.get_plugin_config(@parent, @plugin, @child)
         assert_eq(rc.code, 200, "as HTTP code for get_plugin_config request 2")
-        asser_eq_str(rc.parsed_response.chomp!, @@plugin_cfg2, "set/get plugin config 2")
+        assert_eq_str(rc.parsed_response.chomp!, @@plugin_cfg2, "set/get plugin config 2")
         PASS()
 
         TEST("child/get_plugin_config", "Get child (hops:0) plugin config and compare with what we got trough parent (set_plugin_config from previous test)")
         rc = DynCfgHttpClient.get_plugin_config(@child, @plugin, nil)
         assert_eq(rc.code, 200, "as HTTP code for get_plugin_config request")
-        asser_eq_str(rc.parsed_response.chomp!, @@plugin_cfg2.chomp, "as plugin config")
+        assert_eq_str(rc.parsed_response.chomp!, @@plugin_cfg2.chomp, "as plugin config")
         PASS()
 
         TEST("parent/child/plugin_module_list", "Get child (hops:1) plugin module list trough parent and check its contents")
@@ -85,7 +86,7 @@ HEREDOC
         new_job = jobs[:jobs].find {|i| i[:name] == @test_job}
         assert_not_nil(new_job)
         assert_has_key?(new_job, :status)
-        asser_not_eq_str(new_job[:status], "unknown", "job status is other than unknown")
+        assert_not_eq_str(new_job[:status], "unknown", "job status is other than unknown")
         assert_has_key?(new_job, :flags)
         assert_array_include?(new_job[:flags], "JOB_FLG_STREAMING_PUSHED")
         PASS()
@@ -101,10 +102,16 @@ HEREDOC
         new_job = jobs[:jobs].find {|i| i[:name] == @test_job}
         assert_not_nil(new_job)
         assert_has_key?(new_job, :status)
-        asser_not_eq_str(new_job[:status], "unknown", "job status is other than unknown")
+        assert_not_eq_str(new_job[:status], "unknown", "job status is other than unknown")
         assert_has_key?(new_job, :flags)
 
         assert_array_not_include?(new_job[:flags], "JOB_FLG_STREAMING_PUSHED") # this is plugin directly at child so it should not show this flag
+        PASS()
+
+        TEST("child/single_module/jobs", "Attempt getting list of jobs from child (hops:1) trough parent on single module. Check it fails properly")
+        rc = DynCfgHttpClient.get_job_list(@parent, @plugin, @single_mod, @child)
+        assert_eq(rc.code, 400, "as HTTP code for get_jobs request")
+        assert_eq_str(rc.parsed_response, '400 - this module is not array type', "as HTTP code for get_jobs request on single module")
         PASS()
     end
 end
