@@ -4,8 +4,6 @@
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 
-ls -l "$(dirname "${0}")/../"
-
 version="$(cat "$(dirname "${0}")/../curl.version")"
 
 # shellcheck disable=SC2015
@@ -73,7 +71,7 @@ fi
 
 run make install
 
-store_cache curl "${NETDATA_MAKESELF_PATH}/tmp/curl-${version}"
+store_cache curl "${NETDATA_MAKESELF_PATH}/tmp/${version}"
 
 if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
   run strip "${NETDATA_INSTALL_PATH}"/bin/curl
