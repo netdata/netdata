@@ -4,13 +4,34 @@
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 
-version="7.87.0"
+ls -l "$(dirname "${0}")/../"
+
+version="$(cat "$(dirname "${0}")/../curl.version")"
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building cURL" || true
 
-fetch "curl-${version}" "https://curl.haxx.se/download/curl-${version}.tar.gz" \
-    8a063d664d1c23d35526b87a2bf15514962ffdd8ef7fd40519191b3c23e39548 curl
+if [ -d "${NETDATA_MAKESELF_PATH}/tmp/curl" ]; then
+  rm -rf "${NETDATA_MAKESELF_PATH}/tmp/curl"
+fi
+
+if [ -d "${NETDATA_MAKESELF_PATH}/tmp/curl" ]; then
+  rm -rf "${NETDATA_MAKESELF_PATH}/tmp/curl"
+fi
+
+cache="${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/curl"
+
+if [ -d "${cache}" ]; then
+  echo "Found cached copy of build directory for curl, using it."
+  cp -a "${cache}/curl" "${NETDATA_MAKESELF_PATH}/tmp/"
+  CACHE_HIT=1
+else
+  echo "No cached copy of build directory for curl found, fetching sources instead."
+  run git clone --branch "${version}" --single-branch --depth 1 'https://github.com/curl/curl.git' "${NETDATA_MAKESELF_PATH}/tmp/curl"
+  CACHE_HIT=0
+fi
+
+cd "${NETDATA_MAKESELF_PATH}/tmp/curl" || exit 1
 
 export CFLAGS="-I/openssl-static/include -pipe"
 export LDFLAGS="-static -L/openssl-static/lib"
