@@ -826,6 +826,8 @@ struct node_instance_list *get_node_list(void)
             uuid_t *host_id = (uuid_t *)sqlite3_column_blob(res, 1);
             uuid_unparse_lower(*host_id, host_guid);
             RRDHOST *host = rrdhost_find_by_guid(host_guid);
+            if (!host)
+                continue;
             if (rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)) {
                 netdata_log_info("ACLK: 'host:%s' skipping get node list because context is initializing", rrdhost_hostname(host));
                 continue;
