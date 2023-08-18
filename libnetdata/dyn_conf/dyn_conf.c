@@ -922,9 +922,9 @@ struct uni_http_response dyn_conf_process_http_request(DICTIONARY *plugins_dict,
         goto EXIT_PLUGIN;
     }
     if (mod->type != MOD_TYPE_ARRAY) {
-        resp.content = "module is not array";
+        resp.content = "400 - this module is not array type";
         resp.content_length = strlen(resp.content);
-        resp.status = HTTP_RESP_NOT_FOUND;
+        resp.status = HTTP_RESP_BAD_REQUEST;
         goto EXIT_PLUGIN;
     }
     handle_job_root(&resp, method, mod, job_id, post_payload, post_payload_size);
