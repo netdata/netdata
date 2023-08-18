@@ -1280,13 +1280,13 @@ static void ebpf_socket_fill_function_buffer(BUFFER *buf)
         netdata_ebpf_socket_judy_connections_t *pid_ptr = (netdata_ebpf_socket_judy_connections_t *)*pid_value;
         bool first_socket = true;
         Word_t local_timestamp = 0;
+        rw_spinlock_read_lock(&pid_ptr->index.rw_spinlock);
         while ((socket_value = JudyLFirstThenNext(pid_ptr->index.JudyHSArray, &local_timestamp, &first_socket))) {
             counter++;
-            /*
-            netdata_socket_plus_t *values = (netdata_socket_plus_t *)*SocketValue;
+            netdata_socket_plus_t *values = (netdata_socket_plus_t *)*socket_value;
             ebpf_fill_function_buffer(buf, values);
-            */
         }
+        rw_spinlock_read_unlock(&pid_ptr->index.rw_spinlock);
     }
     rw_spinlock_read_unlock(&ebpf_socket_pid.index.rw_spinlock);
 
