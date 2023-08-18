@@ -237,24 +237,57 @@ struct job *get_job_by_name(struct module *module, const char *job_name)
     return dictionary_get(module->jobs, job_name);
 }
 
-int remove_job(struct module *module, struct job *job)
+void unlink_job(const char *plugin_name, const char *module_name, const char *job_name)
 {
     // as we are going to do unlink here we better make sure we have all to build proper path
-    if (unlikely(job->name == NULL || module == NULL || module->name == NULL || module->plugin == NULL || module->plugin->name == NULL))
-        return 0;
+    if (unlikely(job_name == NULL || module_name == NULL || plugin_name == NULL))
+        return;
+    BUFFER *buffer = buffer_create(DYN_CONF_PATH_MAX, NULL);
+    buffer_sprintf(buffer, DYN_CONF_DIR "/%s/%s/%s" DYN_CONF_CFG_EXT, plugin_name, module_name, job_name);
+    unlink(buffer_tostring(buffer));
+    buffer_free(buffer);
+}
 
+void delete_job(struct configurable_plugin *plugin, const char *module_name, const char *job_name)
+{
+    struct module *module = get_module_by_name(plugin, module_name);
+    if (module == NULL) {
+        error_report("DYNCFG module \"%s\" not found", module_name);
+        return;
+    }
+
+    struct job  *job_item = get_job_by_name(module, job_name);
+    if (job_item == NULL) {
+        error_report("DYNCFG job \"%s\" not found", job_name);
+        return;
+    }
+
+    dictionary_del(module->jobs, job_name);
+}
+
+void delete_job_pname(DICTIONARY *plugins_dict, const char *plugin_name, const char *module_name, const char *job_name)
+{
+    const DICTIONARY_ITEM *plugin_item = dictionary_get_and_acquire_item(plugins_dict, plugin_name);
+    if (plugin_item == NULL) {
+        error_report("DYNCFG plugin \"%s\" not found", plugin_name);
+        return;
+    }
+    struct configurable_plugin *plugin  = dictionary_acquired_item_value(plugin_item);
+
+    delete_job(plugin, module_name, job_name);
+
+    dictionary_acquired_item_release(plugins_dict, plugin_item);
+}
+
+int remove_job(struct module *module, struct job *job)
+{
     enum set_config_result rc = module->delete_job_cb(module->job_config_cb_usr_ctx, module->plugin->name, module->name, job->name);
 
     if (rc != SET_CONFIG_ACCEPTED) {
         error_report("DYNCFG module \"%s\" rejected delete job for \"%s\"", module->name, job->name);
         return 0;
     }
-
-    BUFFER *buffer = buffer_create(DYN_CONF_PATH_MAX, NULL);
-    buffer_sprintf(buffer, DYN_CONF_DIR "/%s/%s/%s" DYN_CONF_CFG_EXT, module->plugin->name, module->name, job->name);
-    unlink(buffer_tostring(buffer));
-    buffer_free(buffer);
-    return dictionary_del(module->jobs, job->name);
+    return 1;
 }
 
 struct module *get_module_by_name(struct configurable_plugin *plugin, const char *module_name)
@@ -319,7 +352,6 @@ static int store_config(const char *module_name, const char *submodule_name, con
 #define netdata_dev_fatal(...) error_report(__VA_ARGS__)
 #endif
 
-#define DYNCFG_MAX_WORDS 5
 void dyn_conf_store_config(const char *function, const char *payload, struct configurable_plugin *plugin) {
     dyncfg_config_t config = {
         .data = (char*)payload,

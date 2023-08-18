@@ -486,6 +486,22 @@ void rrdpush_send_job_status_update(RRDHOST *host, const char *plugin_name, cons
     job->dirty = 0;
 }
 
+void rrdpush_send_job_deleted(RRDHOST *host, const char *plugin_name, const char *module_name, const char *job_name) {
+    if(unlikely(!rrdhost_can_send_definitions_to_parent(host)))
+        return;
+
+/* TODO    if(!stream_has_capability(host->sender, STREAM_CAP_DYNCFG))
+        return;*/
+
+    BUFFER *wb = sender_start(host->sender);
+
+    buffer_sprintf(wb, PLUGINSD_KEYWORD_DELETE_JOB " %s %s %s\n", plugin_name, module_name, job_name);
+
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+
+    sender_thread_buffer_free();
+}
+
 RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock_time) {
     RRDHOST *host = st->rrdhost;
 

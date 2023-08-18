@@ -745,6 +745,7 @@ struct inflight_function {
     usec_t sent_ut;
     const char *payload;
     PARSER *parser;
+    bool virtual;
 };
 
 static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void *func, void *parser_ptr) {
@@ -811,6 +812,32 @@ static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __m
     return false;
 }
 
+void delete_job_finalize(struct parser *parser, struct configurable_plugin *plug, const char *fnc_sig, int code) {
+    if (code != SET_CONFIG_ACCEPTED)
+        return;
+
+    char *params_local = strdupz(fnc_sig);
+    char *words[DYNCFG_MAX_WORDS];
+    size_t words_c = quoted_strings_splitter(params_local, words, DYNCFG_MAX_WORDS, isspace_map_pluginsd);
+
+    if (words_c != 3) {
+        netdata_log_error("PLUGINSD_PARSER: invalid number of parameters for delete_job");
+        freez(params_local);
+        return;
+    }
+
+    const char *module = words[1];
+    const char *job = words[2];
+
+    delete_job(plug, module, job);
+
+    unlink_job(plug->name, module, job);
+
+    rrdpush_send_job_deleted(localhost, plug->name, module, job);
+
+    freez(params_local);
+}
+
 static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func, void *parser_ptr) {
     struct inflight_function *pf = func;
     struct parser *parser = (struct parser *)parser_ptr;
@@ -820,8 +847,13 @@ static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __may
                    string2str(pf->function), dictionary_acquired_item_name(item),
                    buffer_strlen(pf->result_body_wb), pf->sent_ut - pf->started_ut, now_realtime_usec() - pf->sent_ut);
 
-    if (pf->payload && SERVING_PLUGINSD(parser))
-        dyn_conf_store_config(string2str(pf->function), pf->payload, parser->user.cd->configuration);
+    if (pf->virtual && SERVING_PLUGINSD(parser)) {
+        if (pf->payload) {
+            dyn_conf_store_config(string2str(pf->function), pf->payload, parser->user.cd->configuration);
+        } else if (strncmp(string2str(pf->function), FUNCTION_NAME_DELETE_JOB, strlen(FUNCTION_NAME_DELETE_JOB)) == 0) {
+            delete_job_finalize(parser, parser->user.cd->configuration, string2str(pf->function), pf->code);
+        }
+    }
 
     pf->result_cb(pf->result_body_wb, pf->code, pf->result_cb_data);
 
@@ -1999,6 +2031,7 @@ void call_virtual_function_async(BUFFER *wb, RRDHOST *host, const char *name, co
         .result_cb = callback,
         .result_cb_data = callback_data,
         .payload = payload != NULL ? strdupz(payload) : NULL,
+        .virtual = true,
     };
     buffer_free(function_out);
 
@@ -2043,6 +2076,7 @@ dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name,
         .result_cb = virt_fnc_got_data_cb,
         .result_cb_data = &cond,
         .payload = payload != NULL ? strdupz(payload) : NULL,
+        .virtual = true,
     };
 
     uuid_t uuid;
@@ -2445,6 +2479,24 @@ static PARSER_RC pluginsd_job_status(char **words, size_t num_words, PARSER *par
     return pluginsd_job_status_common(&words[2], num_words - 2, parser, words[1]);
 }
 
+static PARSER_RC pluginsd_delete_job(char **words, size_t num_words, PARSER *parser) {
+    // this can confuse a bit but there is a diference between KEYWORD_DELETE_JOB and actual delete_job function
+    // they are of opossite direction
+    if (num_words != 4)
+        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DELETE_JOB, "expected 2 parameters: plugin_name, module_name, job_name");
+
+    const char *plugin_name = get_word(words, num_words, 1);
+    const char *module_name = get_word(words, num_words, 2);
+    const char *job_name = get_word(words, num_words, 3);
+
+    if (SERVING_STREAMING(parser))
+        delete_job_pname(parser->user.host->configurable_plugins, plugin_name, module_name, job_name);
+
+    // forward to parent if any
+    rrdpush_send_job_deleted(parser->user.host, plugin_name, module_name, job_name);
+    return PARSER_RC_OK;
+}
+
 static inline PARSER_RC streaming_claimed_id(char **words, size_t num_words, PARSER *parser)
 {
     const char *host_uuid_str = get_word(words, num_words, 1);
@@ -2767,6 +2819,9 @@ PARSER_RC parser_execute(PARSER *parser, PARSER_KEYWORD *keyword, char **words, 
 
         case 110:
             return pluginsd_job_status(words, num_words, parser);
+        
+        case 111:
+            return pluginsd_delete_job(words, num_words, parser);
 
         default:
             fatal("Unknown keyword '%s' with id %zu", keyword->keyword, keyword->id);

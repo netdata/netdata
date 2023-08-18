@@ -16,6 +16,8 @@
 #define FUNCTION_NAME_SET_JOB_CONFIG "set_job_config"
 #define FUNCTION_NAME_DELETE_JOB "delete_job"
 
+#define DYNCFG_MAX_WORDS 5
+
 enum module_type {
     MOD_TYPE_UNKNOWN = 0,
     MOD_TYPE_ARRAY,
@@ -186,6 +188,9 @@ int register_job(DICTIONARY *plugins_dict, const char *plugin_name, const char *
 const DICTIONARY_ITEM *report_job_status_acq_lock(DICTIONARY *plugins_dict, const DICTIONARY_ITEM **plugin_acq_item, DICTIONARY **job_dict, const char *plugin_name, const char *module_name, const char *job_name, enum job_status status, int status_code, char *reason);
 
 void dyn_conf_store_config(const char *function, const char *payload, struct configurable_plugin *plugin);
+void unlink_job(const char *plugin_name, const char *module_name, const char *job_name);
+void delete_job(struct configurable_plugin *plugin, const char *module_name, const char *job_name);
+void delete_job_pname(DICTIONARY *plugins_dict, const char *plugin_name, const char *module_name, const char *job_name);
 
 // API to be used by the web server(s)
 json_object *get_list_of_plugins_json(DICTIONARY *plugins_dict);
