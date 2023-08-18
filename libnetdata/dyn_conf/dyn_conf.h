@@ -161,7 +161,7 @@ struct module
     dyncfg_config_t (*get_job_config_cb)(void *usr_ctx, const char *plugin_name, const char *module_name, const char *job_name);
     dyncfg_config_t (*get_job_config_schema_cb)(void *usr_ctx, const char *plugin_name, const char *module_name);
     enum set_config_result (*set_job_config_cb)(void *usr_ctx, const char *plugin_name, const char *module_name, const char *job_name, dyncfg_config_t *cfg);
-    enum set_config_result (*delete_job_cb)(void *usr_ctx, const char *module_name, const char *job_name);
+    enum set_config_result (*delete_job_cb)(void *usr_ctx, const char *plugin_name, const char *module_name, const char *job_name);
     void *job_config_cb_usr_ctx;
 };
 

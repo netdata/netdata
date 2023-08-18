@@ -243,7 +243,7 @@ int remove_job(struct module *module, struct job *job)
     if (unlikely(job->name == NULL || module == NULL || module->name == NULL || module->plugin == NULL || module->plugin->name == NULL))
         return 0;
 
-    enum set_config_result rc = module->delete_job_cb(module->job_config_cb_usr_ctx, module->name, job->name);
+    enum set_config_result rc = module->delete_job_cb(module->job_config_cb_usr_ctx, module->plugin->name, module->name, job->name);
 
     if (rc != SET_CONFIG_ACCEPTED) {
         error_report("DYNCFG module \"%s\" rejected delete job for \"%s\"", module->name, job->name);

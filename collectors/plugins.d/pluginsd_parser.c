@@ -2253,14 +2253,22 @@ enum set_config_result set_job_config_cb(void *usr_ctx, const char *plugin_name,
     return SET_CONFIG_ACCEPTED;
 }
 
-enum set_config_result delete_job_cb(void *usr_ctx, const char *module_name, const char *job_name)
+enum set_config_result delete_job_cb(void *usr_ctx, const char *plugin_name ,const char *module_name, const char *job_name)
 {
     PARSER *parser = usr_ctx;
-    int rc;
+    BUFFER *wb = buffer_create(CVF_MAX_LEN, NULL);
 
-    char buf[1024];
-    snprintfz(buf, sizeof(buf), "delete_job %s %s", module_name, job_name);
-    call_virtual_function_blocking(parser, buf, &rc, NULL);
+    buffer_strcat(wb, FUNCTION_NAME_DELETE_JOB);
+
+    if (SERVING_STREAMING(parser))
+        buffer_sprintf(wb, " %s", plugin_name);
+
+    buffer_sprintf(wb, " %s %s", module_name, job_name);
+
+    int rc;
+    call_virtual_function_blocking(parser, buffer_tostring(wb), &rc, NULL);
+
+    buffer_free(wb);
 
     if(rc != 1)
         return SET_CONFIG_REJECTED;
