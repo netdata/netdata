@@ -7,7 +7,7 @@
 cd "${NETDATA_SOURCE_PATH}" || exit 1
 
 if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
-  export CFLAGS="-ffunction-sections -fdata-sections -static -O0 -g -funroll-loops -I/openssl-static/include -I/libnetfilter-acct-static/include/libnetfilter_acct -I/usr/include/libmnl -pipe"
+  export CFLAGS="-ffunction-sections -fdata-sections -static -O2 -funroll-loops -I/openssl-static/include -I/libnetfilter-acct-static/include/libnetfilter_acct -I/usr/include/libmnl -pipe"
 else
   export CFLAGS="-static -O1 -pipe -ggdb -Wall -Wextra -Wformat-signedness -DNETDATA_INTERNAL_CHECKS=1 -I/openssl-static/include -I/libnetfilter-acct-static/include/libnetfilter_acct -I/usr/include/libmnl"
 fi
