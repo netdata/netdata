@@ -974,14 +974,17 @@ void send_statistics(const char *action, const char *action_result, const char *
         action_result = "";
     if (!action_data)
         action_data = "";
+
+    const char *fail_reason = getenv("NETDATA_FAIL_REASON") ? getenv("NETDATA_FAIL_REASON") : "";
+
     char *command_to_run = mallocz(
         sizeof(char) * (strlen(action) + strlen(action_result) + strlen(action_data) + strlen(as_script) +
-                        analytics_data.data_length + (ANALYTICS_NO_OF_ITEMS * 3) + 15));
+                        analytics_data.data_length + (ANALYTICS_NO_OF_ITEMS * 3) + 15 + strlen(fail_reason) + 5));
     pid_t command_pid;
 
     sprintf(
         command_to_run,
-        "%s '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' ",
+        "%s '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' ",
         as_script,
         action,
         action_result,
@@ -1024,7 +1027,8 @@ void send_statistics(const char *action, const char *action_result, const char *
         analytics_data.netdata_config_is_private_registry,
         analytics_data.netdata_config_use_private_registry,
         analytics_data.netdata_config_oom_score,
-        analytics_data.netdata_prebuilt_distro);
+        analytics_data.netdata_prebuilt_distro,
+        fail_reason);
 
     netdata_log_info("%s '%s' '%s' '%s'", as_script, action, action_result, action_data);
 
