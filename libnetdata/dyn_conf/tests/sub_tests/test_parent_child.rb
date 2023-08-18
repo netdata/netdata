@@ -6,6 +6,10 @@ HEREDOC
 { "asdfgh" : "asdfgh" }
 HEREDOC
 
+    @@job_cfg = <<~HEREDOC
+{ "i am newly created job" : "true" }
+HEREDOC
+
     def initialize
         @parent = $config[:http_endpoints][:parent]
         @child  = $config[:http_endpoints][:child]
@@ -108,10 +112,43 @@ HEREDOC
         assert_array_not_include?(new_job[:flags], "JOB_FLG_STREAMING_PUSHED") # this is plugin directly at child so it should not show this flag
         PASS()
 
-        TEST("child/single_module/jobs", "Attempt getting list of jobs from child (hops:1) trough parent on single module. Check it fails properly")
+        TEST("parent/child/single_module/jobs", "Attempt getting list of jobs from child (hops:1) trough parent on single module. Check it fails properly")
         rc = DynCfgHttpClient.get_job_list(@parent, @plugin, @single_mod, @child)
         assert_eq(rc.code, 400, "as HTTP code for get_jobs request")
         assert_eq_str(rc.parsed_response, '400 - this module is not array type', "as HTTP code for get_jobs request on single module")
+        PASS()
+
+        created_job = "created_job"
+        TEST("parent/child/module/cr_del_job", "Create and delete job on child (hops:1) trough parent")
+        # create new job
+        rc = DynCfgHttpClient.create_job(@parent, @plugin, @arry_mod, created_job, @@job_cfg, @child)
+        assert_eq(rc.code, 200, "as HTTP code for create_job request")
+        # check this job is in job list
+        rc = DynCfgHttpClient.get_job_list(@parent, @plugin, @arry_mod, @child)
+        assert_eq(rc.code, 200, "as HTTP code for get_jobs request")
+        jobs = nil
+        assert_nothing_raised do
+            jobs = JSON.parse(rc.parsed_response, symbolize_names: true)
+        end
+        assert_has_key?(jobs, :jobs)
+        new_job = jobs[:jobs].find {|i| i[:name] == created_job}
+        assert_not_nil(new_job)
+        # check we can get job config back
+        rc = DynCfgHttpClient.get_job_config(@parent, @plugin, @arry_mod, created_job, @child)
+        assert_eq(rc.code, 200, "as HTTP code for get_job_config request")
+        assert_eq_str(rc.parsed_response.chomp!, @@job_cfg, "as job config")
+        rc = DynCfgHttpClient.delete_job(@parent, @plugin, @arry_mod, created_job, @child)
+        assert_eq(rc.code, 200, "as HTTP code for delete_job request")
+        # Check it is not in parents job list anymore
+        rc = DynCfgHttpClient.get_job_list(@parent, @plugin, @arry_mod, @child)
+        assert_eq(rc.code, 200, "as HTTP code for get_jobs request")
+        jobs = nil
+        assert_nothing_raised do
+            jobs = JSON.parse(rc.parsed_response, symbolize_names: true)
+        end
+        assert_has_key?(jobs, :jobs)
+        new_job = jobs[:jobs].find {|i| i[:name] == created_job}
+        assert_nil(new_job)
         PASS()
     end
 end

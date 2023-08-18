@@ -62,7 +62,7 @@ class TestRunner
         assert_no_test_running()
         @test = name
         col = 0
-        txt = "  ∘ TEST: \"#{name}\" "
+        txt = "  ├─ T: #{name} "
         col += txt.length
         print $pastel.bold(txt)
 
@@ -156,6 +156,12 @@ def assert_not_nil(value)
     end
     $test_runner.add_assertion()
 end
+def assert_nil(value)
+    unless value == nil
+        FAIL("Expected value to not be nil", nil, caller_locations(1, 1).first)
+    end
+    $test_runner.add_assertion()
+end
 
 
 class DynCfgHttpClient
@@ -176,6 +182,9 @@ class DynCfgHttpClient
     end
     def self.get_url_cfg_module(host, plugin, mod, child = nil)
         return get_url_cfg_plugin(host, plugin, child) + '/' + mod
+    end
+    def self.get_url_cfg_job(host, plugin, mod, job_id, child = nil)
+        return get_url_cfg_module(host, plugin, mod, child) + "/#{job_id}"
     end
     def self.get_plugin_list(host, child = nil)
         begin
@@ -208,6 +217,34 @@ class DynCfgHttpClient
     def self.get_job_list(host, plugin, mod, child = nil)
         begin
             return HTTParty.get(get_url_cfg_module(host, plugin, mod, child) + "/jobs", verify: false, format: :plain)
+        rescue => e
+            FAIL(e.message, e)
+        end
+    end
+    def self.create_job(host, plugin, mod, job_id, job_cfg, child = nil)
+        begin
+            return HTTParty.post(get_url_cfg_job(host, plugin, mod, job_id, child), verify: false, body: job_cfg)
+        rescue => e
+            FAIL(e.message, e)
+        end
+    end
+    def self.delete_job(host, plugin, mod, job_id, child = nil)
+        begin
+            return HTTParty.delete(get_url_cfg_job(host, plugin, mod, job_id, child), verify: false)
+        rescue => e
+            FAIL(e.message, e)
+        end
+    end
+    def self.get_job_config(host, plugin, mod, job_id, child = nil)
+        begin
+            return HTTParty.get(get_url_cfg_job(host, plugin, mod, job_id, child), verify: false, format: :plain)
+        rescue => e
+            FAIL(e.message, e)
+        end
+    end
+    def self.set_job_config(host, plugin, mod, job_id, job_cfg, child = nil)
+        begin
+            return HTTParty.put(get_url_cfg_job(host, plugin, mod, job_id, child), verify: false, body: job_cfg)
         rescue => e
             FAIL(e.message, e)
         end
