@@ -34,9 +34,9 @@ fi
 cd "${NETDATA_MAKESELF_PATH}/tmp/curl" || exit 1
 
 export CFLAGS="-I/openssl-static/include -pipe"
-export LDFLAGS="-static -L/openssl-static/lib"
+export LDFLAGS="-static -L/openssl-static/lib64"
 export PKG_CONFIG="pkg-config --static"
-export PKG_CONFIG_PATH="/openssl-static/lib/pkgconfig"
+export PKG_CONFIG_PATH="/openssl-static/lib64/pkgconfig"
 
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then
     run autoreconf -fi
