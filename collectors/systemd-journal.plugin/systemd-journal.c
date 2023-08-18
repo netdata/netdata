@@ -546,6 +546,9 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
 
+    // initialize the threads
+    netdata_threads_init_for_external_plugins(0); // set the default threads stack size here
+
     uids = dictionary_create(0);
     gids = dictionary_create(0);
 
