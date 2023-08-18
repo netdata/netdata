@@ -1349,7 +1349,8 @@ static void ebpf_socket_translate(netdata_socket_plus_t *dst, netdata_socket_idx
     }
     dst->pid = key->pid;
     dst->socket_string.src_port = ntohs(key->sport);
-    dst->socket_string.dst_port = ntohs(key->dport);
+    // translated by caller
+    dst->socket_string.dst_port = key->dport;
 
 #ifdef NETDATA_DEV_MODE
     collector_info("New socket: { SRC IP: %s, SRC PORT: %u, DST IP:%s, DST PORT: %u, PID: %u, Protocol: %d, Family: %d}",
@@ -1398,17 +1399,22 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         test = bpf_map_lookup_elem(fd, &key, values);
         if (test < 0) {
-            memcpy(&key, &next_key, sizeof(key));
-            continue;
+            goto end_socket_loop;
         }
 
         if (key.pid > (uint32_t)pid_max) {
-            memcpy(&key, &next_key, sizeof(key));
-            continue;
+            goto end_socket_loop;
         }
 
         ebpf_hash_socket_accumulator(values, &key, end);
         ebpf_socket_fill_publish_apps(key.pid, values);
+
+        // We update UDP to show info with charts, but we do not show them with functions
+        key.dport = ntohs(key.dport);
+        if (key.dport == NETDATA_EBPF_UDP_PORT && values[0].protocol == IPPROTO_UDP) {
+            bpf_map_delete_elem(fd, &key);
+            goto end_socket_loop;
+        }
 
         // Get PID structure
         netdata_ebpf_socket_judy_connections_t **pid_pptr =
@@ -1441,8 +1447,8 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
             ebpf_socket_translate(socket_ptr, &key);
         rw_spinlock_write_unlock(&pid_ptr->index.rw_spinlock);
 
+end_socket_loop:
         memset(values, 0, length);
-
         memcpy(&key, &next_key, sizeof(key));
     }
     rw_spinlock_write_unlock(&ebpf_socket_pid.index.rw_spinlock);
