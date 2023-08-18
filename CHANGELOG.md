@@ -6,7 +6,19 @@
 
 **Merged pull requests:**
 
+- workaround for systems that do not have SD\_JOURNAL\_OS\_ROOT [\#15837](https://github.com/netdata/netdata/pull/15837) ([ktsaou](https://github.com/ktsaou))
+- added ilove.html [\#15836](https://github.com/netdata/netdata/pull/15836) ([ktsaou](https://github.com/ktsaou))
+- Fix CID 382964:  Code maintainability issues  \(SIZEOF\_MISMATCH\) [\#15833](https://github.com/netdata/netdata/pull/15833) ([stelfrag](https://github.com/stelfrag))
+- Fix coverity 393052:  API usage errors  \(LOCK\) [\#15832](https://github.com/netdata/netdata/pull/15832) ([stelfrag](https://github.com/stelfrag))
+- systemd-journal in containers [\#15830](https://github.com/netdata/netdata/pull/15830) ([ktsaou](https://github.com/ktsaou))
+- RPM: fixed attrs for conf.d dirs [\#15828](https://github.com/netdata/netdata/pull/15828) ([k0ste](https://github.com/k0ste))
+- Avoid resource leak  [\#15827](https://github.com/netdata/netdata/pull/15827) ([stelfrag](https://github.com/stelfrag))
+- Release fd if setsockopt or bind fails [\#15826](https://github.com/netdata/netdata/pull/15826) ([stelfrag](https://github.com/stelfrag))
+- Fix use after free [\#15825](https://github.com/netdata/netdata/pull/15825) ([stelfrag](https://github.com/stelfrag))
+- Improve dyncfg exit [\#15824](https://github.com/netdata/netdata/pull/15824) ([underhood](https://github.com/underhood))
 - Release job message status to avoid memory leak [\#15822](https://github.com/netdata/netdata/pull/15822) ([stelfrag](https://github.com/stelfrag))
+- ML improve init [\#15819](https://github.com/netdata/netdata/pull/15819) ([stelfrag](https://github.com/stelfrag))
+- Update cmakelist [\#15817](https://github.com/netdata/netdata/pull/15817) ([stelfrag](https://github.com/stelfrag))
 - added /api/v2/ilove.svg endpoint [\#15815](https://github.com/netdata/netdata/pull/15815) ([ktsaou](https://github.com/ktsaou))
 - systemd-journal fixes [\#15814](https://github.com/netdata/netdata/pull/15814) ([ktsaou](https://github.com/ktsaou))
 - fix packaging: link health.log to stdout [\#15813](https://github.com/netdata/netdata/pull/15813) ([ilyam8](https://github.com/ilyam8))
@@ -31,6 +43,7 @@
 - Update an oversight on the openSUSE 15.5 packages [\#15781](https://github.com/netdata/netdata/pull/15781) ([tkatsoulas](https://github.com/tkatsoulas))
 - Bump openssl version of static builds to 1.1.1v [\#15779](https://github.com/netdata/netdata/pull/15779) ([tkatsoulas](https://github.com/tkatsoulas))
 - fix: the cleanup was not performed during the kickstart.sh dry run [\#15775](https://github.com/netdata/netdata/pull/15775) ([ilyam8](https://github.com/ilyam8))
+- Increase alert snapshot chunk size [\#15748](https://github.com/netdata/netdata/pull/15748) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.42.1](https://github.com/netdata/netdata/tree/v1.42.1) (2023-08-16)
 
@@ -422,14 +435,6 @@
 - exporting: change priority to synchronous when calculating value [\#15276](https://github.com/netdata/netdata/pull/15276) ([ilyam8](https://github.com/ilyam8))
 - expose CmdLine in apps function [\#15275](https://github.com/netdata/netdata/pull/15275) ([ilyam8](https://github.com/ilyam8))
 - Misc alert fixes [\#15274](https://github.com/netdata/netdata/pull/15274) ([MrZammler](https://github.com/MrZammler))
-- Small readme improvements [\#15270](https://github.com/netdata/netdata/pull/15270) ([andrewm4894](https://github.com/andrewm4894))
-- Optimizations Part 2 [\#15267](https://github.com/netdata/netdata/pull/15267) ([ktsaou](https://github.com/ktsaou))
-- Replace `info` macro with a less generic name [\#15266](https://github.com/netdata/netdata/pull/15266) ([carlocab](https://github.com/carlocab))
-- Yaml template finalization [\#15265](https://github.com/netdata/netdata/pull/15265) ([Ancairon](https://github.com/Ancairon))
-- fix tc.plugin charts labels [\#15262](https://github.com/netdata/netdata/pull/15262) ([ilyam8](https://github.com/ilyam8))
-- Update libbpf version [\#15258](https://github.com/netdata/netdata/pull/15258) ([thiagoftsm](https://github.com/thiagoftsm))
-- rewrite /api/v2/alerts [\#15257](https://github.com/netdata/netdata/pull/15257) ([ktsaou](https://github.com/ktsaou))
-- Fix $\(libh2o\_dir\) not expanded properly sometimes. [\#15253](https://github.com/netdata/netdata/pull/15253) ([Dim-P](https://github.com/Dim-P))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
