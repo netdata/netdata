@@ -1416,6 +1416,12 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
             goto end_socket_loop;
         }
 
+        // Discard non-bind sockets
+        if (!key.daddr.addr64[0] && !key.daddr.addr64[1] && !key.saddr.addr64[0] && !key.saddr.addr64[1]) {
+            bpf_map_delete_elem(fd, &key);
+            goto end_socket_loop;
+        }
+
         // Get PID structure
         netdata_ebpf_socket_judy_connections_t **pid_pptr =
             (netdata_ebpf_socket_judy_connections_t **) ebpf_socket_hashtable_insert_unsafe(judy_array, key.pid);
