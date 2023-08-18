@@ -71,7 +71,7 @@ fi
 
 run make install
 
-store_cache curl "${NETDATA_MAKESELF_PATH}/tmp/${version}"
+store_cache curl "${NETDATA_MAKESELF_PATH}/tmp/curl"
 
 if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
   run strip "${NETDATA_INSTALL_PATH}"/bin/curl
