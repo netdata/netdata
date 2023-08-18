@@ -1015,7 +1015,6 @@ if ! run ./configure \
          --localstatedir="${NETDATA_PREFIX}/var" \
          --libexecdir="${NETDATA_PREFIX}/usr/libexec" \
          --libdir="${NETDATA_PREFIX}/usr/lib" \
-         --with-zlib \
          --with-math \
          --with-user="${NETDATA_USER}" \
          ${NETDATA_CONFIGURE_OPTIONS} \
