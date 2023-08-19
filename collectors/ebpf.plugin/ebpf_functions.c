@@ -382,7 +382,7 @@ static void ebpf_function_thread_manipulation(const char *transaction,
 }
 
 /*****************************************************************
- *  EBPF THREAD FUNCTION
+ *  EBPF SOCKET FUNCTION
  *****************************************************************/
 
 /**
@@ -426,6 +426,150 @@ static void ebpf_function_socket_help(const char *transaction) {
 }
 
 /**
+ * Fill Fake socket
+ *
+ * Fill socket with an invalid request.
+ *
+ * @param fake_values is the structure where we are storing the value.
+ */
+static inline void ebpf_socket_fill_fake_socket(netdata_socket_plus_t *fake_values)
+{
+    snprintfz(fake_values->socket_string.src_ip, INET6_ADDRSTRLEN, "%s", "127.0.0.1");
+    snprintfz(fake_values->socket_string.dst_ip, INET6_ADDRSTRLEN, "%s", "127.0.0.1");
+    fake_values->pid = getpid();
+    fake_values->socket_string.src_port = 0;
+    fake_values->socket_string.dst_port = 0;
+    fake_values->data.family = AF_INET;
+    fake_values->data.protocol = AF_UNSPEC;
+}
+
+/**
+ * Fill function buffer
+ *
+ * Fill buffer with data to be shown on cloud.
+ *
+ * @param wb          buffer where we store data.
+ * @param values      data read from hash table
+ */
+static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values)
+{
+    buffer_json_add_array_item_array(wb);
+
+    // IMPORTANT!
+    // THE ORDER SHOULD BE THE SAME WITH THE FIELDS!
+
+    // PID
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->pid);
+
+    // SRC IP
+    buffer_json_add_array_item_string(wb, values->socket_string.src_ip);
+
+    // SRC Port
+    buffer_json_add_array_item_uint64(wb, (uint64_t) values->socket_string.src_port);
+
+    // DST IP
+    buffer_json_add_array_item_string(wb, values->socket_string.dst_ip);
+
+    // DST Port
+    buffer_json_add_array_item_uint64(wb, (uint64_t) values->socket_string.dst_port);
+
+    if (values->data.protocol == IPPROTO_TCP) {
+        // Protocol
+        buffer_json_add_array_item_string(wb, "TCP");
+
+        // Traffic received
+        buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.tcp.tcp_bytes_received);
+
+        // Traffic sent
+        buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.tcp.tcp_bytes_sent);
+    } else if (values->data.protocol == IPPROTO_UDP) {
+        // Protocol
+        buffer_json_add_array_item_string(wb, "UDP");
+
+        // Traffic received
+        buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.udp.call_udp_received);
+
+        // Traffic sent
+        buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.udp.udp_bytes_sent);
+    } else {
+        // Protocol
+        buffer_json_add_array_item_string(wb, "UNSPEC");
+
+        // Traffic received
+        buffer_json_add_array_item_uint64(wb, 0);
+
+        // Traffic sent
+        buffer_json_add_array_item_uint64(wb, 0);
+    }
+
+    buffer_json_array_close(wb);
+}
+
+/**
+ * Fill function buffer
+ *
+ * Fill the function buffer with socket information.
+ *
+ * @param buf    buffer used to store data to be shown by function.
+ *
+ * @return it returns 0 on success and -1 otherwise.
+ */
+static void ebpf_socket_fill_function_buffer(BUFFER *buf)
+{
+    int counter = 0;
+
+    Pvoid_t *pid_value, *socket_value;
+    Word_t local_pid = 0;
+    bool first_pid = true;
+    rw_spinlock_read_lock(&ebpf_socket_pid.index.rw_spinlock);
+    while ((pid_value = JudyLFirstThenNext(ebpf_socket_pid.index.JudyHSArray, &local_pid, &first_pid))) {
+        netdata_ebpf_socket_judy_connections_t *pid_ptr = (netdata_ebpf_socket_judy_connections_t *)*pid_value;
+        bool first_socket = true;
+        Word_t local_timestamp = 0;
+        rw_spinlock_read_lock(&pid_ptr->index.rw_spinlock);
+        while ((socket_value = JudyLFirstThenNext(pid_ptr->index.JudyHSArray, &local_timestamp, &first_socket))) {
+            counter++;
+            netdata_socket_plus_t *values = (netdata_socket_plus_t *)*socket_value;
+            ebpf_fill_function_buffer(buf, values);
+        }
+        rw_spinlock_read_unlock(&pid_ptr->index.rw_spinlock);
+    }
+    rw_spinlock_read_unlock(&ebpf_socket_pid.index.rw_spinlock);
+
+    if (!counter) {
+        netdata_socket_plus_t fake_values = { };
+        ebpf_socket_fill_fake_socket(&fake_values);
+        ebpf_fill_function_buffer(buf, &fake_values);
+    }
+}
+
+/**
+ * Socket read hash
+ *
+ * This is the thread callback.
+ * This thread is necessary, because we cannot freeze the whole plugin to read the data on very busy socket.
+ *
+ * @param buf the buffer to store data;
+ * @param em  the module main structure.
+ *
+ * @return It always returns NULL.
+ */
+void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
+{
+    // thread was not initialized
+    if (!em->maps || (em->maps && em->maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED)){
+        netdata_socket_plus_t fake_values = { };
+
+        ebpf_socket_fill_fake_socket(&fake_values);
+
+        ebpf_fill_function_buffer(buf, &fake_values);
+        return;
+    }
+
+    ebpf_socket_fill_function_buffer(buf);
+}
+
+/**
  * Function: Socket
  *
  * Show information for sockets stored in hash tables.
@@ -461,12 +605,10 @@ static void ebpf_function_socket_manipulation(const char *transaction,
 
         if (strncmp(keyword, EBPF_FUNCTION_SOCKET_FAMILY, sizeof(EBPF_FUNCTION_SOCKET_FAMILY) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_FAMILY) - 1];
-            separator = strchr(name, ':');
-            if (separator) {
-                separator++;
-                if (!strcmp(separator, "IPV4"))
+            if (name) {
+                if (!strcmp(name, "IPV4"))
                     network_viewer_opt.family = AF_INET;
-                else if (!strcmp(separator, "IPV6"))
+                else if (!strcmp(name, "IPV6"))
                     network_viewer_opt.family = AF_INET6;
                 else
                     network_viewer_opt.family = AF_UNSPEC;
@@ -518,6 +660,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             ebpf_function_error(transaction,
                                 HTTP_RESP_INTERNAL_SERVER_ERROR,
                                 "Cannot start thread.");
+            pthread_mutex_unlock(&ebpf_exit_cleanup);
             return;
         }
     } else {

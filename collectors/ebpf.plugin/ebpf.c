@@ -636,6 +636,7 @@ pthread_mutex_t mutex_cgroup_shm;
 
 //Network viewer
 ebpf_network_viewer_options_t network_viewer_opt;
+netdata_ebpf_socket_judy_pid_t ebpf_socket_pid = {.pid_table = NULL, .index = {.JudyHSArray = NULL}};
 
 // Statistic
 ebpf_plugin_stats_t plugin_statistics = {.core = 0, .legacy = 0, .running = 0, .threads = 0, .tracepoints = 0,

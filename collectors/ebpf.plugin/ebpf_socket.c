@@ -104,7 +104,6 @@ struct netdata_static_thread ebpf_read_socket = {
         .start_routine = NULL
 };
 
-netdata_ebpf_socket_judy_pid_t ebpf_socket_pid = {.pid_table = NULL, .index = {.JudyHSArray = NULL}};
 ARAL *aral_socket_table = NULL;
 
 #ifdef NETDATA_DEV_MODE
@@ -1118,16 +1117,23 @@ int hostname_matches_pattern(char *cmp)
  * Compare destination addresses and destination ports to define next steps
  *
  * @param key     the socket read from kernel ring
- * @param family  the family used to compare IPs (AF_INET and AF_INET6)
+ * @param data    the socket data used also used to refuse some sockets.
  *
  * @return It returns 1 if this socket is inside the ranges and 0 otherwise.
  */
-int is_socket_allowed(netdata_socket_idx_t *key, int family)
+int is_socket_allowed(netdata_socket_idx_t *key, netdata_socket_t *data)
 {
+    // If family is not AF_UNSPEC and it is different of specified
+    if (network_viewer_opt.family && network_viewer_opt.family != data->family)
+        return 0;
+    /*
     if (!is_port_inside_range(key->dport))
         return 0;
 
     return ebpf_is_specific_ip_inside_range(&key->daddr, family);
+     */
+
+    return 1;
 }
 
 /**
@@ -1169,132 +1175,9 @@ static void ebpf_hash_socket_accumulator(netdata_socket_t *values, netdata_socke
             ft = w->first_timestamp;
     }
 
-    /*
-    if (!is_socket_allowed(key, family))
-        return;
-        */
-
     values[0].protocol          = (!protocol)?IPPROTO_TCP:protocol;
     values[0].current_timestamp = ct;
     values[0].first_timestamp = ft;
-}
-
-/**
- * Fill Fake socket
- *
- * Fill socket with an invalid request.
- *
- * @param fake_values is the structure where we are storing the value.
- */
-static inline void ebpf_socket_fill_fake_socket(netdata_socket_plus_t *fake_values)
-{
-    snprintfz(fake_values->socket_string.src_ip, INET6_ADDRSTRLEN, "%s", "127.0.0.1");
-    snprintfz(fake_values->socket_string.dst_ip, INET6_ADDRSTRLEN, "%s", "127.0.0.1");
-    fake_values->pid = getpid();
-    fake_values->socket_string.src_port = 0;
-    fake_values->socket_string.dst_port = 0;
-    fake_values->data.family = AF_INET;
-    fake_values->data.protocol = AF_UNSPEC;
-}
-
-/**
- * Fill function buffer
- *
- * Fill buffer with data to be shown on cloud.
- *
- * @param wb          buffer where we store data.
- * @param values      data read from hash table
- */
-static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values)
-{
-    buffer_json_add_array_item_array(wb);
-
-    // IMPORTANT!
-    // THE ORDER SHOULD BE THE SAME WITH THE FIELDS!
-
-    // PID
-    buffer_json_add_array_item_uint64(wb, (uint64_t)values->pid);
-
-    // SRC IP
-    buffer_json_add_array_item_string(wb, values->socket_string.src_ip);
-
-    // SRC Port
-    buffer_json_add_array_item_uint64(wb, (uint64_t) values->socket_string.src_port);
-
-    // DST IP
-    buffer_json_add_array_item_string(wb, values->socket_string.dst_ip);
-
-    // DST Port
-    buffer_json_add_array_item_uint64(wb, (uint64_t) values->socket_string.dst_port);
-
-    if (values->data.protocol == IPPROTO_TCP) {
-        // Protocol
-        buffer_json_add_array_item_string(wb, "TCP");
-
-        // Traffic received
-        buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.tcp.tcp_bytes_received);
-
-        // Traffic sent
-        buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.tcp.tcp_bytes_sent);
-    } else if (values->data.protocol == IPPROTO_UDP) {
-        // Protocol
-        buffer_json_add_array_item_string(wb, "UDP");
-
-        // Traffic received
-        buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.udp.call_udp_received);
-
-        // Traffic sent
-        buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.udp.udp_bytes_sent);
-    } else {
-        // Protocol
-        buffer_json_add_array_item_string(wb, "UNSPEC");
-
-        // Traffic received
-        buffer_json_add_array_item_uint64(wb, 0);
-
-        // Traffic sent
-        buffer_json_add_array_item_uint64(wb, 0);
-    }
-
-    buffer_json_array_close(wb);
-}
-
-/**
- * Fill function buffer
- *
- * Fill the function buffer with socket information.
- *
- * @param buf    buffer used to store data to be shown by function.
- *
- * @return it returns 0 on success and -1 otherwise.
- */
-static void ebpf_socket_fill_function_buffer(BUFFER *buf)
-{
-    int counter = 0;
-
-    Pvoid_t *pid_value, *socket_value;
-    Word_t local_pid = 0;
-    bool first_pid = true;
-    rw_spinlock_read_lock(&ebpf_socket_pid.index.rw_spinlock);
-    while ((pid_value = JudyLFirstThenNext(ebpf_socket_pid.index.JudyHSArray, &local_pid, &first_pid))) {
-        netdata_ebpf_socket_judy_connections_t *pid_ptr = (netdata_ebpf_socket_judy_connections_t *)*pid_value;
-        bool first_socket = true;
-        Word_t local_timestamp = 0;
-        rw_spinlock_read_lock(&pid_ptr->index.rw_spinlock);
-        while ((socket_value = JudyLFirstThenNext(pid_ptr->index.JudyHSArray, &local_timestamp, &first_socket))) {
-            counter++;
-            netdata_socket_plus_t *values = (netdata_socket_plus_t *)*socket_value;
-            ebpf_fill_function_buffer(buf, values);
-        }
-        rw_spinlock_read_unlock(&pid_ptr->index.rw_spinlock);
-    }
-    rw_spinlock_read_unlock(&ebpf_socket_pid.index.rw_spinlock);
-
-    if (!counter) {
-        netdata_socket_plus_t fake_values = { };
-        ebpf_socket_fill_fake_socket(&fake_values);
-        ebpf_fill_function_buffer(buf, &fake_values);
-    }
 }
 
 /**
@@ -1419,6 +1302,11 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         // Discard non-bind sockets
         if (!key.daddr.addr64[0] && !key.daddr.addr64[1] && !key.saddr.addr64[0] && !key.saddr.addr64[1]) {
             bpf_map_delete_elem(fd, &key);
+            goto end_socket_loop;
+        }
+
+        // When socket is not allowed, we do not append it to table, but we are still keeping it to accumulate data.
+        if (!is_socket_allowed(&key, values)) {
             goto end_socket_loop;
         }
 
@@ -1588,32 +1476,6 @@ static void read_listen_table()
         // The correct protocol must come from kernel
         update_listen_table(next_key.port, next_key.protocol, &value);
     }
-}
-
-/**
- * Socket read hash
- *
- * This is the thread callback.
- * This thread is necessary, because we cannot freeze the whole plugin to read the data on very busy socket.
- *
- * @param buf the buffer to store data;
- * @param em  the module main structure.
- *
- * @return It always returns NULL.
- */
-void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
-{
-    // thread was not initialized
-    if (!em->maps || (em->maps && em->maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED)){
-        netdata_socket_plus_t fake_values = { };
-
-        ebpf_socket_fill_fake_socket(&fake_values);
-
-        ebpf_fill_function_buffer(buf, &fake_values);
-        return;
-    }
-
-    ebpf_socket_fill_function_buffer(buf);
 }
 
 /**

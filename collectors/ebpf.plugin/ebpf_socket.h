@@ -349,6 +349,8 @@ typedef struct netdata_ebpf_socket_judy_connections {
     } index;
 } netdata_ebpf_socket_judy_connections_t;
 
+extern netdata_ebpf_socket_judy_pid_t ebpf_socket_pid;
+
 /**
  * Index used together previous structure
  */
