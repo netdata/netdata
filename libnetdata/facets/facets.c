@@ -201,7 +201,7 @@ static inline void facets_histogram_value_names(BUFFER *wb, FACETS *facets __may
         }
         dfe_done(v);
     }
-    buffer_json_object_close(wb); // key
+    buffer_json_array_close(wb); // key
 }
 
 static inline void facets_histogram_value_units(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
@@ -216,7 +216,7 @@ static inline void facets_histogram_value_units(BUFFER *wb, FACETS *facets __may
         }
         dfe_done(v);
     }
-    buffer_json_object_close(wb); // key
+    buffer_json_array_close(wb); // key
 }
 
 static inline void facets_histogram_value_min(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
@@ -231,7 +231,7 @@ static inline void facets_histogram_value_min(BUFFER *wb, FACETS *facets __maybe
         }
         dfe_done(v);
     }
-    buffer_json_object_close(wb); // key
+    buffer_json_array_close(wb); // key
 }
 
 static inline void facets_histogram_value_max(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
@@ -246,7 +246,7 @@ static inline void facets_histogram_value_max(BUFFER *wb, FACETS *facets __maybe
                 }
         dfe_done(v);
     }
-    buffer_json_object_close(wb); // key
+    buffer_json_array_close(wb); // key
 }
 
 static inline void facets_histogram_value_avg(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
@@ -261,7 +261,7 @@ static inline void facets_histogram_value_avg(BUFFER *wb, FACETS *facets __maybe
         }
         dfe_done(v);
     }
-    buffer_json_object_close(wb); // key
+    buffer_json_array_close(wb); // key
 }
 
 static inline void facets_histogram_value_arp(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
@@ -276,7 +276,7 @@ static inline void facets_histogram_value_arp(BUFFER *wb, FACETS *facets __maybe
         }
         dfe_done(v);
     }
-    buffer_json_object_close(wb); // key
+    buffer_json_array_close(wb); // key
 }
 
 static inline void facets_histogram_value_con(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key, uint32_t sum) {
@@ -291,7 +291,7 @@ static inline void facets_histogram_value_con(BUFFER *wb, FACETS *facets __maybe
         }
         dfe_done(v);
     }
-    buffer_json_object_close(wb); // key
+    buffer_json_array_close(wb); // key
 }
 
 static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) {
