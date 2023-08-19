@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- bump bundled ui to v6.29.0 [\#15841](https://github.com/netdata/netdata/pull/15841) ([ilyam8](https://github.com/ilyam8))
+- Fix configure: WARNING: unrecognized options: --with-zlib [\#15840](https://github.com/netdata/netdata/pull/15840) ([stelfrag](https://github.com/stelfrag))
+- Fix compilation warning [\#15839](https://github.com/netdata/netdata/pull/15839) ([stelfrag](https://github.com/stelfrag))
+- Fix warning when compiling with -flto [\#15838](https://github.com/netdata/netdata/pull/15838) ([stelfrag](https://github.com/stelfrag))
 - workaround for systems that do not have SD\_JOURNAL\_OS\_ROOT [\#15837](https://github.com/netdata/netdata/pull/15837) ([ktsaou](https://github.com/ktsaou))
 - added ilove.html [\#15836](https://github.com/netdata/netdata/pull/15836) ([ktsaou](https://github.com/ktsaou))
 - Fix CID 382964:  Code maintainability issues  \(SIZEOF\_MISMATCH\) [\#15833](https://github.com/netdata/netdata/pull/15833) ([stelfrag](https://github.com/stelfrag))
@@ -44,6 +48,7 @@
 - Bump openssl version of static builds to 1.1.1v [\#15779](https://github.com/netdata/netdata/pull/15779) ([tkatsoulas](https://github.com/tkatsoulas))
 - fix: the cleanup was not performed during the kickstart.sh dry run [\#15775](https://github.com/netdata/netdata/pull/15775) ([ilyam8](https://github.com/ilyam8))
 - Increase alert snapshot chunk size [\#15748](https://github.com/netdata/netdata/pull/15748) ([MrZammler](https://github.com/MrZammler))
+- Added CentOS-Stream to distros [\#15742](https://github.com/netdata/netdata/pull/15742) ([k0ste](https://github.com/k0ste))
 
 ## [v1.42.1](https://github.com/netdata/netdata/tree/v1.42.1) (2023-08-16)
 
@@ -430,11 +435,6 @@
 - Only try to enable \_FORTIFY\_SOURCE if the user has not disabled optimizations [\#15284](https://github.com/netdata/netdata/pull/15284) ([Ferroin](https://github.com/Ferroin))
 - Send alert chart labels config key to cloud [\#15283](https://github.com/netdata/netdata/pull/15283) ([MrZammler](https://github.com/MrZammler))
 - Fixed mistype for 'send automatic labels' Prometheus option [\#15282](https://github.com/netdata/netdata/pull/15282) ([k0ste](https://github.com/k0ste))
-- Optimizations part 2 [\#15280](https://github.com/netdata/netdata/pull/15280) ([ktsaou](https://github.com/ktsaou))
-- Revert "Optimizations Part 2" [\#15279](https://github.com/netdata/netdata/pull/15279) ([ktsaou](https://github.com/ktsaou))
-- exporting: change priority to synchronous when calculating value [\#15276](https://github.com/netdata/netdata/pull/15276) ([ilyam8](https://github.com/ilyam8))
-- expose CmdLine in apps function [\#15275](https://github.com/netdata/netdata/pull/15275) ([ilyam8](https://github.com/ilyam8))
-- Misc alert fixes [\#15274](https://github.com/netdata/netdata/pull/15274) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
