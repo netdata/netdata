@@ -6,34 +6,6 @@ static void facets_row_free(FACETS *facets __maybe_unused, FACET_ROW *row);
 
 // ----------------------------------------------------------------------------
 
-time_t calculate_bar_width(time_t before, time_t after) {
-    // Array of valid durations in seconds
-    static time_t valid_durations[] = {
-            1,
-            15,
-            30,
-            1 * 60, 2 * 60, 3 * 60, 5 * 60, 10 * 60, 15 * 60, 30 * 60,          // minutes
-            1 * 3600, 2 * 3600, 6 * 3600, 8 * 3600, 12 * 3600,                  // hours
-            1 * 86400, 2 * 86400, 3 * 86400, 5 * 86400, 7 * 86400, 14 * 86400,  // days
-            1 * (30*86400)                                                      // months
-    };
-    static int array_size = sizeof(valid_durations) / sizeof(valid_durations[0]);
-
-    time_t duration = before - after;
-    time_t bar_width = 1;
-
-    for (int i = array_size - 1; i >= 0; --i) {
-        if (duration / valid_durations[i] >= HISTOGRAM_COLUMNS) {
-            bar_width = valid_durations[i];
-            break;
-        }
-    }
-
-    return bar_width;
-}
-
-// ----------------------------------------------------------------------------
-
 static inline void uint32_to_char(uint32_t num, char *out) {
     static char id_encoding_characters[64 + 1] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ.abcdefghijklmnopqrstuvwxyz_0123456789";
 
@@ -66,6 +38,8 @@ typedef struct facet_value {
 
     uint32_t rows_matching_facet_value;
     uint32_t final_facet_value_counter;
+
+    uint32_t *histogram;
 } FACET_VALUE;
 
 struct facet_key {
@@ -125,6 +99,15 @@ struct facets {
     uint32_t order;
 
     struct {
+        char *chart;
+        bool enabled;
+        uint32_t slots;
+        usec_t slot_width;
+        usec_t after_ut;
+        usec_t before_ut;
+    } histogram;
+
+    struct {
         FACET_ROW *last_added;
 
         size_t evaluated;
@@ -140,6 +123,74 @@ struct facets {
         size_t shifts;
     } operations;
 };
+
+// ----------------------------------------------------------------------------
+
+static usec_t calculate_histogram_bar_width(usec_t after_ut, usec_t before_ut) {
+    // Array of valid durations in seconds
+    static time_t valid_durations[] = {
+            1,
+            15,
+            30,
+            1 * 60, 2 * 60, 3 * 60, 5 * 60, 10 * 60, 15 * 60, 30 * 60,          // minutes
+            1 * 3600, 2 * 3600, 6 * 3600, 8 * 3600, 12 * 3600,                  // hours
+            1 * 86400, 2 * 86400, 3 * 86400, 5 * 86400, 7 * 86400, 14 * 86400,  // days
+            1 * (30*86400)                                                      // months
+    };
+    static int array_size = sizeof(valid_durations) / sizeof(valid_durations[0]);
+
+    usec_t duration = before_ut - after_ut;
+    usec_t bar_width = 1 * 60;
+
+    for (int i = array_size - 1; i >= 0; --i) {
+        if (duration / (valid_durations[i] * 60) >= HISTOGRAM_COLUMNS) {
+            bar_width = valid_durations[i] * 60;
+            break;
+        }
+    }
+
+    return bar_width;
+}
+
+static inline usec_t facets_histogram_slot_baseline_ut(FACETS *facets, usec_t ut) {
+    usec_t delta = ut % facets->histogram.slot_width;
+    return ut - delta;
+}
+
+void facets_set_histogram(FACETS *facets, const char *chart, usec_t after_ut, usec_t before_ut) {
+    facets->histogram.enabled = true;
+    facets->histogram.chart = chart ? strdupz(chart) : NULL;
+    facets->histogram.slot_width = calculate_histogram_bar_width(after_ut, before_ut);
+    facets->histogram.after_ut = facets_histogram_slot_baseline_ut(facets, after_ut);
+    facets->histogram.before_ut = facets_histogram_slot_baseline_ut(facets, before_ut) + facets->histogram.slot_width;
+    facets->histogram.slots = (facets->histogram.before_ut - facets->histogram.after_ut) / facets->histogram.slot_width;
+}
+
+static inline void facets_histogram_update_value(FACETS *facets, FACET_KEY *k, FACET_VALUE *v, usec_t usec) {
+    if(!facets->histogram.enabled)
+        return;
+
+    if(unlikely(!v->histogram))
+        v->histogram = callocz(facets->histogram.slots, sizeof(*v->histogram));
+
+    usec_t base_ut = facets_histogram_slot_baseline_ut(facets, usec);
+
+    if(base_ut < facets->histogram.after_ut)
+        base_ut = facets->histogram.after_ut;
+
+    if(base_ut > facets->histogram.before_ut)
+        base_ut = facets->histogram.before_ut;
+
+    uint32_t slot = (base_ut - facets->histogram.after_ut) / facets->histogram.slot_width;
+
+    internal_fatal(slot >= facets->histogram.slots, "invalid slot");
+
+    v->histogram[slot]++;
+}
+
+static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) {
+    ;
+}
 
 // ----------------------------------------------------------------------------
 
@@ -226,6 +277,7 @@ static bool facet_value_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
 
 static void facet_value_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     FACET_VALUE *v = value;
+    freez(v->histogram);
     freez((char *)v->name);
 }
 
@@ -337,6 +389,7 @@ void facets_destroy(FACETS *facets) {
         facets_row_free(facets, r);
     }
 
+    freez(facets->histogram.chart);
     freez(facets);
 }
 
@@ -656,6 +709,9 @@ void facets_row_finished(FACETS *facets, usec_t usec) {
 
                     FACET_VALUE *v = dictionary_get(k->values, k->current_value.hash);
                     v->final_facet_value_counter++;
+
+                    if(selected_by == total_keys)
+                        facets_histogram_update_value(facets, k, v, usec);
                 }
 
                 found++;
@@ -733,6 +789,13 @@ void facets_report(FACETS *facets, BUFFER *wb) {
                             buffer_json_member_add_string(wb, "id", v_dfe.name);
                             buffer_json_member_add_string(wb, "name", v->name);
                             buffer_json_member_add_uint64(wb, "count", v->final_facet_value_counter);
+
+//                            if(v->histogram) {
+//                                buffer_json_member_add_array(wb, "histogram");
+//                                for(uint32_t i = 0; i < facets->histogram.slots ;i++)
+//                                    buffer_json_add_array_item_uint64(wb, v->histogram[i]);
+//                                buffer_json_array_close(wb);
+//                            }
                         }
                         buffer_json_object_close(wb);
                     }
@@ -825,6 +888,49 @@ void facets_report(FACETS *facets, BUFFER *wb) {
     buffer_json_member_add_string(wb, "default_sort_column", "timestamp");
     buffer_json_member_add_array(wb, "default_charts");
     buffer_json_array_close(wb);
+
+    if(facets->histogram.enabled) {
+        const char *first_histogram = NULL;
+        buffer_json_member_add_array(wb, "available_histograms");
+        {
+            FACET_KEY *k;
+            dfe_start_read(facets->keys, k) {
+                if (!k->values)
+                    continue;
+
+                if(unlikely(!first_histogram))
+                    first_histogram = k_dfe.name;
+
+                buffer_json_add_array_item_object(wb);
+                buffer_json_member_add_string(wb, "id", k_dfe.name);
+                buffer_json_member_add_string(wb, "name", k->name);
+                buffer_json_object_close(wb);
+            }
+            dfe_done(k);
+        }
+        buffer_json_array_close(wb);
+
+        {
+            const char *id = facets->histogram.chart;
+            FACET_KEY *k = dictionary_get(facets->keys, id);
+            if(!k || !k->values) {
+                id = first_histogram;
+                k = dictionary_get(facets->keys, id);
+            }
+
+            if(k && k->values) {
+                buffer_json_member_add_object(wb, "histogram");
+                {
+                    buffer_json_member_add_string(wb, "id", id);
+                    buffer_json_member_add_string(wb, "name", k->name);
+                    buffer_json_member_add_object(wb, "chart");
+                    facets_histogram_generate(facets, k, wb);
+                    buffer_json_object_close(wb);
+                }
+                buffer_json_object_close(wb); // histogram
+            }
+        }
+    }
 
     buffer_json_member_add_object(wb, "items");
     {

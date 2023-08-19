@@ -55,6 +55,7 @@ void facets_set_query(FACETS *facets, const char *query);
 void facets_set_items(FACETS *facets, uint32_t items);
 void facets_set_anchor(FACETS *facets, usec_t anchor);
 void facets_register_facet_filter(FACETS *facets, const char *key_id, char *value_ids, FACET_KEY_OPTIONS options);
+void facets_set_histogram(FACETS *facets, const char *chart, usec_t after_ut, usec_t before_ut);
 
 void facets_add_key_value(FACETS *facets, const char *key, const char *value);
 void facets_add_key_value_length(FACETS *facets, const char *key, const char *value, size_t value_len);
