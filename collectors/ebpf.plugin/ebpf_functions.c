@@ -398,7 +398,10 @@ static void ebpf_function_socket_help(const char *transaction) {
     fprintf(stdout, "%s",
             "ebpf.plugin / socket\n"
             "\n"
-            "Function `socket` display information for all open sockets during ebpf.plugin run time.\n"
+            "Function `socket` display information for all open sockets during ebpf.plugin runtime.\n"
+            "During thread runtime the plugin is always collecting data, but when an option is modified, the plugin\n"
+            "resets completely the previous table and can show a clean data for the first request before to bring the\n"
+            "modified request.\n"
             "\n"
             "The following filters are supported:\n"
             "\n"
@@ -514,14 +517,41 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values)
  *
  * @return it returns 0 on success and -1 otherwise.
  */
-static void ebpf_socket_fill_function_buffer(BUFFER *buf)
+static void ebpf_socket_clean_judy_array()
+{
+    if (!ebpf_socket_pid.index.JudyHSArray)
+        return;
+
+    Pvoid_t *pid_value;
+    Word_t local_pid = 0;
+    bool first_pid = true;
+    rw_spinlock_read_lock(&ebpf_socket_pid.index.rw_spinlock);
+    while ((pid_value = JudyLFirstThenNext(ebpf_socket_pid.index.JudyHSArray, &local_pid, &first_pid))) {
+        netdata_ebpf_socket_judy_connections_t *pid_ptr = (netdata_ebpf_socket_judy_connections_t *)*pid_value;
+        JudyLFreeArray(&pid_ptr->index.JudyHSArray, PJE0);
+    }
+    JudyLFreeArray(&ebpf_socket_pid.index.JudyHSArray, PJE0);
+    ebpf_socket_pid.index.JudyHSArray = NULL;
+    rw_spinlock_read_unlock(&ebpf_socket_pid.index.rw_spinlock);
+}
+
+/**
+ * Fill function buffer unsafe
+ *
+ * Fill the function buffer with socket information. Before to call this function it is necessary to lock
+ * ebpf_socket_pid.index.rw_spinlock
+ *
+ * @param buf    buffer used to store data to be shown by function.
+ *
+ * @return it returns 0 on success and -1 otherwise.
+ */
+static void ebpf_socket_fill_function_buffer_unsafe(BUFFER *buf)
 {
     int counter = 0;
 
     Pvoid_t *pid_value, *socket_value;
     Word_t local_pid = 0;
     bool first_pid = true;
-    rw_spinlock_read_lock(&ebpf_socket_pid.index.rw_spinlock);
     while ((pid_value = JudyLFirstThenNext(ebpf_socket_pid.index.JudyHSArray, &local_pid, &first_pid))) {
         netdata_ebpf_socket_judy_connections_t *pid_ptr = (netdata_ebpf_socket_judy_connections_t *)*pid_value;
         bool first_socket = true;
@@ -534,7 +564,6 @@ static void ebpf_socket_fill_function_buffer(BUFFER *buf)
         }
         rw_spinlock_read_unlock(&pid_ptr->index.rw_spinlock);
     }
-    rw_spinlock_read_unlock(&ebpf_socket_pid.index.rw_spinlock);
 
     if (!counter) {
         netdata_socket_plus_t fake_values = { };
@@ -556,17 +585,21 @@ static void ebpf_socket_fill_function_buffer(BUFFER *buf)
  */
 void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
 {
-    // thread was not initialized
-    if (!em->maps || (em->maps && em->maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED)){
+    // thread was not initialized or Array was reset
+    rw_spinlock_read_lock(&ebpf_socket_pid.index.rw_spinlock);
+    if (!em->maps || (em->maps && em->maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED) ||
+        !ebpf_socket_pid.index.JudyHSArray){
         netdata_socket_plus_t fake_values = { };
 
         ebpf_socket_fill_fake_socket(&fake_values);
 
         ebpf_fill_function_buffer(buf, &fake_values);
+        rw_spinlock_read_unlock(&ebpf_socket_pid.index.rw_spinlock);
         return;
     }
 
-    ebpf_socket_fill_function_buffer(buf);
+    ebpf_socket_fill_function_buffer_unsafe(buf);
+    rw_spinlock_read_unlock(&ebpf_socket_pid.index.rw_spinlock);
 }
 
 /**
@@ -605,6 +638,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
 
         if (strncmp(keyword, EBPF_FUNCTION_SOCKET_FAMILY, sizeof(EBPF_FUNCTION_SOCKET_FAMILY) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_FAMILY) - 1];
+            uint32_t curr_family = network_viewer_opt.family;
             if (name) {
                 if (!strcmp(name, "IPV4"))
                     network_viewer_opt.family = AF_INET;
@@ -615,6 +649,9 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             } else {
                 network_viewer_opt.family = AF_UNSPEC;
             }
+
+            if (network_viewer_opt.family != curr_family)
+                ebpf_socket_clean_judy_array();
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_PERIOD, sizeof(EBPF_FUNCTION_SOCKET_PERIOD) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_PERIOD) - 1];
             separator = strchr(name, ':');
