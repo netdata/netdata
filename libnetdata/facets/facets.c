@@ -6,27 +6,27 @@ static void facets_row_free(FACETS *facets __maybe_unused, FACET_ROW *row);
 
 // ----------------------------------------------------------------------------
 
-static inline void uint32_to_char(uint32_t num, char *out) {
-    static char id_encoding_characters[64 + 1] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ.abcdefghijklmnopqrstuvwxyz_0123456789";
+#include "xxhash.h"
+
+#include "xxhash.h"
+
+static inline void uint64_to_char(uint64_t num, char *out) {
+    static const char id_encoding_characters[64 + 1] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ.abcdefghijklmnopqrstuvwxyz_0123456789";
 
     int i;
-    for(i = 5; i >= 0; --i) {
+    for(i = 10; i >= 0; --i) {
         out[i] = id_encoding_characters[num & 63];
         num >>= 6;
     }
-    out[6] = '\0';
 }
 
-inline void facets_string_hash(const char *src, char *out) {
-    uint32_t hash1 = fnv1a_hash32(src);
-    uint32_t hash2 = djb2_hash32(src);
-    uint32_t hash3 = larson_hash32(src);
+inline void facets_string_hash(const char *src, size_t len, char *out) {
+    XXH128_hash_t hash = XXH128(src, len, 0);
 
-    uint32_to_char(hash1, out);
-    uint32_to_char(hash2, &out[6]);
-    uint32_to_char(hash3, &out[12]);
+    uint64_to_char(hash.high64, out);
+    uint64_to_char(hash.low64, &out[11]);  // Starts right after the first 64-bit encoded string
 
-    out[18] = '\0';
+    out[FACET_STRING_HASH_SIZE - 1] = '\0';
 }
 
 // ----------------------------------------------------------------------------
@@ -710,7 +710,7 @@ static bool facet_value_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
     if(v->name)
         facet_value_is_used(k, v);
 
-    internal_fatal(v->name && strcmp(v->name, nv->name) != 0, "hash conflict: '%s' and '%s' have the same hash '%s'", v->name, nv->name,
+    internal_fatal(v->name && strcmp(v->name, nv->name) != 0, "value hash conflict: '%s' and '%s' have the same hash '%s'", v->name, nv->name,
                    dictionary_acquired_item_name(item));
 
     return false;
@@ -770,6 +770,9 @@ static bool facet_key_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
         k->name = strdupz(nk->name);
         facet_key_late_init(facets, k);
     }
+
+    internal_fatal(k->name && strcmp(k->name, nk->name) != 0, "key hash conflict: '%s' and '%s' have the same hash '%s'", v->name, nv->name,
+                   dictionary_acquired_item_name(item));
 
     if(k->options & FACET_KEY_OPTION_REORDER) {
         k->order = facets->order++;
@@ -848,7 +851,7 @@ inline FACET_KEY *facets_register_key(FACETS *facets, const char *key, FACET_KEY
             .default_selected_for_values = true,
     };
     char hash[FACET_STRING_HASH_SIZE];
-    facets_string_hash(tk.name, hash);
+    facets_string_hash(tk.name, strlen(key), hash);
     return dictionary_set(facets->keys, hash, &tk, sizeof(tk));
 }
 
@@ -908,7 +911,7 @@ static inline void facets_check_value(FACETS *facets __maybe_unused, FACET_KEY *
         k->transform.cb(facets, k->current_value.b, k->transform.data);
 
     if(!k->current_value.updated) {
-        buffer_strcat(k->current_value.b, FACET_VALUE_UNSET);
+        buffer_fast_strcat(k->current_value.b, FACET_VALUE_UNSET, sizeof(FACET_VALUE_UNSET) - 1);
         k->current_value.updated = true;
     }
 
@@ -925,7 +928,7 @@ static inline void facets_check_value(FACETS *facets __maybe_unused, FACET_KEY *
         FACET_VALUE tk = {
             .name = buffer_tostring(k->current_value.b),
         };
-        facets_string_hash(tk.name, k->current_value.hash);
+        facets_string_hash(tk.name, buffer_strlen(k->current_value.b), k->current_value.hash);
         dictionary_set(k->values, k->current_value.hash, &tk, sizeof(tk));
     }
     else {
@@ -1146,7 +1149,7 @@ void facets_row_finished(FACETS *facets, usec_t usec) {
             if(counted_by == total_keys) {
                 if(k->values) {
                     if(!k->current_value.hash[0])
-                        facets_string_hash(buffer_tostring(k->current_value.b), k->current_value.hash);
+                        facets_string_hash(buffer_tostring(k->current_value.b), buffer_strlen(k->current_value.b), k->current_value.hash);
 
                     FACET_VALUE *v = dictionary_get(k->values, k->current_value.hash);
                     v->final_facet_value_counter++;
