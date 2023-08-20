@@ -81,8 +81,10 @@ int systemd_journal_query(BUFFER *wb, FACETS *facets, usec_t after_ut, usec_t be
         r = sd_journal_open(&j, 0);
     }
 
-    if (r < 0)
+    if (r < 0) {
+        netdata_log_error("SYSTEMD-JOURNAL: Failed to open SystemD Journal, with error %d", r);
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
+    }
 
     facets_rows_begin(facets);
 
