@@ -190,4 +190,9 @@ connectivity is not available.
     Copyright March 2010 by Université de Montréal, Richard Simard and Pierre L'Ecuyer
     [GPL 3.0](https://www.gnu.org/licenses/gpl-3.0.en.html)
 
+-   [xxHash](https://github.com/Cyan4973/xxHash)
+
+    Copyright (c) 2012-2021 Yann Collet
+    [BSD](https://github.com/Cyan4973/xxHash/blob/dev/LICENSE)
+
 
