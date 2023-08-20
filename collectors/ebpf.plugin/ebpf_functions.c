@@ -650,16 +650,18 @@ static void ebpf_function_socket_manipulation(const char *transaction,
                 ebpf_socket_clean_judy_array_unsafe();
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_PERIOD, sizeof(EBPF_FUNCTION_SOCKET_PERIOD) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_PERIOD) - 1];
-            separator = strchr(name, ':');
             pthread_mutex_lock(&ebpf_exit_cleanup);
-            if (separator) {
-                period = str2i(++separator);
+            if (name) {
+                period = str2i(name);
                 if (period > 0) {
                     em->lifetime = period;
                 }
             } else
-                em->lifetime = EBPF_DEFAULT_LIFETIME;
+                em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
 
+#ifdef NETDATA_DEV_MODE
+            collector_info("Lifetime modified for %d", em->lifetime);
+#endif
             pthread_mutex_unlock(&ebpf_exit_cleanup);
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_RESOLVE, sizeof(EBPF_FUNCTION_SOCKET_RESOLVE) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_RESOLVE) - 1];
@@ -698,9 +700,6 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             pthread_mutex_unlock(&ebpf_exit_cleanup);
             return;
         }
-    } else {
-        if (period > 0) // user is modifying period to run
-            em->lifetime = period;
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
