@@ -692,7 +692,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
     }
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    if (em->enabled < NETDATA_THREAD_EBPF_STOPPING) {
+    if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         if (ebpf_function_start_thread(em, period)) {
             ebpf_function_error(transaction,
                                 HTTP_RESP_INTERNAL_SERVER_ERROR,

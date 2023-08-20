@@ -3136,6 +3136,11 @@ void *ebpf_socket_thread(void *ptr)
     netdata_thread_cleanup_push(ebpf_socket_exit, ptr);
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        collector_error("There is already a thread %s running", em->info.thread_name);
+        return NULL;
+    }
+
     em->maps = socket_maps;
 
     parse_table_size_options(&socket_config);
