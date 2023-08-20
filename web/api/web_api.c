@@ -142,7 +142,7 @@ RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o) {
 
 int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *url, WEIGHTS_METHOD method, WEIGHTS_FORMAT format, size_t api_version) {
     if (!netdata_ready)
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
+        return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     time_t baseline_after = 0, baseline_before = 0, after = 0, before = 0;
     size_t points = 0;

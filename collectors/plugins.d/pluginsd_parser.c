@@ -718,13 +718,13 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
                       string2str(pf->function));
 
     // send the command to the plugin
-    int ret = send_to_plugin(buffer, parser);
+    ssize_t ret = send_to_plugin(buffer, parser);
 
     pf->sent_ut = now_realtime_usec();
 
     if(ret < 0) {
-        netdata_log_error("FUNCTION: failed to send function to plugin, error %d", ret);
-        rrd_call_function_error(pf->destination_wb, "Failed to communicate with collector", HTTP_RESP_BACKEND_FETCH_FAILED);
+        netdata_log_error("FUNCTION '%s': failed to send it to the plugin, error %d", string2str(pf->function), ret);
+        rrd_call_function_error(pf->destination_wb, "Failed to communicate with collector", HTTP_RESP_SERVICE_UNAVAILABLE);
     }
     else {
         internal_error(LOG_FUNCTIONS,
@@ -740,8 +740,8 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     ret = send_to_plugin(pf->payload, parser);
 
     if(ret < 0) {
-        netdata_log_error("FUNCTION_PAYLOAD: failed to send function to plugin, error %d", ret);
-        rrd_call_function_error(pf->destination_wb, "Failed to communicate with collector", HTTP_RESP_BACKEND_FETCH_FAILED);
+        netdata_log_error("FUNCTION_PAYLOAD '%s': failed to send function to plugin, error %d", string2str(pf->function), ret);
+        rrd_call_function_error(pf->destination_wb, "Failed to communicate with collector", HTTP_RESP_SERVICE_UNAVAILABLE);
     }
     else {
         internal_error(LOG_FUNCTIONS,
