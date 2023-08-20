@@ -509,15 +509,12 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values)
 }
 
 /**
- * Fill function buffer
+ * Clean Judy array unsafe
  *
- * Fill the function buffer with socket information.
- *
- * @param buf    buffer used to store data to be shown by function.
- *
- * @return it returns 0 on success and -1 otherwise.
- */
-static void ebpf_socket_clean_judy_array()
+ * Clean all Judy Array allocated to show table when a function is called.
+ * Before to call this function it is necessary to lock `ebpf_socket_pid.index.rw_spinlock`.
+ **/
+static void ebpf_socket_clean_judy_array_unsafe()
 {
     if (!ebpf_socket_pid.index.JudyHSArray)
         return;
@@ -525,14 +522,12 @@ static void ebpf_socket_clean_judy_array()
     Pvoid_t *pid_value;
     Word_t local_pid = 0;
     bool first_pid = true;
-    rw_spinlock_read_lock(&ebpf_socket_pid.index.rw_spinlock);
     while ((pid_value = JudyLFirstThenNext(ebpf_socket_pid.index.JudyHSArray, &local_pid, &first_pid))) {
         netdata_ebpf_socket_judy_connections_t *pid_ptr = (netdata_ebpf_socket_judy_connections_t *)*pid_value;
         JudyLFreeArray(&pid_ptr->index.JudyHSArray, PJE0);
     }
     JudyLFreeArray(&ebpf_socket_pid.index.JudyHSArray, PJE0);
     ebpf_socket_pid.index.JudyHSArray = NULL;
-    rw_spinlock_read_unlock(&ebpf_socket_pid.index.rw_spinlock);
 }
 
 /**
@@ -631,6 +626,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
     char *separator;
     const char *name;
     int period = -1;
+    rw_spinlock_read_lock(&ebpf_socket_pid.index.rw_spinlock);
     for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
         const char *keyword = get_word(words, num_words, i);
         if (!keyword)
@@ -651,7 +647,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             }
 
             if (network_viewer_opt.family != curr_family)
-                ebpf_socket_clean_judy_array();
+                ebpf_socket_clean_judy_array_unsafe();
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_PERIOD, sizeof(EBPF_FUNCTION_SOCKET_PERIOD) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_PERIOD) - 1];
             separator = strchr(name, ':');
@@ -681,15 +677,17 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             }
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_PORT, sizeof(EBPF_FUNCTION_SOCKET_PORT) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_PORT) - 1];
-            separator = strchr(name, ':');
-            if (separator) {
-                ebpf_parse_ports(++separator);
+            if (name) {
+                ebpf_parse_ports((char *)name);
+                ebpf_socket_clean_judy_array_unsafe();
             }
         } else if (strncmp(keyword, "help", 4) == 0) {
             ebpf_function_socket_help(transaction);
+            rw_spinlock_read_unlock(&ebpf_socket_pid.index.rw_spinlock);
             return;
         }
     }
+    rw_spinlock_read_unlock(&ebpf_socket_pid.index.rw_spinlock);
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {

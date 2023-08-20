@@ -1454,6 +1454,211 @@ void ebpf_read_global_table_stats(netdata_idx_t *stats,
 
 /*****************************************************************
  *
+ *  FUNCTIONS USED WITH SOCKET
+ *
+ *****************************************************************/
+
+/**
+ * Fill Port list
+ *
+ * @param out a pointer to the link list.
+ * @param in the structure that will be linked.
+ */
+static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, ebpf_network_viewer_port_list_t *in)
+{
+    if (likely(*out)) {
+        ebpf_network_viewer_port_list_t *move = *out, *store = *out;
+        uint16_t first = ntohs(in->first);
+        uint16_t last = ntohs(in->last);
+        while (move) {
+            uint16_t cmp_first = ntohs(move->first);
+            uint16_t cmp_last = ntohs(move->last);
+            if (cmp_first <= first && first <= cmp_last  &&
+                cmp_first <= last && last <= cmp_last ) {
+                netdata_log_info("The range/value (%u, %u) is inside the range/value (%u, %u) already inserted, it will be ignored.",
+                                 first, last, cmp_first, cmp_last);
+                freez(in->value);
+                freez(in);
+                return;
+            } else if (first <= cmp_first && cmp_first <= last  &&
+                       first <= cmp_last && cmp_last <= last) {
+                netdata_log_info("The range (%u, %u) is bigger than previous range (%u, %u) already inserted, the previous will be ignored.",
+                                 first, last, cmp_first, cmp_last);
+                freez(move->value);
+                move->value = in->value;
+                move->first = in->first;
+                move->last = in->last;
+                freez(in);
+                return;
+            }
+
+            store = move;
+            move = move->next;
+        }
+
+        store->next = in;
+    } else {
+        *out = in;
+    }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    netdata_log_info("Adding values %s( %u, %u) to %s port list used on network viewer",
+                     in->value, in->first, in->last,
+                     (*out == network_viewer_opt.included_port)?"included":"excluded");
+#endif
+}
+
+/**
+ * Parse Service List
+ *
+ * @param out a pointer to store the link list
+ * @param service the service used to create the structure that will be linked.
+ */
+static void ebpf_parse_service_list(void **out, char *service)
+{
+    ebpf_network_viewer_port_list_t **list = (ebpf_network_viewer_port_list_t **)out;
+    struct servent *serv = getservbyname((const char *)service, "tcp");
+    if (!serv)
+        serv = getservbyname((const char *)service, "udp");
+
+    if (!serv) {
+        netdata_log_info("Cannot resolv the service '%s' with protocols TCP and UDP, it will be ignored", service);
+        return;
+    }
+
+    ebpf_network_viewer_port_list_t *w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
+    w->value = strdupz(service);
+    w->hash = simple_hash(service);
+
+    w->first = w->last = (uint16_t)serv->s_port;
+
+    fill_port_list(list, w);
+}
+
+/**
+ * Parse port list
+ *
+ * Parse an allocated port list with the range given
+ *
+ * @param out a pointer to store the link list
+ * @param range the informed range for the user.
+ */
+static void ebpf_parse_port_list(void **out, char *range)
+{
+    int first, last;
+    ebpf_network_viewer_port_list_t **list = (ebpf_network_viewer_port_list_t **)out;
+
+    char *copied = strdupz(range);
+    if (*range == '*' && *(range+1) == '\0') {
+        first = 1;
+        last = 65535;
+
+        clean_port_structure(list);
+        goto fillenvpl;
+    }
+
+    char *end = range;
+    //Move while I cannot find a separator
+    while (*end && *end != ':' && *end != '-') end++;
+
+    //It has a range
+    if (likely(*end)) {
+        *end++ = '\0';
+        if (*end == '!') {
+            netdata_log_info("The exclusion cannot be in the second part of the range, the range %s will be ignored.", copied);
+            freez(copied);
+            return;
+        }
+        last = str2i((const char *)end);
+    } else {
+        last = 0;
+    }
+
+    first = str2i((const char *)range);
+    if (first < NETDATA_MINIMUM_PORT_VALUE || first > NETDATA_MAXIMUM_PORT_VALUE) {
+        netdata_log_info("The first port %d of the range \"%s\" is invalid and it will be ignored!", first, copied);
+        freez(copied);
+        return;
+    }
+
+    if (!last)
+        last = first;
+
+    if (last < NETDATA_MINIMUM_PORT_VALUE || last > NETDATA_MAXIMUM_PORT_VALUE) {
+        netdata_log_info("The second port %d of the range \"%s\" is invalid and the whole range will be ignored!", last, copied);
+        freez(copied);
+        return;
+    }
+
+    if (first > last) {
+        netdata_log_info("The specified order %s is wrong, the smallest value is always the first, it will be ignored!", copied);
+        freez(copied);
+        return;
+    }
+
+    ebpf_network_viewer_port_list_t *w;
+    fillenvpl:
+    w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
+    w->value = copied;
+    w->hash = simple_hash(copied);
+    w->first = (uint16_t)first;
+    w->last = (uint16_t)last;
+    w->cmp_first = (uint16_t)first;
+    w->cmp_last = (uint16_t)last;
+
+    fill_port_list(list, w);
+}
+
+/**
+ * Parse Port Range
+ *
+ * Parse the port ranges given and create Network Viewer Port Structure
+ *
+ * @param ptr  is a pointer with the text to parse.
+ */
+void ebpf_parse_ports(char *ptr)
+{
+    // No value
+    if (unlikely(!ptr))
+        return;
+
+    while (likely(ptr)) {
+        // Move forward until next valid character
+        while (isspace(*ptr)) ptr++;
+
+        // No valid value found
+        if (unlikely(!*ptr))
+            return;
+
+        // Find space that ends the list
+        char *end = strchr(ptr, ' ');
+        if (end) {
+            *end++ = '\0';
+        }
+
+        int neg = 0;
+        if (*ptr == '!') {
+            neg++;
+            ptr++;
+        }
+
+        if (isdigit(*ptr)) { // Parse port
+            ebpf_parse_port_list(
+                (!neg) ? (void **)&network_viewer_opt.included_port : (void **)&network_viewer_opt.excluded_port, ptr);
+        } else if (isalpha(*ptr)) { // Parse service
+            ebpf_parse_service_list(
+                (!neg) ? (void **)&network_viewer_opt.included_port : (void **)&network_viewer_opt.excluded_port, ptr);
+        } else if (*ptr == '*') { // All
+            ebpf_parse_port_list(
+                (!neg) ? (void **)&network_viewer_opt.included_port : (void **)&network_viewer_opt.excluded_port, ptr);
+        }
+
+        ptr = end;
+    }
+}
+
+/*****************************************************************
+ *
  *  FUNCTIONS TO DEFINE OPTIONS
  *
  *****************************************************************/
