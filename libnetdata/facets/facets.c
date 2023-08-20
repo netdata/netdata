@@ -6,10 +6,6 @@ static void facets_row_free(FACETS *facets __maybe_unused, FACET_ROW *row);
 
 // ----------------------------------------------------------------------------
 
-#include "xxhash.h"
-
-#include "xxhash.h"
-
 static inline void uint64_to_char(uint64_t num, char *out) {
     static const char id_encoding_characters[64 + 1] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ.abcdefghijklmnopqrstuvwxyz_0123456789";
 
