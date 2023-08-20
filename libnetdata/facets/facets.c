@@ -767,7 +767,7 @@ static bool facet_key_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
         facet_key_late_init(facets, k);
     }
 
-    internal_fatal(k->name && strcmp(k->name, nk->name) != 0, "key hash conflict: '%s' and '%s' have the same hash '%s'", v->name, nv->name,
+    internal_fatal(k->name && strcmp(k->name, nk->name) != 0, "key hash conflict: '%s' and '%s' have the same hash '%s'", k->name, nk->name,
                    dictionary_acquired_item_name(item));
 
     if(k->options & FACET_KEY_OPTION_REORDER) {
