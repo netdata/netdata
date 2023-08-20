@@ -261,7 +261,7 @@ You can also enable the following eBPF programs:
 -   `swap` : This eBPF program creates charts that show information about swap access.
 -   `mdflush`: This eBPF program creates charts that show information about
 -   `sync`: Monitor calls to syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2).
--   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
+-   `socket`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
     bandwidth consumed by each.
     multi-device software flushes.
 -   `vfs`: This eBPF program creates charts that show information about VFS (Virtual File System) functions.
@@ -302,11 +302,10 @@ are divided in the following sections:
 
 #### `[network connections]`
 
-You can configure the information shown on `outbound` and `inbound` charts with the settings in this section.
+You can configure the information shown with function `ebpf_socket` using the settings in this section.
 
 ```conf
 [network connections]
-    maximum dimensions = 500
     resolve hostname ips = no
     ports = 1-1024 !145 !domain
     hostnames = !example.com
@@ -318,8 +317,8 @@ write `ports = 19999`, Netdata will collect only connections for itself. The `ho
 [simple patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md). The `ports`, and `ips` settings accept negation (`!`) to deny
 specific values or asterisk alone to define all values.
 
-In the above example, Netdata will collect metrics for all ports between 1 and 443, with the exception of 53 (domain)
-and 145.
+In the above example, Netdata will collect metrics for all ports between `1` and `1024`, with the exception of `53` (domain)
+and `145`.
 
 The following options are available:
 
@@ -329,12 +328,8 @@ The following options are available:
     range of IPs, or use CIDR values. By default, only data for private IP addresses is collected, but this can
     be changed with the `ips` setting.
 
-By default, Netdata displays up to 500 dimensions on network connection charts. If there are more possible dimensions,
-they will be bundled into the `other` dimension. You can increase the number of shown dimensions by changing
-the `maximum dimensions` setting.
-
-The dimensions for the traffic charts are created using the destination IPs of the sockets by default. This can be
-changed setting `resolve hostname ips = yes` and restarting Netdata, after this Netdata will create dimensions using
+The table for the traffic are created using the destination IPs of the sockets by default. This can be
+changed setting `resolve hostname ips = yes`, after this Netdata will create dimensions using
 the `hostnames` every time that is possible to resolve IPs to their hostnames.
 
 #### `[service name]`
