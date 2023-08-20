@@ -160,7 +160,7 @@ void facets_set_histogram(FACETS *facets, const char *chart, usec_t after_ut, us
     facets->histogram.slot_width = calculate_histogram_bar_width(after_ut, before_ut);
     facets->histogram.after_ut = facets_histogram_slot_baseline_ut(facets, after_ut);
     facets->histogram.before_ut = facets_histogram_slot_baseline_ut(facets, before_ut) + facets->histogram.slot_width;
-    facets->histogram.slots = (facets->histogram.before_ut - facets->histogram.after_ut) / facets->histogram.slot_width;
+    facets->histogram.slots = (facets->histogram.before_ut - facets->histogram.after_ut) / facets->histogram.slot_width + 1;
 }
 
 static inline void facets_histogram_update_value(FACETS *facets, FACET_KEY *k, FACET_VALUE *v, usec_t usec) {
