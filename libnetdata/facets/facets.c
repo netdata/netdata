@@ -180,7 +180,8 @@ static inline void facets_histogram_update_value(FACETS *facets, FACET_KEY *k, F
 
     uint32_t slot = (base_ut - facets->histogram.after_ut) / facets->histogram.slot_width;
 
-    internal_fatal(slot >= facets->histogram.slots, "invalid slot");
+    if(unlikely(slot >= facets->histogram.slots))
+        slot = facets->histogram.slots - 1;
 
     v->histogram[slot]++;
 }
