@@ -778,4 +778,8 @@ bool rrdhost_state_cloud_emulation(RRDHOST *host);
 void rrdpush_send_job_status_update(RRDHOST *host, const char *plugin_name, const char *module_name, struct job *job);
 void rrdpush_send_job_deleted(RRDHOST *host, const char *plugin_name, const char *module_name, const char *job_name);
 
+void rrdpush_send_dyncfg_enable(RRDHOST *host, const char *plugin_name);
+void rrdpush_send_dyncfg_reg_module(RRDHOST *host, const char *plugin_name, const char *module_name, enum module_type type);
+void rrdpush_send_dyncfg_reg_job(RRDHOST *host, const char *plugin_name, const char *module_name, const char *job_name, enum job_type type, uint32_t flags);//x
+
 #endif //NETDATA_RRDPUSH_H

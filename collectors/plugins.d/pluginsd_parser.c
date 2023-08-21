@@ -2341,6 +2341,8 @@ static inline PARSER_RC pluginsd_register_plugin(char **words __maybe_unused, si
         dictionary_acquired_item_release(parser->user.host->configurable_plugins, di);
     }
 
+    rrdpush_send_dyncfg_enable(parser->user.host, cfg->name);
+
     return PARSER_RC_OK;
 }
 
@@ -2398,6 +2400,8 @@ static inline PARSER_RC pluginsd_register_module(char **words __maybe_unused, si
     if (di != NULL)
         dictionary_acquired_item_release(parser->user.host->configurable_plugins, di);
 
+    rrdpush_send_dyncfg_reg_module(parser->user.host, plug_cfg->name, mod->name, mod->type);
+
     return PARSER_RC_OK;
 }
 
@@ -2418,6 +2422,8 @@ static inline PARSER_RC pluginsd_register_job_common(char **words __maybe_unused
 
     if (register_job(parser->user.host->configurable_plugins, plugin_name, words[0], words[1], job_type, flags))
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_JOB, "error registering job");
+
+    rrdpush_send_dyncfg_reg_job(parser->user.host, plugin_name, words[0], words[1], job_type, flags);
     return PARSER_RC_OK;
 }
 
