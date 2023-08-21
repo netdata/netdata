@@ -163,7 +163,7 @@ void facets_set_histogram(FACETS *facets, const char *chart, usec_t after_ut, us
     facets->histogram.slots = (facets->histogram.before_ut - facets->histogram.after_ut) / facets->histogram.slot_width + 1;
 }
 
-static inline void facets_histogram_update_value(FACETS *facets, FACET_KEY *k, FACET_VALUE *v, usec_t usec) {
+static inline void facets_histogram_update_value(FACETS *facets, FACET_KEY *k __maybe_unused, FACET_VALUE *v, usec_t usec) {
     if(!facets->histogram.enabled)
         return;
 
