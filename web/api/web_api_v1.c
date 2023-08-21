@@ -1788,8 +1788,8 @@ static struct web_api_command api_commands_v1[] = {
         { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_allmetrics,      0              },
 
 #if defined(ENABLE_LOGSMANAGEMENT)
-        { "logsmanagement_sources", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_logsmanagement_sources   },
-        { "logsmanagement",         0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_logsmanagement           },
+        { "logsmanagement_sources", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_logsmanagement_sources, 0 },
+        { "logsmanagement",         0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_logsmanagement,         0 },
 #endif
 
 #if defined(ENABLE_ML)
