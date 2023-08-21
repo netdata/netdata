@@ -625,7 +625,6 @@ static void ebpf_function_socket_manipulation(const char *transaction,
 
     char *words[PLUGINSD_MAX_WORDS] = {NULL};
     size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
-    char *separator;
     const char *name;
     int period = -1;
     rw_spinlock_read_lock(&ebpf_socket_pid.index.rw_spinlock);
@@ -678,9 +677,9 @@ static void ebpf_function_socket_manipulation(const char *transaction,
                 ebpf_socket_clean_judy_array_unsafe();
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_RANGE, sizeof(EBPF_FUNCTION_SOCKET_RANGE) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_RANGE) - 1];
-            separator = strchr(name, ':');
-            if (separator) {
-                ebpf_parse_ips(++separator);
+            if (name) {
+                ebpf_parse_ips((char *)name);
+                ebpf_socket_clean_judy_array_unsafe();
             }
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_PORT, sizeof(EBPF_FUNCTION_SOCKET_PORT) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_PORT) - 1];
