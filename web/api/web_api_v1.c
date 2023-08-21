@@ -1531,7 +1531,7 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
 inline int web_client_api_request_v1_logsmanagement_sources(RRDHOST *host, struct web_client *w, char *url) {
     UNUSED(host);
     UNUSED(url);
-    if (unlikely(!netdata_ready)) return HTTP_RESP_BACKEND_FETCH_FAILED;
+    if (unlikely(!netdata_ready)) return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     buffer_flush(w->response.data);
     w->response.data->content_type = CT_APPLICATION_JSON;
@@ -1555,7 +1555,7 @@ inline int web_client_api_request_v1_logsmanagement_sources(RRDHOST *host, struc
 
 inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_client *w, char *url) {
     UNUSED(host);
-    if (unlikely(!netdata_ready)) return HTTP_RESP_BACKEND_FETCH_FAILED;
+    if (unlikely(!netdata_ready)) return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     struct rusage start, end;
     getrusage(RUSAGE_THREAD, &start);

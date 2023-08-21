@@ -36,7 +36,7 @@ typedef struct {
 
 static const logs_qry_res_err_t logs_qry_res_err[] = {
     { LOGS_QRY_RES_ERR_CODE_OK,             "success",                              HTTP_RESP_OK                    },
-    { LOGS_QRY_RES_ERR_CODE_GEN_ERR,        "generic error",                        HTTP_RESP_BACKEND_FETCH_FAILED  },
+    { LOGS_QRY_RES_ERR_CODE_GEN_ERR,        "generic error",                        HTTP_RESP_SERVICE_UNAVAILABLE  },
     { LOGS_QRY_RES_ERR_CODE_INV_REQ_ERR,    "invalid request",                      HTTP_RESP_BAD_REQUEST           },
     { LOGS_QRY_RES_ERR_CODE_INV_TS_ERROR,   "invalid timestamp range",              HTTP_RESP_BAD_REQUEST           },
     { LOGS_QRY_RES_ERR_CODE_NO_MATCH_ERR,   "no matching chart or filename found",  HTTP_RESP_BAD_REQUEST           },
