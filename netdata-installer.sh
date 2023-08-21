@@ -958,10 +958,10 @@ bundle_ebpf_co_re
 
 # -----------------------------------------------------------------------------
 build_fluentbit() {
-  env_cmd=''
+  env_cmd="env CFLAGS='-w' CXXFLAGS='-w' LDFLAGS="
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
-    env_cmd="env CFLAGS='-fPIC -pipe' CXXFLAGS='-fPIC -pipe' LDFLAGS="
+    env_cmd="env CFLAGS='-fPIC -pipe -w' CXXFLAGS='-fPIC -pipe -w' LDFLAGS="
   fi
   
   mkdir -p fluent-bit/build || return 1
