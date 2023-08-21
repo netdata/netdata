@@ -486,18 +486,6 @@ static void ebpf_socket_exit(void *ptr)
     ebpf_socket_free(em);
 }
 
-/**
- * Socket cleanup
- *
- * Clean up allocated addresses.
- *
- * @param ptr thread data.
- */
-void ebpf_socket_cleanup(void *ptr)
-{
-    UNUSED(ptr);
-}
-
 /*****************************************************************
  *
  *  PROCESS DATA AND SEND TO NETDATA
@@ -1117,11 +1105,10 @@ int is_socket_allowed(netdata_socket_idx_t *key, netdata_socket_t *data)
  * Hash accumulator
  *
  * @param values        the values used to calculate the data.
- * @param key           the key to store  data.
  * @param family        the connection family
  * @param end           the values size.
  */
-static void ebpf_hash_socket_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key, int end)
+static void ebpf_hash_socket_accumulator(netdata_socket_t *values, int end)
 {
     int i;
     uint8_t protocol = values[0].protocol;
@@ -1314,7 +1301,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
             goto end_socket_loop;
         }
 
-        ebpf_hash_socket_accumulator(values, &key, end);
+        ebpf_hash_socket_accumulator(values, end);
         ebpf_socket_fill_publish_apps(key.pid, values);
 
         // We update UDP to show info with charts, but we do not show them with functions
@@ -1579,10 +1566,8 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, netdata_socket_t *ns)
  * Update cgroup
  *
  * Update cgroup data based in PIDs.
- *
- * @param maps_per_core      do I need to read all cores?
  */
-static void ebpf_update_socket_cgroup(int maps_per_core)
+static void ebpf_update_socket_cgroup()
 {
     ebpf_cgroup_target_t *ect ;
 
@@ -2148,7 +2133,7 @@ static void socket_collector(ebpf_module_t *em)
 
         pthread_mutex_lock(&collect_data_mutex);
         if (cgroups)
-            ebpf_update_socket_cgroup(maps_per_core);
+            ebpf_update_socket_cgroup();
 
         pthread_mutex_lock(&lock);
         if (socket_global_enabled)
@@ -2192,10 +2177,8 @@ static void socket_collector(ebpf_module_t *em)
  *
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
- *
- * @param apps is apps enabled?
  */
-static void ebpf_socket_initialize_global_vectors(int apps)
+static void ebpf_socket_initialize_global_vectors()
 {
     memset(socket_aggregated_data, 0 ,NETDATA_MAX_SOCKET_VECTOR * sizeof(netdata_syscall_stat_t));
     memset(socket_publish_aggregated, 0 ,NETDATA_MAX_SOCKET_VECTOR * sizeof(netdata_publish_syscall_t));
@@ -2255,7 +2238,7 @@ static int ebpf_is_ip_inside_range(union netdata_ip_t *rfirst, union netdata_ip_
  * @param in the structure that will be linked.
  * @param table the modified table.
  */
-void ebpf_fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table)
+void ebpf_fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, __maybe_unused char *table)
 {
 #ifndef NETDATA_INTERNAL_CHECKS
     UNUSED(table);
@@ -2284,7 +2267,7 @@ void ebpf_fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_
         *out = in;
     }
 
-#ifdef NETDATA_INTERNAL_CHECKS
+#ifdef NETDATA_DEV_MODE
     char first[256], last[512];
     if (in->ver == AF_INET) {
         netdata_log_info("Adding values %s: (%u - %u) to %s IP list \"%s\" used on network viewer",
@@ -2300,36 +2283,6 @@ void ebpf_fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_
                  table);
     }
 #endif
-}
-
-/**
- * Read max dimension.
- *
- * Netdata plot two dimensions per connection, so it is necessary to adjust the values.
- *
- * @param cfg the configuration structure
- */
-static void read_max_dimension(struct config *cfg)
-{
-    int maxdim ;
-    maxdim = (int) appconfig_get_number(cfg,
-                                        EBPF_NETWORK_VIEWER_SECTION,
-                                        EBPF_MAXIMUM_DIMENSIONS,
-                                        NETDATA_NV_CAP_VALUE);
-    if (maxdim < 0) {
-        netdata_log_error("'maximum dimensions = %d' must be a positive number, Netdata will change for default value %ld.",
-              maxdim, NETDATA_NV_CAP_VALUE);
-        maxdim = NETDATA_NV_CAP_VALUE;
-    }
-
-    maxdim /= 2;
-    if (!maxdim) {
-        netdata_log_info("The number of dimensions is too small (%u), we are setting it to minimum 2", network_viewer_opt.max_dim);
-        network_viewer_opt.max_dim = 1;
-        return;
-    }
-
-    network_viewer_opt.max_dim = (uint32_t)maxdim;
 }
 
 /**
@@ -2417,8 +2370,6 @@ static void link_hostnames(char *parse)
  */
 void parse_network_viewer_section(struct config *cfg)
 {
-    read_max_dimension(cfg);
-
     network_viewer_opt.hostname_resolution_enabled = appconfig_get_boolean(cfg,
                                                                            EBPF_NETWORK_VIEWER_SECTION,
                                                                            EBPF_CONFIG_RESOLVE_HOSTNAME,
@@ -2608,7 +2559,7 @@ void *ebpf_socket_thread(void *ptr)
 
     parse_table_size_options(&socket_config);
 
-    ebpf_socket_initialize_global_vectors(em->apps_charts);
+    ebpf_socket_initialize_global_vectors();
 
     if (running_on_kernel < NETDATA_EBPF_KERNEL_5_0)
         em->mode = MODE_ENTRY;

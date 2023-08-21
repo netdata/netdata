@@ -116,13 +116,6 @@ typedef enum ebpf_socket_idx {
 #define NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS "bandwidth_udp_send"
 #define NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS "bandwidth_udp_recv"
 
-// Network viewer charts
-#define NETDATA_NV_OUTBOUND_BYTES "outbound_bytes"
-#define NETDATA_NV_OUTBOUND_PACKETS "outbound_packets"
-#define NETDATA_NV_OUTBOUND_RETRANSMIT "outbound_retransmit"
-#define NETDATA_NV_INBOUND_BYTES "inbound_bytes"
-#define NETDATA_NV_INBOUND_PACKETS "inbound_packets"
-
 // Port range
 #define NETDATA_MINIMUM_PORT_VALUE 1
 #define NETDATA_MAXIMUM_PORT_VALUE 65535
@@ -242,10 +235,8 @@ typedef struct ebpf_network_viewer_hostname_list {
     struct ebpf_network_viewer_hostname_list *next;
 } ebpf_network_viewer_hostname_list_t;
 
-#define NETDATA_NV_CAP_VALUE 50L
 typedef struct ebpf_network_viewer_options {
     uint32_t enabled;
-    uint32_t max_dim;                                       // Store value read from 'maximum dimensions'
     uint32_t family;                                        // AF_INET, AF_INET6 or AF_UNSPEC (both)
 
     uint32_t hostname_resolution_enabled;
@@ -361,10 +352,6 @@ typedef struct netdata_socket_idx {
     uint16_t dport;
     uint32_t pid;
 } netdata_socket_idx_t;
-
-// Next values were defined according getnameinfo(3)
-#define NETDATA_MAX_NETWORK_COMBINED_LENGTH 1018
-#define NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH 5 // :TCP:
 
 void clean_port_structure(ebpf_network_viewer_port_list_t **clean);
 extern ebpf_network_viewer_port_list_t *listen_ports;

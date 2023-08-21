@@ -661,7 +661,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
                 em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
 
 #ifdef NETDATA_DEV_MODE
-            collector_info("Lifetime modified for %d", em->lifetime);
+            collector_info("Lifetime modified for %u", em->lifetime);
 #endif
             pthread_mutex_unlock(&ebpf_exit_cleanup);
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_RESOLVE, sizeof(EBPF_FUNCTION_SOCKET_RESOLVE) - 1) == 0) {

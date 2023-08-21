@@ -2425,7 +2425,7 @@ static void read_local_addresses()
         }
 
         ebpf_fill_ip_list((family == AF_INET)?&network_viewer_opt.ipv4_local_ip:&network_viewer_opt.ipv6_local_ip,
-                     w,
+                          w,
                      "selector");
     }
 
@@ -2908,7 +2908,6 @@ static void ebpf_parse_args(int argc, char **argv)
     };
 
     memset(&network_viewer_opt, 0, sizeof(network_viewer_opt));
-    network_viewer_opt.max_dim = NETDATA_NV_CAP_VALUE;
 
     if (argc > 1) {
         int n = (int)str2l(argv[1]);
