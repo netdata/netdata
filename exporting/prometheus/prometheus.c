@@ -335,6 +335,7 @@ void format_host_labels_prometheus(struct instance *instance, RRDHOST *host)
 
 struct format_prometheus_chart_label_callback {
     BUFFER *labels_buffer;
+    const char *labels_prefix;
 };
 
 static int format_prometheus_chart_label_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
@@ -368,7 +369,7 @@ void format_chart_labels_prometheus(struct format_prometheus_chart_label_callbac
     else {
         plabel->labels_buffer = buffer_create(1024, NULL);
     }
-    buffer_sprintf(plabel->labels_buffer, "chart=\"%s\",dimension=\"%s\",family=\"%s\"", chart, dim, family);
+    buffer_sprintf(plabel->labels_buffer, "%1$schart=\"%2$s\",%1$sdimension=\"%3$s\",%1$sfamily=\"%4$s\"", plabel->labels_prefix, chart, dim, family);
 
     rrdlabels_walkthrough_read(st->rrdlabels, format_prometheus_chart_label_callback, plabel);
 }
@@ -598,7 +599,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
     char labels[PROMETHEUS_LABELS_MAX + 1] = "";
     if (allhosts) {
-        snprintfz(labels, PROMETHEUS_LABELS_MAX, ",instance=\"%s\"", hostname);
+        snprintfz(labels, PROMETHEUS_LABELS_MAX, ",%sinstance=\"%s\"", instance->config.label_prefix, hostname);
      }
 
     if (instance->labels_buffer)
@@ -624,8 +625,9 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     // for each chart
     RRDSET *st;
 
-    static struct format_prometheus_chart_label_callback plabels = {
+    struct format_prometheus_chart_label_callback plabels = {
         .labels_buffer = NULL,
+        .labels_prefix = instance->config.label_prefix,
     };
 
     STRING *prometheus = string_strdupz("prometheus");
