@@ -29,6 +29,7 @@
 #define JOURNAL_PARAMETER_ANCHOR                "anchor"
 #define JOURNAL_PARAMETER_LAST                  "last"
 #define JOURNAL_PARAMETER_QUERY                 "query"
+#define JOURNAL_PARAMETER_HISTOGRAM             "histogram"
 
 #define SYSTEMD_ALWAYS_VISIBLE_KEYS             NULL
 #define SYSTEMD_KEYS_EXCLUDED_FROM_FACETS       NULL
@@ -80,8 +81,10 @@ int systemd_journal_query(BUFFER *wb, FACETS *facets, usec_t after_ut, usec_t be
         r = sd_journal_open(&j, 0);
     }
 
-    if (r < 0)
+    if (r < 0) {
+        netdata_log_error("SYSTEMD-JOURNAL: Failed to open SystemD Journal, with error %d", r);
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
+    }
 
     facets_rows_begin(facets);
 
@@ -350,6 +353,7 @@ static void function_systemd_journal(const char *transaction, char *function, ch
     facets_accepted_param(facets, JOURNAL_PARAMETER_ANCHOR);
     facets_accepted_param(facets, JOURNAL_PARAMETER_LAST);
     facets_accepted_param(facets, JOURNAL_PARAMETER_QUERY);
+    facets_accepted_param(facets, JOURNAL_PARAMETER_HISTOGRAM);
 
     // register the fields in the order you want them on the dashboard
 
@@ -379,6 +383,7 @@ static void function_systemd_journal(const char *transaction, char *function, ch
     usec_t anchor = 0;
     size_t last = 0;
     const char *query = NULL;
+    const char *chart = NULL;
 
     buffer_json_member_add_object(wb, "request");
     buffer_json_member_add_object(wb, "filters");
@@ -405,6 +410,9 @@ static void function_systemd_journal(const char *transaction, char *function, ch
         }
         else if(strncmp(keyword, JOURNAL_PARAMETER_QUERY ":", strlen(JOURNAL_PARAMETER_QUERY ":")) == 0) {
             query= &keyword[strlen(JOURNAL_PARAMETER_QUERY ":")];
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_HISTOGRAM ":", strlen(JOURNAL_PARAMETER_HISTOGRAM ":")) == 0) {
+            chart = &keyword[strlen(JOURNAL_PARAMETER_HISTOGRAM ":")];
         }
         else {
             char *value = strchr(keyword, ':');
@@ -459,12 +467,15 @@ static void function_systemd_journal(const char *transaction, char *function, ch
     buffer_json_member_add_uint64(wb, "anchor", anchor);
     buffer_json_member_add_uint64(wb, "last", last);
     buffer_json_member_add_string(wb, "query", query);
+    buffer_json_member_add_string(wb, "chart", chart);
     buffer_json_member_add_time_t(wb, "timeout", timeout);
     buffer_json_object_close(wb); // request
 
     facets_set_items(facets, last);
     facets_set_anchor(facets, anchor);
     facets_set_query(facets, query);
+    facets_set_histogram(facets, chart ? chart : "PRIORITY", after_s * USEC_PER_SEC, before_s * USEC_PER_SEC);
+
     int response = systemd_journal_query(wb, facets, after_s * USEC_PER_SEC, before_s * USEC_PER_SEC,
                                        now_monotonic_usec() + (timeout - 1) * USEC_PER_SEC);
 

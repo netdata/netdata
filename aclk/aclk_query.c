@@ -112,7 +112,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) 
     if(web_client_timeout_checkpoint_and_check(w, &t)) {
         netdata_log_access("QUERY CANCELED: QUEUE TIME EXCEEDED %llu ms (LIMIT %d ms)", t / USEC_PER_MS, query->timeout);
         retval = 1;
-        w->response.code = HTTP_RESP_BACKEND_FETCH_FAILED;
+        w->response.code = HTTP_RESP_SERVICE_UNAVAILABLE;
         aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, w->response.code, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, NULL, 0);
         goto cleanup;
     }

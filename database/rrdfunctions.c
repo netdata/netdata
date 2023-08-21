@@ -587,7 +587,7 @@ static int rrd_call_function_find(RRDHOST *host, BUFFER *wb, const char *name, s
         return rrd_call_function_error(wb, "No collector is supplying this function on this host at this time.", HTTP_RESP_NOT_FOUND);
 
     if(!(*rdcf)->collector->running)
-        return rrd_call_function_error(wb, "The collector that registered this function, is not currently running.", HTTP_RESP_BACKEND_FETCH_FAILED);
+        return rrd_call_function_error(wb, "The collector that registered this function, is not currently running.", HTTP_RESP_SERVICE_UNAVAILABLE);
 
     return HTTP_RESP_OK;
 }

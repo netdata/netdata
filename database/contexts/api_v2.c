@@ -2023,7 +2023,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         }
         else {
             buffer_strcat(wb, "query interrupted");
-            resp = HTTP_RESP_BACKEND_FETCH_FAILED;
+            resp = HTTP_RESP_CLIENT_CLOSED_REQUEST;
         }
         goto cleanup;
     }
