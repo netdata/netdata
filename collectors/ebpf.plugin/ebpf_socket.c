@@ -1213,23 +1213,71 @@ static inline void **ebpf_socket_hashtable_insert_unsafe(PPvoid_t arr, Word_t ke
  */
 static void ebpf_socket_translate(netdata_socket_plus_t *dst, netdata_socket_idx_t *key)
 {
+    uint32_t resolve = network_viewer_opt.hostname_resolution_enabled;
+    char service[NI_MAXSERV];
+    int ret;
     if (dst->data.family == AF_INET) {
-        struct in_addr ipv4_addr = {.s_addr = key->saddr.addr32[0]};
-        if(inet_ntop(AF_INET, &ipv4_addr, dst->socket_string.src_ip, INET_ADDRSTRLEN))
-            netdata_log_info("Cannot convert IP %u .", ipv4_addr.s_addr);
+        struct sockaddr_in ipv4_addr = { };
+        ipv4_addr.sin_addr.s_addr = key->saddr.addr32[0];
+        ipv4_addr.sin_family = AF_INET;
+        if (resolve) {
+            // NI_NAMEREQD : It is too slow
+            ret = getnameinfo((struct sockaddr *) &ipv4_addr, sizeof(ipv4_addr), dst->socket_string.src_ip,
+                              NI_MAXHOST, service, NI_MAXSERV, NI_NUMERICHOST);
+            if (ret) {
+                collector_error("Cannot resolve name: %s", gai_strerror(ret));
+                resolve = 0;
+            } else {
+                ipv4_addr.sin_addr.s_addr = key->daddr.addr32[0];
+                ret = getnameinfo((struct sockaddr *) &ipv4_addr, sizeof(ipv4_addr), dst->socket_string.dst_ip,
+                                  NI_MAXHOST, service, NI_MAXSERV, NI_NUMERICHOST);
+                if (ret) {
+                    collector_error("Cannot resolve name: %s", gai_strerror(ret));
+                    resolve = 0;
+                }
+            }
+        }
 
-        ipv4_addr.s_addr = key->daddr.addr32[0];
-        if(inet_ntop(AF_INET, &ipv4_addr, dst->socket_string.dst_ip, INET_ADDRSTRLEN))
-            netdata_log_info("Cannot convert IP %u .", ipv4_addr.s_addr);
+        // When resolution fail, we should use addresses
+        if (!resolve) {
+            ipv4_addr.sin_addr.s_addr = key->saddr.addr32[0];
+            if(!inet_ntop(AF_INET, &ipv4_addr.sin_addr, dst->socket_string.src_ip, NI_MAXHOST))
+                netdata_log_info("Cannot convert IP %u .", ipv4_addr.sin_addr.s_addr);
+
+            ipv4_addr.sin_addr.s_addr = key->daddr.addr32[0];
+            if(!inet_ntop(AF_INET, &ipv4_addr.sin_addr, dst->socket_string.dst_ip, NI_MAXHOST))
+                netdata_log_info("Cannot convert IP %u .", ipv4_addr.sin_addr.s_addr);
+        }
     } else {
-        struct in6_addr ipv6_addr;
-        memcpy(ipv6_addr.s6_addr, key->saddr.addr8, sizeof(key->saddr.addr8));
-        if(inet_ntop(AF_INET6, &ipv6_addr, dst->socket_string.src_ip, INET_ADDRSTRLEN))
-            netdata_log_info("Cannot convert IPv6 Address.");
+        struct sockaddr_in6 ipv6_addr = { };
+        memcpy(&ipv6_addr.sin6_addr, key->saddr.addr8, sizeof(key->saddr.addr8));
+        ipv6_addr.sin6_family = AF_INET6;
+        if (resolve) {
+            ret = getnameinfo((struct sockaddr *) &ipv6_addr, sizeof(ipv6_addr), dst->socket_string.src_ip, NI_MAXHOST,
+                              service, NI_MAXSERV, NI_NUMERICHOST);
+            if (ret) {
+                collector_error("Cannot resolve name: %s", gai_strerror(ret));
+                resolve = 0;
+            } else {
+                memcpy(&ipv6_addr.sin6_addr, key->daddr.addr8, sizeof(key->daddr.addr8));
+                ret = getnameinfo((struct sockaddr *) &ipv6_addr, sizeof(ipv6_addr), dst->socket_string.dst_ip,
+                                  NI_MAXHOST, service, NI_MAXSERV, NI_NUMERICHOST);
+                if (ret) {
+                    collector_error("Cannot resolve name: %s", gai_strerror(ret));
+                    resolve = 0;
+                }
+            }
+        }
 
-        memcpy(ipv6_addr.s6_addr, key->daddr.addr8, sizeof(key->daddr.addr8));
-        if(inet_ntop(AF_INET6, &ipv6_addr, dst->socket_string.dst_ip, INET_ADDRSTRLEN))
-            netdata_log_info("Cannot convert IPv6 Address.");
+        if (!resolve) {
+            memcpy(&ipv6_addr.sin6_addr, key->saddr.addr8, sizeof(key->saddr.addr8));
+            if(!inet_ntop(AF_INET6, &ipv6_addr.sin6_addr, dst->socket_string.src_ip, NI_MAXHOST))
+                netdata_log_info("Cannot convert IPv6 Address.");
+
+            memcpy(&ipv6_addr.sin6_addr, key->daddr.addr8, sizeof(key->daddr.addr8));
+            if(!inet_ntop(AF_INET6, &ipv6_addr.sin6_addr, dst->socket_string.dst_ip, NI_MAXHOST))
+                netdata_log_info("Cannot convert IPv6 Address.");
+        }
     }
     dst->pid = key->pid;
     dst->socket_string.src_port = ntohs(key->sport);

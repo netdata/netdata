@@ -302,9 +302,9 @@ typedef struct netata_socket_plus {
     uint32_t pid;
 
     struct  {
-        char src_ip[INET6_ADDRSTRLEN + 1];
+        char src_ip[NI_MAXHOST + 1];
         uint16_t src_port;
-        char dst_ip[INET6_ADDRSTRLEN + 1];
+        char dst_ip[NI_MAXHOST + 1];
         uint16_t dst_port;
     } socket_string;
 } netdata_socket_plus_t;
