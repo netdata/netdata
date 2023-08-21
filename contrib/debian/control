@@ -36,7 +36,7 @@ Architecture: any
 Depends: openssl,
          ${misc:Depends},
          ${shlibs:Depends},
-         netdata-plugin-ebpf [amd64] (= ${source:Version}),
+         netdata-plugin-ebpf (= ${source:Version}) [amd64],
          netdata-plugin-apps (= ${source:Version}),
          netdata-plugin-pythond (= ${source:Version}),
          netdata-plugin-go (= ${source:Version}),
