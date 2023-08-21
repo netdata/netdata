@@ -116,6 +116,7 @@ void pluginsd_rrdset_cleanup(RRDSET *st) {
     }
 
     freez(st->pluginsd.rda);
+    st->pluginsd.collector_tid = 0;
     st->pluginsd.rda = NULL;
     st->pluginsd.size = 0;
     st->pluginsd.pos = 0;
