@@ -465,13 +465,21 @@ void rrdset_push_metrics_finished(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
     *rsb = (RRDSET_STREAM_BUFFER){ .wb = NULL, };
 }
 
+// TODO enable this macro before release
+#define bail_if_no_cap(cap);
+/*    if(unlikely(!stream_has_capability(host->sender, cap))) { \
+          netdata_log_error("STREAM %s [send]: cannot send job status update - parent does not support it.", rrdhost_hostname(host)); \
+          return; \
+      }*/
+
+#define dyncfg_check_can_push(host) \
+    if(unlikely(!rrdhost_can_send_definitions_to_parent(host))) \
+        return; \
+    bail_if_no_cap(STREAM_CAP_DYNCFG)
+
 // assumes job is locked and acquired!!!
 void rrdpush_send_job_status_update(RRDHOST *host, const char *plugin_name, const char *module_name, struct job *job) {
-    if(unlikely(!rrdhost_can_send_definitions_to_parent(host)))
-        return;
-
-/* TODO    if(!stream_has_capability(host->sender, STREAM_CAP_DYNCFG))
-        return;*/
+    dyncfg_check_can_push(host);
 
     BUFFER *wb = sender_start(host->sender);
 
@@ -487,11 +495,7 @@ void rrdpush_send_job_status_update(RRDHOST *host, const char *plugin_name, cons
 }
 
 void rrdpush_send_job_deleted(RRDHOST *host, const char *plugin_name, const char *module_name, const char *job_name) {
-    if(unlikely(!rrdhost_can_send_definitions_to_parent(host)))
-        return;
-
-/* TODO    if(!stream_has_capability(host->sender, STREAM_CAP_DYNCFG))
-        return;*/
+    dyncfg_check_can_push(host);
 
     BUFFER *wb = sender_start(host->sender);
 
@@ -597,12 +601,7 @@ void rrdpush_send_global_functions(RRDHOST *host) {
 }
 
 void rrdpush_send_dyncfg(RRDHOST *host) {
-/*    if(!stream_has_capability(s->host->sender, STREAM_CAP_DYNCFG))
-        return;
-// TODO underhood */
-
-    if(unlikely(!rrdhost_can_send_definitions_to_parent(host)))
-        return;
+    dyncfg_check_can_push(host);
 
     BUFFER *wb = sender_start(host->sender);
 
