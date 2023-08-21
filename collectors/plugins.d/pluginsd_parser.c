@@ -764,12 +764,12 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     pf->sent_ut = now_realtime_usec();
 
     if(ret < 0) {
-        netdata_log_error("FUNCTION '%s': failed to send it to the plugin, error %d", string2str(pf->function), ret);
+        netdata_log_error("FUNCTION '%s': failed to send it to the plugin, error %zd", string2str(pf->function), ret);
         rrd_call_function_error(pf->destination_wb, "Failed to communicate with collector", HTTP_RESP_SERVICE_UNAVAILABLE);
     }
     else {
         internal_error(LOG_FUNCTIONS,
-                       "FUNCTION '%s' with transaction '%s' sent to collector (%d bytes, in %llu usec)",
+                       "FUNCTION '%s' with transaction '%s' sent to collector (%zd bytes, in %llu usec)",
                        string2str(pf->function), dictionary_acquired_item_name(item), ret,
                        pf->sent_ut - pf->started_ut);
     }
@@ -781,12 +781,12 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     ret = send_to_plugin(pf->payload, parser);
 
     if(ret < 0) {
-        netdata_log_error("FUNCTION_PAYLOAD '%s': failed to send function to plugin, error %d", string2str(pf->function), ret);
+        netdata_log_error("FUNCTION_PAYLOAD '%s': failed to send function to plugin, error %zd", string2str(pf->function), ret);
         rrd_call_function_error(pf->destination_wb, "Failed to communicate with collector", HTTP_RESP_SERVICE_UNAVAILABLE);
     }
     else {
         internal_error(LOG_FUNCTIONS,
-                       "FUNCTION_PAYLOAD '%s' with transaction '%s' sent to collector (%d bytes, in %llu usec)",
+                       "FUNCTION_PAYLOAD '%s' with transaction '%s' sent to collector (%zd bytes, in %llu usec)",
                        string2str(pf->function), dictionary_acquired_item_name(item), ret,
                        pf->sent_ut - pf->started_ut);
     }
@@ -1894,7 +1894,7 @@ struct mutex_cond {
     int rc;
 };
 
-static void virt_fnc_got_data_cb(BUFFER *wb, int code, void *callback_data)
+static void virt_fnc_got_data_cb(BUFFER *wb __maybe_unused, int code, void *callback_data)
 {
     struct mutex_cond *ctx = callback_data;
     pthread_mutex_lock(&ctx->lock);

@@ -663,7 +663,7 @@ static int web_client_api_request_v2_webrtc(RRDHOST *host __maybe_unused, struct
 }
 
 #define CONFIG_API_V2_URL "/api/v2/config"
-static int web_client_api_request_v2_config(RRDHOST *host __maybe_unused, struct web_client *w, char *query) {
+static int web_client_api_request_v2_config(RRDHOST *host __maybe_unused, struct web_client *w, char *query __maybe_unused) {
 
     char *url = strdupz(buffer_tostring(w->url_as_received));
     char *url_full = url;
