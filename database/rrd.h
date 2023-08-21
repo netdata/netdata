@@ -891,9 +891,11 @@ struct rrdset {
     } alerts;
 
     struct {
+        SPINLOCK spinlock; // used only for cleanup
+        pid_t collector_tid;
+        bool set;
         uint32_t pos;
         uint32_t size;
-        uint32_t used;
         RRDDIM_ACQUIRED **rda;
     } pluginsd;
 
