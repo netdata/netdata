@@ -892,6 +892,7 @@ struct rrdset {
 
     struct {
         SPINLOCK spinlock; // used only for cleanup
+        pid_t collector_tid;
         bool set;
         uint32_t pos;
         uint32_t size;

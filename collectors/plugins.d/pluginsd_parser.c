@@ -149,7 +149,27 @@ static inline void pluginsd_clear_scope_chart(PARSER *parser, const char *keywor
     parser->user.st = NULL;
 }
 
-static inline void pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const char *keyword) {
+static inline bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const char *keyword) {
+    RRDSET *old_st = parser->user.st;
+    pid_t old_collector_tid = (old_st) ? old_st->pluginsd.collector_tid : 0;
+    pid_t my_collector_tid = gettid();
+
+    if(unlikely(old_collector_tid)) {
+        if(old_collector_tid != my_collector_tid) {
+            error_limit_static_global_var(erl, 1, 0);
+            error_limit(&erl, "PLUGINSD: keyword %s: 'host:%s/chart:%s' is collected twice (my tid %d, other collector tid %d)",
+                        keyword ? keyword : "UNKNOWN",
+                        rrdhost_hostname(st->rrdhost), rrdset_id(st)),
+                        my_collector_tid, old_collector_tid);
+
+            return false;
+        }
+
+        old_st->pluginsd.collector_tid = 0;
+    }
+
+    st->pluginsd.collector_tid = my_collector_tid;
+
     pluginsd_clear_scope_chart(parser, keyword);
 
     size_t dims = dictionary_entries(st->rrddim_root_index);
@@ -165,6 +185,8 @@ static inline void pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const ch
 
     st->pluginsd.pos = 0;
     parser->user.st = st;
+
+    return true;
 }
 
 static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, const char *dimension, const char *cmd) {
@@ -268,7 +290,8 @@ static inline PARSER_RC pluginsd_begin(char **words, size_t num_words, PARSER *p
     RRDSET *st = pluginsd_find_chart(host, id, PLUGINSD_KEYWORD_BEGIN);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
-    pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_BEGIN);
+    if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_BEGIN))
+        return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
     usec_t microseconds = 0;
     if (microseconds_txt && *microseconds_txt) {
@@ -573,7 +596,8 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
             rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
         }
 
-        pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_CHART);
+        if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_CHART))
+            return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
     }
     else
         pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_CHART);
@@ -1193,7 +1217,9 @@ static inline PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PA
         st = pluginsd_find_chart(host, id, PLUGINSD_KEYWORD_REPLAY_BEGIN);
 
     if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
-    pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_REPLAY_BEGIN);
+
+    if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_REPLAY_BEGIN))
+        return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
     if(start_time_str && end_time_str) {
         time_t start_time = (time_t) str2ull_encoded(start_time_str);
@@ -1574,7 +1600,8 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
     RRDSET *st = pluginsd_find_chart(host, id, PLUGINSD_KEYWORD_BEGIN_V2);
     if(unlikely(!st)) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
-    pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_BEGIN_V2);
+    if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_BEGIN_V2))
+        return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE | RRDSET_FLAG_ARCHIVED)))
         rrdset_isnot_obsolete(st);
