@@ -7,6 +7,8 @@
  *  EBPF FUNCTION COMMON
  *****************************************************************/
 
+RW_SPINLOCK rw_spinlock;        // protect the buffer
+
 /**
  * Function Start thread
  *
@@ -958,6 +960,7 @@ void *ebpf_function_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     char buffer[PLUGINSD_LINE_MAX + 1];
 
+    rw_spinlock_init(&rw_spinlock);
     char *s = NULL;
     while(!ebpf_exit_plugin && (s = fgets(buffer, PLUGINSD_LINE_MAX, stdin))) {
         char *words[PLUGINSD_MAX_WORDS] = { NULL };
@@ -979,6 +982,7 @@ void *ebpf_function_thread(void *ptr)
             }
             else {
                 int timeout = str2i(timeout_s);
+                rw_spinlock_write_lock(&rw_spinlock);
                 if (!strncmp(function, EBPF_FUNCTION_THREAD, sizeof(EBPF_FUNCTION_THREAD) - 1))
                     ebpf_function_thread_manipulation(transaction,
                                                       function,
@@ -997,6 +1001,8 @@ void *ebpf_function_thread(void *ptr)
                     ebpf_function_error(transaction,
                                         HTTP_RESP_NOT_FOUND,
                                         "No function with this name found in ebpf.plugin.");
+
+                rw_spinlock_write_unlock(&rw_spinlock);
             }
         }
         else
