@@ -65,7 +65,7 @@ jobs:
         id: channel
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.type != 'nightly'
         run: |
-          sed -i 's/^RELEASE_CHANNEL="nightly" *#/RELEASE_CHANNEL="stable" #/' netdata-installer.sh
+          sed -i 's/^RELEASE_CHANNEL="nightly"/RELEASE_CHANNEL="stable"/' netdata-installer.sh
       - name: Build
         id: build
         run: |
@@ -140,7 +140,7 @@ jobs:
         id: channel
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.type != 'nightly'
         run: |
-          sed -i 's/^RELEASE_CHANNEL="nightly" *#/RELEASE_CHANNEL="stable" #/' netdata-installer.sh packaging/makeself/install-or-update.sh
+          sed -i 's/^RELEASE_CHANNEL="nightly"/RELEASE_CHANNEL="stable"/' netdata-installer.sh packaging/makeself/install-or-update.sh
       - name: Get Cache Key
         if: github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'run-ci/no-cache')
         id: cache-key
