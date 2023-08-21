@@ -12,7 +12,7 @@ else
   export CFLAGS="-static -O1 -pipe -ggdb -Wall -Wextra -Wformat-signedness -DNETDATA_INTERNAL_CHECKS=1 -I/openssl-static/include -I/libnetfilter-acct-static/include/libnetfilter_acct -I/usr/include/libmnl"
 fi
 
-export LDFLAGS="-Wl,--gc-sections -static -L/openssl-static/lib -L/libnetfilter-acct-static/lib -lnetfilter_acct -L/usr/lib -lmnl"
+export LDFLAGS="-Wl,--gc-sections -Wl,-z,stack-size=$[8 * 1024 * 1024] -static -L/openssl-static/lib64 -L/libnetfilter-acct-static/lib -lnetfilter_acct -L/usr/lib -lmnl"
 
 # We export this to 'yes', installer sets this to .environment.
 # The updater consumes this one, so that it can tell whether it should update a static install or a non-static one
@@ -21,11 +21,11 @@ export IS_NETDATA_STATIC_BINARY="yes"
 # Set eBPF LIBC to "static" to bundle the `-static` variant of the kernel-collector
 export EBPF_LIBC="static"
 export PKG_CONFIG="pkg-config --static"
-export PKG_CONFIG_PATH="/openssl-static/lib/pkgconfig:/libnetfilter-acct-static/lib/pkgconfig:/usr/lib/pkgconfig"
+export PKG_CONFIG_PATH="/openssl-static/lib64/pkgconfig:/libnetfilter-acct-static/lib/pkgconfig:/usr/lib/pkgconfig"
 
 # Set correct CMake flags for building against non-System OpenSSL
 # See: https://github.com/warmcat/libwebsockets/blob/master/READMEs/README.build.md
-export CMAKE_FLAGS="-DOPENSSL_ROOT_DIR=/openssl-static -DOPENSSL_LIBRARIES=/openssl-static/lib -DCMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE=/openssl-static -DLWS_OPENSSL_INCLUDE_DIRS=/openssl-static/include -DLWS_OPENSSL_LIBRARIES=/openssl-static/lib/libssl.a;/openssl-static/lib/libcrypto.a"
+export CMAKE_FLAGS="-DOPENSSL_ROOT_DIR=/openssl-static -DOPENSSL_LIBRARIES=/openssl-static/lib64 -DCMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE=/openssl-static -DLWS_OPENSSL_INCLUDE_DIRS=/openssl-static/include -DLWS_OPENSSL_LIBRARIES=/openssl-static/lib64/libssl.a;/openssl-static/lib64/libcrypto.a"
 
 run ./netdata-installer.sh \
   --install-prefix "${NETDATA_INSTALL_PARENT}" \
