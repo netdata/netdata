@@ -105,7 +105,7 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
                             "   },\n"
                             "   \"error code\": %d,\n"
                             "   \"error\": \"%s\"\n}",
-                            res_err->err_code,
+                            (int) res_err->err_code,
                             res_err->err_str);
 
             return res_err->http_code;
@@ -303,7 +303,7 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
                     start.ru_utime.tv_sec * USEC_PER_SEC - start.ru_utime.tv_usec,
                     end.ru_stime.tv_sec * USEC_PER_SEC + end.ru_stime.tv_usec - 
                     start.ru_stime.tv_sec * USEC_PER_SEC - start.ru_stime.tv_usec,
-                    res_err->err_code,
+                    (int) res_err->err_code,
                     res_err->err_str
     );
 

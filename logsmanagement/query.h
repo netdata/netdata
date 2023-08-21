@@ -24,7 +24,7 @@
 #define LOGS_QRY_KW_SANITIZE_KW "sanitize_keyword"
 
 typedef struct {
-    const enum {LOGS_QRY_RES_ERR_CODE_OK, 
+    const enum {LOGS_QRY_RES_ERR_CODE_OK = 0, 
                 LOGS_QRY_RES_ERR_CODE_GEN_ERR, 
                 LOGS_QRY_RES_ERR_CODE_INV_REQ_ERR,
                 LOGS_QRY_RES_ERR_CODE_INV_TS_ERROR,
