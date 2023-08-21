@@ -9,7 +9,8 @@ set -e
 
 case "${ID}" in
     amzn|almalinux|centos|fedora)
-        dnf install -y procps-ng cronie cronie-anacron || yum install -y procps-ng cronie cronie-anacron
+        dnf install -y procps-ng cronie cronie-anacron || \
+        yum install -y procps-ng cronie cronie-anacron
         ;;
     arch)
         pacman -S --noconfirm cronie

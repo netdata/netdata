@@ -981,7 +981,9 @@ void execute_commands(struct sender_state *s) {
 
                 int code = rrd_call_function_async(s->host, wb, timeout, function, stream_execute_function_callback, tmp);
                 if(code != HTTP_RESP_OK) {
-                    rrd_call_function_error(wb, "Failed to route request to collector", code);
+                    if (!buffer_strlen(wb))
+                        rrd_call_function_error(wb, "Failed to route request to collector", code);
+
                     stream_execute_function_callback(wb, code, tmp);
                 }
             }

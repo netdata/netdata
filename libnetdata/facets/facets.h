@@ -29,8 +29,8 @@ typedef struct facet_row {
 typedef struct facets FACETS;
 typedef struct facet_key FACET_KEY;
 
-#define FACET_STRING_HASH_SIZE 19
-void facets_string_hash(const char *src, char *out);
+#define FACET_STRING_HASH_SIZE 23
+void facets_string_hash(const char *src, size_t len, char *out);
 
 typedef void (*facets_key_transformer_t)(FACETS *facets __maybe_unused, BUFFER *wb, void *data);
 typedef void (*facet_dynamic_row_t)(FACETS *facets, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row, void *data);
@@ -55,6 +55,7 @@ void facets_set_query(FACETS *facets, const char *query);
 void facets_set_items(FACETS *facets, uint32_t items);
 void facets_set_anchor(FACETS *facets, usec_t anchor);
 void facets_register_facet_filter(FACETS *facets, const char *key_id, char *value_ids, FACET_KEY_OPTIONS options);
+void facets_set_histogram(FACETS *facets, const char *chart, usec_t after_ut, usec_t before_ut);
 
 void facets_add_key_value(FACETS *facets, const char *key, const char *value);
 void facets_add_key_value_length(FACETS *facets, const char *key, const char *value, size_t value_len);

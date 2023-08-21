@@ -1838,7 +1838,7 @@ static void replication_main_cleanup(void *ptr) {
     }
     freez(replication_globals.main_thread.threads_ptrs);
     replication_globals.main_thread.threads_ptrs = NULL;
-    __atomic_sub_fetch(&replication_buffers_allocated, threads * sizeof(netdata_thread_t *), __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&replication_buffers_allocated, threads * sizeof(netdata_thread_t), __ATOMIC_RELAXED);
 
     aral_destroy(replication_globals.aral_rse);
     replication_globals.aral_rse = NULL;
@@ -1867,7 +1867,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
     if(--threads) {
         replication_globals.main_thread.threads = threads;
         replication_globals.main_thread.threads_ptrs = mallocz(threads * sizeof(netdata_thread_t *));
-        __atomic_add_fetch(&replication_buffers_allocated, threads * sizeof(netdata_thread_t *), __ATOMIC_RELAXED);
+        __atomic_add_fetch(&replication_buffers_allocated, threads * sizeof(netdata_thread_t), __ATOMIC_RELAXED);
 
         for(int i = 0; i < threads ;i++) {
             char tag[NETDATA_THREAD_TAG_MAX + 1];

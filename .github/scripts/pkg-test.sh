@@ -14,7 +14,9 @@ install_debian_like() {
 
   # Install Netdata
   # Strange quoting is required here so that glob matching works.
-  apt-get install -y $(find /netdata/artifacts -type f -name 'netdata*.deb' ! -name '*dbgsym*' ! -name '*cups*' ! -name '*freeipmi*') || exit 3
+  # shellcheck disable=SC2046
+  apt-get install -y $(find /netdata/artifacts -type f -name 'netdata*.deb' \
+! -name '*dbgsym*' ! -name '*cups*' ! -name '*freeipmi*') || exit 3
 
   # Install testing tools
   apt-get install -y --no-install-recommends curl "${netcat}" jq || exit 1
@@ -32,10 +34,10 @@ install_fedora_like() {
 
   # Install Netdata
   # Strange quoting is required here so that glob matching works.
-  "$PKGMGR" install -y /netdata/artifacts/netdata*.rpm || exit 1
+  "${PKGMGR}" install -y /netdata/artifacts/netdata*.rpm || exit 1
 
   # Install testing tools
-  "$PKGMGR" install -y curl nc jq || exit 1
+  "${PKGMGR}" install -y curl nc jq || exit 1
 }
 
 install_centos() {
@@ -49,15 +51,15 @@ install_centos() {
   fi
 
   # Install EPEL (needed for `jq`
-  "$PKGMGR" install -y epel-release || exit 1
+  "${PKGMGR}" install -y epel-release || exit 1
 
   # Install Netdata
   # Strange quoting is required here so that glob matching works.
-  "$PKGMGR" install -y /netdata/artifacts/netdata*.rpm || exit 1
+  "${PKGMGR}" install -y /netdata/artifacts/netdata*.rpm || exit 1
 
   # Install testing tools
   # shellcheck disable=SC2086
-  "$PKGMGR" install -y ${opts} curl nc jq || exit 1
+  "${PKGMGR}" install -y ${opts} curl nc jq || exit 1
 }
 
 install_amazon_linux() {
@@ -69,11 +71,11 @@ install_amazon_linux() {
 
   # Install Netdata
   # Strange quoting is required here so that glob matching works.
-  "$PKGMGR" install -y /netdata/artifacts/netdata*.rpm || exit 1
+  "${PKGMGR}" install -y /netdata/artifacts/netdata*.rpm || exit 1
 
   # Install testing tools
   # shellcheck disable=SC2086
-  "$PKGMGR" install -y ${opts} curl nc jq || exit 1
+  "${PKGMGR}" install -y ${opts} curl nc jq || exit 1
 }
 
 install_suse_like() {
@@ -130,7 +132,7 @@ case "${DISTRO}" in
   fedora | oraclelinux)
     install_fedora_like
     ;;
-  centos | rockylinux | almalinux)
+  centos| centos-stream | rockylinux | almalinux)
     install_centos
     ;;
   amazonlinux)

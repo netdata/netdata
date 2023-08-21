@@ -4,7 +4,7 @@ modules:
       plugin_name: python.d.plugin
       module_name: bind_rndc
       monitored_instance:
-        name: ISCBind (RNDC)
+        name: ISC Bind (RNDC)
         link: "https://www.isc.org/bind/"
         categories:
           - data-collection.dns-and-dhcp-servers

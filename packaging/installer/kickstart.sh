@@ -685,7 +685,7 @@ get_system_info() {
               DISTRO_COMPAT_NAME="opensuse"
               SYSVERSION="tumbleweed"
               ;;
-          cloudlinux|almalinux|rocky|rhel)
+          cloudlinux|almalinux|centos-stream|rocky|rhel)
               DISTRO_COMPAT_NAME="centos"
               ;;
           artix|manjaro|obarun)

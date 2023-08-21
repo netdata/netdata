@@ -170,7 +170,7 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
 
     if (r->view.flags & RRDR_RESULT_FLAG_CANCEL) {
         rrdr_free(owa, r);
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
+        return HTTP_RESP_CLIENT_CLOSED_REQUEST;
     }
 
     if(r->view.flags & RRDR_RESULT_FLAG_RELATIVE)

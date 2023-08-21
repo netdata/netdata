@@ -428,7 +428,7 @@
   quick_start: 3
 - id: deploy-kubernetes
   meta:
-    name: Kubernetes
+    name: Kubernetes (Helm)
     link: ''
     categories:
       - deploy.docker-kubernetes

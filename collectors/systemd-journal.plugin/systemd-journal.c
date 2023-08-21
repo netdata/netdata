@@ -11,12 +11,6 @@
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
-#ifndef SD_JOURNAL_ALL_NAMESPACES
-#define JOURNAL_NAMESPACE SD_JOURNAL_LOCAL_ONLY
-#else
-#define JOURNAL_NAMESPACE SD_JOURNAL_ALL_NAMESPACES
-#endif
-
 #include <systemd/sd-journal.h>
 #include <syslog.h>
 
@@ -35,6 +29,7 @@
 #define JOURNAL_PARAMETER_ANCHOR                "anchor"
 #define JOURNAL_PARAMETER_LAST                  "last"
 #define JOURNAL_PARAMETER_QUERY                 "query"
+#define JOURNAL_PARAMETER_HISTOGRAM             "histogram"
 
 #define SYSTEMD_ALWAYS_VISIBLE_KEYS             NULL
 #define SYSTEMD_KEYS_EXCLUDED_FROM_FACETS       NULL
@@ -65,17 +60,31 @@ static bool plugin_should_exit = false;
 DICTIONARY *uids = NULL;
 DICTIONARY *gids = NULL;
 
-
 // ----------------------------------------------------------------------------
 
 int systemd_journal_query(BUFFER *wb, FACETS *facets, usec_t after_ut, usec_t before_ut, usec_t stop_monotonic_ut) {
-    sd_journal *j;
+    sd_journal *j = NULL;
     int r;
 
-    // Open the system journal for reading
-    r = sd_journal_open(&j, JOURNAL_NAMESPACE);
-    if (r < 0)
+    if(*netdata_configured_host_prefix) {
+#ifdef HAVE_SD_JOURNAL_OS_ROOT
+        // Give our host prefix to systemd journal
+        r = sd_journal_open_directory(&j, netdata_configured_host_prefix, SD_JOURNAL_OS_ROOT);
+#else
+        char buf[FILENAME_MAX + 1];
+        snprintfz(buf, FILENAME_MAX, "%s/var/log/journal", netdata_configured_host_prefix);
+        r = sd_journal_open_directory(&j, buf, 0);
+#endif
+    }
+    else {
+        // Open the system journal for reading
+        r = sd_journal_open(&j, 0);
+    }
+
+    if (r < 0) {
+        netdata_log_error("SYSTEMD-JOURNAL: Failed to open SystemD Journal, with error %d", r);
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
+    }
 
     facets_rows_begin(facets);
 
@@ -344,6 +353,7 @@ static void function_systemd_journal(const char *transaction, char *function, ch
     facets_accepted_param(facets, JOURNAL_PARAMETER_ANCHOR);
     facets_accepted_param(facets, JOURNAL_PARAMETER_LAST);
     facets_accepted_param(facets, JOURNAL_PARAMETER_QUERY);
+    facets_accepted_param(facets, JOURNAL_PARAMETER_HISTOGRAM);
 
     // register the fields in the order you want them on the dashboard
 
@@ -373,6 +383,7 @@ static void function_systemd_journal(const char *transaction, char *function, ch
     usec_t anchor = 0;
     size_t last = 0;
     const char *query = NULL;
+    const char *chart = NULL;
 
     buffer_json_member_add_object(wb, "request");
     buffer_json_member_add_object(wb, "filters");
@@ -399,6 +410,9 @@ static void function_systemd_journal(const char *transaction, char *function, ch
         }
         else if(strncmp(keyword, JOURNAL_PARAMETER_QUERY ":", strlen(JOURNAL_PARAMETER_QUERY ":")) == 0) {
             query= &keyword[strlen(JOURNAL_PARAMETER_QUERY ":")];
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_HISTOGRAM ":", strlen(JOURNAL_PARAMETER_HISTOGRAM ":")) == 0) {
+            chart = &keyword[strlen(JOURNAL_PARAMETER_HISTOGRAM ":")];
         }
         else {
             char *value = strchr(keyword, ':');
@@ -453,12 +467,15 @@ static void function_systemd_journal(const char *transaction, char *function, ch
     buffer_json_member_add_uint64(wb, "anchor", anchor);
     buffer_json_member_add_uint64(wb, "last", last);
     buffer_json_member_add_string(wb, "query", query);
+    buffer_json_member_add_string(wb, "chart", chart);
     buffer_json_member_add_time_t(wb, "timeout", timeout);
     buffer_json_object_close(wb); // request
 
     facets_set_items(facets, last);
     facets_set_anchor(facets, anchor);
     facets_set_query(facets, query);
+    facets_set_histogram(facets, chart ? chart : "PRIORITY", after_s * USEC_PER_SEC, before_s * USEC_PER_SEC);
+
     int response = systemd_journal_query(wb, facets, after_s * USEC_PER_SEC, before_s * USEC_PER_SEC,
                                        now_monotonic_usec() + (timeout - 1) * USEC_PER_SEC);
 
@@ -542,6 +559,9 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     uids = dictionary_create(0);
     gids = dictionary_create(0);
+
+    netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
+    if(verify_netdata_host_prefix() == -1) exit(1);
 
     // ------------------------------------------------------------------------
     // debug
