@@ -159,7 +159,7 @@ static inline bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const ch
             error_limit_static_global_var(erl, 1, 0);
             error_limit(&erl, "PLUGINSD: keyword %s: 'host:%s/chart:%s' is collected twice (my tid %d, other collector tid %d)",
                         keyword ? keyword : "UNKNOWN",
-                        rrdhost_hostname(st->rrdhost), rrdset_id(st)),
+                        rrdhost_hostname(st->rrdhost), rrdset_id(st),
                         my_collector_tid, old_collector_tid);
 
             return false;
