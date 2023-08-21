@@ -1450,6 +1450,9 @@ int main (int argc, char **argv) {
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
 
+    // initialize the threads
+    netdata_threads_init_for_external_plugins(0); // set the default threads stack size here
+
     // ------------------------------------------------------------------------
     // parse command line parameters
 

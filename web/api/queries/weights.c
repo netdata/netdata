@@ -1913,7 +1913,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
 
     if(qwd.interrupted) {
         error = "interrupted";
-        resp = HTTP_RESP_BACKEND_FETCH_FAILED;
+        resp = HTTP_RESP_CLIENT_CLOSED_REQUEST;
         goto cleanup;
     }
 

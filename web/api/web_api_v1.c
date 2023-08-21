@@ -1313,7 +1313,7 @@ int web_client_api_request_v1_ml_info(RRDHOST *host, struct web_client *w, char 
     (void) url;
 
     if (!netdata_ready)
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
+        return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
@@ -1332,7 +1332,7 @@ int web_client_api_request_v1_ml_models(RRDHOST *host, struct web_client *w, cha
     (void) url;
 
     if (!netdata_ready)
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
+        return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
@@ -1346,7 +1346,7 @@ int web_client_api_request_v1_ml_models(RRDHOST *host, struct web_client *w, cha
 
 inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
-    if (!netdata_ready) return HTTP_RESP_BACKEND_FETCH_FAILED;
+    if (!netdata_ready) return HTTP_RESP_SERVICE_UNAVAILABLE;
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
@@ -1360,7 +1360,7 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
 static int web_client_api_request_v1_aclk_state(RRDHOST *host, struct web_client *w, char *url) {
     UNUSED(url);
     UNUSED(host);
-    if (!netdata_ready) return HTTP_RESP_BACKEND_FETCH_FAILED;
+    if (!netdata_ready) return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
@@ -1386,7 +1386,7 @@ int web_client_api_request_v1_weights(RRDHOST *host, struct web_client *w, char 
 
 int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char *url) {
     if (!netdata_ready)
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
+        return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     int timeout = 0;
     const char *function = NULL;
@@ -1417,7 +1417,7 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
 
 int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {
     if (!netdata_ready)
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
+        return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
@@ -1500,7 +1500,7 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
 }
 int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struct web_client *w, char *url __maybe_unused) {
     if (!netdata_ready)
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
+        return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);

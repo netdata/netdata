@@ -123,10 +123,12 @@ size_t netdata_threads_init(void) {
     // --------------------------------------------------------------------
     // get the required stack size of the threads of netdata
 
-    netdata_threads_attr = callocz(1, sizeof(pthread_attr_t));
-    i = pthread_attr_init(netdata_threads_attr);
-    if(i != 0)
-        fatal("pthread_attr_init() failed with code %d.", i);
+    if(!netdata_threads_attr) {
+        netdata_threads_attr = callocz(1, sizeof(pthread_attr_t));
+        i = pthread_attr_init(netdata_threads_attr);
+        if (i != 0)
+            fatal("pthread_attr_init() failed with code %d.", i);
+    }
 
     size_t stacksize = 0;
     i = pthread_attr_getstacksize(netdata_threads_attr, &stacksize);
@@ -156,6 +158,17 @@ void netdata_threads_init_after_fork(size_t stacksize) {
     }
     else
         netdata_log_error("Invalid pthread stacksize %zu", stacksize);
+}
+
+// ----------------------------------------------------------------------------
+// threads init for external plugins
+
+void netdata_threads_init_for_external_plugins(size_t stacksize) {
+    size_t default_stacksize = netdata_threads_init();
+    if(default_stacksize < 1 * 1024 * 1024)
+        default_stacksize = 1 * 1024 * 1024;
+
+    netdata_threads_init_after_fork(stacksize ? stacksize : default_stacksize);
 }
 
 // ----------------------------------------------------------------------------
