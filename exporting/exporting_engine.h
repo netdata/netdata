@@ -74,6 +74,7 @@ struct instance_config {
     const char *username;
     const char *password;
     const char *prefix;
+    const char *label_prefix;
     const char *hostname;
 
     int update_every;
