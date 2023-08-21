@@ -455,6 +455,7 @@ static int print_host_variables_callback(const DICTIONARY_ITEM *item __maybe_unu
 
 struct gen_parameters {
     const char *prefix;
+    const char *labels_prefix;
     char *context;
     char *suffix;
 
@@ -526,12 +527,12 @@ static void generate_as_collected_prom_metric(BUFFER *wb,
     if (!homogeneous)
         buffer_sprintf(wb, "_%s", p->dimension);
 
-    buffer_sprintf(wb, "%s{chart=\"%s\"", p->suffix, p->chart);
+    buffer_sprintf(wb, "%s{%schart=\"%s\"", p->suffix, p->labels_prefix, p->chart);
 
     if (homogeneous)
-        buffer_sprintf(wb, ",dimension=\"%s\"", p->dimension);
+        buffer_sprintf(wb, ",%sdimension=\"%s\"", p->labels_prefix, p->dimension);
 
-    buffer_sprintf(wb, ",family=\"%s\"", p->family);
+    buffer_sprintf(wb, ",%sfamily=\"%s\"", p->labels_prefix, p->family);
 
     rrdlabels_walkthrough_read(chart_labels, format_prometheus_chart_label_callback, &local_label);
 
@@ -686,6 +687,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
                         struct gen_parameters p;
                         p.prefix = prefix;
+                        p.labels_prefix = instance->config.label_prefix;
                         p.context = context;
                         p.suffix = suffix;
                         p.chart = chart;
