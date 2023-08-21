@@ -769,7 +769,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     }
     else {
         internal_error(LOG_FUNCTIONS,
-                       "FUNCTION '%s' with transaction '%s' sent to collector (%d bytes, in %llu usec)",
+                       "FUNCTION '%s' with transaction '%s' sent to collector (%zd bytes, in %llu usec)",
                        string2str(pf->function), dictionary_acquired_item_name(item), ret,
                        pf->sent_ut - pf->started_ut);
     }
@@ -786,7 +786,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     }
     else {
         internal_error(LOG_FUNCTIONS,
-                       "FUNCTION_PAYLOAD '%s' with transaction '%s' sent to collector (%d bytes, in %llu usec)",
+                       "FUNCTION_PAYLOAD '%s' with transaction '%s' sent to collector (%zd bytes, in %llu usec)",
                        string2str(pf->function), dictionary_acquired_item_name(item), ret,
                        pf->sent_ut - pf->started_ut);
     }
