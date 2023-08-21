@@ -8,6 +8,7 @@
 
 #include <vector>
 #include <queue>
+#include <unordered_map>
 
 typedef double calculated_number_t;
 typedef dlib::matrix<calculated_number_t, 6, 1> DSample;
@@ -211,6 +212,12 @@ typedef struct {
 void ml_chart_update_dimension(ml_chart_t *chart, ml_dimension_t *dim, bool is_anomalous);
 
 typedef struct {
+    RRDDIM *rd;
+    size_t normal_dimensions;
+    size_t anomalous_dimensions;
+} ml_type_anomaly_rate_t;
+
+typedef struct {
     RRDHOST *rh;
 
     std::atomic<bool> ml_running;
@@ -255,6 +262,9 @@ typedef struct {
     RRDSET *detector_events_rs;
     RRDDIM *detector_events_above_threshold_rd;
     RRDDIM *detector_events_new_anomaly_event_rd;
+
+    RRDSET *type_anomaly_rate_rs;
+    std::unordered_map<STRING *, ml_type_anomaly_rate_t> type_anomaly_rate;
 } ml_host_t;
 
 typedef struct {
