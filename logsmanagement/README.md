@@ -6,7 +6,6 @@
     - [Types of available log collectors](#collector-types)
 - [Getting Started](#getting-started)  
 - [Package Requirements](#package-requirements)
-    - [Systemd](#requirements-systemd)
 - [General Configuration](#general-configuration)
 - [Collector-specific Configuration](#collector-configuration)
 	- [Kernel logs (kmsg)](#collector-configuration-kmsg)
@@ -93,29 +92,6 @@ Netdata logs management introduces minimal additional package dependencies and t
 - `musl-fts-dev` ([Alpine Linux](https://www.alpinelinux.org/about) only)
 
 However, there may be some exceptions to this rule as more collectors are added to the logs management engine, so if a specific collector is disabled due to missing dependencies, please refer to this section or check [Troubleshooting](#troubleshooting).
-
-<a name="requirements-systemd"/>
-
-### Systemd
-
-</a>
-
-If systemd development libraries are missing at build time, the systemd log collector will not be available. This can be fixed by installing the missing libraries prior to building the agent:
-
-Debian and derivatives:
-```
-apt install libsystemd-dev
-```
-
-Red Hat Enterprise Linux and derivatives:
-```
-yum install systemd-devel
-```
-
-openSUSE:
-```
-zypper install systemd-devel
-```
 
 <a name="general-configuration"/>
 
@@ -218,7 +194,6 @@ This collector will collect any type of logs from a log file, similar to executi
 | `log path` | The path to the log file to be monitored. |
 | `use inotify` | Select between inotify and file stat watchers (providing `libfluent-bit.so` has been built with inotify support). It defaults to `yes`. Set to `no` if abnormally high CPU usage is observed or if the log source is expected to constantly produce tens of thousands of logs per second. |
 
-
 <a name="collector-configuration-web-log"/>
 
 ### Web log
@@ -318,10 +293,12 @@ there is no parsing at all by default.
 To create a custom chart, the following key-value configuration options must be 
 added to the respective log source configuration section:
 
+```
 	custom 1 chart = identifier
 	custom 1 regex name = kernel
 	custom 1 regex = .*\bkernel\b.*
 	custom 1 ignore case = no
+```
 
 where the value denoted by:
 - `custom x chart` is the title of the chart.
@@ -667,13 +644,13 @@ For example, the following configuration will add 2 outputs to a `docker events`
 
 </a>
 
-1. I am building Netdata from source but the `FLB_SYSTEMD` plugin is not  available / does not work: 
+1. I am building Netdata from source or a Git checkout but the `FLB_SYSTEMD` plugin is not  available / does not work: 
 
 If during the Fluent Bit build step you are seeing the following message: 
 ```
 -- Could NOT find Journald (missing: JOURNALD_LIBRARY JOURNALD_INCLUDE_DIR)
 ``` 
-it means that the systemd development libraries are missing from your system. Please see [systemd collector](#requirements-systemd-collector).
+it means that the systemd development libraries are missing from your system. Please see [how to install them alongside other required packages](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md).
 
 2. Logs management and kernel log collection do not work at all and I am seeing the following error in `collector.log`:
 
