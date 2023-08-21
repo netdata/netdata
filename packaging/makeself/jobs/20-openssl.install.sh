@@ -43,6 +43,12 @@ fi
 
 run make -j "$(nproc)" install_sw
 
+if [ -d "/openssl-static/lib" ]; then
+  cd "/openssl-static" || exit 1
+  ln -s "lib" "lib64" || true
+  cd - || exit 1
+fi
+
 store_cache openssl "${NETDATA_MAKESELF_PATH}/tmp/openssl"
 
 perl configdata.pm --dump
