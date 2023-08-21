@@ -16,6 +16,7 @@
 	- [Web log](#collector-configuration-web-log)
 	- [Syslog socket](#collector-configuration-syslog)
 	- [Serial](#collector-configuration-serial)
+	- [MQTT](#collector-configuration-mqtt)
 - [Custom Charts](#custom-charts)
 - [Streaming logs to Netdata](#streaming-in)
 	- [Example: Systemd log streaming](#streaming-systemd)
@@ -60,6 +61,7 @@ The following log collectors are supported at the moment. The table will be upda
 | web log       	| `flb_web_log` 		| Collection of Apache or Nginx access logs.|
 | syslog socket   	| `flb_syslog`  		| Collection of RFC-3164 syslog logs by creating listening sockets.|
 | serial        	| `flb_serial`  		| Collection of logs from a serial interface.|
+| mqtt           	| `flb_mqtt`    		| Collection of MQTT messages over a TCP connection.|
 
 <a name="getting-started"/>
 
@@ -287,6 +289,20 @@ This collector will collect logs through a serial interface. See also documentat
 | `min bytes` | The minimum bytes the serial interface will wait to receive before it begines to process the log message.|
 | `separator` | An optional separator string to determine the end of a log message.|
 | `format` | Specify the format of the incoming data stream. The only option available is 'json'. Note that Format and Separator cannot be used at the same time.|
+
+<a name="collector-configuration-mqtt"/>
+
+### MQTT
+
+</a>
+
+This collector will collect MQTT data over a TCP connection, by spawning an MQTT server through Fluent Bit. See also documentation of [Fluent Bit MQTT input plugin](https://docs.fluentbit.io/manual/v/1.9-pre/pipeline/inputs/mqtt).
+
+|  Configuration Option | Description  |
+|      :------------:  	| ------------ |
+| `listen` | Specifies the network interface to bind.|
+| `port`   | Specifies the port to listen for incoming connections.|
+| `topic chart`   | Enable chart showing MQTT topic of incoming messages.|
 
 <a name="custom-charts"/>
 

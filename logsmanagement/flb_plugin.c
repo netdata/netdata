@@ -13,6 +13,7 @@
 #include "daemon/common.h"
 #include "libnetdata/libnetdata.h"
 #include "../fluent-bit/lib/msgpack-c/include/msgpack/unpack.h"
+#include "../fluent-bit/lib/msgpack-c/include/msgpack/object.h"
 #include "../fluent-bit/lib/monkey/include/monkey/mk_core/mk_list.h"
 #include <dlfcn.h>
 
@@ -109,6 +110,7 @@ static int (*flb_output)(flb_ctx_t *ctx, const char *output, struct flb_lib_out_
 static int (*flb_output_set)(flb_ctx_t *ctx, int ffd, ...);
 static msgpack_unpack_return (*dl_msgpack_unpack_next)(msgpack_unpacked* result, const char* data, size_t len, size_t* off);
 static void (*dl_msgpack_zone_free)(msgpack_zone* zone);
+static int (*dl_msgpack_object_print_buffer)(char *buffer, size_t buffer_size, msgpack_object o);
 
 static flb_ctx_t *ctx = NULL;
 static void *flb_lib_handle = NULL;
@@ -159,14 +161,19 @@ int flb_init(flb_srvc_config_t flb_srvc_config){
         collector_error("dlerror loading msgpack_unpack_next: %s", dl_error);
         rc = -1;
         goto do_return;
-    } 
+    }
     *(void **) (&dl_msgpack_zone_free) = dlsym(flb_lib_handle, "msgpack_zone_free");
     if ((dl_error = dlerror()) != NULL) {
         collector_error("dlerror loading msgpack_zone_free: %s", dl_error);
         rc = -1;
         goto do_return;
-    } 
-
+    }
+    *(void **) (&dl_msgpack_object_print_buffer) = dlsym(flb_lib_handle, "msgpack_object_print_buffer");
+    if ((dl_error = dlerror()) != NULL) {
+        collector_error("dlerror loading msgpack_object_print_buffer: %s", dl_error);
+        rc = -1;
+        goto do_return;
+    }
 
     ctx = flb_create();
     if (unlikely(!ctx)){
@@ -295,6 +302,14 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
     char timestamp_str[TIMESTAMP_MS_STR_SIZE] = "";
     msec_t timestamp = 0;
 
+    struct resizable_key_val_arr {
+        char **key;
+        char **val;
+        size_t *key_size;
+        size_t *val_size;
+        int size, max_size;
+    };
+
     /* FLB_WEB_LOG case */
     Log_line_parsed_t line_parsed = (Log_line_parsed_t) {0};
     /* FLB_WEB_LOG case end */
@@ -330,15 +345,16 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
     size_t docker_ev_action_size = 0;
     char *docker_ev_id = NULL;
     size_t docker_ev_id_size = 0;
-    static struct Docker_ev_attr {
-        char **key;
-        char **val;
-        size_t *key_size; 
-        size_t *val_size;
-        int size, max_size;
-    } docker_ev_attr = {0};
+    static struct resizable_key_val_arr docker_ev_attr = {0};
     docker_ev_attr.size = 0;
     /* FLB_DOCKER_EV case end */
+
+    /* FLB_MQTT case */
+    char *mqtt_topic = NULL;
+    size_t mqtt_topic_size = 0;
+    static char *mqtt_message = NULL;
+    static size_t mqtt_message_size_max = 0;
+    /* FLB_MQTT case end */
 
     size_t new_tmp_text_size = 0;
 
@@ -453,8 +469,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                     }
                     ++p;
                     continue;
-                }
-                /* FLB_TAIL, FLB_WEB_LOG and FLB_SERIAL case end */
+                } /* FLB_TAIL, FLB_WEB_LOG and FLB_SERIAL case end */
 
                 /* FLB_KMSG case */
                 if(p_file_info->log_type == FLB_KMSG){
@@ -614,7 +629,10 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                         // netdata_log_debug(D_LOGS_MANAG,"docker_ev_id: %.*s", docker_ev_id_size, docker_ev_id);
                     }
                     else if(!strncmp(p->key.via.str.ptr, "Actor", (size_t) p->key.via.str.size)){
-                        // netdata_log_debug(D_LOGS_MANAG,"msg key:[%.*s]val:[%.*s]", (int) p->key.via.str.size, p->key.via.str.ptr, (int) p->val.via.str.size, p->val.via.str.ptr);
+                        // netdata_log_debug(D_LOGS_MANAG, "msg key:[%.*s]val:[%.*s]", (int)   p->key.via.str.size, 
+                        //                                                                     p->key.via.str.ptr, 
+                        //                                                             (int)   p->val.via.str.size, 
+                        //                                                                     p->val.via.str.ptr);
                         if(likely(p->val.type == MSGPACK_OBJECT_MAP && p->val.via.map.size != 0)){
                             msgpack_object_kv* ac = p->val.via.map.ptr;
                             msgpack_object_kv* const ac_pend= p->val.via.map.ptr + p->val.via.map.size;
@@ -636,25 +654,19 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                                             if(unlikely(++docker_ev_attr.size > docker_ev_attr.max_size)){
                                                 docker_ev_attr.max_size = docker_ev_attr.size;
                                                 docker_ev_attr.key = reallocz(docker_ev_attr.key, 
-                                                                            docker_ev_attr.max_size * sizeof(char*));
+                                                                            docker_ev_attr.max_size * sizeof(char *));
                                                 docker_ev_attr.val = reallocz(docker_ev_attr.val, 
-                                                                            docker_ev_attr.max_size * sizeof(char*));   
+                                                                            docker_ev_attr.max_size * sizeof(char *));
                                                 docker_ev_attr.key_size = reallocz(docker_ev_attr.key_size, 
-                                                                            docker_ev_attr.max_size * sizeof(size_t));    
+                                                                            docker_ev_attr.max_size * sizeof(size_t));
                                                 docker_ev_attr.val_size = reallocz(docker_ev_attr.val_size, 
-                                                                            docker_ev_attr.max_size * sizeof(size_t));                                               
+                                                                            docker_ev_attr.max_size * sizeof(size_t));
                                             }
 
                                             docker_ev_attr.key[docker_ev_attr.size - 1] =  (char *) att->key.via.str.ptr;
                                             docker_ev_attr.val[docker_ev_attr.size - 1] =  (char *) att->val.via.str.ptr;
-                                            docker_ev_attr.key_size[docker_ev_attr.size - 1] = att->key.via.str.size;
-                                            docker_ev_attr.val_size[docker_ev_attr.size - 1] = att->val.via.str.size;
-
-                                            // netdata_log_debug(D_LOGS_MANAG, "att_key:%.*s, att_val:%.*s", 
-                                            // (int) docker_ev_attr.key_size[docker_ev_attr.size - 1], 
-                                            // docker_ev_attr.key[docker_ev_attr.size - 1],
-                                            // (int) docker_ev_attr.val_size[docker_ev_attr.size - 1], 
-                                            // docker_ev_attr.val[docker_ev_attr.size - 1]);
+                                            docker_ev_attr.key_size[docker_ev_attr.size - 1] = (size_t) att->key.via.str.size;
+                                            docker_ev_attr.val_size[docker_ev_attr.size - 1] = (size_t) att->val.via.str.size;
 
                                             att++;
                                             continue;
@@ -670,6 +682,29 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                     continue;
                 }
                 /* FLB_DOCKER_EV case end */
+
+                /* FLB_MQTT case */
+                if(p_file_info->log_type == FLB_MQTT){
+                    if(!strncmp(p->key.via.str.ptr, "topic", (size_t) p->key.via.str.size)){
+                        mqtt_topic = (char *) p->val.via.str.ptr;
+                        mqtt_topic_size = (size_t) p->val.via.str.size;
+
+                        while(0 == (message_size = dl_msgpack_object_print_buffer(mqtt_message, mqtt_message_size_max, *x)))
+                            mqtt_message = reallocz(mqtt_message, (mqtt_message_size_max += 10));
+
+                        new_tmp_text_size = message_size + 1; // +1 for '\n'
+
+                        m_assert(message_size, "message_size is 0");
+                        m_assert(mqtt_message, "mqtt_message is NULL");
+
+                        break; // watch out, MQTT requires a 'break' here, as we parse the entire 'x' msgpack_object
+                    }
+                    else m_assert(0, "missing mqtt topic");
+
+                    ++p;
+                    continue;
+                }
+
             } while(p < pend);
         } 
     }
@@ -760,10 +795,10 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                 }
 
                 if(likely(str)){
-                    char * const key = mallocz(str_len + 1);
+                    char *const key = mallocz(str_len + 1);
                     memcpy(key, str, str_len);
                     key[str_len] = '\0';
-                    Kernel_metrics_dict_item_t item = {.dim = NULL, .num = 1};
+                    metrics_dict_item_t item = {.dim = NULL, .num = 1};
                     dictionary_set_advanced(dict, key, str_len, &item, sizeof(item), NULL);
                 }
                 c = &c[sz];
@@ -1003,7 +1038,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
              * '(' and ')' characters, so no need to add or subtract */
         }
 
-        new_tmp_text_size += 1; // +1 fpr '\n' character at the end
+        new_tmp_text_size += 1; // +1 for '\n' character at the end
         
         /* Metrics extracted, now prepare circular buffer for write */
         // TODO: Fix: Metrics will still be collected if circ_buff_prepare_write() returns 0.
@@ -1054,6 +1089,30 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
         m_assert(tmp_item_off == new_tmp_text_size, "tmp_item_off should be == new_tmp_text_size");
         buff->in->text_size = new_tmp_text_size;
     } /* FLB_DOCKER_EV case end */
+
+    /* FLB_MQTT case */
+    else if(p_file_info->log_type == FLB_MQTT){
+        if(likely(mqtt_topic)){
+            char *const key = mallocz(mqtt_topic_size + 1);
+            memcpy(key, mqtt_topic, mqtt_topic_size);
+            key[mqtt_topic_size] = '\0';
+            metrics_dict_item_t item = {.dim = NULL, .num = 1};
+            dictionary_set_advanced(p_file_info->parser_metrics->mqtt->topic, key, mqtt_topic_size, &item, sizeof(item), NULL);
+
+            // TODO: Fix: Metrics will still be collected if circ_buff_prepare_write() returns 0.
+            if(unlikely(!circ_buff_prepare_write(buff, new_tmp_text_size))) goto skip_collect_and_drop_logs;
+
+            size_t tmp_item_off = buff->in->text_size;
+
+            memcpy(&buff->in->data[tmp_item_off], mqtt_message, message_size);
+            tmp_item_off += message_size;
+
+            buff->in->data[tmp_item_off++] = '\n';
+            m_assert(tmp_item_off == new_tmp_text_size, "tmp_item_off should be == new_tmp_text_size");
+            buff->in->text_size = new_tmp_text_size;
+        }
+        else m_assert(0, "missing mqtt topic");
+    }
 
 skip_collect_and_drop_logs:
     /* Following code is equivalent to msgpack_unpacked_destroy(&result) due 
@@ -1147,7 +1206,7 @@ int flb_add_input(struct File_info *const p_file_info){
             /* Set up systemd input */
             p_file_info->flb_input = flb_input(ctx, "systemd", NULL);
             if(p_file_info->flb_input < 0 ) return FLB_INPUT_ERROR;
-            if(!strcmp(p_file_info->filename, SYSTEMD_DEFAULT_PATH)){
+            if(!strcmp(p_file_info->filename, LOG_PATH_AUTO)){
                 if(flb_input_set(ctx, p_file_info->flb_input, 
                     "Tag", tag_s,
                     "Read_From_Tail", "On",
@@ -1245,6 +1304,24 @@ int flb_add_input(struct File_info *const p_file_info){
                 "Bitrate", serial_config->bitrate,
                 "Separator", serial_config->separator,
                 "Format", serial_config->format,
+                NULL) != 0) return FLB_INPUT_SET_ERROR;
+            
+            break;
+        }
+        case FLB_MQTT: {
+            netdata_log_debug(D_LOGS_MANAG, "Setting up FLB_MQTT collector");
+
+            Flb_socket_config_t *socket_config = (Flb_socket_config_t *) p_file_info->flb_config;
+            if(unlikely(!socket_config || !socket_config->listen || !*socket_config->listen ||
+                        !socket_config->port || !*socket_config->port)) return CONFIG_READ_ERROR;
+        
+            /* Set up MQTT input */
+            p_file_info->flb_input = flb_input(ctx, "mqtt", NULL);
+            if(p_file_info->flb_input < 0 ) return FLB_INPUT_ERROR;
+            if(flb_input_set(ctx, p_file_info->flb_input, 
+                "Tag", tag_s,
+                "Listen", socket_config->listen,
+                "Port", socket_config->port,
                 NULL) != 0) return FLB_INPUT_SET_ERROR;
             
             break;

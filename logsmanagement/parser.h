@@ -45,13 +45,16 @@ typedef enum{
     CHART_SYSLOG_SEVER =            1 << 17,
     CHART_SYSLOG_FACIL =            1 << 18,
 
-    /* FLB_KMSG */
+    /* FLB_KMSG charts */
     CHART_KMSG_SUBSYSTEM =          1 << 19,
     CHART_KMSG_DEVICE =             1 << 20,
 
     /* FLB_DOCKER_EV charts */
     CHART_DOCKER_EV_TYPE =          1 << 21,
-    CHART_DOCKER_EV_ACTION =        1 << 22
+    CHART_DOCKER_EV_ACTION =        1 << 22,
+
+    /* FLB_MQTT charts*/
+    CHART_MQTT_TOPIC =              1 << 23
 
 } chart_type_t;
 
@@ -278,10 +281,10 @@ Web_log_parser_config_t *auto_detect_web_log_parser_config(char *line, const cha
 
 #define SYSLOG_SEVER_ARR_SIZE 9         /**< Number of severity levels plus 1 for 'unknown' **/
 
-typedef struct kernel_metrics_dict_item{
+typedef struct metrics_dict_item{
     RRDDIM *dim;
     int num;
-} Kernel_metrics_dict_item_t;
+} metrics_dict_item_t;
 
 typedef struct kernel_metrics{
     unsigned int sever[SYSLOG_SEVER_ARR_SIZE];      /**< Syslog severity, 0-7 plus 1 space for 'unknown' **/
@@ -367,6 +370,17 @@ typedef struct docker_ev_metrics{
 
 
 /* -------------------------------------------------------------------------- */
+/*                              MQTT metrics                                  */
+/* -------------------------------------------------------------------------- */
+
+typedef struct mqtt_metrics{
+    DICTIONARY *topic;
+} Mqtt_metrics_t;
+
+/* -------------------------------------------------------------------------- */
+
+
+/* -------------------------------------------------------------------------- */
 /*                         Regex / Keyword search                             */
 /* -------------------------------------------------------------------------- */
 
@@ -411,6 +425,7 @@ struct log_parser_metrics{
         Kernel_metrics_t *kernel;
         Systemd_metrics_t *systemd;
         Docker_ev_metrics_t *docker_ev;
+        Mqtt_metrics_t *mqtt;
     };	
     Log_parser_cus_metrics_t **parser_cus; /**< Array storing custom chart metrics structs **/
 } ;

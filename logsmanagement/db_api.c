@@ -570,7 +570,7 @@ int db_init() {
                       "Log_Source_Path  TEXT        NOT NULL,"
                       "Type             INTEGER     NOT NULL,"
                       "DB_Dir           TEXT        NOT NULL,"
-                      "UNIQUE(Stream_Tag, Log_Source_Path) "
+                      "UNIQUE(Stream_Tag, DB_Dir) "
                       ");",
                       0, 0, &err_msg);
     if (unlikely(SQLITE_OK != rc)) {
@@ -582,7 +582,7 @@ int db_init() {
     sqlite3_stmt *stmt_search_if_log_source_exists;
     rc = sqlite3_prepare_v2(main_db,
                             "SELECT COUNT(*), Id, DB_Dir FROM " MAIN_COLLECTIONS_TABLE
-                            " WHERE Stream_Tag = ? AND Log_Source_Path = ? ;",
+                            " WHERE Stream_Tag = ? AND Log_Source_Path = ? AND Type = ? ;",
                             -1, &stmt_search_if_log_source_exists, NULL);
     if (unlikely(SQLITE_OK != rc)){
         throw_error(MAIN_DB, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
@@ -632,6 +632,7 @@ int db_init() {
             if(unlikely(
                     SQLITE_OK != (rc = sqlite3_bind_text(stmt_search_if_log_source_exists, 1, p_file_info->stream_guid, -1, NULL)) ||
                     SQLITE_OK != (rc = sqlite3_bind_text(stmt_search_if_log_source_exists, 2, p_file_info->filename, -1, NULL)) ||
+                    SQLITE_OK != (rc = sqlite3_bind_int(stmt_search_if_log_source_exists, 3, p_file_info->log_type)) ||
                     /* COUNT(*) query should always return SQLITE_ROW */
                     SQLITE_ROW != (rc = sqlite3_step(stmt_search_if_log_source_exists)))){
                 throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);

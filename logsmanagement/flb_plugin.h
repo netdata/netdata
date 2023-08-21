@@ -10,8 +10,7 @@
 #include "file_info.h"
 #include <uv.h>
 
-#define KMSG_DEFAULT_PATH "kmsg_default"
-#define SYSTEMD_DEFAULT_PATH "systemd_default"
+#define LOG_PATH_AUTO "auto"
 #define DOCKER_EV_DEFAULT_PATH "/var/run/docker.sock"
 
 typedef struct {

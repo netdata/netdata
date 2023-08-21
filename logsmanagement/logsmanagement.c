@@ -57,7 +57,8 @@ static struct Chart_meta chart_types[] = {
     {.type = FLB_SYSTEMD,   .init = systemd_chart_init,   .update = systemd_chart_update},
     {.type = FLB_DOCKER_EV, .init = docker_ev_chart_init, .update = docker_ev_chart_update},
     {.type = FLB_SYSLOG,    .init = systemd_chart_init,   .update = systemd_chart_update},
-    {.type = FLB_SERIAL,    .init = generic_chart_init,   .update = generic_chart_update}
+    {.type = FLB_SERIAL,    .init = generic_chart_init,   .update = generic_chart_update},
+    {.type = FLB_MQTT,      .init = mqtt_chart_init,      .update = mqtt_chart_update}
 };
 
 g_logs_manag_config_t g_logs_manag_config = {
@@ -91,7 +92,7 @@ static logs_manag_db_mode_t db_mode_str_to_db_mode(const char *const db_mode_str
 }
 
 static bool metrics_dict_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused){
-    ((Kernel_metrics_dict_item_t *)old_value)->num += ((Kernel_metrics_dict_item_t *)new_value)->num;
+    ((metrics_dict_item_t *)old_value)->num += ((metrics_dict_item_t *)new_value)->num;
     return true;
 }
 
@@ -147,20 +148,34 @@ static void p_file_info_destroy(struct File_info *p_file_info){
     if(p_file_info->parser_metrics){
         switch(p_file_info->log_type){
             case FLB_WEB_LOG: {
-                freez(p_file_info->parser_metrics->web_log);
+                if(p_file_info->parser_metrics->web_log)
+                    freez(p_file_info->parser_metrics->web_log);
                 break;
             }
             case FLB_KMSG: {
-                freez(p_file_info->parser_metrics->kernel);
+                if(p_file_info->parser_metrics->kernel){
+                    dictionary_destroy(p_file_info->parser_metrics->kernel->subsystem);
+                    dictionary_destroy(p_file_info->parser_metrics->kernel->device);
+                    freez(p_file_info->parser_metrics->kernel);
+                }
                 break;
             }
             case FLB_SYSTEMD: 
             case FLB_SYSLOG: {
-                freez(p_file_info->parser_metrics->systemd);
+                if(p_file_info->parser_metrics->systemd)
+                    freez(p_file_info->parser_metrics->systemd);
                 break;
             }
             case FLB_DOCKER_EV: {
-                freez(p_file_info->parser_metrics->docker_ev);
+                if(p_file_info->parser_metrics->docker_ev)
+                    freez(p_file_info->parser_metrics->docker_ev);
+                break;
+            }
+            case FLB_MQTT: {
+                if(p_file_info->parser_metrics->mqtt){
+                    dictionary_destroy(p_file_info->parser_metrics->mqtt->topic);
+                    freez(p_file_info->parser_metrics->mqtt);
+                }
                 break;
             }
             default:
@@ -425,6 +440,7 @@ static void logs_management_init(uv_loop_t *main_loop,
         else if (!strcasecmp(type, "flb_docker_events")) p_file_info->log_type = FLB_DOCKER_EV;
         else if (!strcasecmp(type, "flb_syslog")) p_file_info->log_type = FLB_SYSLOG;
         else if (!strcasecmp(type, "flb_serial")) p_file_info->log_type = FLB_SERIAL;
+        else if (!strcasecmp(type, "flb_mqtt")) p_file_info->log_type = FLB_MQTT;
         else p_file_info->log_type = FLB_TAIL;
     }
     freez(type);
@@ -457,17 +473,19 @@ static void logs_management_init(uv_loop_t *main_loop,
     /* -------------------------------------------------------------------------
      * Read log path configuration and check if it is valid.
      * ------------------------------------------------------------------------- */
-    p_file_info->filename = appconfig_get(&log_management_config, config_section->name, "log path", "auto");
-    m_assert(p_file_info->filename, "appconfig_get() should never return log path == NULL");
+    p_file_info->filename = appconfig_get(&log_management_config, config_section->name, "log path", LOG_PATH_AUTO);
     if( /* path doesn't matter when log source is not local */
         (p_file_info->log_source == LOG_SOURCE_LOCAL) &&
         
-        /* FLB_SYSLOG is special case, may or may not require path */
+        /* FLB_SYSLOG is special case, may or may not require a path */
         (p_file_info->log_type != FLB_SYSLOG) &&
+
+        /* FLB_MQTT is special case, does not require a path */
+        (p_file_info->log_type != FLB_MQTT) &&
         
         (!p_file_info->filename /* Sanity check */ || 
          !*p_file_info->filename || 
-         !strcmp(p_file_info->filename, "auto") || 
+         !strcmp(p_file_info->filename, LOG_PATH_AUTO) || 
          access(p_file_info->filename, R_OK)
         )){ 
 
@@ -545,10 +563,8 @@ static void logs_management_init(uv_loop_t *main_loop,
                 }
                 break;
             case FLB_KMSG:
-                p_file_info->filename = strdupz(KMSG_DEFAULT_PATH);
-                break;
             case FLB_SYSTEMD:
-                p_file_info->filename = strdupz(SYSTEMD_DEFAULT_PATH);
+                p_file_info->filename = strdupz(LOG_PATH_AUTO);
                 break;
             case FLB_DOCKER_EV:
                 if(access(DOCKER_EV_DEFAULT_PATH, R_OK)){
@@ -665,7 +681,7 @@ static void logs_management_init(uv_loop_t *main_loop,
      * ------------------------------------------------------------------------- */
     
     if(p_file_info->log_type == FLB_TAIL || p_file_info->log_type == FLB_WEB_LOG){
-        Flb_tail_config_t *tail_config = (Flb_tail_config_t *) callocz(1, sizeof(Flb_tail_config_t));
+        Flb_tail_config_t *tail_config = callocz(1, sizeof(Flb_tail_config_t));
         if(appconfig_get_boolean(&log_management_config, config_section->name, "use inotify", CONFIG_BOOLEAN_YES))
             tail_config->use_inotify = 1;
         collector_info( "[%s]: use inotify = %s",  p_file_info->chart_name, tail_config->use_inotify? "yes" : "no");
@@ -675,7 +691,7 @@ static void logs_management_init(uv_loop_t *main_loop,
     
     if(p_file_info->log_type == FLB_WEB_LOG){
         /* Check if a valid web log format configuration is detected */
-        char *log_format = appconfig_get(&log_management_config, config_section->name, "log format", "auto");
+        char *log_format = appconfig_get(&log_management_config, config_section->name, "log format", LOG_PATH_AUTO);
         const char delimiter = ' '; // TODO!!: TO READ FROM CONFIG
         collector_info("[%s]: log format = %s", p_file_info->chart_name, log_format ? log_format : "NULL!");
 
@@ -683,7 +699,7 @@ static void logs_management_init(uv_loop_t *main_loop,
             * try log format autodetection based on last log file line.
             * TODO 1: Add another case in OR where log_format is compared with a valid reg exp.
             * TODO 2: Set default log format and delimiter if not found in config? Or auto-detect? */ 
-        if(!log_format || !*log_format || !strcmp(log_format, "auto")){ 
+        if(!log_format || !*log_format || !strcmp(log_format, LOG_PATH_AUTO)){ 
             collector_info("[%s]: Attempting auto-detection of log format", p_file_info->chart_name);
             char *line = read_last_line(p_file_info->filename, 0);
             if(!line){
@@ -786,7 +802,7 @@ static void logs_management_init(uv_loop_t *main_loop,
     }
     else if(p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG){
         if(p_file_info->log_type == FLB_SYSLOG){
-            Syslog_parser_config_t *syslog_config = (Syslog_parser_config_t *) callocz(1, sizeof(Syslog_parser_config_t));
+            Syslog_parser_config_t *syslog_config = callocz(1, sizeof(Syslog_parser_config_t));
 
             /* Read syslog format */
             syslog_config->log_format = appconfig_get(  &log_management_config, 
@@ -800,7 +816,7 @@ static void logs_management_init(uv_loop_t *main_loop,
                 return p_file_info_destroy(p_file_info);
             }
 
-            syslog_config->socket_config = (Flb_socket_config_t *) callocz(1, sizeof(Flb_socket_config_t));
+            syslog_config->socket_config = callocz(1, sizeof(Flb_socket_config_t));
 
             /* Read syslog socket mode
              * see also https://docs.fluentbit.io/manual/pipeline/inputs/syslog#configuration-parameters */
@@ -814,7 +830,7 @@ static void logs_management_init(uv_loop_t *main_loop,
              * if (mode == udp) or (mode == tcp). */
             if( !strcasecmp(syslog_config->socket_config->mode, "unix_udp") || 
                 !strcasecmp(syslog_config->socket_config->mode, "unix_tcp")){
-                if(!p_file_info->filename || !*p_file_info->filename || !strcasecmp(p_file_info->filename, "auto")){
+                if(!p_file_info->filename || !*p_file_info->filename || !strcasecmp(p_file_info->filename, LOG_PATH_AUTO)){
                     // freez(syslog_config->socket_config->mode);
                     freez(syslog_config->socket_config);
                     freez(syslog_config->log_format);
@@ -866,7 +882,7 @@ static void logs_management_init(uv_loop_t *main_loop,
         }
     }
     else if(p_file_info->log_type == FLB_SERIAL){
-        Flb_serial_config_t *serial_config = (Flb_serial_config_t *) callocz(1, sizeof(Flb_serial_config_t));
+        Flb_serial_config_t *serial_config = callocz(1, sizeof(Flb_serial_config_t));
 
         serial_config->bitrate = appconfig_get(&log_management_config, config_section->name, "bitrate", "115200");
         serial_config->min_bytes = appconfig_get(&log_management_config, config_section->name, "min bytes", "1");
@@ -874,6 +890,18 @@ static void logs_management_init(uv_loop_t *main_loop,
         serial_config->format = appconfig_get(&log_management_config, config_section->name, "format", "");
 
         p_file_info->flb_config = serial_config;
+    }
+    else if(p_file_info->log_type == FLB_MQTT){
+        Flb_socket_config_t *socket_config = callocz(1, sizeof(Flb_socket_config_t));
+
+        socket_config->listen = appconfig_get(&log_management_config, config_section->name, "listen", "0.0.0.0");
+        socket_config->port = appconfig_get(&log_management_config, config_section->name, "port", "1883");
+
+        p_file_info->flb_config = socket_config;
+
+        if(appconfig_get_boolean(&log_management_config, config_section->name, "topic chart", CONFIG_BOOLEAN_NO)) {
+            p_file_info->parser_config->chart_config |= CHART_MQTT_TOPIC;
+        }
     }
 
 
@@ -905,6 +933,14 @@ static void logs_management_init(uv_loop_t *main_loop,
         }
         case FLB_DOCKER_EV: {
             p_file_info->parser_metrics->docker_ev = callocz(1, sizeof(Docker_ev_metrics_t));
+            break;
+        }
+        case FLB_MQTT: {
+            p_file_info->parser_metrics->mqtt = callocz(1, sizeof(Mqtt_metrics_t));
+            p_file_info->parser_metrics->mqtt->topic = dictionary_create(   DICT_OPTION_SINGLE_THREADED | 
+                                                                            DICT_OPTION_NAME_LINK_DONT_CLONE | 
+                                                                            DICT_OPTION_DONT_OVERWRITE_VALUE);
+            dictionary_register_conflict_callback(p_file_info->parser_metrics->mqtt->topic, metrics_dict_conflict_cb, NULL);
             break;
         }
         default:
@@ -1149,11 +1185,13 @@ static void logsmanagement_main_cleanup(void *ptr) {
 
     uv_walk(thread_data->main_loop, on_walk_cleanup, NULL);
     while(0 != uv_run(thread_data->main_loop, UV_RUN_ONCE));
-    m_assert(0 == uv_loop_close(thread_data->main_loop), "uv_loop_close() result not 0");
+    if(uv_loop_close(thread_data->main_loop))
+        m_assert(0, "uv_loop_close() result not 0");
     freez(thread_data->main_loop);
 
     if(p_file_infos_arr){
-        for(int i = 0; i < p_file_infos_arr->count; i++) p_file_info_destroy(p_file_infos_arr->data[i]);
+        for(int i = 0; i < p_file_infos_arr->count; i++) 
+            p_file_info_destroy(p_file_infos_arr->data[i]);
         freez(p_file_infos_arr);
         p_file_infos_arr = NULL;
     }

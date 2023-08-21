@@ -17,7 +17,7 @@
 /* WARNING: DO NOT CHANGED THE ORDER OF LOG_SRC_TYPES, ONLY APPEND NEW TYPES */
 #define LOG_SRC_TYPES   LST(FLB_TAIL)LST(FLB_WEB_LOG)LST(FLB_KMSG) \
                         LST(FLB_SYSTEMD)LST(FLB_DOCKER_EV)LST(FLB_SYSLOG) \
-                        LST(FLB_SERIAL)
+                        LST(FLB_SERIAL)LST(FLB_MQTT)
 #define LST(x) x,
 enum log_src_type_t {LOG_SRC_TYPES};
 #undef LST
@@ -135,11 +135,6 @@ struct File_info {
     void *flb_config;                               /**< Any other Fluent-Bit configuration specific to this log source only **/
     uv_mutex_t flb_tmp_buff_mut;
     uv_timer_t flb_tmp_buff_cpy_timer;
-    // TODO: The following structs need to be converted to pointers, to reduce memory consumption when not used
-    Web_log_metrics_t flb_tmp_web_log_metrics;      /**< Temporarily store Web log metrics after each extraction in flb_collect_logs_cb(), until they are synced to parser_metrics->web_log **/
-    Kernel_metrics_t flb_tmp_kernel_metrics;        /**< Temporarily store Kernel log metrics after each extraction in flb_collect_logs_cb(), until they are synced to parser_metrics->kernel **/
-    Systemd_metrics_t flb_tmp_systemd_metrics;      /**< Temporarily store Systemd metrics after each extraction in flb_collect_logs_cb(), until they are synced to parser_metrics->systemd **/
-    Docker_ev_metrics_t flb_tmp_docker_ev_metrics;  /**< Temporarily store Docker Events metrics after each extraction in flb_collect_logs_cb(), until they are synced to parser_metrics->docker_ev **/
     Flb_output_config_t *flb_outputs;               /**< Linked list of Fluent Bit outputs for this log source **/
 
 };

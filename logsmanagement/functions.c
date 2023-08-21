@@ -19,11 +19,9 @@
     "   sources\n" \
     "      returns a list of available log sources to be queried\n\n" \
     "   "LOGS_QRY_KW_START_TIME":NUMBER\n" \
-    "      start timestamp in ms to search from (inclusive), default: " \
-            "N/A\n\n" \
+    "      start timestamp in ms to search from (inclusive)\n\n" \
     "   "LOGS_QRY_KW_END_TIME":NUMBER\n" \
-    "      end timestamp in ms to search until (inclusive), default: " \
-            "N/A\n\n" \
+    "      end timestamp in ms to search until (inclusive), if < '"LOGS_QRY_KW_START_TIME"', query will search timestamps in reverse order\n\n" \
     "   "LOGS_QRY_KW_QUOTA":NUMBER\n" \
     "      max size of logs to return (in MiB), default: " \
             LOGS_MANAG_STR(LOGS_MANAG_QUERY_QUOTA_DEFAULT) "\n\n" \

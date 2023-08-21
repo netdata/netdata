@@ -15,6 +15,7 @@ struct Chart_meta;
 #include "rrd_api_kernel.h"
 #include "rrd_api_systemd.h"
 #include "rrd_api_docker_ev.h"
+#include "rrd_api_mqtt.h"
 
 #define CHART_TITLE_TOTAL_COLLECTED_LOGS "Total collected log records"
 #define CHART_TITLE_RATE_COLLECTED_LOGS "Rate of collected log records"
@@ -40,6 +41,7 @@ struct Chart_meta {
         chart_data_kernel_t     *chart_data_kernel;
         chart_data_systemd_t    *chart_data_systemd;
         chart_data_docker_ev_t  *chart_data_docker_ev;
+        chart_data_mqtt_t       *chart_data_mqtt;
     };
 
     Chart_data_cus_t **chart_data_cus_arr;

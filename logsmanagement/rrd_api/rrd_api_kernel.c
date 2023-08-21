@@ -158,7 +158,7 @@ void kernel_chart_update(struct File_info *p_file_info){
 
         /* Subsystem - update */
         if(p_file_info->parser_config->chart_config & CHART_KMSG_SUBSYSTEM){
-            Kernel_metrics_dict_item_t *it;
+            metrics_dict_item_t *it;
             if(likely(chart_data->st_subsys->counter_done)){
 
                 tv.tv_sec = chart_data->tv.tv_sec - lag_in_sec;
@@ -189,7 +189,7 @@ void kernel_chart_update(struct File_info *p_file_info){
 
         /* Device - update */
         if(p_file_info->parser_config->chart_config & CHART_KMSG_DEVICE){
-            Kernel_metrics_dict_item_t *it;
+            metrics_dict_item_t *it;
             if(likely(chart_data->st_device->counter_done)){
 
                 tv.tv_sec = chart_data->tv.tv_sec - lag_in_sec;

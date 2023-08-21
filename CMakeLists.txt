@@ -1068,6 +1068,8 @@ set(LOGSMANAGEMENT_FILES
         logsmanagement/rrd_api/rrd_api_generic.h
         logsmanagement/rrd_api/rrd_api_kernel.c
         logsmanagement/rrd_api/rrd_api_kernel.h
+        logsmanagement/rrd_api/rrd_api_mqtt.c
+        logsmanagement/rrd_api/rrd_api_mqtt.h
         logsmanagement/rrd_api/rrd_api_stats.c
         logsmanagement/rrd_api/rrd_api_stats.h
         logsmanagement/rrd_api/rrd_api_systemd.c
