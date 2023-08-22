@@ -1,5 +1,8 @@
 # [[ entry.meta.monitored_instance.name ]]
 
+Plugin: [[ entry.meta.plugin_name ]]
+Module: [[ entry.meta.module_name ]]
+
 ## Overview
 
 [[ entry.overview.data_collection.metrics_description ]]
