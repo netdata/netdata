@@ -585,7 +585,6 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
 
         int param = 0;
         alarm_config.alarm = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
-        alarm_config.alarm = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
         alarm_config.tmpl = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
         alarm_config.on_chart = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
         alarm_config.classification = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
