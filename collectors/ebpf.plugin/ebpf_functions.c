@@ -521,12 +521,17 @@ static void ebpf_socket_clean_judy_array_unsafe()
     if (!ebpf_socket_pid.index.JudyHSArray)
         return;
 
-    Pvoid_t *pid_value;
-    Word_t local_pid = 0;
-    bool first_pid = true;
+    Pvoid_t *pid_value, *socket_value;
+    Word_t local_pid = 0, local_socket = 0;
+    bool first_pid = true, first_socket = true;
     while ((pid_value = JudyLFirstThenNext(ebpf_socket_pid.index.JudyHSArray, &local_pid, &first_pid))) {
         netdata_ebpf_socket_judy_connections_t *pid_ptr = (netdata_ebpf_socket_judy_connections_t *)*pid_value;
+        while ((socket_value = JudyLFirstThenNext(pid_ptr->index.JudyHSArray, &local_socket, &first_socket))) {
+            netdata_socket_plus_t *socket_clean = *socket_value;
+            aral_freez(aral_socket_table, socket_clean);
+        }
         JudyLFreeArray(&pid_ptr->index.JudyHSArray, PJE0);
+        aral_freez(ebpf_socket_pid.pid_table, pid_ptr);
     }
     JudyLFreeArray(&ebpf_socket_pid.index.JudyHSArray, PJE0);
     ebpf_socket_pid.index.JudyHSArray = NULL;

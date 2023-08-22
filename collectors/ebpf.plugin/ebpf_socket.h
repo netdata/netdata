@@ -341,6 +341,7 @@ typedef struct netdata_ebpf_socket_judy_connections {
 } netdata_ebpf_socket_judy_connections_t;
 
 extern netdata_ebpf_socket_judy_pid_t ebpf_socket_pid;
+extern ARAL *aral_socket_table;
 
 /**
  * Index used together previous structure
