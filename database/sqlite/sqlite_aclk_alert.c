@@ -44,7 +44,7 @@ static inline bool is_event_from_alert_variable_config(uint32_t unique_id, uuid_
 
     rc = sqlite3_bind_int(res, 1, (int) unique_id);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id for checking alert variable.");
+        error_report("Failed to bind unique_id for checking alert variable.");
         goto fail;
     }
 
