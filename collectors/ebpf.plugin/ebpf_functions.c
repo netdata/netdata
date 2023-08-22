@@ -699,12 +699,21 @@ static void ebpf_function_socket_manipulation(const char *transaction,
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        // Cleanup when we already had a thread running
+        rw_spinlock_read_lock(&ebpf_socket_pid.index.rw_spinlock);
+        ebpf_socket_clean_judy_array_unsafe();
+        rw_spinlock_read_unlock(&ebpf_socket_pid.index.rw_spinlock);
+
         if (ebpf_function_start_thread(em, period)) {
             ebpf_function_error(transaction,
                                 HTTP_RESP_INTERNAL_SERVER_ERROR,
                                 "Cannot start thread.");
             pthread_mutex_unlock(&ebpf_exit_cleanup);
             return;
+        }
+    } else {
+        if (period < 0 && em->lifetime < EBPF_NON_FUNCTION_LIFE_TIME) {
+            em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
         }
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
