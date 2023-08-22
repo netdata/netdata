@@ -716,13 +716,6 @@ STORAGE_ENGINE* storage_engine_find(const char* name);
 
 #define rrddim_foreach_read(rd, st) \
     dfe_start_read((st)->rrddim_root_index, rd)
-
-#define rrddim_foreach_write(rd, st) \
-    dfe_start_write((st)->rrddim_root_index, rd)
-
-#define rrddim_foreach_reentrant(rd, st) \
-    dfe_start_reentrant((st)->rrddim_root_index, rd)
-
 #define rrddim_foreach_done(rd) \
     dfe_done(rd)
 
@@ -1094,8 +1087,6 @@ struct alarm_entry {
 #define ae_chart_context(ae) string2str((ae)->chart_context)
 #define ae_family(ae) string2str((ae)->family)
 #define ae_classification(ae) string2str((ae)->classification)
-#define ae_component(ae) string2str((ae)->component)
-#define ae_type(ae) string2str((ae)->type)
 #define ae_exec(ae) string2str((ae)->exec)
 #define ae_recipient(ae) string2str((ae)->recipient)
 #define ae_source(ae) string2str((ae)->source)
@@ -1115,13 +1106,13 @@ typedef struct alarm_log {
 } ALARM_LOG;
 
 typedef struct health {
-    unsigned int health_enabled;                   // 1 when this host has health enabled
     time_t health_delay_up_to;                     // a timestamp to delay alarms processing up to
     STRING *health_default_exec;                   // the full path of the alarms notifications program
     STRING *health_default_recipient;              // the default recipient for all alarms
-    size_t health_log_entries_written;             // the number of alarm events written to the alarms event log
+    int health_log_entries_written;                // the number of alarm events written to the alarms event log
     uint32_t health_default_warn_repeat_every;     // the default value for the interval between repeating warning notifications
     uint32_t health_default_crit_repeat_every;     // the default value for the interval between repeating critical notifications
+    unsigned int health_enabled;                   // 1 when this host has health enabled
 } HEALTH;
 
 // ----------------------------------------------------------------------------
