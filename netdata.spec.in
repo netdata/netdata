@@ -136,24 +136,24 @@ Requires(pre): /usr/sbin/useradd
 # makes it impossible to properly test the packages prior to upload,
 # so we just skip depending on them on CentOS 7.
 %if 0%{?_have_ebpf}
-Requires: netdata-plugin-ebpf
+Requires: netdata-plugin-ebpf = %{version}
 %endif
-Requires: netdata-plugin-apps
-Requires: netdata-plugin-pythond
-Requires: netdata-plugin-go
-Requires: netdata-plugin-debugfs
-Requires: netdata-plugin-chartsd
-Requires: netdata-plugin-slabinfo
-Requires: netdata-plugin-perf
+Requires: netdata-plugin-apps = %{version}
+Requires: netdata-plugin-pythond = %{version}
+Requires: netdata-plugin-go = %{version}
+Requires: netdata-plugin-debugfs = %{version}
+Requires: netdata-plugin-chartsd = %{version}
+Requires: netdata-plugin-slabinfo = %{version}
+Requires: netdata-plugin-perf = %{version}
 %if 0%{?_have_nfacct}
-Requires: netdata-plugin-nfacct
+Requires: netdata-plugin-nfacct = %{version}
 %endif
 %if 0%{?_have_freeipmi} && 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
-Suggests: netdata-plugin-freeipmi
+Suggests: netdata-plugin-freeipmi = %{version}
 %endif
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
-Suggests: netdata-plugin-cups
-Recommends: netdata-plugin-systemd-journal
+Suggests: netdata-plugin-cups = %{version}
+Recommends: netdata-plugin-systemd-journal = %{version}
 %endif
 
 
@@ -919,6 +919,7 @@ fi
 %caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/systemd-journal.plugin
 
 %changelog
+* Mon Aug 21 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-22
 * Thu Aug 03 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-21
 - Added systemd-journal plugin handling
 * Wed Jun 14 2023 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-20

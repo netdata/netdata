@@ -36,15 +36,15 @@ Architecture: any
 Depends: openssl,
          ${misc:Depends},
          ${shlibs:Depends},
-         netdata-plugin-ebpf [amd64],
-         netdata-plugin-apps,
-         netdata-plugin-pythond,
-         netdata-plugin-go,
-         netdata-plugin-debugfs,
-         netdata-plugin-nfacct,
-         netdata-plugin-chartsd,
-         netdata-plugin-slabinfo,
-         netdata-plugin-perf
+         netdata-plugin-ebpf (= ${source:Version}) [amd64],
+         netdata-plugin-apps (= ${source:Version}),
+         netdata-plugin-pythond (= ${source:Version}),
+         netdata-plugin-go (= ${source:Version}),
+         netdata-plugin-debugfs (= ${source:Version}),
+         netdata-plugin-nfacct (= ${source:Version}),
+         netdata-plugin-chartsd (= ${source:Version}),
+         netdata-plugin-slabinfo (= ${source:Version}),
+         netdata-plugin-perf (= ${source:Version})
 Pre-Depends: adduser,
              dpkg (>= 1.17.14),
              libcap2-bin (>=1:2.0),
@@ -53,9 +53,9 @@ Conflicts: netdata-core,
            netdata-plugins-bash,
            netdata-plugins-python,
            netdata-web
-Suggests: netdata-plugin-cups,
-          netdata-plugin-freeipmi
-Recommends: netdata-plugin-systemd-journal
+Suggests: netdata-plugin-cups (= ${source:Version}),
+          netdata-plugin-freeipmi (= ${source:Version})
+Recommends: netdata-plugin-systemd-journal (= ${source:Version})
 Description: real-time charts for system monitoring
  Netdata is a daemon that collects data in realtime (per second)
  and presents a web site to view and analyze them. The presentation
