@@ -1157,6 +1157,7 @@ void *health_main(void *ptr) {
                                                                     RRDCALC_STATUS_REMOVED,
                                                                     rc->source,
                                                                     rc->units,
+                                                                    rc->summary,
                                                                     rc->info,
                                                                     0,
                                                                     rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0);
@@ -1424,6 +1425,7 @@ void *health_main(void *ptr) {
                                                                     status,
                                                                     rc->source,
                                                                     rc->units,
+                                                                    rc->summary,
                                                                     rc->info,
                                                                     rc->delay_last,
                                                                     (
@@ -1511,6 +1513,7 @@ void *health_main(void *ptr) {
                                                                     rc->status,
                                                                     rc->source,
                                                                     rc->units,
+                                                                    rc->summary,
                                                                     rc->info,
                                                                     rc->delay_last,
                                                                     (

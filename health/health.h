@@ -84,6 +84,7 @@ ALARM_ENTRY* health_create_alarm_entry(
     RRDCALC_STATUS new_status,
     STRING *source,
     STRING *units,
+    STRING *summary,
     STRING *info,
     int delay,
     HEALTH_ENTRY_FLAGS flags);

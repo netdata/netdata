@@ -1002,6 +1002,7 @@ struct alarm_entry {
 
     STRING *source;
     STRING *units;
+    STRING *summary;
     STRING *info;
 
     NETDATA_DOUBLE old_value;
@@ -1038,6 +1039,7 @@ struct alarm_entry {
 #define ae_recipient(ae) string2str((ae)->recipient)
 #define ae_source(ae) string2str((ae)->source)
 #define ae_units(ae) string2str((ae)->units)
+#define ae_summary(ae) string2str((ae)->summary)
 #define ae_info(ae) string2str((ae)->info)
 #define ae_old_value_string(ae) string2str((ae)->old_value_string)
 #define ae_new_value_string(ae) string2str((ae)->new_value_string)
