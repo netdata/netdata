@@ -158,6 +158,7 @@ public:
             worker_set_metric(WORKER_JOB_METRIC_DURATION_TO_BACKFILL, RemainingSeconds);
 
             if (CollectionTV.tv_sec >= NowTV.tv_sec) {
+                fatal("GVD: All done!!!");
                 worker_is_idle();
                 heartbeat_next(&HB, UpdateEvery * USEC_PER_SEC);
             }
@@ -199,10 +200,10 @@ extern "C" void *profile_main(void *ptr) {
         UpdateEvery = localhost->rrd_update_every;
 
     // pick low-default values, in case this plugin is ever enabled accidentaly.
-    size_t NumThreads = config_get_number(CONFIG_SECTION_PROFILE, "number of threads", 2);
-    size_t NumCharts = config_get_number(CONFIG_SECTION_PROFILE, "number of charts", 2);
-    size_t NumDimsPerChart = config_get_number(CONFIG_SECTION_PROFILE, "number of dimensions per chart", 2);
-    size_t SecondsToBackfill = config_get_number(CONFIG_SECTION_PROFILE, "seconds to backfill", 10 * 60);
+    size_t NumThreads = config_get_number(CONFIG_SECTION_PROFILE, "number of threads", 1);
+    size_t NumCharts = config_get_number(CONFIG_SECTION_PROFILE, "number of charts", 1);
+    size_t NumDimsPerChart = config_get_number(CONFIG_SECTION_PROFILE, "number of dimensions per chart", 1);
+    size_t SecondsToBackfill = config_get_number(CONFIG_SECTION_PROFILE, "seconds to backfill", 365 * 24 * 3600);
 
     std::vector<Profiler> Profilers;
 

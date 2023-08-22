@@ -6,7 +6,7 @@
 static void rrdhost_streaming_sender_structures_init(RRDHOST *host);
 
 bool dbengine_enabled = false; // will become true if and when dbengine is initialized
-size_t storage_tiers = 3;
+size_t storage_tiers = 1;
 bool use_direct_io = true;
 size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = { 1, 60, 60, 60, 60 };
 RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS] = { RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW };

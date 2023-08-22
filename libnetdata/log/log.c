@@ -608,12 +608,12 @@ void open_all_log_files() {
     open_log_file(STDIN_FILENO, stdin, "/dev/null", NULL, 0, NULL);
 
     open_log_file(STDOUT_FILENO, stdout, stdout_filename, &output_log_syslog, 0, NULL);
-    open_log_file(STDERR_FILENO, stderr, stdcollector_filename, &collector_log_syslog, 0, NULL);
+    // open_log_file(STDERR_FILENO, stderr, stdcollector_filename, &collector_log_syslog, 0, NULL);
 
     // Netdata starts using stderr and if it has success to open file it redirects
-    FILE *fp = open_log_file(stdcollector_fd, NULL, stderr_filename, &error_log_syslog, 1, &stdcollector_fd);
-    if (fp)
-        stderror = fp;
+    // FILE *fp = open_log_file(stdcollector_fd, NULL, stderr_filename, &error_log_syslog, 1, &stdcollector_fd);
+    // if (fp)
+        // stderror = fp;
 
 #ifdef ENABLE_ACLK
     if(aclklog_enabled)
@@ -629,7 +629,7 @@ void open_all_log_files() {
 // error log throttling
 
 time_t error_log_throttle_period = 1200;
-unsigned long error_log_errors_per_period = 200;
+unsigned long error_log_errors_per_period = 999999;
 unsigned long error_log_errors_per_period_backup = 0;
 
 int error_log_limit(int reset) {

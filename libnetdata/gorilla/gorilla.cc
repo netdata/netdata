@@ -7,6 +7,8 @@
 #include <cstdio>
 #include <cstring>
 
+#include <forward_list>
+
 using std::size_t;
 
 template <typename T>
@@ -17,414 +19,443 @@ static constexpr size_t bit_size() noexcept
     return (sizeof(T) * CHAR_BIT);
 }
 
-/*
- * Low-level bitstream operations, allowing us to read/write individual bits.
-*/
-
 template<typename Word>
-struct bit_stream_t {
-    Word *buffer;
-    size_t capacity;
-    size_t position;
+class BitBuffer {
+public:
+    void init(size_t capacity) {
+        cap = capacity;
+    }
+
+    bool write(Word *buf, size_t pos, Word v, size_t nbits)
+    {
+        assert(nbits > 0 && nbits <= bit_size<Word>());
+
+        if ((pos + nbits) > cap)
+            return false;
+
+        const size_t index = pos / bit_size<Word>();
+        const size_t offset = pos % bit_size<Word>();
+
+        pos += nbits;
+
+        if (offset == 0) {
+            buf[index] = v;
+        } else {
+            const size_t remaining_bits = bit_size<Word>() - offset;
+
+            // write the lower part of the value
+            const Word low_bits_mask = ((Word) 1 << remaining_bits) - 1;
+            const Word lowest_bits_in_value = v & low_bits_mask;
+            buf[index] |= (lowest_bits_in_value << offset);
+
+            if (nbits > remaining_bits) {
+                // write the upper part of the value
+                const Word high_bits_mask = ~low_bits_mask;
+                const Word highest_bits_in_value = (v & high_bits_mask) >> (remaining_bits);
+                buf[index + 1] = highest_bits_in_value;
+            }
+        }
+
+        return true;
+    }
+
+    bool read(const Word *buf, size_t pos, Word *v, size_t nbits) const
+    {
+        assert(nbits > 0 && nbits <= bit_size<Word>());
+
+        if (pos + nbits > cap)
+            return false;
+
+        const size_t index = pos / bit_size<Word>();
+        const size_t offset = pos % bit_size<Word>();
+
+        pos += nbits;
+
+        if (offset == 0) {
+            *v = (nbits == bit_size<Word>()) ?
+                        buf[index] :
+                        buf[index] & (((Word) 1 << nbits) - 1);
+        } else {
+            const size_t remaining_bits = bit_size<Word>() - offset;
+
+            // extract the lower part of the value
+            if (nbits < remaining_bits) {
+                *v = (buf[index] >> offset) & (((Word) 1 << nbits) - 1);
+            } else {
+                *v = (buf[index] >> offset) & (((Word) 1 << remaining_bits) - 1);
+                nbits -= remaining_bits;
+                *v |= (buf[index + 1] & (((Word) 1 << nbits) - 1)) << remaining_bits;
+            }
+        }
+
+        return true;
+    }
+
+    size_t capacity() const {
+        return cap;
+    }
+
+private:
+    size_t cap;
 };
 
 template<typename Word>
-static bit_stream_t<Word> bit_stream_new(Word *buffer, Word capacity) {
-    bit_stream_t<Word> bs;
-
-    bs.buffer = buffer;
-    bs.capacity = capacity * bit_size<Word>();
-    bs.position = 0;
-
-    return bs;
-}
-
-template<typename Word>
-static bool bit_stream_write(bit_stream_t<Word> *bs, Word value, size_t nbits) {
-    assert(nbits > 0 && nbits <= bit_size<Word>());
-    assert(bs->capacity >= (bs->position + nbits));
-
-    if (bs->position + nbits > bs->capacity) {
-        return false;
+class BitStreamWriter {
+public:
+    void init(size_t capacity) {
+        bb.init(capacity);
+        pos = bit_size<Word>();
+        assert(pos <= capacity);
     }
 
-    const size_t index = bs->position / bit_size<Word>();
-    const size_t offset = bs->position % bit_size<Word>();
-    bs->position += nbits;
+    inline bool write(Word *buf, Word value, size_t nbits)
+    {
+        bool ok = bb.write(buf, pos, value, nbits);
 
-    if (offset == 0) {
-        bs->buffer[index] = value;
-    } else {
-        const size_t remaining_bits = bit_size<Word>() - offset;
+        if (ok)
+            pos += nbits;
 
-        // write the lower part of the value
-        const Word low_bits_mask = ((Word) 1 << remaining_bits) - 1;
-        const Word lowest_bits_in_value = value & low_bits_mask;
-        bs->buffer[index] |= (lowest_bits_in_value << offset);
+        return ok;
+    }
 
-        if (nbits > remaining_bits) {
-            // write the upper part of the value
-            const Word high_bits_mask = ~low_bits_mask;
-            const Word highest_bits_in_value = (value & high_bits_mask) >> (remaining_bits);
-            bs->buffer[index + 1] = highest_bits_in_value;
+    inline void flush(Word *buf)
+    {
+        __atomic_store_n(&buf[0], pos, __ATOMIC_RELAXED);
+    }
+
+    inline size_t capacity() const
+    {
+        return bb.capacity();
+    }
+
+    inline size_t position() const
+    {
+        return pos;
+    }
+
+private:
+    BitBuffer<Word> bb;
+    size_t pos;
+};
+
+template<typename Word>
+class BitStreamReader {
+public:
+    void init(const Word *buffer) {
+        size_t capacity = __atomic_load_n(&buffer[0], __ATOMIC_SEQ_CST);
+
+        bb.init(capacity);
+        pos = bit_size<Word>();
+    }
+
+    inline bool read(const Word *buf, Word *value, size_t nbits)
+    {
+        bool ok = bb.read(buf, pos, value, nbits);
+
+        if (ok)
+            pos += nbits;
+
+        return ok;
+    }
+
+    inline size_t capacity() const
+    {
+        return bb.capacity();
+    }
+
+    inline size_t position() const
+    {
+        return pos;
+    }
+
+private:
+    BitBuffer<Word> bb;
+    size_t pos;
+};
+
+template<typename Word>
+class GorillaWriter
+{
+public:
+    void init(Word *buf, size_t n) {
+        buffer = buf;
+        entries = 0;
+        bs.init((n - 1) * bit_size<Word>());
+        prev_number = 0;
+        prev_xor_lzc = 0;
+    }
+
+    bool write(Word number)
+    {
+        // this is the first number we are writing
+        if (entries == 0) {
+            bool ok = bs.write(bit_buffer(), number, bit_size<Word>());
+
+            if (ok) {
+                entries++;
+                prev_number = number;
+            }
+
+            return ok;
         }
-    }
-
-    return true;
-}
-
-template<typename Word>
-static bool bit_stream_read(bit_stream_t<Word> *bs, Word *value, size_t nbits) {
-    assert(nbits > 0 && nbits <= bit_size<Word>());
-    assert(bs->capacity >= (bs->position + nbits));
-
-    if (bs->position + nbits > bs->capacity) {
-        return false;
-    }
-
-    const size_t index = bs->position / bit_size<Word>();
-    const size_t offset = bs->position % bit_size<Word>();
-    bs->position += nbits;
-
-    if (offset == 0) {
-        *value = (nbits == bit_size<Word>()) ?
-                    bs->buffer[index] :
-                    bs->buffer[index] & (((Word) 1 << nbits) - 1);
-    } else {
-        const size_t remaining_bits = bit_size<Word>() - offset;
-
-        // extract the lower part of the value
-        if (nbits < remaining_bits) {
-            *value = (bs->buffer[index] >> offset) & (((Word) 1 << nbits) - 1);
+    
+        // write true/false based on whether we got the same number or not.
+        if (number == prev_number) {
+            bool ok = bs.write(bit_buffer(), static_cast<Word>(1), 1);
+            if (ok)
+                entries++;
+            return ok;
         } else {
-            *value = (bs->buffer[index] >> offset) & (((Word) 1 << remaining_bits) - 1);
-            nbits -= remaining_bits;
-            *value |= (bs->buffer[index + 1] & (((Word) 1 << nbits) - 1)) << remaining_bits;
+            bool ok = bs.write(bit_buffer(),static_cast<Word>(0), 1);
+            if (!ok)
+                return false;
         }
+
+        Word xor_value = prev_number ^ number;
+        Word xor_lzc = (bit_size<Word>() == 32) ? __builtin_clz(xor_value) : __builtin_clzll(xor_value);
+        Word is_xor_lzc_same = (xor_lzc == prev_xor_lzc) ? 1 : 0;
+
+        if (!bs.write(bit_buffer(), is_xor_lzc_same, 1))
+            return false;
+        
+        if (!is_xor_lzc_same) {
+            if (!bs.write(bit_buffer(), xor_lzc, (bit_size<Word>() == 32) ? 5 : 6))
+                return false;
+        }
+
+        // write the bits of the XOR'd value without the LZC prefix
+        if (!bs.write(bit_buffer(), xor_value, bit_size<Word>() - xor_lzc))
+            return false;
+
+        entries++;
+        prev_number = number;
+        prev_xor_lzc = xor_lzc;
+        return true;
     }
 
-    return true;
-}
+    inline void flush()
+    {
+        bs.flush(bit_buffer());
+        __atomic_store_n(&buffer[0], entries, __ATOMIC_RELAXED);
+    }
 
-/*
- * High-level Gorilla codec implementation
-*/
+    Word *data() const
+    {
+        return buffer;
+    }
 
-template<typename Word>
-struct bit_code_t {
-    bit_stream_t<Word> bs;
+    inline void capacity() const
+    {
+        return bs.capacity() / bit_size<Word>();
+    }
+
+    inline void size() const
+    {
+        return (bs.position() + (bit_size<Word>() - 1)) / bit_size<Word>();
+    }
+
+private:
+    inline Word *bit_buffer() const
+    {
+        return &buffer[1];
+    }
+
+private:
+    Word *buffer;
     Word entries;
+
+    BitStreamWriter<Word> bs;
+
     Word prev_number;
-    Word prev_xor;
     Word prev_xor_lzc;
 };
 
 template<typename Word>
-static void bit_code_init(bit_code_t<Word> *bc, Word *buffer, Word capacity) {
-    bc->bs = bit_stream_new(buffer, capacity);
+class GorillaReader {
+public: 
+    void init(const Word *buf) {
+        buffer = buf;
+        bs.init(bit_buffer());
+        position = 0;
 
-    bc->entries = 0;
-    bc->prev_number = 0;
-    bc->prev_xor = 0;
-    bc->prev_xor_lzc = 0;
-
-    // reserved two words:
-    //     Buffer[0] -> number of entries written
-    //     Buffer[1] -> number of bits written
-
-    bc->bs.position += 2 * bit_size<Word>();
-}
-
-template<typename Word>
-static bool bit_code_read(bit_code_t<Word> *bc, Word *number) {
-    bit_stream_t<Word> *bs = &bc->bs;
-
-    bc->entries++;
-
-    // read the first number
-    if (bc->entries == 1) {
-        bool ok = bit_stream_read(bs, number, bit_size<Word>());
-        bc->prev_number = *number;
-        return ok;
+        prev_number = 0;
+        prev_xor_lzc = 0;
+        prev_xor = 0;
     }
 
-    // process same-number bit
-    Word is_same_number;
-    if (!bit_stream_read(bs, &is_same_number, 1)) {
-        return false;        
-    }
+    bool read(Word *number) {
+        // read the first number
+        if (position == 0) {
+            bool ok = bs.read(bit_buffer(), number, bit_size<Word>());
 
-    if (is_same_number) {
-        *number = bc->prev_number;
+            if (ok) {
+                position++;
+                prev_number = *number;
+            }
+
+            return ok;
+        }
+
+        // process same-number bit
+        Word is_same_number;
+        if (!bs.read(bit_buffer(), &is_same_number, 1)) {
+            return false;
+        }
+
+        if (is_same_number) {
+            *number = prev_number;
+            return true;
+        }
+
+        // proceess same-xor-lzc bit
+        Word xor_lzc = prev_xor_lzc;
+
+        Word same_xor_lzc;
+        if (!bs.read(bit_buffer(), &same_xor_lzc, 1)) {
+            return false;
+        }
+
+        if (!same_xor_lzc) {
+            if (!bs.read(bit_buffer(), &xor_lzc, (bit_size<Word>() == 32) ? 5 : 6)) {
+                return false;        
+            }
+        }
+
+        // process the non-lzc suffix
+        Word xor_value = 0;
+        if (!bs.read(bit_buffer(), &xor_value, bit_size<Word>() - xor_lzc)) {
+            return false;        
+        }
+
+        *number = (prev_number ^ xor_value);
+
+        position++;
+        prev_number = *number;
+        prev_xor_lzc = xor_lzc;
+        prev_xor = xor_value;
+
         return true;
     }
 
-    // proceess same-xor-lzc bit
-    Word xor_lzc = bc->prev_xor_lzc;
-
-    Word same_xor_lzc;
-    if (!bit_stream_read(bs, &same_xor_lzc, 1)) {
-        return false;
+    size_t entries() const {
+        return __atomic_load_n(&buffer[0], __ATOMIC_SEQ_CST);
     }
 
-    if (!same_xor_lzc) {
-        if (!bit_stream_read(bs, &xor_lzc, (bit_size<Word>() == 32) ? 5 : 6)) {
-            return false;        
-        }
+    Word *data() {
+        return buffer;
     }
 
-    // process the non-lzc suffix
-    Word xor_value = 0;
-    if (!bit_stream_read(bs, &xor_value, bit_size<Word>() - xor_lzc)) {
-        return false;        
+private:
+    inline const Word *bit_buffer() const
+    {
+        return &buffer[1];
     }
 
-    *number = (bc->prev_number ^ xor_value);
+private:
+    const Word *buffer;
+    BitStreamReader<Word> bs;
 
-    bc->prev_number = *number;
-    bc->prev_xor_lzc = xor_lzc;
-    bc->prev_xor = xor_value;
+    size_t position;
 
-    return true;
-}
+    Word prev_number;
+    Word prev_xor_lzc;
+    Word prev_xor;
+};
 
 template<typename Word>
-static bool bit_code_write(bit_code_t<Word> *bc, const Word number) {
-    bit_stream_t<Word> *bs = &bc->bs;
-    Word position = bs->position;
+class GorillaPageWriter {
+public:
+    void init() {}
 
-    bc->entries++;
-
-    // this is the first number we are writing
-    if (bc->entries == 1) {
-        bc->prev_number = number;
-        return bit_stream_write(bs, number, bit_size<Word>());
-    }
-    
-    // write true/false based on whether we got the same number or not.
-    if (number == bc->prev_number) {
-        return bit_stream_write(bs, static_cast<Word>(1), 1);
-    } else {
-        if (bit_stream_write(bs, static_cast<Word>(0), 1) == false) {
-            return false;
+    void add_buffer() {
+        int length = std::distance(buffers.begin(), buffers.end());
+        if (length) {
+            gw.flush();
+            buffers.insert_after(buffers.cend(), gw.data());
         }
+
+        size_t n = 256;
+        Word *buffer = new Word[n];
+        gw.init(buffer, n);
     }
 
-    // otherwise:
-    //     - compute the non-zero xor
-    //     - find its leading-zero count
+    bool write(Word value) {
+        if (gw.write(value))
+            return true;
 
-    Word xor_value = bc->prev_number ^ number;
-    // FIXME: Use SFINAE
-    Word xor_lzc = (bit_size<Word>() == 32) ? __builtin_clz(xor_value) : __builtin_clzll(xor_value);
-    Word is_xor_lzc_same = (xor_lzc == bc->prev_xor_lzc) ? 1 : 0;
-
-    if (is_xor_lzc_same) {
-        // xor-lzc is same
-        if (bit_stream_write(bs, static_cast<Word>(1), 1) == false) {
-            goto RET_FALSE;
-        }
-    } else {
-        // xor-lzc is different
-        if (bit_stream_write(bs, static_cast<Word>(0), 1) == false) {
-            goto RET_FALSE;
-        }
-        
-        if (bit_stream_write(bs, xor_lzc, (bit_size<Word>() == 32) ? 5 : 6) == false) {
-            goto RET_FALSE;
-        }
+        add_buffer();
+        return gw.write(value);
     }
 
-    // write the bits of the XOR value without the LZC prefix
-    if (bit_stream_write(bs, xor_value, bit_size<Word>() - xor_lzc) == false) {
-        goto RET_FALSE; 
-    }
-
-    bc->prev_number = number;
-    bc->prev_xor_lzc = xor_lzc;
-    return true;
-
-RET_FALSE:
-    bc->bs.position = position;
-    return false;
-}
-
-// only valid for writers
-template<typename Word>
-static bool bit_code_flush(bit_code_t<Word> *bc) {
-    bit_stream_t<Word> *bs = &bc->bs;
-
-    Word num_entries_written = bc->entries;
-    Word num_bits_written = bs->position;
-
-    // we want to write these at the beginning
-    bs->position = 0;
-
-    if (!bit_stream_write(bs, num_entries_written, bit_size<Word>())) {
-        return false;
-    }
-
-    if (!bit_stream_write(bs, num_bits_written, bit_size<Word>())) {
-        return false;
-    }
-
-    bs->position = num_bits_written;
-    return true;
-}
-
-// only valid for readers
-template<typename Word>
-static bool bit_code_info(bit_code_t<Word> *bc, Word *num_entries_written,
-                                                Word *num_bits_written) {
-    bit_stream_t<Word> *bs = &bc->bs;
-
-    assert(bs->position == 2 * bit_size<Word>());
-    if (bs->capacity < (2 * bit_size<Word>())) {
-        return false;
-    }
-
-    if (num_entries_written) {
-        *num_entries_written = bs->buffer[0];
-    }
-    if (num_bits_written) {
-        *num_bits_written = bs->buffer[1];
-    }
-
-    return true;
-}
-
-template<typename Word>
-static size_t gorilla_encode(Word *dst, Word dst_len, const Word *src, Word src_len) {
-    bit_code_t<Word> bcw;
-
-    bit_code_init(&bcw, dst, dst_len);
-
-    for (size_t i = 0; i != src_len; i++) {
-        if (!bit_code_write(&bcw, src[i]))
-            return 0;
-    }
-
-    if (!bit_code_flush(&bcw))
-        return 0;
-
-    return src_len;
-}
-
-template<typename Word>
-static size_t gorilla_decode(Word *dst, Word dst_len, const Word *src, Word src_len) {
-    bit_code_t<Word> bcr;
-
-    bit_code_init(&bcr, (Word *) src, src_len);
-
-    Word num_entries;
-    if (!bit_code_info(&bcr, &num_entries, (Word *) NULL)) {
-        return 0;
-    }
-    if (num_entries > dst_len) {
-        return 0;
-    }
-    
-    for (size_t i = 0; i != num_entries; i++) {
-        if (!bit_code_read(&bcr, &dst[i]))
-            return 0;
-    }
-
-    return num_entries;
-}
+private:
+    GorillaWriter<Word> gw;
+    std::forward_list<Word *> buffers;
+};
 
 /*
- * Low-level public API
+ * C API
 */
 
-// 32-bit API
-
-void bit_code_writer_u32_init(bit_code_writer_u32_t *bcw, uint32_t *buffer, uint32_t capacity) {
-    bit_code_t<uint32_t> *bc = (bit_code_t<uint32_t> *) bcw;
-    bit_code_init(bc, buffer, capacity);
+gpw_t *gpw_new() {
+    GorillaPageWriter<uint32_t> *gpw = new GorillaPageWriter<uint32_t>();
+    gpw->init();
+    return reinterpret_cast<gpw_t *>(gpw);
 }
 
-bool bit_code_writer_u32_write(bit_code_writer_u32_t *bcw, const uint32_t number) {
-    bit_code_t<uint32_t> *bc = (bit_code_t<uint32_t> *) bcw;
-    return bit_code_write(bc, number);
+void gpw_free(gpw_t *ptr) {
+    GorillaPageWriter<uint32_t> *gpw = reinterpret_cast<GorillaPageWriter<uint32_t> *>(ptr);
+    delete gpw;
 }
 
-bool bit_code_writer_u32_flush(bit_code_writer_u32_t *bcw) {
-    bit_code_t<uint32_t> *bc = (bit_code_t<uint32_t> *) bcw;
-    return bit_code_flush(bc);
+void gpw_add_buffer(gpw_t *ptr) {
+    GorillaPageWriter<uint32_t> *gpw = reinterpret_cast<GorillaPageWriter<uint32_t> *>(ptr);
+    fprintf(stderr, "\nGVD: adding new gorilla buffer\n");
+    gpw->add_buffer();
 }
 
-void bit_code_reader_u32_init(bit_code_reader_u32_t *bcr, uint32_t *buffer, uint32_t capacity) {
-    bit_code_t<uint32_t> *bc = (bit_code_t<uint32_t> *) bcr;
-    bit_code_init(bc, buffer, capacity);
+bool gpw_add(gpw_t *ptr, uint32_t value) {
+    GorillaPageWriter<uint32_t> *gpw = reinterpret_cast<GorillaPageWriter<uint32_t> *>(ptr);
+    return gpw->write(value);
 }
 
-bool bit_code_reader_u32_read(bit_code_reader_u32_t *bcr, uint32_t *number) {
-    bit_code_t<uint32_t> *bc = (bit_code_t<uint32_t> *) bcr;
-    return bit_code_read(bc, number);
-}
+// gorilla_writer_t *gorilla_writer_new(uint32_t *buffer, size_t n)
+// {
+//     GorillaWriter<uint32_t> *GW = new GorillaWriter<uint32_t>();
+//     GW->init(buffer, n);
+//     return reinterpret_cast<gorilla_writer_t *>(GW);
+// }
 
-bool bit_code_reader_u32_info(bit_code_reader_u32_t *bcr, uint32_t *num_entries_written,
-                                                          uint32_t *num_bits_written) {
-    bit_code_t<uint32_t> *bc = (bit_code_t<uint32_t> *) bcr;
-    return bit_code_info(bc, num_entries_written, num_bits_written);
-}
+// void gorilla_writer_free(gorilla_writer_t *writer) {
+//     GorillaWriter<uint32_t> *GW = reinterpret_cast<GorillaWriter<uint32_t> *>(writer);
+//     delete GW;
+// }
 
-// 64-bit API
+// bool gorilla_writer_add(gorilla_writer *writer, uint32_t number) {
+//     GorillaWriter<uint32_t> *GW = reinterpret_cast<GorillaWriter<uint32_t> *>(writer);
+//     return GW->write(number);
+// }
 
-void bit_code_writer_u64_init(bit_code_writer_u64_t *bcw, uint64_t *buffer, uint64_t capacity) {
-    bit_code_t<uint64_t> *bc = (bit_code_t<uint64_t> *) bcw;
-    bit_code_init(bc, buffer, capacity);
-}
+// void gorilla_writer_flush(gorilla_writer_t *writer) {
+//     GorillaWriter<uint32_t> *GW = reinterpret_cast<GorillaWriter<uint32_t> *>(writer);
+//     GW->flush();
+// }
 
-bool bit_code_writer_u64_write(bit_code_writer_u64_t *bcw, const uint64_t number) {
-    bit_code_t<uint64_t> *bc = (bit_code_t<uint64_t> *) bcw;
-    return bit_code_write(bc, number);
-}
+// gorilla_reader_t *gorilla_reader_alloc(const uint32_t *buffer)
+// {
+//     GorillaReader<uint32_t> *GW = new GorillaReader<uint32_t>();
+//     GW->init(buffer);
+//     return reinterpret_cast<gorilla_reader_t *>(GW);
+// }
 
-bool bit_code_writer_u64_flush(bit_code_writer_u64_t *bcw) {
-    bit_code_t<uint64_t> *bc = (bit_code_t<uint64_t> *) bcw;
-    return bit_code_flush(bc);
-}
+// void gorilla_reader_free(gorilla_reader_t *reader) {
+//     GorillaReader<uint32_t> *GR = reinterpret_cast<GorillaReader<uint32_t> *>(reader);
+//     delete GR;
+// }
 
-void bit_code_reader_u64_init(bit_code_reader_u64_t *bcr, uint64_t *buffer, uint64_t capacity) {
-    bit_code_t<uint64_t> *bc = (bit_code_t<uint64_t> *) bcr;
-    bit_code_init(bc, buffer, capacity);
-}
-
-bool bit_code_reader_u64_read(bit_code_reader_u64_t *bcr, uint64_t *number) {
-    bit_code_t<uint64_t> *bc = (bit_code_t<uint64_t> *) bcr;
-    return bit_code_read(bc, number);
-}
-
-bool bit_code_reader_u64_info(bit_code_reader_u64_t *bcr, uint64_t *num_entries_written,
-                                                          uint64_t *num_bits_written) {
-    bit_code_t<uint64_t> *bc = (bit_code_t<uint64_t> *) bcr;
-    return bit_code_info(bc, num_entries_written, num_bits_written);
-}
-
-/*
- * High-level public API
-*/
-
-// 32-bit API
-
-size_t gorilla_encode_u32(uint32_t *dst, size_t dst_len, const uint32_t *src, size_t src_len) {
-    return gorilla_encode(dst, (uint32_t) dst_len, src, (uint32_t) src_len);
-}
-
-size_t gorilla_decode_u32(uint32_t *dst, size_t dst_len, const uint32_t *src, size_t src_len) {
-    return gorilla_decode(dst, (uint32_t) dst_len, src, (uint32_t) src_len);
-}
-
-// 64-bit API
-
-size_t gorilla_encode_u64(uint64_t *dst, size_t dst_len, const uint64_t *src, size_t src_len) {
-    return gorilla_encode(dst, (uint64_t) dst_len, src, (uint64_t) src_len);
-}
-
-size_t gorilla_decode_u64(uint64_t *dst, size_t dst_len, const uint64_t *src, size_t src_len) {
-    return gorilla_decode(dst, (uint64_t) dst_len, src, (uint64_t) src_len);
-}
+// size_t gorilla_reader_entries(gorilla_reader_t *reader) {
+//     GorillaReader<uint32_t> *GR = reinterpret_cast<GorillaReader<uint32_t> *>(reader);
+//     return GR->entries();
+// }
 
 /*
  * Internal code used for fuzzing the library
@@ -451,15 +482,6 @@ static std::vector<Word> random_vector(const uint8_t *data, size_t size) {
     return V;
 }
 
-template<typename Word>
-static void check_equal_buffers(Word *lhs, Word lhs_size, Word *rhs, Word rhs_size) {
-    assert((lhs_size == rhs_size) && "Buffers have different size.");
-
-    for (size_t i = 0; i != lhs_size; i++) {
-        assert((lhs[i] == rhs[i]) && "Buffers differ");
-    }
-}
-
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
     // 32-bit tests
     {
@@ -468,16 +490,34 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
 
         std::vector<uint32_t> RandomData = random_vector<uint32_t>(Data, Size);
         std::vector<uint32_t> EncodedData(10 * RandomData.capacity(), 0);
-        std::vector<uint32_t> DecodedData(10 * RandomData.capacity(), 0);
 
-        size_t num_entries_written = gorilla_encode_u32(EncodedData.data(), EncodedData.size(),
-                                                        RandomData.data(), RandomData.size());
-        size_t num_entries_read = gorilla_decode_u32(DecodedData.data(), DecodedData.size(),
-                                                     EncodedData.data(), EncodedData.size());
+        // write data
+        {
+            GorillaWriter<uint32_t> GW;
+            GW.init(EncodedData.data(), EncodedData.capacity());
+            for (size_t i = 0; i != RandomData.size(); i++)
+                GW.write(RandomData[i]);
 
-        assert(num_entries_written == num_entries_read);
-        check_equal_buffers(RandomData.data(), (uint32_t) RandomData.size(),
-                            DecodedData.data(), (uint32_t) RandomData.size());
+            GW.flush();
+        }
+
+        // read data
+        {
+            GorillaReader<uint32_t> GR;
+            GR.init(EncodedData.data());
+
+            assert((GR.entries() == RandomData.size()) &&
+                   "Bad number of entries in gorilla buffer");
+
+            for (size_t i = 0; i != RandomData.size(); i++) {
+                uint32_t number = 0;
+                bool ok = GR.read(&number);
+                assert(ok && "Failed to read number from gorilla buffer");
+
+                assert((number == RandomData[i])
+                        && "Read wrong number from gorilla buffer");
+            }
+        }
     }
 
     // 64-bit tests
@@ -487,16 +527,34 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
 
         std::vector<uint64_t> RandomData = random_vector<uint64_t>(Data, Size);
         std::vector<uint64_t> EncodedData(10 * RandomData.capacity(), 0);
-        std::vector<uint64_t> DecodedData(10 * RandomData.capacity(), 0);
 
-        size_t num_entries_written = gorilla_encode_u64(EncodedData.data(), EncodedData.size(),
-                                                        RandomData.data(), RandomData.size());
-        size_t num_entries_read = gorilla_decode_u64(DecodedData.data(), DecodedData.size(),
-                                                     EncodedData.data(), EncodedData.size());
+        // write data
+        {
+            GorillaWriter<uint64_t> GW;
+            GW.init(EncodedData.data(), EncodedData.capacity());
+            for (size_t i = 0; i != RandomData.size(); i++)
+                GW.write(RandomData[i]);
 
-        assert(num_entries_written == num_entries_read);
-        check_equal_buffers(RandomData.data(), (uint64_t) RandomData.size(),
-                            DecodedData.data(), (uint64_t) RandomData.size());
+            GW.flush();
+        }
+
+        // read data
+        {
+            GorillaReader<uint64_t> GR;
+            GR.init(EncodedData.data());
+
+            assert((GR.entries() == RandomData.size()) &&
+                   "Bad number of entries in gorilla buffer");
+
+            for (size_t i = 0; i != RandomData.size(); i++) {
+                uint64_t number = 0;
+                bool ok = GR.read(&number);
+                assert(ok && "Failed to read number from gorilla buffer");
+
+                assert((number == RandomData[i])
+                        && "Read wrong number from gorilla buffer");
+            }
+        }
     }
 
     return 0;
@@ -523,10 +581,12 @@ static void BM_EncodeU32Numbers(benchmark::State& state) {
     std::vector<uint32_t> EncodedData(10 * RandomData.capacity(), 0);
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(
-        gorilla_encode_u32(EncodedData.data(), EncodedData.size(),
-                                  RandomData.data(), RandomData.size())
-        );
+        GorillaWriter<uint32_t> GW;
+        GW.init(EncodedData.data(), EncodedData.size());
+
+        for (size_t i = 0; i != RandomData.size(); i++)
+            benchmark::DoNotOptimize(GW.write(RandomData[i]));
+
         benchmark::ClobberMemory();
     }
 
@@ -547,21 +607,27 @@ static void BM_DecodeU32Numbers(benchmark::State& state) {
     std::vector<uint32_t> EncodedData(10 * RandomData.capacity(), 0);
     std::vector<uint32_t> DecodedData(10 * RandomData.capacity(), 0);
 
-    gorilla_encode_u32(EncodedData.data(), EncodedData.size(),
-                       RandomData.data(), RandomData.size());
+    GorillaWriter<uint32_t> GW;
+    GW.init(EncodedData.data(), EncodedData.size());
+    for (size_t i = 0; i != RandomData.size(); i++)
+        GW.write(RandomData[i]);
+    GW.flush();
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(
-            gorilla_decode_u32(DecodedData.data(), DecodedData.size(),
-                               EncodedData.data(), EncodedData.size())
-        );
+        GorillaReader<uint32_t> GR;
+        GR.init(EncodedData.data());
+
+        for (size_t i = 0; i != RandomData.size(); i++) {
+            uint32_t number = 0;
+            benchmark::DoNotOptimize(GR.read(&number));
+        }
+
         benchmark::ClobberMemory();
     }
 
     state.SetItemsProcessed(NumItems * state.iterations());
     state.SetBytesProcessed(NumItems * state.iterations() * sizeof(uint32_t));
 }
-// Register the function as a benchmark
 BENCHMARK(BM_DecodeU32Numbers);
 
 static void BM_EncodeU64Numbers(benchmark::State& state) {
@@ -570,16 +636,18 @@ static void BM_EncodeU64Numbers(benchmark::State& state) {
     std::uniform_int_distribution<uint64_t> dist(0x0, 0x0000FFFF);
 
     std::vector<uint64_t> RandomData;
-    for (size_t idx = 0; idx != 1024; idx++) {
+    for (size_t idx = 0; idx != NumItems; idx++) {
         RandomData.push_back(dist(mt));
     }
     std::vector<uint64_t> EncodedData(10 * RandomData.capacity(), 0);
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(
-        gorilla_encode_u64(EncodedData.data(), EncodedData.size(),
-                                  RandomData.data(), RandomData.size())
-        );
+        GorillaWriter<uint64_t> GW;
+        GW.init(EncodedData.data(), EncodedData.size());
+
+        for (size_t i = 0; i != RandomData.size(); i++)
+            benchmark::DoNotOptimize(GW.write(RandomData[i]));
+
         benchmark::ClobberMemory();
     }
 
@@ -594,27 +662,33 @@ static void BM_DecodeU64Numbers(benchmark::State& state) {
     std::uniform_int_distribution<uint64_t> dist(0x0, 0xFFFFFFFF);
 
     std::vector<uint64_t> RandomData;
-    for (size_t idx = 0; idx != 1024; idx++) {
+    for (size_t idx = 0; idx != NumItems; idx++) {
         RandomData.push_back(dist(mt));
     }
     std::vector<uint64_t> EncodedData(10 * RandomData.capacity(), 0);
     std::vector<uint64_t> DecodedData(10 * RandomData.capacity(), 0);
 
-    gorilla_encode_u64(EncodedData.data(), EncodedData.size(),
-                       RandomData.data(), RandomData.size());
+    GorillaWriter<uint64_t> GW;
+    GW.init(EncodedData.data(), EncodedData.size());
+    for (size_t i = 0; i != RandomData.size(); i++)
+        GW.write(RandomData[i]);
+    GW.flush();
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(
-            gorilla_decode_u64(DecodedData.data(), DecodedData.size(),
-                               EncodedData.data(), EncodedData.size())
-        );
+        GorillaReader<uint64_t> GR;
+        GR.init(EncodedData.data());
+
+        for (size_t i = 0; i != RandomData.size(); i++) {
+            uint64_t number = 0;
+            benchmark::DoNotOptimize(GR.read(&number));
+        }
+
         benchmark::ClobberMemory();
     }
 
     state.SetItemsProcessed(NumItems * state.iterations());
     state.SetBytesProcessed(NumItems * state.iterations() * sizeof(uint64_t));
 }
-// Register the function as a benchmark
 BENCHMARK(BM_DecodeU64Numbers);
 
 #endif /* ENABLE_BENCHMARK */
