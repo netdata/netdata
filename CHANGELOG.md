@@ -6,6 +6,16 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#15862](https://github.com/netdata/netdata/pull/15862) ([netdatabot](https://github.com/netdatabot))
+- Apply a label prefix for netdata labels [\#15860](https://github.com/netdata/netdata/pull/15860) ([kevin-fwu](https://github.com/kevin-fwu))
+- fix proc meminfo cached calculation [\#15859](https://github.com/netdata/netdata/pull/15859) ([ilyam8](https://github.com/ilyam8))
+- Fix compilation warnings [\#15858](https://github.com/netdata/netdata/pull/15858) ([stelfrag](https://github.com/stelfrag))
+- packaging cleanup after \#15842 [\#15857](https://github.com/netdata/netdata/pull/15857) ([ilyam8](https://github.com/ilyam8))
+- fix packaging static build openssl 32bit [\#15855](https://github.com/netdata/netdata/pull/15855) ([ilyam8](https://github.com/ilyam8))
+- fix packaging mark stable static build [\#15854](https://github.com/netdata/netdata/pull/15854) ([ilyam8](https://github.com/ilyam8))
+- Facets histograms [\#15846](https://github.com/netdata/netdata/pull/15846) ([ktsaou](https://github.com/ktsaou))
+- reworked pluginsd caching of RDAs to avoid crashes [\#15845](https://github.com/netdata/netdata/pull/15845) ([ktsaou](https://github.com/ktsaou))
+- Fix static build SSL [\#15842](https://github.com/netdata/netdata/pull/15842) ([ktsaou](https://github.com/ktsaou))
 - bump bundled ui to v6.29.0 [\#15841](https://github.com/netdata/netdata/pull/15841) ([ilyam8](https://github.com/ilyam8))
 - Fix configure: WARNING: unrecognized options: --with-zlib [\#15840](https://github.com/netdata/netdata/pull/15840) ([stelfrag](https://github.com/stelfrag))
 - Fix compilation warning [\#15839](https://github.com/netdata/netdata/pull/15839) ([stelfrag](https://github.com/stelfrag))
@@ -308,8 +318,6 @@
 - Add linux powercap metrics collector [\#15364](https://github.com/netdata/netdata/pull/15364) ([fhriley](https://github.com/fhriley))
 - systemd-journal plugin [\#15363](https://github.com/netdata/netdata/pull/15363) ([ktsaou](https://github.com/ktsaou))
 - Hash table charts [\#15323](https://github.com/netdata/netdata/pull/15323) ([thiagoftsm](https://github.com/thiagoftsm))
-- Drop support for native packages of Ubuntu 22.10 [\#15292](https://github.com/netdata/netdata/pull/15292) ([tkatsoulas](https://github.com/tkatsoulas))
-- Fix non-interactive options for apt-get and zypper. [\#15288](https://github.com/netdata/netdata/pull/15288) ([zeylos](https://github.com/zeylos))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
@@ -421,20 +429,6 @@
 - ci: disable clang format [\#15305](https://github.com/netdata/netdata/pull/15305) ([ilyam8](https://github.com/ilyam8))
 - Change info to netdata\_log\_info in sqlite\_db\_migration.c [\#15303](https://github.com/netdata/netdata/pull/15303) ([MrZammler](https://github.com/MrZammler))
 - Create integrations JSON schema [\#15302](https://github.com/netdata/netdata/pull/15302) ([Ancairon](https://github.com/Ancairon))
-- Change query to store host system info values [\#15300](https://github.com/netdata/netdata/pull/15300) ([MrZammler](https://github.com/MrZammler))
-- s/info/netdata\_log\_info/ [\#15299](https://github.com/netdata/netdata/pull/15299) ([vkalintiris](https://github.com/vkalintiris))
-- Fix wording issue in Docker README [\#15298](https://github.com/netdata/netdata/pull/15298) ([Ancairon](https://github.com/Ancairon))
-- Update metrics-streaming-and-replication.md [\#15297](https://github.com/netdata/netdata/pull/15297) ([Ancairon](https://github.com/Ancairon))
-- Rename generic `error` function [\#15296](https://github.com/netdata/netdata/pull/15296) ([thiagoftsm](https://github.com/thiagoftsm))
-- Code reorg and cleanup - enrichment of /api/v2 [\#15294](https://github.com/netdata/netdata/pull/15294) ([ktsaou](https://github.com/ktsaou))
-- Optimizations part 3 [\#15293](https://github.com/netdata/netdata/pull/15293) ([ktsaou](https://github.com/ktsaou))
-- docs: update stream.conf "health enabled by default" description [\#15291](https://github.com/netdata/netdata/pull/15291) ([ilyam8](https://github.com/ilyam8))
-- Remove extra parenthesis from doc [\#15290](https://github.com/netdata/netdata/pull/15290) ([Ancairon](https://github.com/Ancairon))
-- merged spaces, war rooms and invite your team to one place [\#15289](https://github.com/netdata/netdata/pull/15289) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- use stat\(\) instead of lstat\(\) [\#15287](https://github.com/netdata/netdata/pull/15287) ([ktsaou](https://github.com/ktsaou))
-- Only try to enable \_FORTIFY\_SOURCE if the user has not disabled optimizations [\#15284](https://github.com/netdata/netdata/pull/15284) ([Ferroin](https://github.com/Ferroin))
-- Send alert chart labels config key to cloud [\#15283](https://github.com/netdata/netdata/pull/15283) ([MrZammler](https://github.com/MrZammler))
-- Fixed mistype for 'send automatic labels' Prometheus option [\#15282](https://github.com/netdata/netdata/pull/15282) ([k0ste](https://github.com/k0ste))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
