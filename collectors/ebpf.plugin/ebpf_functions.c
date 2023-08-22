@@ -414,9 +414,9 @@ static void ebpf_function_socket_help(const char *transaction) {
             "      Enable socket to run a specific PERIOD in seconds. When PERIOD is not\n"
             "      specified plugin will use the default 300 seconds\n"
             "\n"
-            "   resolve:BOOL\n"
+         /*   "   resolve:BOOL\n"
             "      Resolve IP address, default value is NO.\n"
-            "\n"
+            "\n" */
             "   range:CIDR\n"
             "      Show sockets that have only a specific destination. Default all addresses.\n"
             "\n"
@@ -665,6 +665,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
 #endif
             pthread_mutex_unlock(&ebpf_exit_cleanup);
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_RESOLVE, sizeof(EBPF_FUNCTION_SOCKET_RESOLVE) - 1) == 0) {
+            /*
             uint32_t previous = network_viewer_opt.hostname_resolution_enabled;
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_RESOLVE) - 1];
             if (name)
@@ -675,6 +676,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
 
             if (previous != network_viewer_opt.hostname_resolution_enabled)
                 ebpf_socket_clean_judy_array_unsafe();
+                */
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_RANGE, sizeof(EBPF_FUNCTION_SOCKET_RANGE) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_RANGE) - 1];
             if (name) {
