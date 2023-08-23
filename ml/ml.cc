@@ -436,6 +436,10 @@ const char *db_models_delete =
     "DELETE FROM models "
     "WHERE dim_id = @dim_id AND before < @before;";
 
+const char *db_models_prune =
+    "DELETE FROM models "
+    "WHERE after < @after LIMIT @n;";
+
 static int
 ml_dimension_add_model(const uuid_t *metric_uuid, const ml_kmeans_t *km)
 {
@@ -560,6 +564,58 @@ bind_fail:
     rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to reset statement to delete models, rc = %d", rc);
+    return rc;
+}
+
+static int
+ml_prune_old_models(size_t num_models_to_prune)
+{
+    static __thread sqlite3_stmt *res = NULL;
+    int rc = 0;
+    int param = 0;
+
+    if (unlikely(!db)) {
+        error_report("Database has not been initialized");
+        return 1;
+    }
+
+    if (unlikely(!res)) {
+        rc = prepare_statement(db, db_models_prune, &res);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare statement to prune models, rc = %d", rc);
+            return rc;
+        }
+    }
+
+    int after = (int) (now_realtime_sec() - Cfg.delete_models_older_than);
+
+    rc = sqlite3_bind_int(res, ++param, after);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, ++param, num_models_to_prune);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE)) {
+        error_report("Failed to prune old models, rc = %d", rc);
+        return rc;
+    }
+
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to reset statement when pruning old models, rc = %d", rc);
+        return rc;
+    }
+
+    return 0;
+
+bind_fail:
+    error_report("Failed to bind parameter %d to prune old models, rc = %d", param, rc);
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement to prune old models, rc = %d", rc);
     return rc;
 }
 
@@ -1498,9 +1554,12 @@ bool ml_dimension_is_anomalous(RRDDIM *rd, time_t curr_time, double value, bool 
 }
 
 static void ml_flush_pending_models(ml_training_thread_t *training_thread) {
-    int rc = db_execute(db, "BEGIN TRANSACTION;");
     int op_no = 1;
 
+    // begin transaction
+    int rc = db_execute(db, "BEGIN TRANSACTION;");
+
+    // add/delete models
     if (!rc) {
         op_no++;
 
@@ -1513,18 +1572,33 @@ static void ml_flush_pending_models(ml_training_thread_t *training_thread) {
         }
     }
 
+    // prune old models
+    if (!rc) {
+        if ((training_thread->num_db_transactions % 64) == 0) {
+            rc = ml_prune_old_models(training_thread->num_models_to_prune);
+            if (!rc)
+                training_thread->num_models_to_prune = 0;
+        }
+    }
+
+    // commit transaction
     if (!rc) {
         op_no++;
         rc = db_execute(db, "COMMIT TRANSACTION;");
     }
 
-    // try to rollback transaction if we got any failures
+    // rollback transaction on failure
     if (rc) {
         netdata_log_error("Trying to rollback ML transaction because it failed with rc=%d, op_no=%d", rc, op_no);
         op_no++;
         rc = db_execute(db, "ROLLBACK;");
         if (rc)
             netdata_log_error("ML transaction rollback failed with rc=%d", rc);
+    }
+
+    if (!rc) {
+        training_thread->num_db_transactions++;
+        training_thread->num_models_to_prune += training_thread->pending_model_info.size();        
     }
 
     training_thread->pending_model_info.clear();
@@ -1677,6 +1751,7 @@ void ml_init()
         db = NULL;
     }
 
+    // create table
     if (db) {
         char *err = NULL;
         int rc = sqlite3_exec(db, db_models_create_table, NULL, NULL, &err);
