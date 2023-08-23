@@ -474,37 +474,6 @@ void job_del_cb(const DICTIONARY_ITEM *item, void *value, void *data)
     job_del((struct job *)value);
 }
 
-static int set_job_config(struct job *job, dyncfg_config_t cfg)
-{
-    struct module *mod = job->module;
-    enum set_config_result rt = mod->set_job_config_cb(mod->job_config_cb_usr_ctx, mod->plugin->name, mod->name, job->name, &cfg);
-
-    if (rt != SET_CONFIG_ACCEPTED) {
-        error_report("DYNCFG module \"%s\" rejected config for job \"%s\"", mod->name, job->name);
-        return 1;
-    }
-
-    return 0;
-}
-
-struct job *add_job(struct module *mod, const char *job_id, dyncfg_config_t *cfg, enum job_type job_type, dyncfg_job_flg_t flags)
-{
-    struct job *job = job_new(job_id);
-    job->module = mod;
-    job->flags = flags;
-    job->type = job_type;
-
-    if (cfg != NULL && set_job_config(job, *cfg)) {
-        job_del(job);
-        return NULL;
-    }
-
-    dictionary_set(mod->jobs, job->name, job, sizeof(job));
-
-    return job;
-
-}
-
 void module_del_cb(const DICTIONARY_ITEM *item, void *value, void *data)
 {
     UNUSED(item);
@@ -514,7 +483,6 @@ void module_del_cb(const DICTIONARY_ITEM *item, void *value, void *data)
     freez(mod->name);
     freez(mod);
 }
-
 
 const DICTIONARY_ITEM *register_plugin(DICTIONARY *plugins_dict, struct configurable_plugin *plugin, bool localhost)
 {
@@ -586,7 +554,12 @@ int register_module(DICTIONARY *plugins_dict, struct configurable_plugin *plugin
                         continue;
                     ent->d_name[len - strlen(DYN_CONF_CFG_EXT)] = '\0';
 
-                    add_job(module, ent->d_name, NULL, JOB_TYPE_USER, JOB_FLG_PS_LOADED);
+                    struct job *job = job_new(ent->d_name);
+                    job->module = module;
+                    job->flags = JOB_FLG_PS_LOADED;
+                    job->type = JOB_TYPE_USER;
+
+                    dictionary_set(module->jobs, job->name, job, sizeof(job));
 
                     deferred_config_push_back(plugins_dict, plugin->name, module->name, ent->d_name);
                 }
@@ -601,7 +574,7 @@ int register_module(DICTIONARY *plugins_dict, struct configurable_plugin *plugin
     return 0;
 }
 
-int register_job(DICTIONARY *plugins_dict, const char *plugin_name, const char *module_name, const char *job_name, enum job_type job_type, dyncfg_job_flg_t flags)
+int register_job(DICTIONARY *plugins_dict, const char *plugin_name, const char *module_name, const char *job_name, enum job_type job_type, dyncfg_job_flg_t flags, int ignore_existing)
 {
     int rc = 1;
     const DICTIONARY_ITEM *plugin_item = dictionary_get_and_acquire_item(plugins_dict, plugin_name);
@@ -620,11 +593,19 @@ int register_job(DICTIONARY *plugins_dict, const char *plugin_name, const char *
         goto ERR_EXIT;
     }
     if (get_job_by_name(mod, job_name) != NULL) {
-        error_report("job \"%s\" already registered", job_name);
+        if (!ignore_existing)
+            error_report("job \"%s\" already registered", job_name);
         goto ERR_EXIT;
     }
 
-    rc = (add_job(mod, job_name, NULL, job_type, flags) == NULL);
+    struct job *job = job_new(job_name);
+    job->module = mod;
+    job->flags = flags;
+    job->type = job_type;
+
+    dictionary_set(mod->jobs, job->name, job, sizeof(job));
+
+    rc = 0;
 ERR_EXIT:
     dictionary_acquired_item_release(plugins_dict, plugin_item);
     return rc;
@@ -791,8 +772,7 @@ static inline void _handle_job_root(struct uni_http_response *resp, int method, 
             .data = post_payload,
             .data_size = post_payload_size
         };
-        job = add_job(mod, job_id, &cont, JOB_TYPE_USER, JOB_FLG_USER_CREATED);
-        if (job == NULL) {
+        if (mod->set_job_config_cb(mod->job_config_cb_usr_ctx, mod->plugin->name, mod->name, job_id, &cont)) {
             resp->content = "failed to add job";
             resp->content_length = strlen(resp->content);
             resp->status = HTTP_RESP_INTERNAL_SERVER_ERROR;
@@ -832,10 +812,11 @@ static inline void _handle_job_root(struct uni_http_response *resp, int method, 
                 .data = post_payload,
                 .data_size = post_payload_size
             };
-            if(set_job_config(job, cont)) {
-                resp->status = HTTP_RESP_BAD_REQUEST;
+            if (mod->set_job_config_cb(mod->job_config_cb_usr_ctx, mod->plugin->name, mod->name, job->name, &cont) != SET_CONFIG_ACCEPTED) {
+                error_report("DYNCFG module \"%s\" rejected config for job \"%s\"", mod->name, job->name);
                 resp->content = "failed to set job config";
                 resp->content_length = strlen(resp->content);
+                resp->status = HTTP_RESP_INTERNAL_SERVER_ERROR;
                 return;
             }
             resp->status = HTTP_RESP_OK;

@@ -838,6 +838,34 @@ void delete_job_finalize(struct parser *parser, struct configurable_plugin *plug
     freez(params_local);
 }
 
+void set_job_finalize(struct parser *parser, struct configurable_plugin *plug, const char *fnc_sig, int code) {
+    if (code != SET_CONFIG_ACCEPTED)
+        return;
+
+    char *params_local = strdupz(fnc_sig);
+    char *words[DYNCFG_MAX_WORDS];
+    size_t words_c = quoted_strings_splitter(params_local, words, DYNCFG_MAX_WORDS, isspace_map_pluginsd);
+
+    if (words_c != 3) {
+        netdata_log_error("PLUGINSD_PARSER: invalid number of parameters for set_job_config");
+        freez(params_local);
+        return;
+    }
+
+    const char *module_name = get_word(words, words_c, 1);
+    const char *job_name = get_word(words, words_c, 2);
+
+    if (register_job(parser->user.host->configurable_plugins, parser->user.cd->configuration->name, module_name, job_name, JOB_TYPE_USER, JOB_FLG_USER_CREATED, 1)) {
+        freez(params_local);
+        return;
+    }
+
+    // only send this if it is not existing already (register_job cares for that)
+    rrdpush_send_dyncfg_reg_job(localhost, parser->user.cd->configuration->name, module_name, job_name, JOB_TYPE_USER, JOB_FLG_USER_CREATED);
+
+    freez(params_local);
+}
+
 static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func, void *parser_ptr) {
     struct inflight_function *pf = func;
     struct parser *parser = (struct parser *)parser_ptr;
@@ -849,6 +877,8 @@ static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __may
 
     if (pf->virtual && SERVING_PLUGINSD(parser)) {
         if (pf->payload) {
+            if (strncmp(string2str(pf->function), FUNCTION_NAME_SET_JOB_CONFIG, strlen(FUNCTION_NAME_SET_JOB_CONFIG)) == 0)
+                set_job_finalize(parser, parser->user.cd->configuration, string2str(pf->function), pf->code);
             dyn_conf_store_config(string2str(pf->function), pf->payload, parser->user.cd->configuration);
         } else if (strncmp(string2str(pf->function), FUNCTION_NAME_DELETE_JOB, strlen(FUNCTION_NAME_DELETE_JOB)) == 0) {
             delete_job_finalize(parser, parser->user.cd->configuration, string2str(pf->function), pf->code);
@@ -2420,7 +2450,7 @@ static inline PARSER_RC pluginsd_register_job_common(char **words __maybe_unused
     if (SERVING_PLUGINSD(parser) && job_type == JOB_TYPE_USER)
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_JOB, "plugins cannot push jobs of type \"user\" (this is allowed only in streaming)");
 
-    if (register_job(parser->user.host->configurable_plugins, plugin_name, words[0], words[1], job_type, flags))
+    if (register_job(parser->user.host->configurable_plugins, plugin_name, words[0], words[1], job_type, flags, 0)) // ignore existing is off as this is explicitly called register job
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_JOB, "error registering job");
 
     rrdpush_send_dyncfg_reg_job(parser->user.host, plugin_name, words[0], words[1], job_type, flags);
