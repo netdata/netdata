@@ -3,6 +3,7 @@
 require 'json'
 require 'httparty'
 require 'pastel'
+require 'securerandom'
 
 ARGV.length == 1 or raise "Usage: #{$0} <config file>"
 config_file = ARGV[0]
@@ -103,6 +104,12 @@ end
 def assert_eq(got, expected, msg = nil)
     unless got == expected
         FAIL("Expected #{expected}, got #{got} #{msg ? "(#{msg})" : ""}", nil, caller_locations(1, 1).first)
+    end
+    $test_runner.add_assertion()
+end
+def assert_eq_http_code(got, expected, msg = nil)
+    unless got.code == expected
+        FAIL("Expected #{expected}, got #{got}. Server \"#{got.parsed_response}\" #{msg ? "(#{msg})" : ""}", nil, caller_locations(1, 1).first)
     end
     $test_runner.add_assertion()
 end
