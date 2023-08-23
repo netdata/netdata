@@ -145,7 +145,7 @@ Below is a list of all the available configuration params and their default valu
 	# charts to skip from training = netdata.*
 	# dimension anomaly rate suppression window = 900
 	# dimension anomaly rate suppression threshold = 450
-    # delete models older than = 604800
+	# delete models older than = 604800
 ```
 
 ### Configuration Examples
