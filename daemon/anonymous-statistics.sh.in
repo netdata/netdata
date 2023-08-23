@@ -68,6 +68,7 @@ NETDATA_IS_PRIVATE_REGISTRY="${39}"
 NETDATA_USE_PRIVATE_REGISTRY="${40}"
 NETDATA_CONFIG_OOM_SCORE="${41}"
 NETDATA_PREBUILT_DISTRO="${42}"
+NETDATA_FAIL_REASON="${43}"
 
 [ -z "$NETDATA_REGISTRY_UNIQUE_ID" ] && NETDATA_REGISTRY_UNIQUE_ID="00000000-0000-0000-0000-000000000000"
 
@@ -175,7 +176,8 @@ REQ_BODY="$(cat << EOF
         "mirrored_host_count": ${NETDATA_MIRRORED_HOST_COUNT},
         "mirrored_hosts_reachable": ${NETDATA_MIRRORED_HOSTS_REACHABLE},
         "mirrored_hosts_unreachable": ${NETDATA_MIRRORED_HOSTS_UNREACHABLE},
-        "exporting_connectors": ${NETDATA_EXPORTING_CONNECTORS}
+        "exporting_connectors": ${NETDATA_EXPORTING_CONNECTORS},
+        "netdata_fail_reason": ${NETDATA_FAIL_REASON}
   }
 }
 EOF
