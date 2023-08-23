@@ -31,6 +31,7 @@ netdata_rwlock_t rrd_rwlock = NETDATA_RWLOCK_INITIALIZER;
 
 time_t rrdset_free_obsolete_time_s = 3600;
 time_t rrdhost_free_orphan_time_s = 3600;
+time_t rrdhost_free_ephemeral_time_s = 3600;
 
 bool is_storage_engine_shared(STORAGE_INSTANCE *engine __maybe_unused) {
 #ifdef ENABLE_DBENGINE
@@ -838,7 +839,7 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
        && rrdhost_receiver_replicating_charts(host) == 0
        && rrdhost_sender_replicating_charts(host) == 0
        && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)
-       && !rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)
+       && !rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)
        && !host->receiver
        && host->child_disconnected_time
        && host->child_disconnected_time + rrdhost_free_orphan_time_s < now_s)

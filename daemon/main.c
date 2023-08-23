@@ -1223,6 +1223,7 @@ static void get_netdata_configured_variables() {
     // --------------------------------------------------------------------
 
     rrdset_free_obsolete_time_s = config_get_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time_s);
+    rrdhost_free_ephemeral_time_s = config_get_number(CONFIG_SECTION_DB, "cleanup ephemeral hosts after secs", rrdhost_free_ephemeral_time_s);
     // Current chart locking and invalidation scheme doesn't prevent Netdata from segmentation faults if a short
     // cleanup delay is set. Extensive stress tests showed that 10 seconds is quite a safe delay. Look at
     // https://github.com/netdata/netdata/pull/11222#issuecomment-868367920 for more information.
