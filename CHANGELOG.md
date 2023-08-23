@@ -6,7 +6,10 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#15867](https://github.com/netdata/netdata/pull/15867) ([netdatabot](https://github.com/netdatabot))
+- Add plugin and module information to collector integrations. [\#15864](https://github.com/netdata/netdata/pull/15864) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#15862](https://github.com/netdata/netdata/pull/15862) ([netdatabot](https://github.com/netdatabot))
+- Explicitly depend on version-matched plugins in native packages. [\#15861](https://github.com/netdata/netdata/pull/15861) ([Ferroin](https://github.com/Ferroin))
 - Apply a label prefix for netdata labels [\#15860](https://github.com/netdata/netdata/pull/15860) ([kevin-fwu](https://github.com/kevin-fwu))
 - fix proc meminfo cached calculation [\#15859](https://github.com/netdata/netdata/pull/15859) ([ilyam8](https://github.com/ilyam8))
 - Fix compilation warnings [\#15858](https://github.com/netdata/netdata/pull/15858) ([stelfrag](https://github.com/stelfrag))
@@ -59,6 +62,7 @@
 - fix: the cleanup was not performed during the kickstart.sh dry run [\#15775](https://github.com/netdata/netdata/pull/15775) ([ilyam8](https://github.com/ilyam8))
 - Increase alert snapshot chunk size [\#15748](https://github.com/netdata/netdata/pull/15748) ([MrZammler](https://github.com/MrZammler))
 - Added CentOS-Stream to distros [\#15742](https://github.com/netdata/netdata/pull/15742) ([k0ste](https://github.com/k0ste))
+- Misc code cleanup [\#15665](https://github.com/netdata/netdata/pull/15665) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.42.1](https://github.com/netdata/netdata/tree/v1.42.1) (2023-08-16)
 
@@ -423,12 +427,6 @@
 - bump go.d.plugin to v0.54.0 [\#15312](https://github.com/netdata/netdata/pull/15312) ([ilyam8](https://github.com/ilyam8))
 - health: respect overriding nc binary for IRC notifications [\#15310](https://github.com/netdata/netdata/pull/15310) ([ilyam8](https://github.com/ilyam8))
 - hide not available for viewers charts when exporting in shell format [\#15309](https://github.com/netdata/netdata/pull/15309) ([ilyam8](https://github.com/ilyam8))
-- move collectors meta to metadata/ [\#15308](https://github.com/netdata/netdata/pull/15308) ([ilyam8](https://github.com/ilyam8))
-- Release acquired dimensions [\#15307](https://github.com/netdata/netdata/pull/15307) ([stelfrag](https://github.com/stelfrag))
-- Check for source field when requesting /api/v1/alarm\_log [\#15306](https://github.com/netdata/netdata/pull/15306) ([MrZammler](https://github.com/MrZammler))
-- ci: disable clang format [\#15305](https://github.com/netdata/netdata/pull/15305) ([ilyam8](https://github.com/ilyam8))
-- Change info to netdata\_log\_info in sqlite\_db\_migration.c [\#15303](https://github.com/netdata/netdata/pull/15303) ([MrZammler](https://github.com/MrZammler))
-- Create integrations JSON schema [\#15302](https://github.com/netdata/netdata/pull/15302) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
