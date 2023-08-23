@@ -409,6 +409,7 @@ typedef struct query_target {
     struct {
         SPINLOCK spinlock;
         bool used;                              // when true, this query is currently being used
+        bool relative;                          // when true, this query uses relative timestamps
         size_t queries;                         // how many query we have done so far with this QUERY_TARGET - not related to database queries
         struct query_target *prev;
         struct query_target *next;

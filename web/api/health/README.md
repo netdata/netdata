@@ -12,23 +12,23 @@ learn_rel_path: "Developers/Web/Api"
 
 ## Health Read API
 
-### Enabled Alarms
+### Enabled Alerts
 
-Netdata enables alarms on demand, i.e. when the chart they should be linked to starts collecting data. So, although many
-more alarms are configured, only the useful ones are enabled.
+Netdata enables alerts on demand, i.e. when the chart they should be linked to starts collecting data. So, although many
+more alerts are configured, only the useful ones are enabled.
 
-To get the list of all enabled alarms, open your browser and navigate to `http://NODE:19999/api/v1/alarms?all`,
+To get the list of all enabled alerts, open your browser and navigate to `http://NODE:19999/api/v1/alarms?all`,
 replacing `NODE` with the IP address or hostname for your Agent dashboard.
 
-### Raised Alarms
+### Raised Alerts
 
-This API call will return the alarms currently in WARNING or CRITICAL state.
+This API call will return the alerts currently in WARNING or CRITICAL state.
 
 `http://NODE:19999/api/v1/alarms`
 
 ### Event Log
 
-The size of the alarm log is configured in `netdata.conf`. There are 2 settings: the event history kept in the DB (in seconds), and the in memory size of the alarm log.
+The size of the alert log is configured in `netdata.conf`. There are 2 settings: the event history kept in the DB (in seconds), and the in memory size of the alert log.
 
 ```
 [health]
@@ -36,32 +36,32 @@ The size of the alarm log is configured in `netdata.conf`. There are 2 settings:
 	health log history = 432000
 ```
 
-The API call retrieves all entries of the alarm log:
+The API call retrieves all entries of the alert log:
 
 `http://NODE:19999/api/v1/alarm_log`
 
-### Alarm Log Incremental Updates
+### Alert Log Incremental Updates
 
 `http://NODE:19999/api/v1/alarm_log?after=UNIQUEID`
 
-The above returns all the events in the alarm log that occurred after UNIQUEID (you poll it once without `after=`, remember the last UNIQUEID of the returned set, which you give back to get incrementally the next events).
+The above returns all the events in the alert log that occurred after UNIQUEID (you poll it once without `after=`, remember the last UNIQUEID of the returned set, which you give back to get incrementally the next events).
 
-### Alarm badges
+### Alert badges
 
-The following will return an SVG badge of the alarm named `NAME`, attached to the chart named `CHART`.
+The following will return an SVG badge of the alert named `NAME`, attached to the chart named `CHART`.
 
 `http://NODE:19999/api/v1/badge.svg?alarm=NAME&chart=CHART`
 
 ## Health Management API
 
-Netdata v1.12 and beyond provides a command API to control health checks and notifications at runtime. The feature is especially useful for maintenance periods, during which you receive meaningless alarms.
+Netdata v1.12 and beyond provides a command API to control health checks and notifications at runtime. The feature is especially useful for maintenance periods, during which you receive meaningless alerts.
 From Netdata v1.16.0 and beyond, the configuration controlled via the API commands is [persisted across Netdata restarts](#persistence).
 
 Specifically, the API allows you to:
 
--   Disable health checks completely. Alarm conditions will not be evaluated at all and no entries will be added to the alarm log.
--   Silence alarm notifications. Alarm conditions will be evaluated, the alarms will appear in the log and the Netdata UI will show the alarms as active, but no notifications will be sent.
--   Disable or Silence specific alarms that match selectors on alarm/template name, chart, context, host and family.
+-   Disable health checks completely. Alert conditions will not be evaluated at all and no entries will be added to the alert log.
+-   Silence alert notifications. Alert conditions will be evaluated, the alerts will appear in the log and the Netdata UI will show the alerts as active, but no notifications will be sent.
+-   Disable or Silence specific alerts that match selectors on alert/template name, chart, context, host and family.
 
 The API is available by default, but it is protected by an `api authorization token` that is stored in the file you will see in the following entry of `http://NODE:19999/netdata.conf`:
 
@@ -81,7 +81,7 @@ By default access to the health management API is only allowed from `localhost`.
 The command `RESET` just returns Netdata to the default operation, with all health checks and notifications enabled.
 If you've configured and entered your token correctly, you should see the plain text response `All health checks and notifications are enabled`.
 
-### Disable or silence all alarms
+### Disable or silence all alerts
 
 If all you need is temporarily disable all health checks, then you issue the following before your maintenance period starts:
 
@@ -89,14 +89,14 @@ If all you need is temporarily disable all health checks, then you issue the fol
 curl "http://NODE:19999/api/v1/manage/health?cmd=DISABLE ALL" -H "X-Auth-Token: Mytoken"
 ```
 
-The effect of disabling health checks is that the alarm criteria are not evaluated at all and nothing is written in the alarm log.
+The effect of disabling health checks is that the alert criteria are not evaluated at all and nothing is written in the alert log.
 If you want the health checks to be running but to not receive any notifications during your maintenance period, you can instead use this:
 
 ```sh
 curl "http://NODE:19999/api/v1/manage/health?cmd=SILENCE ALL" -H "X-Auth-Token: Mytoken"
 ```
 
-Alarms may then still be raised and logged in Netdata, so you'll be able to see them via the UI.  
+Alerts may then still be raised and logged in Netdata, so you'll be able to see them via the UI.  
 
 Regardless of the option you choose, at the end of your maintenance period you revert to the normal state via the RESET command.
 
@@ -104,25 +104,25 @@ Regardless of the option you choose, at the end of your maintenance period you r
  curl "http://NODE:19999/api/v1/manage/health?cmd=RESET" -H "X-Auth-Token: Mytoken"
 ```
 
-### Disable or silence specific alarms
+### Disable or silence specific alerts
 
-If you do not wish to disable/silence all alarms, then the `DISABLE ALL` and `SILENCE ALL` commands can't be used.
-Instead, the following commands expect that one or more alarm selectors will be added, so that only alarms that match the selectors are disabled or silenced.  
+If you do not wish to disable/silence all alerts, then the `DISABLE ALL` and `SILENCE ALL` commands can't be used.
+Instead, the following commands expect that one or more alert selectors will be added, so that only alerts that match the selectors are disabled or silenced.  
 
 -   `DISABLE` : Set the mode to disable health checks.
 -   `SILENCE` : Set the mode to silence notifications.
 
-You will normally put one of these commands in the same request with your first alarm selector, but it's possible to issue them separately as well.
+You will normally put one of these commands in the same request with your first alert selector, but it's possible to issue them separately as well.
 You will get a warning in the response, if a selector was added without a SILENCE/DISABLE command, or vice versa.
 
-Each request can specify a single alarm `selector`, with one or more `selection criteria`.
-A single alarm will match a `selector` if all selection criteria match the alarm.
+Each request can specify a single alert `selector`, with one or more `selection criteria`.
+A single alert will match a `selector` if all selection criteria match the alert.
 You can add as many selectors as you like.
-In essence, the rule is: IF (alarm matches all the criteria in selector1 OR all the criteria in selector2 OR ...) THEN apply the DISABLE or SILENCE command.
+In essence, the rule is: IF (alert matches all the criteria in selector1 OR all the criteria in selector2 OR ...) THEN apply the DISABLE or SILENCE command.
 
 To clear all selectors and reset the mode to default, use the `RESET` command.
 
-The following example silences notifications for all the alarms with context=load:
+The following example silences notifications for all the alerts with context=load:
 
 ```
 curl "http://NODE:19999/api/v1/manage/health?cmd=SILENCE&context=load" -H "X-Auth-Token: Mytoken"
@@ -138,9 +138,9 @@ The accepted keys for the `selection criteria` are the following:
 -   `chart`    : Chart ids/names, as shown on the dashboard. These will match the `on` entry of a configured `alarm`.
 -   `context`  : Chart context, as shown on the dashboard. These will match the `on` entry of a configured `template`.
 -   `hosts`    : The hostnames that will need to match.
--   `families` : The alarm families.
+-   `families` : The alert families.
 
-You can add any of the selection criteria you need on the request, to ensure that only the alarms you are interested in are matched and disabled/silenced. e.g. there is no reason to add `hosts: *`, if you want the criteria to be applied to alarms for all hosts.
+You can add any of the selection criteria you need on the request, to ensure that only the alerts you are interested in are matched and disabled/silenced. e.g. there is no reason to add `hosts: *`, if you want the criteria to be applied to alerts for all hosts.
 
 Example 1: Disable all health checks for context = `random`
 
@@ -148,13 +148,13 @@ Example 1: Disable all health checks for context = `random`
 http://NODE:19999/api/v1/manage/health?cmd=DISABLE&context=random
 ```
 
-Example 2: Silence all alarms and templates with name starting with `out_of` on host `myhost`
+Example 2: Silence all alerts and templates with name starting with `out_of` on host `myhost`
 
 ```
 http://NODE:19999/api/v1/manage/health?cmd=SILENCE&alarm=out_of*&hosts=myhost
 ```
 
-Example 2.2: Add one more selector, to also silence alarms for cpu1 and cpu2
+Example 2.2: Add one more selector, to also silence alerts for cpu1 and cpu2
 
 ```
 http://NODE:19999/api/v1/manage/health?families=cpu1 cpu2
@@ -168,7 +168,7 @@ The command `LIST` was added in Netdata v1.16.0 and returns a JSON with the curr
  curl "http://NODE:19999/api/v1/manage/health?cmd=LIST" -H "X-Auth-Token: Mytoken"
 ```
 
-As an example, the following response shows that we have two silencers configured, one for an alarm called `samplealarm` and one for alarms with context `random` on host `myhost`
+As an example, the following response shows that we have two silencers configured, one for an alert called `samplealert` and one for alerts with context `random` on host `myhost`
 
 ```
 json
@@ -177,7 +177,7 @@ json
         "type": "SILENCE",
         "silencers": [
                 {
-                        "alarm": "samplealarm"
+                        "alarm": "samplealert"
                 },
                 {
                         "context": "random",

@@ -46,6 +46,7 @@ int do_ipc(int update_every, usec_t dt);
 int do_sys_class_power_supply(int update_every, usec_t dt);
 int do_proc_pagetypeinfo(int update_every, usec_t dt);
 int do_sys_class_infiniband(int update_every, usec_t dt);
+int do_sys_class_drm(int update_every, usec_t dt);
 int get_numa_node_count(void);
 
 // metrics that need to be shared among data collectors

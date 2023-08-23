@@ -18,6 +18,8 @@ typedef enum web_client_mode {
     WEB_CLIENT_MODE_FILECOPY = 2,
     WEB_CLIENT_MODE_OPTIONS = 3,
     WEB_CLIENT_MODE_STREAM = 4,
+    WEB_CLIENT_MODE_PUT = 5,
+    WEB_CLIENT_MODE_DELETE = 6,
 } WEB_CLIENT_MODE;
 
 typedef enum {

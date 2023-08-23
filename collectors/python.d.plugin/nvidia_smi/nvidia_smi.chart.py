@@ -62,20 +62,22 @@ POWER_STATES = ['P' + str(i) for i in range(0, 16)]
 
 # PCI Transfer data rate in gigabits per second (Gb/s) per generation
 PCI_SPEED = {
-  "1": 2.5,
-  "2": 5,
-  "3": 8,
-  "4": 16,
-  "5": 32
+    "1": 2.5,
+    "2": 5,
+    "3": 8,
+    "4": 16,
+    "5": 32
 }
 # PCI encoding per generation
 PCI_ENCODING = {
-  "1": 2/10,
-  "2": 2/10,
-  "3": 2/130,
-  "4": 2/130,
-  "5": 2/130
+    "1": 2 / 10,
+    "2": 2 / 10,
+    "3": 2 / 130,
+    "4": 2 / 130,
+    "5": 2 / 130
 }
+
+
 def gpu_charts(gpu):
     fam = gpu.full_name()
 
@@ -88,7 +90,8 @@ def gpu_charts(gpu):
             ]
         },
         PCI_BANDWIDTH_PERCENT: {
-            'options': [None, 'PCI Express Bandwidth Percent', 'percentage', fam, 'nvidia_smi.pci_bandwidth_percent', 'area'],
+            'options': [None, 'PCI Express Bandwidth Percent', 'percentage', fam, 'nvidia_smi.pci_bandwidth_percent',
+                        'area'],
             'lines': [
                 ['rx_util_percent', 'rx_percent'],
                 ['tx_util_percent', 'tx_percent'],
@@ -358,7 +361,8 @@ class GPU:
 
     @handle_attr_error
     def pci_link_width(self):
-        return self.root.find('pci').find('pci_gpu_link_info').find('link_widths').find('max_link_width').text.split('x')[0]
+        info = self.root.find('pci').find('pci_gpu_link_info')
+        return info.find('link_widths').find('max_link_width').text.split('x')[0]
 
     def pci_bw_max(self):
         link_gen = self.pci_link_gen()
@@ -368,7 +372,7 @@ class GPU:
         # Maximum PCIe Bandwidth = SPEED * WIDTH * (1 - ENCODING) - 1Gb/s.
         # see details https://enterprise-support.nvidia.com/s/article/understanding-pcie-configuration-for-maximum-performance
         # return max bandwidth in kilobytes per second (kB/s)
-        return (PCI_SPEED[link_gen] * link_width * (1- PCI_ENCODING[link_gen]) - 1) * 1000 * 1000 / 8
+        return (PCI_SPEED[link_gen] * link_width * (1 - PCI_ENCODING[link_gen]) - 1) * 1000 * 1000 / 8
 
     @handle_attr_error
     def rx_util(self):
@@ -435,13 +439,18 @@ class GPU:
         return self.root.find('clocks').find('mem_clock').text.split()[0]
 
     @handle_attr_error
+    def power_readings(self):
+        elem = self.root.find('power_readings')
+        return elem if elem else self.root.find('gpu_power_readings')
+
+    @handle_attr_error
     def power_state(self):
-        return str(self.root.find('power_readings').find('power_state').text.split()[0])
+        return str(self.power_readings().find('power_state').text.split()[0])
 
     @handle_value_error
     @handle_attr_error
     def power_draw(self):
-        return float(self.root.find('power_readings').find('power_draw').text.split()[0]) * 100
+        return float(self.power_readings().find('power_draw').text.split()[0]) * 100
 
     @handle_attr_error
     def processes(self):
@@ -491,7 +500,6 @@ class GPU:
             else:
                 data['rx_util_percent'] = str(int(int(self.rx_util()) * 100 / self.pci_bw_max()))
                 data['tx_util_percent'] = str(int(int(self.tx_util()) * 100 / self.pci_bw_max()))
-
 
         for v in POWER_STATES:
             data['power_state_' + v.lower()] = 0

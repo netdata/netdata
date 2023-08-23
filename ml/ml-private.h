@@ -291,6 +291,9 @@ typedef struct {
     RRDDIM *training_results_not_enough_collected_values_rd;
     RRDDIM *training_results_null_acquired_dimension_rd;
     RRDDIM *training_results_chart_under_replication_rd;
+
+    size_t num_db_transactions;
+    size_t num_models_to_prune;
 } ml_training_thread_t;
 
 typedef struct {
@@ -301,6 +304,7 @@ typedef struct {
     unsigned train_every;
 
     unsigned num_models_to_use;
+    unsigned delete_models_older_than;
 
     unsigned db_engine_anomaly_rate_every;
 

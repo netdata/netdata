@@ -36,7 +36,7 @@ Netdata ships with a few synthetic chart definitions to automatically present ap
 more uniform way. These synthetic charts are configuration files (you can create your own) that re-arrange 
 statsd metrics into a more meaningful way.
 
-On synthetic charts, we can have alarms as with any metric and chart.
+On synthetic charts, we can have alerts as with any metric and chart.
 
 - [K6 load testing tool](https://k6.io)
   - **Description:** k6 is a developer-centric, free and open-source load testing tool built for making performance testing a productive and enjoyable experience.
@@ -348,11 +348,11 @@ Using the above configuration `myapp` should get its own section on the dashboar
 -   `gaps when not collected = yes|no`, enables or disables gaps on the charts of the application in case that no metrics are collected.
 -   `memory mode` sets the memory mode for all charts of the application. The default is the global default for Netdata (not the global default for StatsD private charts). We suggest not to use this (we have commented it out in the example) and let your app use the global default for Netdata, which is our dbengine.
 
--   `history` sets the size of the round robin database for this application. The default is the global default for Netdata (not the global default for StatsD private charts). This is only relevant if you use `memory mode = save`. Read more on our [metrics storage(]/docs/store/change-metrics-storage.md) doc.
+-   `history` sets the size of the round-robin database for this application. The default is the global default for Netdata (not the global default for StatsD private charts). This is only relevant if you use `memory mode = save`. Read more on our [metrics storage(]/docs/store/change-metrics-storage.md) doc.
 
 `[dictionary]` defines name-value associations. These are used to renaming metrics, when added to synthetic charts. Metric names are also defined at each `dimension` line. However, using the dictionary dimension names can be declared globally, for each app and is the only way to rename dimensions when using patterns. Of course the dictionary can be empty or missing.
 
-Then, add any number of charts. Each chart should start with `[id]`. The chart will be called `app_name.id`.  `family` controls the submenu on the dashboard. `context` controls the alarm templates. `priority` controls the ordering of the charts on the dashboard. The rest of the settings are informational.
+Then, add any number of charts. Each chart should start with `[id]`. The chart will be called `app_name.id`.  `family` controls the submenu on the dashboard. `context` controls the alert templates. `priority` controls the ordering of the charts on the dashboard. The rest of the settings are informational.
 
 Add any number of metrics to a chart, using `dimension` lines. These lines accept 5 space separated parameters:
 
@@ -361,7 +361,7 @@ Add any number of metrics to a chart, using `dimension` lines. These lines accep
 3.  an optional selector (type) of the value to shown (see below)
 4.  an optional multiplier
 5.  an optional divider
-6.  optional flags, space separated and enclosed in quotes. All the external plugins `DIMENSION` flags can be used. Currently the only usable flag is `hidden`, to add the dimension, but not show it on the dashboard. This is usually needed to have the values available for percentage calculation, or use them in alarms.
+6.  optional flags, space separated and enclosed in quotes. All the external plugins `DIMENSION` flags can be used. Currently, the only usable flag is `hidden`, to add the dimension, but not show it on the dashboard. This is usually needed to have the values available for percentage calculation, or use them in alerts.
 
 So, the format is this:
 
@@ -439,7 +439,7 @@ Use the dictionary in 2 ways:
 1.  set `dimension = myapp.metric1 ''` and have at the dictionary `myapp.metric1 = metric1 name`
 2.  set `dimension = myapp.metric1 'm1'` and have at the dictionary `m1 = metric1 name`
 
-In both cases, the dimension will be added with ID `myapp.metric1` and will be named `metric1 name`. So, in alarms use either of the 2 as `${myapp.metric1}` or `${metric1 name}`.
+In both cases, the dimension will be added with ID `myapp.metric1` and will be named `metric1 name`. So, in alerts use either of the 2 as `${myapp.metric1}` or `${metric1 name}`.
 
 > keep in mind that if you add multiple times the same StatsD metric to a chart, Netdata will append `TYPE` to the dimension ID, so `myapp.metric1` will be added as `myapp.metric1_last` or `myapp.metric1_events`, etc. If you add multiple times the same metric with the same `TYPE` to a chart, Netdata will also append an incremental counter to the dimension ID, i.e. `myapp.metric1_last1`, `myapp.metric1_last2`, etc.
 

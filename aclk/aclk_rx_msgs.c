@@ -449,7 +449,7 @@ int stop_streaming_contexts(const char *msg, size_t msg_len)
 
 int cancel_pending_req(const char *msg, size_t msg_len)
 {
-    struct aclk_cancel_pending_req cmd;
+    struct aclk_cancel_pending_req cmd = {.request_id = NULL, .trace_id = NULL};
     if(parse_cancel_pending_req(msg, msg_len, &cmd)) {
         error_report("Error parsing CancelPendingReq");
         return 1;

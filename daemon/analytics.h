@@ -18,7 +18,7 @@
 #define ANALYTICS_MAX_DASHBOARD_HITS 255
 
 /* Needed to calculate the space needed for parameters */
-#define ANALYTICS_NO_OF_ITEMS 39
+#define ANALYTICS_NO_OF_ITEMS 40
 
 struct analytics_data {
     char *netdata_config_stream_enabled;
@@ -60,6 +60,7 @@ struct analytics_data {
     char *netdata_config_use_private_registry;
     char *netdata_config_oom_score;
     char *netdata_prebuilt_distro;
+    char *netdata_fail_reason;
 
     size_t data_length;
 

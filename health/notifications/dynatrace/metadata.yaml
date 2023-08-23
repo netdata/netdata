@@ -1,0 +1,92 @@
+# yamllint disable rule:line-length
+---
+- id: 'notify-dynatrace'
+  meta:
+    name: 'Dynatrace'
+    link: 'https://dynatrace.com'
+    categories:
+      - notify.agent
+    icon_filename: 'dynatrace.svg'
+  keywords:
+    - Dynatrace
+  overview:
+    notification_description: |
+      Dynatrace allows you to receive notifications using their Events REST API. See the [Dynatrace documentation](https://www.dynatrace.com/support/help/dynatrace-api/environment-api/events-v2/post-event) about POSTing an event in the Events API for more details.
+      You can send notifications to Dynatrace using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+    notification_limitations: ''
+  setup:
+    prerequisites:
+      list:
+        - title: ''
+          description: |
+            - A Dynatrace Server. You can use the same on all your Netdata servers but make sure the server is network visible from your Netdata hosts. The Dynatrace server should be with protocol prefixed (http:// or https://), for example: https://monitor.example.com.
+            - An API Token. Generate a secure access API token that enables access to your Dynatrace monitoring data via the REST-based API. See [Dynatrace API - Authentication](https://www.dynatrace.com/support/help/extend-dynatrace/dynatrace-api/basics/dynatrace-api-authentication/) for more details.
+            - An API Space. This is the URL part of the page you have access in order to generate the API Token. For example, the URL for a generated API token might look like: https://monitor.illumineit.com/e/2a93fe0e-4cd5-469a-9d0d-1a064235cfce/#settings/integration/apikeys;gf=all In that case, the Space is 2a93fe0e-4cd5-469a-9d0d-1a064235cfce.
+            - A Server Tag. To generate one on your Dynatrace Server, go to Settings --> Tags --> Manually applied tags and create the Tag. The Netdata alarm is sent as a Dynatrace Event to be correlated with all those hosts tagged with this Tag you have created.
+            - Terminal access to the Agent you wish to configure
+    configuration:
+      file:
+        name: 'health_alarm_notify.conf'
+      options:
+        description: 'The following options can be defined for this notification'
+        folding:
+          title: 'Config Options'
+          enabled: true
+        list:
+          - name: 'SEND_DYNATRACE'
+            default_value: 'YES'
+            description: "Set `SEND_DYNATRACE` to YES"
+            required: true
+          - name: 'DYNATRACE_SERVER'
+            default_value: ''
+            description: "Set `DYNATRACE_SERVER` to the Dynatrace server with the protocol prefix, for example `https://monitor.example.com`."
+            required: true
+          - name: 'DYNATRACE_TOKEN'
+            default_value: ''
+            description: "Set `DYNATRACE_TOKEN` to your Dynatrace API authentication token"
+            required: true
+          - name: 'DYNATRACE_SPACE'
+            default_value: ''
+            description: "Set `DYNATRACE_SPACE` to the API Space, it is the URL part of the page you have access in order to generate the API Token."
+            required: true
+            detailed_description: |
+              For example, the URL for a generated API token might look like: https://monitor.illumineit.com/e/2a93fe0e-4cd5-469a-9d0d-1a064235cfce/#settings/integration/apikeys;gf=all In that case, the Space is 2a93fe0e-4cd5-469a-9d0d-1a064235cfce.
+          - name: 'DYNATRACE_TAG_VALUE'
+            default_value: ''
+            description: "Set `DYNATRACE_TAG_VALUE` to your Dynatrace Server Tag."
+            required: true
+          - name: 'DYNATRACE_ANNOTATION_TYPE'
+            default_value: 'Netdata Alarm'
+            description: "`DYNATRACE_ANNOTATION_TYPE` can be left to its default value Netdata Alarm, but you can change it to better fit your needs."
+            required: false
+          - name: 'DYNATRACE_EVENT'
+            default_value: 'Netdata Alarm'
+            description: "Set `DYNATRACE_EVENT` to the Dynatrace eventType you want."
+            required: false
+            detailed_description: |
+              `AVAILABILITY_EVENT`, `CUSTOM_ALERT`, `CUSTOM_ANNOTATION`, `CUSTOM_CONFIGURATION`, `CUSTOM_DEPLOYMENT`, `CUSTOM_INFO`, `ERROR_EVENT`,
+              `MARKED_FOR_TERMINATION`, `PERFORMANCE_EVENT`, `RESOURCE_CONTENTION_EVENT`.
+              You can read more [here](https://www.dynatrace.com/support/help/dynatrace-api/environment-api/events-v2/post-event#request-body-objects).
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: 'Basic Configuration'
+            folding:
+              enabled: false
+            description: ''
+            config: |
+              #------------------------------------------------------------------------------
+              # Dynatrace global notification options
+
+              SEND_DYNATRACE="YES"
+              DYNATRACE_SERVER="https://monitor.example.com"
+              DYNATRACE_TOKEN="XXXXXXX"
+              DYNATRACE_SPACE="2a93fe0e-4cd5-469a-9d0d-1a064235cfce"
+              DYNATRACE_TAG_VALUE="SERVERTAG"
+              DYNATRACE_ANNOTATION_TYPE="Netdata Alert"
+              DYNATRACE_EVENT="AVAILABILITY_EVENT"
+  troubleshooting:
+    problems:
+      list: []

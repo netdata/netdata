@@ -94,6 +94,93 @@ static void rrdcontext_delete_callback(const DICTIONARY_ITEM *item __maybe_unuse
     rrdcontext_freez(rc);
 }
 
+typedef enum __attribute__((packed)) {
+    OLDNEW_KEEP_OLD,
+    OLDNEW_USE_NEW,
+    OLDNEW_MERGE,
+} OLDNEW;
+
+static inline OLDNEW oldnew_decide(bool archived, bool new_archived) {
+    if(archived && !new_archived)
+        return OLDNEW_USE_NEW;
+
+    if(!archived && new_archived)
+        return OLDNEW_KEEP_OLD;
+
+    return OLDNEW_MERGE;
+}
+
+static inline void string_replace(STRING **stringpp, STRING *new_string) {
+    STRING *old = *stringpp;
+    *stringpp = string_dup(new_string);
+    string_freez(old);
+}
+
+static inline void string_merge(STRING **stringpp, STRING *new_string) {
+    STRING *old = *stringpp;
+    *stringpp = string_2way_merge(*stringpp, new_string);
+    string_freez(old);
+}
+
+static void rrdcontext_merge_with(RRDCONTEXT *rc, bool archived, STRING *title, STRING *family, STRING *units, RRDSET_TYPE chart_type, uint32_t priority) {
+    OLDNEW oldnew = oldnew_decide(rrd_flag_is_archived(rc), archived);
+
+    switch(oldnew) {
+        case OLDNEW_KEEP_OLD:
+            break;
+
+        case OLDNEW_USE_NEW:
+            if(rc->title != title) {
+                string_replace(&rc->title, title);
+                rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
+            }
+            if(rc->family != family) {
+                string_replace(&rc->family, family);
+                rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
+            }
+            break;
+
+        case OLDNEW_MERGE:
+            if(rc->title != title) {
+                string_merge(&rc->title, title);
+                rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
+            }
+            if(rc->family != family) {
+                string_merge(&rc->family, family);
+                rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
+            }
+            break;
+    }
+
+    switch(oldnew) {
+        case OLDNEW_KEEP_OLD:
+            break;
+
+        case OLDNEW_USE_NEW:
+        case OLDNEW_MERGE:
+            if(rc->units != units) {
+                string_replace(&rc->units, units);
+                rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
+            }
+
+            if(rc->chart_type != chart_type) {
+                rc->chart_type = chart_type;
+                rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
+            }
+
+            if(rc->priority != priority) {
+                rc->priority = priority;
+                rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
+            }
+            break;
+    }
+}
+
+void rrdcontext_update_from_collected_rrdinstance(RRDINSTANCE *ri) {
+    rrdcontext_merge_with(ri->rc, rrd_flag_is_archived(ri),
+                          ri->title, ri->family, ri->units, ri->chart_type, ri->priority);
+}
+
 static bool rrdcontext_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *rrdhost __maybe_unused) {
     RRDCONTEXT *rc = (RRDCONTEXT *)old_value;
     RRDCONTEXT *rc_new = (RRDCONTEXT *)new_value;
@@ -106,42 +193,8 @@ static bool rrdcontext_conflict_callback(const DICTIONARY_ITEM *item __maybe_unu
 
     rrdcontext_lock(rc);
 
-    if(rc->title != rc_new->title) {
-        STRING *old_title = rc->title;
-        if (rrd_flag_is_archived(rc) && !rrd_flag_is_archived(rc_new))
-            rc->title = string_dup(rc_new->title);
-        else
-            rc->title = string_2way_merge(rc->title, rc_new->title);
-        string_freez(old_title);
-        rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
-    }
-
-    if(rc->units != rc_new->units) {
-        STRING *old_units = rc->units;
-        rc->units = string_dup(rc_new->units);
-        string_freez(old_units);
-        rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
-    }
-
-    if(rc->family != rc_new->family) {
-        STRING *old_family = rc->family;
-        if (rrd_flag_is_archived(rc) && !rrd_flag_is_archived(rc_new))
-            rc->family = string_dup(rc_new->family);
-        else
-            rc->family = string_2way_merge(rc->family, rc_new->family);
-        string_freez(old_family);
-        rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
-    }
-
-    if(rc->chart_type != rc_new->chart_type) {
-        rc->chart_type = rc_new->chart_type;
-        rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
-    }
-
-    if(rc->priority != rc_new->priority) {
-        rc->priority = rc_new->priority;
-        rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
-    }
+    rrdcontext_merge_with(rc, rrd_flag_is_archived(rc_new),
+                          rc_new->title, rc_new->family, rc_new->units, rc_new->chart_type, rc_new->priority);
 
     rrd_flag_set(rc, rc_new->flags & RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS); // no need for atomics on rc_new
 

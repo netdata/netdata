@@ -131,12 +131,12 @@ static METRIC *rrdeng_metric_create(STORAGE_INSTANCE *db_instance, uuid_t *uuid)
 
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
     MRG_ENTRY entry = {
+            .uuid = uuid,
             .section = (Word_t)ctx,
             .first_time_s = 0,
             .last_time_s = 0,
             .latest_update_every_s = 0,
     };
-    uuid_copy(entry.uuid, *uuid);
 
     METRIC *metric = mrg_metric_add_and_acquire(main_mrg, entry, NULL);
     return metric;
@@ -1014,7 +1014,12 @@ size_t rrdeng_disk_space_used(STORAGE_INSTANCE *db_instance) {
 
 time_t rrdeng_global_first_time_s(STORAGE_INSTANCE *db_instance) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
-    return __atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED);
+
+    time_t t = __atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED);
+    if(t == LONG_MAX || t < 0)
+        t = 0;
+
+    return t;
 }
 
 size_t rrdeng_currently_collected_metrics(STORAGE_INSTANCE *db_instance) {

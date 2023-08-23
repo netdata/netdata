@@ -109,6 +109,7 @@ void analytics_free_data(void)
     freez(analytics_data.netdata_config_use_private_registry);
     freez(analytics_data.netdata_config_oom_score);
     freez(analytics_data.netdata_prebuilt_distro);
+    freez(analytics_data.netdata_fail_reason);
 }
 
 /*
@@ -127,7 +128,7 @@ void analytics_set_data(char **name, char *value)
 /*
  * Set a string data with a value
  */
-void analytics_set_data_str(char **name, char *value)
+void analytics_set_data_str(char **name, const char *value)
 {
     size_t value_string_len;
     if (*name) {
@@ -899,6 +900,7 @@ void set_global_environment()
     analytics_set_data(&analytics_data.netdata_config_use_private_registry, "null");
     analytics_set_data(&analytics_data.netdata_config_oom_score, "null");
     analytics_set_data(&analytics_data.netdata_prebuilt_distro, "null");
+    analytics_set_data(&analytics_data.netdata_fail_reason, "null");
 
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;
@@ -974,6 +976,7 @@ void send_statistics(const char *action, const char *action_result, const char *
         action_result = "";
     if (!action_data)
         action_data = "";
+
     char *command_to_run = mallocz(
         sizeof(char) * (strlen(action) + strlen(action_result) + strlen(action_data) + strlen(as_script) +
                         analytics_data.data_length + (ANALYTICS_NO_OF_ITEMS * 3) + 15));
@@ -981,7 +984,7 @@ void send_statistics(const char *action, const char *action_result, const char *
 
     sprintf(
         command_to_run,
-        "%s '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' ",
+        "%s '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' ",
         as_script,
         action,
         action_result,
@@ -1024,7 +1027,8 @@ void send_statistics(const char *action, const char *action_result, const char *
         analytics_data.netdata_config_is_private_registry,
         analytics_data.netdata_config_use_private_registry,
         analytics_data.netdata_config_oom_score,
-        analytics_data.netdata_prebuilt_distro);
+        analytics_data.netdata_prebuilt_distro,
+        analytics_data.netdata_fail_reason);
 
     netdata_log_info("%s '%s' '%s' '%s'", as_script, action, action_result, action_data);
 

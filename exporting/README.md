@@ -314,9 +314,9 @@ and performance of the exporting engine itself:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/20463536/eb196084-af3d-11e6-8ee5-ddbd3b4d8449.png)
 
-## Exporting engine alarms
+## Exporting engine alerts
 
-Netdata adds 3 alarms:
+Netdata adds 3 alerts:
 
 1.  `exporting_last_buffering`, number of seconds since the last successful buffering of exported data
 2.  `exporting_metrics_sent`, percentage of metrics sent to the external database server

@@ -1,0 +1,63 @@
+# yamllint disable rule:line-length
+---
+- id: 'notify-slack'
+  meta:
+    name: 'Slack'
+    link: 'https://slack.com/'
+    categories:
+      - notify.agent
+    icon_filename: 'slack.png'
+  keywords:
+    - Slack
+  overview:
+    notification_description: |
+      Send notifications to a Slack workspace using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+    notification_limitations: ''
+  setup:
+    prerequisites:
+      list:
+        - title: ''
+          description: |
+            - Slack app along with an incoming webhook, read Slack's guide on the topic [here](https://api.slack.com/messaging/webhooks).
+            - One or more channels to post the messages to
+            - Access to the terminal where Netdata Agent is running
+    configuration:
+      file:
+        name: 'health_alarm_notify.conf'
+      options:
+        description: 'The following options can be defined for this notification'
+        folding:
+          title: 'Config Options'
+          enabled: true
+        list:
+          - name: 'SEND_SLACK'
+            default_value: 'YES'
+            description: "Set `SEND_SLACK` to YES"
+            required: true
+          - name: 'SLACK_WEBHOOK_URL'
+            default_value: ''
+            description: "set `SLACK_WEBHOOK_URL` to your Slack app's webhook URL."
+            required: true
+          - name: 'DEFAULT_RECIPIENT_SLACK'
+            default_value: ''
+            description: "Set `DEFAULT_RECIPIENT_SLACK` to the Slack channel your Slack app is set to send messages to. The syntax for channels is `#channel` or `channel`."
+            required: true
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: 'Basic Configuration'
+            folding:
+              enabled: false
+            description: ''
+            config: |
+              #------------------------------------------------------------------------------
+              # slack (slack.com) global notification options
+
+              SEND_SLACK="YES"
+              SLACK_WEBHOOK_URL="https://hooks.slack.com/services/XXXXXXXX/XXXXXXXX/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" 
+              DEFAULT_RECIPIENT_SLACK="#alarms"
+  troubleshooting:
+    problems:
+      list: []

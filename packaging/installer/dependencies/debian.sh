@@ -8,32 +8,33 @@ NON_INTERACTIVE=0
 DONT_WAIT=0
 
 package_tree="
-  git
-  gcc
-  g++
-  make
-  automake
-  cmake
   autoconf
   autoconf-archive
   autogen
-  libatomic1
-  libtool
-  pkg-config
-  tar
+  automake
+  cmake
   curl
+  g++
+  gcc
+  git
   gzip
-  zlib1g-dev
-  uuid-dev
-  libmnl-dev
-  libjson-c-dev
-  libuv1-dev
-  liblz4-dev
-  libssl-dev
+  libatomic1
   libelf-dev
+  libjson-c-dev
+  liblz4-dev
+  libmnl-dev
+  libssl-dev
+  libsystemd-dev
+  libtool
+  libuv1-dev
   libyaml-dev
+  make
+  pkg-config
   python
   python3
+  tar
+  uuid-dev
+  zlib1g-dev
   "
 
 usage() {

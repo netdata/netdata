@@ -7,8 +7,7 @@
     "description": "Individual entries for deployment information.",
     "properties": {
       "id": {
-        "type": "string",
-        "description": "A unique ID for this integration."
+        "$ref": "./shared.json#/$defs/id"
       },
       "meta": {
         "$ref": "./shared.json#/$defs/instance"
@@ -16,7 +15,11 @@
       "keywords": {
         "$ref": "./shared.json#/$defs/keywords"
       },
-      "description": {
+      "most_popular": {
+        "type": "boolean",
+        "description": "If true, the integration is sorted to the top of the list of integrations."
+      },
+      "install_description": {
         "type": "string",
         "description": "Describes basic information about how to deploy on this platform."
       },
@@ -101,7 +104,8 @@
       "id",
       "meta",
       "keywords",
-      "description",
+      "most_popular",
+      "install_description",
       "methods",
       "additional_info",
       "related_resources",

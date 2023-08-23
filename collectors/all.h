@@ -375,11 +375,11 @@
 
 // Linux powercap
 
-#define NETDATA_CHART_PRIO_POWERCAP        9600
+#define NETDATA_CHART_PRIO_POWERCAP                   9600
 
 // Wireless
 
-#define NETDATA_CHART_PRIO_WIRELESS_IFACE	     7110
+#define NETDATA_CHART_PRIO_WIRELESS_IFACE	          7110
 
 // CGROUPS
 
@@ -394,12 +394,16 @@
 
 #define NETDATA_CHART_PRIO_PCI_AER                  100000
 
+// AMD GPUs
+
+#define NETDATA_CHART_PRIO_DRM_AMDGPU                 39000
+
 // NETDATA ML CHARTS
 
 // [ml] charts
-#define ML_CHART_PRIO_DIMENSIONS        39181
-#define ML_CHART_PRIO_ANOMALY_RATE      39182
-#define ML_CHART_PRIO_DETECTOR_EVENTS   39183
+#define ML_CHART_PRIO_DIMENSIONS                      39181
+#define ML_CHART_PRIO_ANOMALY_RATE                    39182
+#define ML_CHART_PRIO_DETECTOR_EVENTS                 39183
 
 // [netdata.ml] charts
 #define NETDATA_ML_CHART_RUNNING                      890001

@@ -6,6 +6,8 @@
 #include "daemon/common.h"
 #include "sqlite3.h"
 
+void analytics_set_data_str(char **name, const char *value);
+
 // return a node list
 struct node_instance_list {
     uuid_t  node_id;

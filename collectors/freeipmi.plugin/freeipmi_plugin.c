@@ -1450,6 +1450,9 @@ int main (int argc, char **argv) {
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
 
+    // initialize the threads
+    netdata_threads_init_for_external_plugins(0); // set the default threads stack size here
+
     // ------------------------------------------------------------------------
     // parse command line parameters
 
@@ -1892,7 +1895,7 @@ int main (int argc, char **argv) {
 
         // restart check (14400 seconds)
         if (now_monotonic_sec() - started_t > IPMI_RESTART_EVERY_SECONDS) {
-            collector_error("%s(): reached my lifetime expectancy. Exiting to restart.", __FUNCTION__);
+            collector_info("%s(): reached my lifetime expectancy. Exiting to restart.", __FUNCTION__);
             fprintf(stdout, "EXIT\n");
             fflush(stdout);
             exit(0);

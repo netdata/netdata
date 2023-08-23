@@ -34,8 +34,6 @@ const char *database_config[] = {
     "repeat text, host_labels text, p_db_lookup_dimensions text, p_db_lookup_method text, p_db_lookup_options int, "
     "p_db_lookup_after int, p_db_lookup_before int, p_update_every int, source text, chart_labels text);",
 
-    "CREATE INDEX IF NOT EXISTS alert_hash_index ON alert_hash (hash_id);",
-
     "CREATE TABLE IF NOT EXISTS host_info(host_id blob, system_key text NOT NULL, system_value text NOT NULL, "
     "date_created INT, PRIMARY KEY(host_id, system_key));",
 
@@ -57,10 +55,9 @@ const char *database_config[] = {
     "info text, exec_code int, new_status real, old_status real, delay int, "
     "new_value double, old_value double, last_repeat int, transition_id blob, global_id int);",
 
-    "CREATE INDEX IF NOT EXISTS health_log_d_ind_1 ON health_log_detail (unique_id);",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_2 ON health_log_detail (global_id);",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_3 ON health_log_detail (transition_id);",
-    "CREATE INDEX IF NOT EXISTS health_log_d_ind_4 ON health_log_detail (health_log_id);",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_5 ON health_log_detail (health_log_id, unique_id DESC);",
 
     NULL
 };
@@ -75,6 +72,9 @@ const char *database_cleanup[] = {
     "DROP INDEX IF EXISTS ind_d1;",
     "DROP INDEX IF EXISTS ind_c1;",
     "DROP INDEX IF EXISTS ind_c2;",
+    "DROP INDEX IF EXISTS alert_hash_index;",
+    "DROP INDEX IF EXISTS health_log_d_ind_4;",
+    "DROP INDEX IF EXISTS health_log_d_ind_1;",
     NULL
 };
 
@@ -324,6 +324,7 @@ int init_database_batch(sqlite3 *database, int rebuild, int init_type, const cha
         if (rc != SQLITE_OK) {
             error_report("SQLite error during database %s, rc = %d (%s)", init_type ? "cleanup" : "setup", rc, err_msg);
             error_report("SQLite failed statement %s", batch[i]);
+            analytics_set_data_str(&analytics_data.netdata_fail_reason, err_msg);
             sqlite3_free(err_msg);
             if (SQLITE_CORRUPT == rc) {
                 if (!rebuild)
@@ -398,6 +399,7 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     rc = sqlite3_open(sqlite_database, &db_meta);
     if (rc != SQLITE_OK) {
         error_report("Failed to initialize database at %s, due to \"%s\"", sqlite_database, sqlite3_errstr(rc));
+        analytics_set_data_str(&analytics_data.netdata_fail_reason, sqlite3_errstr(rc));
         sqlite3_close(db_meta);
         db_meta = NULL;
         return 1;
@@ -827,6 +829,8 @@ struct node_instance_list *get_node_list(void)
             uuid_t *host_id = (uuid_t *)sqlite3_column_blob(res, 1);
             uuid_unparse_lower(*host_id, host_guid);
             RRDHOST *host = rrdhost_find_by_guid(host_guid);
+            if (!host)
+                continue;
             if (rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)) {
                 netdata_log_info("ACLK: 'host:%s' skipping get node list because context is initializing", rrdhost_hostname(host));
                 continue;

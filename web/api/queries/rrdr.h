@@ -206,8 +206,6 @@ RRDR *rrd2rrdr_legacy(
 RRDR *rrd2rrdr(ONEWAYALLOC *owa, struct query_target *qt);
 bool query_target_calculate_window(struct query_target *qt);
 
-bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t *now_ptr);
-
 #ifdef __cplusplus
 }
 #endif

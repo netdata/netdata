@@ -22,8 +22,8 @@ inline int web_client_bearer_required(struct web_client *w) {
     w->response.data->content_type = CT_TEXT_PLAIN;
     buffer_flush(w->response.data);
     buffer_strcat(w->response.data, "An authorization bearer is required to access the resource.");
-    w->response.code = HTTP_RESP_UNAUTHORIZED;
-    return HTTP_RESP_UNAUTHORIZED;
+    w->response.code = HTTP_RESP_PRECOND_FAIL;
+    return HTTP_RESP_PRECOND_FAIL;
 }
 
 static inline int bad_request_multiple_dashboard_versions(struct web_client *w) {
@@ -204,7 +204,9 @@ void web_client_request_done(struct web_client *w) {
                 break;
 
             case WEB_CLIENT_MODE_POST:
+            case WEB_CLIENT_MODE_PUT:
             case WEB_CLIENT_MODE_GET:
+            case WEB_CLIENT_MODE_DELETE:
                 mode = "DATA";
                 break;
 
@@ -926,6 +928,8 @@ const char *web_response_code_to_string(int code) {
             return "Request Header Fields Too Large";
         case 451:
             return "Unavailable For Legal Reasons";
+        case 499: // nginx's extension to the standard
+            return "Client Closed Request";
 
         case 500:
             return "Internal Server Error";
@@ -1080,6 +1084,14 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
     else if(!strncmp(s, "POST ", 5)) {
         s = &s[5];
         w->mode = WEB_CLIENT_MODE_POST;
+    }
+    else if(!strncmp(s, "PUT ", 4)) {
+        s = &s[4];
+        w->mode = WEB_CLIENT_MODE_PUT;
+    }
+    else if(!strncmp(s, "DELETE ", 7)) {
+        s = &s[7];
+        w->mode = WEB_CLIENT_MODE_DELETE;
     }
     else if(!strncmp(s, "STREAM ", 7)) {
         s = &s[7];
@@ -1280,12 +1292,9 @@ void web_client_build_http_header(struct web_client *w) {
         w->response.data->date = now_realtime_sec();
 
     // set a proper expiration date, if not already set
-    if(unlikely(!w->response.data->expires)) {
-        if(w->response.data->options & WB_CONTENT_NO_CACHEABLE)
-            w->response.data->expires = w->response.data->date + localhost->rrd_update_every;
-        else
-            w->response.data->expires = w->response.data->date + 86400;
-    }
+    if(unlikely(!w->response.data->expires))
+        w->response.data->expires = w->response.data->date +
+                ((w->response.data->options & WB_CONTENT_NO_CACHEABLE) ? 0 : 86400);
 
     // prepare the HTTP response header
     netdata_log_debug(D_WEB_CLIENT, "%llu: Generating HTTP header with response %d.", w->id, w->response.code);
@@ -1756,6 +1765,8 @@ void web_client_process_request(struct web_client *w) {
                 case WEB_CLIENT_MODE_FILECOPY:
                 case WEB_CLIENT_MODE_POST:
                 case WEB_CLIENT_MODE_GET:
+                case WEB_CLIENT_MODE_PUT:
+                case WEB_CLIENT_MODE_DELETE:
                     if(unlikely(
                             !web_client_can_access_dashboard(w) &&
                             !web_client_can_access_registry(w) &&
@@ -1888,6 +1899,8 @@ void web_client_process_request(struct web_client *w) {
 
         case WEB_CLIENT_MODE_POST:
         case WEB_CLIENT_MODE_GET:
+        case WEB_CLIENT_MODE_PUT:
+        case WEB_CLIENT_MODE_DELETE:
             netdata_log_debug(D_WEB_CLIENT, "%llu: Done preparing the response. Sending data (%zu bytes) to client.", w->id, w->response.data->len);
             break;
 
@@ -2051,7 +2064,7 @@ ssize_t web_client_send_deflate(struct web_client *w)
 
         // ask for FINISH if we have all the input
         int flush = Z_SYNC_FLUSH;
-        if((w->mode == WEB_CLIENT_MODE_GET || w->mode == WEB_CLIENT_MODE_POST)
+        if((w->mode == WEB_CLIENT_MODE_GET || w->mode == WEB_CLIENT_MODE_POST || w->mode == WEB_CLIENT_MODE_PUT || w->mode == WEB_CLIENT_MODE_DELETE)
             || (w->mode == WEB_CLIENT_MODE_FILECOPY && !web_client_has_wait_receive(w) && w->response.data->len == w->response.rlen)) {
             flush = Z_FINISH;
             netdata_log_debug(D_DEFLATE, "%llu: Requesting Z_FINISH, if possible.", w->id);
@@ -2426,7 +2439,7 @@ inline bool web_client_timeout_checkpoint_and_check(struct web_client *w, usec_t
     if (since_reception_ut >= w->timings.timeout_ut) {
         buffer_flush(w->response.data);
         buffer_strcat(w->response.data, "Query timeout exceeded");
-        w->response.code = HTTP_RESP_BACKEND_FETCH_FAILED;
+        w->response.code = HTTP_RESP_GATEWAY_TIMEOUT;
         return true;
     }
 

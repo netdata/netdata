@@ -25,6 +25,7 @@ SUBDIRS = \
     statsd.plugin \
     ebpf.plugin \
     tc.plugin \
+    systemd-journal.plugin \
     $(NULL)
 
 usercustompluginsconfigdir=$(configdir)/custom-plugins.d

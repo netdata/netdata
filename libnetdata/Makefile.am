@@ -14,6 +14,7 @@ SUBDIRS = \
     dictionary \
     ebpf \
     eval \
+    facets \
     json \
     july \
     health \

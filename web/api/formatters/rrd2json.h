@@ -38,8 +38,6 @@ typedef enum {
 
 #define HOSTNAME_MAX 1024
 
-#define API_RELATIVE_TIME_MAX (3 * 365 * 86400)
-
 #define DATASOURCE_FORMAT_JSON "json"
 #define DATASOURCE_FORMAT_JSON2 "json2"
 #define DATASOURCE_FORMAT_DATATABLE_JSON "datatable"

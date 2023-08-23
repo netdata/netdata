@@ -1332,6 +1332,7 @@ int mrg_unittest(void);
 int julytest(void);
 int pluginsd_parser_unittest(void);
 void replication_initialize(void);
+void bearer_tokens_init(void);
 
 int main(int argc, char **argv) {
     // initialize the system clocks
@@ -1936,6 +1937,8 @@ int main(int argc, char **argv) {
         delta_startup_time("initialize signals");
         signals_block();
         signals_init(); // setup the signals we want to use
+
+        dyn_conf_init();
 
         // --------------------------------------------------------------------
         // check which threads are enabled and initialize them

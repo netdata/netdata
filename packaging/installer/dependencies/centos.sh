@@ -5,30 +5,31 @@
 set -e
 
 declare -a package_tree=(
-  gcc
-  gcc-c++
-  make
   autoconf
   autoconf-archive
   automake
-  libatomic
-  libtool
-  pkgconfig
   cmake
-  zlib-devel
-  libuuid-devel
-  libmnl-devel
-  json-c-devel
-  libyaml-devel
-  libuv-devel
-  lz4-devel
-  openssl-devel
-  python3
-  elfutils-libelf-devel
-  git
-  tar
   curl
+  elfutils-libelf-devel
+  gcc
+  gcc-c++
+  git
   gzip
+  json-c-devel
+  libatomic
+  libmnl-devel
+  libtool
+  libuuid-devel
+  libuv-devel
+  libyaml-devel
+  lz4-devel
+  make
+  openssl-devel
+  pkgconfig
+  python3
+  systemd-devel
+  tar
+  zlib-devel
 )
 
 os_version() {

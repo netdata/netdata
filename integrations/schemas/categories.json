@@ -11,9 +11,7 @@
       "description": "An entry for a single category.",
       "properties": {
         "id": {
-          "type": "string",
-          "minLength": 1,
-          "description": "A unique ID for the category. Recommended format is a dot-separated list of categories that are parents of this category, followed by a unique value for this category. Must be URL safe."
+          "$ref": "./shared.json#/$defs/id"
         },
         "name": {
           "type": "string",
@@ -31,6 +29,10 @@
         "priority": {
           "type": "integer",
           "description": "Indicates sort order for categories that are marked as most popular."
+        },
+        "collector_default": {
+          "type": "boolean",
+          "description": "Indicates that the category should be added to collector integrations that list no categories."
         },
         "children": {
           "type": "array",

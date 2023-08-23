@@ -173,13 +173,13 @@ sudo systemctl restart netdata
 Upon restart, Netdata should recognize your HDFS/Zookeeper servers, enable the HDFS and Zookeeper modules, and begin
 showing real-time metrics for both in your Netdata dashboard. 🎉
 
-## Configuring HDFS and Zookeeper alarms
+## Configuring HDFS and Zookeeper alerts
 
-The Netdata community helped us create sane defaults for alarms related to both HDFS and Zookeeper. You may want to
+The Netdata community helped us create sane defaults for alerts related to both HDFS and Zookeeper. You may want to
 investigate these to ensure they work well with your Hadoop implementation.
 
--   [HDFS alarms](https://raw.githubusercontent.com/netdata/netdata/master/health/health.d/hdfs.conf)
--   [Zookeeper alarms](https://raw.githubusercontent.com/netdata/netdata/master/health/health.d/zookeeper.conf)
+-   [HDFS alerts](https://raw.githubusercontent.com/netdata/netdata/master/health/health.d/hdfs.conf)
+-   [Zookeeper alerts](https://raw.githubusercontent.com/netdata/netdata/master/health/health.d/zookeeper.conf)
 
 You can also access/edit these files directly with `edit-config`:
 
@@ -188,5 +188,5 @@ sudo /etc/netdata/edit-config health.d/hdfs.conf
 sudo /etc/netdata/edit-config health.d/zookeeper.conf
 ```
 
-For more information about editing the defaults or writing new alarm entities, see our 
+For more information about editing the defaults or writing new alert entities, see our 
 [health monitoring documentation](https://github.com/netdata/netdata/blob/master/health/README.md).

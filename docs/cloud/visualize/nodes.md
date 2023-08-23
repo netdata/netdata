@@ -7,7 +7,7 @@ to any node's dashboard for troubleshooting performance issues or anomalies usin
 Cloud](https://user-images.githubusercontent.com/1153921/119035218-2eebb700-b964-11eb-8b74-4ec2df0e457c.png)
 
 Each War Room's Nodes tab is populated based on the nodes you added to that specific War Room. Each node occupies a
-single row, first featuring that node's alarm status (yellow for warnings, red for critical alarms) and operating
+single row, first featuring that node's alert status (yellow for warnings, red for critical alerts) and operating
 system, some essential information about the node, followed by columns of user-defined key metrics represented in
 real-time charts.
 

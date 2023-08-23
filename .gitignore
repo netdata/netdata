@@ -80,6 +80,9 @@ collectors/ebpf.plugin/includes/
 debugfs.plugin
 !debugfs.plugin/
 
+systemd-journal.plugin
+!systemd-journal.plugin/
+
 # protoc generated files
 *.pb.cc
 *.pb.h
@@ -100,7 +103,7 @@ netdata-coverity-analysis.tgz
 .cproject/
 .idea/
 .vscode/*
-!.vscode/settings.json
+!.vscode/settings.default.json
 .project/
 .settings/
 README

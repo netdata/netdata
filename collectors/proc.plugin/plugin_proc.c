@@ -70,8 +70,11 @@ static struct proc_module {
     // IPC metrics
     {.name = "ipc",                          .dim = "ipc",          .func = do_ipc},
 
-    {.name = "/sys/class/power_supply",      .dim = "power_supply", .func = do_sys_class_power_supply},
     // linux power supply metrics
+    {.name = "/sys/class/power_supply",      .dim = "power_supply", .func = do_sys_class_power_supply},
+    
+    // GPU metrics
+    {.name = "/sys/class/drm",               .dim = "drm",          .func = do_sys_class_drm},
 
     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL}

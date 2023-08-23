@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Netdata Agent data exporter metadata.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/entry"
+    },
+    {
+      "type": "array",
+      "minLength": 1,
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
+    }
+  ],
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "./shared.json#/$defs/id"
+        },
+        "meta": {
+          "$ref": "./shared.json#/$defs/instance"
+        },
+        "keywords": {
+          "$ref": "./shared.json#/$defs/keywords"
+        },
+        "overview": {
+          "type": "object",
+          "description": "General information about the exporter.",
+          "properties": {
+            "exporter_description": {
+              "type": "string",
+              "description": "General description of what the exporter does."
+            },
+            "exporter_limitations": {
+              "type": "string",
+              "description": "Explanation of any limitations of the exporter."
+            }
+          },
+          "required": [
+            "exporter_description",
+            "exporter_limitations"
+          ]
+        },
+        "setup": {
+          "$ref": "./shared.json#/$defs/full_setup"
+        },
+        "troubleshooting": {
+          "$ref": "./shared.json#/$defs/troubleshooting"
+        }
+      },
+      "required": [
+        "id",
+        "meta",
+        "keywords",
+        "overview",
+        "setup"
+      ]
+    }
+  }
+}

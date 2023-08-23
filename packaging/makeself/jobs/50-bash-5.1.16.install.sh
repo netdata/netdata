@@ -13,7 +13,7 @@ fetch "bash-${version}" "http://ftp.gnu.org/gnu/bash/bash-${version}.tar.gz" \
     5bac17218d3911834520dad13cd1f85ab944e1c09ae1aba55906be1f8192f558 bash
 
 export CFLAGS="-pipe"
-export PKG_CONFIG_PATH="/openssl-static/lib/pkgconfig"
+export PKG_CONFIG_PATH="/openssl-static/lib64/pkgconfig"
 
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then
     run ./configure \

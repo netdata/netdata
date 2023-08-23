@@ -18,6 +18,8 @@
 #define NETDATA_CHART_PRIO_NETFILTER_PACKETS          8906
 #define NETDATA_CHART_PRIO_NETFILTER_BYTES            8907
 
+#define NFACCT_RESTART_EVERY_SECONDS 86400 // restart the plugin every this many seconds
+
 static inline size_t mnl_buffer_size() {
     long s = MNL_SOCKET_BUFFER_SIZE;
     if(s <= 0) return 8192;
@@ -879,9 +881,11 @@ int main(int argc, char **argv) {
 
         fflush(stdout);
 
-        // restart check (14400 seconds)
-        if(now_monotonic_sec() - started_t > 14400) break;
+        if (now_monotonic_sec() - started_t > NFACCT_RESTART_EVERY_SECONDS) {
+            collector_info("NFACCT reached my lifetime expectancy. Exiting to restart.");
+            fprintf(stdout, "EXIT\n");
+            fflush(stdout);
+            exit(0);
+        }
     }
-
-    collector_info("NFACCT process exiting");
 }

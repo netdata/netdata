@@ -1,6 +1,6 @@
 <!--
 title: "Alert notifications"
-description: "Send Netdata alarms from a centralized place with Netdata Cloud, or configure nodes individually, to enable incident response and faster resolution."
+description: "Send Netdata alerts from a centralized place with Netdata Cloud, or configure nodes individually, to enable incident response and faster resolution."
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/monitor/enable-notifications.md"
 sidebar_label: "Notify"
 learn_status: "Published"

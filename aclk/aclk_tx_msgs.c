@@ -194,15 +194,16 @@ int aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg_
     int rc = aclk_send_message_with_bin_payload(client, msg, topic, payload, payload_len);
 
     switch (rc) {
-    case HTTP_RESP_FORBIDDEN:
-        aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, NULL, 0);
-        break;
-    case HTTP_RESP_INTERNAL_SERVER_ERROR:
-        aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_FAIL_TOPIC, CLOUD_EMSG_FAIL_TOPIC, payload, payload_len);
-        break;
-    case HTTP_RESP_BACKEND_FETCH_FAILED:
-        aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, payload, payload_len);
-        break;
+        case HTTP_RESP_FORBIDDEN:
+            aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, NULL, 0);
+            break;
+        case HTTP_RESP_INTERNAL_SERVER_ERROR:
+            aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_FAIL_TOPIC, CLOUD_EMSG_FAIL_TOPIC, payload, payload_len);
+            break;
+        case HTTP_RESP_GATEWAY_TIMEOUT:
+        case HTTP_RESP_SERVICE_UNAVAILABLE:
+            aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, payload, payload_len);
+            break;
     }
     return rc ? rc : http_code;
 }

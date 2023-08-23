@@ -507,7 +507,7 @@ static void read_swap_apps_table(int maps_per_core)
 */
 static void swap_send_global()
 {
-    write_io_chart(NETDATA_MEM_SWAP_CHART, NETDATA_EBPF_SYSTEM_GROUP,
+    write_io_chart(NETDATA_MEM_SWAP_CHART, NETDATA_EBPF_MEMORY_GROUP,
                    swap_publish_aggregated[NETDATA_KEY_SWAP_WRITEPAGE_CALL].dimension,
                    (long long) swap_hash_values[NETDATA_KEY_SWAP_WRITEPAGE_CALL],
                    swap_publish_aggregated[NETDATA_KEY_SWAP_READPAGE_CALL].dimension,

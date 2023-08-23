@@ -1,0 +1,395 @@
+plugin_name: debugfs.plugin
+modules:
+  - meta:
+      plugin_name: debugfs.plugin
+      module_name: /sys/kernel/debug/extfrag
+      monitored_instance:
+        name: System Memory Fragmentation
+        link: 'https://www.kernel.org/doc/html/next/admin-guide/sysctl/vm.html'
+        categories:
+          - data-collection.linux-systems.memory-metrics
+        icon_filename: 'microchip.svg'
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords:
+        - extfrag
+        - extfrag_threshold
+        - memory fragmentation
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: 'Collects memory fragmentation statistics from the Linux kernel'
+        method_description: 'Parse data from `debugfs` file'
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: >
+          This integration requires read access to files under `/sys/kernel/debug/extfrag`, which are accessible
+          only to the root user by default. Netdata uses Linux Capabilities to give the plugin access to
+          debugfs. `CAP_DAC_READ_SEARCH` is added automatically during installation. This capability allows bypassing
+          file read permission checks and directory read and execute permission checks. If file capabilities are not
+          usable, then the plugin is instead installed with the SUID bit set in permissions so that it runs as root.
+      default_behavior:
+        auto_detection:
+          description: >
+            Assuming that debugfs is mounted and the required permissions are available, this integration will
+            automatically run by default.
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list:
+          - title: 'filesystem'
+            description: >
+              The debugfs filesystem must be mounted on your host for plugin to collect data.
+              You can run the command-line (`sudo mount -t debugfs none /sys/kernel/debug/`) to mount it locally.
+              It is also recommended to modify your fstab (5) avoiding necessity to mount the filesystem
+              before starting netdata.
+      configuration:
+        file:
+          name: 'netdata.conf'
+          section_name: '[plugin:debugfs]'
+          description: 'This is netdata main configuration file.'
+        options:
+          description: ''
+          folding:
+            title: 'Config options'
+            enabled: true
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: command options
+              description: Additinal parameters for collector
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: "Monitor the overall memory fragmentation of the system."
+      availability: []
+      scopes:
+        - name: node
+          description: "Memory fragmentation statistics for each NUMA node in the system."
+          labels:
+            - name: numa_node
+              description: The NUMA node the metrics are associated with.
+          metrics:
+            - name: mem.fragmentation_index_dma
+              description: Memory fragmentation index for each order
+              unit: "index"
+              chart_type: line
+              dimensions:
+                - name: order0
+                - name: order1
+                - name: order2
+                - name: order3
+                - name: order4
+                - name: order5
+                - name: order6
+                - name: order7
+                - name: order8
+                - name: order9
+                - name: order10
+            - name: mem.fragmentation_index_dma32
+              description: Memory fragmentation index for each order
+              unit: "index"
+              chart_type: line
+              dimensions:
+                - name: order0
+                - name: order1
+                - name: order2
+                - name: order3
+                - name: order4
+                - name: order5
+                - name: order6
+                - name: order7
+                - name: order8
+                - name: order9
+                - name: order10
+            - name: mem.fragmentation_index_normal
+              description: Memory fragmentation index for each order
+              unit: "index"
+              chart_type: line
+              dimensions:
+                - name: order0
+                - name: order1
+                - name: order2
+                - name: order3
+                - name: order4
+                - name: order5
+                - name: order6
+                - name: order7
+                - name: order8
+                - name: order9
+                - name: order10
+  - meta:
+      plugin_name: debugfs.plugin
+      module_name: /sys/kernel/debug/zswap
+      monitored_instance:
+        name: Linux ZSwap
+        link: 'https://www.kernel.org/doc/html/latest/admin-guide/mm/zswap.html'
+        categories:
+          - data-collection.linux-systems.memory-metrics
+        icon_filename: 'microchip.svg'
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords:
+        - swap
+        - zswap
+        - frontswap
+        - swap cache
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: >
+          Collects zswap performance metrics on Linux systems.
+        method_description: 'Parse data from `debugfs file.'
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: >
+          This integration requires read access to files under `/sys/kernel/debug/zswap`, which are accessible
+          only to the root user by default. Netdata uses Linux Capabilities to give the plugin access to
+          debugfs. `CAP_DAC_READ_SEARCH` is added automatically during installation. This capability allows bypassing
+          file read permission checks and directory read and execute permission checks. If file capabilities are not
+          usable, then the plugin is instead installed with the SUID bit set in permissions so that it runs as root.
+      default_behavior:
+        auto_detection:
+          description: >
+            Assuming that debugfs is mounted and the required permissions are available, this integration will
+            automatically detect whether or not the system is using zswap.
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list:
+          - title: 'filesystem'
+            description: >
+              The debugfs filesystem must be mounted on your host for plugin to collect data.
+              You can run the command-line (`sudo mount -t debugfs none /sys/kernel/debug/`) to mount it locally.
+              It is also recommended to modify your fstab (5) avoiding necessity to mount the filesystem
+              before starting netdata.
+      configuration:
+        file:
+          name: 'netdata.conf'
+          section_name: '[plugin:debugfs]'
+          description: 'This is netdata main configuration file.'
+        options:
+          description: ''
+          folding:
+            title: 'Config options'
+            enabled: true
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: command options
+              description: Additinal parameters for collector
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: "Monitor the performance statistics of zswap."
+      availability: []
+      scopes:
+        - name: global
+          description: "Global zswap performance metrics."
+          labels: []
+          metrics:
+            - name: system.zswap_pool_compression_ratio
+              description: Zswap compression ratio
+              unit: "ratio"
+              chart_type: line
+              dimensions:
+                - name: compression_ratio
+            - name: system.zswap_pool_compressed_size
+              description: Zswap compressed bytes currently stored
+              unit: "bytes"
+              chart_type: area
+              dimensions:
+                - name: compressed_size
+            - name: system.zswap_pool_raw_size
+              description: Zswap uncompressed bytes currently stored
+              unit: "bytes"
+              chart_type: area
+              dimensions:
+                - name: uncompressed_size
+            - name: system.zswap_rejections
+              description: Zswap rejections
+              unit: "rejections/s"
+              chart_type: stacked
+              dimensions:
+                - name: compress_poor
+                - name: kmemcache_fail
+                - name: alloc_fail
+                - name: reclaim_fail
+            - name: system.zswap_pool_limit_hit
+              description: Zswap pool limit was reached
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: limit
+            - name: system.zswap_written_back_raw_bytes
+              description: Zswap uncomressed bytes written back when pool limit was reached
+              unit: "bytes/s"
+              chart_type: area
+              dimensions:
+                - name: written_back
+            - name: system.zswap_same_filled_raw_size
+              description: Zswap same-value filled uncompressed bytes currently stored
+              unit: "bytes"
+              chart_type: area
+              dimensions:
+                - name: same_filled
+            - name: system.zswap_duplicate_entry
+              description: Zswap duplicate store was encountered
+              unit: "entries/s"
+              chart_type: line
+              dimensions:
+                - name: duplicate
+  - meta:
+      plugin_name: debugfs.plugin
+      module_name: intel_rapl
+      monitored_instance:
+        name: Power Capping
+        link: 'https://www.kernel.org/doc/html/next/power/powercap/powercap.html'
+        categories:
+          - data-collection.linux-systems.kernel-metrics
+        icon_filename: 'powersupply.svg'
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords:
+        - power capping
+        - energy
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: >
+          Collects power capping performance metrics on Linux systems.
+        method_description: 'Parse data from `debugfs file.'
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: >
+          This integration requires read access to files under `/sys/devices/virtual/powercap`, which are accessible
+          only to the root user by default. Netdata uses Linux Capabilities to give the plugin access to
+          debugfs. `CAP_DAC_READ_SEARCH` is added automatically during installation. This capability allows bypassing
+          file read permission checks and directory read and execute permission checks. If file capabilities are not
+          usable, then the plugin is instead installed with the SUID bit set in permissions so that it runs as root.
+      default_behavior:
+        auto_detection:
+          description: >
+            Assuming that debugfs is mounted and the required permissions are available, this integration will
+            automatically detect whether or not the system is using zswap.
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list:
+          - title: 'filesystem'
+            description: >
+              The debugfs filesystem must be mounted on your host for plugin to collect data.
+              You can run the command-line (`sudo mount -t debugfs none /sys/kernel/debug/`) to mount it locally.
+              It is also recommended to modify your fstab (5) avoiding necessity to mount the filesystem
+              before starting netdata.
+      configuration:
+        file:
+          name: 'netdata.conf'
+          section_name: '[plugin:debugfs]'
+          description: 'This is netdata main configuration file.'
+        options:
+          description: ''
+          folding:
+            title: 'Config options'
+            enabled: true
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: command options
+              description: Additinal parameters for collector
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: "Monitor the Intel RAPL zones Consumption."
+      availability: []
+      scopes:
+        - name: global
+          description: "Global Intel RAPL zones."
+          labels: []
+          metrics:
+            - name: cpu.powercap_intel_rapl_zone
+              description: Intel RAPL Zone Power Consumption
+              unit: "Watts"
+              chart_type: line
+              dimensions:
+                - name: Power
+            - name: cpu.powercap_intel_rapl_subzones
+              description: Intel RAPL Subzones Power Consumption
+              unit: "Watts"
+              chart_type: line
+              dimensions:
+                - name: dram
+                - name: core
+                - name: uncore

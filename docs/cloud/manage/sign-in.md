@@ -23,7 +23,7 @@ device, and sign in.
 
 ### Don't have a Netdata Cloud account yet?
 
-If you don't have a Netdata Cloud account yet you won't need to worry about it. During the sign in process we will create one for you and make the process seamless to you.
+If you don't already have a Netdata Cloud account, you don't need to worry about this. During the sign-in process we will create one for you and make the process seamless to you.
 
 After your account is created and you sign in to Netdata, you first are asked to agree to Netdata Cloud's [Privacy
 Policy](https://www.netdata.cloud/privacy/) and [Terms of Use](https://www.netdata.cloud/terms/). Once you agree with these you are directed
@@ -40,14 +40,14 @@ If you don't see the email, try the following:
 - Check your spam folder.
 - In Gmail, check the **Updates** category.
 - Check [Netdata Cloud status](https://status.netdata.cloud) for ongoing issues with our infrastructure.
-- Request another sign in email via the [sign in page](https://app.netdata.cloud/sign-in?cloudRoute=spaces?utm_source=docs&utm_content=sign_in_button_troubleshooting_section).
+- Request another sign in email via the [sign-in page](https://app.netdata.cloud/sign-in?cloudRoute=spaces?utm_source=docs&utm_content=sign_in_button_troubleshooting_section).
 
 You may also want to add `no-reply@netdata.cloud` to your address book or contacts list, especially if you're using
 a public email service, such as Gmail. You may also want to whitelist/allowlist either the specific email or the entire
 `netdata.cloud` domain.
 
 In some cases, temporary issues with your mail server or email account may result in your email address being added to a Bounce list by Sendgrid.
-If you are added to that list, no Netdata cloud email can reach you, including alarm notifications. Let us know in Discord that you have trouble receiving
+If you are added to that list, no Netdata cloud email can reach you, including alert notifications. Let us know in Discord that you have trouble receiving
 any email from us and someone will ask you to provide your email address privately, so we can check if you are on the Bounce list.
 
 ## Google and GitHub OAuth
