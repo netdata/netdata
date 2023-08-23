@@ -275,7 +275,7 @@ void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number 
                     id_buf, // id
                     name_buf, // name
                     "anomaly_rate", // family
-                    "anomaly_detection.anomaly_rate", // ctx
+                    "anomaly_detection.type_anomaly_rate", // ctx
                     "Percentage of anomalous dimensions by type", // title
                     "percentage", // units
                     NETDATA_ML_PLUGIN, // plugin
