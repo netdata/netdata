@@ -4,7 +4,7 @@ modules:
       plugin_name: python.d.plugin
       module_name: go_expvar
       monitored_instance:
-        name: Go applications
+        name: Go applications (EXPVAR)
         link: "https://pkg.go.dev/expvar"
         categories:
           - data-collection.apm
