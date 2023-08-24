@@ -610,7 +610,10 @@ static RRDLABEL *add_label_name_value(const char *name, const char *value)
     spinlock_lock(&global_labels.spinlock);
 
     Pvoid_t *PValue = JudyHSIns(&global_labels.JudyHS, (void *)&label_index, sizeof(label_index), PJE0);
-    if (PValue && *PValue) {
+    if(unlikely(!PValue || PValue == PJERR))
+        fatal("RRDLABELS: corrupted judyHS array");
+
+    if (*PValue) {
         rrdlabel = *PValue;
         string_freez(label_index.key);
         string_freez(label_index.value);
@@ -689,7 +692,10 @@ static void labels_add_already_sanitized(RRDLABELS *labels, const char *key, con
     size_t mem_before_judyl = JudyLMemUsed(labels->JudyL);
 
     Pvoid_t *PValue = JudyLIns(&labels->JudyL, (Word_t) label, PJE0);
-    if (PValue && !*PValue) {
+    if(unlikely(!PValue || PValue == PJERR))
+        fatal("RRDLABELS: corrupted labels JudyL array");
+
+    if (!*PValue) {
         *((RRDLABEL_SRC *)PValue) = (ls & ~(RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_OLD));
         labels->version++;
         size_t mem_after_judyl = JudyLMemUsed(labels->JudyL);
@@ -895,7 +901,6 @@ void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
 
     spinlock_lock(&dst->spinlock);
     spinlock_lock(&src->spinlock);
-//    spinlock_lock(&rrdb.labels.spinlock);
 
     RRDLABEL *label;
     Pvoid_t *PValue;
@@ -910,14 +915,18 @@ void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
     {
         size_t mem_before_judyl = JudyLMemUsed(dst->JudyL);
         PValue = JudyLIns(&dst->JudyL, (Word_t)label, PJE0);
+        if(unlikely(!PValue || PValue == PJERR))
+            fatal("RRDLABELS migrate: corrupted labels array");
+
         RRDLABEL_SRC flag = RRDLABEL_FLAG_NEW;
-        if (PValue && !*PValue) {
+        if (!*PValue) {
             dup_label(label);
             size_t mem_after_judyl = JudyLMemUsed(dst->JudyL);
             STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, mem_after_judyl - mem_before_judyl, 0);
         }
         else
             flag = RRDLABEL_FLAG_OLD;
+
         *((RRDLABEL_SRC *)PValue) |= flag;
     }
     lfe_done_nolock();
@@ -943,8 +952,6 @@ void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
 
     dst->version = src->version;
 
-//    spinlock_unlock(&rrdb.labels.spinlock);
-
     spinlock_unlock(&src->spinlock);
     spinlock_unlock(&dst->spinlock);
 }
@@ -956,7 +963,6 @@ void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src)
 
     RRDLABEL *label;
     RRDLABEL_SRC ls;
-    Pvoid_t *PValue;
 
     spinlock_lock(&dst->spinlock);
     spinlock_lock(&src->spinlock);
@@ -964,8 +970,11 @@ void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src)
     lfe_start_nolock(src, label, ls)
     {
         size_t mem_before_judyl = JudyLMemUsed(dst->JudyL);
-        PValue = JudyLIns(&dst->JudyL, (Word_t)label, PJE0);
-        if (PValue && !*PValue) {
+        Pvoid_t *PValue = JudyLIns(&dst->JudyL, (Word_t)label, PJE0);
+        if(unlikely(!PValue || PValue == PJERR))
+            fatal("RRDLABELS: corrupted labels array");
+
+        if (!*PValue) {
             dup_label(label);
             size_t mem_after_judyl = JudyLMemUsed(dst->JudyL);
             STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, mem_after_judyl - mem_before_judyl, 0);
