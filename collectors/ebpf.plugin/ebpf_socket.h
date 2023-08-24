@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include "libnetdata/avl/avl.h"
 
+#ifdef HAVE_NETDB_H
+#include <netdb.h>
+#endif
+
 // Module name & description
 #define NETDATA_EBPF_MODULE_NAME_SOCKET "socket"
 #define NETDATA_EBPF_SOCKET_MODULE_DESC "Monitors TCP and UDP bandwidth. This thread is integrated with apps and cgroup."
