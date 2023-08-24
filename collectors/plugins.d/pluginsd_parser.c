@@ -2024,11 +2024,11 @@ void call_virtual_function_async(BUFFER *wb, RRDHOST *host, const char *name, co
     //TODO simplify (as we really need only first parameter to get plugin name maybe we can avoid parsing all)
     char *words[PLUGINSD_MAX_WORDS];
     char *function_with_params = strdupz(name);
-    BUFFER *function_out = buffer_create(strlen(name), NULL);
     size_t num_words = quoted_strings_splitter(function_with_params, words, PLUGINSD_MAX_WORDS, isspace_map_pluginsd);
 
     if (num_words < 2) {
-        netdata_log_error("PLUGINSD: virtual function name is emptya.");
+        netdata_log_error("PLUGINSD: virtual function name is empty.");
+        freez(function_with_params);
         return;
     }
 
@@ -2041,6 +2041,7 @@ void call_virtual_function_async(BUFFER *wb, RRDHOST *host, const char *name, co
     struct configurable_plugin *cp = dictionary_acquired_item_value(cpi);
     parser = (PARSER *)cp->cb_usr_ctx;
 
+    BUFFER *function_out = buffer_create(strlen(name), NULL);
     // if we are forwarding this to a plugin (as opposed to streaming/child) we have to remove the first parameter (plugin_name)
     buffer_strcat(function_out, get_word(words, num_words, 0));
     for (size_t i = 1; i < num_words; i++) {
@@ -2254,7 +2255,7 @@ static dyncfg_config_t get_job_config_cb(void *usr_ctx, const char *plugin_name,
     return ret;
 }
 
-enum set_config_result set_plugin_config_cb(void *usr_ctx, const char *plugin_name ,dyncfg_config_t *cfg)
+enum set_config_result set_plugin_config_cb(void *usr_ctx, const char *plugin_name, dyncfg_config_t *cfg)
 {
     PARSER *parser = usr_ctx;
     BUFFER *wb = buffer_create(CVF_MAX_LEN, NULL);
