@@ -7,6 +7,7 @@
 **Merged pull requests:**
 
 - Regenerate integrations.js [\#15867](https://github.com/netdata/netdata/pull/15867) ([netdatabot](https://github.com/netdatabot))
+- Add a fail reason to pinpoint exactly what went wrong [\#15866](https://github.com/netdata/netdata/pull/15866) ([stelfrag](https://github.com/stelfrag))
 - Add plugin and module information to collector integrations. [\#15864](https://github.com/netdata/netdata/pull/15864) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#15862](https://github.com/netdata/netdata/pull/15862) ([netdatabot](https://github.com/netdatabot))
 - Explicitly depend on version-matched plugins in native packages. [\#15861](https://github.com/netdata/netdata/pull/15861) ([Ferroin](https://github.com/Ferroin))
@@ -62,6 +63,7 @@
 - fix: the cleanup was not performed during the kickstart.sh dry run [\#15775](https://github.com/netdata/netdata/pull/15775) ([ilyam8](https://github.com/ilyam8))
 - Increase alert snapshot chunk size [\#15748](https://github.com/netdata/netdata/pull/15748) ([MrZammler](https://github.com/MrZammler))
 - Added CentOS-Stream to distros [\#15742](https://github.com/netdata/netdata/pull/15742) ([k0ste](https://github.com/k0ste))
+- Unconditionally delete very old models. [\#15720](https://github.com/netdata/netdata/pull/15720) ([vkalintiris](https://github.com/vkalintiris))
 - Misc code cleanup [\#15665](https://github.com/netdata/netdata/pull/15665) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.42.1](https://github.com/netdata/netdata/tree/v1.42.1) (2023-08-16)
@@ -425,8 +427,6 @@
 - Keep health log history in seconds [\#15314](https://github.com/netdata/netdata/pull/15314) ([MrZammler](https://github.com/MrZammler))
 - stale vitual hosts [\#15313](https://github.com/netdata/netdata/pull/15313) ([ktsaou](https://github.com/ktsaou))
 - bump go.d.plugin to v0.54.0 [\#15312](https://github.com/netdata/netdata/pull/15312) ([ilyam8](https://github.com/ilyam8))
-- health: respect overriding nc binary for IRC notifications [\#15310](https://github.com/netdata/netdata/pull/15310) ([ilyam8](https://github.com/ilyam8))
-- hide not available for viewers charts when exporting in shell format [\#15309](https://github.com/netdata/netdata/pull/15309) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
