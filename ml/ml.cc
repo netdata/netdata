@@ -1082,6 +1082,21 @@ ml_host_detect_once(ml_host_t *host)
 
             host->mls.num_anomalous_dimensions += chart_mls.num_anomalous_dimensions;
             host->mls.num_normal_dimensions += chart_mls.num_normal_dimensions;
+
+            STRING *key = rs->parts.type;
+            auto &um = host->type_anomaly_rate;
+            auto it = um.find(key);
+            if (it == um.end()) {
+                um[key] = ml_type_anomaly_rate_t {
+                    .rd = NULL,
+                    .normal_dimensions = 0,
+                    .anomalous_dimensions = 0
+                };
+                it = um.find(key);
+            }
+
+            it->second.anomalous_dimensions += chart_mls.num_anomalous_dimensions;
+            it->second.normal_dimensions += chart_mls.num_normal_dimensions;
         }
         rrdset_foreach_done(rsp);
 
@@ -1095,6 +1110,15 @@ ml_host_detect_once(ml_host_t *host)
         netdata_mutex_unlock(&host->mutex);
     } else {
         host->host_anomaly_rate = 0.0;
+
+        auto &um = host->type_anomaly_rate;
+        for (auto &entry: um) {
+            entry.second = ml_type_anomaly_rate_t {
+                .rd = NULL,
+                .normal_dimensions = 0,
+                .anomalous_dimensions = 0
+            };
+        }
     }
 
     worker_is_busy(WORKER_JOB_DETECTION_DIM_CHART);

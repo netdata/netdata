@@ -222,7 +222,7 @@ void ml_update_dimensions_chart(ml_host_t *host, const ml_machine_learning_stats
 
 void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number AnomalyRate) {
     /*
-     * Anomaly rate
+     * Host anomaly rate
     */
     {
         if (!host->anomaly_rate_rs) {
@@ -256,6 +256,56 @@ void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number 
         rrddim_set_by_pointer(host->anomaly_rate_rs, host->anomaly_rate_rd, AnomalyRate);
 
         rrdset_done(host->anomaly_rate_rs);
+    }
+
+    /*
+     * Type anomaly rate
+    */
+    {
+        if (!host->type_anomaly_rate_rs) {
+            char id_buf[1024];
+            char name_buf[1024];
+
+            snprintfz(id_buf, 1024, "type_anomaly_rate_on_%s", localhost->machine_guid);
+            snprintfz(name_buf, 1024, "type_anomaly_rate_on_%s", rrdhost_hostname(localhost));
+
+            host->type_anomaly_rate_rs = rrdset_create(
+                    host->rh,
+                    "anomaly_detection", // type
+                    id_buf, // id
+                    name_buf, // name
+                    "anomaly_rate", // family
+                    "anomaly_detection.type_anomaly_rate", // ctx
+                    "Percentage of anomalous dimensions by type", // title
+                    "percentage", // units
+                    NETDATA_ML_PLUGIN, // plugin
+                    NETDATA_ML_MODULE_DETECTION, // module
+                    ML_CHART_PRIO_TYPE_ANOMALY_RATE, // priority
+                    localhost->rrd_update_every, // update_every
+                    RRDSET_TYPE_LINE // chart_type
+            );
+
+            rrdset_flag_set(host->type_anomaly_rate_rs, RRDSET_FLAG_ANOMALY_DETECTION);
+        }
+
+        for (auto &entry : host->type_anomaly_rate) {
+            ml_type_anomaly_rate_t &type_anomaly_rate = entry.second;
+
+            if (!type_anomaly_rate.rd)
+                type_anomaly_rate.rd = rrddim_add(host->type_anomaly_rate_rs, string2str(entry.first), NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+
+            double ar = 0.0;
+            size_t n = type_anomaly_rate.anomalous_dimensions + type_anomaly_rate.normal_dimensions;
+            if (n)
+                ar = static_cast<double>(type_anomaly_rate.anomalous_dimensions) / n;
+
+            rrddim_set_by_pointer(host->type_anomaly_rate_rs, type_anomaly_rate.rd, ar * 10000.0);
+
+            type_anomaly_rate.anomalous_dimensions = 0;
+            type_anomaly_rate.normal_dimensions = 0;
+        }
+
+        rrdset_done(host->type_anomaly_rate_rs);
     }
 
     /*
