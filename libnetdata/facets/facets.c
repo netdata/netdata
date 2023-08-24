@@ -17,7 +17,7 @@ static inline void uint64_to_char(uint64_t num, char *out) {
 }
 
 inline void facets_string_hash(const char *src, size_t len, char *out) {
-    XXH128_hash_t hash = XXH128(src, len, 0);
+    XXH128_hash_t hash = XXH3_128bits(src, len);
 
     uint64_to_char(hash.high64, out);
     uint64_to_char(hash.low64, &out[11]);  // Starts right after the first 64-bit encoded string
