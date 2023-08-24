@@ -54,7 +54,7 @@ class TestRunner
         @stats[:suites] += 1
     end
     def assert_no_test_running()
-        if !@test.nil?
+        unless @test.nil?
             STDERR.puts $pastel.red("\nFATAL: Test \"#{@test}\" did not call PASS() or FAIL()!")
             exit 1
         end
@@ -158,13 +158,13 @@ def assert_is_one_of(value, *values)
     $test_runner.add_assertion()
 end
 def assert_not_nil(value)
-    if value == nil
+    if value.nil?
         FAIL("Expected value to not be nil", nil, caller_locations(1, 1).first)
     end
     $test_runner.add_assertion()
 end
 def assert_nil(value)
-    unless value == nil
+    unless value.nil?
         FAIL("Expected value to not be nil", nil, caller_locations(1, 1).first)
     end
     $test_runner.add_assertion()
