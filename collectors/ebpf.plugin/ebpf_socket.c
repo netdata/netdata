@@ -2609,11 +2609,9 @@ static int ebpf_is_ip_inside_range(union netdata_ip_t *rfirst, union netdata_ip_
  * @param in the structure that will be linked.
  * @param table the modified table.
  */
-void ebpf_fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, __maybe_unused char *table)
+void ebpf_fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in,
+                       char *table __maybe_unused)
 {
-#ifndef NETDATA_INTERNAL_CHECKS
-    UNUSED(table);
-#endif
     if (in->ver == AF_INET) { // It is simpler to compare using host order
         in->first.addr32[0] = ntohl(in->first.addr32[0]);
         in->last.addr32[0] = ntohl(in->last.addr32[0]);
