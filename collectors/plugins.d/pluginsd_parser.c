@@ -2018,6 +2018,7 @@ static void virt_fnc_got_data_cb(BUFFER *wb __maybe_unused, int code, void *call
 }
 
 #define VIRT_FNC_TIMEOUT 1
+#define VIRT_FNC_BUF_SIZE (4096)
 void call_virtual_function_async(BUFFER *wb, RRDHOST *host, const char *name, const char *payload, rrd_function_result_callback_t callback, void *callback_data) {
     PARSER *parser = NULL;
 
@@ -2041,7 +2042,7 @@ void call_virtual_function_async(BUFFER *wb, RRDHOST *host, const char *name, co
     struct configurable_plugin *cp = dictionary_acquired_item_value(cpi);
     parser = (PARSER *)cp->cb_usr_ctx;
 
-    BUFFER *function_out = buffer_create(strlen(name), NULL);
+    BUFFER *function_out = buffer_create(VIRT_FNC_BUF_SIZE, NULL);
     // if we are forwarding this to a plugin (as opposed to streaming/child) we have to remove the first parameter (plugin_name)
     buffer_strcat(function_out, get_word(words, num_words, 0));
     for (size_t i = 1; i < num_words; i++) {
@@ -2091,7 +2092,7 @@ void call_virtual_function_async(BUFFER *wb, RRDHOST *host, const char *name, co
 
 dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name, int *rc, const char *payload) {
     usec_t now = now_realtime_usec();
-    BUFFER *wb = buffer_create(4096, NULL);
+    BUFFER *wb = buffer_create(VIRT_FNC_BUF_SIZE, NULL);
 
     struct mutex_cond cond = {
         .lock = PTHREAD_MUTEX_INITIALIZER,
