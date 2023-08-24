@@ -1647,6 +1647,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
     // values for specific processor unless it is used to store data. As result of this behavior one the next socket
     // can have values from the previous one.
     memset(values, 0, length);
+    time_t update_time = time(NULL);
     PPvoid_t judy_array = &ebpf_socket_pid.index.JudyHSArray;
     rw_spinlock_write_lock(&ebpf_socket_pid.index.rw_spinlock);
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
@@ -1706,9 +1707,23 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
 
             translate = true;
         }
+        uint64_t prev_period = socket_ptr->data.current_timestamp;
         memcpy(&socket_ptr->data, &values[0], sizeof(netdata_socket_t));
         if (translate)
             ebpf_socket_translate(socket_ptr, &key);
+        else { // Check socket was updated
+            if (prev_period) {
+                if (values[0].current_timestamp != prev_period) // Socket updated
+                    socket_ptr->last_update = update_time;
+                else if ((update_time - socket_ptr->last_update) > em->update_every) {
+                    // Socket was not updated since last read
+                    JudyLDel(&pid_ptr->index.JudyHSArray, values[0].first_timestamp, PJE0);
+                    aral_freez(aral_socket_table, socket_ptr);
+                }
+            } else // First time
+                socket_ptr->last_update = update_time;
+        }
+
         rw_spinlock_write_unlock(&pid_ptr->index.rw_spinlock);
 
 end_socket_loop:
