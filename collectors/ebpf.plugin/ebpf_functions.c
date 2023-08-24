@@ -414,9 +414,9 @@ static void ebpf_function_socket_help(const char *transaction) {
             "      Enable socket to run a specific PERIOD in seconds. When PERIOD is not\n"
             "      specified plugin will use the default 300 seconds\n"
             "\n"
-         /*   "   resolve:BOOL\n"
-            "      Resolve IP address, default value is NO.\n"
-            "\n" */
+            "   resolve:BOOL\n"
+            "      Resolve service name, default value is NO.\n"
+            "\n"
             "   range:CIDR\n"
             "      Show sockets that have only a specific destination. Default all addresses.\n"
             "\n"
@@ -443,7 +443,8 @@ static inline void ebpf_socket_fill_fake_socket(netdata_socket_plus_t *fake_valu
     snprintfz(fake_values->socket_string.dst_ip, INET6_ADDRSTRLEN, "%s", "127.0.0.1");
     fake_values->pid = getpid();
     fake_values->socket_string.src_port = 0;
-    fake_values->socket_string.dst_port = 0;
+    fake_values->socket_string.dst_port[0] = 0;
+    snprintfz(fake_values->socket_string.dst_ip, NI_MAXSERV, "%s", "none");
     fake_values->data.family = AF_INET;
     fake_values->data.protocol = AF_UNSPEC;
 }
@@ -476,7 +477,7 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values)
     buffer_json_add_array_item_string(wb, values->socket_string.dst_ip);
 
     // DST Port
-    buffer_json_add_array_item_uint64(wb, (uint64_t) values->socket_string.dst_port);
+    buffer_json_add_array_item_string(wb, values->socket_string.dst_port);
 
     if (values->data.protocol == IPPROTO_TCP) {
         // Protocol
@@ -670,7 +671,6 @@ static void ebpf_function_socket_manipulation(const char *transaction,
 #endif
             pthread_mutex_unlock(&ebpf_exit_cleanup);
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_RESOLVE, sizeof(EBPF_FUNCTION_SOCKET_RESOLVE) - 1) == 0) {
-            /*
             uint32_t previous = network_viewer_opt.hostname_resolution_enabled;
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_RESOLVE) - 1];
             if (name)
@@ -681,7 +681,6 @@ static void ebpf_function_socket_manipulation(const char *transaction,
 
             if (previous != network_viewer_opt.hostname_resolution_enabled)
                 ebpf_socket_clean_judy_array_unsafe();
-                */
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_RANGE, sizeof(EBPF_FUNCTION_SOCKET_RANGE) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_RANGE) - 1];
             if (name) {
