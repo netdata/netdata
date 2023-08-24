@@ -1535,7 +1535,7 @@ static void ebpf_socket_translate(netdata_socket_plus_t *dst, netdata_socket_idx
     int ret;
     if (dst->data.family == AF_INET) {
         struct sockaddr_in ipv4_addr = { };
-        ipv4_addr.sin_port = key->sport;
+        ipv4_addr.sin_port = 0;
         ipv4_addr.sin_addr.s_addr = key->saddr.addr32[0];
         ipv4_addr.sin_family = AF_INET;
         if (resolve) {
@@ -1603,12 +1603,10 @@ static void ebpf_socket_translate(netdata_socket_plus_t *dst, netdata_socket_idx
         }
     }
     dst->pid = key->pid;
-    dst->socket_string.src_port = ntohs(key->sport);
 
 #ifdef NETDATA_DEV_MODE
-    collector_info("New socket: { SRC IP: %s, SRC PORT: %u, DST IP:%s, DST PORT: %s, PID: %u, Protocol: %d, Family: %d}",
+    collector_info("New socket: { SRC IP: %s, DST IP:%s, DST PORT: %s, PID: %u, Protocol: %d, Family: %d}",
                    dst->socket_string.src_ip,
-                   dst->socket_string.src_port,
                    dst->socket_string.dst_ip,
                    dst->socket_string.dst_port,
                    dst->pid,

@@ -295,7 +295,7 @@ typedef struct netata_socket_plus {
 
     struct  {
         char src_ip[INET6_ADDRSTRLEN + 1];
-        uint16_t src_port;
+ //       uint16_t src_port;
         char dst_ip[INET6_ADDRSTRLEN+ 1];
         char dst_port[NI_MAXSERV + 1];
     } socket_string;
@@ -349,7 +349,7 @@ extern ARAL *aral_socket_table;
  */
 typedef struct netdata_socket_idx {
     union netdata_ip_t saddr;
-    uint16_t sport;
+    //uint16_t sport;
     union netdata_ip_t daddr;
     uint16_t dport;
     uint32_t pid;
