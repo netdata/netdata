@@ -841,7 +841,7 @@ void facets_accepted_param(FACETS *facets, const char *param) {
     dictionary_set(facets->accepted_params, param, NULL, 0);
 }
 
-inline FACET_KEY *facets_register_key(FACETS *facets, const char *key, FACET_KEY_OPTIONS options) {
+inline FACET_KEY *facets_register_key_name(FACETS *facets, const char *key, FACET_KEY_OPTIONS options) {
     FACET_KEY tk = {
             .name = key,
             .options = options,
@@ -852,15 +852,15 @@ inline FACET_KEY *facets_register_key(FACETS *facets, const char *key, FACET_KEY
     return dictionary_set(facets->keys, hash, &tk, sizeof(tk));
 }
 
-inline FACET_KEY *facets_register_key_transformation(FACETS *facets, const char *key, FACET_KEY_OPTIONS options, facets_key_transformer_t cb, void *data) {
-    FACET_KEY *k = facets_register_key(facets, key, options);
+inline FACET_KEY *facets_register_key_name_transformation(FACETS *facets, const char *key, FACET_KEY_OPTIONS options, facets_key_transformer_t cb, void *data) {
+    FACET_KEY *k = facets_register_key_name(facets, key, options);
     k->transform.cb = cb;
     k->transform.data = data;
     return k;
 }
 
-inline FACET_KEY *facets_register_dynamic_key(FACETS *facets, const char *key, FACET_KEY_OPTIONS options, facet_dynamic_row_t cb, void *data) {
-    FACET_KEY *k = facets_register_key(facets, key, options);
+inline FACET_KEY *facets_register_dynamic_key_name(FACETS *facets, const char *key, FACET_KEY_OPTIONS options, facet_dynamic_row_t cb, void *data) {
+    FACET_KEY *k = facets_register_key_name(facets, key, options);
     k->dynamic.cb = cb;
     k->dynamic.data = data;
     return k;
@@ -881,16 +881,23 @@ void facets_set_anchor(FACETS *facets, usec_t anchor) {
     facets->anchor = anchor;
 }
 
-void facets_register_facet_filter(FACETS *facets, const char *key_id, char *value_ids, FACET_KEY_OPTIONS options) {
+inline FACET_KEY *facets_register_facet_id(FACETS *facets, const char *key_id, FACET_KEY_OPTIONS options) {
     FACET_KEY tk = {
             .options = options,
+            .default_selected_for_values = true,
     };
     FACET_KEY *k = dictionary_set(facets->keys, key_id, &tk, sizeof(tk));
 
-    k->default_selected_for_values = false;
     k->options |= FACET_KEY_OPTION_FACET;
     k->options &= ~FACET_KEY_OPTION_NO_FACET;
     facet_key_late_init(facets, k);
+
+    return k;
+}
+
+void facets_register_facet_id_filter(FACETS *facets, const char *key_id, char *value_ids, FACET_KEY_OPTIONS options) {
+    FACET_KEY *k = facets_register_facet_id(facets, key_id, options);
+    k->default_selected_for_values = false;
 
     FACET_VALUE tv = {
             .selected = true,
@@ -935,7 +942,7 @@ static inline void facets_check_value(FACETS *facets __maybe_unused, FACET_KEY *
 }
 
 void facets_add_key_value(FACETS *facets, const char *key, const char *value) {
-    FACET_KEY *k = facets_register_key(facets, key, 0);
+    FACET_KEY *k = facets_register_key_name(facets, key, 0);
     buffer_flush(k->current_value.b);
     buffer_strcat(k->current_value.b, value);
     k->current_value.updated = true;
@@ -944,7 +951,7 @@ void facets_add_key_value(FACETS *facets, const char *key, const char *value) {
 }
 
 void facets_add_key_value_length(FACETS *facets, const char *key, const char *value, size_t value_len) {
-    FACET_KEY *k = facets_register_key(facets, key, 0);
+    FACET_KEY *k = facets_register_key_name(facets, key, 0);
     buffer_flush(k->current_value.b);
     buffer_strncat(k->current_value.b, value, value_len);
     k->current_value.updated = true;
