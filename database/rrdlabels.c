@@ -41,6 +41,7 @@ typedef struct rrdlabels {
         Word_t _Index = 0;                                                                                             \
         while ((_PValue = JudyLFirstThenNext((label_list)->JudyL, &_Index, &_first_then_next))) {                      \
             (ls) = *(RRDLABEL_SRC *)_PValue;                                                                           \
+            (void)(ls);                                                                                                \
             (label) = (void *)_Index;
 
 #define lfe_done_nolock()                                                                                              \
@@ -56,6 +57,7 @@ typedef struct rrdlabels {
         Word_t _Index = 0;                                                                                             \
         while ((_PValue = JudyLFirstThenNext((label_list)->JudyL, &_Index, &_first_then_next))) {                      \
             (ls) = *(RRDLABEL_SRC *)_PValue;                                                                           \
+            (void)(ls);                                                                                                \
             (label) = (void *)_Index;
 
 #define lfe_done(label_list)                                                                                           \
