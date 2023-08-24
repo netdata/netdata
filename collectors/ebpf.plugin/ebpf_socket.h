@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "libnetdata/avl/avl.h"
 
+#include <sys/socket.h>
 #ifdef HAVE_NETDB_H
 #include <netdb.h>
 #endif
@@ -25,7 +26,6 @@
 #define EBPF_CONFIG_HOSTNAMES "hostnames"
 #define EBPF_CONFIG_SOCKET_MONITORING_SIZE "socket monitoring table size"
 #define EBPF_CONFIG_UDP_SIZE "udp connection table size"
-#define EBPF_MAXIMUM_DIMENSIONS "maximum dimensions"
 
 enum ebpf_socket_table_list {
     NETDATA_SOCKET_GLOBAL,
@@ -304,24 +304,6 @@ typedef struct netata_socket_plus {
         char dst_port[NI_MAXSERV + 1];
     } socket_string;
 } netdata_socket_plus_t;
-
-typedef struct netdata_plot_values {
-    // Values used in the previous iteration
-    uint64_t recv_packets;
-    uint64_t sent_packets;
-    uint64_t recv_bytes;
-    uint64_t sent_bytes;
-    uint32_t retransmit;
-
-    uint64_t last_time;
-
-    // Values used to plot
-    uint64_t plot_recv_packets;
-    uint64_t plot_sent_packets;
-    uint64_t plot_recv_bytes;
-    uint64_t plot_sent_bytes;
-    uint16_t plot_retransmit;
-} netdata_plot_values_t;
 
 enum netdata_udp_ports {
     NETDATA_EBPF_UDP_PORT = 53
