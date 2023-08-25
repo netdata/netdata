@@ -813,7 +813,7 @@ static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __m
 }
 
 void delete_job_finalize(struct parser *parser, struct configurable_plugin *plug, const char *fnc_sig, int code) {
-    if (code != SET_CONFIG_ACCEPTED)
+    if (code != DYNCFG_VFNC_RET_CFG_ACCEPTED)
         return;
 
     char *params_local = strdupz(fnc_sig);
@@ -839,7 +839,7 @@ void delete_job_finalize(struct parser *parser, struct configurable_plugin *plug
 }
 
 void set_job_finalize(struct parser *parser, struct configurable_plugin *plug, const char *fnc_sig, int code) {
-    if (code != SET_CONFIG_ACCEPTED)
+    if (code != DYNCFG_VFNC_RET_CFG_ACCEPTED)
         return;
 
     char *params_local = strdupz(fnc_sig);
@@ -2270,7 +2270,7 @@ enum set_config_result set_plugin_config_cb(void *usr_ctx, const char *plugin_na
     call_virtual_function_blocking(parser, buffer_tostring(wb), &rc, cfg->data);
 
     buffer_free(wb);
-    if(rc != 1)
+    if(rc != DYNCFG_VFNC_RET_CFG_ACCEPTED)
         return SET_CONFIG_REJECTED;
     return SET_CONFIG_ACCEPTED;
 }
@@ -2292,7 +2292,7 @@ enum set_config_result set_module_config_cb(void *usr_ctx, const char *plugin_na
 
     buffer_free(wb);
 
-    if(rc != 1)
+    if(rc != DYNCFG_VFNC_RET_CFG_ACCEPTED)
         return SET_CONFIG_REJECTED;
     return SET_CONFIG_ACCEPTED;
 }
@@ -2314,7 +2314,7 @@ enum set_config_result set_job_config_cb(void *usr_ctx, const char *plugin_name,
 
     buffer_free(wb);
 
-    if(rc != 1)
+    if(rc != DYNCFG_VFNC_RET_CFG_ACCEPTED)
         return SET_CONFIG_REJECTED;
     return SET_CONFIG_ACCEPTED;
 }
@@ -2336,7 +2336,7 @@ enum set_config_result delete_job_cb(void *usr_ctx, const char *plugin_name ,con
 
     buffer_free(wb);
 
-    if(rc != 1)
+    if(rc != DYNCFG_VFNC_RET_CFG_ACCEPTED)
         return SET_CONFIG_REJECTED;
     return SET_CONFIG_ACCEPTED;
 }

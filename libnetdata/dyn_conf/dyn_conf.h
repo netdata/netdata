@@ -18,6 +18,8 @@
 
 #define DYNCFG_MAX_WORDS 5
 
+#define DYNCFG_VFNC_RET_CFG_ACCEPTED (1)
+
 enum module_type {
     MOD_TYPE_UNKNOWN = 0,
     MOD_TYPE_ARRAY,
