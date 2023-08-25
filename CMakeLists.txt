@@ -1095,8 +1095,6 @@ set(LOGSMANAGEMENT_FILES
         logsmanagement/logsmanagement.c
         logsmanagement/parser.c
         logsmanagement/parser.h
-        logsmanagement/query_test.c
-        logsmanagement/query_test.h
         logsmanagement/query.c
         logsmanagement/query.h
         )
