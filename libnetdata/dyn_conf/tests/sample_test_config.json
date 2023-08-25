@@ -17,6 +17,6 @@
         "test_plugin_name": "external_plugin",
         "test_array_module_name": "module_of_the_future",
         "test_single_module_name": "module_of_the_future_single_type",
-        "test_job_name": "new_job"
+        "test_job_name": "fixed_job"
     }
 }
