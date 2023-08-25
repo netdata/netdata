@@ -26,7 +26,8 @@ install_netdata() {
     --dont-start-it \
     --enable-plugin-nfacct \
     --enable-plugin-freeipmi \
-    --disable-lto
+    --disable-lto \
+    --enable-logsmanagement-tests
 }
 
 c_unit_tests() {

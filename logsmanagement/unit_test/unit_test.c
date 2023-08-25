@@ -541,9 +541,7 @@ static int test_search_keyword(){
     return errors;
 }
 
-int test_logs_management(int argc, char *argv[]){
-    (void) argc;
-    (void) argv;
+int logs_management_unittest(void){
     int errors = 0;
 
     fprintf(stderr, "\n\n======================================================\n");

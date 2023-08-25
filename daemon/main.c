@@ -1487,6 +1487,10 @@ int main(int argc, char **argv) {
 #endif
                             if(test_sqlite()) return 1;
                             if(string_unittest(10000)) return 1;
+#if defined(ENABLE_LOGSMANAGEMENT) && defined(ENABLE_LOGSMANAGEMENT_TESTS)
+                            if(logs_management_unittest())
+                                return 1;
+#endif
                             if (dictionary_unittest(10000))
                                 return 1;
                             if(aral_unittest(10000))
@@ -1503,7 +1507,8 @@ int main(int argc, char **argv) {
                         }
 #if defined(ENABLE_LOGSMANAGEMENT) && defined(ENABLE_LOGSMANAGEMENT_TESTS)
                         else if(strcmp(optarg, "logsmantest") == 0) {
-                            return test_logs_management(argc, argv);
+                            unittest_running = true;
+                            return logs_management_unittest();
                         }
 #endif
                         else if(strcmp(optarg, "dicttest") == 0) {
