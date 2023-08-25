@@ -108,6 +108,14 @@ typedef struct netdata_ebpf_judy_pid {
     } index;
 } netdata_ebpf_judy_pid_t;
 
+typedef struct netdata_ebpf_judy_pid_stats {
+    // Index for Socket timestamp
+    struct {                            // support for multiple indexing engines
+        Pvoid_t JudyHSArray;            // the hash table
+        RW_SPINLOCK rw_spinlock;        // protect the index
+    } socket_stats;
+} netdata_ebpf_judy_pid_stats_t;
+
 extern ebpf_module_t ebpf_modules[];
 enum ebpf_main_index {
     EBPF_MODULE_PROCESS_IDX,

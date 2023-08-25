@@ -314,14 +314,6 @@ enum netdata_udp_ports {
     NETDATA_EBPF_UDP_PORT = 53
 };
 
-typedef struct netdata_ebpf_socket_judy_connections {
-    // Index for Socket timestamp
-    struct {                            // support for multiple indexing engines
-        Pvoid_t JudyHSArray;            // the hash table
-        RW_SPINLOCK rw_spinlock;        // protect the index
-    } index;
-} netdata_ebpf_socket_judy_connections_t;
-
 extern ARAL *aral_socket_table;
 
 /**
