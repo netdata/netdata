@@ -76,12 +76,13 @@ g_logs_manag_config_t g_logs_manag_config = {
 };
 
 static flb_srvc_config_t flb_srvc_config = {
-    .flush          = "0.1",
-    .http_listen    = "0.0.0.0",
-    .http_port      = "2020",
-    .http_server    = "false",
-    .log_path       = "NULL",
-    .log_level      = "info"
+    .flush           = "0.1",
+    .http_listen     = "0.0.0.0",
+    .http_port       = "2020",
+    .http_server     = "false",
+    .log_path        = "NULL",
+    .log_level       = "info",
+    .coro_stack_size = "24576"
 };
 
 static logs_manag_db_mode_t db_mode_str_to_db_mode(const char *const db_mode_str){
@@ -343,19 +344,20 @@ static int logs_manag_config_load(Flb_socket_config_t **forward_in_config_p){
 
     snprintfz(temp_path, FILENAME_MAX, "%s/fluentbit.log", netdata_configured_log_dir);
     
-    flb_srvc_config.flush = config_get(         CONFIG_SECTION_LOGS_MANAGEMENT, 
+    flb_srvc_config.flush           = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, 
                                                 "fluent bit flush", flb_srvc_config.flush);
-    flb_srvc_config.http_listen = config_get(   CONFIG_SECTION_LOGS_MANAGEMENT, 
+    flb_srvc_config.http_listen     = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, 
                                                 "fluent bit http listen", flb_srvc_config.http_listen);
-    flb_srvc_config.http_port = config_get(     CONFIG_SECTION_LOGS_MANAGEMENT, 
+    flb_srvc_config.http_port       = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, 
                                                 "fluent bit http port", flb_srvc_config.http_port);
-    flb_srvc_config.http_server = config_get(   CONFIG_SECTION_LOGS_MANAGEMENT, 
+    flb_srvc_config.http_server     = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, 
                                                 "fluent bit http server", flb_srvc_config.http_server);
-    flb_srvc_config.log_path = config_get(      CONFIG_SECTION_LOGS_MANAGEMENT, 
+    flb_srvc_config.log_path        = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, 
                                                 "fluent bit log file", temp_path);
-    flb_srvc_config.log_level = config_get(     CONFIG_SECTION_LOGS_MANAGEMENT, 
+    flb_srvc_config.log_level       = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, 
                                                 "fluent bit log level", flb_srvc_config.log_level);
-
+    flb_srvc_config.coro_stack_size = config_get(CONFIG_SECTION_LOGS_MANAGEMENT, 
+                                                "fluent bit coro stack size", flb_srvc_config.coro_stack_size);
 
     return rc;
 }
@@ -537,10 +539,10 @@ static void logs_management_init(uv_loop_t *main_loop,
                 if(!strcasecmp(p_file_info->chart_name, "Apache access.log")){
                     const char * const apache_access_path_default[] = {
                         "/var/log/apache/access.log",
-                        "/var/log/apache2/access.log", /* Debian, Ubuntu */
-                        "/var/log/apache2/access_log", /* Gentoo ? */
-                        "/var/log/httpd/access_log",  /* RHEL, Red Hat, CentOS, Fedora */
-                        "/var/log/httpd-access.log",   /* FreeBSD */
+                        "/var/log/apache2/access.log",  /* Debian and derivatives, Alpine */
+                        "/var/log/apache2/access_log",  /* Gentoo ? */
+                        "/var/log/httpd/access_log",    /* RHEL and derivatives */
+                        "/var/log/httpd-access.log",    /* FreeBSD */
                         NULL
                     };
                     int i = 0;

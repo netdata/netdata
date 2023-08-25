@@ -198,29 +198,32 @@ Win64; x64; rv:103.0)    Gecko/20100101 Firefox/103.0\"",
     403 42410 \"https://www.senioriterate.name/streamline/exploit\" \"Opera/10.54 (Macintosh; Intel Mac OS X 10_7_6;\
  en-US) Presto/2.12.334 Version/10.00\"\n",
 
-    /* [4] Apache csvVhostCombined */
+    /* [4] Apache csvCombined 4 - invalid request field */
+    "::1 - - [13/Jul/2023:21:00:56 +0100] \"-\" 408 - \"-\" \"-\"",
+
+    /* [5] Apache csvVhostCombined */
     "XPS-wsl.localdomain:80 ::1 - - [30/Jun/2022:20:59:29 +0300] \"GET / HTTP/1.1\" 200 3477 \"-\" \"Mozilla\
 /5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.53 Safari/537.36\
  Edg/103.0.1264.37\"",
 
-    /* [5] Apache csvCommon 1 */                                                                                        
+    /* [6] Apache csvCommon 1 */                                                                                        
     "127.0.0.1 - - [30/Jun/2022:16:43:51 +0300] \"GET / HTTP/1.0\" 200 11228",
 
-    /* [6] Apache csvCommon 2 - with carriage return */                                                                                        
+    /* [7] Apache csvCommon 2 - with carriage return */                                                                                        
     "180.89.137.89 - barrows1527 [05/Jun/2023:17:46:08 +0000]\
  \"DELETE /b2c/viral/innovative/reintermediate HTTP/1.0\" 416 99\r",
 
-    /* [7] Apache csvCommon 3 - with new line */
+    /* [8] Apache csvCommon 3 - with new line */
     "212.113.230.101 - - [20/Jun/2023:14:29:49 +0000] \"PATCH /strategic HTTP/1.1\" 404 1217\n",
 
-    /* [8] Apache csvVhostCommon 1 */                  
+    /* [9] Apache csvVhostCommon 1 */                  
     "XPS-wsl.localdomain:80 127.0.0.1 - - [30/Jun/2022:16:43:51 +0300] \"GET / HTTP/1.0\" 200 11228",
 
-    /* [9] Apache csvVhostCommon 2 - with new line and extra white space */      
+    /* [10] Apache csvVhostCommon 2 - with new line and extra white space */      
     "XPS-wsl.localdomain:80    2001:0db8:85a3:0000:0000:8a2e:0370:7334 -   - [30/Jun/2022:16:43:51 +0300] \"GET /\
  HTTP/1.0\" 200 11228\n",
 
-    /* [10] Nginx csvCombined */
+    /* [11] Nginx csvCombined */
     "47.29.201.179 - - [28/Feb/2019:13:17:10 +0000] \"GET /?p=1 HTTP/2.0\" 200 5316 \"https://dot.com/?p=1\"\
  \"Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.119 Safari/537.36\"", 
 };
@@ -228,13 +231,14 @@ const web_log_line_field_t parse_config_expected[][15] = {
     /* [1]  */ {REQ_CLIENT     , CUSTOM    , CUSTOM, TIME  , TIME, REQ , RESP_CODE, RESP_SIZE, CUSTOM   , CUSTOM ,     -1, -1, -1, -1, -1}, /* Apache csvCombined 1 */
     /* [2]  */ {REQ_CLIENT     , CUSTOM    , CUSTOM, TIME  , TIME, REQ , RESP_CODE, RESP_SIZE, CUSTOM   , CUSTOM ,     -1, -1, -1, -1, -1}, /* Apache csvCombined 2 */
     /* [3]  */ {REQ_CLIENT     , CUSTOM    , CUSTOM, TIME  , TIME, REQ , RESP_CODE, RESP_SIZE, CUSTOM   , CUSTOM ,     -1, -1, -1, -1, -1}, /* Apache csvCombined 3 */
-    /* [4]  */ {VHOST_WITH_PORT, REQ_CLIENT, CUSTOM, CUSTOM, TIME, TIME, REQ      , RESP_CODE, RESP_SIZE, CUSTOM , CUSTOM, -1, -1, -1, -1}, /* Apache csvVhostCombined */
-    /* [5]  */ {REQ_CLIENT     , CUSTOM    , CUSTOM, TIME  , TIME, REQ , RESP_CODE, RESP_SIZE, -1       , -1     ,     -1, -1, -1, -1, -1}, /* Apache csvCommon 1 */
-    /* [6]  */ {REQ_CLIENT     , CUSTOM    , CUSTOM, TIME  , TIME, REQ , RESP_CODE, RESP_SIZE, -1       , -1     ,     -1, -1, -1, -1, -1}, /* Apache csvCommon 2 */
-    /* [7]  */ {REQ_CLIENT     , CUSTOM    , CUSTOM, TIME  , TIME, REQ , RESP_CODE, RESP_SIZE, -1       , -1     ,     -1, -1, -1, -1, -1}, /* Apache csvCommon 3 */
-    /* [8]  */ {VHOST_WITH_PORT, REQ_CLIENT, CUSTOM, CUSTOM, TIME, TIME, REQ      , RESP_CODE, RESP_SIZE, -1     ,     -1, -1, -1, -1, -1}, /* Apache csvVhostCommon 1 */
-    /* [9]  */ {VHOST_WITH_PORT, REQ_CLIENT, CUSTOM, CUSTOM, TIME, TIME, REQ      , RESP_CODE, RESP_SIZE, -1     ,     -1, -1, -1, -1, -1}, /* Apache csvVhostCommon 2 */
-    /* [10] */ {REQ_CLIENT     , CUSTOM    , CUSTOM, TIME  , TIME, REQ,  RESP_CODE, RESP_SIZE, CUSTOM   , CUSTOM ,     -1, -1, -1, -1, -1}, /* Nginx csvCombined */
+    /* [4]  */ {REQ_CLIENT     , CUSTOM    , CUSTOM, TIME  , TIME, REQ , RESP_CODE, RESP_SIZE, CUSTOM   , CUSTOM ,     -1, -1, -1, -1, -1}, /* Apache csvCombined 4 */
+    /* [5]  */ {VHOST_WITH_PORT, REQ_CLIENT, CUSTOM, CUSTOM, TIME, TIME, REQ      , RESP_CODE, RESP_SIZE, CUSTOM , CUSTOM, -1, -1, -1, -1}, /* Apache csvVhostCombined */
+    /* [6]  */ {REQ_CLIENT     , CUSTOM    , CUSTOM, TIME  , TIME, REQ , RESP_CODE, RESP_SIZE, -1       , -1     ,     -1, -1, -1, -1, -1}, /* Apache csvCommon 1 */
+    /* [7]  */ {REQ_CLIENT     , CUSTOM    , CUSTOM, TIME  , TIME, REQ , RESP_CODE, RESP_SIZE, -1       , -1     ,     -1, -1, -1, -1, -1}, /* Apache csvCommon 2 */
+    /* [8]  */ {REQ_CLIENT     , CUSTOM    , CUSTOM, TIME  , TIME, REQ , RESP_CODE, RESP_SIZE, -1       , -1     ,     -1, -1, -1, -1, -1}, /* Apache csvCommon 3 */
+    /* [9]  */ {VHOST_WITH_PORT, REQ_CLIENT, CUSTOM, CUSTOM, TIME, TIME, REQ      , RESP_CODE, RESP_SIZE, -1     ,     -1, -1, -1, -1, -1}, /* Apache csvVhostCommon 1 */
+    /* [10]  */ {VHOST_WITH_PORT, REQ_CLIENT, CUSTOM, CUSTOM, TIME, TIME, REQ      , RESP_CODE, RESP_SIZE, -1     ,     -1, -1, -1, -1, -1}, /* Apache csvVhostCommon 2 */
+    /* [11] */ {REQ_CLIENT     , CUSTOM    , CUSTOM, TIME  , TIME, REQ,  RESP_CODE, RESP_SIZE, CUSTOM   , CUSTOM ,     -1, -1, -1, -1, -1}, /* Nginx csvCombined */
 };
 static const char parse_config_delim = ' ';
 static int *parse_config_expected_num_fields = NULL;
@@ -329,13 +333,14 @@ Log_line_parsed_t log_line_parsed_expected[] = {
     /* [1]  */ {"",                    0,  "", "127.0.0.1",                                "GET",    "/",                                      "1.0", 0, 0, 200, 11228, 0, "", "", 1602762231, 0}, 
     /* [2]  */ {"",                    0,  "", "::1",                                      "GET",    "/",                                      "1.1", 0, 0, 200, 3477 , 0, "", "", 1662055482, 0},
     /* [3]  */ {"",                    0,  "", "209.202.252.202",                          "PUT",    "/harness/networks/initiatives/engineer", "2.0", 0, 0, 403, 42410, 0, "", "", 1687272147, 0},
-    /* [4]  */ {"XPS-wsl.localdomain", 80, "", "::1",                                      "GET",    "/",                                      "1.1", 0, 0, 200, 3477 , 0, "", "", 1656611969, 0},
-    /* [5]  */ {"",                    0,  "", "127.0.0.1",                                "GET",    "/",                                      "1.0", 0, 0, 200, 11228, 0, "", "", 1656596631, 0},
-    /* [6]  */ {"",                    0,  "", "180.89.137.89",                            "DELETE", "/b2c/viral/innovative/reintermediate",   "1.0", 0, 0, 416, 99   , 0, "", "", 1685987168, 0},
-    /* [7]  */ {"",                    0,  "", "212.113.230.101",                          "PATCH",  "/strategic",                             "1.1", 0, 0, 404, 1217 , 0, "", "", 1687271389, 0},
-    /* [8]  */ {"XPS-wsl.localdomain", 80, "", "127.0.0.1",                                "GET",    "/",                                      "1.0", 0, 0, 200, 11228, 0, "", "", 1656596631, 0},
-    /* [9]  */ {"XPS-wsl.localdomain", 80, "", "2001:0db8:85a3:0000:0000:8a2e:0370:7334",  "GET",    "/",                                      "1.0", 0, 0, 200, 11228, 0, "", "", 1656596631, 0},
-    /* [10] */ {"",                    0,  "", "47.29.201.179",                            "GET",    "/?p=1",                                  "2.0", 0, 0, 200, 5316 , 0, "", "", 1551359830, 0}
+    /* [4]  */ {"",                    0,  "", "::1",                                      "-",      "",                                       "",    0, 0, 408, 0,     0, "", "", 1689278456, 0},
+    /* [5]  */ {"XPS-wsl.localdomain", 80, "", "::1",                                      "GET",    "/",                                      "1.1", 0, 0, 200, 3477 , 0, "", "", 1656611969, 0},
+    /* [6]  */ {"",                    0,  "", "127.0.0.1",                                "GET",    "/",                                      "1.0", 0, 0, 200, 11228, 0, "", "", 1656596631, 0},
+    /* [7]  */ {"",                    0,  "", "180.89.137.89",                            "DELETE", "/b2c/viral/innovative/reintermediate",   "1.0", 0, 0, 416, 99   , 0, "", "", 1685987168, 0},
+    /* [8]  */ {"",                    0,  "", "212.113.230.101",                          "PATCH",  "/strategic",                             "1.1", 0, 0, 404, 1217 , 0, "", "", 1687271389, 0},
+    /* [9]  */ {"XPS-wsl.localdomain", 80, "", "127.0.0.1",                                "GET",    "/",                                      "1.0", 0, 0, 200, 11228, 0, "", "", 1656596631, 0},
+    /* [10] */ {"XPS-wsl.localdomain", 80, "", "2001:0db8:85a3:0000:0000:8a2e:0370:7334",  "GET",    "/",                                      "1.0", 0, 0, 200, 11228, 0, "", "", 1656596631, 0},
+    /* [11] */ {"",                    0,  "", "47.29.201.179",                            "GET",    "/?p=1",                                  "2.0", 0, 0, 200, 5316 , 0, "", "", 1551359830, 0}
 };
 static int test_parse_web_log_line(){
     int errors = 0;

@@ -167,7 +167,8 @@ static const char *const req_method_str[] = {
     "UNLINK",
     "UNLOCK",
     "UPDATE",
-    "UPDATEREDIRECTREF"
+    "UPDATEREDIRECTREF",
+    "-"
 };
 
 #define REQ_METHOD_ARR_SIZE (int)(sizeof(req_method_str) / sizeof(req_method_str[0]))

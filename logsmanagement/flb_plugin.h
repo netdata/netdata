@@ -16,7 +16,8 @@
 typedef struct {
     char *flush,
          *http_listen, *http_port, *http_server,
-         *log_path, *log_level;
+         *log_path, *log_level,
+         *coro_stack_size;
 } flb_srvc_config_t ;
 
 int flb_init(flb_srvc_config_t flb_srvc_config);

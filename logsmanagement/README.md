@@ -192,7 +192,7 @@ This collector will collect any type of logs from a log file, similar to executi
 |  Configuration Option | Description  |
 |      :------------:  	| ------------ |
 | `log path` | The path to the log file to be monitored. |
-| `use inotify` | Select between inotify and file stat watchers (providing `libfluent-bit.so` has been built with inotify support). It defaults to `yes`. Set to `no` if abnormally high CPU usage is observed or if the log source is expected to constantly produce tens of thousands of logs per second. |
+| `use inotify` | Select between inotify and file stat watchers (providing `libfluent-bit.so` has been built with inotify support). It defaults to `yes`. Set to `no` if abnormally high CPU usage is observed or if the log source is expected to consistently produce tens of thousands of (unbuffered) logs per second. |
 
 <a name="collector-configuration-web-log"/>
 
@@ -205,7 +205,7 @@ This collector will collect [Apache](https://httpd.apache.org/) and [Nginx](http
 |  Configuration Option | Description  |
 |      :------------:  	| ------------ |
 | `log path` | The path to the web server's `access.log`. If set to `auto`, the collector will attempt to auto-discover it, provided the name of the configuration section is either `Apache access.log` or `Nginx access.log`. |
-| `use inotify` | Select between inotify and file stat watchers (providing `libfluent-bit.so` has been built with inotify support). It defaults to `yes`. Set to `no` if abnormally high CPU usage is observed or if the log source is expected to constantly produce tens of thousands of logs per second. |
+| `use inotify` | Select between inotify and file stat watchers (providing `libfluent-bit.so` has been built with inotify support). It defaults to `yes`. Set to `no` if abnormally high CPU usage is observed or if the log source is expected to consistently produce tens of thousands of (unbuffered) logs per second. |
 | `log format` | The log format to be used for parsing. Unlike the [`GO weblog`]() module, only the `CSV` parser is supported and it can be configured [in the same way](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md#known-fields) as in the `GO` module. If set to `auto`, the collector will attempt to auto-detect the log format using the same logic explained [here](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md#log-parser-auto-detection). |
 | `verify parsed logs` | If set to `yes`, the parser will attempt to verify that the parsed fields are valid, before extracting metrics from them. If they are invalid (for example, the response code is less than `100`), the `invalid` dimension will be incremented instead. Setting this to `no` will result in a slight performance gain. |
 | `vhosts chart` | Enable chart showing names of the virtual hosts extracted from the collected logs. |
@@ -229,7 +229,7 @@ This collector will collect [Apache](https://httpd.apache.org/) and [Nginx](http
 
 </a>
 
-This collector will collect logs through a Unix socket server (UDP or TCP) or over the network using TCP or UDP. See also documentation of [Fluent Bit syslog input plugin](https://docs.fluentbit.io/manual/v/1.9-pre/pipeline/inputs/syslog).
+This collector will collect logs through a Unix socket server (UDP or TCP) or over the network using TCP or UDP. See also documentation of [Fluent Bit syslog input plugin](https://docs.fluentbit.io/manual/pipeline/inputs/syslog).
 
 |  Configuration Option | Description  |
 |      :------------:  	| ------------ |
@@ -255,7 +255,7 @@ This collector will collect logs through a Unix socket server (UDP or TCP) or ov
 
 </a>
 
-This collector will collect logs through a serial interface. See also documentation of [Fluent Bit serial interface input plugin](https://docs.fluentbit.io/manual/v/1.9-pre/pipeline/inputs/serial-interface).
+This collector will collect logs through a serial interface. See also documentation of [Fluent Bit serial interface input plugin](https://docs.fluentbit.io/manual/pipeline/inputs/serial-interface).
 
 |  Configuration Option | Description  |
 |      :------------:  	| ------------ |
@@ -271,7 +271,7 @@ This collector will collect logs through a serial interface. See also documentat
 
 </a>
 
-This collector will collect MQTT data over a TCP connection, by spawning an MQTT server through Fluent Bit. See also documentation of [Fluent Bit MQTT input plugin](https://docs.fluentbit.io/manual/v/1.9-pre/pipeline/inputs/mqtt).
+This collector will collect MQTT data over a TCP connection, by spawning an MQTT server through Fluent Bit. See also documentation of [Fluent Bit MQTT input plugin](https://docs.fluentbit.io/manual/pipeline/inputs/mqtt).
 
 |  Configuration Option | Description  |
 |      :------------:  	| ------------ |
@@ -663,6 +663,6 @@ Netdata is executed without root permissions, so the kernel ring buffer logs may
 sudo sysctl kernel.dmesg_restrict=0
 ```
 
-<!-- 3. The timestamp of some of the collected log records is wrong.
+3. I am observing very high CPU usage when monitoring a log source using `flb_tail` or `flb_web_log`.
 
-Some collection cycles may include log records with timestamps _preceding_ the cycle collection timestamp. This is expected, as the collection datetime is used instead of each log record's timestamp. -->
+The log source is probably producing a very high number of unbuffered logs, which results in too many filesystem events. Try setting `use inotify = no` to use file stat watchers instead.

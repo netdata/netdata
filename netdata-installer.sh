@@ -1010,6 +1010,8 @@ bundle_fluentbit() {
   libc="$(detect_libc)"
   if [ "${libc}" = "musl" ]; then
     patch -N -p1 fluent-bit/lib/chunkio/src/CMakeLists.txt -i logsmanagement/fluent_bit_build/chunkio-static-lib-fts.patch
+    patch -N -p1 fluent-bit/cmake/luajit.cmake -i logsmanagement/fluent_bit_build/exclude-luajit.patch
+    patch -N -p1 fluent-bit/src/flb_network.c -i logsmanagement/fluent_bit_build/xsi-strerror.patch
   fi
   
   [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling Fluent-Bit."

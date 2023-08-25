@@ -98,10 +98,11 @@ static int (*flb_stop)(flb_ctx_t *ctx);
 static void (*flb_destroy)(flb_ctx_t *ctx);
 static int (*flb_time_pop_from_msgpack)(struct flb_time *time, msgpack_unpacked *upk, msgpack_object **map);
 static int (*flb_lib_free)(void *data);
-static struct flb_parser *(*flb_parser_create)(const char *name, const char *format, const char *p_regex,int skip_empty,
-                                               const char *time_fmt, const char *time_key, const char *time_offset,
-                                               int time_keep, int time_strict, struct flb_parser_types *types,
-                                               int types_len, struct mk_list *decoders, struct flb_config *config);
+static struct flb_parser *(*flb_parser_create)( const char *name, const char *format, const char *p_regex, int skip_empty,
+                                                const char *time_fmt, const char *time_key, const char *time_offset,
+                                                int time_keep, int time_strict, int logfmt_no_bare_keys, 
+                                                struct flb_parser_types *types, int types_len,struct mk_list *decoders,
+                                                struct flb_config *config);
 static int (*flb_input)(flb_ctx_t *ctx, const char *input, void *data);
 static int (*flb_input_set)(flb_ctx_t *ctx, int ffd, ...);
 // static int (*flb_filter)(flb_ctx_t *ctx, const char *filter, void *data);
@@ -183,12 +184,13 @@ int flb_init(flb_srvc_config_t flb_srvc_config){
 
     /* Global service settings */
     if(unlikely(flb_service_set(ctx,
-        "Flush"         , flb_srvc_config.flush,
-        "HTTP_Listen"   , flb_srvc_config.http_listen,
-        "HTTP_Port"     , flb_srvc_config.http_port,
-        "HTTP_Server"   , flb_srvc_config.http_server,
-        "Log_File"      , flb_srvc_config.log_path,
-        "Log_Level"     , flb_srvc_config.log_level,
+        "Flush"             , flb_srvc_config.flush,
+        "HTTP_Listen"       , flb_srvc_config.http_listen,
+        "HTTP_Port"         , flb_srvc_config.http_port,
+        "HTTP_Server"       , flb_srvc_config.http_server,
+        "Log_File"          , flb_srvc_config.log_path,
+        "Log_Level"         , flb_srvc_config.log_level,
+        "Coro_stack_size"   , flb_srvc_config.coro_stack_size,
         NULL) != 0 )){
             rc = -1;
             goto do_return;
@@ -1227,9 +1229,20 @@ int flb_add_input(struct File_info *const p_file_info){
             netdata_log_debug(D_LOGS_MANAG, "Setting up FLB_DOCKER_EV collector");
 
             /* Set up Docker Events parser */
-            if(flb_parser_create( "docker_events_parser", "json", NULL,
-                FLB_TRUE, NULL, NULL, NULL, FLB_TRUE, FLB_TRUE, NULL, 0,
-                NULL, ctx->config) == NULL) return FLB_PARSER_CREATE_ERROR;
+            if(flb_parser_create(   "docker_events_parser", /* parser name */
+                                    "json",                 /* backend type */
+                                    NULL,                   /* regex */
+                                    FLB_TRUE,               /* skip_empty */
+                                    NULL,                   /* time format */
+                                    NULL,                   /* time key */
+                                    NULL,                   /* time offset */
+                                    FLB_TRUE,               /* time keep */
+                                    FLB_FALSE,              /* time strict */
+                                    FLB_FALSE,              /* no bare keys */
+                                    NULL,                   /* parser types */
+                                    0,                      /* types len */
+                                    NULL,                   /* decoders */
+                                    ctx->config) == NULL) return FLB_PARSER_CREATE_ERROR;
         
             /* Set up Docker Events input */
             p_file_info->flb_input = flb_input(ctx, "docker_events", NULL);
@@ -1256,9 +1269,21 @@ int flb_add_input(struct File_info *const p_file_info){
                         !syslog_config->socket_config || 
                         !syslog_config->socket_config->mode || 
                         !p_file_info->filename)) return CONFIG_READ_ERROR;
-            if(flb_parser_create( parser_name, "regex", syslog_config->log_format,
-                FLB_TRUE, NULL, NULL, NULL, FLB_TRUE, FLB_TRUE, NULL, 0,
-                NULL, ctx->config) == NULL) return FLB_PARSER_CREATE_ERROR;
+                        
+            if(flb_parser_create(   parser_name,                /* parser name */
+                                    "regex",                    /* backend type */
+                                    syslog_config->log_format,  /* regex */
+                                    FLB_TRUE,                   /* skip_empty */
+                                    NULL,                       /* time format */
+                                    NULL,                       /* time key */
+                                    NULL,                       /* time offset */
+                                    FLB_TRUE,                   /* time keep */
+                                    FLB_TRUE,                   /* time strict */
+                                    FLB_FALSE,                  /* no bare keys */
+                                    NULL,                       /* parser types */
+                                    0,                          /* types len */
+                                    NULL,                       /* decoders */
+                                    ctx->config) == NULL) return FLB_PARSER_CREATE_ERROR;
         
             /* Set up syslog input */
             p_file_info->flb_input = flb_input(ctx, "syslog", NULL);

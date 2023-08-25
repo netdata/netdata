@@ -694,70 +694,64 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
             netdata_log_debug(D_LOGS_MANAG, "Item %d (type: REQ or REQ_METHOD):%.*s", i, (int)field_size, field);
             #endif
 
-            if(unlikely(field[0] ==  '-' && field_size == 1)){
-                log_line_parsed->req_method[0] = '\0';
-                log_line_parsed->parsing_errors++;
-            }
-            else{
+            snprintfz( log_line_parsed->req_method, REQ_METHOD_MAX_LEN, "%.*s", (int)field_size, field); 
 
-                snprintfz( log_line_parsed->req_method, REQ_METHOD_MAX_LEN, "%.*s", (int)field_size, field); 
+            if(verify){
+                if( unlikely( 
+                        /* GET and POST are the most common requests, so check them first */
+                        strcmp(log_line_parsed->req_method, "GET") &&
+                        strcmp(log_line_parsed->req_method, "POST") &&
 
-                if(verify){
-                    if( unlikely( 
-                         /* GET and POST are the most common requests, so check them first */
-                         strcmp(log_line_parsed->req_method, "GET") && 
-                         strcmp(log_line_parsed->req_method, "POST") && 
+                        strcmp(log_line_parsed->req_method, "ACL") &&
+                        strcmp(log_line_parsed->req_method, "BASELINE-CONTROL") &&
+                        strcmp(log_line_parsed->req_method, "BIND") &&
+                        strcmp(log_line_parsed->req_method, "CHECKIN") &&
+                        strcmp(log_line_parsed->req_method, "CHECKOUT") &&
+                        strcmp(log_line_parsed->req_method, "CONNECT") &&
+                        strcmp(log_line_parsed->req_method, "COPY") &&
+                        strcmp(log_line_parsed->req_method, "DELETE") &&
+                        strcmp(log_line_parsed->req_method, "HEAD") &&
+                        strcmp(log_line_parsed->req_method, "LABEL") &&
+                        strcmp(log_line_parsed->req_method, "LINK") &&
+                        strcmp(log_line_parsed->req_method, "LOCK") &&
+                        strcmp(log_line_parsed->req_method, "MERGE") &&
+                        strcmp(log_line_parsed->req_method, "MKACTIVITY") &&
+                        strcmp(log_line_parsed->req_method, "MKCALENDAR") &&
+                        strcmp(log_line_parsed->req_method, "MKCOL") &&
+                        strcmp(log_line_parsed->req_method, "MKREDIRECTREF") &&
+                        strcmp(log_line_parsed->req_method, "MKWORKSPACE") &&
+                        strcmp(log_line_parsed->req_method, "MOVE") &&
+                        strcmp(log_line_parsed->req_method, "OPTIONS") &&
+                        strcmp(log_line_parsed->req_method, "ORDERPATCH") &&
+                        strcmp(log_line_parsed->req_method, "PATCH") &&
+                        strcmp(log_line_parsed->req_method, "PRI") &&
+                        strcmp(log_line_parsed->req_method, "PROPFIND") &&
+                        strcmp(log_line_parsed->req_method, "PROPPATCH") &&
+                        strcmp(log_line_parsed->req_method, "PUT") &&
+                        strcmp(log_line_parsed->req_method, "REBIND") &&
+                        strcmp(log_line_parsed->req_method, "REPORT") &&
+                        strcmp(log_line_parsed->req_method, "SEARCH") &&
+                        strcmp(log_line_parsed->req_method, "TRACE") &&
+                        strcmp(log_line_parsed->req_method, "UNBIND") &&
+                        strcmp(log_line_parsed->req_method, "UNCHECKOUT") &&
+                        strcmp(log_line_parsed->req_method, "UNLINK") &&
+                        strcmp(log_line_parsed->req_method, "UNLOCK") &&
+                        strcmp(log_line_parsed->req_method, "UPDATE") &&
+                        strcmp(log_line_parsed->req_method, "UPDATEREDIRECTREF") &&
+                        strcmp(log_line_parsed->req_method, "-"))) {
 
-                         strcmp(log_line_parsed->req_method, "ACL") && 
-                         strcmp(log_line_parsed->req_method, "BASELINE-CONTROL") && 
-                         strcmp(log_line_parsed->req_method, "BIND") && 
-                         strcmp(log_line_parsed->req_method, "CHECKIN") && 
-                         strcmp(log_line_parsed->req_method, "CHECKOUT") && 
-                         strcmp(log_line_parsed->req_method, "CONNECT") && 
-                         strcmp(log_line_parsed->req_method, "COPY") && 
-                         strcmp(log_line_parsed->req_method, "DELETE") && 
-                         strcmp(log_line_parsed->req_method, "HEAD") && 
-                         strcmp(log_line_parsed->req_method, "LABEL") && 
-                         strcmp(log_line_parsed->req_method, "LINK") && 
-                         strcmp(log_line_parsed->req_method, "LOCK") && 
-                         strcmp(log_line_parsed->req_method, "MERGE") && 
-                         strcmp(log_line_parsed->req_method, "MKACTIVITY") && 
-                         strcmp(log_line_parsed->req_method, "MKCALENDAR") && 
-                         strcmp(log_line_parsed->req_method, "MKCOL") && 
-                         strcmp(log_line_parsed->req_method, "MKREDIRECTREF") && 
-                         strcmp(log_line_parsed->req_method, "MKWORKSPACE") && 
-                         strcmp(log_line_parsed->req_method, "MOVE") && 
-                         strcmp(log_line_parsed->req_method, "OPTIONS") && 
-                         strcmp(log_line_parsed->req_method, "ORDERPATCH") && 
-                         strcmp(log_line_parsed->req_method, "PATCH") && 
-                         strcmp(log_line_parsed->req_method, "PRI") && 
-                         strcmp(log_line_parsed->req_method, "PROPFIND") && 
-                         strcmp(log_line_parsed->req_method, "PROPPATCH") && 
-                         strcmp(log_line_parsed->req_method, "PUT") && 
-                         strcmp(log_line_parsed->req_method, "REBIND") && 
-                         strcmp(log_line_parsed->req_method, "REPORT") && 
-                         strcmp(log_line_parsed->req_method, "SEARCH") && 
-                         strcmp(log_line_parsed->req_method, "TRACE") && 
-                         strcmp(log_line_parsed->req_method, "UNBIND") && 
-                         strcmp(log_line_parsed->req_method, "UNCHECKOUT") && 
-                         strcmp(log_line_parsed->req_method, "UNLINK") && 
-                         strcmp(log_line_parsed->req_method, "UNLOCK") && 
-                         strcmp(log_line_parsed->req_method, "UPDATE") && 
-                         strcmp(log_line_parsed->req_method, "UPDATEREDIRECTREF"))) {
-
-                        #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-                        collector_error("REQ_METHOD is invalid");
-                        #endif
-                        log_line_parsed->req_method[0] = '\0';
-                        log_line_parsed->parsing_errors++;
-                    }
+                    #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
+                    collector_error("REQ_METHOD is invalid");
+                    #endif
+                    log_line_parsed->req_method[0] = '\0';
+                    log_line_parsed->parsing_errors++;
                 }
-                #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-                netdata_log_debug(D_LOGS_MANAG, "Extracted REQ_METHOD:%s", log_line_parsed->req_method);
-                #endif
             }
+            #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
+            netdata_log_debug(D_LOGS_MANAG, "Extracted REQ_METHOD:%s", log_line_parsed->req_method);
+            #endif
             
-            if(fields_format[i] == REQ) {
+            if(fields_format[i] == REQ && field[0] !=  '-') {
                 while(*(offset + 1) == delimiter) offset++; // Consume extra whitespace characters
                 field = ++offset; 
                 while(*offset != delimiter && ((size_t)(offset - line) < line_len)) offset++;
