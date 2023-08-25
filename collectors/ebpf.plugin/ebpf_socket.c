@@ -1646,8 +1646,8 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
     // can have values from the previous one.
     memset(values, 0, length);
     time_t update_time = time(NULL);
-    PPvoid_t judy_array = &ebpf_socket_pid.index.JudyHSArray;
-    rw_spinlock_write_lock(&ebpf_socket_pid.index.rw_spinlock);
+    PPvoid_t judy_array = &ebpf_judy_pid.index.JudyHSArray;
+    rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         test = bpf_map_lookup_elem(fd, &key, values);
         if (test < 0) {
@@ -1686,7 +1686,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         netdata_ebpf_socket_judy_connections_t *pid_ptr = *pid_pptr;
         if (likely(*pid_pptr == NULL)) {
             // a new PID added to the index
-            *pid_pptr = aral_mallocz(ebpf_socket_pid.pid_table);
+            *pid_pptr = aral_mallocz(ebpf_judy_pid.pid_table);
 
             pid_ptr = *pid_pptr;
 
@@ -1729,7 +1729,7 @@ end_socket_loop:
         memset(values, 0, length);
         memcpy(&key, &next_key, sizeof(key));
     }
-    rw_spinlock_write_unlock(&ebpf_socket_pid.index.rw_spinlock);
+    rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
     netdata_thread_enable_cancelability();
 }
 
@@ -2559,14 +2559,14 @@ static void ebpf_socket_initialize_global_vectors()
     ebpf_socket_aral_init();
     socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
 
-    ebpf_socket_pid.pid_table = ebpf_allocate_pid_aral(NETDATA_EBPF_PID_SOCKET_ARAL_TABLE_NAME,
+    ebpf_judy_pid.pid_table = ebpf_allocate_pid_aral(NETDATA_EBPF_PID_SOCKET_ARAL_TABLE_NAME,
                                                        sizeof(netdata_ebpf_socket_judy_connections_t));
     aral_socket_table = ebpf_allocate_pid_aral(NETDATA_EBPF_SOCKET_ARAL_TABLE_NAME,
                                                sizeof(netdata_socket_plus_t));
 
     socket_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_socket_t));
 
-    rw_spinlock_init(&ebpf_socket_pid.index.rw_spinlock);
+    rw_spinlock_init(&ebpf_judy_pid.index.rw_spinlock);
 }
 
 /*****************************************************************

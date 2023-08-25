@@ -534,34 +534,34 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values)
  * Clean Judy array unsafe
  *
  * Clean all Judy Array allocated to show table when a function is called.
- * Before to call this function it is necessary to lock `ebpf_socket_pid.index.rw_spinlock`.
+ * Before to call this function it is necessary to lock `ebpf_judy_pid.index.rw_spinlock`.
  **/
 static void ebpf_socket_clean_judy_array_unsafe()
 {
-    if (!ebpf_socket_pid.index.JudyHSArray)
+    if (!ebpf_judy_pid.index.JudyHSArray)
         return;
 
     Pvoid_t *pid_value, *socket_value;
     Word_t local_pid = 0, local_socket = 0;
     bool first_pid = true, first_socket = true;
-    while ((pid_value = JudyLFirstThenNext(ebpf_socket_pid.index.JudyHSArray, &local_pid, &first_pid))) {
+    while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyHSArray, &local_pid, &first_pid))) {
         netdata_ebpf_socket_judy_connections_t *pid_ptr = (netdata_ebpf_socket_judy_connections_t *)*pid_value;
         while ((socket_value = JudyLFirstThenNext(pid_ptr->index.JudyHSArray, &local_socket, &first_socket))) {
             netdata_socket_plus_t *socket_clean = *socket_value;
             aral_freez(aral_socket_table, socket_clean);
         }
         JudyLFreeArray(&pid_ptr->index.JudyHSArray, PJE0);
-        aral_freez(ebpf_socket_pid.pid_table, pid_ptr);
+        aral_freez(ebpf_judy_pid.pid_table, pid_ptr);
     }
-    JudyLFreeArray(&ebpf_socket_pid.index.JudyHSArray, PJE0);
-    ebpf_socket_pid.index.JudyHSArray = NULL;
+    JudyLFreeArray(&ebpf_judy_pid.index.JudyHSArray, PJE0);
+    ebpf_judy_pid.index.JudyHSArray = NULL;
 }
 
 /**
  * Fill function buffer unsafe
  *
  * Fill the function buffer with socket information. Before to call this function it is necessary to lock
- * ebpf_socket_pid.index.rw_spinlock
+ * ebpf_judy_pid.index.rw_spinlock
  *
  * @param buf    buffer used to store data to be shown by function.
  *
@@ -574,7 +574,7 @@ static void ebpf_socket_fill_function_buffer_unsafe(BUFFER *buf)
     Pvoid_t *pid_value, *socket_value;
     Word_t local_pid = 0;
     bool first_pid = true;
-    while ((pid_value = JudyLFirstThenNext(ebpf_socket_pid.index.JudyHSArray, &local_pid, &first_pid))) {
+    while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyHSArray, &local_pid, &first_pid))) {
         netdata_ebpf_socket_judy_connections_t *pid_ptr = (netdata_ebpf_socket_judy_connections_t *)*pid_value;
         bool first_socket = true;
         Word_t local_timestamp = 0;
@@ -608,20 +608,20 @@ static void ebpf_socket_fill_function_buffer_unsafe(BUFFER *buf)
 void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
 {
     // thread was not initialized or Array was reset
-    rw_spinlock_read_lock(&ebpf_socket_pid.index.rw_spinlock);
+    rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
     if (!em->maps || (em->maps && em->maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED) ||
-        !ebpf_socket_pid.index.JudyHSArray){
+        !ebpf_judy_pid.index.JudyHSArray){
         netdata_socket_plus_t fake_values = { };
 
         ebpf_socket_fill_fake_socket(&fake_values);
 
         ebpf_fill_function_buffer(buf, &fake_values);
-        rw_spinlock_read_unlock(&ebpf_socket_pid.index.rw_spinlock);
+        rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
         return;
     }
 
     ebpf_socket_fill_function_buffer_unsafe(buf);
-    rw_spinlock_read_unlock(&ebpf_socket_pid.index.rw_spinlock);
+    rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
 }
 
 /**
@@ -652,7 +652,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
     size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
     const char *name;
     int period = -1;
-    rw_spinlock_read_lock(&ebpf_socket_pid.index.rw_spinlock);
+    rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
     for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
         const char *keyword = get_word(words, num_words, i);
         if (!keyword)
@@ -714,18 +714,18 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             }
         } else if (strncmp(keyword, "help", 4) == 0) {
             ebpf_function_socket_help(transaction);
-            rw_spinlock_read_unlock(&ebpf_socket_pid.index.rw_spinlock);
+            rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
             return;
         }
     }
-    rw_spinlock_read_unlock(&ebpf_socket_pid.index.rw_spinlock);
+    rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         // Cleanup when we already had a thread running
-        rw_spinlock_read_lock(&ebpf_socket_pid.index.rw_spinlock);
+        rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
         ebpf_socket_clean_judy_array_unsafe();
-        rw_spinlock_read_unlock(&ebpf_socket_pid.index.rw_spinlock);
+        rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
         if (ebpf_function_start_thread(em, period)) {
             ebpf_function_error(transaction,

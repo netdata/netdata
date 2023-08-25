@@ -636,12 +636,12 @@ pthread_mutex_t mutex_cgroup_shm;
 
 //Network viewer
 ebpf_network_viewer_options_t network_viewer_opt;
-netdata_ebpf_socket_judy_pid_t ebpf_socket_pid = {.pid_table = NULL, .index = {.JudyHSArray = NULL}};
 
 // Statistic
 ebpf_plugin_stats_t plugin_statistics = {.core = 0, .legacy = 0, .running = 0, .threads = 0, .tracepoints = 0,
                                          .probes = 0, .retprobes = 0, .trampolines = 0, .memlock_kern = 0,
                                          .hash_tables = 0};
+netdata_ebpf_judy_pid_t ebpf_judy_pid = {.pid_table = NULL, .index = {.JudyHSArray = NULL}};
 
 #ifdef LIBBPF_MAJOR_VERSION
 struct btf *default_btf = NULL;

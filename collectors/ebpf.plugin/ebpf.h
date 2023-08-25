@@ -98,6 +98,16 @@ typedef struct netdata_error_report {
     int err;
 } netdata_error_report_t;
 
+typedef struct netdata_ebpf_judy_pid {
+    ARAL *pid_table;
+
+    // Index for PIDs
+    struct {                            // support for multiple indexing engines
+        Pvoid_t JudyHSArray;            // the hash table
+        RW_SPINLOCK rw_spinlock;        // protect the index
+    } index;
+} netdata_ebpf_judy_pid_t;
+
 extern ebpf_module_t ebpf_modules[];
 enum ebpf_main_index {
     EBPF_MODULE_PROCESS_IDX,
@@ -326,6 +336,7 @@ void ebpf_read_global_table_stats(netdata_idx_t *stats, netdata_idx_t *values, i
 extern ebpf_filesystem_partitions_t localfs[];
 extern ebpf_sync_syscalls_t local_syscalls[];
 extern int ebpf_exit_plugin;
+extern netdata_ebpf_judy_pid_t ebpf_judy_pid;
 
 #define EBPF_MAX_SYNCHRONIZATION_TIME 300
 
