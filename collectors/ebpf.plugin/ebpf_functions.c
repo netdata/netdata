@@ -546,15 +546,17 @@ static void ebpf_socket_clean_judy_array_unsafe()
     bool first_pid = true, first_socket = true;
     while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyHSArray, &local_pid, &first_pid))) {
         netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
-        while ((socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyHSArray, &local_socket, &first_socket))) {
-            netdata_socket_plus_t *socket_clean = *socket_value;
-            aral_freez(aral_socket_table, socket_clean);
+        rw_spinlock_write_lock(&pid_ptr->socket_stats.rw_spinlock);
+        if (pid_ptr->socket_stats.JudyHSArray) {
+            while ((socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyHSArray, &local_socket, &first_socket))) {
+                netdata_socket_plus_t *socket_clean = *socket_value;
+                aral_freez(aral_socket_table, socket_clean);
+            }
+            JudyLFreeArray(&pid_ptr->socket_stats.JudyHSArray, PJE0);
+            pid_ptr->socket_stats.JudyHSArray = NULL;
         }
-        JudyLFreeArray(&pid_ptr->socket_stats.JudyHSArray, PJE0);
-        aral_freez(ebpf_judy_pid.pid_table, pid_ptr);
+        rw_spinlock_write_unlock(&pid_ptr->socket_stats.rw_spinlock);
     }
-    JudyLFreeArray(&ebpf_judy_pid.index.JudyHSArray, PJE0);
-    ebpf_judy_pid.index.JudyHSArray = NULL;
 }
 
 /**
@@ -579,10 +581,12 @@ static void ebpf_socket_fill_function_buffer_unsafe(BUFFER *buf)
         bool first_socket = true;
         Word_t local_timestamp = 0;
         rw_spinlock_read_lock(&pid_ptr->socket_stats.rw_spinlock);
-        while ((socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyHSArray, &local_timestamp, &first_socket))) {
-            counter++;
-            netdata_socket_plus_t *values = (netdata_socket_plus_t *)*socket_value;
-            ebpf_fill_function_buffer(buf, values);
+        if (pid_ptr->socket_stats.JudyHSArray) {
+            while ((socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyHSArray, &local_timestamp, &first_socket))) {
+                counter++;
+                netdata_socket_plus_t *values = (netdata_socket_plus_t *)*socket_value;
+                ebpf_fill_function_buffer(buf, values);
+            }
         }
         rw_spinlock_read_unlock(&pid_ptr->socket_stats.rw_spinlock);
     }
