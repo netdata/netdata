@@ -1547,7 +1547,7 @@ static void ebpf_socket_translate(netdata_socket_plus_t *dst, netdata_socket_idx
                 resolve = 0;
             } else {
                 ipv4_addr.sin_addr.s_addr = key->daddr.addr32[0];
-                ipv4_addr.sin_port = ntohs(key->dport);
+                ipv4_addr.sin_port = key->dport;
                 ret = getnameinfo((struct sockaddr *) &ipv4_addr, sizeof(ipv4_addr), dst->socket_string.dst_ip,
                                   INET6_ADDRSTRLEN, dst->socket_string.dst_port, NI_MAXSERV,
                                   NI_NUMERICHOST);
@@ -1567,7 +1567,7 @@ static void ebpf_socket_translate(netdata_socket_plus_t *dst, netdata_socket_idx
             ipv4_addr.sin_addr.s_addr = key->daddr.addr32[0];
             if(!inet_ntop(AF_INET, &ipv4_addr.sin_addr, dst->socket_string.dst_ip, NI_MAXHOST))
                 netdata_log_info("Cannot convert IP %u .", ipv4_addr.sin_addr.s_addr);
-            snprintfz(dst->socket_string.dst_port, NI_MAXSERV, "%u",  key->dport);
+            snprintfz(dst->socket_string.dst_port, NI_MAXSERV, "%u",  ntohs(key->dport));
         }
     } else {
         struct sockaddr_in6 ipv6_addr = { };
@@ -1599,7 +1599,7 @@ static void ebpf_socket_translate(netdata_socket_plus_t *dst, netdata_socket_idx
             memcpy(&ipv6_addr.sin6_addr, key->daddr.addr8, sizeof(key->daddr.addr8));
             if(!inet_ntop(AF_INET6, &ipv6_addr.sin6_addr, dst->socket_string.dst_ip, NI_MAXHOST))
                 netdata_log_info("Cannot convert IPv6 Address.");
-            snprintfz(dst->socket_string.dst_port, NI_MAXSERV, "%u",  key->dport);
+            snprintfz(dst->socket_string.dst_port, NI_MAXSERV, "%u",  ntohs(key->dport));
         }
     }
     dst->pid = key->pid;
@@ -1662,11 +1662,12 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         ebpf_socket_fill_publish_apps(key.pid, values);
 
         // We update UDP to show info with charts, but we do not show them with functions
-        key.dport = ntohs(key.dport);
+        /*
         if (key.dport == NETDATA_EBPF_UDP_PORT && values[0].protocol == IPPROTO_UDP) {
             bpf_map_delete_elem(fd, &key);
             goto end_socket_loop;
         }
+         */
 
         // Discard non-bind sockets
         if (!key.daddr.addr64[0] && !key.daddr.addr64[1] && !key.saddr.addr64[0] && !key.saddr.addr64[1]) {
