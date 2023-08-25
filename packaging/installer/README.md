@@ -211,7 +211,7 @@ to connect to (or ping) `https://api.github.com/`. Failing to connect indicates 
 
 There are three potential workarounds for this:
 
-1. You can configure your system with a proper IPv6 transition mechanism, such as NAT64. GitHub’s anacrhonisms
+1. You can configure your system with a proper IPv6 transition mechanism, such as NAT64. GitHub’s anachronisms
    affect many projects other than just Netdata, and there are unfortunately a number of other services out there
    that do not provide IPv6 connectivity, so taking this route is likely to save you time in the future as well.
 2. If you are using a system that we publish native packages for (see our [platform support
