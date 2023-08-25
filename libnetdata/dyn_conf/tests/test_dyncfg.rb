@@ -165,7 +165,7 @@ def assert_not_nil(value)
 end
 def assert_nil(value)
     unless value.nil?
-        FAIL("Expected value to not be nil", nil, caller_locations(1, 1).first)
+        FAIL("Expected value to be nil", nil, caller_locations(1, 1).first)
     end
     $test_runner.add_assertion()
 end

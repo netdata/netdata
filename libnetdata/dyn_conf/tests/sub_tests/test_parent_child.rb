@@ -171,6 +171,21 @@ HEREDOC
         new_job = jobs[:jobs].find {|i| i[:name] == created_job}
         assert_nil(new_job)
         PASS()
+
+        TEST("parent/child/module/del_undeletable_job", "Try delete job on child (child rejects), check failure case works (hops:1)")
+        # test if plugin rejects job deletion the job still remains in list as it should
+        rc = DynCfgHttpClient.delete_job(@parent, @plugin, @arry_mod, @test_job, @child)
+        assert_eq(rc.code, 500, "as HTTP code for delete_job request")
+        rc = DynCfgHttpClient.get_job_list(@parent, @plugin, @arry_mod, @child)
+        assert_eq(rc.code, 200, "as HTTP code for get_jobs request")
+        jobs = nil
+        assert_nothing_raised do
+            jobs = JSON.parse(rc.parsed_response, symbolize_names: true)
+        end
+        assert_has_key?(jobs, :jobs)
+        job = jobs[:jobs].find {|i| i[:name] == @test_job}
+        assert_not_nil(job)
+        PASS()
     end
 end
 
