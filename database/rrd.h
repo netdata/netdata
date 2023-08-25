@@ -1105,7 +1105,7 @@ struct rrdhost_system_info {
     int mc_version;
 };
 
-struct rrdhost_system_info *rrdhost_labels_to_system_info(DICTIONARY *labels);
+struct rrdhost_system_info *rrdhost_labels_to_system_info(RRDLABELS *labels);
 
 struct rrdhost {
     char machine_guid[GUID_LEN + 1];                // the unique ID of this host
