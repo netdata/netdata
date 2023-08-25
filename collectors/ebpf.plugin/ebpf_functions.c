@@ -467,19 +467,6 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values)
     // PID
     buffer_json_add_array_item_uint64(wb, (uint64_t)values->pid);
 
-    // Connections
-    uint64_t connections = (values->data.protocol == IPPROTO_TCP) ?
-                           (values->data.tcp.ipv4_connect + values->data.tcp.ipv6_connect ):
-                           values->data.udp.call_udp_sent;
-    if (values->flags & NETDATA_SOCKET_FLAGS_NOT_NEW) {
-        connections++;
-    } else if (!connections) {
-        // If no connections, this means that we lost when connection was opened
-        values->flags |= NETDATA_SOCKET_FLAGS_NOT_NEW;
-        connections++;
-    }
-    buffer_json_add_array_item_uint64(wb, connections);
-
     // SRC IP
     buffer_json_add_array_item_string(wb, values->socket_string.src_ip);
 
@@ -492,6 +479,7 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values)
     // DST Port
     buffer_json_add_array_item_string(wb, values->socket_string.dst_port);
 
+    uint64_t connections;
     if (values->data.protocol == IPPROTO_TCP) {
         // Protocol
         buffer_json_add_array_item_string(wb, "TCP");
@@ -501,6 +489,9 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values)
 
         // Traffic sent
         buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.tcp.tcp_bytes_sent);
+
+        // Connections
+        connections = values->data.tcp.ipv4_connect + values->data.tcp.ipv6_connect;
     } else if (values->data.protocol == IPPROTO_UDP) {
         // Protocol
         buffer_json_add_array_item_string(wb, "UDP");
@@ -510,6 +501,9 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values)
 
         // Traffic sent
         buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.udp.udp_bytes_sent);
+
+        // Connections
+        connections = values->data.udp.call_udp_sent;
     } else {
         // Protocol
         buffer_json_add_array_item_string(wb, "UNSPEC");
@@ -519,7 +513,19 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values)
 
         // Traffic sent
         buffer_json_add_array_item_uint64(wb, 0);
+
+        connections = 1;
     }
+
+    // Connections
+    if (values->flags & NETDATA_SOCKET_FLAGS_ALREADY_OPEN) {
+        connections++;
+    } else if (!connections) {
+        // If no connections, this means that we lost when connection was opened
+        values->flags |= NETDATA_SOCKET_FLAGS_ALREADY_OPEN;
+        connections++;
+    }
+    buffer_json_add_array_item_uint64(wb, connections);
 
     buffer_json_array_close(wb);
 }
@@ -762,13 +768,6 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
             NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "CONNECTIONS", "Number of connections", RRDF_FIELD_TYPE_INTEGER,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
-                                    NULL);
-
         buffer_rrdf_table_add_field(wb, fields_id++, "SRC IP", "Source IP", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
@@ -810,6 +809,13 @@ static void ebpf_function_socket_manipulation(const char *transaction,
                                     NULL);
 
         buffer_rrdf_table_add_field(wb, fields_id, "Outcoming Bandwidth", "Traffic sent.", RRDF_FIELD_TYPE_INTEGER,
+                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, fields_id++, "CONNECTIONS", "Number of connections", RRDF_FIELD_TYPE_INTEGER,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,

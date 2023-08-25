@@ -293,7 +293,7 @@ typedef struct netdata_socket {
 } netdata_socket_t;
 
 typedef enum netdata_socket_flags {
-    NETDATA_SOCKET_FLAGS_NOT_NEW = (1<<0)
+    NETDATA_SOCKET_FLAGS_ALREADY_OPEN = (1<<0)
 } netdata_socket_flags_t;
 
 typedef struct netata_socket_plus {
