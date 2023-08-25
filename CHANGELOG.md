@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- use the newer XXH3 128bits algorithm, instead of the classic XXH128 [\#15878](https://github.com/netdata/netdata/pull/15878) ([ktsaou](https://github.com/ktsaou))
+- ML add new `delete old models param` to readme [\#15873](https://github.com/netdata/netdata/pull/15873) ([andrewm4894](https://github.com/andrewm4894))
 - Regenerate integrations.js [\#15867](https://github.com/netdata/netdata/pull/15867) ([netdatabot](https://github.com/netdatabot))
 - Add a fail reason to pinpoint exactly what went wrong [\#15866](https://github.com/netdata/netdata/pull/15866) ([stelfrag](https://github.com/stelfrag))
 - Add plugin and module information to collector integrations. [\#15864](https://github.com/netdata/netdata/pull/15864) ([Ferroin](https://github.com/Ferroin))
@@ -15,6 +17,7 @@
 - fix proc meminfo cached calculation [\#15859](https://github.com/netdata/netdata/pull/15859) ([ilyam8](https://github.com/ilyam8))
 - Fix compilation warnings [\#15858](https://github.com/netdata/netdata/pull/15858) ([stelfrag](https://github.com/stelfrag))
 - packaging cleanup after \#15842 [\#15857](https://github.com/netdata/netdata/pull/15857) ([ilyam8](https://github.com/ilyam8))
+- Add a chart that groups anomaly rate by chart type. [\#15856](https://github.com/netdata/netdata/pull/15856) ([vkalintiris](https://github.com/vkalintiris))
 - fix packaging static build openssl 32bit [\#15855](https://github.com/netdata/netdata/pull/15855) ([ilyam8](https://github.com/ilyam8))
 - fix packaging mark stable static build [\#15854](https://github.com/netdata/netdata/pull/15854) ([ilyam8](https://github.com/ilyam8))
 - Facets histograms [\#15846](https://github.com/netdata/netdata/pull/15846) ([ktsaou](https://github.com/ktsaou))
@@ -424,9 +427,6 @@
 - avoid memory allocations for alert transitions facets processing [\#15318](https://github.com/netdata/netdata/pull/15318) ([ktsaou](https://github.com/ktsaou))
 - add add summary linking to alert instances \(ati\) when options=summary,values is requested [\#15317](https://github.com/netdata/netdata/pull/15317) ([ktsaou](https://github.com/ktsaou))
 - fix alerts transitions sorting [\#15315](https://github.com/netdata/netdata/pull/15315) ([ktsaou](https://github.com/ktsaou))
-- Keep health log history in seconds [\#15314](https://github.com/netdata/netdata/pull/15314) ([MrZammler](https://github.com/MrZammler))
-- stale vitual hosts [\#15313](https://github.com/netdata/netdata/pull/15313) ([ktsaou](https://github.com/ktsaou))
-- bump go.d.plugin to v0.54.0 [\#15312](https://github.com/netdata/netdata/pull/15312) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
