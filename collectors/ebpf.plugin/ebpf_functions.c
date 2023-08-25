@@ -471,9 +471,13 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values)
     uint64_t connections = (values->data.protocol == IPPROTO_TCP) ?
                            (values->data.tcp.ipv4_connect + values->data.tcp.ipv6_connect ):
                            values->data.udp.call_udp_sent;
-    // If no connections, this means that we lost when connection was opened
-    if (!connections)
+    if (values->flags & NETDATA_SOCKET_FLAGS_NOT_NEW) {
         connections++;
+    } else if (!connections) {
+        // If no connections, this means that we lost when connection was opened
+        values->flags |= NETDATA_SOCKET_FLAGS_NOT_NEW;
+        connections++;
+    }
     buffer_json_add_array_item_uint64(wb, connections);
 
     // SRC IP
