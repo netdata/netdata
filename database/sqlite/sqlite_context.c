@@ -55,48 +55,48 @@ int sql_init_context_database(int memory)
     // https://www.sqlite.org/pragma.html#pragma_auto_vacuum
     // PRAGMA schema.auto_vacuum = 0 | NONE | 1 | FULL | 2 | INCREMENTAL;
     snprintfz(buf, 1024, "PRAGMA auto_vacuum=%s;", config_get(CONFIG_SECTION_SQLITE, "auto vacuum", "INCREMENTAL"));
-    if(init_database_batch(db_context_meta, DB_CHECK_NONE, 0, list)) return 1;
+    if(init_database_batch(db_context_meta, list)) return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_synchronous
     // PRAGMA schema.synchronous = 0 | OFF | 1 | NORMAL | 2 | FULL | 3 | EXTRA;
     snprintfz(buf, 1024, "PRAGMA synchronous=%s;", config_get(CONFIG_SECTION_SQLITE, "synchronous", "NORMAL"));
-    if(init_database_batch(db_context_meta, DB_CHECK_NONE, 0, list))  return 1;
+    if(init_database_batch(db_context_meta, list))  return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_journal_mode
     // PRAGMA schema.journal_mode = DELETE | TRUNCATE | PERSIST | MEMORY | WAL | OFF
     snprintfz(buf, 1024, "PRAGMA journal_mode=%s;", config_get(CONFIG_SECTION_SQLITE, "journal mode", "WAL"));
-    if(init_database_batch(db_context_meta, DB_CHECK_NONE, 0, list)) return 1;
+    if(init_database_batch(db_context_meta, list)) return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_temp_store
     // PRAGMA temp_store = 0 | DEFAULT | 1 | FILE | 2 | MEMORY;
     snprintfz(buf, 1024, "PRAGMA temp_store=%s;", config_get(CONFIG_SECTION_SQLITE, "temp store", "MEMORY"));
-    if(init_database_batch(db_context_meta, DB_CHECK_NONE, 0, list)) return 1;
+    if(init_database_batch(db_context_meta, list)) return 1;
     
     // https://www.sqlite.org/pragma.html#pragma_journal_size_limit
     // PRAGMA schema.journal_size_limit = N ;
     snprintfz(buf, 1024, "PRAGMA journal_size_limit=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "journal size limit", 16777216));
-    if(init_database_batch(db_context_meta, DB_CHECK_NONE, 0, list)) return 1;
+    if(init_database_batch(db_context_meta, list)) return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_cache_size
     // PRAGMA schema.cache_size = pages;
     // PRAGMA schema.cache_size = -kibibytes;
     snprintfz(buf, 1024, "PRAGMA cache_size=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "cache size", -2000));
-    if(init_database_batch(db_context_meta, DB_CHECK_NONE, 0, list)) return 1;
+    if(init_database_batch(db_context_meta, list)) return 1;
 
     snprintfz(buf, 1024, "PRAGMA user_version=%d;", target_version);
-    if(init_database_batch(db_context_meta, DB_CHECK_NONE, 0, list)) return 1;
+    if(init_database_batch(db_context_meta, list)) return 1;
 
     if (likely(!memory))
         snprintfz(buf, 1024, "ATTACH DATABASE \"%s/netdata-meta.db\" as meta;", netdata_configured_cache_dir);
     else
         snprintfz(buf, 1024, "ATTACH DATABASE ':memory:' as meta;");
 
-    if(init_database_batch(db_context_meta, DB_CHECK_NONE, 0, list)) return 1;
+    if(init_database_batch(db_context_meta, list)) return 1;
 
-    if (init_database_batch(db_context_meta, DB_CHECK_NONE, 0, &database_context_config[0]))
+    if (init_database_batch(db_context_meta, &database_context_config[0]))
         return 1;
 
-    if (init_database_batch(db_context_meta, DB_CHECK_NONE, 0, &database_context_cleanup[0]))
+    if (init_database_batch(db_context_meta, &database_context_cleanup[0]))
         return 1;
 
     return 0;

@@ -787,8 +787,7 @@ int help(int exitcode) {
             "  -W stacksize=N           Set the stacksize (in bytes).\n\n"
             "  -W debug_flags=N         Set runtime tracing to debug.log.\n\n"
             "  -W unittest              Run internal unittests and exit.\n\n"
-            "  -W sqlite-check          Check metadata database integrity and exit.\n\n"
-            "  -W sqlite-fix            Check metadata database integrity, fix if needed and exit.\n\n"
+            "  -W sqlite-meta-recover   Run recovery on the metadata database and exit.\n\n"
             "  -W sqlite-compact        Reclaim metadata database unused space and exit.\n\n"
 #ifdef ENABLE_DBENGINE
             "  -W createdataset=N       Create a DB engine dataset of N seconds and exit.\n\n"
@@ -1436,13 +1435,9 @@ int main(int argc, char **argv) {
                         char* createdataset_string = "createdataset=";
                         char* stresstest_string = "stresstest=";
 #endif
-                        if(strcmp(optarg, "sqlite-check") == 0) {
-                            sql_init_database(DB_CHECK_INTEGRITY, 0);
-                            return 0;
-                        }
 
-                        if(strcmp(optarg, "sqlite-fix") == 0) {
-                            sql_init_database(DB_CHECK_FIX_DB, 0);
+                        if(strcmp(optarg, "sqlite-meta-recover") == 0) {
+                            sql_init_database(DB_CHECK_RECOVER, 0);
                             return 0;
                         }
 
@@ -1509,7 +1504,7 @@ int main(int argc, char **argv) {
                             unittest_running = true;
                             return aral_unittest(10000);
                         }
-                        else if(strcmp(optarg, "stringtest") == 0) {
+                        else if(strcmp(optarg, "stringtest") == 0)  {
                             unittest_running = true;
                             return string_unittest(10000);
                         }
