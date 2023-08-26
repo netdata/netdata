@@ -6,8 +6,11 @@
 
 **Merged pull requests:**
 
+- allow any field to be a facet [\#15880](https://github.com/netdata/netdata/pull/15880) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations.js [\#15879](https://github.com/netdata/netdata/pull/15879) ([netdatabot](https://github.com/netdatabot))
 - use the newer XXH3 128bits algorithm, instead of the classic XXH128 [\#15878](https://github.com/netdata/netdata/pull/15878) ([ktsaou](https://github.com/ktsaou))
 - ML add new `delete old models param` to readme [\#15873](https://github.com/netdata/netdata/pull/15873) ([andrewm4894](https://github.com/andrewm4894))
+- Update SQLITE version to 3.42.0 [\#15870](https://github.com/netdata/netdata/pull/15870) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#15867](https://github.com/netdata/netdata/pull/15867) ([netdatabot](https://github.com/netdatabot))
 - Add a fail reason to pinpoint exactly what went wrong [\#15866](https://github.com/netdata/netdata/pull/15866) ([stelfrag](https://github.com/stelfrag))
 - Add plugin and module information to collector integrations. [\#15864](https://github.com/netdata/netdata/pull/15864) ([Ferroin](https://github.com/Ferroin))
@@ -68,6 +71,7 @@
 - Added CentOS-Stream to distros [\#15742](https://github.com/netdata/netdata/pull/15742) ([k0ste](https://github.com/k0ste))
 - Unconditionally delete very old models. [\#15720](https://github.com/netdata/netdata/pull/15720) ([vkalintiris](https://github.com/vkalintiris))
 - Misc code cleanup [\#15665](https://github.com/netdata/netdata/pull/15665) ([stelfrag](https://github.com/stelfrag))
+- Metadata cleanup improvements [\#15462](https://github.com/netdata/netdata/pull/15462) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.42.1](https://github.com/netdata/netdata/tree/v1.42.1) (2023-08-16)
 
@@ -423,10 +427,6 @@
 - Rename log Macros \(debug\) [\#15322](https://github.com/netdata/netdata/pull/15322) ([thiagoftsm](https://github.com/thiagoftsm))
 - bearer authorization API [\#15321](https://github.com/netdata/netdata/pull/15321) ([ktsaou](https://github.com/ktsaou))
 - local-listeners: use host prefix in read\_cmdline [\#15320](https://github.com/netdata/netdata/pull/15320) ([ilyam8](https://github.com/ilyam8))
-- local-listener using libnetdata [\#15319](https://github.com/netdata/netdata/pull/15319) ([ktsaou](https://github.com/ktsaou))
-- avoid memory allocations for alert transitions facets processing [\#15318](https://github.com/netdata/netdata/pull/15318) ([ktsaou](https://github.com/ktsaou))
-- add add summary linking to alert instances \(ati\) when options=summary,values is requested [\#15317](https://github.com/netdata/netdata/pull/15317) ([ktsaou](https://github.com/ktsaou))
-- fix alerts transitions sorting [\#15315](https://github.com/netdata/netdata/pull/15315) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
