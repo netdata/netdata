@@ -109,6 +109,8 @@ typedef struct netdata_ebpf_judy_pid {
 } netdata_ebpf_judy_pid_t;
 
 typedef struct netdata_ebpf_judy_pid_stats {
+    char *cmdline;
+
     // Index for Socket timestamp
     struct {                            // support for multiple indexing engines
         Pvoid_t JudyHSArray;            // the hash table
@@ -340,6 +342,8 @@ void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe
 
 void ebpf_read_global_table_stats(netdata_idx_t *stats, netdata_idx_t *values, int map_fd,
                                   int maps_per_core, uint32_t begin, uint32_t end);
+void **ebpf_judy_insert_unsafe(PPvoid_t arr, Word_t key);
+netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array, uint32_t pid);
 
 extern ebpf_filesystem_partitions_t localfs[];
 extern ebpf_sync_syscalls_t local_syscalls[];

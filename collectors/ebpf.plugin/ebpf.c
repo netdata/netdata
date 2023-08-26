@@ -663,6 +663,60 @@ char *btf_path = NULL;
 
 /*****************************************************************
  *
+ *  FUNCTIONS USED TO MANIPULATE JUDY ARRAY
+ *
+ *****************************************************************/
+
+/**
+ * Hashtable insert unsafe
+ *
+ * Find or create a value associated to the index
+ *
+ * @return The lsocket = 0 when new item added to the array otherwise the existing item value is returned in *lsocket
+ * we return a pointer to a pointer, so that the caller can put anything needed at the value of the index.
+ * The pointer to pointer we return has to be used before any other operation that may change the index (insert/delete).
+ *
+ */
+void **ebpf_judy_insert_unsafe(PPvoid_t arr, Word_t key)
+{
+    JError_t J_Error;
+    Pvoid_t *idx = JudyLIns(arr, key, &J_Error);
+    if (unlikely(idx == PJERR)) {
+        netdata_log_error("Cannot add PID to JudyL, JU_ERRNO_* == %u, ID == %d",
+                          JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+    }
+
+    return idx;
+}
+
+/**
+ * Get PID from judy
+ *
+ * Get a pointer for the `pid` from judy_array;
+ *
+ * @param judy_array a judy array where PID is the primary key
+ * @param pid        pid stored.
+ */
+netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array, uint32_t pid)
+{
+    netdata_ebpf_judy_pid_stats_t **pid_pptr =
+        (netdata_ebpf_judy_pid_stats_t **)ebpf_judy_insert_unsafe(judy_array, pid);
+    netdata_ebpf_judy_pid_stats_t *pid_ptr = *pid_pptr;
+    if (likely(*pid_pptr == NULL)) {
+        // a new PID added to the index
+        *pid_pptr = aral_mallocz(ebpf_judy_pid.pid_table);
+
+        pid_ptr = *pid_pptr;
+
+        pid_ptr->socket_stats.JudyHSArray = NULL;
+        rw_spinlock_init(&pid_ptr->socket_stats.rw_spinlock);
+    }
+
+    return pid_ptr;
+}
+
+/*****************************************************************
+ *
  *  FUNCTIONS USED TO ALLOCATE APPS/CGROUP MEMORIES (ARAL)
  *
  *****************************************************************/

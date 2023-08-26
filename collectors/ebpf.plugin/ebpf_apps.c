@@ -835,6 +835,7 @@ static inline int read_proc_pid_cmdline(struct ebpf_pid_stat *p)
 {
     static char cmdline[MAX_CMDLINE + 1];
 
+    int ret = 0;
     if (unlikely(!p->cmdline_filename)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cmdline", netdata_configured_host_prefix, p->pid);
@@ -857,20 +858,23 @@ static inline int read_proc_pid_cmdline(struct ebpf_pid_stat *p)
             cmdline[i] = ' ';
     }
 
-    if (p->cmdline)
-        freez(p->cmdline);
-    p->cmdline = strdupz(cmdline);
-
     debug_log("Read file '%s' contents: %s", p->cmdline_filename, p->cmdline);
 
-    return 1;
+    ret = 1;
 
 cleanup:
     // copy the command to the command line
     if (p->cmdline)
         freez(p->cmdline);
     p->cmdline = strdupz(p->comm);
-    return 0;
+
+    rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
+    netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyHSArray, p->pid);
+    if (pid_ptr)
+        pid_ptr->cmdline = p->cmdline;
+    rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
+
+    return ret;
 }
 
 /**
@@ -1186,6 +1190,24 @@ static inline void del_pid_entry(pid_t pid)
     freez(p->status_filename);
     freez(p->io_filename);
     freez(p->cmdline_filename);
+
+    rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
+    netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyHSArray, p->pid);
+    if (pid_ptr) {
+        if (pid_ptr->socket_stats.JudyHSArray) {
+            Word_t local_socket = 0;
+            Pvoid_t *socket_value;
+            bool first_socket = true;
+            while ((socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyHSArray, &local_socket, &first_socket))) {
+                netdata_socket_plus_t *socket_clean = *socket_value;
+                aral_freez(aral_socket_table, socket_clean);
+            }
+            JudyLFreeArray(&pid_ptr->socket_stats.JudyHSArray, PJE0);
+        }
+        JudyLDel(&ebpf_judy_pid.index.JudyHSArray, p->pid, PJE0);
+    }
+    rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
+
     freez(p->cmdline);
     ebpf_pid_stat_release(p);
 

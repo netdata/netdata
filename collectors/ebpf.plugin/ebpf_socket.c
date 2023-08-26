@@ -1499,28 +1499,6 @@ static void ebpf_hash_socket_accumulator(netdata_socket_t *values, int end)
 }
 
 /**
- * Hashtable insert unsafe
- *
- * Find or create a value associated to the index
- *
- * @return The lsocket = 0 when new item added to the array otherwise the existing item value is returned in *lsocket
- * we return a pointer to a pointer, so that the caller can put anything needed at the value of the index.
- * The pointer to pointer we return has to be used before any other operation that may change the index (insert/delete).
- *
- */
-static inline void **ebpf_socket_hashtable_insert_unsafe(PPvoid_t arr, Word_t key)
-{
-    JError_t J_Error;
-    Pvoid_t *idx = JudyLIns(arr, key, &J_Error);
-    if (unlikely(idx == PJERR)) {
-        netdata_log_error("SOCKET: Cannot add PID to JudyL, JU_ERRNO_* == %u, ID == %d",
-                          JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
-    }
-
-    return idx;
-}
-
-/**
  * Translate socket
  *
  * Convert socket address to string
@@ -1681,22 +1659,15 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         }
 
         // Get PID structure
-        netdata_ebpf_judy_pid_stats_t **pid_pptr =
-            (netdata_ebpf_judy_pid_stats_t **) ebpf_socket_hashtable_insert_unsafe(judy_array, key.pid);
-        netdata_ebpf_judy_pid_stats_t *pid_ptr = *pid_pptr;
-        if (likely(*pid_pptr == NULL)) {
-            // a new PID added to the index
-            *pid_pptr = aral_mallocz(ebpf_judy_pid.pid_table);
-
-            pid_ptr = *pid_pptr;
-
-            pid_ptr->socket_stats.JudyHSArray = NULL;
-            rw_spinlock_init(&pid_ptr->socket_stats.rw_spinlock);
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, key.pid);
+        if (!pid_ptr) {
+            goto end_socket_loop;
         }
 
+        // Get Socket structure
         rw_spinlock_write_lock(&pid_ptr->socket_stats.rw_spinlock);
-        netdata_socket_plus_t **socket_pptr = (netdata_socket_plus_t **) ebpf_socket_hashtable_insert_unsafe(&pid_ptr->socket_stats.JudyHSArray,
-                                                                                                          values[0].first_timestamp);
+        netdata_socket_plus_t **socket_pptr = (netdata_socket_plus_t **)ebpf_judy_insert_unsafe(
+            &pid_ptr->socket_stats.JudyHSArray, values[0].first_timestamp);
         netdata_socket_plus_t *socket_ptr = *socket_pptr;
         bool translate = false;
         if (likely(*socket_pptr == NULL)) {
