@@ -250,6 +250,7 @@ static inline void pointer_del(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM 
 // ----------------------------------------------------------------------------
 // memory statistics
 
+#ifdef DICT_WITH_STATS
 static inline void DICTIONARY_STATS_PLUS_MEMORY(DICTIONARY *dict, size_t key_size, size_t item_size, size_t value_size) {
     if(key_size)
         __atomic_fetch_add(&dict->stats->memory.index, (long)JUDYHS_INDEX_SIZE_ESTIMATE(key_size), __ATOMIC_RELAXED);
@@ -260,6 +261,7 @@ static inline void DICTIONARY_STATS_PLUS_MEMORY(DICTIONARY *dict, size_t key_siz
     if(value_size)
         __atomic_fetch_add(&dict->stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
 }
+
 static inline void DICTIONARY_STATS_MINUS_MEMORY(DICTIONARY *dict, size_t key_size, size_t item_size, size_t value_size) {
     if(key_size)
         __atomic_fetch_sub(&dict->stats->memory.index, (long)JUDYHS_INDEX_SIZE_ESTIMATE(key_size), __ATOMIC_RELAXED);
@@ -270,6 +272,10 @@ static inline void DICTIONARY_STATS_MINUS_MEMORY(DICTIONARY *dict, size_t key_si
     if(value_size)
         __atomic_fetch_sub(&dict->stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
 }
+#else
+#define DICTIONARY_STATS_PLUS_MEMORY(dict, key_size, item_size, value_size)
+#define DICTIONARY_STATS_MINUS_MEMORY(dict, key_size, item_size, value_size)
+#endif
 
 // ----------------------------------------------------------------------------
 // callbacks registration
@@ -376,14 +382,21 @@ void dictionary_version_increment(DICTIONARY *dict) {
 // ----------------------------------------------------------------------------
 // internal statistics API
 
+#ifdef DICT_WITH_STATS
 static inline void DICTIONARY_STATS_SEARCHES_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->ops.searches, 1, __ATOMIC_RELAXED);
 }
+#else
+#define DICTIONARY_STATS_SEARCHES_PLUS1(dict)
+#endif
+
 static inline void DICTIONARY_ENTRIES_PLUS1(DICTIONARY *dict) {
+#ifdef DICT_WITH_STATS
     // statistics
     __atomic_fetch_add(&dict->stats->items.entries, 1, __ATOMIC_RELAXED);
     __atomic_fetch_add(&dict->stats->items.referenced, 1, __ATOMIC_RELAXED);
     __atomic_fetch_add(&dict->stats->ops.inserts, 1, __ATOMIC_RELAXED);
+#endif
 
     if(unlikely(is_dictionary_single_threaded(dict))) {
         dict->version++;
@@ -397,10 +410,13 @@ static inline void DICTIONARY_ENTRIES_PLUS1(DICTIONARY *dict) {
         __atomic_fetch_add(&dict->referenced_items, 1, __ATOMIC_RELAXED);
     }
 }
+
 static inline void DICTIONARY_ENTRIES_MINUS1(DICTIONARY *dict) {
+#ifdef DICT_WITH_STATS
     // statistics
     __atomic_fetch_add(&dict->stats->ops.deletes, 1, __ATOMIC_RELAXED);
     __atomic_fetch_sub(&dict->stats->items.entries, 1, __ATOMIC_RELAXED);
+#endif
 
     size_t entries; (void)entries;
     if(unlikely(is_dictionary_single_threaded(dict))) {
@@ -418,14 +434,19 @@ static inline void DICTIONARY_ENTRIES_MINUS1(DICTIONARY *dict) {
                    dict->creation_line,
                    dict->creation_file);
 }
+
 static inline void DICTIONARY_VALUE_RESETS_PLUS1(DICTIONARY *dict) {
+#ifdef DICT_WITH_STATS
     __atomic_fetch_add(&dict->stats->ops.resets, 1, __ATOMIC_RELAXED);
+#endif
 
     if(unlikely(is_dictionary_single_threaded(dict)))
         dict->version++;
     else
         __atomic_fetch_add(&dict->version, 1, __ATOMIC_RELAXED);
 }
+
+#ifdef DICT_WITH_STATS
 static inline void DICTIONARY_STATS_TRAVERSALS_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->ops.traversals, 1, __ATOMIC_RELAXED);
 }
@@ -476,9 +497,29 @@ static inline void DICTIONARY_STATS_DICT_DESTROY_QUEUED_MINUS1(DICTIONARY *dict)
 static inline void DICTIONARY_STATS_DICT_FLUSHES_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->ops.flushes, 1, __ATOMIC_RELAXED);
 }
+#else
+#define DICTIONARY_STATS_TRAVERSALS_PLUS1(dict)
+#define DICTIONARY_STATS_WALKTHROUGHS_PLUS1(dict)
+#define DICTIONARY_STATS_CHECK_SPINS_PLUS(dict, count)
+#define DICTIONARY_STATS_INSERT_SPINS_PLUS(dict, count)
+#define DICTIONARY_STATS_DELETE_SPINS_PLUS(dict, count)
+#define DICTIONARY_STATS_SEARCH_IGNORES_PLUS1(dict)
+#define DICTIONARY_STATS_CALLBACK_INSERTS_PLUS1(dict)
+#define DICTIONARY_STATS_CALLBACK_CONFLICTS_PLUS1(dict)
+#define DICTIONARY_STATS_CALLBACK_REACTS_PLUS1(dict)
+#define DICTIONARY_STATS_CALLBACK_DELETES_PLUS1(dict)
+#define DICTIONARY_STATS_GARBAGE_COLLECTIONS_PLUS1(dict)
+#define DICTIONARY_STATS_DICT_CREATIONS_PLUS1(dict)
+#define DICTIONARY_STATS_DICT_DESTRUCTIONS_PLUS1(dict)
+#define DICTIONARY_STATS_DICT_DESTROY_QUEUED_PLUS1(dict)
+#define DICTIONARY_STATS_DICT_DESTROY_QUEUED_MINUS1(dict)
+#define DICTIONARY_STATS_DICT_FLUSHES_PLUS1(dict)
+#endif
 
 static inline void DICTIONARY_REFERENCED_ITEMS_PLUS1(DICTIONARY *dict) {
+#ifdef DICT_WITH_STATS
     __atomic_fetch_add(&dict->stats->items.referenced, 1, __ATOMIC_RELAXED);
+#endif
 
     if(unlikely(is_dictionary_single_threaded(dict)))
         ++dict->referenced_items;
@@ -487,7 +528,9 @@ static inline void DICTIONARY_REFERENCED_ITEMS_PLUS1(DICTIONARY *dict) {
 }
 
 static inline void DICTIONARY_REFERENCED_ITEMS_MINUS1(DICTIONARY *dict) {
+#ifdef DICT_WITH_STATS
     __atomic_fetch_sub(&dict->stats->items.referenced, 1, __ATOMIC_RELAXED);
+#endif
 
     long int referenced_items; (void)referenced_items;
     if(unlikely(is_dictionary_single_threaded(dict)))
@@ -504,7 +547,9 @@ static inline void DICTIONARY_REFERENCED_ITEMS_MINUS1(DICTIONARY *dict) {
 }
 
 static inline void DICTIONARY_PENDING_DELETES_PLUS1(DICTIONARY *dict) {
+#ifdef DICT_WITH_STATS
     __atomic_fetch_add(&dict->stats->items.pending_deletion, 1, __ATOMIC_RELAXED);
+#endif
 
     if(unlikely(is_dictionary_single_threaded(dict)))
         ++dict->pending_deletion_items;
@@ -513,7 +558,9 @@ static inline void DICTIONARY_PENDING_DELETES_PLUS1(DICTIONARY *dict) {
 }
 
 static inline long int DICTIONARY_PENDING_DELETES_MINUS1(DICTIONARY *dict) {
+#ifdef DICT_WITH_STATS
     __atomic_fetch_sub(&dict->stats->items.pending_deletion, 1, __ATOMIC_RELEASE);
+#endif
 
     if(unlikely(is_dictionary_single_threaded(dict)))
         return --dict->pending_deletion_items;
@@ -977,7 +1024,7 @@ static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *it
             DICTIONARY_REFERENCED_ITEMS_PLUS1(dict);
     }
 
-    if(unlikely(spins > 1 && dict->stats))
+    if(unlikely(spins > 1))
         DICTIONARY_STATS_CHECK_SPINS_PLUS(dict, spins - 1);
 
     return ret;
@@ -1022,7 +1069,7 @@ static inline int item_is_not_referenced_and_can_be_removed_advanced(DICTIONARY 
         item->deleter_pid = gettid();
 #endif
 
-    if(unlikely(spins > 1 && dict->stats))
+    if(unlikely(spins > 1))
         DICTIONARY_STATS_DELETE_SPINS_PLUS(dict, spins - 1);
 
     return ret;
@@ -1695,7 +1742,7 @@ static DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONARY *dic
     } while(!item);
 
 
-    if(unlikely(spins > 0 && dict->stats))
+    if(unlikely(spins > 0))
         DICTIONARY_STATS_INSERT_SPINS_PLUS(dict, spins);
 
     if(is_master_dictionary(dict) && added_or_updated)

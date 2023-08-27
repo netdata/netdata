@@ -2813,6 +2813,7 @@ struct dictionary_stats dictionary_stats_category_rrdhealth = { .name = "health"
 struct dictionary_stats dictionary_stats_category_functions = { .name = "functions" };
 struct dictionary_stats dictionary_stats_category_replication = { .name = "replication" };
 
+#ifdef DICT_WITH_STATS
 struct dictionary_categories {
     struct dictionary_stats *stats;
     const char *family;
@@ -3165,6 +3166,13 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     }
 }
 
+static void dictionary_statistics(void) {
+    for(int i = 0; dictionary_categories[i].stats ;i++) {
+        update_dictionary_category_charts(&dictionary_categories[i]);
+    }
+}
+#endif // DICT_WITH_STATS
+
 #ifdef NETDATA_TRACE_ALLOCATIONS
 
 struct memory_trace_data {
@@ -3303,12 +3311,6 @@ static void malloc_trace_statistics(void) {
     rrdset_done(tmp.st_avg_alloc);
 }
 #endif
-
-static void dictionary_statistics(void) {
-    for(int i = 0; dictionary_categories[i].stats ;i++) {
-        update_dictionary_category_charts(&dictionary_categories[i]);
-    }
-}
 
 // ---------------------------------------------------------------------------------------------------------------------
 // worker utilization
@@ -4171,8 +4173,10 @@ void *global_statistics_main(void *ptr)
         worker_is_busy(WORKER_JOB_STRINGS);
         update_strings_charts();
 
+#ifdef DICT_WITH_STATS
         worker_is_busy(WORKER_JOB_DICTIONARIES);
         dictionary_statistics();
+#endif
 
 #ifdef NETDATA_TRACE_ALLOCATIONS
         worker_is_busy(WORKER_JOB_MALLOC_TRACE);
