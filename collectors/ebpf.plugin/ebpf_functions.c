@@ -617,7 +617,7 @@ void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
 {
     // thread was not initialized or Array was reset
     rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
-    if (!em->maps || (em->maps && em->maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED) ||
+    if (!em->maps || (em->maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED) ||
         !ebpf_judy_pid.index.JudyHSArray){
         netdata_socket_plus_t fake_values = { };
 

@@ -1381,7 +1381,6 @@ static int ebpf_is_port_inside_range(uint16_t cmp)
 
     // Test if port is excluded
     ebpf_network_viewer_port_list_t *move = network_viewer_opt.excluded_port;
-    cmp = cmp;
     while (move) {
         if (move->cmp_first <= cmp && cmp <= move->cmp_last)
             return 0;

@@ -1623,10 +1623,8 @@ static void get_ipv6_last_addr(union netdata_ip_t *out, union netdata_ip_t *in, 
         ret[1] = 0xFFFFFFFFFFFFFFFFULL;
 
         tmp = be64toh(ret[0]);
-        if (prefix > 0) {
-            mask = 0xFFFFFFFFFFFFFFFFULL << (64 - prefix);
-            tmp |= ~mask;
-        }
+        mask = 0xFFFFFFFFFFFFFFFFULL << (64 - prefix);
+        tmp |= ~mask;
         ret[0] = htobe64(tmp);
     } else {
         mask = 0xFFFFFFFFFFFFFFFFULL << (128 - prefix);
