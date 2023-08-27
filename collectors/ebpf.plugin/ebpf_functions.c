@@ -456,8 +456,9 @@ static inline void ebpf_socket_fill_fake_socket(netdata_socket_plus_t *fake_valu
  *
  * @param wb          buffer where we store data.
  * @param values      data read from hash table
+ * @param name        the process name
  */
-static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values)
+static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values, char *name)
 {
     buffer_json_add_array_item_array(wb);
 
@@ -466,6 +467,9 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values)
 
     // PID
     buffer_json_add_array_item_uint64(wb, (uint64_t)values->pid);
+
+    // NAME
+    buffer_json_add_array_item_string(wb, (name) ? name : "no identifed");
 
     // SRC IP
     buffer_json_add_array_item_string(wb, values->socket_string.src_ip);
@@ -585,7 +589,7 @@ static void ebpf_socket_fill_function_buffer_unsafe(BUFFER *buf)
             while ((socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyHSArray, &local_timestamp, &first_socket))) {
                 counter++;
                 netdata_socket_plus_t *values = (netdata_socket_plus_t *)*socket_value;
-                ebpf_fill_function_buffer(buf, values);
+                ebpf_fill_function_buffer(buf, values, pid_ptr->cmdline);
             }
         }
         rw_spinlock_read_unlock(&pid_ptr->socket_stats.rw_spinlock);
@@ -594,7 +598,7 @@ static void ebpf_socket_fill_function_buffer_unsafe(BUFFER *buf)
     if (!counter) {
         netdata_socket_plus_t fake_values = { };
         ebpf_socket_fill_fake_socket(&fake_values);
-        ebpf_fill_function_buffer(buf, &fake_values);
+        ebpf_fill_function_buffer(buf, &fake_values, NULL);
     }
 }
 
@@ -619,7 +623,7 @@ void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
 
         ebpf_socket_fill_fake_socket(&fake_values);
 
-        ebpf_fill_function_buffer(buf, &fake_values);
+        ebpf_fill_function_buffer(buf, &fake_values, NULL);
         rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
         return;
     }
@@ -771,6 +775,13 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             RRDF_FIELD_FILTER_MULTISELECT,
             RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
             NULL);
+
+        buffer_rrdf_table_add_field(wb, fields_id++, "PName", "Process Name", RRDF_FIELD_TYPE_INTEGER,
+                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+                                    NULL);
 
         buffer_rrdf_table_add_field(wb, fields_id++, "SRC IP", "Source IP", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
@@ -930,6 +941,18 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             buffer_json_member_add_array(wb, "columns");
             {
                 buffer_json_add_array_item_string(wb, "PID");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // group by Process Name
+        buffer_json_member_add_object(wb, "Process Name");
+        {
+            buffer_json_member_add_string(wb, "name", "Process Name");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Process Name");
             }
             buffer_json_array_close(wb);
         }
