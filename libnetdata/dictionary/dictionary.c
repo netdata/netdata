@@ -1582,22 +1582,6 @@ static inline void dict_item_release_and_check_if_it_is_deleted_and_can_be_remov
 }
 
 static bool dict_item_del(DICTIONARY *dict, const char *name, ssize_t name_len) {
-    if(unlikely(!name || !*name)) {
-        internal_error(
-            true,
-            "DICTIONARY: attempted to %s() without a name on a dictionary created from %s() %zu@%s.",
-            __FUNCTION__,
-            dict->creation_function,
-            dict->creation_line,
-            dict->creation_file);
-        return false;
-    }
-
-    if(unlikely(is_dictionary_destroyed(dict))) {
-        internal_error(true, "DICTIONARY: attempted to dictionary_del() on a destroyed dictionary");
-        return false;
-    }
-
     if(name_len == -1)
         name_len = (ssize_t)strlen(name) + 1; // we need the terminating null too
 
@@ -2113,8 +2097,11 @@ void dictionary_flush(DICTIONARY *dict) {
 
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 
-    for(DICTIONARY_ITEM *item = dict->items.list; item ;item = item->next)
-        dictionary_del_advanced(dict, item_get_name(item), (ssize_t)item_get_name_len(item) + 1);
+    DICTIONARY_ITEM *item, *next = NULL;
+    for(item = dict->items.list; item ;item = next) {
+        next = item->next;
+        dict_item_del(dict, item_get_name(item), (ssize_t) item_get_name_len(item) + 1);
+    }
 
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
 
@@ -2299,6 +2286,12 @@ bool dictionary_del_advanced(DICTIONARY *dict, const char *name, ssize_t name_le
         return false;
 
     api_internal_check(dict, NULL, false, true);
+
+    if(unlikely(is_dictionary_destroyed(dict))) {
+        internal_error(true, "DICTIONARY: attempted to delete item on a destroyed dictionary");
+        return false;
+    }
+
     return dict_item_del(dict, name, name_len);
 }
 
