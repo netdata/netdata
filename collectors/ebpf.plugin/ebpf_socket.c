@@ -1487,7 +1487,8 @@ static void ebpf_hash_socket_accumulator(netdata_socket_t *values, int end)
         if (family == AF_UNSPEC)
             family = w->family;
 
-        if (w->current_timestamp != ct)
+        if (w->current_timestamp > ct)
+            ct = w->current_timestamp;
 
         if (!ft)
             ft = w->first_timestamp;
@@ -1683,7 +1684,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
             ebpf_socket_translate(socket_ptr, &key);
         else { // Check socket was updated
             if (prev_period) {
-                if (values[0].current_timestamp != prev_period) // Socket updated
+                if (values[0].current_timestamp > prev_period) // Socket updated
                     socket_ptr->last_update = update_time;
                 else if ((update_time - socket_ptr->last_update) > em->update_every) {
                     // Socket was not updated since last read
