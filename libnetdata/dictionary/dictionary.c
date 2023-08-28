@@ -273,8 +273,8 @@ static inline void DICTIONARY_STATS_MINUS_MEMORY(DICTIONARY *dict, size_t key_si
         __atomic_fetch_sub(&dict->stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
 }
 #else
-#define DICTIONARY_STATS_PLUS_MEMORY(dict, key_size, item_size, value_size) {}
-#define DICTIONARY_STATS_MINUS_MEMORY(dict, key_size, item_size, value_size) {}
+#define DICTIONARY_STATS_PLUS_MEMORY(dict, key_size, item_size, value_size) do {;} while(0)
+#define DICTIONARY_STATS_MINUS_MEMORY(dict, key_size, item_size, value_size) do {;} while(0)
 #endif
 
 // ----------------------------------------------------------------------------
@@ -387,7 +387,7 @@ static inline void DICTIONARY_STATS_SEARCHES_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->ops.searches, 1, __ATOMIC_RELAXED);
 }
 #else
-#define DICTIONARY_STATS_SEARCHES_PLUS1(dict) {}
+#define DICTIONARY_STATS_SEARCHES_PLUS1(dict) do {;} while(0)
 #endif
 
 static inline void DICTIONARY_ENTRIES_PLUS1(DICTIONARY *dict) {
@@ -498,22 +498,22 @@ static inline void DICTIONARY_STATS_DICT_FLUSHES_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->ops.flushes, 1, __ATOMIC_RELAXED);
 }
 #else
-#define DICTIONARY_STATS_TRAVERSALS_PLUS1(dict) {}
-#define DICTIONARY_STATS_WALKTHROUGHS_PLUS1(dict) {}
-#define DICTIONARY_STATS_CHECK_SPINS_PLUS(dict, count) {}
-#define DICTIONARY_STATS_INSERT_SPINS_PLUS(dict, count) {}
-#define DICTIONARY_STATS_DELETE_SPINS_PLUS(dict, count) {}
-#define DICTIONARY_STATS_SEARCH_IGNORES_PLUS1(dict) {}
-#define DICTIONARY_STATS_CALLBACK_INSERTS_PLUS1(dict) {}
-#define DICTIONARY_STATS_CALLBACK_CONFLICTS_PLUS1(dict) {}
-#define DICTIONARY_STATS_CALLBACK_REACTS_PLUS1(dict) {}
-#define DICTIONARY_STATS_CALLBACK_DELETES_PLUS1(dict) {}
-#define DICTIONARY_STATS_GARBAGE_COLLECTIONS_PLUS1(dict) {}
-#define DICTIONARY_STATS_DICT_CREATIONS_PLUS1(dict) {}
-#define DICTIONARY_STATS_DICT_DESTRUCTIONS_PLUS1(dict) {}
-#define DICTIONARY_STATS_DICT_DESTROY_QUEUED_PLUS1(dict) {}
-#define DICTIONARY_STATS_DICT_DESTROY_QUEUED_MINUS1(dict) {}
-#define DICTIONARY_STATS_DICT_FLUSHES_PLUS1(dict) {}
+#define DICTIONARY_STATS_TRAVERSALS_PLUS1(dict) do {;} while(0)
+#define DICTIONARY_STATS_WALKTHROUGHS_PLUS1(dict) do {;} while(0)
+#define DICTIONARY_STATS_CHECK_SPINS_PLUS(dict, count) do {;} while(0)
+#define DICTIONARY_STATS_INSERT_SPINS_PLUS(dict, count) do {;} while(0)
+#define DICTIONARY_STATS_DELETE_SPINS_PLUS(dict, count) do {;} while(0)
+#define DICTIONARY_STATS_SEARCH_IGNORES_PLUS1(dict) do {;} while(0)
+#define DICTIONARY_STATS_CALLBACK_INSERTS_PLUS1(dict) do {;} while(0)
+#define DICTIONARY_STATS_CALLBACK_CONFLICTS_PLUS1(dict) do {;} while(0)
+#define DICTIONARY_STATS_CALLBACK_REACTS_PLUS1(dict) do {;} while(0)
+#define DICTIONARY_STATS_CALLBACK_DELETES_PLUS1(dict) do {;} while(0)
+#define DICTIONARY_STATS_GARBAGE_COLLECTIONS_PLUS1(dict) do {;} while(0)
+#define DICTIONARY_STATS_DICT_CREATIONS_PLUS1(dict) do {;} while(0)
+#define DICTIONARY_STATS_DICT_DESTRUCTIONS_PLUS1(dict) do {;} while(0)
+#define DICTIONARY_STATS_DICT_DESTROY_QUEUED_PLUS1(dict) do {;} while(0)
+#define DICTIONARY_STATS_DICT_DESTROY_QUEUED_MINUS1(dict) do {;} while(0)
+#define DICTIONARY_STATS_DICT_FLUSHES_PLUS1(dict) do {;} while(0)
 #endif
 
 static inline void DICTIONARY_REFERENCED_ITEMS_PLUS1(DICTIONARY *dict) {
