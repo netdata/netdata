@@ -40,9 +40,9 @@ extern const char *global_exporting_prefix;
 #define sending_labels_configured(instance)                                                                            \
     ((instance)->config.options & (EXPORTING_OPTION_SEND_CONFIGURED_LABELS | EXPORTING_OPTION_SEND_AUTOMATIC_LABELS))
 
-#define should_send_label(instance)                                                                                    \
-     (((instance)->config.options & EXPORTING_OPTION_SEND_CONFIGURED_LABELS) ||                                          \
-     ((instance)->config.options & EXPORTING_OPTION_SEND_AUTOMATIC_LABELS))
+#define should_send_label(instance, label_source)                                                                      \
+    (((instance)->config.options & EXPORTING_OPTION_SEND_CONFIGURED_LABELS && (label_source)&RRDLABEL_SRC_CONFIG) ||   \
+     ((instance)->config.options & EXPORTING_OPTION_SEND_AUTOMATIC_LABELS && (label_source)&RRDLABEL_SRC_AUTO))
 
 #define should_send_variables(instance) ((instance)->config.options & EXPORTING_OPTION_SEND_VARIABLES)
 

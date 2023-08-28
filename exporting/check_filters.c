@@ -7,7 +7,7 @@ bool exporting_labels_filter_callback(const char *name, const char *value, RRDLA
     (void)name;
     (void)value;
     struct instance *instance = (struct instance *)data;
-    return should_send_label(instance);
+    return should_send_label(instance, ls);
 }
 
 /**

@@ -1788,7 +1788,7 @@ char *cgroup_parse_resolved_name_and_labels(RRDLABELS *labels, char *data) {
     // the rest are key=value pairs separated by comma
     while(data) {
         char *pair = strsep_skip_consecutive_separators(&data, ",");
-        rrdlabels_add_pair(labels, pair, RRDLABEL_SRC_AUTO| RRDLABEL_SRC_K8S);
+        rrdlabels_add_pair(labels, pair, RRDLABEL_SRC_AUTO | RRDLABEL_SRC_K8S);
     }
 
     return name;
@@ -2745,9 +2745,8 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
 
     if (!k8s_is_kubepod(cg)) {
         rrdlabels_add(cg->chart_labels, "cgroup_name", cg->chart_id, RRDLABEL_SRC_AUTO);
-        //if (!dictionary_get(cg->chart_labels, "image")) {
-        //    rrdlabels_add(cg->chart_labels, "image", "", RRDLABEL_SRC_AUTO);
-        //}
+        if (!rrdlabels_exist(cg->chart_labels, "image"))
+            rrdlabels_add(cg->chart_labels, "image", "", RRDLABEL_SRC_AUTO);
     }
 
     worker_is_busy(WORKER_DISCOVERY_PROCESS_NETWORK);

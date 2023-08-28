@@ -76,6 +76,7 @@ static inline void STATS_PLUS_MEMORY(struct dictionary_stats *stats, size_t key_
     if(value_size)
         __atomic_fetch_add(&stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
 }
+
 static inline void STATS_MINUS_MEMORY(struct dictionary_stats *stats, size_t key_size, size_t item_size, size_t value_size) {
     if(key_size)
         __atomic_fetch_sub(&stats->memory.index, (long)JUDYHS_INDEX_SIZE_ESTIMATE(key_size), __ATOMIC_RELAXED);
@@ -599,15 +600,10 @@ static void dup_label(RRDLABEL *label_index)
 
 static RRDLABEL *add_label_name_value(const char *name, const char *value)
 {
-    char n[RRDLABELS_MAX_NAME_LENGTH + 1], v[RRDLABELS_MAX_VALUE_LENGTH + 1];
-
-    rrdlabels_sanitize_name(n, name, RRDLABELS_MAX_NAME_LENGTH);
-    rrdlabels_sanitize_value(v, value, RRDLABELS_MAX_VALUE_LENGTH);
-
     RRDLABEL_IDX *rrdlabel = NULL;
     LABEL_REGISTRY_IDX label_index;
-    label_index.key = string_strdupz(n);
-    label_index.value = string_strdupz(v);
+    label_index.key = string_strdupz(name);
+    label_index.value = string_strdupz(value);
 
     spinlock_lock(&global_labels.spinlock);
 
@@ -640,18 +636,11 @@ static void delete_label(RRDLABEL *label)
         RRDLABEL_IDX *rrdlabel = *PValue;
         size_t refcount = __atomic_sub_fetch(&rrdlabel->refcount, 1, __ATOMIC_RELAXED);
         if (refcount == 0) {
-            JError_t J_Error;
             int ret = JudyHSDel(&global_labels.JudyHS, (void *)label, sizeof(*label), PJE0);
-            if (unlikely(ret == JERR)) {
-                // Log error but continue
-                netdata_log_error(
-                    "LABEL: Cannot delete entry with key:value '%s:%s' from JudyHS, JU_ERRNO_* == %u, ID == %d",
-                    string2str(label->index.key),
-                    string2str(label->index.value),
-                    JU_ERRNO(&J_Error),
-                    JU_ERRID(&J_Error));
-            }
-            STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, sizeof(LABEL_REGISTRY_IDX), sizeof(*rrdlabel), 0);
+            if (unlikely(ret == JERR))
+                STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, sizeof(*rrdlabel), 0);
+            else
+                STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, sizeof(LABEL_REGISTRY_IDX), sizeof(*rrdlabel), 0);
             string_freez(label->index.key);
             string_freez(label->index.value);
             freez(rrdlabel);
@@ -726,6 +715,29 @@ void rrdlabels_add(RRDLABELS *labels, const char *name, const char *value, RRDLA
     }
 
     labels_add_already_sanitized(labels, n, v, ls);
+}
+
+bool rrdlabels_exist(RRDLABELS *labels, const char *key)
+{
+    if (!labels)
+        return false;
+
+    STRING *this_key = string_strdupz(key);
+
+    RRDLABEL *lb;
+    RRDLABEL_SRC ls;
+
+    bool found = false;
+    lfe_start_read(labels, lb, ls)
+    {
+        if (lb->index.key == this_key) {
+            found = true;
+            break;
+        }
+    }
+    lfe_done(labels);
+    string_freez(this_key);
+    return found;
 }
 
 static const char *get_quoted_string_up_to(char *dst, size_t dst_size, const char *string, char upto1, char upto2) {
@@ -1198,7 +1210,7 @@ void rrdlabels_to_buffer_json_members(RRDLABELS *labels, BUFFER *wb)
     lfe_done(labels);
 }
 
-size_t label_entries(RRDLABELS *labels __maybe_unused)
+size_t rrdlabels_entries(RRDLABELS *labels __maybe_unused)
 {
     size_t count;
     spinlock_lock(&labels->spinlock);
@@ -1207,7 +1219,7 @@ size_t label_entries(RRDLABELS *labels __maybe_unused)
     return count;
 }
 
-size_t label_version(RRDLABELS *labels __maybe_unused)
+size_t rrdlabels_version(RRDLABELS *labels __maybe_unused)
 {
     return (size_t) labels->version;
 }

@@ -295,7 +295,7 @@ struct format_prometheus_label_callback {
 static int format_prometheus_label_callback(const char *name, const char *value, RRDLABEL_SRC ls __maybe_unused, void *data) {
     struct format_prometheus_label_callback *d = (struct format_prometheus_label_callback *)data;
 
-//    if (!should_send_label(d->instance, ls)) return 0;
+    if (!should_send_label(d->instance, ls)) return 0;
 
     char k[PROMETHEUS_ELEMENT_MAX + 1];
     char v[PROMETHEUS_ELEMENT_MAX + 1];

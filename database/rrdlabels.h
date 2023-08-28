@@ -29,8 +29,9 @@ void rrdlabels_add_pair(RRDLABELS *labels, const char *string, RRDLABEL_SRC ls);
 void rrdlabels_value_to_buffer_array_item_or_null(RRDLABELS *labels, BUFFER *wb, const char *key);
 void rrdlabels_get_value_strdup_or_null(RRDLABELS *labels, char **value, const char *key);
 void rrdlabels_get_value_to_buffer_or_unset(RRDLABELS *labels, BUFFER *wb, const char *key, const char *unset);
-size_t label_entries(RRDLABELS *labels __maybe_unused);
-size_t label_version(RRDLABELS *labels __maybe_unused);
+bool rrdlabels_exist(RRDLABELS *labels, const char *key);
+size_t rrdlabels_entries(RRDLABELS *labels __maybe_unused);
+size_t rrdlabels_version(RRDLABELS *labels __maybe_unused);
 void rrdlabels_get_value_strcpyz(RRDLABELS *labels, char *dst, size_t dst_len, const char *key);
 
 void rrdlabels_unmark_all(RRDLABELS *labels);
