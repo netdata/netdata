@@ -1062,6 +1062,7 @@ typedef struct health {
     uint32_t health_default_warn_repeat_every;     // the default value for the interval between repeating warning notifications
     uint32_t health_default_crit_repeat_every;     // the default value for the interval between repeating critical notifications
     unsigned int health_enabled;                   // 1 when this host has health enabled
+    bool use_summary_for_notifications;            // whether or not to use the summary field as a subject for notifications
 } HEALTH;
 
 // ----------------------------------------------------------------------------
