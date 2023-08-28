@@ -323,13 +323,21 @@ static int do_migration_v10_v11(sqlite3 *database, const char *name)
 
 static int do_migration_v11_v12(sqlite3 *database, const char *name)
 {
+    char sql[2048];
+    int rc = 0;
+
     netdata_log_info("Running \"%s\" database migration", name);
 
-    if (table_exists_in_database("health_log") && !column_exists_in_table("health_log", "summary") &&
+    if (table_exists_in_database("health_log_detail") && !column_exists_in_table("health_log_detail", "summary") &&
         table_exists_in_database("alert_hash") && !column_exists_in_table("alert_hash", "summary"))
-        return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v11_v12[0]);
+        rc = init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v11_v12[0]);
 
-    return 0;
+    if (!rc) {
+        snprintfz(sql, 2047, "UPDATE health_log_detail SET summary = (select name from health_log where health_log_id = health_log_detail.health_log_id);");
+        sqlite3_exec_monitored(database, sql, 0, 0, NULL);
+    }
+
+    return rc;
 }
 
 static int do_migration_noop(sqlite3 *database, const char *name)
