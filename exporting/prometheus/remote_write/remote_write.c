@@ -96,6 +96,7 @@ int init_prometheus_remote_write_instance(struct instance *instance)
     instance->start_host_formatting = format_host_prometheus_remote_write;
     instance->start_chart_formatting = format_chart_prometheus_remote_write;
     instance->metric_formatting = format_dimension_prometheus_remote_write;
+    instance->netdata_info_formatting = NULL;
     instance->end_chart_formatting = NULL;
     instance->variables_formatting = format_variables_prometheus_remote_write;
     instance->end_host_formatting = NULL;

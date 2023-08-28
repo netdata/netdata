@@ -98,6 +98,7 @@ int init_mongodb_instance(struct instance *instance)
         instance->metric_formatting = format_dimension_collected_json_plaintext;
     else
         instance->metric_formatting = format_dimension_stored_json_plaintext;
+    instance->netdata_info_formatting = NULL;
 
     instance->end_chart_formatting = NULL;
     instance->variables_formatting = NULL;

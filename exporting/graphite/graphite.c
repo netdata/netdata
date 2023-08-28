@@ -27,17 +27,18 @@ int init_graphite_instance(struct instance *instance)
 #endif
 
     instance->start_batch_formatting = NULL;
-    instance->start_host_formatting = format_host_labels_graphite_plaintext;
-    instance->start_chart_formatting = NULL;
+    instance->start_host_formatting = NULL;
+    instance->start_chart_formatting = format_chart_graphite_remote_write;
 
     if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED)
         instance->metric_formatting = format_dimension_collected_graphite_plaintext;
     else
         instance->metric_formatting = format_dimension_stored_graphite_plaintext;
+    instance->netdata_info_formatting = format_netdata_info_labels_graphite;
 
-    instance->end_chart_formatting = NULL;
+    instance->end_chart_formatting = flush_chart_labels;
     instance->variables_formatting = NULL;
-    instance->end_host_formatting = flush_host_labels;
+    instance->end_host_formatting = NULL;
     instance->end_batch_formatting = simple_connector_end_batch;
 
     if (instance->config.type == EXPORTING_CONNECTOR_TYPE_GRAPHITE_HTTP)
@@ -91,17 +92,54 @@ void sanitize_graphite_label_value(char *dst, const char *src, size_t len)
  * @param host a data collecting host.
  * @return Always returns 0.
  */
+int format_netdata_info_labels_graphite(struct instance *instance, RRDHOST *host)
+{
+    if (unlikely(!sending_labels_configured(instance)))
+        return 0;
 
-int format_host_labels_graphite_plaintext(struct instance *instance, RRDHOST *host)
+    static BUFFER *host_labels = NULL;
+    if (!host_labels)
+        host_labels = buffer_create(1024, &netdata_buffers_statistics.buffers_exporters);
+    else
+        buffer_reset(host_labels);
+
+    rrdlabels_to_buffer(host->rrdlabels, host_labels, ";", "=", "", "",
+                        exporting_labels_filter_callback, instance,
+                        NULL, sanitize_graphite_label_value);
+
+    time_t ct = now_realtime_sec();
+    buffer_sprintf(instance->buffer,
+                   "%s.%s.netdata.info;instance=\"%s\",application=\"%s\",version=\"%s\"%s 1.00000 %llu\n",
+                   instance->config.prefix,
+                   (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
+                   rrdhost_hostname(host),
+                   rrdhost_program_name(host),
+                   rrdhost_program_version(host),
+                   (host_labels) ? buffer_tostring(host_labels) : "",
+                   (unsigned long long)ct);
+
+    return 0;
+}
+
+/**
+ * Format chart data for Prometheus Remote Write connector
+ *
+ * @param instance an instance data structure.
+ * @param st a chart.
+ * @return Always returns 0.
+ */
+int format_chart_graphite_remote_write(struct instance *instance, RRDSET *st)
 {
     if (!instance->labels_buffer)
         instance->labels_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_exporters);
+    else
+        buffer_reset(instance->labels_buffer);
 
     if (unlikely(!sending_labels_configured(instance)))
         return 0;
 
-    rrdlabels_to_buffer(host->rrdlabels, instance->labels_buffer, ";", "=", "", "",
-                        exporting_labels_filter_callback, instance,
+    rrdlabels_to_buffer(st->rrdlabels, instance->labels_buffer, ";", "=", "", "",
+                        exporting_chart_labels_filter_callback, instance,
                         NULL, sanitize_graphite_label_value);
 
     return 0;
