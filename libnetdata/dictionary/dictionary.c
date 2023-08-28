@@ -3271,7 +3271,8 @@ static int dictionary_unittest_threads() {
     time_t seconds_to_run = 5;
     int threads_to_create = 2;
 
-    struct thread_unittest tu[threads_to_create] = {};
+    struct thread_unittest tu[threads_to_create];
+    memset(tu, 0, sizeof(struct thread_unittest) * threads_to_create);
 
     fprintf(
             stderr,
