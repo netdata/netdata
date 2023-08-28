@@ -88,6 +88,12 @@ const char *database_migrate_v10_v11[] = {
     NULL
 };
 
+const char *database_migrate_v11_v12[] = {
+    "ALTER TABLE health_log_detail ADD summary TEXT;",
+    "ALTER TABLE alert_hash ADD summary TEXT;",
+    NULL
+};
+
 static int do_migration_v1_v2(sqlite3 *database, const char *name)
 {
     UNUSED(name);
@@ -315,6 +321,17 @@ static int do_migration_v10_v11(sqlite3 *database, const char *name)
     return 0;
 }
 
+static int do_migration_v11_v12(sqlite3 *database, const char *name)
+{
+    netdata_log_info("Running \"%s\" database migration", name);
+
+    if (table_exists_in_database("health_log") && !column_exists_in_table("health_log", "summary") &&
+        table_exists_in_database("alert_hash") && !column_exists_in_table("alert_hash", "summary"))
+        return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v11_v12[0]);
+
+    return 0;
+}
+
 static int do_migration_noop(sqlite3 *database, const char *name)
 {
     UNUSED(database);
@@ -369,6 +386,7 @@ DATABASE_FUNC_MIGRATION_LIST migration_action[] = {
     {.name = "v8 to v9",  .func = do_migration_v8_v9},
     {.name = "v9 to v10",  .func = do_migration_v9_v10},
     {.name = "v10 to v11",  .func = do_migration_v10_v11},
+    {.name = "v11 to v12",  .func = do_migration_v11_v12},
     // the terminator of this array
     {.name = NULL, .func = NULL}
 };
