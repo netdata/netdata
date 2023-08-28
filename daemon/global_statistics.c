@@ -2706,16 +2706,20 @@ static void update_strings_charts() {
 
         rd_ops_inserts      = rrddim_add(st_ops, "inserts",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
         rd_ops_deletes      = rrddim_add(st_ops, "deletes",      NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+#ifdef NETDATA_INTERNAL_CHECKS
         rd_ops_searches     = rrddim_add(st_ops, "searches",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
         rd_ops_duplications = rrddim_add(st_ops, "duplications", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
         rd_ops_releases     = rrddim_add(st_ops, "releases",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+#endif
     }
 
     rrddim_set_by_pointer(st_ops, rd_ops_inserts,      (collected_number)inserts);
     rrddim_set_by_pointer(st_ops, rd_ops_deletes,      (collected_number)deletes);
+#ifdef NETDATA_INTERNAL_CHECKS
     rrddim_set_by_pointer(st_ops, rd_ops_searches,     (collected_number)searches);
     rrddim_set_by_pointer(st_ops, rd_ops_duplications, (collected_number)duplications);
     rrddim_set_by_pointer(st_ops, rd_ops_releases,     (collected_number)releases);
+#endif
     rrdset_done(st_ops);
 
     if (unlikely(!st_entries)) {
@@ -2734,11 +2738,15 @@ static void update_strings_charts() {
             , RRDSET_TYPE_AREA);
 
         rd_entries_entries  = rrddim_add(st_entries, "entries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+#ifdef NETDATA_INTERNAL_CHECKS
         rd_entries_refs  = rrddim_add(st_entries, "references", NULL, 1, -1, RRD_ALGORITHM_ABSOLUTE);
+#endif
     }
 
     rrddim_set_by_pointer(st_entries, rd_entries_entries, (collected_number)entries);
+#ifdef NETDATA_INTERNAL_CHECKS
     rrddim_set_by_pointer(st_entries, rd_entries_refs, (collected_number)references);
+#endif
     rrdset_done(st_entries);
 
     if (unlikely(!st_mem)) {
