@@ -51,13 +51,14 @@ static struct string_partition {
 } string_base[STRING_PARTITIONS] = { 0 };
 
 #ifdef NETDATA_INTERNAL_CHECKS
-#define string_internal_stats_add(partition, var, val) __atomic_add_fetch(&string_base[partition].var, val, __ATOMIC_RELAXED)
-#else
-#define string_internal_stats_add(partition, var, val) do {;} while(0)
-#endif
-
 #define string_stats_atomic_increment(partition, var) __atomic_add_fetch(&string_base[partition].var, 1, __ATOMIC_RELAXED)
 #define string_stats_atomic_decrement(partition, var) __atomic_sub_fetch(&string_base[partition].var, 1, __ATOMIC_RELAXED)
+#define string_internal_stats_add(partition, var, val) __atomic_add_fetch(&string_base[partition].var, val, __ATOMIC_RELAXED)
+#else
+#define string_stats_atomic_increment(partition, var) do {;} while(0)
+#define string_stats_atomic_decrement(partition, var) do {;} while(0)
+#define string_internal_stats_add(partition, var, val) do {;} while(0)
+#endif
 
 void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_t *entries, size_t *references, size_t *memory, size_t *duplications, size_t *releases) {
     if (inserts) *inserts = 0;
