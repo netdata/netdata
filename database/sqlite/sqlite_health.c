@@ -346,7 +346,7 @@ static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
         goto failed;
     }
 
-    rc = sqlite3_bind_string_or_null(res, ae->summary, 23);
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ae->summary, 23);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind summary parameter for SQL_INSERT_HEALTH_LOG_DETAIL");
         goto failed;
@@ -1139,7 +1139,7 @@ int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_string_or_null(res, cfg->summary, ++param);
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->summary, ++param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
