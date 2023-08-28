@@ -3185,7 +3185,7 @@ Content-Transfer-Encoding: 8bit
                       <tbody>
                       <tr>
                         <td align="left" style="font-size:0px;padding:10px 25px;padding-top:15px;word-break:break-word;">
-                          <div style="font-family:Open Sans, sans-serif;font-size:20px;font-weight:700;line-height:1;text-align:left;color:#35414A;">${name}</div>
+                          <div style="font-family:Open Sans, sans-serif;font-size:20px;font-weight:700;line-height:1;text-align:left;color:#35414A;">${summary}</div>
                         </td>
                       </tr>
                       </tbody>
@@ -3343,14 +3343,14 @@ Content-Transfer-Encoding: 8bit
               <tbody>
               <tr>
                 <td align="left" style="font-size:0px;padding:10px 25px;padding-bottom:6px;word-break:break-word;">
-                  <div style="font-family:Open Sans, sans-serif;font-size:18px;line-height:1;text-align:left;color:#35414A;">Chart:
-                    <span style="font-weight:700; font-size:20px">${chart}</span></div>
+                  <div style="font-family:Open Sans, sans-serif;font-size:18px;line-height:1;text-align:left;color:#35414A;">Alert:
+                    <span style="font-weight:700; font-size:20px">${name}</span></div>
                 </td>
               </tr>
               <tr>
                 <td align="left" style="font-size:0px;padding:10px 25px;padding-top:0;word-break:break-word;">
-                  <div style="font-family:Open Sans, sans-serif;font-size:18px;line-height:1;text-align:left;color:#35414A;">Family:
-                    <span style="font-weight:700; font-size:20px">${family}</span></div>
+                  <div style="font-family:Open Sans, sans-serif;font-size:18px;line-height:1;text-align:left;color:#35414A;">Chart:
+                    <span style="font-weight:700; font-size:20px">${chart}</span></div>
                 </td>
               </tr>
               <tr>
