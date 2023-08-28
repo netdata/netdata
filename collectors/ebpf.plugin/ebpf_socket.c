@@ -1539,11 +1539,11 @@ static void ebpf_socket_translate(netdata_socket_plus_t *dst, netdata_socket_idx
         // When resolution fail, we should use addresses
         if (!resolve) {
             ipv4_addr.sin_addr.s_addr = key->saddr.addr32[0];
-            if(!inet_ntop(AF_INET, &ipv4_addr.sin_addr, dst->socket_string.src_ip, NI_MAXHOST))
+            if(!inet_ntop(AF_INET, &ipv4_addr.sin_addr, dst->socket_string.src_ip, INET6_ADDRSTRLEN))
                 netdata_log_info("Cannot convert IP %u .", ipv4_addr.sin_addr.s_addr);
 
             ipv4_addr.sin_addr.s_addr = key->daddr.addr32[0];
-            if(!inet_ntop(AF_INET, &ipv4_addr.sin_addr, dst->socket_string.dst_ip, NI_MAXHOST))
+            if(!inet_ntop(AF_INET, &ipv4_addr.sin_addr, dst->socket_string.dst_ip, INET6_ADDRSTRLEN))
                 netdata_log_info("Cannot convert IP %u .", ipv4_addr.sin_addr.s_addr);
             snprintfz(dst->socket_string.dst_port, NI_MAXSERV, "%u",  ntohs(key->dport));
         }
@@ -1571,11 +1571,11 @@ static void ebpf_socket_translate(netdata_socket_plus_t *dst, netdata_socket_idx
 
         if (!resolve) {
             memcpy(&ipv6_addr.sin6_addr, key->saddr.addr8, sizeof(key->saddr.addr8));
-            if(!inet_ntop(AF_INET6, &ipv6_addr.sin6_addr, dst->socket_string.src_ip, NI_MAXHOST))
+            if(!inet_ntop(AF_INET6, &ipv6_addr.sin6_addr, dst->socket_string.src_ip, INET6_ADDRSTRLEN))
                 netdata_log_info("Cannot convert IPv6 Address.");
 
             memcpy(&ipv6_addr.sin6_addr, key->daddr.addr8, sizeof(key->daddr.addr8));
-            if(!inet_ntop(AF_INET6, &ipv6_addr.sin6_addr, dst->socket_string.dst_ip, NI_MAXHOST))
+            if(!inet_ntop(AF_INET6, &ipv6_addr.sin6_addr, dst->socket_string.dst_ip, INET6_ADDRSTRLEN))
                 netdata_log_info("Cannot convert IPv6 Address.");
             snprintfz(dst->socket_string.dst_port, NI_MAXSERV, "%u",  ntohs(key->dport));
         }
