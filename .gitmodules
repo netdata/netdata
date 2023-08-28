@@ -17,3 +17,4 @@
 	path = fluent-bit
 	url = https://github.com/fluent/fluent-bit.git
 	shallow = true
+	ignore = dirty

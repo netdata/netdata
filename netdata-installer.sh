@@ -1006,6 +1006,8 @@ bundle_fluentbit() {
     return 0
   fi
 
+  patch -N -p1 fluent-bit/src/flb_log.c -i logsmanagement/fluent_bit_build/flb-log-fmt.patch
+
   # If musl is used, we need to patch chunkio, providing fts has been previously installed.
   libc="$(detect_libc)"
   if [ "${libc}" = "musl" ]; then
