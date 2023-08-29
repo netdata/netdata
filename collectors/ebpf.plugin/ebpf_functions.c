@@ -471,13 +471,13 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values,
     // NAME
     buffer_json_add_array_item_string(wb, (name) ? name : "no identifed");
 
-    // SRC IP
+    // Source IP
     buffer_json_add_array_item_string(wb, values->socket_string.src_ip);
 
     // SRC Port
     //buffer_json_add_array_item_uint64(wb, (uint64_t) values->socket_string.src_port);
 
-    // DST IP
+    // Destination IP
     buffer_json_add_array_item_string(wb, values->socket_string.dst_ip);
 
     // DST Port
@@ -776,13 +776,13 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
             NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "PName", "Process Name", RRDF_FIELD_TYPE_STRING,
+        buffer_rrdf_table_add_field(wb, fields_id++, "Process Name", "Process Name", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "SRC IP", "Source IP", RRDF_FIELD_TYPE_STRING,
+        buffer_rrdf_table_add_field(wb, fields_id++, "Source IP", "Source IP", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
@@ -796,13 +796,13 @@ static void ebpf_function_socket_manipulation(const char *transaction,
                                     NULL);
                                     */
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "DST IP", "Destination IP", RRDF_FIELD_TYPE_STRING,
+        buffer_rrdf_table_add_field(wb, fields_id++, "Destination IP", "Destination IP", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "DST PORT", "Destination Port", RRDF_FIELD_TYPE_STRING,
+        buffer_rrdf_table_add_field(wb, fields_id++, "Destination Port", "Destination Port", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
@@ -828,7 +828,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
                                     NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "CONNECTIONS", "Number of connections", RRDF_FIELD_TYPE_INTEGER,
+        buffer_rrdf_table_add_field(wb, fields_id++, "Connections", "Number of connections", RRDF_FIELD_TYPE_INTEGER,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
@@ -945,48 +945,48 @@ static void ebpf_function_socket_manipulation(const char *transaction,
         buffer_json_object_close(wb);
 
         // group by Process Name
-        buffer_json_member_add_object(wb, "PName");
+        buffer_json_member_add_object(wb, "Process Name");
         {
             buffer_json_member_add_string(wb, "name", "Process Name");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "PName");
+                buffer_json_add_array_item_string(wb, "Process Name");
             }
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
 
-        // group by SRC IP
-        buffer_json_member_add_object(wb, "SRC IP");
+        // group by Source IP
+        buffer_json_member_add_object(wb, "Source IP");
         {
             buffer_json_member_add_string(wb, "name", "Source IP");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "SRC IP");
+                buffer_json_add_array_item_string(wb, "Source IP");
             }
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
 
-        // group by DST IP
-        buffer_json_member_add_object(wb, "DST IP");
+        // group by Destination IP
+        buffer_json_member_add_object(wb, "Destination IP");
         {
             buffer_json_member_add_string(wb, "name", "Destination IP");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "DST IP");
+                buffer_json_add_array_item_string(wb, "Destination IP");
             }
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
 
         // group by DST Port
-        buffer_json_member_add_object(wb, "DST PORT");
+        buffer_json_member_add_object(wb, "Destination Port");
         {
             buffer_json_member_add_string(wb, "name", "Destination Port");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "DST PORT");
+                buffer_json_add_array_item_string(wb, "Destination Port");
             }
             buffer_json_array_close(wb);
         }
