@@ -6,7 +6,7 @@ typedef enum __attribute__((packed)) {
     PAGE_OPTION_ALL_VALUES_EMPTY = (1 << 0),
 } PAGE_OPTIONS;
 
-struct dbengine_page {
+struct dbengine_page_data {
     uint8_t type;           // the page type
     PAGE_OPTIONS options;   // options related to the page
 
@@ -20,15 +20,15 @@ struct dbengine_page {
     uint8_t data[];         // the data of the page
 };
 
-void dbengine_page_append_point(DBENGINE_PAGE *pg,
-                                const usec_t point_in_time_ut,
-                                const NETDATA_DOUBLE n,
-                                const NETDATA_DOUBLE min_value,
-                                const NETDATA_DOUBLE max_value,
-                                const uint16_t count,
-                                const uint16_t anomaly_count,
-                                const SN_FLAGS flags,
-                                const uint32_t expected_slot) {
+void dbengine_page_data_append_point(DBENGINE_PAGE_DATA *pg,
+                                     const usec_t point_in_time_ut,
+                                     const NETDATA_DOUBLE n,
+                                     const NETDATA_DOUBLE min_value,
+                                     const NETDATA_DOUBLE max_value,
+                                     const uint16_t count,
+                                     const uint16_t anomaly_count,
+                                     const SN_FLAGS flags,
+                                     const uint32_t expected_slot) {
 
     if(unlikely(pg->used >= pg->slots))
         fatal("DBENGINE: attempted to write beyond page size (page type %u, slots %u, used %u, size %u)",
@@ -73,13 +73,13 @@ void dbengine_page_append_point(DBENGINE_PAGE *pg,
     }
 }
 
-DBENGINE_PAGE *dbengine_page_create(uint8_t type, uint32_t slots) {
+DBENGINE_PAGE_DATA *dbengine_page_data_create(uint8_t type, uint32_t slots) {
     uint32_t size = slots * page_type_size[type];
 
     internal_fatal(!size || slots == 1, "DBENGINE: invalid number of slots (%u) or page type (%u)",
                    slots, type);
 
-    DBENGINE_PAGE *pg = dbengine_page_alloc(sizeof(DBENGINE_PAGE) + size);
+    DBENGINE_PAGE_DATA *pg = dbengine_page_alloc(sizeof(DBENGINE_PAGE_DATA) + size);
     pg->type = type;
     pg->size = size;
     pg->used = 0;
@@ -89,6 +89,6 @@ DBENGINE_PAGE *dbengine_page_create(uint8_t type, uint32_t slots) {
     return pg;
 }
 
-bool dbengine_page_is_empty(DBENGINE_PAGE *pg) {
+bool dbengine_page_data_is_empty(DBENGINE_PAGE_DATA *pg) {
     return ((!pg->used) || (pg->options & PAGE_OPTION_ALL_VALUES_EMPTY));
 }

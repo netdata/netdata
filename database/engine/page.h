@@ -5,22 +5,22 @@
 
 #include "rrdengine.h"
 
-struct dbengine_page;
-typedef struct dbengine_page DBENGINE_PAGE;
+struct dbengine_page_data;
+typedef struct dbengine_page_data DBENGINE_PAGE_DATA;
 
 
-DBENGINE_PAGE *dbengine_page_create(uint8_t type, uint32_t slots);
+DBENGINE_PAGE_DATA *dbengine_page_data_create(uint8_t type, uint32_t slots);
 
-void dbengine_page_append_point(DBENGINE_PAGE *pg,
-                                usec_t point_in_time_ut,
-                                NETDATA_DOUBLE n,
-                                NETDATA_DOUBLE min_value,
-                                NETDATA_DOUBLE max_value,
-                                uint16_t count,
-                                uint16_t anomaly_count,
-                                SN_FLAGS flags,
-                                uint32_t expected_slot);
+void dbengine_page_data_append_point(DBENGINE_PAGE_DATA *pg,
+                                     const usec_t point_in_time_ut,
+                                     const NETDATA_DOUBLE n,
+                                     const NETDATA_DOUBLE min_value,
+                                     const NETDATA_DOUBLE max_value,
+                                     const uint16_t count,
+                                     const uint16_t anomaly_count,
+                                     const SN_FLAGS flags,
+                                     const uint32_t expected_slot);
 
-bool dbengine_page_is_empty(DBENGINE_PAGE *pg);
+bool dbengine_page_data_is_empty(DBENGINE_PAGE_DATA *pg);
 
 #endif // DBENGINE_PAGE_H
