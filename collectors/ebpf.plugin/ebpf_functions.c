@@ -821,14 +821,14 @@ static void ebpf_function_socket_manipulation(const char *transaction,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
                                     NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id, "Outcoming Bandwidth", "Traffic sent.", RRDF_FIELD_TYPE_INTEGER,
+        buffer_rrdf_table_add_field(wb, fields_id++, "Outcoming Bandwidth", "Traffic sent.", RRDF_FIELD_TYPE_INTEGER,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
                                     NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "Connections", "Number of connections", RRDF_FIELD_TYPE_INTEGER,
+        buffer_rrdf_table_add_field(wb, fields_id, "Connections", "Number of connections", RRDF_FIELD_TYPE_INTEGER,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
