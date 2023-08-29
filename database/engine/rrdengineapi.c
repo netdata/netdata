@@ -25,7 +25,11 @@ size_t tier_page_size[RRD_STORAGE_TIERS] = {4096, 2048, 384, 384, 384};
 #if PAGE_TYPE_MAX != 1
 #error PAGE_TYPE_MAX is not 1 - you need to add allocations here
 #endif
-size_t page_type_size[256] = {sizeof(storage_number), sizeof(storage_number_tier1_t)};
+
+size_t page_type_size[256] = {
+        [PAGE_METRICS] = sizeof(storage_number),
+        [PAGE_TIER] = sizeof(storage_number_tier1_t)
+};
 
 __attribute__((constructor)) void initialize_multidb_ctx(void) {
     multidb_ctx[0] = &multidb_ctx_storage_tier0;
@@ -198,15 +202,15 @@ static inline void check_and_fix_mrg_update_every(struct rrdeng_collect_handle *
 
 static inline bool check_completed_page_consistency(struct rrdeng_collect_handle *handle __maybe_unused) {
 #ifdef NETDATA_INTERNAL_CHECKS
-    if (unlikely(!handle->page || !handle->page_entries_max || !handle->page_position || !handle->page_end_time_ut))
+    if (unlikely(!handle->pgc_page || !handle->page_entries_max || !handle->page_position || !handle->page_end_time_ut))
         return false;
 
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
     uuid_t *uuid = mrg_metric_uuid(main_mrg, handle->metric);
-    time_t start_time_s = pgc_page_start_time_s(handle->page);
-    time_t end_time_s = pgc_page_end_time_s(handle->page);
-    time_t update_every_s = pgc_page_update_every_s(handle->page);
+    time_t start_time_s = pgc_page_start_time_s(handle->pgc_page);
+    time_t end_time_s = pgc_page_end_time_s(handle->pgc_page);
+    time_t update_every_s = pgc_page_update_every_s(handle->pgc_page);
     size_t page_length = handle->page_position * CTX_POINT_SIZE_BYTES(ctx);
     size_t entries = handle->page_position;
     time_t overwrite_zero_update_every_s = (time_t)(handle->update_every_ut / USEC_PER_SEC);
@@ -257,9 +261,9 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
     handle = callocz(1, sizeof(struct rrdeng_collect_handle));
     handle->common.backend = STORAGE_ENGINE_BACKEND_DBENGINE;
     handle->metric = metric;
-    handle->page = NULL;
-    handle->data = NULL;
-    handle->data_size = 0;
+    handle->pgc_page = NULL;
+    handle->page_data = NULL;
+    handle->page_data_size = 0;
     handle->page_position = 0;
     handle->page_entries_max = 0;
     handle->update_every_ut = (usec_t)update_every * USEC_PER_SEC;
@@ -291,7 +295,7 @@ static bool page_has_only_empty_metrics(struct rrdeng_collect_handle *handle) {
     switch(handle->type) {
         case PAGE_METRICS: {
             size_t slots = handle->page_position;
-            storage_number *array = (storage_number *)pgc_page_data(handle->page);
+            storage_number *array = (storage_number *)pgc_page_data(handle->pgc_page);
             for (size_t i = 0 ; i < slots; ++i) {
                 if(does_storage_number_exist(array[i]))
                     return false;
@@ -301,7 +305,7 @@ static bool page_has_only_empty_metrics(struct rrdeng_collect_handle *handle) {
 
         case PAGE_TIER: {
             size_t slots = handle->page_position;
-            storage_number_tier1_t *array = (storage_number_tier1_t *)pgc_page_data(handle->page);
+            storage_number_tier1_t *array = (storage_number_tier1_t *)pgc_page_data(handle->pgc_page);
             for (size_t i = 0 ; i < slots; ++i) {
                 if(fpclassify(array[i].sum_value) != FP_NAN)
                     return false;
@@ -325,26 +329,26 @@ static bool page_has_only_empty_metrics(struct rrdeng_collect_handle *handle) {
 void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle) {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
 
-    if (unlikely(!handle->page))
+    if (unlikely(!handle->pgc_page))
         return;
 
     if(!handle->page_position || page_has_only_empty_metrics(handle))
-        pgc_page_to_clean_evict_or_release(main_cache, handle->page);
+        pgc_page_to_clean_evict_or_release(main_cache, handle->pgc_page);
 
     else {
         check_completed_page_consistency(handle);
-        mrg_metric_set_clean_latest_time_s(main_mrg, handle->metric, pgc_page_end_time_s(handle->page));
-        pgc_page_hot_to_dirty_and_release(main_cache, handle->page);
+        mrg_metric_set_clean_latest_time_s(main_mrg, handle->metric, pgc_page_end_time_s(handle->pgc_page));
+        pgc_page_hot_to_dirty_and_release(main_cache, handle->pgc_page);
     }
 
     mrg_metric_set_hot_latest_time_s(main_mrg, handle->metric, 0);
 
-    handle->page = NULL;
+    handle->pgc_page = NULL;
     handle->page_flags = 0;
     handle->page_position = 0;
     handle->page_entries_max = 0;
-    handle->data = NULL;
-    handle->data_size = 0;
+    handle->page_data = NULL;
+    handle->page_data_size = 0;
 
     // important!
     // we should never zero page end time ut, because this will allow
@@ -378,7 +382,7 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
 
     size_t conflicts = 0;
     bool added = true;
-    PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
+    PGC_PAGE *pgc_page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
     while (unlikely(!added)) {
         conflicts++;
 
@@ -390,31 +394,31 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
 #else
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl,
-#endif
+                    #endif
               "DBENGINE: metric '%s' new page from %ld to %ld, update every %ld, has a conflict in main cache "
               "with existing %s%s page from %ld to %ld, update every %ld - "
               "is it collected more than once?",
-              uuid,
-              page_entry.start_time_s, page_entry.end_time_s, (time_t)page_entry.update_every_s,
-              pgc_is_page_hot(page) ? "hot" : "not-hot",
-              pgc_page_data(page) == DBENGINE_EMPTY_PAGE ? " gap" : "",
-              pgc_page_start_time_s(page), pgc_page_end_time_s(page), pgc_page_update_every_s(page)
+                    uuid,
+                    page_entry.start_time_s, page_entry.end_time_s, (time_t)page_entry.update_every_s,
+                    pgc_is_page_hot(pgc_page) ? "hot" : "not-hot",
+                    pgc_page_data(pgc_page) == DBENGINE_EMPTY_PAGE ? " gap" : "",
+                    pgc_page_start_time_s(pgc_page), pgc_page_end_time_s(pgc_page), pgc_page_update_every_s(pgc_page)
               );
 
-        pgc_page_release(main_cache, page);
+        pgc_page_release(main_cache, pgc_page);
 
         point_in_time_ut -= handle->update_every_ut;
         point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
         page_entry.start_time_s = point_in_time_s;
         page_entry.end_time_s = point_in_time_s;
-        page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
+        pgc_page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
     }
 
     handle->page_entries_max = data_size / CTX_POINT_SIZE_BYTES(ctx);
     handle->page_start_time_ut = point_in_time_ut;
     handle->page_end_time_ut = point_in_time_ut;
     handle->page_position = 1; // zero is already in our data
-    handle->page = page;
+    handle->pgc_page = pgc_page;
     handle->page_flags = conflicts? RRDENG_PAGE_CONFLICT : 0;
 
     if(point_in_time_s > max_acceptable_collected_time())
@@ -486,17 +490,17 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
-    if(unlikely(!handle->data))
-        handle->data = rrdeng_alloc_new_metric_data(handle, &handle->data_size, point_in_time_ut);
+    if(unlikely(!handle->page_data))
+        handle->page_data = rrdeng_alloc_new_metric_data(handle, &handle->page_data_size, point_in_time_ut);
 
     timing_step(TIMING_STEP_DBENGINE_CHECK_DATA);
 
     if(likely(ctx->config.page_type == PAGE_METRICS)) {
-        storage_number *tier0_metric_data = handle->data;
+        storage_number *tier0_metric_data = handle->page_data;
         tier0_metric_data[handle->page_position] = pack_storage_number(n, flags);
     }
     else if(likely(ctx->config.page_type == PAGE_TIER)) {
-        storage_number_tier1_t *tier12_metric_data = handle->data;
+        storage_number_tier1_t *tier12_metric_data = handle->page_data;
         storage_number_tier1_t number_tier1;
         number_tier1.sum_value = (float) n;
         number_tier1.min_value = (float) min_value;
@@ -510,13 +514,13 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
 
     timing_step(TIMING_STEP_DBENGINE_PACK);
 
-    if(unlikely(!handle->page)){
-        rrdeng_store_metric_create_new_page(handle, ctx, point_in_time_ut, handle->data, handle->data_size);
+    if(unlikely(!handle->pgc_page)){
+        rrdeng_store_metric_create_new_page(handle, ctx, point_in_time_ut, handle->page_data, handle->page_data_size);
         // handle->position is set to 1 already
     }
     else {
         // update an existing page
-        pgc_page_hot_set_end_time_s(main_cache, handle->page, (time_t) (point_in_time_ut / USEC_PER_SEC));
+        pgc_page_hot_set_end_time_s(main_cache, handle->pgc_page, (time_t) (point_in_time_ut / USEC_PER_SEC));
         handle->page_end_time_ut = point_in_time_ut;
 
         if(unlikely(++handle->page_position >= handle->page_entries_max)) {
@@ -540,7 +544,7 @@ static void store_metric_next_error_log(struct rrdeng_collect_handle *handle, us
     uuid_unparse(*mrg_metric_uuid(main_mrg, handle->metric), uuid);
 
     BUFFER *wb = NULL;
-    if(handle->page && handle->page_flags) {
+    if(handle->pgc_page && handle->page_flags) {
         wb = buffer_create(0, NULL);
         collect_page_flags_to_buffer(wb, handle->page_flags);
     }
@@ -554,7 +558,7 @@ static void store_metric_next_error_log(struct rrdeng_collect_handle *handle, us
                 msg,
                 (time_t)(handle->page_end_time_ut / USEC_PER_SEC),
                 (time_t)(handle->update_every_ut / USEC_PER_SEC),
-                handle->page ? "current" : "*LAST*",
+                handle->pgc_page ? "current" : "*LAST*",
                 (time_t)(handle->page_start_time_ut / USEC_PER_SEC),
                 (time_t)(handle->page_end_time_ut / USEC_PER_SEC),
                 handle->page_position, handle->page_entries_max,
@@ -589,7 +593,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
         ;
     }
     else if(unlikely(point_in_time_ut > handle->page_end_time_ut)) {
-        if(handle->page) {
+        if(handle->pgc_page) {
             if (unlikely(delta_ut < handle->update_every_ut)) {
                 handle->page_flags |= RRDENG_PAGE_STEP_TOO_SMALL;
                 rrdeng_store_metric_flush_current_page(collection_handle);

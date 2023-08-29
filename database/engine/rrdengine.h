@@ -191,9 +191,9 @@ struct rrdeng_collect_handle {
     uint8_t type;
 
     struct metric *metric;
-    struct pgc_page *page;
-    void *data;
-    size_t data_size;
+    struct pgc_page *pgc_page;
+    void *page_data;
+    size_t page_data_size;
     struct pg_alignment *alignment;
     uint32_t page_entries_max;
     uint32_t page_position;                   // keep track of the current page size, to make sure we don't exceed it
