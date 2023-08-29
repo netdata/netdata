@@ -306,7 +306,9 @@ You can configure the information shown with function `ebpf_socket` using the se
 
 ```conf
 [network connections]
+    enabled = yes
     resolve hostname ips = no
+    resolve service names = yes
     ports = 1-1024 !145 !domain
     hostnames = !example.com
     ips = !127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7
@@ -322,15 +324,18 @@ and `145`.
 
 The following options are available:
 
+-   `enabled`: Disable network connections monitoring. This can affect directly some funcion output.
+-   `resolve hostname ips`: This option is disabled, because it is too slow.
+-   `resolve service names`: Convert destination ports into service names, for example, port `53` protocol `UDP` becomes `domain`.
+    all names are read from /etc/services.
 -   `ports`: Define the destination ports for Netdata to monitor.
 -   `hostnames`: The list of hostnames that can be resolved to an IP address.
 -   `ips`: The IP or range of IPs that you want to monitor. You can use IPv4 or IPv6 addresses, use dashes to define a
-    range of IPs, or use CIDR values. By default, only data for private IP addresses is collected, but this can
-    be changed with the `ips` setting.
+    range of IPs, or use CIDR values.
 
-The table for the traffic are created using the destination IPs of the sockets by default. This can be
-changed setting `resolve hostname ips = yes`, after this Netdata will create dimensions using
-the `hostnames` every time that is possible to resolve IPs to their hostnames.
+The table for the traffic are created using the destination IPs and ports of the sockets by default. This can be
+changed setting `resolve service names = yes`, after this Netdata will fill function tables with
+the `service name` every time that is possible to resolve them.
 
 #### `[service name]`
 
@@ -985,13 +990,15 @@ shows how the lockdown module impacts `ebpf.plugin` based on the selected option
 If you or your distribution compiled the kernel with the last combination, your system cannot load shared libraries
 required to run `ebpf.plugin`.
 
-## Function
+## Functions
+
+### ebpf_thread
 
 The eBPF plugin has a [function](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md) named
 `ebpf_thread` that controls its internal threads and helps to reduce the overhead on host. Using the function you
 can run the plugin with all threads disabled and enable them only when you want to take a look in specific areas.
 
-### List threads
+#### List threads
 
 To list all threads status you can query directly the endpoint function:
 
@@ -1001,7 +1008,7 @@ It is also possible to query a specific thread adding keyword `thread` and threa
 
 `http://localhost:19999/api/v1/function?function=ebpf_thread%20thread:mount`
 
-### Enable thread
+#### Enable thread
 
 It is possible to enable a specific thread using the keyword `enable`:
 
@@ -1014,14 +1021,14 @@ after the thread name:
 
 in this example thread `mount` will run during 600 seconds (10 minutes).
 
-### Disable thread
+#### Disable thread
 
 It is also possible to stop any thread running using the keyword `disable`. For example, to disable `cachestat` you can
 request:
 
 `http://localhost:19999/api/v1/function?function=ebpf_thread%20disable:cachestat`
 
-### Debugging threads
+#### Debugging threads
 
 You can verify the impact of threads on the host by running the
 [ebpf_thread_function.sh](https://github.com/netdata/netdata/blob/master/tests/ebpf/ebpf_thread_function.sh)
@@ -1031,3 +1038,33 @@ You can check the results of having threads running on your environment in the N
 dashboard
 
 <img src="https://github.com/netdata/netdata/assets/49162938/91823573-114c-4c16-b634-cc46f7bb1bcf" alt="Threads running." />
+
+### ebpf_socket
+
+The eBPF plugin has a [function](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md) named
+`ebpf_socket` that shows current status of open sockets on host.
+
+#### Families
+
+The plugin shows by default sockets for IPV4 and IPV6, but it is possible to select a specific family passing the family
+as an argument:
+
+`http://localhost:19999/api/v1/function?function=ebpf_socket%20family:IPV4`
+
+#### Resolve
+
+The plugin resolves port to service name by default. You can show the port number disabling the name resolution:
+
+`http://localhost:19999/api/v1/function?function=ebpf_socket%20resolve:NO`
+
+#### CIDR
+
+The plugin shows connection for all possible destination IP by default. You can limit the range specifying the CIDR:
+
+`http://localhost:19999/api/v1/function?function=ebpf_socket%20cidr:192.168.1.0/24`
+
+#### PORT
+
+The plugin shows connection for all possible ports by default. You can limit the range specifying a port or range of ports:
+
+`http://localhost:19999/api/v1/function?function=ebpf_socket%20port:1-1024`
