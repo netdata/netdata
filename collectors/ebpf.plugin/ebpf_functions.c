@@ -991,6 +991,18 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
+
+        // group by Protocol
+        buffer_json_member_add_object(wb, "Protocol");
+        {
+            buffer_json_member_add_string(wb, "name", "Protocol");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Protocol");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb); // group_by
 
