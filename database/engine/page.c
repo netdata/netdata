@@ -2,48 +2,73 @@
 
 #include "page.h"
 
+typedef enum __attribute__((packed)) {
+    PAGE_OPTION_ALL_VALUES_EMPTY = (1 << 0),
+} PAGE_OPTIONS;
+
 struct dbengine_page {
-    uint8_t page_type;
-    uint32_t used;
-    uint32_t slots;
-    uint32_t data_size;
-    uint8_t data[];
+    uint8_t type;           // the page type
+    PAGE_OPTIONS options;   // options related to the page
+
+    uint32_t used;          // the uses number of slots in the page
+    uint32_t slots;         // the total number of slots available in the page
+
+    uint32_t size;          // the size of data in bytes
+
+    usec_t page_start_time_ut; // the first timestamp on the page
+
+    uint8_t data[];         // the data of the page
 };
 
-void dbengine_page_append_point(DBENGINE_PAGE *page,
-                                             const usec_t point_in_time_ut,
-                                             const NETDATA_DOUBLE n,
-                                             const NETDATA_DOUBLE min_value,
-                                             const NETDATA_DOUBLE max_value,
-                                             const uint16_t count,
-                                             const uint16_t anomaly_count,
-                                             const SN_FLAGS flags) {
+void dbengine_page_append_point(DBENGINE_PAGE *pg,
+                                const usec_t point_in_time_ut,
+                                const NETDATA_DOUBLE n,
+                                const NETDATA_DOUBLE min_value,
+                                const NETDATA_DOUBLE max_value,
+                                const uint16_t count,
+                                const uint16_t anomaly_count,
+                                const SN_FLAGS flags,
+                                const uint32_t expected_slot) {
 
-    if(unlikely(page->used >= page->slots))
+    if(unlikely(pg->used >= pg->slots))
         fatal("DBENGINE: attempted to write beyond page size (page type %u, slots %u, used %u, size %u)",
-              page->page_type, page->slots, page->used, page->data_size);
+              pg->type, pg->slots, pg->used, pg->size);
 
-    switch(page->page_type) {
+    if(unlikely(pg->used != expected_slot))
+        fatal("DBENGINE: page is not aligned to expected slot (used %u, expected %u)",
+              pg->used, expected_slot);
+
+    if(unlikely(!pg->used))
+        pg->page_start_time_ut = point_in_time_ut;
+
+    switch(pg->type) {
         case PAGE_METRICS: {
-            storage_number *tier0_metric_data = (void *)page->data;
-            tier0_metric_data[page->used++] = pack_storage_number(n, flags);
+            storage_number *tier0_metric_data = (storage_number *)pg->data;
+            storage_number t = pack_storage_number(n, flags);
+            tier0_metric_data[pg->used++] = t;
+
+            if((pg->options & PAGE_OPTION_ALL_VALUES_EMPTY) && does_storage_number_exist(t))
+                pg->options &= ~PAGE_OPTION_ALL_VALUES_EMPTY;
         }
         break;
 
         case PAGE_TIER: {
-            storage_number_tier1_t *tier12_metric_data = (void *)page->data;
-            storage_number_tier1_t number_tier1;
-            number_tier1.sum_value = (float) n;
-            number_tier1.min_value = (float) min_value;
-            number_tier1.max_value = (float) max_value;
-            number_tier1.anomaly_count = anomaly_count;
-            number_tier1.count = count;
-            tier12_metric_data[page->used++] = number_tier1;
+            storage_number_tier1_t *tier12_metric_data = (storage_number_tier1_t *)pg->data;
+            storage_number_tier1_t t;
+            t.sum_value = (float) n;
+            t.min_value = (float) min_value;
+            t.max_value = (float) max_value;
+            t.anomaly_count = anomaly_count;
+            t.count = count;
+            tier12_metric_data[pg->used++] = t;
+
+            if((pg->options & PAGE_OPTION_ALL_VALUES_EMPTY) && fpclassify(n) != FP_NAN)
+                pg->options &= ~PAGE_OPTION_ALL_VALUES_EMPTY;
         }
         break;
 
         default:
-            fatal("DBENGINE: unknown page type id %d", page->page_type);
+            fatal("DBENGINE: unknown page type id %d", pg->type);
             break;
     }
 }
@@ -55,9 +80,15 @@ DBENGINE_PAGE *dbengine_page_create(uint8_t type, uint32_t slots) {
                    slots, type);
 
     DBENGINE_PAGE *pg = dbengine_page_alloc(sizeof(DBENGINE_PAGE) + size);
-    pg->page_type = type;
-    pg->data_size = size;
+    pg->type = type;
+    pg->size = size;
+    pg->used = 0;
     pg->slots = slots;
+    pg->options = PAGE_OPTION_ALL_VALUES_EMPTY;
 
     return pg;
+}
+
+bool dbengine_page_is_empty(DBENGINE_PAGE *pg) {
+    return ((!pg->used) || (pg->options & PAGE_OPTION_ALL_VALUES_EMPTY));
 }
