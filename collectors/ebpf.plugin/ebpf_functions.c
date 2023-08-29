@@ -488,10 +488,10 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values,
         // Protocol
         buffer_json_add_array_item_string(wb, "TCP");
 
-        // Traffic received
+        // Bytes received
         buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.tcp.tcp_bytes_received);
 
-        // Traffic sent
+        // Bytes sent
         buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.tcp.tcp_bytes_sent);
 
         // Connections
@@ -500,10 +500,10 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values,
         // Protocol
         buffer_json_add_array_item_string(wb, "UDP");
 
-        // Traffic received
+        // Bytes received
         buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.udp.call_udp_received);
 
-        // Traffic sent
+        // Bytes sent
         buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.udp.udp_bytes_sent);
 
         // Connections
@@ -512,10 +512,10 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values,
         // Protocol
         buffer_json_add_array_item_string(wb, "UNSPEC");
 
-        // Traffic received
+        // Bytes received
         buffer_json_add_array_item_uint64(wb, 0);
 
-        // Traffic sent
+        // Bytes sent
         buffer_json_add_array_item_uint64(wb, 0);
 
         connections = 1;
@@ -814,14 +814,14 @@ static void ebpf_function_socket_manipulation(const char *transaction,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "Incoming Bandwidth", "Traffic received.", RRDF_FIELD_TYPE_INTEGER,
+        buffer_rrdf_table_add_field(wb, fields_id++, "Incoming Bandwidth", "Bytes received.", RRDF_FIELD_TYPE_INTEGER,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
                                     NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "Outcoming Bandwidth", "Traffic sent.", RRDF_FIELD_TYPE_INTEGER,
+        buffer_rrdf_table_add_field(wb, fields_id++, "Outcoming Bandwidth", "Bytes sent.", RRDF_FIELD_TYPE_INTEGER,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
