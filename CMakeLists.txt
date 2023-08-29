@@ -741,6 +741,7 @@ set(RRD_PLUGIN_FILES
         database/rrdfunctions.h
         database/rrdhost.c
         database/rrdlabels.c
+        database/rrdlabels.h
         database/rrd.c
         database/rrd.h
         database/rrdset.c
