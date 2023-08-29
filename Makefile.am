@@ -589,6 +589,8 @@ if ENABLE_DBENGINE
         database/engine/cache.h \
         database/engine/metric.c \
         database/engine/metric.h \
+        database/engine/page.c \
+        database/engine/page.h \
         database/engine/pdc.c \
         database/engine/pdc.h \
         $(NULL)
