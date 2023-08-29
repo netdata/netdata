@@ -364,10 +364,10 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
 }
 
 static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *handle,
-                struct rrdengine_instance *ctx,
-                usec_t point_in_time_ut,
-                void *data,
-                size_t data_size) {
+                                                struct rrdengine_instance *ctx,
+                                                usec_t point_in_time_ut,
+                                                void *data,
+                                                size_t data_size) {
     time_t point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
     const time_t update_every_s = (time_t)(handle->update_every_ut / USEC_PER_SEC);
 
