@@ -415,7 +415,7 @@ static void ebpf_function_socket_help(const char *transaction) {
             "      specified plugin will use the default 300 seconds\n"
             "\n"
             "   resolve:BOOL\n"
-            "      Resolve service name, default value is NO.\n"
+            "      Resolve service name, default value is YES.\n"
             "\n"
             "   range:CIDR\n"
             "      Show sockets that have only a specific destination. Default all addresses.\n"
@@ -698,15 +698,15 @@ static void ebpf_function_socket_manipulation(const char *transaction,
 #endif
             pthread_mutex_unlock(&ebpf_exit_cleanup);
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_RESOLVE, sizeof(EBPF_FUNCTION_SOCKET_RESOLVE) - 1) == 0) {
-            uint32_t previous = network_viewer_opt.hostname_resolution_enabled;
+            uint32_t previous = network_viewer_opt.service_resolution_enabled;
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_RESOLVE) - 1];
             if (name)
-                network_viewer_opt.hostname_resolution_enabled =
+                network_viewer_opt.service_resolution_enabled =
                     (!strcasecmp(name, "YES")) ? CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_NO;
             else
-                network_viewer_opt.hostname_resolution_enabled = CONFIG_BOOLEAN_NO;
+                network_viewer_opt.service_resolution_enabled = CONFIG_BOOLEAN_YES;
 
-            if (previous != network_viewer_opt.hostname_resolution_enabled)
+            if (previous != network_viewer_opt.service_resolution_enabled)
                 ebpf_socket_clean_judy_array_unsafe();
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_RANGE, sizeof(EBPF_FUNCTION_SOCKET_RANGE) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_RANGE) - 1];

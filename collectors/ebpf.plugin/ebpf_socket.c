@@ -1508,7 +1508,7 @@ static void ebpf_hash_socket_accumulator(netdata_socket_t *values, int end)
  */
 static void ebpf_socket_translate(netdata_socket_plus_t *dst, netdata_socket_idx_t *key)
 {
-    uint32_t resolve = network_viewer_opt.hostname_resolution_enabled;
+    uint32_t resolve = network_viewer_opt.service_resolution_enabled;
     char service[NI_MAXSERV];
     int ret;
     if (dst->data.family == AF_INET) {
@@ -2717,7 +2717,7 @@ void parse_network_viewer_section(struct config *cfg)
     network_viewer_opt.service_resolution_enabled = appconfig_get_boolean(cfg,
                                                                           EBPF_NETWORK_VIEWER_SECTION,
                                                                           EBPF_CONFIG_RESOLVE_SERVICE,
-                                                                          CONFIG_BOOLEAN_NO);
+                                                                          CONFIG_BOOLEAN_YES);
 
     char *value = appconfig_get(cfg, EBPF_NETWORK_VIEWER_SECTION, EBPF_CONFIG_PORTS, NULL);
     ebpf_parse_ports(value);
