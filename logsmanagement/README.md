@@ -666,3 +666,11 @@ sudo sysctl kernel.dmesg_restrict=0
 3. I am observing very high CPU usage when monitoring a log source using `flb_tail` or `flb_web_log`.
 
 The log source is probably producing a very high number of unbuffered logs, which results in too many filesystem events. Try setting `use inotify = no` to use file stat watchers instead.
+
+4. I am using Podman instead of Docker, but I cannot see any Podman events logs being collected.
+
+Please ensure there is a listening service running that answers API calls for Podman. Instructions on how to start such a service can be found [here](https://docs.podman.io/en/latest/markdown/podman-system-service.1.html).
+
+Once the service is started, you must updated the Docker events logs collector `log path` to monitor the generated socket (otherwise, it will search for a `dock.sock` by default).
+
+You must ensure `podman.sock` has the right permissions for Netdata to be able to access it.
