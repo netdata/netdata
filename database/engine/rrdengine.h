@@ -120,7 +120,6 @@ struct page_details {
     time_t first_time_s;
     time_t last_time_s;
     uint32_t update_every_s;
-    uint16_t page_length;
     PDC_PAGE_STATUS status;
 
     struct {
