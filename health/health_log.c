@@ -45,7 +45,7 @@ static inline STRING *alarm_entry_replace_variables(const char *line, RRDCALC *r
                     temp = buf;
                 } else {
                     char val_string[100];
-                    snprintfz(val_string, 99, "" NETDATA_DOUBLE_FORMAT "", n);
+                    snprintfz(val_string, 99, "" NETDATA_DOUBLE_FORMAT_PRINT "", n);
                     char *buf = find_and_replace(temp, var, val_string, m);
                     freez(temp);
                     temp = buf;
