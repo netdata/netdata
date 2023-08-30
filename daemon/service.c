@@ -156,6 +156,9 @@ static void svc_rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
             rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
             svc_rrdset_archive_obsolete_dimensions(st, false);
         }
+        else if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))) {
+            rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS);
+        }
     }
     rrdset_foreach_done(st);
 }
