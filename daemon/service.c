@@ -130,10 +130,10 @@ static void svc_rrdset_obsolete_to_archive(RRDSET *st) {
             worker_is_busy(WORKER_JOB_SAVE_CHART);
             rrdset_save(st);
         }
-
-        worker_is_busy(WORKER_JOB_FREE_CHART);
-        rrdset_free(st);
     }
+
+    worker_is_busy(WORKER_JOB_FREE_CHART);
+    rrdset_free(st);
 }
 
 static void svc_rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
