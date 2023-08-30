@@ -1020,16 +1020,17 @@ static bool epdl_populate_pages_from_extent_data(
         if(worker)
             worker_is_busy(UV_EVENT_DBENGINE_EXTENT_PAGE_ALLOCATION);
 
-        void *page_data;
+        PGD *page_data;
 
         if (unlikely(!vd.is_valid)) {
-            page_data = DBENGINE_EMPTY_PAGE;
+            page_data = PGD_EMPTY;
             stats_load_invalid_page++;
         }
         else {
             if (RRD_NO_COMPRESSION == header->compression_algorithm) {
-                page_data = dbengine_page_alloc(vd.page_length);
-                memcpy(page_data, data + payload_offset + page_offset, (size_t) vd.page_length);
+                page_data = pgd_create_and_copy(header->descr[i].type,
+                                                data + payload_offset + page_offset,
+                                                vd.page_length);
                 stats_load_uncompressed++;
             }
             else {
@@ -1040,12 +1041,13 @@ static bool epdl_populate_pages_from_extent_data(
                                         i, count, page_offset, vd.page_length, uncompressed_payload_length);
                     epdl_extent_loading_error_log(ctx, epdl, &header->descr[i], log);
 
-                    page_data = DBENGINE_EMPTY_PAGE;
+                    page_data = PGD_EMPTY;
                     stats_load_invalid_page++;
                 }
                 else {
-                    page_data = dbengine_page_alloc(vd.page_length);
-                    memcpy(page_data, uncompressed_buf + page_offset, vd.page_length);
+                    page_data = pgd_create_and_copy(header->descr[i].type,
+                                                    uncompressed_buf + page_offset,
+                                                    vd.page_length);
                     stats_load_compressed++;
                 }
             }
@@ -1061,14 +1063,14 @@ static bool epdl_populate_pages_from_extent_data(
                 .start_time_s = vd.start_time_s,
                 .end_time_s = vd.end_time_s,
                 .update_every_s = (uint32_t) vd.update_every_s,
-                .size = (size_t) ((page_data == DBENGINE_EMPTY_PAGE) ? 0 : vd.page_length),
+                .size = pgd_footprint(page_data), // the footprint of the page data, for accurate memory management
                 .data = page_data
         };
 
         bool added = true;
         PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
         if (false == added) {
-            dbengine_page_free(page_data, vd.page_length);
+            pgd_free(page_data);
             stats_cache_hit_while_inserting++;
             stats_data_from_main_cache++;
         }
@@ -1081,8 +1083,8 @@ static bool epdl_populate_pages_from_extent_data(
                 pgc_page_dup(main_cache, page);
 
             pd->page = page;
-            pd->page_length = pgc_page_data_size(main_cache, page);
-            pdc_page_status_set(pd, PDC_PAGE_READY | tags | ((page_data == DBENGINE_EMPTY_PAGE) ? PDC_PAGE_EMPTY : 0));
+            pd->page_length = pgd_length(pgc_page_data(page)); // the actual size of the page data
+            pdc_page_status_set(pd, PDC_PAGE_READY | tags | (pgd_is_empty(page_data) ? PDC_PAGE_EMPTY : 0));
 
             pd = pd->load.next;
         } while(pd);

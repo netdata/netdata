@@ -12,8 +12,9 @@ struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats = {};
 static void main_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
 {
     // Release storage associated with the page
-    dbengine_page_free(entry.data, entry.size);
+    pgd_free(entry.data);
 }
+
 static void main_cache_flush_dirty_page_init_callback(PGC *cache __maybe_unused, Word_t section) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
 
@@ -53,7 +54,7 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
             error_limit(&erl, "DBENGINE: page exceeds the maximum size, adjusting it to max.");
         }
 
-        descr->page = pgc_page_data(pages_array[Index]);
+        descr->page = pgd_raw_data_pointer(pgc_page_data(pages_array[Index]));
         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(base, descr, link.prev, link.next);
 
         internal_fatal(descr->page_length > RRDENG_BLOCK_SIZE, "DBENGINE: faulty page length calculation");
@@ -254,7 +255,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
         time_t page_start_time_s = pgc_page_start_time_s(page);
         time_t page_end_time_s = pgc_page_end_time_s(page);
         time_t page_update_every_s = pgc_page_update_every_s(page);
-        size_t page_length = pgc_page_data_size(cache, page);
+        size_t page_length = pgd_length(pgc_page_data(page));
 
         if(!page_update_every_s)
             page_update_every_s = dt_s;
@@ -312,7 +313,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
             if((pd->page)) {
                 pd->status |= PDC_PAGE_READY | PDC_PAGE_PRELOADED;
 
-                if(pgc_page_data(page) == DBENGINE_EMPTY_PAGE)
+                if(pgd_is_empty(pgc_page_data(page)))
                     pd->status |= PDC_PAGE_EMPTY;
             }
 
@@ -369,7 +370,7 @@ static void pgc_inject_gap(struct rrdengine_instance *ctx, METRIC *metric, time_
             .end_time_s = MIN(end_time_s, db_last_time_s),
             .update_every_s = 0,
             .size = 0,
-            .data = DBENGINE_EMPTY_PAGE,
+            .data = PGD_EMPTY,
     };
 
     if(page_entry.start_time_s >= page_entry.end_time_s)
@@ -478,7 +479,7 @@ static size_t list_has_time_gaps(
                 pd->status &= ~PDC_PAGE_DISK_PENDING;
                 pd->status |= PDC_PAGE_READY | PDC_PAGE_PRELOADED | PDC_PAGE_PRELOADED_PASS4;
 
-                if(pgc_page_data(pd->page) == DBENGINE_EMPTY_PAGE)
+                if(pgd_is_empty(pgc_page_data(pd->page)))
                     pd->status |= PDC_PAGE_EMPTY;
 
             }
@@ -917,7 +918,7 @@ struct pgc_page *pg_cache_lookup_next(
             }
         }
 
-        if(page && pgc_page_data(page) == DBENGINE_EMPTY_PAGE)
+        if(page && pgd_is_empty(pgc_page_data(page)))
                 pdc_page_status_set(pd, PDC_PAGE_EMPTY);
 
         if(!page || pdc_page_status_check(pd, PDC_PAGE_QUERY_GLOBAL_SKIP_LIST | PDC_PAGE_EMPTY)) {
@@ -930,7 +931,7 @@ struct pgc_page *pg_cache_lookup_next(
         time_t page_start_time_s = pgc_page_start_time_s(page);
         time_t page_end_time_s = pgc_page_end_time_s(page);
         time_t page_update_every_s = pgc_page_update_every_s(page);
-        size_t page_length = pgc_page_data_size(main_cache, page);
+        size_t page_length = pgd_length(pgc_page_data(page));
 
         if(unlikely(page_start_time_s == INVALID_TIME || page_end_time_s == INVALID_TIME)) {
             __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_zero_time_skipped, 1, __ATOMIC_RELAXED);

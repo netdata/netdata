@@ -292,49 +292,13 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
     return (STORAGE_COLLECT_HANDLE *)handle;
 }
 
-/* The page must be populated and referenced */
-static bool page_has_only_empty_metrics(struct rrdeng_collect_handle *handle) {
-    switch(handle->type) {
-        case PAGE_METRICS: {
-            size_t slots = handle->page_position;
-            storage_number *array = (storage_number *)pgc_page_data(handle->pgc_page);
-            for (size_t i = 0 ; i < slots; ++i) {
-                if(does_storage_number_exist(array[i]))
-                    return false;
-            }
-        }
-        break;
-
-        case PAGE_TIER: {
-            size_t slots = handle->page_position;
-            storage_number_tier1_t *array = (storage_number_tier1_t *)pgc_page_data(handle->pgc_page);
-            for (size_t i = 0 ; i < slots; ++i) {
-                if(fpclassify(array[i].sum_value) != FP_NAN)
-                    return false;
-            }
-        }
-        break;
-
-        default: {
-            static bool logged = false;
-            if(!logged) {
-                netdata_log_error("DBENGINE: cannot check page for nulls on unknown page type id %d", handle->ctx->config.page_type);
-                logged = true;
-            }
-            return false;
-        }
-    }
-
-    return true;
-}
-
 void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle) {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
 
     if (unlikely(!handle->pgc_page))
         return;
 
-    if(!handle->page_position || page_has_only_empty_metrics(handle))
+    if(pgd_is_empty(handle->page_data))
         pgc_page_to_clean_evict_or_release(main_cache, handle->pgc_page);
 
     else {
@@ -366,7 +330,7 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
 static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *handle,
                                                 struct rrdengine_instance *ctx,
                                                 usec_t point_in_time_ut,
-                                                void *data,
+                                                PGD *data,
                                                 size_t data_size) {
     time_t point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
     const time_t update_every_s = (time_t)(handle->update_every_ut / USEC_PER_SEC);
@@ -403,7 +367,7 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
                     uuid,
                     page_entry.start_time_s, page_entry.end_time_s, (time_t)page_entry.update_every_s,
                     pgc_is_page_hot(pgc_page) ? "hot" : "not-hot",
-                    pgc_page_data(pgc_page) == DBENGINE_EMPTY_PAGE ? " gap" : "",
+                    pgc_page_data(pgc_page) == PGD_EMPTY ? " gap" : "",
                     pgc_page_start_time_s(pgc_page), pgc_page_end_time_s(pgc_page), pgc_page_update_every_s(pgc_page)
               );
 
@@ -447,8 +411,13 @@ static size_t aligned_allocation_entries(size_t max_slots, size_t target_slot, t
     return slots;
 }
 
+<<<<<<< HEAD
 static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, size_t *data_size, usec_t point_in_time_ut) {
     struct rrdengine_instance *ctx = handle->ctx;
+=======
+static PGD *rrdeng_alloc_new_page_data(struct rrdeng_collect_handle *handle, size_t *data_size, usec_t point_in_time_ut) {
+    struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
+>>>>>>> c331fd018 (first working prototype)
 
     size_t max_size = tier_page_size[ctx->config.tier];
     size_t max_slots = max_size / CTX_POINT_SIZE_BYTES(ctx);
@@ -473,7 +442,7 @@ static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, 
     internal_fatal(size > tier_page_size[ctx->config.tier] || size < CTX_POINT_SIZE_BYTES(ctx) * 2, "ooops! wrong page size");
 
     *data_size = size;
-    void *d = dbengine_page_alloc(size);
+    PGD *d = pgd_create(ctx->config.page_type, slots);
 
     timing_step(TIMING_STEP_DBENGINE_PAGE_ALLOC);
 
@@ -493,26 +462,14 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
     struct rrdengine_instance *ctx = handle->ctx;
 
     if(unlikely(!handle->page_data))
-        handle->page_data = rrdeng_alloc_new_metric_data(handle, &handle->page_data_size, point_in_time_ut);
+        handle->page_data = rrdeng_alloc_new_page_data(handle, &handle->page_data_size, point_in_time_ut);
 
     timing_step(TIMING_STEP_DBENGINE_CHECK_DATA);
 
-    if(likely(ctx->config.page_type == PAGE_METRICS)) {
-        storage_number *tier0_metric_data = handle->page_data;
-        tier0_metric_data[handle->page_position] = pack_storage_number(n, flags);
-    }
-    else if(likely(ctx->config.page_type == PAGE_TIER)) {
-        storage_number_tier1_t *tier12_metric_data = handle->page_data;
-        storage_number_tier1_t number_tier1;
-        number_tier1.sum_value = (float) n;
-        number_tier1.min_value = (float) min_value;
-        number_tier1.max_value = (float) max_value;
-        number_tier1.anomaly_count = anomaly_count;
-        number_tier1.count = count;
-        tier12_metric_data[handle->page_position] = number_tier1;
-    }
-    else
-        fatal("DBENGINE: cannot store metric on unknown page type id %d", ctx->config.page_type);
+    pgd_append_point(handle->page_data,
+                     point_in_time_ut,
+                     n, min_value, max_value, count, anomaly_count, flags,
+                     handle->page_position);
 
     timing_step(TIMING_STEP_DBENGINE_PACK);
 
@@ -813,6 +770,7 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_han
         // we have a page to release
         pgc_page_release(main_cache, handle->page);
         handle->page = NULL;
+        pgdc_clear(&handle->pgdc);
     }
 
     if (unlikely(handle->now_s > rrddim_handle->end_time_s))
@@ -821,10 +779,10 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_han
     size_t entries = 0;
     handle->page = pg_cache_lookup_next(ctx, handle->pdc, handle->now_s, handle->dt_s, &entries);
 
-    internal_fatal(handle->page && (pgc_page_data(handle->page) == DBENGINE_EMPTY_PAGE || !entries),
+    internal_fatal((handle->page && pgc_page_data(handle->page) == PGD_EMPTY) || !entries,
                    "A page was returned, but it is empty - pg_cache_lookup_next() should be handling this case");
 
-    if (unlikely(!handle->page || pgc_page_data(handle->page) == DBENGINE_EMPTY_PAGE || !entries))
+    if (unlikely(!handle->page || pgc_page_data(handle->page) == PGD_EMPTY || !entries))
         return false;
 
     time_t page_start_time_s = pgc_page_start_time_s(handle->page);
@@ -865,8 +823,10 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_han
 
     handle->entries = entries;
     handle->position = position;
-    handle->metric_data = pgc_page_data((PGC_PAGE *)handle->page);
     handle->dt_s = page_update_every_s;
+
+    pgdc_reset(&handle->pgdc, pgc_page_data((PGC_PAGE *)handle->page), position);
+
     return true;
 }
 
@@ -895,38 +855,7 @@ STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim
     sp.start_time_s = handle->now_s - handle->dt_s;
     sp.end_time_s = handle->now_s;
 
-    switch(handle->ctx->config.page_type) {
-        case PAGE_METRICS: {
-            storage_number n = handle->metric_data[handle->position];
-            sp.min = sp.max = sp.sum = unpack_storage_number(n);
-            sp.flags = n & SN_USER_FLAGS;
-            sp.count = 1;
-            sp.anomaly_count = is_storage_number_anomalous(n) ? 1 : 0;
-        }
-        break;
-
-        case PAGE_TIER: {
-            storage_number_tier1_t tier1_value = ((storage_number_tier1_t *)handle->metric_data)[handle->position];
-            sp.flags = tier1_value.anomaly_count ? SN_FLAG_NONE : SN_FLAG_NOT_ANOMALOUS;
-            sp.count = tier1_value.count;
-            sp.anomaly_count = tier1_value.anomaly_count;
-            sp.min = tier1_value.min_value;
-            sp.max = tier1_value.max_value;
-            sp.sum = tier1_value.sum_value;
-        }
-        break;
-
-        // we don't know this page type
-        default: {
-            static bool logged = false;
-            if(!logged) {
-                netdata_log_error("DBENGINE: unknown page type %d found. Cannot decode it. Ignoring its metrics.", handle->ctx->config.page_type);
-                logged = true;
-            }
-            storage_point_empty(sp, sp.start_time_s, sp.end_time_s);
-        }
-        break;
-    }
+    pgdc_get_next_point(&handle->pgdc, handle->position, &sp);
 
 prepare_for_next_iteration:
     internal_fatal(sp.end_time_s < rrddim_handle->start_time_s, "DBENGINE: this point is too old for this query");
@@ -950,8 +879,10 @@ void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrddim_hand
 {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrddim_handle->handle;
 
-    if (handle->page)
+    if (handle->page) {
         pgc_page_release(main_cache, handle->page);
+        pgdc_clear(&handle->pgdc);
+    }
 
     if(!pdc_release_and_destroy_if_unreferenced(handle->pdc, false, false))
         __atomic_store_n(&handle->pdc->workers_should_stop, true, __ATOMIC_RELAXED);
