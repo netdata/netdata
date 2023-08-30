@@ -846,7 +846,7 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
     }
     for (i = 0 ; i < count ; ++i) {
         descr = xt_io_descr->descr_array[i];
-        (void) memcpy(xt_io_descr->buf + pos, descr->page, descr->page_length);
+        pgd_copy_to_extent(descr->pgd, xt_io_descr->buf + pos, descr->page_length);
         pos += descr->page_length;
     }
 

@@ -29,8 +29,6 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
 
      struct rrdengine_instance *ctx = (struct rrdengine_instance *) entries_array[0].section;
 
-    size_t bytes_per_point =  CTX_POINT_SIZE_BYTES(ctx);
-
     struct page_descr_with_data *base = NULL;
 
     for (size_t Index = 0 ; Index < entries; Index++) {
@@ -43,18 +41,11 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
         descr->start_time_ut = start_time_s * USEC_PER_SEC;
         descr->end_time_ut = end_time_s * USEC_PER_SEC;
         descr->update_every_s = entries_array[Index].update_every_s;
-        descr->type = ctx->config.page_type;
 
-        descr->page_length = (end_time_s - (start_time_s - descr->update_every_s)) / descr->update_every_s * bytes_per_point;
+        descr->pgd = pgc_page_data(pages_array[Index]);
+        descr->type = pgd_type(descr->pgd);
+        descr->page_length = pgd_disk_footprint_size(descr->pgd);
 
-        if(descr->page_length > entries_array[Index].size) {
-            descr->page_length = entries_array[Index].size;
-
-            error_limit_static_global_var(erl, 1, 0);
-            error_limit(&erl, "DBENGINE: page exceeds the maximum size, adjusting it to max.");
-        }
-
-        descr->page = pgd_raw_data_pointer(pgc_page_data(pages_array[Index]));
         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(base, descr, link.prev, link.next);
 
         internal_fatal(descr->page_length > RRDENG_BLOCK_SIZE, "DBENGINE: faulty page length calculation");
@@ -255,7 +246,6 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
         time_t page_start_time_s = pgc_page_start_time_s(page);
         time_t page_end_time_s = pgc_page_end_time_s(page);
         time_t page_update_every_s = pgc_page_update_every_s(page);
-        size_t page_length = pgd_length(pgc_page_data(page));
 
         if(!page_update_every_s)
             page_update_every_s = dt_s;
@@ -278,24 +268,10 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
         if (!PValue || PValue == PJERR)
             fatal("DBENGINE: corrupted judy array in %s()", __FUNCTION__ );
 
-        if (unlikely(*PValue)) {
-            struct page_details *pd = *PValue;
-            UNUSED(pd);
-
-//            internal_error(
-//                    pd->first_time_s != page_first_time_s ||
-//                    pd->last_time_s != page_last_time_s ||
-//                    pd->update_every_s != page_update_every_s,
-//                    "DBENGINE: duplicate page with different retention in %s cache "
-//                    "1st: %ld to %ld, ue %u, size %u "
-//                    "2nd: %ld to %ld, ue %ld size %zu "
-//                    "- ignoring the second",
-//                    cache == open_cache ? "open" : "main",
-//                    pd->first_time_s, pd->last_time_s, pd->update_every_s, pd->page_length,
-//                    page_first_time_s, page_last_time_s, page_update_every_s, page_length);
-
+        if (unlikely(*PValue))
+            // already exists in our list
             pgc_page_release(cache, page);
-        }
+
         else {
 
             internal_fatal(pgc_page_metric(page) != metric_id, "Wrong metric id in page found in cache");
@@ -305,7 +281,6 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
             pd->metric_id = metric_id;
             pd->first_time_s = page_start_time_s;
             pd->last_time_s = page_end_time_s;
-            pd->page_length = page_length;
             pd->update_every_s = (uint32_t) page_update_every_s;
             pd->page = (open_cache_mode) ? NULL : page;
             pd->status |= tags;
@@ -643,7 +618,6 @@ void add_page_details_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
     pd->first_time_s = pgc_page_start_time_s(page);
     pd->last_time_s = pgc_page_end_time_s(page);
     pd->datafile.ptr = datafile;
-    pd->page_length = ei->page_length;
     pd->update_every_s = (uint32_t) pgc_page_update_every_s(page);
     pd->metric_id = metric_id;
     pd->status |= PDC_PAGE_DISK_PENDING | PDC_PAGE_SOURCE_JOURNAL_V2 | PDC_PAGE_DATAFILE_ACQUIRED;
@@ -931,17 +905,9 @@ struct pgc_page *pg_cache_lookup_next(
         time_t page_start_time_s = pgc_page_start_time_s(page);
         time_t page_end_time_s = pgc_page_end_time_s(page);
         time_t page_update_every_s = pgc_page_update_every_s(page);
-        size_t page_length = pgd_length(pgc_page_data(page));
 
         if(unlikely(page_start_time_s == INVALID_TIME || page_end_time_s == INVALID_TIME)) {
             __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_zero_time_skipped, 1, __ATOMIC_RELAXED);
-            pgc_page_to_clean_evict_or_release(main_cache, page);
-            pdc_page_status_set(pd, PDC_PAGE_INVALID | PDC_PAGE_RELEASED);
-            pd->page = page = NULL;
-            continue;
-        }
-        else if(page_length > RRDENG_BLOCK_SIZE) {
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_invalid_size_skipped, 1, __ATOMIC_RELAXED);
             pgc_page_to_clean_evict_or_release(main_cache, page);
             pdc_page_status_set(pd, PDC_PAGE_INVALID | PDC_PAGE_RELEASED);
             pd->page = page = NULL;
@@ -954,7 +920,7 @@ struct pgc_page *pg_cache_lookup_next(
                 pd->update_every_s = (uint32_t) page_update_every_s;
             }
 
-            size_t entries_by_size = page_entries_by_size(page_length, CTX_POINT_SIZE_BYTES(ctx));
+            size_t entries_by_size = pgd_slots_used(pgc_page_data(page));
             size_t entries_by_time = page_entries_by_time(page_start_time_s, page_end_time_s, page_update_every_s);
             if(unlikely(entries_by_size < entries_by_time)) {
                 time_t fixed_page_end_time_s = (time_t)(page_start_time_s + (entries_by_size - 1) * page_update_every_s);

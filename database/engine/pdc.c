@@ -1020,16 +1020,16 @@ static bool epdl_populate_pages_from_extent_data(
         if(worker)
             worker_is_busy(UV_EVENT_DBENGINE_EXTENT_PAGE_ALLOCATION);
 
-        PGD *page_data;
+        PGD *pgd;
 
         if (unlikely(!vd.is_valid)) {
-            page_data = PGD_EMPTY;
+            pgd = PGD_EMPTY;
             stats_load_invalid_page++;
         }
         else {
             if (RRD_NO_COMPRESSION == header->compression_algorithm) {
-                page_data = pgd_create_and_copy(header->descr[i].type,
-                                                data + payload_offset + page_offset,
+                pgd = pgd_create_from_disk_data(header->descr[i].type,
+                                                      data + payload_offset + page_offset,
                                                 vd.page_length);
                 stats_load_uncompressed++;
             }
@@ -1041,11 +1041,11 @@ static bool epdl_populate_pages_from_extent_data(
                                         i, count, page_offset, vd.page_length, uncompressed_payload_length);
                     epdl_extent_loading_error_log(ctx, epdl, &header->descr[i], log);
 
-                    page_data = PGD_EMPTY;
+                    pgd = PGD_EMPTY;
                     stats_load_invalid_page++;
                 }
                 else {
-                    page_data = pgd_create_and_copy(header->descr[i].type,
+                    pgd = pgd_create_from_disk_data(header->descr[i].type,
                                                     uncompressed_buf + page_offset,
                                                     vd.page_length);
                     stats_load_compressed++;
@@ -1063,14 +1063,14 @@ static bool epdl_populate_pages_from_extent_data(
                 .start_time_s = vd.start_time_s,
                 .end_time_s = vd.end_time_s,
                 .update_every_s = (uint32_t) vd.update_every_s,
-                .size = pgd_footprint(page_data), // the footprint of the page data, for accurate memory management
-                .data = page_data
+                .size = pgd_memory_footprint(pgd), // the footprint of the entire PGD, for accurate memory management
+                .data = pgd,
         };
 
         bool added = true;
         PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
         if (false == added) {
-            pgd_free(page_data);
+            pgd_free(pgd);
             stats_cache_hit_while_inserting++;
             stats_data_from_main_cache++;
         }
@@ -1083,8 +1083,7 @@ static bool epdl_populate_pages_from_extent_data(
                 pgc_page_dup(main_cache, page);
 
             pd->page = page;
-            pd->page_length = pgd_length(pgc_page_data(page)); // the actual size of the page data
-            pdc_page_status_set(pd, PDC_PAGE_READY | tags | (pgd_is_empty(page_data) ? PDC_PAGE_EMPTY : 0));
+            pdc_page_status_set(pd, PDC_PAGE_READY | tags | (pgd_is_empty(pgd) ? PDC_PAGE_EMPTY : 0));
 
             pd = pd->load.next;
         } while(pd);
