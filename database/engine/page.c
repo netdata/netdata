@@ -3,7 +3,9 @@
 #include "page.h"
 
 typedef enum __attribute__((packed)) {
-    PAGE_OPTION_ALL_VALUES_EMPTY = (1 << 0),
+    PAGE_OPTION_ALL_VALUES_EMPTY    = (1 << 0),
+    PAGE_OPTION_READ_ONLY           = (1 << 1),
+    PAGE_OPTION_ON_DISK             = (1 << 2),
 } PAGE_OPTIONS;
 
 struct pgd {
@@ -14,13 +16,11 @@ struct pgd {
     uint32_t slots;         // the total number of slots available in the page
 
     uint32_t size;          // the size of data in bytes
-
-    usec_t page_start_time_ut; // the first timestamp on the page
-
     uint8_t data[];         // the data of the page
 };
 
 // ----------------------------------------------------------------------------
+// memory management
 
 struct {
     ARAL *aral[RRD_STORAGE_TIERS];
@@ -67,16 +67,35 @@ static inline void pgd_free_internal(void *page, size_t size __maybe_unused) {
 }
 
 // ----------------------------------------------------------------------------
+// utility functions
 
 inline bool pgd_is_empty(PGD *pg) {
     return pg == PGD_EMPTY || !pg->used || (pg->options & PAGE_OPTION_ALL_VALUES_EMPTY);
+}
+
+inline uint32_t pgd_memory_footprint(PGD *pg) {
+    if(pg && pg != PGD_EMPTY)
+        return sizeof(PGD) + pg->size;
+
+    return 0;
+}
+
+inline uint32_t pgd_type(PGD *pg) {
+    return pg->type;
+}
+
+inline uint32_t pgd_slots_used(PGD *pg) {
+    if(pg && pg != PGD_EMPTY)
+        return pg->used;
+
+    return 0;
 }
 
 // ----------------------------------------------------------------------------
 // data collection
 
 inline void pgd_append_point(PGD *pg,
-                      usec_t point_in_time_ut,
+                      usec_t point_in_time_ut __maybe_unused,
                       NETDATA_DOUBLE n,
                       NETDATA_DOUBLE min_value,
                       NETDATA_DOUBLE max_value,
@@ -93,8 +112,7 @@ inline void pgd_append_point(PGD *pg,
         fatal("DBENGINE: page is not aligned to expected slot (used %u, expected %u)",
               pg->used, expected_slot);
 
-    if(unlikely(!pg->used))
-        pg->page_start_time_ut = point_in_time_ut;
+    internal_fatal(pg->options & (PAGE_OPTION_READ_ONLY|PAGE_OPTION_ON_DISK), "Data collection on read-only page");
 
     switch(pg->type) {
         case PAGE_METRICS: {
@@ -129,7 +147,7 @@ inline void pgd_append_point(PGD *pg,
 }
 
 // ----------------------------------------------------------------------------
-// management
+// management api
 
 inline PGD *pgd_create(uint8_t type, uint32_t slots) {
     uint32_t size = slots * page_type_size[type];
@@ -152,6 +170,9 @@ inline void pgd_free(PGD *pg) {
         pgd_free_internal(pg, sizeof(PGD) + pg->size);
 }
 
+// ----------------------------------------------------------------------------
+// loading from disk
+
 inline PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size) {
     if(!size || size < page_type_size[type])
         return PGD_EMPTY;
@@ -161,29 +182,11 @@ inline PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size) {
     pg->size = size;
     pg->used = size / page_type_size[type];
     pg->slots = pg->used;
-    pg->options = 0;
+    pg->options = PAGE_OPTION_READ_ONLY | PAGE_OPTION_ON_DISK;
 
     memcpy(pg->data, base, size);
 
     return pg;
-}
-
-inline uint32_t pgd_memory_footprint(PGD *pg) {
-    if(pg && pg != PGD_EMPTY)
-        return sizeof(PGD) + pg->size;
-
-    return 0;
-}
-
-inline uint32_t pgd_type(PGD *pg) {
-    return pg->type;
-}
-
-inline uint32_t pgd_slots_used(PGD *pg) {
-    if(pg && pg != PGD_EMPTY)
-        return pg->used;
-
-    return 0;
 }
 
 // ----------------------------------------------------------------------------
@@ -196,6 +199,8 @@ inline uint32_t pgd_disk_footprint_size(PGD *pg) {
         used_size = pg->used * page_type_size[pg->type];
 
         internal_fatal(used_size > pg->size, "Wrong disk footprint page size");
+
+        pg->options |= PAGE_OPTION_READ_ONLY;
     }
 
     return used_size;
@@ -206,10 +211,11 @@ inline void pgd_copy_to_extent(PGD *pg, uint8_t *dst, uint32_t dst_size) {
                    pgd_disk_footprint_size(pg), dst_size);
 
     memcpy(dst, pg->data, dst_size);
+    pg->options |= PAGE_OPTION_ON_DISK;
 }
 
 // ----------------------------------------------------------------------------
-// querying
+// querying with cursor
 
 static inline void pgdc_seek(PGDC *pgdc) {
     ;
